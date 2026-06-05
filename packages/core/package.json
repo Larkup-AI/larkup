@@ -15,21 +15,12 @@
     "./indexing/indexer": "./src/indexing/indexer.ts",
     "./indexing/embedder": "./src/indexing/embedder.ts",
     "./indexing/chunker": "./src/indexing/chunker.ts",
-    "./vector-stores/adapter": "./src/vector-stores/adapter.ts",
-    "./vector-stores/factory": "./src/vector-stores/factory.ts",
-    "./vector-stores/registry": "./src/vector-stores/registry.ts",
-    "./vector-stores/lancedb-adapter": "./src/vector-stores/lancedb-adapter.ts",
-    "./vector-stores/pinecone-adapter": "./src/vector-stores/pinecone-adapter.ts",
-    "./scraper/firecrawl": "./src/scraper/firecrawl.ts",
-    "./scraper/job-runner": "./src/scraper/job-runner.ts",
-    "./scraper/local-runtime": "./src/scraper/local-runtime.ts",
     "./generator/generate-server": "./src/generator/generate-server.ts",
     "./generator/server-runtime": "./src/generator/server-runtime.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.68",
-    "@lancedb/lancedb": "^0.30.0",
-    "@pinecone-database/pinecone": "^7.2.0",
+    "@buddy-rag/vector-stores": "workspace:*",
     "ai": "^6.0.197"
   },
   "devDependencies": {

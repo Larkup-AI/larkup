@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { readConfig, writeConfig } from "@buddy-rag/core/config-store"
-import { getVectorStore, validateStoreConfig } from "@buddy-rag/core/vector-stores/registry"
+import { getVectorStore, validateStoreConfig } from "@buddy-rag/vector-stores/registry"
 import { getEmbeddingModel } from "@buddy-rag/core/embeddings/registry"
 import type { RagConfig } from "@buddy-rag/core/types"
 

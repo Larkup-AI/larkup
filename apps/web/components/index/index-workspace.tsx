@@ -23,7 +23,7 @@ import type {
   VectorStoreId,
 } from "@buddy-rag/core/types";
 import { getEmbeddingModel } from "@buddy-rag/core/embeddings/registry";
-import { getVectorStore } from "@buddy-rag/core/vector-stores/registry";
+import { getVectorStore } from "@buddy-rag/vector-stores/registry";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";

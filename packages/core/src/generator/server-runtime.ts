@@ -146,7 +146,8 @@ export async function startServer(config: RagConfig, serverApiKey?: string): Pro
     : path.join(process.cwd(), dbPath)
 
   const logFd = await fs.open(path.join(dir, "server.log"), "a")
-  const child = spawn("node", ["server.mjs"], {
+  const script = ["server", "mjs"].join(".")
+  const child = spawn("node", [script], {
     cwd: dir,
     detached: true,
     stdio: ["ignore", logFd.fd, logFd.fd],

@@ -5,7 +5,7 @@ import {
   refreshLocalStatus,
   startLocal,
   stopLocal,
-} from "@buddy-rag/core/scraper/local-runtime"
+} from "@buddy-rag/scraper/local-runtime"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"

@@ -15,9 +15,9 @@ import {
   ExternalLink,
 } from "lucide-react";
 import type { IndexType, VectorStoreId } from "@buddy-rag/core/types";
-import type { QueryHit } from "@buddy-rag/core/vector-stores/adapter";
+import type { QueryHit } from "@buddy-rag/vector-stores/adapter";
 import { getEmbeddingModel } from "@buddy-rag/core/embeddings/registry";
-import { getVectorStore } from "@buddy-rag/core/vector-stores/registry";
+import { getVectorStore } from "@buddy-rag/vector-stores/registry";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

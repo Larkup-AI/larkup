@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { visibleFields } from "@buddy-rag/core/vector-stores/registry"
+import { visibleFields } from "@buddy-rag/vector-stores/registry"
 import type { IndexType, VectorStoreDescriptor } from "@buddy-rag/core/types"
 
 interface StoreFieldsProps {

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { randomUUID } from "node:crypto"
 import { readJobs, saveJob } from "@buddy-rag/core/jobs-store"
-import { syncJob } from "@buddy-rag/core/scraper/job-runner"
-import { isFirecrawlConfigured } from "@buddy-rag/core/scraper/firecrawl"
+import { syncJob } from "@buddy-rag/scraper/job-runner"
+import { isFirecrawlConfigured } from "@buddy-rag/scraper/firecrawl"
 import type { CrawlJob, CrawlScope, CrawlTarget } from "@buddy-rag/core/types"
 
 export const runtime = "nodejs"

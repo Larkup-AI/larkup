@@ -8,7 +8,8 @@
     "rag": "tsx src/index.ts"
   },
   "dependencies": {
-    "@buddy-rag/core": "workspace:*"
+    "@buddy-rag/core": "workspace:*",
+    "@buddy-rag/vector-stores": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.22.4",

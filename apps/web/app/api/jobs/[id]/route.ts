@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { deleteJob, getJob } from "@buddy-rag/core/jobs-store"
-import { cancelJob, syncJob } from "@buddy-rag/core/scraper/job-runner"
+import { cancelJob, syncJob } from "@buddy-rag/scraper/job-runner"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"

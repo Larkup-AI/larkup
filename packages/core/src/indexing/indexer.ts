@@ -4,8 +4,8 @@ import { readDocuments } from "../documents-store"
 import { patchRun, writeRun } from "../index-store"
 import { chunkCorpus } from "./chunker"
 import { embedTexts, expectedDimensions } from "./embedder"
-import { createAdapter } from "../vector-stores/factory"
-import type { VectorRecord } from "../vector-stores/adapter"
+import { createAdapter } from "@buddy-rag/vector-stores/factory"
+import type { VectorRecord } from "@buddy-rag/vector-stores/adapter"
 
 /**
  * The indexing pipeline: corpus → chunks → embeddings → vector store.

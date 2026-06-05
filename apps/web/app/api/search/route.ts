@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { searchWeb, isFirecrawlConfigured, FirecrawlError } from "@buddy-rag/core/scraper/firecrawl"
+import { searchWeb, isFirecrawlConfigured, FirecrawlError } from "@buddy-rag/scraper/firecrawl"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"

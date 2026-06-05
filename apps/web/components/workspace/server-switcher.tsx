@@ -88,7 +88,7 @@ export function ServerSwitcher() {
                       <span>{s.docCount} docs</span>
                       {s.indexed && <span>· indexed</span>}
                       {s.running && (
-                        <span className="flex items-center gap-1 text-primary">
+                        <span className="flex items-center gap-1 text-green-500">
                           <RunningDot />
                           live
                         </span>
@@ -156,8 +156,8 @@ export function ServerSwitcher() {
 function RunningDot() {
   return (
     <span className="relative flex size-2">
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-      <span className="relative inline-flex size-2 rounded-full bg-primary" />
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+      <span className="relative inline-flex size-2 rounded-full bg-green-500" />
     </span>
   );
 }

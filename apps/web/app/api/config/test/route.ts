@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { getVectorStore, validateStoreConfig } from "@buddy-rag/core/vector-stores/registry"
-import { createAdapter } from "@buddy-rag/core/vector-stores/factory"
+import { getVectorStore, validateStoreConfig } from "@buddy-rag/vector-stores/registry"
+import { createAdapter } from "@buddy-rag/vector-stores/factory"
 import type { RagConfig } from "@buddy-rag/core/types"
 
 // Uses node:fs — must run on the Node.js runtime, not edge.

@@ -17,6 +17,9 @@ importers:
       '@buddy-rag/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@buddy-rag/vector-stores':
+        specifier: workspace:*
+        version: link:../../packages/vector-stores
     devDependencies:
       tsx:
         specifier: ^4.22.4
@@ -36,6 +39,12 @@ importers:
       '@buddy-rag/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@buddy-rag/scraper':
+        specifier: workspace:*
+        version: link:../../packages/scraper
+      '@buddy-rag/vector-stores':
+        specifier: workspace:*
+        version: link:../../packages/vector-stores
       '@codemirror/lang-javascript':
         specifier: ^6.2.5
         version: 6.2.5
@@ -127,15 +136,38 @@ importers:
       '@ai-sdk/openai':
         specifier: ^3.0.68
         version: 3.0.68(zod@3.25.76)
+      '@buddy-rag/vector-stores':
+        specifier: workspace:*
+        version: link:../vector-stores
+      ai:
+        specifier: ^6.0.197
+        version: 6.0.197(zod@3.25.76)
+    devDependencies:
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/scraper:
+    dependencies:
+      '@buddy-rag/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/vector-stores:
+    dependencies:
+      '@buddy-rag/core':
+        specifier: workspace:*
+        version: link:../core
       '@lancedb/lancedb':
         specifier: ^0.30.0
         version: 0.30.0(apache-arrow@18.1.0)
       '@pinecone-database/pinecone':
         specifier: ^7.2.0
         version: 7.2.0
-      ai:
-        specifier: ^6.0.197
-        version: 6.0.197(zod@3.25.76)
     devDependencies:
       typescript:
         specifier: 5.7.3

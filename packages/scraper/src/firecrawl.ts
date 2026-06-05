@@ -1,4 +1,4 @@
-import type { SearchResultItem } from "../types"
+import type { SearchResultItem } from "@buddy-rag/core/types"
 import { readLocalState } from "./local-runtime"
 
 /**

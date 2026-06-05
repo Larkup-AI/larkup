@@ -1,0 +1,17 @@
+{
+  "name": "@buddy-rag/scraper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./firecrawl": "./src/firecrawl.ts",
+    "./job-runner": "./src/job-runner.ts",
+    "./local-runtime": "./src/local-runtime.ts"
+  },
+  "dependencies": {
+    "@buddy-rag/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "5.7.3"
+  }
+}

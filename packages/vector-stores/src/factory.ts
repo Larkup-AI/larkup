@@ -1,4 +1,4 @@
-import type { RagConfig } from "../types"
+import type { RagConfig } from "@buddy-rag/core/types"
 import type { VectorStoreAdapter } from "./adapter"
 
 /**

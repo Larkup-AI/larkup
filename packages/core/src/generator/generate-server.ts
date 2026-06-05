@@ -1,5 +1,5 @@
 import type { RagConfig } from "../types"
-import { getVectorStore } from "../vector-stores/registry"
+import { getVectorStore } from "@buddy-rag/vector-stores/registry"
 import { getEmbeddingModel } from "../embeddings/registry"
 
 /**

@@ -50,7 +50,7 @@ import {
   getVectorStore,
   validateStoreConfig,
   VECTOR_STORE_LIST,
-} from "@buddy-rag/core/vector-stores/registry";
+} from "@buddy-rag/vector-stores/registry";
 import { StoreFields } from "@/components/configure/store-fields";
 
 const fetcher = (url: string) =>

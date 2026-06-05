@@ -22,7 +22,7 @@ import type {
   GeneratedFile,
   GeneratedServer,
 } from "@buddy-rag/core/generator/generate-server";
-import { getVectorStore } from "@buddy-rag/core/vector-stores/registry";
+import { getVectorStore } from "@buddy-rag/vector-stores/registry";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

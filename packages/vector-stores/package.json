@@ -1,0 +1,21 @@
+{
+  "name": "@buddy-rag/vector-stores",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./adapter": "./src/adapter.ts",
+    "./factory": "./src/factory.ts",
+    "./registry": "./src/registry.ts",
+    "./lancedb-adapter": "./src/lancedb-adapter.ts",
+    "./pinecone-adapter": "./src/pinecone-adapter.ts"
+  },
+  "dependencies": {
+    "@buddy-rag/core": "workspace:*",
+    "@lancedb/lancedb": "^0.30.0",
+    "@pinecone-database/pinecone": "^7.2.0"
+  },
+  "devDependencies": {
+    "typescript": "5.7.3"
+  }
+}

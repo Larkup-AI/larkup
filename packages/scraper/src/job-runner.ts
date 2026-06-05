@@ -1,6 +1,6 @@
-import type { CrawlJob, CrawlJobStatus, CrawlTarget } from "../types"
-import { getJob, updateJob } from "../jobs-store"
-import { addCrawledDocuments, type NewDocumentInput } from "../documents-store"
+import type { CrawlJob, CrawlJobStatus, CrawlTarget } from "@buddy-rag/core/types"
+import { getJob, updateJob } from "@buddy-rag/core/jobs-store"
+import { addCrawledDocuments, type NewDocumentInput } from "@buddy-rag/core/documents-store"
 import {
   cancelCrawl,
   getCrawlStatus,

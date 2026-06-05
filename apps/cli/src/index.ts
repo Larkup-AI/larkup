@@ -38,9 +38,10 @@ import { readRun } from "@buddy-rag/core/index-store"
 import { generateServer } from "@buddy-rag/core/generator/generate-server"
 import { emitToDisk } from "@buddy-rag/core/generator/server-runtime"
 import { embedQuery } from "@buddy-rag/core/indexing/embedder"
-import { createAdapter } from "@buddy-rag/core/vector-stores/factory"
+import { createAdapter } from "@buddy-rag/vector-stores/factory"
+import { loadConfig } from "@buddy-rag/core/config-store"
+import { getVectorStore } from "@buddy-rag/vector-stores/registry"
 import { getEmbeddingModel } from "@buddy-rag/core/embeddings/registry"
-import { getVectorStore } from "@buddy-rag/core/vector-stores/registry"
 
 /* ------------------------------- arg parsing ----------------------------- */
 
