@@ -27,28 +27,41 @@ const CONTAINER_PREFIX = "ragtoolkit-firecrawl";
 const DEFAULT_PORT = 3002;
 const IMAGE = "ghcr.io/firecrawl/firecrawl:latest";
 
-const ELITE_PROXIES = [
-  { ip: "38.154.203.95", port: 5863, username: "ftutuguj", password: "de26hosclc1i" },
-  { ip: "198.105.121.200", port: 6462, username: "ftutuguj", password: "de26hosclc1i" },
-  { ip: "64.137.96.74", port: 6641, username: "ftutuguj", password: "de26hosclc1i" },
-  { ip: "209.127.138.10", port: 5784, username: "ftutuguj", password: "de26hosclc1i" },
-  { ip: "38.154.185.97", port: 6370, username: "ftutuguj", password: "de26hosclc1i" },
-  { ip: "84.247.60.125", port: 6095, username: "ftutuguj", password: "de26hosclc1i" },
-  { ip: "142.111.67.146", port: 5611, username: "ftutuguj", password: "de26hosclc1i" },
-  { ip: "191.96.254.138", port: 6185, username: "ftutuguj", password: "de26hosclc1i" },
-  { ip: "31.58.9.4", port: 6077, username: "ftutuguj", password: "de26hosclc1i" },
-  { ip: "104.239.107.47", port: 5699, username: "ftutuguj", password: "de26hosclc1i" }
-];
+// Webshare Rotating Proxy Endpoint (Fallback)
+// Automatically assigns a random IP from your 500+ proxy list.
+const ROTATING_PROXY = { 
+  server: "http://p.webshare.io:80", 
+  username: "ftutuguj-rotate", 
+  password: "de26hosclc1i" 
+};
 
 async function getProxy(): Promise<{ server: string; username?: string; password?: string } | null> {
-  if (ELITE_PROXIES.length === 0) return null;
-  
-  const p = ELITE_PROXIES[Math.floor(Math.random() * ELITE_PROXIES.length)];
-  return {
-    server: `http://${p.ip}:${p.port}`,
-    username: p.username,
-    password: p.password
-  };
+  // Option 1 (Most Efficient): Try reading from proxies.txt for direct connections
+  // By picking a direct IP ourselves, we bypass the rotating proxy load balancer 
+  // which slightly improves latency and avoids session stickiness.
+  try {
+    const proxiesPath = path.join(process.cwd(), "proxies.txt");
+    const raw = await fs.readFile(proxiesPath, "utf8");
+    const lines = raw.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+    if (lines.length > 0) {
+      const randomLine = lines[Math.floor(Math.random() * lines.length)];
+      const parts = randomLine.split(":");
+      
+      if (parts.length >= 4) {
+        return {
+          server: `http://${parts[0]}:${parts[1]}`,
+          username: parts[2],
+          password: parts[3]
+        };
+      }
+    }
+  } catch (err) {
+    // If proxies.txt isn't found, silently fall through to the rotating proxy
+  }
+
+  // Option 2 (Convenient Fallback): Use the Webshare rotating proxy endpoint
+  return ROTATING_PROXY;
 }
 
 export interface LocalFirecrawlState {

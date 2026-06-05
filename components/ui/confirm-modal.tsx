@@ -39,7 +39,9 @@ export function ConfirmModal({
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description && (
-            <AlertDialogDescription className="whitespace-pre-wrap">{description}</AlertDialogDescription>
+            <AlertDialogDescription className="whitespace-pre-wrap">
+              {description}
+            </AlertDialogDescription>
           )}
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -52,7 +54,7 @@ export function ConfirmModal({
             }}
             className={
               variant === "destructive"
-                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                ? "bg-destructive text-white hover:bg-destructive/90"
                 : ""
             }
           >
