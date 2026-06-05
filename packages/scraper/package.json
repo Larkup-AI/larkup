@@ -12,6 +12,7 @@
     "@buddy-rag/core": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^24.13.1",
     "typescript": "5.7.3"
   }
 }

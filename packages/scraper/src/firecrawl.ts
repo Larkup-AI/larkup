@@ -1,5 +1,5 @@
-import type { SearchResultItem } from "@buddy-rag/core/types"
-import { readLocalState } from "./local-runtime"
+import type { SearchResultItem } from "@buddy-rag/core/types";
+import { readLocalState } from "./local-runtime";
 
 /**
  * Minimal, dependency-free Firecrawl v1 client.
@@ -14,37 +14,37 @@ import { readLocalState } from "./local-runtime"
  *  2. The Firecrawl cloud via FIRECRAWL_API_KEY.
  */
 
-const CLOUD_BASE = "https://api.firecrawl.dev/v1"
+const CLOUD_BASE = "https://api.firecrawl.dev/v1";
 
 export class FirecrawlError extends Error {
   constructor(
     message: string,
     readonly status?: number,
   ) {
-    super(message)
-    this.name = "FirecrawlError"
+    super(message);
+    this.name = "FirecrawlError";
   }
 }
 
 interface Endpoint {
-  base: string
-  key: string
-  mode: "local" | "cloud"
+  base: string;
+  key: string;
+  mode: "local" | "cloud";
 }
 
 /** Resolve which Firecrawl to talk to: a running local instance wins. */
 async function resolveEndpoint(): Promise<Endpoint> {
-  const local = await readLocalState()
+  const local = await readLocalState();
   if (local.running && local.apiKey) {
-    return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: "local" }
+    return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: "local" };
   }
-  const key = process.env.FIRECRAWL_API_KEY
-  if (key) return { base: CLOUD_BASE, key, mode: "cloud" }
+  const key = process.env.FIRECRAWL_API_KEY;
+  if (key) return { base: CLOUD_BASE, key, mode: "cloud" };
 
   throw new FirecrawlError(
     "No Firecrawl available. Launch a local instance or set FIRECRAWL_API_KEY to run web search and scraping.",
     401,
-  )
+  );
 }
 
 /**
@@ -52,13 +52,13 @@ async function resolveEndpoint(): Promise<Endpoint> {
  * cloud key is set. UI uses this to show/hide the setup notice.
  */
 export async function isFirecrawlConfigured() {
-  const local = await readLocalState()
-  if (local.running && local.apiKey) return true
-  return Boolean(process.env.FIRECRAWL_API_KEY)
+  const local = await readLocalState();
+  if (local.running && local.apiKey) return true;
+  return Boolean(process.env.FIRECRAWL_API_KEY);
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const { base, key } = await resolveEndpoint()
+  const { base, key } = await resolveEndpoint();
   const res = await fetch(`${base}${path}`, {
     ...init,
     headers: {
@@ -67,51 +67,51 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers ?? {}),
     },
     cache: "no-store",
-  })
+  });
 
-  const text = await res.text()
-  const json = text ? safeParse(text) : {}
+  const text = await res.text();
+  const json = text ? safeParse(text) : {};
 
   if (!res.ok) {
     const msg =
       (json as { error?: string })?.error ||
-      `Firecrawl request failed (${res.status})`
-    throw new FirecrawlError(msg, res.status)
+      `Firecrawl request failed (${res.status})`;
+    throw new FirecrawlError(msg, res.status);
   }
-  return json as T
+  return json as T;
 }
 
 /** Fetch an absolute Firecrawl URL (used for pagination cursors). */
 async function callAbsolute<T>(url: string): Promise<T> {
-  const { key } = await resolveEndpoint()
+  const { key } = await resolveEndpoint();
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${key}` },
     cache: "no-store",
-  })
-  const text = await res.text()
-  const json = text ? safeParse(text) : {}
+  });
+  const text = await res.text();
+  const json = text ? safeParse(text) : {};
   if (!res.ok) {
     const msg =
       (json as { error?: string })?.error ||
-      `Firecrawl request failed (${res.status})`
-    throw new FirecrawlError(msg, res.status)
+      `Firecrawl request failed (${res.status})`;
+    throw new FirecrawlError(msg, res.status);
   }
-  return json as T
+  return json as T;
 }
 
 function safeParse(text: string): unknown {
   try {
-    return JSON.parse(text)
+    return JSON.parse(text);
   } catch {
-    return {}
+    return {};
   }
 }
 
 /* ----------------------------- Search ----------------------------- */
 
 interface FcSearchResponse {
-  success: boolean
-  data?: Array<{ url: string; title?: string; description?: string }>
+  success: boolean;
+  data?: Array<{ url: string; title?: string; description?: string }>;
 }
 
 export async function searchWeb(
@@ -121,64 +121,66 @@ export async function searchWeb(
   const json = await call<FcSearchResponse>("/search", {
     method: "POST",
     body: JSON.stringify({ query, limit }),
-  })
+  });
   return (json.data ?? []).map((r) => ({
     url: r.url,
     title: r.title || r.url,
     description: r.description,
-  }))
+  }));
 }
 
 /* ------------------------- Single-page scrape --------------------- */
 
 export interface ScrapedPage {
-  url: string
-  title: string
-  markdown: string
+  url: string;
+  title: string;
+  markdown: string;
 }
 
 interface FcScrapeResponse {
-  success: boolean
+  success: boolean;
   data?: {
-    markdown?: string
-    metadata?: { title?: string; sourceURL?: string; ogTitle?: string }
-  }
+    markdown?: string;
+    metadata?: { title?: string; sourceURL?: string; ogTitle?: string };
+  };
 }
 
 const STEALTH_OPTIONS = {
   waitFor: 10000,
   onlyMainContent: false, // capture ALL content, not just what Firecrawl deems "main"
   headers: {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9",
-    "Sec-Ch-Ua": "\"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\"",
+    "Sec-Ch-Ua":
+      '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
     "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": "\"Windows\""
-  }
+    "Sec-Ch-Ua-Platform": '"Windows"',
+  },
 };
 
 export async function scrapePage(url: string): Promise<ScrapedPage> {
   const json = await call<FcScrapeResponse>("/scrape", {
     method: "POST",
-    body: JSON.stringify({ 
-      url, 
-      formats: ["markdown"], 
-      ...STEALTH_OPTIONS
+    body: JSON.stringify({
+      url,
+      formats: ["markdown"],
+      ...STEALTH_OPTIONS,
     }),
-  })
-  const d = json.data ?? {}
+  });
+  const d = json.data ?? {};
   return {
     url: d.metadata?.sourceURL || url,
     title: d.metadata?.title || d.metadata?.ogTitle || url,
     markdown: d.markdown ?? "",
-  }
+  };
 }
 
 /* --------------------------- Domain crawl ------------------------- */
 
 interface FcCrawlStartResponse {
-  success: boolean
-  id?: string
+  success: boolean;
+  id?: string;
 }
 
 /** Kick off an async crawl of an entire site. Returns the Firecrawl job id. */
@@ -188,37 +190,37 @@ export async function startCrawl(url: string, limit: number): Promise<string> {
     body: JSON.stringify({
       url,
       limit,
-      scrapeOptions: { 
-        formats: ["markdown"], 
+      scrapeOptions: {
+        ...STEALTH_OPTIONS,
+        formats: ["markdown"],
         onlyMainContent: true,
-        ...STEALTH_OPTIONS
       },
     }),
-  })
-  if (!json.id) throw new FirecrawlError("Firecrawl did not return a crawl id")
-  return json.id
+  });
+  if (!json.id) throw new FirecrawlError("Firecrawl did not return a crawl id");
+  return json.id;
 }
 
-export type FcCrawlState = "scraping" | "completed" | "failed" | "cancelled"
+export type FcCrawlState = "scraping" | "completed" | "failed" | "cancelled";
 
 export interface CrawlStatus {
-  state: FcCrawlState
-  total: number
-  completed: number
-  pages: ScrapedPage[]
+  state: FcCrawlState;
+  total: number;
+  completed: number;
+  pages: ScrapedPage[];
   /** cursor URL for the next page of results, if any */
-  next?: string
+  next?: string;
 }
 
 interface FcCrawlStatusResponse {
-  status: FcCrawlState
-  total?: number
-  completed?: number
-  next?: string
+  status: FcCrawlState;
+  total?: number;
+  completed?: number;
+  next?: string;
   data?: Array<{
-    markdown?: string
-    metadata?: { title?: string; sourceURL?: string; url?: string }
-  }>
+    markdown?: string;
+    metadata?: { title?: string; sourceURL?: string; url?: string };
+  }>;
 }
 
 /**
@@ -235,7 +237,7 @@ export async function getCrawlStatus(
     ? await callAbsolute<FcCrawlStatusResponse>(idOrCursor)
     : await call<FcCrawlStatusResponse>(`/crawl/${idOrCursor}`, {
         method: "GET",
-      })
+      });
   return {
     state: json.status ?? "scraping",
     total: json.total ?? 0,
@@ -246,13 +248,13 @@ export async function getCrawlStatus(
       title: p.metadata?.title || p.metadata?.sourceURL || "Untitled",
       markdown: p.markdown ?? "",
     })),
-  }
+  };
 }
 
 /** Cancel a running crawl on Firecrawl's side (best-effort). */
 export async function cancelCrawl(id: string): Promise<void> {
   try {
-    await call(`/crawl/${id}`, { method: "DELETE" })
+    await call(`/crawl/${id}`, { method: "DELETE" });
   } catch {
     // best-effort; local job is cancelled regardless
   }
