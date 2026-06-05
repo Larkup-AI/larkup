@@ -168,15 +168,15 @@ export function FirecrawlNotice({
           {running ? (
             <Button
               size="sm"
-              variant="outline"
-              className={"text-red-500 hover:text-red-500"}
+              variant="destructive"
+              className={"bg-red-500 hover:bg-red-500/80 text-white "}
               onClick={() => control("stop")}
               disabled={busy !== null}
             >
               {busy === "stop" ? (
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin text-white" />
               ) : (
-                <Square className="size-4 " />
+                <Square className="size-4 text-white!" />
               )}
               Stop
             </Button>
