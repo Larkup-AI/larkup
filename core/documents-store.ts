@@ -89,7 +89,7 @@ export function addCrawledDocuments(
     const docs = await readDocuments()
     const seen = new Set(
       docs
-        .filter((d) => d.jobId === jobId && d.url)
+        .filter((d) => d.url)
         .map((d) => d.url as string),
     )
     let added = 0
@@ -137,6 +137,14 @@ export function deleteDocument(id: string) {
   return serialize(async () => {
     const docs = await readDocuments()
     await writeAll(docs.filter((d) => d.id !== id))
+  })
+}
+
+export function deleteDocuments(ids: string[]) {
+  return serialize(async () => {
+    const docs = await readDocuments()
+    const idSet = new Set(ids)
+    await writeAll(docs.filter((d) => !idSet.has(d.id)))
   })
 }
 

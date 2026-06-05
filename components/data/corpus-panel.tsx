@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 
 const SOURCE_META: Record<
@@ -55,16 +56,31 @@ export function CorpusPanel({
   onChanged: () => void
 }) {
   const [active, setActive] = useState<SourceDocument | null>(null)
-  const [deleteTask, setDeleteTask] = useState<{ type: "single"; doc: SourceDocument } | { type: "all" } | null>(null)
+  const [deleteTask, setDeleteTask] = useState<{ type: "single"; doc: SourceDocument } | { type: "all" } | { type: "selected" } | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   async function del(id: string) {
     await fetch(`/api/documents?id=${id}`, { method: "DELETE" })
     toast.message("Document deleted")
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+    onChanged()
+  }
+  async function delSelected() {
+    if (selectedIds.size === 0) return
+    const ids = Array.from(selectedIds).join(",")
+    await fetch(`/api/documents?ids=${ids}`, { method: "DELETE" })
+    toast.message(`Deleted ${selectedIds.size} document(s)`)
+    setSelectedIds(new Set())
     onChanged()
   }
   async function clearAll() {
     await fetch("/api/documents", { method: "DELETE" })
     toast.message("Corpus cleared")
+    setSelectedIds(new Set())
     onChanged()
   }
 
@@ -90,21 +106,47 @@ export function CorpusPanel({
           </span>{" "}
           document{documents.length === 1 ? "" : "s"} in corpus
         </p>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-8 text-xs text-muted-foreground hover:text-destructive"
-          onClick={() => setDeleteTask({ type: "all" })}
-        >
-          <Trash2 className="size-3.5" />
-          Clear corpus
-        </Button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs text-muted-foreground hover:text-destructive"
+              onClick={() => setDeleteTask({ type: "selected" })}
+            >
+              <Trash2 className="size-3.5" />
+              Delete {selectedIds.size} selected
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs text-muted-foreground hover:text-destructive"
+            onClick={() => setDeleteTask({ type: "all" })}
+          >
+            <Trash2 className="size-3.5" />
+            Clear corpus
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={documents.length > 0 && selectedIds.size === documents.length}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedIds(new Set(documents.map((d) => d.id)))
+                    } else {
+                      setSelectedIds(new Set())
+                    }
+                  }}
+                  aria-label="Select all"
+                />
+              </TableHead>
               <TableHead>Title</TableHead>
               <TableHead className="w-28">Source</TableHead>
               <TableHead className="w-24 text-right">Chars</TableHead>
@@ -117,6 +159,18 @@ export function CorpusPanel({
               const Icon = meta.icon
               return (
                 <TableRow key={doc.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(doc.id)}
+                      onCheckedChange={(checked) => {
+                        const next = new Set(selectedIds)
+                        if (checked) next.add(doc.id)
+                        else next.delete(doc.id)
+                        setSelectedIds(next)
+                      }}
+                      aria-label="Select document"
+                    />
+                  </TableCell>
                   <TableCell>
                     <button
                       type="button"
@@ -188,19 +242,29 @@ export function CorpusPanel({
         onOpenChange={(open) => {
           if (!open) setDeleteTask(null)
         }}
-        title={deleteTask?.type === "all" ? "Clear corpus" : "Delete document"}
+        title={
+          deleteTask?.type === "all"
+            ? "Clear corpus"
+            : deleteTask?.type === "selected"
+              ? "Delete selected documents"
+              : "Delete document"
+        }
         description={
           deleteTask?.type === "all"
             ? "Are you sure you want to delete all documents in the corpus? This action cannot be undone."
-            : `Are you sure you want to delete "${
-                deleteTask?.type === "single" ? deleteTask.doc.title : ""
-              }"?`
+            : deleteTask?.type === "selected"
+              ? `Are you sure you want to delete ${selectedIds.size} selected documents?`
+              : `Are you sure you want to delete "${
+                  deleteTask?.type === "single" ? deleteTask.doc.title : ""
+                }"?`
         }
         confirmText="Delete"
         variant="destructive"
         onConfirm={() => {
           if (deleteTask?.type === "all") {
             clearAll()
+          } else if (deleteTask?.type === "selected") {
+            delSelected()
           } else if (deleteTask?.type === "single") {
             del(deleteTask.doc.id)
             if (active?.id === deleteTask.doc.id) {

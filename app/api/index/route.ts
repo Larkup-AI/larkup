@@ -24,7 +24,7 @@ function assessReadiness(config: RagConfig, docCount: number) {
 
   // Pinecone needs a hosted index + key; LanceDB is local and always ready.
   if (config.vectorStore === "pinecone") {
-    if (!process.env.PINECONE_API_KEY)
+    if (!config.storeConfig?.apiKey?.trim())
       blockers.push("PINECONE_API_KEY is not set.")
     if (!config.storeConfig?.indexName?.trim())
       blockers.push("A Pinecone index name is required.")

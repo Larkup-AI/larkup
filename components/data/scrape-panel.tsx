@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { toast } from "sonner"
 import {
   Globe,
@@ -13,6 +13,8 @@ import {
   Info,
   CheckCheck,
   BarChart2,
+  Clock,
+  AlertTriangle,
 } from "lucide-react"
 import type { CrawlScope, SearchResultItem } from "@/core/types"
 import { Button } from "@/components/ui/button"
@@ -20,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import {
   Select,
   SelectContent,
@@ -27,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ConfirmModal } from "@/components/ui/confirm-modal"
 import { cn } from "@/lib/utils"
 
 function domainOf(url: string) {
@@ -44,6 +48,28 @@ function formatCount(n: number): string {
   return n.toLocaleString()
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `~${Math.ceil(seconds)}s`
+  if (seconds < 3600) return `~${Math.ceil(seconds / 60)}min`
+  const h = Math.floor(seconds / 3600)
+  const m = Math.ceil((seconds % 3600) / 60)
+  return `~${h}h ${m}min`
+}
+
+/** Estimate ETL duration based on URL count, scope, and page limit */
+function estimateEtlDuration(
+  urlCount: number,
+  scope: CrawlScope,
+  pageLimit: number,
+): { totalPages: number; estimatedSeconds: number } {
+  // ~3s per page scrape, ~5s per domain page (crawl overhead)
+  const pagesPerUrl = scope === "domain" ? pageLimit : 1
+  const totalPages = urlCount * pagesPerUrl
+  const perPageSeconds = scope === "domain" ? 5 : 3
+  const estimatedSeconds = totalPages * perPageSeconds
+  return { totalPages, estimatedSeconds }
+}
+
 interface SearchState {
   results: SearchResultItem[]
   totalResults: number
@@ -52,7 +78,7 @@ interface SearchState {
   totalPages: number
   hasMore: boolean
   query: string
-  usingGoogle: boolean
+  searchProvider: "firecrawl" | "serper"
 }
 
 export function ScrapePanel({
@@ -73,14 +99,28 @@ export function ScrapePanel({
   const [pageLimit, setPageLimit] = useState(25)
   const [manualUrl, setManualUrl] = useState("")
   const [starting, setStarting] = useState(false)
-  const [googleConfigured, setGoogleConfigured] = useState<boolean | null>(null)
+  const [serperConfigured, setSerperConfigured] = useState<boolean | null>(null)
+  const [firecrawlConfigured, setFirecrawlConfigured] = useState<boolean | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [fetchingCount, setFetchingCount] = useState(false)
+  const [serperTotalForQuery, setSerperTotalForQuery] = useState<{
+    query: string
+    total: number
+    totalPages: number
+  } | null>(null)
 
-  // Check if Google Search is configured on mount
+  // Check providers on mount
   useEffect(() => {
+    // Check Serper
     fetch("/api/search/google")
       .then((r) => r.json())
-      .then((d) => setGoogleConfigured(d.configured ?? false))
-      .catch(() => setGoogleConfigured(false))
+      .then((d) => setSerperConfigured(d.configured ?? false))
+      .catch(() => setSerperConfigured(false))
+    // Check Firecrawl
+    fetch("/api/search")
+      .then((r) => r.json())
+      .then((d) => setFirecrawlConfigured(d.configured ?? false))
+      .catch(() => setFirecrawlConfigured(false))
   }, [])
 
   const selectedUrls = useMemo(
@@ -88,12 +128,48 @@ export function ScrapePanel({
     [selected],
   )
 
-  /** Search using Google Custom Search API (with total count + pagination). */
-  async function searchGoogle(page: number, append = false) {
-    const isFirstPage = page === 1
-    if (isFirstPage) {
-      setSearching(true)
-      if (!append) setSearchState(null)
+  /** Search using Firecrawl (preferred — no Serper credits used for search). */
+  async function searchFirecrawl(q: string, isMulti: boolean) {
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q, limit: 15 }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Search failed")
+      const newItems = (data.results as SearchResultItem[]) ?? []
+      
+      setSearchState((prev) => {
+        const existingResults = prev ? prev.results : []
+        const existingUrls = new Set(existingResults.map((r) => r.url))
+        const fresh = newItems.filter((r) => !existingUrls.has(r.url))
+        return {
+          results: [...existingResults, ...fresh],
+          totalResults: isMulti ? (prev?.totalResults ?? 0) + fresh.length : fresh.length,
+          totalResultsIsEstimate: false,
+          currentPage: 1,
+          totalPages: 1,
+          hasMore: false,
+          query: isMulti ? "Multiple queries" : q,
+          searchProvider: "firecrawl",
+        }
+      })
+      if (newItems.length === 0 && !isMulti) toast.message("No results — try different keywords.")
+
+      // If Serper is also configured, fetch the total count in background
+      if (serperConfigured && !isMulti) {
+        fetchSerperTotalCount(q)
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Search failed for "${q}"`)
+    }
+  }
+
+  /** Search using Serper (fallback if Firecrawl not available). */
+  async function searchSerper(q: string, page: number, isMulti: boolean, appendPagination = false) {
+    if (!appendPagination) {
+      // It's the initial search, searching flag is handled in runSearch
     } else {
       setLoadingMore(true)
     }
@@ -102,7 +178,7 @@ export function ScrapePanel({
       const res = await fetch("/api/search/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim(), page }),
+        body: JSON.stringify({ query: q, page }),
       })
       const data = await res.json()
 
@@ -117,60 +193,61 @@ export function ScrapePanel({
       )
 
       setSearchState((prev) => {
-        const existingResults = append && prev ? prev.results : []
-        // Deduplicate
+        const existingResults = appendPagination || isMulti ? (prev ? prev.results : []) : []
         const existingUrls = new Set(existingResults.map((r) => r.url))
         const fresh = newItems.filter((r) => !existingUrls.has(r.url))
         return {
           results: [...existingResults, ...fresh],
-          totalResults: data.totalResults ?? 0,
+          totalResults: isMulti ? (prev?.totalResults ?? 0) + (data.totalResults ?? 0) : (data.totalResults ?? 0),
           totalResultsIsEstimate: data.totalResultsIsEstimate ?? true,
           currentPage: data.currentPage ?? page,
-          totalPages: data.totalPages ?? 1,
-          hasMore: data.hasMore ?? false,
-          query: data.query ?? query.trim(),
-          usingGoogle: true,
+          totalPages: isMulti ? 1 : (data.totalPages ?? 1),
+          hasMore: isMulti ? false : (data.hasMore ?? false),
+          query: isMulti ? "Multiple queries" : (data.query ?? q),
+          searchProvider: "serper",
         }
       })
 
-      if (isFirstPage && (data.totalResults ?? 0) === 0) {
+      if (!isMulti) {
+        // Update Serper total
+        setSerperTotalForQuery({
+          query: q,
+          total: data.totalResults ?? 0,
+          totalPages: data.totalPages ?? 1,
+        })
+      }
+
+      if (page === 1 && (data.totalResults ?? 0) === 0 && !isMulti) {
         toast.message("No results — try different keywords.")
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Search failed")
+      toast.error(err instanceof Error ? err.message : `Search failed for "${q}"`)
     } finally {
-      setSearching(false)
-      setLoadingMore(false)
+      if (appendPagination) setLoadingMore(false)
     }
   }
 
-  /** Fallback: Firecrawl-based search (no count / pagination). */
-  async function searchFirecrawl() {
-    setSearching(true)
+  /** Fetch total count from Serper without using it for results (saves on Firecrawl credits) */
+  async function fetchSerperTotalCount(q: string) {
+    setFetchingCount(true)
     try {
-      const res = await fetch("/api/search", {
+      const res = await fetch("/api/search/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim(), limit: 15 }),
+        body: JSON.stringify({ query: q, page: 1 }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? "Search failed")
-      const results = (data.results as SearchResultItem[]) ?? []
-      setSearchState({
-        results,
-        totalResults: results.length,
-        totalResultsIsEstimate: false,
-        currentPage: 1,
-        totalPages: 1,
-        hasMore: false,
-        query: query.trim(),
-        usingGoogle: false,
-      })
-      if (results.length === 0) toast.message("No results — try different keywords.")
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Search failed")
+      if (res.ok) {
+        setSerperTotalForQuery({
+          query: q,
+          total: data.totalResults ?? 0,
+          totalPages: data.totalPages ?? 1,
+        })
+      }
+    } catch {
+      // Silent fail — count is optional
     } finally {
-      setSearching(false)
+      setFetchingCount(false)
     }
   }
 
@@ -179,22 +256,39 @@ export function ScrapePanel({
       toast.error("Enter one or more keywords to search.")
       return
     }
-    setSelected({})
-    if (googleConfigured) {
-      await searchGoogle(1, false)
-    } else {
-      await searchFirecrawl()
+    
+    // We do NOT clear selected URLs here so users can keep them across searches
+    setSerperTotalForQuery(null)
+
+    const queries = query.split(",").map(q => q.trim()).filter(Boolean)
+    if (queries.length === 0) return
+
+    setSearching(true)
+    setSearchState(null) // Reset list before fetching new ones
+
+    try {
+      if (firecrawlConfigured) {
+        await Promise.all(queries.map(q => searchFirecrawl(q, queries.length > 1)))
+      } else if (serperConfigured) {
+        await Promise.all(queries.map(q => searchSerper(q, 1, queries.length > 1, false)))
+      } else {
+        toast.error("No search provider available. Configure Firecrawl or add SERPER_API_KEY.")
+      }
+    } finally {
+      setSearching(false)
     }
   }
 
   async function loadNextPage() {
     if (!searchState?.hasMore || loadingMore) return
-    await searchGoogle(searchState.currentPage + 1, true)
+    if (searchState.searchProvider === "serper") {
+      await searchSerper(searchState.query, searchState.currentPage + 1, false, true)
+    }
   }
 
-  /** Automatically paginate through ALL available Google results. */
+  /** Automatically paginate through ALL available Serper results. */
   async function gatherAll() {
-    if (!searchState || !searchState.usingGoogle) return
+    if (!searchState || searchState.searchProvider !== "serper") return
     setGatheringAll(true)
     setGatherProgress(searchState.currentPage)
 
@@ -236,7 +330,6 @@ export function ScrapePanel({
 
         if (!data.hasMore) break
         page++
-        // Small delay to be polite to the API
         await new Promise((r) => setTimeout(r, 300))
       }
       toast.success("All available results gathered!")
@@ -270,19 +363,25 @@ export function ScrapePanel({
             totalPages: 1,
             hasMore: false,
             query: "",
-            usingGoogle: false,
+            searchProvider: "firecrawl",
           },
     )
     setSelected((prev) => ({ ...prev, [manualUrl]: true }))
     setManualUrl("")
   }
 
-  async function startJob() {
+  /** Open confirm modal before starting ETL */
+  function handleStartClick() {
     if (selectedUrls.length === 0) {
       toast.error("Select at least one URL to scrape.")
       return
     }
+    setConfirmOpen(true)
+  }
+
+  async function startJob() {
     setStarting(true)
+    setConfirmOpen(false)
     try {
       const res = await fetch("/api/jobs", {
         method: "POST",
@@ -295,9 +394,18 @@ export function ScrapePanel({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Could not start job")
-      toast.success(
-        `ETL job started · ${selectedUrls.length} ${scope === "domain" ? "domain(s)" : "page(s)"}`,
+
+      const { totalPages, estimatedSeconds } = estimateEtlDuration(
+        selectedUrls.length,
+        scope,
+        pageLimit,
       )
+
+      toast.success("ETL job started — running in background", {
+        description: `${selectedUrls.length} ${scope === "domain" ? "domain(s)" : "page(s)"} · ~${totalPages} pages · ETA ${formatDuration(estimatedSeconds)}. You can navigate away — progress is tracked automatically.`,
+        duration: 8000,
+      })
+
       setSelected({})
       onStarted()
     } catch (err) {
@@ -309,7 +417,13 @@ export function ScrapePanel({
 
   const results = searchState?.results ?? []
   const gatherAllAvailable =
-    searchState?.usingGoogle && searchState.hasMore && !gatheringAll
+    searchState?.searchProvider === "serper" && searchState.hasMore && !gatheringAll
+
+  // Estimate for confirmation modal
+  const estimate = useMemo(
+    () => estimateEtlDuration(selectedUrls.length, scope, pageLimit),
+    [selectedUrls.length, scope, pageLimit],
+  )
 
   return (
     <div className="space-y-5">
@@ -335,11 +449,13 @@ export function ScrapePanel({
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          {googleConfigured === true
-            ? "Using Serper.dev Google Search — see total result count and paginate through all results."
-            : googleConfigured === false
-              ? "Using Firecrawl search. Add SERPER_API_KEY to your .env for result counts & full pagination."
-              : "Checking search provider…"}
+          {firecrawlConfigured
+            ? serperConfigured
+              ? "Using Firecrawl for search + Serper for total result count. Scraping powered by Firecrawl."
+              : "Using Firecrawl for search and scraping. Add SERPER_API_KEY for total result counts."
+            : serperConfigured
+              ? "Using Serper.dev for search. Set up Firecrawl for scraping."
+              : "No search provider configured. Set up Firecrawl or add SERPER_API_KEY."}
         </p>
       </div>
 
@@ -349,32 +465,29 @@ export function ScrapePanel({
           <BarChart2 className="size-5 shrink-0 text-primary" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold">
-              {searchState.usingGoogle ? (
-                searchState.totalResultsIsEstimate ? (
-                  <>
-                    <span className="text-primary">{results.length}</span> URLs loaded
-                    {searchState.hasMore && (
-                      <span className="text-muted-foreground font-normal"> · more pages available</span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    About{" "}
-                    <span className="text-primary">
-                      {searchState.totalResults.toLocaleString()}
-                    </span>{" "}
-                    Google results for{" "}
-                    <span className="italic">"{searchState.query}"</span>
-                  </>
-                )
-              ) : (
-                <>
-                  <span className="text-primary">{searchState.totalResults}</span> results
-                  found
-                </>
+              <span className="text-primary">{results.length}</span> URLs loaded
+              {searchState.searchProvider === "serper" && searchState.hasMore && (
+                <span className="text-muted-foreground font-normal"> · more pages available</span>
               )}
             </p>
-            {searchState.usingGoogle && (
+            {/* Show Serper total if available */}
+            {serperTotalForQuery && serperTotalForQuery.query === searchState.query && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Google has{" "}
+                <span className="font-medium text-foreground">
+                  {formatCount(serperTotalForQuery.total)}
+                </span>{" "}
+                results for <span className="italic">&quot;{searchState.query}&quot;</span>
+                {" · "}accessible: up to {serperTotalForQuery.totalPages * 10} URLs
+              </p>
+            )}
+            {fetchingCount && (
+              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                <Loader2 className="size-3 animate-spin" />
+                Fetching total result count from Google…
+              </p>
+            )}
+            {searchState.searchProvider === "serper" && (
               <p className="text-xs text-muted-foreground mt-0.5">
                 Page {searchState.currentPage}
                 {!searchState.totalResultsIsEstimate && ` of ${searchState.totalPages}`}{" "}
@@ -402,7 +515,7 @@ export function ScrapePanel({
             </Button>
           )}
           {/* Done indicator */}
-          {searchState.usingGoogle && !searchState.hasMore && !gatheringAll && searchState.totalPages > 1 && (
+          {searchState.searchProvider === "serper" && !searchState.hasMore && !gatheringAll && searchState.totalPages > 1 && (
             <Badge variant="secondary" className="gap-1 shrink-0">
               <CheckCheck className="size-3" />
               All loaded
@@ -488,7 +601,7 @@ export function ScrapePanel({
           </ul>
 
           {/* Pagination footer */}
-          {searchState?.usingGoogle && (searchState.hasMore || loadingMore || gatheringAll) && (
+          {searchState?.searchProvider === "serper" && (searchState.hasMore || loadingMore || gatheringAll) && (
             <div className="flex items-center justify-between border-t border-border px-3 py-2">
               <span className="text-xs text-muted-foreground">
                 {gatheringAll
@@ -527,24 +640,15 @@ export function ScrapePanel({
         </div>
       )}
 
-      {/* Serper not configured hint */}
-      {googleConfigured === false && (
+      {/* No provider configured hint */}
+      {firecrawlConfigured === false && serperConfigured === false && (
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" />
           <span>
-            <strong className="text-foreground">Enable Serper search</strong> for total
-            Google result counts and full pagination. Add{" "}
+            <strong className="text-foreground">No search provider configured.</strong>{" "}
+            Set up Firecrawl (recommended) for search and scraping, or add{" "}
             <code className="rounded bg-muted px-1 font-mono">SERPER_API_KEY</code> to your{" "}
-            <code className="rounded bg-muted px-1 font-mono">.env</code> —{" "}
-            get a free key at{" "}
-            <a
-              href="https://serper.dev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-foreground"
-            >
-              serper.dev
-            </a>.
+            <code className="rounded bg-muted px-1 font-mono">.env</code> for Google search.
           </span>
         </div>
       )}
@@ -553,8 +657,12 @@ export function ScrapePanel({
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:flex-row sm:items-end">
         <div className="flex-1 space-y-1.5">
           <Label className="text-xs">Scope</Label>
-          <Select value={scope} onValueChange={(v) => setScope(v as CrawlScope)}>
-            <SelectTrigger>
+          <Select
+            defaultValue={scope}
+            value={scope}
+            onValueChange={(v) => setScope(v as CrawlScope)}
+          >
+            <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -578,7 +686,10 @@ export function ScrapePanel({
             />
           </div>
         )}
-        <Button onClick={startJob} disabled={disabled || starting || selectedUrls.length === 0}>
+        <Button
+          onClick={handleStartClick}
+          disabled={disabled || starting || selectedUrls.length === 0}
+        >
           {starting ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
@@ -592,6 +703,27 @@ export function ScrapePanel({
           )}
         </Button>
       </div>
+
+      {/* ETL estimation preview */}
+      {selectedUrls.length > 0 && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Clock className="size-3.5" />
+          <span>
+            Estimated: {estimate.totalPages.toLocaleString()} pages ·{" "}
+            {formatDuration(estimate.estimatedSeconds)}
+          </span>
+        </div>
+      )}
+
+      {/* Confirmation modal */}
+      <ConfirmModal
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Start ETL Job?"
+        description={`This will scrape ${selectedUrls.length} ${scope === "domain" ? "domain(s)" : "page(s)"}${scope === "domain" ? ` with up to ${pageLimit} pages each` : ""}.\n\n• Total pages: ~${estimate.totalPages.toLocaleString()}\n• Estimated time: ${formatDuration(estimate.estimatedSeconds)}\n\nThe job will run in the background. You can navigate away and check progress anytime.`}
+        confirmText="Start ETL Job"
+        onConfirm={startJob}
+      />
     </div>
   )
 }

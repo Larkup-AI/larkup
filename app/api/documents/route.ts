@@ -4,6 +4,7 @@ import {
   clearDocuments,
   corpusStats,
   deleteDocument,
+  deleteDocuments,
   readDocuments,
   updateDocument,
 } from "@/core/documents-store"
@@ -74,10 +75,13 @@ export async function PATCH(req: Request) {
   return NextResponse.json({ document: doc })
 }
 
-/** DELETE ?id=<id> removes one doc; DELETE with no id clears the corpus. */
+/** DELETE ?id=<id> removes one doc; DELETE ?ids=1,2 removes many; DELETE with no id clears the corpus. */
 export async function DELETE(req: Request) {
-  const id = new URL(req.url).searchParams.get("id")
+  const url = new URL(req.url)
+  const id = url.searchParams.get("id")
+  const ids = url.searchParams.get("ids")
   if (id) await deleteDocument(id)
+  else if (ids) await deleteDocuments(ids.split(","))
   else await clearDocuments()
   return NextResponse.json({ ok: true })
 }
