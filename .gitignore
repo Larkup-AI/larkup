@@ -11,3 +11,7 @@ node_modules
 
 # RAG Toolkit local state
 .ragtoolkit/
+
+# LanceDB data
+dummy/
+lancedb/
