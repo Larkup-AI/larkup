@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useSWR from "swr";
 import {
   CheckCircle2,
@@ -186,6 +186,16 @@ function LaunchPanel({ config }: { config: RagConfig }) {
   const [busy, setBusy] = useState<"start" | "stop" | null>(null);
   const [serverApiKey, setServerApiKey] = useState("");
 
+  useEffect(() => {
+    const saved = localStorage.getItem("rag_server_api_key");
+    if (saved) setServerApiKey(saved);
+  }, []);
+
+  const handleSaveApiKey = () => {
+    localStorage.setItem("rag_server_api_key", serverApiKey);
+    toast.success("Server API key saved.");
+  };
+
   const { data, mutate } = useSWR<{ state: LocalServerState }>(
     "/api/server/local",
     fetcher,
@@ -247,12 +257,17 @@ function LaunchPanel({ config }: { config: RagConfig }) {
 
           <div className="grid gap-2 max-w-sm">
             <Label htmlFor="serverApiKey">Server API Key</Label>
-            <Input
-              id="serverApiKey"
-              placeholder="Set an API key to secure your server endpoints"
-              value={serverApiKey}
-              onChange={(e) => setServerApiKey(e.target.value)}
-            />
+            <div className="flex gap-2">
+              <Input
+                id="serverApiKey"
+                placeholder="Set an API key to secure your server endpoints"
+                value={serverApiKey}
+                onChange={(e) => setServerApiKey(e.target.value)}
+              />
+              <Button onClick={handleSaveApiKey} variant="secondary">
+                Save
+              </Button>
+            </div>
           </div>
 
           <Alert>
