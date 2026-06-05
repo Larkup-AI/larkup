@@ -3,7 +3,6 @@ import { readConfig } from "@buddy-rag/core/config-store";
 import { readRun } from "@buddy-rag/core/index-store";
 import { refreshServerStatus } from "@buddy-rag/core/generator/server-runtime";
 import { createAdapter } from "@buddy-rag/vector-stores/factory";
-import { getWorkspaceConfig } from "@buddy-rag/core/workspace";
 import { getEmbeddingModel } from "@buddy-rag/core/embeddings/registry";
 import { getVectorStore } from "@buddy-rag/vector-stores/registry";
 import type { QueryHit } from "@buddy-rag/vector-stores/adapter";

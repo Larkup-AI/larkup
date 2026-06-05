@@ -9,6 +9,7 @@
     "rag": "pnpm --filter @buddy-rag/cli rag"
   },
   "devDependencies": {
+    "@turbo/gen": "^2.9.16",
     "turbo": "^2.5.0"
   },
   "packageManager": "pnpm@10.11.0"
