@@ -4,6 +4,7 @@
 # Environment variables
 .env*.local
 .env
+
 # Common ignores
 node_modules
 .next/
@@ -12,6 +13,10 @@ node_modules
 # RAG Toolkit local state
 .ragtoolkit/
 proxies.txt
+
 # LanceDB data
 dummy/
 lancedb/
+
+# Turbo
+.turbo/
