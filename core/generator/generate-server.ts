@@ -157,6 +157,8 @@ import { query } from "./store.mjs"
  *
  * Endpoints:
  *   GET  /health        -> { ok: true }
+ *   GET  /openapi.json  -> OpenAPI 3.1.0 specification
+ *   GET  /reference     -> Scalar API Reference UI
  *   POST /query         -> { query: string, topK?: number } => { hits: [...] }
  *
  * No framework: plain Node http keeps the deploy tiny. Index type: ${config.indexType}.
@@ -207,6 +209,45 @@ const server = createServer(async (req, res) => {
     } catch (err) {
       return send(res, 500, { error: String(err?.message || err) })
     }
+  }
+
+  if (req.method === "GET" && url.pathname === "/openapi.json") {
+    return send(res, 200, {
+      openapi: "3.1.0",
+      info: { title: "RAG Server", version: "1.0.0" },
+      paths: {
+        "/query": {
+          post: {
+            summary: "Query the RAG knowledge base",
+            requestBody: {
+              content: { "application/json": { schema: { type: "object", properties: { query: { type: "string" }, topK: { type: "number" } } } } }
+            },
+            responses: { "200": { description: "Successful response" } }
+          }
+        },
+        "/health": {
+          get: { summary: "Health check", responses: { "200": { description: "OK" } } }
+        }
+      }
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/reference") {
+    res.writeHead(200, { "Content-Type": "text/html" })
+    return res.end(\`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>API Reference</title>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+        </head>
+        <body>
+          <script id="api-reference" data-url="/openapi.json"></script>
+          <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+        </body>
+      </html>
+    \`)
   }
 
   return send(res, 404, { error: "Not found" })

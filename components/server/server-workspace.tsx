@@ -274,17 +274,32 @@ function LaunchPanel({ config }: { config: RagConfig }) {
             <ExternalLink className="size-4" />
             <AlertTitle>API Documentation</AlertTitle>
             <AlertDescription>
-              We will use{" "}
+              We use{" "}
               <a
                 href="https://scalar.com/"
                 target="_blank"
                 rel="noreferrer"
                 className="text-primary hover:underline"
               >
-                scalar.com
+                Scalar
               </a>{" "}
-              for full API endpoint documentation once the server handles all
-              operations (add document, delete, scrape, query).
+              for full API endpoint documentation.
+              {state?.running ? (
+                <div className="mt-3">
+                  <a
+                    href={`${state.endpoint}/reference`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    Open API Reference
+                  </a>
+                </div>
+              ) : (
+                <p className="mt-2 text-muted-foreground text-xs">
+                  Launch the local server to view the API reference.
+                </p>
+              )}
             </AlertDescription>
           </Alert>
 
