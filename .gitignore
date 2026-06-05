@@ -1,0 +1,13 @@
+.snowflake/
+.vercel/
+
+# Environment variables
+.env*.local
+
+# Common ignores
+node_modules
+.next/
+.DS_Store
+
+# RAG Toolkit local state
+.ragtoolkit/
