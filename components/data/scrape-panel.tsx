@@ -110,6 +110,22 @@ export function ScrapePanel({
     totalPages: number
   } | null>(null)
   const [cachedQueries, setCachedQueries] = useState<string[]>([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        inputRef.current && !inputRef.current.contains(event.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   useEffect(() => {
     try {
@@ -290,6 +306,7 @@ export function ScrapePanel({
   }
 
   async function runSearch() {
+    setShowDropdown(false)
     if (!query.trim()) {
       toast.error("Enter one or more keywords to search.")
       return
@@ -470,15 +487,63 @@ export function ScrapePanel({
       <div className="space-y-2">
         <Label htmlFor="kw">Keywords / Organization</Label>
         <div className="flex gap-2">
-          <Input
-            id="kw"
-            placeholder='e.g. "TUHH university Hamburg"'
-            value={query}
-            disabled={disabled}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && runSearch()}
-          />
-          <Button onClick={runSearch} disabled={disabled || searching}>
+          <div className="relative flex-1">
+            <Input
+              ref={inputRef}
+              id="kw"
+              placeholder='e.g. "TUHH university Hamburg"'
+              value={query}
+              disabled={disabled}
+              onChange={(e) => {
+                setQuery(e.target.value)
+                setShowDropdown(true)
+              }}
+              onFocus={() => setShowDropdown(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setShowDropdown(false)
+                  runSearch()
+                }
+              }}
+            />
+            {showDropdown && cachedQueries.length > 0 && (
+              <div 
+                ref={dropdownRef}
+                className="absolute z-10 top-full left-0 mt-1 w-full rounded-md border border-border bg-popover shadow-md overflow-hidden"
+              >
+                <div className="py-1">
+                  {cachedQueries.map((cq) => (
+                    <div
+                      key={cq}
+                      className="flex items-center justify-between px-3 py-2 text-sm hover:bg-muted cursor-pointer group"
+                      onClick={() => {
+                        setQuery(cq)
+                        setShowDropdown(false)
+                      }}
+                    >
+                      <div className="flex items-center gap-2 truncate mr-2">
+                        <Clock className="size-3.5 text-muted-foreground shrink-0" />
+                        <span className="truncate">{cq}</span>
+                      </div>
+                      <button
+                        className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                        onClick={(e) => removeQuery(cq, e)}
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <Button 
+            onClick={() => {
+              setShowDropdown(false)
+              runSearch()
+            }} 
+            disabled={disabled || searching}
+          >
             {searching ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
@@ -487,24 +552,6 @@ export function ScrapePanel({
             Search
           </Button>
         </div>
-        {cachedQueries.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {cachedQueries.map((cq) => (
-              <Badge 
-                key={cq} 
-                variant="secondary" 
-                className="cursor-pointer hover:bg-secondary/80 pr-1.5 flex items-center gap-1 font-normal"
-                onClick={() => setQuery(cq)}
-              >
-                {cq}
-                <X 
-                  className="size-3 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/50 p-0.5 ml-0.5 transition-colors" 
-                  onClick={(e) => removeQuery(cq, e)} 
-                />
-              </Badge>
-            ))}
-          </div>
-        )}
         <p className="text-xs text-muted-foreground">
           {firecrawlConfigured
             ? serperConfigured
