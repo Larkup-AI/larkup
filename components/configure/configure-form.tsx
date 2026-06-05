@@ -69,6 +69,7 @@ export function ConfigureForm() {
   const [form, setForm] = useState<RagConfig>(DEFAULT_CONFIG)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [hydrated, setHydrated] = useState(false)
 
@@ -121,6 +122,18 @@ export function ConfigureForm() {
 
     setSaving(true)
     try {
+      // Test connection before saving
+      const testRes = await fetch("/api/config/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      const testJson = await testRes.json()
+      if (!testRes.ok) {
+        if (testJson.fieldErrors) setErrors(testJson.fieldErrors)
+        throw new Error(`Connection test failed: ${testJson.error ?? "Invalid credentials"}`)
+      }
+
       const res = await fetch("/api/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -140,6 +153,36 @@ export function ConfigureForm() {
       toast.error(err instanceof Error ? err.message : "Failed to save")
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleTestConnection() {
+    const fieldErrors = validateStoreConfig(store, form.storeConfig)
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors(fieldErrors)
+      toast.error("Please complete the required vector store fields.")
+      return
+    }
+
+    setTesting(true)
+    try {
+      const res = await fetch("/api/config/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        if (json.fieldErrors) setErrors(json.fieldErrors)
+        throw new Error(json.error ?? "Connection failed")
+      }
+      toast.success("Connection successful", {
+        description: "Credentials and settings are valid.",
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Connection failed")
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -395,6 +438,21 @@ export function ConfigureForm() {
                   errors={errors}
                   onChange={setStoreValue}
                 />
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleTestConnection}
+                    disabled={testing}
+                  >
+                    {testing ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <Cloud className="mr-2 size-4" />
+                    )}
+                    Test Connection
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

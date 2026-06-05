@@ -37,4 +37,6 @@ export interface VectorStoreAdapter {
   count(): Promise<number | null>
   /** Nearest-neighbour search for a query vector. */
   query(vector: number[], topK: number): Promise<QueryHit[]>
+  /** Test connection to the vector store. Throws if invalid. */
+  testConnection(): Promise<void>
 }

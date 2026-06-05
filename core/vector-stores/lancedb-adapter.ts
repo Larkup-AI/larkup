@@ -139,4 +139,9 @@ export class LanceDBAdapter implements VectorStoreAdapter {
       documentId: row.documentId,
     }))
   }
+
+  async testConnection(): Promise<void> {
+    const conn = await this.connect()
+    await conn.tableNames()
+  }
 }

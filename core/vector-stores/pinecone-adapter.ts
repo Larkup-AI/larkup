@@ -123,4 +123,9 @@ export class PineconeAdapter implements VectorStoreAdapter {
       }
     })
   }
+
+  async testConnection(): Promise<void> {
+    const pc = this.getClient()
+    await pc.listIndexes()
+  }
 }

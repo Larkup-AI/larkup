@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 import {
   Check,
   ChevronsUpDown,
@@ -8,8 +8,8 @@ import {
   Plus,
   Server,
   Trash2,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,16 +18,21 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useWorkspace, type WorkspaceServer } from "./workspace-provider"
-import { ServerFormDialog } from "./server-form-dialog"
-import { DeleteServerDialog } from "./delete-server-dialog"
+} from "@/components/ui/dropdown-menu";
+import { useWorkspace, type WorkspaceServer } from "./workspace-provider";
+import { ServerFormDialog } from "./server-form-dialog";
+import { DeleteServerDialog } from "./delete-server-dialog";
+import { Separator } from "../ui/separator";
 
 export function ServerSwitcher() {
-  const { servers, activeServer, activateServer } = useWorkspace()
-  const [createOpen, setCreateOpen] = useState(false)
-  const [renameTarget, setRenameTarget] = useState<WorkspaceServer | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<WorkspaceServer | null>(null)
+  const { servers, activeServer, activateServer } = useWorkspace();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<WorkspaceServer | null>(
+    null,
+  );
+  const [deleteTarget, setDeleteTarget] = useState<WorkspaceServer | null>(
+    null,
+  );
 
   return (
     <>
@@ -36,7 +41,7 @@ export function ServerSwitcher() {
           render={
             <button
               type="button"
-              className="flex min-w-[200px] items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex min-w-[300px] items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           }
         >
@@ -65,12 +70,12 @@ export function ServerSwitcher() {
           <DropdownMenuGroup>
             <DropdownMenuLabel>Your servers</DropdownMenuLabel>
             {servers.map((s) => {
-              const active = s.id === activeServer?.id
+              const active = s.id === activeServer?.id;
               return (
                 <DropdownMenuItem
                   key={s.id}
                   onClick={() => {
-                    if (!active) void activateServer(s.id)
+                    if (!active) void activateServer(s.id);
                   }}
                   className="gap-2"
                 >
@@ -92,20 +97,24 @@ export function ServerSwitcher() {
                   </span>
                   {active && <Check className="size-4 shrink-0 text-primary" />}
                 </DropdownMenuItem>
-              )
+              );
             })}
           </DropdownMenuGroup>
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={() => setCreateOpen(true)} className="gap-2">
+          <DropdownMenuItem
+            onClick={() => setCreateOpen(true)}
+            className="gap-2 h-9"
+          >
             <Plus className="size-4" />
             New server
           </DropdownMenuItem>
+          {/* <DropdownMenuSeparator /> */}
           {activeServer && (
             <DropdownMenuItem
               onClick={() => setRenameTarget(activeServer)}
-              className="gap-2"
+              className="gap-2 h-9"
             >
               <Pencil className="size-4" />
               Rename current
@@ -141,7 +150,7 @@ export function ServerSwitcher() {
         onOpenChange={(o) => !o && setDeleteTarget(null)}
       />
     </>
-  )
+  );
 }
 
 function RunningDot() {
@@ -150,5 +159,5 @@ function RunningDot() {
       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
       <span className="relative inline-flex size-2 rounded-full bg-primary" />
     </span>
-  )
+  );
 }
