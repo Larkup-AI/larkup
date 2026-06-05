@@ -22,6 +22,9 @@ export async function createAdapter(
         apiKey: config.storeConfig.apiKey,
         indexName: config.storeConfig.indexName,
         namespace: config.storeConfig.namespace,
+        sparseModel: config.storeConfig.sparseModel,
+        sparseIndexName: config.storeConfig.sparseIndexName,
+        indexType: config.indexType,
       })
     }
     case "lancedb":

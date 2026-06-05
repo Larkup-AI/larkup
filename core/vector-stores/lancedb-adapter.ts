@@ -1,4 +1,5 @@
 import path from "node:path"
+import fs from "node:fs/promises"
 import * as lancedb from "@lancedb/lancedb"
 import type {
   QueryHit,
@@ -47,12 +48,38 @@ export class LanceDBAdapter implements VectorStoreAdapter {
       if (!this.config.uri || !this.config.apiKey) {
         throw new Error("LanceDB Cloud requires both a URI and an API key.")
       }
+      if (!this.config.uri.startsWith("db://")) {
+        throw new Error("LanceDB Cloud URI must start with 'db://' (e.g. db://my-database).")
+      }
       this.conn = await lancedb.connect(this.config.uri, {
         apiKey: this.config.apiKey,
       })
     } else {
       const dir = this.config.dbPath?.trim() || "./.ragtoolkit/lancedb"
-      const abs = path.isAbsolute(dir) ? dir : path.join(process.cwd(), dir)
+      let abs = path.isAbsolute(dir) ? dir : path.join(process.cwd(), dir)
+      
+      try {
+        await fs.mkdir(abs, { recursive: true })
+      } catch (err: any) {
+        if (path.isAbsolute(dir)) {
+          // The user likely forgot the dot (e.g. typed "/lancedb" instead of "./lancedb").
+          // Automatically retry by prepending "." to make it relative to the workspace.
+          const fallbackDir = "." + dir
+          abs = path.join(process.cwd(), fallbackDir)
+          try {
+            await fs.mkdir(abs, { recursive: true })
+          } catch (fallbackErr: any) {
+            throw new Error(
+              `Could not create directory for LanceDB at "${abs}": ${fallbackErr.message}`,
+            )
+          }
+        } else {
+          throw new Error(
+            `Could not create directory for LanceDB at "${abs}": ${err.message}`,
+          )
+        }
+      }
+
       this.conn = await lancedb.connect(abs)
     }
     return this.conn
@@ -140,8 +167,52 @@ export class LanceDBAdapter implements VectorStoreAdapter {
     }))
   }
 
-  async testConnection(): Promise<void> {
-    const conn = await this.connect()
-    await conn.tableNames()
+  async testConnection(dimensions: number): Promise<void> {
+    // ── Local mode: just verify the directory is reachable ──────────────────
+    if (this.config.mode !== "cloud") {
+      try {
+        await this.connect()
+        return
+      } catch (err: any) {
+        throw new Error(`Failed to connect to local LanceDB: ${err.message}`)
+      }
+    }
+
+    // ── Cloud mode ───────────────────────────────────────────────────────────
+    // connect() is lazy (never contacts the server), so we call tableNames()
+    // to force a real authenticated HTTP round-trip.
+    let conn: lancedb.Connection
+    try {
+      conn = await this.connect()
+    } catch (err: any) {
+      throw new Error(`Failed to connect to LanceDB Cloud: ${err.message}`)
+    }
+
+    try {
+      await conn.tableNames()
+    } catch (err: any) {
+      const msg: string = err.message ?? ""
+
+      // The SDK puts the HTTP status INSIDE the message string (not as a
+      // property). Pattern: "Http error: ... 401 Unauthorized: Unauthorized"
+      if (
+        msg.includes("401") ||
+        msg.includes("Unauthorized") ||
+        msg.includes("403") ||
+        msg.includes("Forbidden")
+      ) {
+        throw new Error(
+          "Invalid LanceDB Cloud API key. Please check your credentials in the LanceDB Cloud dashboard.",
+        )
+      }
+
+      if (msg.includes("404") || msg.includes("Not Found")) {
+        throw new Error(
+          `LanceDB Cloud database not found. Please verify your URI (e.g. "db://my-database").`,
+        )
+      }
+
+      throw new Error(`Failed to reach LanceDB Cloud: ${msg}`)
+    }
   }
 }

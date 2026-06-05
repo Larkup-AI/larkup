@@ -65,7 +65,7 @@ export function ServerSwitcher() {
         <DropdownMenuContent
           align="start"
           sideOffset={6}
-          className="w-[var(--anchor-width)] min-w-[260px]"
+          className="w-(--anchor-width) min-w-[260px]"
         >
           <DropdownMenuGroup>
             <DropdownMenuLabel>Your servers</DropdownMenuLabel>

@@ -1,4 +1,4 @@
-import type { VectorStoreDescriptor, VectorStoreId } from "@/core/types"
+import type { IndexType, VectorStoreDescriptor, VectorStoreId } from "@/core/types"
 
 /**
  * Declarative registry of supported vector stores.
@@ -111,6 +111,24 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
         placeholder: "default",
         help: "Optional namespace to isolate this dataset within the index.",
       },
+      {
+        key: "sparseModel",
+        label: "Sparse model",
+        type: "text",
+        required: true,
+        defaultValue: "pinecone-sparse-english-v0",
+        help: "The Pinecone-hosted sparse model used for lexical embedding. Required for hybrid / lexical index types.",
+        showWhenIndexType: ["lexical", "hybrid"],
+      },
+      {
+        key: "sparseIndexName",
+        label: "Sparse index name",
+        type: "text",
+        required: true,
+        placeholder: "rag-sparse-index",
+        help: "Name of the Pinecone sparse index used for lexical/hybrid retrieval.",
+        showWhenIndexType: ["lexical", "hybrid"],
+      },
     ],
   },
 }
@@ -125,16 +143,25 @@ export function getVectorStore(id: VectorStoreId): VectorStoreDescriptor {
 /**
  * Returns the fields that should currently be visible for a store given the
  * values already entered (handles `showWhen` dependencies like LanceDB
- * local-vs-cloud).
+ * local-vs-cloud) and the current `indexType` (handles `showWhenIndexType`
+ * for Pinecone sparse model).
  */
 export function visibleFields(
   store: VectorStoreDescriptor,
   values: Record<string, string>,
+  indexType?: IndexType,
 ) {
   return store.fields.filter((field) => {
-    if (!field.showWhen) return true
-    const current = values[field.showWhen.key] ?? ""
-    return field.showWhen.equals.includes(current)
+    // Sibling-field dependency (e.g. LanceDB mode → local/cloud fields)
+    if (field.showWhen) {
+      const current = values[field.showWhen.key] ?? ""
+      if (!field.showWhen.equals.includes(current)) return false
+    }
+    // Cross-concern dependency (e.g. indexType → sparse model)
+    if (field.showWhenIndexType && indexType) {
+      if (!field.showWhenIndexType.includes(indexType)) return false
+    }
+    return true
   })
 }
 
@@ -145,9 +172,10 @@ export function visibleFields(
 export function validateStoreConfig(
   store: VectorStoreDescriptor,
   values: Record<string, string>,
+  indexType?: IndexType,
 ): Record<string, string> {
   const errors: Record<string, string> = {}
-  for (const field of visibleFields(store, values)) {
+  for (const field of visibleFields(store, values, indexType)) {
     if (field.required && !values[field.key]?.trim()) {
       errors[field.key] = `${field.label} is required`
     }

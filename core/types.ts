@@ -49,6 +49,12 @@ export interface StoreField {
    * (by key) has one of these values. Powers LanceDB local-vs-cloud.
    */
   showWhen?: { key: string; equals: string[] }
+  /**
+   * Optional cross-concern dependency: only show/require this field when the
+   * global `indexType` is one of these values. Powers Pinecone sparse model
+   * field (visible only for lexical / hybrid).
+   */
+  showWhenIndexType?: IndexType[]
   /** mark a field as a secret that should come from an env var on the server */
   secret?: boolean
 }

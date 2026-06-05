@@ -13,13 +13,15 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { visibleFields } from "@/core/vector-stores/registry"
-import type { VectorStoreDescriptor } from "@/core/types"
+import type { IndexType, VectorStoreDescriptor } from "@/core/types"
 
 interface StoreFieldsProps {
   store: VectorStoreDescriptor
   values: Record<string, string>
   errors: Record<string, string>
   onChange: (key: string, value: string) => void
+  /** Global index type — controls showWhenIndexType visibility (e.g. sparse model for hybrid/lexical) */
+  indexType?: IndexType
 }
 
 /**
@@ -32,8 +34,9 @@ export function StoreFields({
   values,
   errors,
   onChange,
+  indexType,
 }: StoreFieldsProps) {
-  const fields = visibleFields(store, values)
+  const fields = visibleFields(store, values, indexType)
 
   return (
     <div className="grid gap-5 sm:grid-cols-2">

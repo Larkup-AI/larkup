@@ -17,6 +17,11 @@ interface PineconeConfig {
   apiKey?: string
   indexName?: string
   namespace?: string
+  /** Only required when indexType is 'lexical' or 'hybrid' */
+  sparseModel?: string
+  sparseIndexName?: string
+  /** Drives metric validation in testConnection */
+  indexType?: string
 }
 
 interface PineMeta {
@@ -124,8 +129,74 @@ export class PineconeAdapter implements VectorStoreAdapter {
     })
   }
 
-  async testConnection(): Promise<void> {
+  async testConnection(dimensions: number): Promise<void> {
     const pc = this.getClient()
-    await pc.listIndexes()
+    let indexList
+    try {
+      indexList = await pc.listIndexes()
+    } catch (err: any) {
+      if (
+        err.message?.toLowerCase().includes("api key") ||
+        err.name === "PineconeAuthorizationError" ||
+        err.status === 401
+      ) {
+        throw new Error("Invalid Pinecone API key.")
+      }
+      throw new Error(`Failed to connect to Pinecone: ${err.message}`)
+    }
+
+    const indexModel = (indexList.indexes ?? []).find(
+      (i) => i.name === this.indexName,
+    )
+    if (!indexModel) {
+      throw new Error(
+        `Index "${this.indexName}" does not exist in your Pinecone project. Please create it first.`,
+      )
+    }
+
+    if (indexModel.dimension !== dimensions) {
+      throw new Error(
+        `Dimension mismatch: Index "${this.indexName}" has dimension ${indexModel.dimension}, but the selected embedding model requires dimension ${dimensions}.`,
+      )
+    }
+
+    // ── Lexical / hybrid extra checks ────────────────────────────────────────
+    const needsSparse =
+      this.config.indexType === "lexical" ||
+      this.config.indexType === "hybrid"
+
+    if (needsSparse) {
+      if (!this.config.sparseModel) {
+        throw new Error(
+          "Hybrid/lexical search requires a sparse model to be selected.",
+        )
+      }
+      
+      if (!this.config.sparseIndexName) {
+        throw new Error(
+          "Hybrid/lexical search requires a sparse index name to be specified.",
+        )
+      }
+
+      const sparseIndexModel = (indexList.indexes ?? []).find(
+        (i) => i.name === this.config.sparseIndexName,
+      )
+
+      if (!sparseIndexModel) {
+        throw new Error(
+          `Sparse index "${this.config.sparseIndexName}" does not exist in your Pinecone project. Please create it first.`,
+        )
+      }
+
+      // Pinecone requires dotproduct metric for hybrid (dense + sparse) indexes.
+      const metric = (sparseIndexModel as any).metric ?? (sparseIndexModel as any).spec?.metric
+      if (metric && metric !== "dotproduct") {
+        throw new Error(
+          `Hybrid/lexical search requires a Pinecone index with metric "dotproduct", ` +
+          `but "${this.config.sparseIndexName}" uses "${metric}". ` +
+          `Please create a new index with metric dotproduct for hybrid search.`,
+        )
+      }
+    }
   }
 }

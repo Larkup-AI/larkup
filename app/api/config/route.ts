@@ -36,7 +36,7 @@ export async function PUT(request: Request) {
       { status: 400 },
     )
   }
-  const fieldErrors = validateStoreConfig(store, body.storeConfig ?? {})
+  const fieldErrors = validateStoreConfig(store, body.storeConfig ?? {}, body.indexType)
   if (Object.keys(fieldErrors).length > 0) {
     return NextResponse.json(
       { error: "Missing required vector store fields", fieldErrors },

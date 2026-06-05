@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const fieldErrors = validateStoreConfig(store, body.storeConfig ?? {})
+  const fieldErrors = validateStoreConfig(store, body.storeConfig ?? {}, body.indexType)
   if (Object.keys(fieldErrors).length > 0) {
     return NextResponse.json(
       { error: "Missing required vector store fields", fieldErrors },
@@ -31,9 +31,17 @@ export async function POST(request: Request) {
     )
   }
 
+  const embeddingModel = await import("@/core/embeddings/registry").then(m => m.getEmbeddingModel(body.embeddingModelId))
+  if (!embeddingModel) {
+    return NextResponse.json(
+      { error: `Unknown embedding model: ${body.embeddingModelId}` },
+      { status: 400 },
+    )
+  }
+
   try {
     const adapter = await createAdapter(body)
-    await adapter.testConnection()
+    await adapter.testConnection(embeddingModel.dimensions)
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json(

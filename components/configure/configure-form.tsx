@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import useSWR from "swr"
 import {
   ChevronDown,
@@ -72,11 +72,15 @@ export function ConfigureForm() {
   const [testing, setTesting] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [hydrated, setHydrated] = useState(false)
+  // Cache storeConfig per store id so switching A→B→A restores A's values.
+  const storeConfigCache = useRef<Record<string, Record<string, string>>>({})
 
   // Hydrate local form from the persisted config once it loads.
   useEffect(() => {
     if (data?.config && !hydrated) {
       setForm(data.config)
+      // Seed the cache with the persisted store config.
+      storeConfigCache.current[data.config.vectorStore] = data.config.storeConfig
       setHydrated(true)
     }
   }, [data, hydrated])
@@ -96,14 +100,26 @@ export function ConfigureForm() {
     })
   }
 
-  // When switching stores, seed defaults for the new store's fields.
+  // When switching stores, seed defaults for the new store's fields
+  // but restore from cache if the user already filled them in before.
   const selectStore = (id: VectorStoreId) => {
+    if (id === form.vectorStore) return // already selected — nothing to do
+
+    // Save current storeConfig to cache before switching away.
+    storeConfigCache.current[form.vectorStore] = form.storeConfig
+
     const next = getVectorStore(id)
-    const seeded: Record<string, string> = {}
-    for (const field of next.fields) {
-      if (field.defaultValue) seeded[field.key] = field.defaultValue
+    // Restore from cache if available, otherwise seed from field defaults.
+    const cached = storeConfigCache.current[id]
+    if (cached) {
+      setForm((f) => ({ ...f, vectorStore: id, storeConfig: cached }))
+    } else {
+      const seeded: Record<string, string> = {}
+      for (const field of next.fields) {
+        if (field.defaultValue) seeded[field.key] = field.defaultValue
+      }
+      setForm((f) => ({ ...f, vectorStore: id, storeConfig: seeded }))
     }
-    setForm((f) => ({ ...f, vectorStore: id, storeConfig: seeded }))
     setErrors({})
   }
 
@@ -113,7 +129,7 @@ export function ConfigureForm() {
   )
 
   async function handleSave() {
-    const fieldErrors = validateStoreConfig(store, form.storeConfig)
+    const fieldErrors = validateStoreConfig(store, form.storeConfig, form.indexType)
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors)
       toast.error("Please complete the required vector store fields.")
@@ -157,7 +173,7 @@ export function ConfigureForm() {
   }
 
   async function handleTestConnection() {
-    const fieldErrors = validateStoreConfig(store, form.storeConfig)
+    const fieldErrors = validateStoreConfig(store, form.storeConfig, form.indexType)
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors)
       toast.error("Please complete the required vector store fields.")
@@ -437,6 +453,7 @@ export function ConfigureForm() {
                   values={form.storeConfig}
                   errors={errors}
                   onChange={setStoreValue}
+                  indexType={form.indexType}
                 />
                 <div className="mt-4 flex justify-end">
                   <Button
