@@ -15,6 +15,7 @@ import {
   BarChart2,
   Clock,
   AlertTriangle,
+  X,
 } from "lucide-react"
 import type { CrawlScope, SearchResultItem } from "@/core/types"
 import { Button } from "@/components/ui/button"
@@ -108,6 +109,43 @@ export function ScrapePanel({
     total: number
     totalPages: number
   } | null>(null)
+  const [cachedQueries, setCachedQueries] = useState<string[]>([])
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("scrape_recent_queries")
+      if (saved) setCachedQueries(JSON.parse(saved))
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  function saveQuery(q: string) {
+    const trimmed = q.trim()
+    if (!trimmed) return
+    setCachedQueries((prev) => {
+      const newCache = [trimmed, ...prev.filter((item) => item !== trimmed)].slice(0, 10)
+      try {
+        localStorage.setItem("scrape_recent_queries", JSON.stringify(newCache))
+      } catch {
+        // ignore
+      }
+      return newCache
+    })
+  }
+
+  function removeQuery(q: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    setCachedQueries((prev) => {
+      const newCache = prev.filter((item) => item !== q)
+      try {
+        localStorage.setItem("scrape_recent_queries", JSON.stringify(newCache))
+      } catch {
+        // ignore
+      }
+      return newCache
+    })
+  }
 
   // Check providers on mount
   useEffect(() => {
@@ -259,6 +297,7 @@ export function ScrapePanel({
     
     // We do NOT clear selected URLs here so users can keep them across searches
     setSerperTotalForQuery(null)
+    saveQuery(query)
 
     const queries = query.split(",").map(q => q.trim()).filter(Boolean)
     if (queries.length === 0) return
@@ -448,6 +487,24 @@ export function ScrapePanel({
             Search
           </Button>
         </div>
+        {cachedQueries.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {cachedQueries.map((cq) => (
+              <Badge 
+                key={cq} 
+                variant="secondary" 
+                className="cursor-pointer hover:bg-secondary/80 pr-1.5 flex items-center gap-1 font-normal"
+                onClick={() => setQuery(cq)}
+              >
+                {cq}
+                <X 
+                  className="size-3 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/50 p-0.5 ml-0.5 transition-colors" 
+                  onClick={(e) => removeQuery(cq, e)} 
+                />
+              </Badge>
+            ))}
+          </div>
+        )}
         <p className="text-xs text-muted-foreground">
           {firecrawlConfigured
             ? serperConfigured

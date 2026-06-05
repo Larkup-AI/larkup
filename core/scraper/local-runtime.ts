@@ -41,39 +41,8 @@ const ELITE_PROXIES = [
 ];
 
 async function getProxy(): Promise<{ server: string; username?: string; password?: string } | null> {
-  // 80% chance to use an elite proxy (higher quality), 20% chance to use a free proxy
-  const useElite = Math.random() < 0.8;
+  if (ELITE_PROXIES.length === 0) return null;
   
-  if (useElite && ELITE_PROXIES.length > 0) {
-    const p = ELITE_PROXIES[Math.floor(Math.random() * ELITE_PROXIES.length)];
-    return {
-      server: `http://${p.ip}:${p.port}`,
-      username: p.username,
-      password: p.password
-    };
-  }
-
-  // Fallback to free proxies list
-  try {
-    const raw = await fs.readFile(path.join(process.cwd(), "public", "Free_Proxy_List2.json"), "utf8");
-    const list = JSON.parse(raw);
-    if (Array.isArray(list) && list.length > 0) {
-      // Prefer elite anonymity level from free list
-      const elite = list.filter(p => p.anonymityLevel === "elite");
-      const pool = elite.length > 0 ? elite : list;
-      const selected = pool[Math.floor(Math.random() * pool.length)];
-      const protocol = (selected.protocols && selected.protocols[0]) ? selected.protocols[0] : "http";
-      // Fallback for socks proxies that Playwright might not support natively
-      const finalProtocol = protocol.startsWith("socks") ? "socks5" : protocol;
-      return {
-        server: `${finalProtocol}://${selected.ip}:${selected.port}`
-      };
-    }
-  } catch (err) {
-    console.error("Failed to load free proxies", err);
-  }
-
-  // If free proxies fail, force an elite one anyway
   const p = ELITE_PROXIES[Math.floor(Math.random() * ELITE_PROXIES.length)];
   return {
     server: `http://${p.ip}:${p.port}`,
