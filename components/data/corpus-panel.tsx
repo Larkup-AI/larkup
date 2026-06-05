@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react"
 import type { DocumentSource, SourceDocument } from "@/core/types"
+import { ConfirmModal } from "@/components/ui/confirm-modal"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -54,6 +55,7 @@ export function CorpusPanel({
   onChanged: () => void
 }) {
   const [active, setActive] = useState<SourceDocument | null>(null)
+  const [deleteTask, setDeleteTask] = useState<{ type: "single"; doc: SourceDocument } | { type: "all" } | null>(null)
 
   async function del(id: string) {
     await fetch(`/api/documents?id=${id}`, { method: "DELETE" })
@@ -92,7 +94,7 @@ export function CorpusPanel({
           size="sm"
           variant="ghost"
           className="h-8 text-xs text-muted-foreground hover:text-destructive"
-          onClick={clearAll}
+          onClick={() => setDeleteTask({ type: "all" })}
         >
           <Trash2 className="size-3.5" />
           Clear corpus
@@ -141,7 +143,7 @@ export function CorpusPanel({
                     {doc.charCount.toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-4">
                       <button
                         type="button"
                         aria-label="Edit document"
@@ -153,7 +155,7 @@ export function CorpusPanel({
                       <button
                         type="button"
                         aria-label="Delete document"
-                        onClick={() => del(doc.id)}
+                        onClick={() => setDeleteTask({ type: "single", doc })}
                         className="text-muted-foreground transition-colors hover:text-destructive"
                       >
                         <Trash2 className="size-4" />
@@ -174,9 +176,37 @@ export function CorpusPanel({
           setActive(null)
           onChanged()
         }}
-        onDelete={async (id) => {
-          await del(id)
-          setActive(null)
+        onDelete={(id) => {
+          if (active) {
+            setDeleteTask({ type: "single", doc: active })
+          }
+        }}
+      />
+
+      <ConfirmModal
+        open={deleteTask !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTask(null)
+        }}
+        title={deleteTask?.type === "all" ? "Clear corpus" : "Delete document"}
+        description={
+          deleteTask?.type === "all"
+            ? "Are you sure you want to delete all documents in the corpus? This action cannot be undone."
+            : `Are you sure you want to delete "${
+                deleteTask?.type === "single" ? deleteTask.doc.title : ""
+              }"?`
+        }
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (deleteTask?.type === "all") {
+            clearAll()
+          } else if (deleteTask?.type === "single") {
+            del(deleteTask.doc.id)
+            if (active?.id === deleteTask.doc.id) {
+              setActive(null)
+            }
+          }
         }}
       />
     </>

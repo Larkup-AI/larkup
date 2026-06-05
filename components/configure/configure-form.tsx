@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import useSWR from "swr"
+import { useEffect, useMemo, useRef, useState } from "react";
+import useSWR from "swr";
 import {
   ChevronDown,
   Cloud,
@@ -9,196 +9,210 @@ import {
   Loader2,
   Save,
   Sparkles,
-} from "lucide-react"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+} from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import {
   DEFAULT_CONFIG,
   type IndexType,
   type RagConfig,
   type VectorStoreId,
-} from "@/core/types"
-import { EMBEDDING_MODELS, getEmbeddingModel } from "@/core/embeddings/registry"
+} from "@/core/types";
+import {
+  EMBEDDING_MODELS,
+  getEmbeddingModel,
+} from "@/core/embeddings/registry";
 import {
   getVectorStore,
   validateStoreConfig,
   VECTOR_STORE_LIST,
-} from "@/core/vector-stores/registry"
-import { StoreFields } from "@/components/configure/store-fields"
+} from "@/core/vector-stores/registry";
+import { StoreFields } from "@/components/configure/store-fields";
 
 const fetcher = (url: string) =>
-  fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>)
+  fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
 const INDEX_TYPES: { value: IndexType; label: string; hint: string }[] = [
   { value: "lexical", label: "Lexical", hint: "Keyword / BM25 matching" },
   { value: "semantic", label: "Semantic", hint: "Pure vector similarity" },
   { value: "hybrid", label: "Hybrid", hint: "Lexical + semantic, reranked" },
-]
+];
 
 const STORE_ICON: Record<VectorStoreId, typeof Cloud> = {
   lancedb: HardDrive,
   pinecone: Cloud,
-}
+};
 
 export function ConfigureForm() {
-  const { data, isLoading, mutate } = useSWR("/api/config", fetcher)
-  const [form, setForm] = useState<RagConfig>(DEFAULT_CONFIG)
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [saving, setSaving] = useState(false)
-  const [testing, setTesting] = useState(false)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
-  const [hydrated, setHydrated] = useState(false)
+  const { data, isLoading, mutate } = useSWR("/api/config", fetcher);
+  const [form, setForm] = useState<RagConfig>(DEFAULT_CONFIG);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   // Cache storeConfig per store id so switching A→B→A restores A's values.
-  const storeConfigCache = useRef<Record<string, Record<string, string>>>({})
+  const storeConfigCache = useRef<Record<string, Record<string, string>>>({});
 
   // Hydrate local form from the persisted config once it loads.
   useEffect(() => {
     if (data?.config && !hydrated) {
-      setForm(data.config)
+      setForm(data.config);
       // Seed the cache with the persisted store config.
-      storeConfigCache.current[data.config.vectorStore] = data.config.storeConfig
-      setHydrated(true)
+      storeConfigCache.current[data.config.vectorStore] =
+        data.config.storeConfig;
+      setHydrated(true);
     }
-  }, [data, hydrated])
+  }, [data, hydrated]);
 
-  const store = getVectorStore(form.vectorStore)
-  const embeddingModel = getEmbeddingModel(form.embeddingModelId)
+  const store = getVectorStore(form.vectorStore);
+  const embeddingModel = getEmbeddingModel(form.embeddingModelId);
 
   const set = <K extends keyof RagConfig>(key: K, value: RagConfig[K]) =>
-    setForm((f) => ({ ...f, [key]: value }))
+    setForm((f) => ({ ...f, [key]: value }));
 
   const setStoreValue = (key: string, value: string) => {
-    setForm((f) => ({ ...f, storeConfig: { ...f.storeConfig, [key]: value } }))
+    setForm((f) => ({ ...f, storeConfig: { ...f.storeConfig, [key]: value } }));
     setErrors((e) => {
-      const next = { ...e }
-      delete next[key]
-      return next
-    })
-  }
+      const next = { ...e };
+      delete next[key];
+      return next;
+    });
+  };
 
   // When switching stores, seed defaults for the new store's fields
   // but restore from cache if the user already filled them in before.
   const selectStore = (id: VectorStoreId) => {
-    if (id === form.vectorStore) return // already selected — nothing to do
+    if (id === form.vectorStore) return; // already selected — nothing to do
 
     // Save current storeConfig to cache before switching away.
-    storeConfigCache.current[form.vectorStore] = form.storeConfig
+    storeConfigCache.current[form.vectorStore] = form.storeConfig;
 
-    const next = getVectorStore(id)
+    const next = getVectorStore(id);
     // Restore from cache if available, otherwise seed from field defaults.
-    const cached = storeConfigCache.current[id]
+    const cached = storeConfigCache.current[id];
     if (cached) {
-      setForm((f) => ({ ...f, vectorStore: id, storeConfig: cached }))
+      setForm((f) => ({ ...f, vectorStore: id, storeConfig: cached }));
     } else {
-      const seeded: Record<string, string> = {}
+      const seeded: Record<string, string> = {};
       for (const field of next.fields) {
-        if (field.defaultValue) seeded[field.key] = field.defaultValue
+        if (field.defaultValue) seeded[field.key] = field.defaultValue;
       }
-      setForm((f) => ({ ...f, vectorStore: id, storeConfig: seeded }))
+      setForm((f) => ({ ...f, vectorStore: id, storeConfig: seeded }));
     }
-    setErrors({})
-  }
+    setErrors({});
+  };
 
   const dirty = useMemo(
     () => hydrated && JSON.stringify(form) !== JSON.stringify(data?.config),
     [form, data, hydrated],
-  )
+  );
 
   async function handleSave() {
-    const fieldErrors = validateStoreConfig(store, form.storeConfig, form.indexType)
+    const fieldErrors = validateStoreConfig(
+      store,
+      form.storeConfig,
+      form.indexType,
+    );
     if (Object.keys(fieldErrors).length > 0) {
-      setErrors(fieldErrors)
-      toast.error("Please complete the required vector store fields.")
-      return
+      setErrors(fieldErrors);
+      toast.error("Please complete the required vector store fields.");
+      return;
     }
 
-    setSaving(true)
+    setSaving(true);
     try {
       // Test connection before saving
       const testRes = await fetch("/api/config/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
-      })
-      const testJson = await testRes.json()
+      });
+      const testJson = await testRes.json();
       if (!testRes.ok) {
-        if (testJson.fieldErrors) setErrors(testJson.fieldErrors)
-        throw new Error(`Connection test failed: ${testJson.error ?? "Invalid credentials"}`)
+        if (testJson.fieldErrors) setErrors(testJson.fieldErrors);
+        throw new Error(
+          `Connection test failed: ${testJson.error ?? "Invalid credentials"}`,
+        );
       }
 
       const res = await fetch("/api/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
-      })
-      const json = await res.json()
+      });
+      const json = await res.json();
       if (!res.ok) {
-        if (json.fieldErrors) setErrors(json.fieldErrors)
-        throw new Error(json.error ?? "Failed to save configuration")
+        if (json.fieldErrors) setErrors(json.fieldErrors);
+        throw new Error(json.error ?? "Failed to save configuration");
       }
-      await mutate(json, { revalidate: false })
-      setForm(json.config)
+      await mutate(json, { revalidate: false });
+      setForm(json.config);
       toast.success("Configuration saved", {
         description: "Written to .ragtoolkit/config.json",
-      })
+      });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save")
+      toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   async function handleTestConnection() {
-    const fieldErrors = validateStoreConfig(store, form.storeConfig, form.indexType)
+    const fieldErrors = validateStoreConfig(
+      store,
+      form.storeConfig,
+      form.indexType,
+    );
     if (Object.keys(fieldErrors).length > 0) {
-      setErrors(fieldErrors)
-      toast.error("Please complete the required vector store fields.")
-      return
+      setErrors(fieldErrors);
+      toast.error("Please complete the required vector store fields.");
+      return;
     }
 
-    setTesting(true)
+    setTesting(true);
     try {
       const res = await fetch("/api/config/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
-      })
-      const json = await res.json()
+      });
+      const json = await res.json();
       if (!res.ok) {
-        if (json.fieldErrors) setErrors(json.fieldErrors)
-        throw new Error(json.error ?? "Connection failed")
+        if (json.fieldErrors) setErrors(json.fieldErrors);
+        throw new Error(json.error ?? "Connection failed");
       }
       toast.success("Connection successful", {
         description: "Credentials and settings are valid.",
-      })
+      });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Connection failed")
+      toast.error(err instanceof Error ? err.message : "Connection failed");
     } finally {
-      setTesting(false)
+      setTesting(false);
     }
   }
 
@@ -208,7 +222,7 @@ export function ConfigureForm() {
         <Loader2 className="size-4 animate-spin" />
         <span className="text-sm">Loading configuration…</span>
       </div>
-    )
+    );
   }
 
   return (
@@ -267,7 +281,9 @@ export function ConfigureForm() {
             <CardContent className="space-y-3">
               <Select
                 value={form.embeddingModelId}
-                onValueChange={(v) => set("embeddingModelId", (v as string) ?? "")}
+                onValueChange={(v) =>
+                  set("embeddingModelId", (v as string) ?? "")
+                }
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -372,8 +388,7 @@ export function ConfigureForm() {
                         onValueChange={(v) =>
                           set("chunking", {
                             ...form.chunking,
-                            strategy:
-                              v as RagConfig["chunking"]["strategy"],
+                            strategy: v as RagConfig["chunking"]["strategy"],
                           })
                         }
                       >
@@ -405,8 +420,8 @@ export function ConfigureForm() {
             <CardContent className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-2">
                 {VECTOR_STORE_LIST.map((s) => {
-                  const Icon = STORE_ICON[s.id]
-                  const active = form.vectorStore === s.id
+                  const Icon = STORE_ICON[s.id];
+                  const active = form.vectorStore === s.id;
                   return (
                     <button
                       key={s.id}
@@ -440,7 +455,7 @@ export function ConfigureForm() {
                         {s.description}
                       </p>
                     </button>
-                  )
+                  );
                 })}
               </div>
 
@@ -522,15 +537,14 @@ export function ConfigureForm() {
             {data?.config?.updatedAt &&
               data.config.updatedAt !== new Date(0).toISOString() && (
                 <p className="text-center text-xs text-muted-foreground">
-                  Last saved{" "}
-                  {new Date(data.config.updatedAt).toLocaleString()}
+                  Last saved {new Date(data.config.updatedAt).toLocaleString()}
                 </p>
               )}
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function SummaryRow({
@@ -538,9 +552,9 @@ function SummaryRow({
   value,
   mono,
 }: {
-  label: string
-  value: string
-  mono?: boolean
+  label: string;
+  value: string;
+  mono?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
@@ -554,5 +568,5 @@ function SummaryRow({
         {value}
       </span>
     </div>
-  )
+  );
 }

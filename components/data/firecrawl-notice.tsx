@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import useSWR from "swr"
+import { useState } from "react";
+import useSWR from "swr";
 import {
   CheckCircle2,
   KeyRound,
@@ -10,31 +10,31 @@ import {
   Server,
   Square,
   TriangleAlert,
-} from "lucide-react"
-import { toast } from "sonner"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+} from "lucide-react";
+import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface LocalState {
-  running: boolean
-  endpoint: string
-  port: number
-  hasKey: boolean
-  startedAt?: string
-  lastError?: string
+  running: boolean;
+  endpoint: string;
+  port: number;
+  hasKey: boolean;
+  startedAt?: string;
+  lastError?: string;
 }
 interface DockerState {
-  docker: boolean
-  compose: boolean
-  message: string
+  docker: boolean;
+  compose: boolean;
+  message: string;
 }
 interface LocalResponse {
-  state: LocalState
-  docker: DockerState
+  state: LocalState;
+  docker: DockerState;
 }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 /**
  * Local Firecrawl launcher.
@@ -48,8 +48,8 @@ export function FirecrawlNotice({
   cloudConfigured = false,
   onChange,
 }: {
-  cloudConfigured?: boolean
-  onChange?: () => void
+  cloudConfigured?: boolean;
+  onChange?: () => void;
 }) {
   const { data, mutate, isLoading } = useSWR<LocalResponse>(
     "/api/firecrawl/local",
@@ -58,58 +58,59 @@ export function FirecrawlNotice({
       refreshInterval: (d) =>
         d?.state.running || d?.state.startedAt ? 8000 : 0,
     },
-  )
-  const [busy, setBusy] = useState<"start" | "stop" | null>(null)
+  );
+  const [busy, setBusy] = useState<"start" | "stop" | null>(null);
 
-  const state = data?.state
-  const docker = data?.docker
-  const running = state?.running ?? false
+  const state = data?.state;
+  const docker = data?.docker;
+  const running = state?.running ?? false;
 
   async function control(action: "start" | "stop") {
-    setBusy(action)
+    setBusy(action);
     if (action === "start") {
       toast.info("Launching local Firecrawl…", {
-        description: "Pulling images and starting containers. This can take a minute on first run.",
-      })
+        description:
+          "Pulling images and starting containers. This can take a minute on first run.",
+      });
     }
     try {
       const res = await fetch("/api/firecrawl/local", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
-      })
-      const json = (await res.json()) as { state?: LocalState; error?: string }
-      if (!res.ok) throw new Error(json.error || "Request failed")
+      });
+      const json = (await res.json()) as { state?: LocalState; error?: string };
+      if (!res.ok) throw new Error(json.error || "Request failed");
 
       if (action === "start") {
         if (json.state?.running) {
           toast.success("Local Firecrawl is running", {
             description: "Web scraping is now wired to your local instance.",
-          })
+          });
         } else {
           toast.warning("Containers started", {
             description:
               json.state?.lastError ?? "Waiting for the API to become healthy.",
-          })
+          });
         }
       } else {
-        toast.success("Local Firecrawl stopped")
+        toast.success("Local Firecrawl stopped");
       }
-      await mutate()
-      onChange?.()
+      await mutate();
+      onChange?.();
     } catch (err) {
       toast.error("Could not control local Firecrawl", {
         description: err instanceof Error ? err.message : undefined,
-      })
+      });
     } finally {
-      setBusy(null)
+      setBusy(null);
     }
   }
 
   // Cloud key present and no local instance running → nothing to show.
-  if (cloudConfigured && !running && !state?.startedAt) return null
+  if (cloudConfigured && !running && !state?.startedAt) return null;
 
-  const dockerReady = docker?.compose ?? false
+  const dockerReady = docker?.compose ?? false;
 
   return (
     <Alert>
@@ -157,7 +158,7 @@ export function FirecrawlNotice({
         )}
 
         {state?.lastError && !running && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <div className="flex items-start gap-2 max-h-[200px]! overflow-auto rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
             <span>{state.lastError}</span>
           </div>
@@ -168,13 +169,14 @@ export function FirecrawlNotice({
             <Button
               size="sm"
               variant="outline"
+              className={"text-red-500 hover:text-red-500"}
               onClick={() => control("stop")}
               disabled={busy !== null}
             >
               {busy === "stop" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Square className="size-4" />
+                <Square className="size-4 " />
               )}
               Stop
             </Button>
@@ -194,13 +196,13 @@ export function FirecrawlNotice({
           )}
 
           {dockerReady && !running && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <CheckCircle2 className="size-3.5 text-primary" />
+            <span className="flex items-center gap-1 text-xs text-green-700">
+              <CheckCircle2 className="size-3.5 " />
               Docker ready
             </span>
           )}
         </div>
       </AlertDescription>
     </Alert>
-  )
+  );
 }

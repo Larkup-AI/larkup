@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import useSWR from "swr"
+import { useState } from "react";
+import useSWR from "swr";
 import {
   AlertTriangle,
   Boxes,
@@ -15,44 +15,44 @@ import {
   Play,
   RotateCcw,
   Scissors,
-} from "lucide-react"
+} from "lucide-react";
 import type {
   ChunkingParams,
   IndexRun,
   IndexType,
   VectorStoreId,
-} from "@/core/types"
-import { getEmbeddingModel } from "@/core/embeddings/registry"
-import { getVectorStore } from "@/core/vector-stores/registry"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Skeleton } from "@/components/ui/skeleton"
-import { toast } from "sonner"
+} from "@/core/types";
+import { getEmbeddingModel } from "@/core/embeddings/registry";
+import { getVectorStore } from "@/core/vector-stores/registry";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface IndexStatus {
-  run: IndexRun | null
-  running: boolean
-  docCount: number
-  charCount: number
-  ready: boolean
-  blockers: string[]
+  run: IndexRun | null;
+  running: boolean;
+  docCount: number;
+  charCount: number;
+  ready: boolean;
+  blockers: string[];
   config: {
-    embeddingModelId: string
-    vectorStore: VectorStoreId
-    indexType: IndexType
-    chunking: ChunkingParams
-  }
+    embeddingModelId: string;
+    vectorStore: VectorStoreId;
+    indexType: IndexType;
+    chunking: ChunkingParams;
+  };
 }
 
-const ACTIVE: IndexRun["status"][] = ["chunking", "embedding", "upserting"]
+const ACTIVE: IndexRun["status"][] = ["chunking", "embedding", "upserting"];
 
 export function IndexWorkspace() {
-  const [starting, setStarting] = useState(false)
+  const [starting, setStarting] = useState(false);
   const { data, isLoading, mutate } = useSWR<IndexStatus>(
     "/api/index",
     fetcher,
@@ -60,40 +60,44 @@ export function IndexWorkspace() {
       refreshInterval: (d) =>
         d?.run && ACTIVE.includes(d.run.status) ? 1000 : 0,
     },
-  )
+  );
 
   if (isLoading || !data) {
     return (
       <div className="px-6 py-6 md:px-8">
         <Skeleton className="h-40 w-full" />
       </div>
-    )
+    );
   }
 
-  const { run, ready, blockers, docCount, charCount, config } = data
-  const running = Boolean(run && ACTIVE.includes(run.status))
+  const { run, ready, blockers, docCount, charCount, config } = data;
+  const running = Boolean(run && ACTIVE.includes(run.status));
 
   async function build() {
-    setStarting(true)
+    setStarting(true);
     try {
-      const res = await fetch("/api/index", { method: "POST" })
-      const body = await res.json()
+      const res = await fetch("/api/index", { method: "POST" });
+      const body = await res.json();
       if (!res.ok) {
-        toast.error(body.error ?? "Could not start indexing.")
-        return
+        toast.error(body.error ?? "Could not start indexing.");
+        return;
       }
-      toast.success("Indexing started.")
-      mutate()
+      toast.success("Indexing started.");
+      mutate();
     } catch {
-      toast.error("Could not start indexing.")
+      toast.error("Could not start indexing.");
     } finally {
-      setStarting(false)
+      setStarting(false);
     }
   }
 
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
-      <ConfigSummary config={config} docCount={docCount} charCount={charCount} />
+      <ConfigSummary
+        config={config}
+        docCount={docCount}
+        charCount={charCount}
+      />
 
       {!ready && (
         <Alert variant="destructive">
@@ -137,7 +141,7 @@ export function IndexWorkspace() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 function ConfigSummary({
@@ -145,12 +149,12 @@ function ConfigSummary({
   docCount,
   charCount,
 }: {
-  config: IndexStatus["config"]
-  docCount: number
-  charCount: number
+  config: IndexStatus["config"];
+  docCount: number;
+  charCount: number;
 }) {
-  const model = getEmbeddingModel(config.embeddingModelId)
-  const store = getVectorStore(config.vectorStore)
+  const model = getEmbeddingModel(config.embeddingModelId);
+  const store = getVectorStore(config.vectorStore);
 
   const items = [
     {
@@ -181,7 +185,7 @@ function ConfigSummary({
       value: `${docCount.toLocaleString()} docs`,
       hint: `${charCount.toLocaleString()} chars`,
     },
-  ]
+  ];
 
   return (
     <Card>
@@ -212,7 +216,7 @@ function ConfigSummary({
         </dl>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 const STATUS_COPY: Record<
@@ -225,7 +229,7 @@ const STATUS_COPY: Record<
   upserting: { label: "Storing", phase: "Writing vectors to the store" },
   completed: { label: "Completed" },
   failed: { label: "Failed" },
-}
+};
 
 function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
   if (!run) {
@@ -235,20 +239,20 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
           <Hash className="mb-1 size-6 text-muted-foreground/60" />
           <p className="text-sm font-medium">No index built yet</p>
           <p className="text-sm text-muted-foreground">
-            Build an index to embed your corpus and make it searchable.
+            Build a Buddy-RAG index to embed your corpus and make it searchable.
           </p>
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  const copy = STATUS_COPY[run.status]
+  const copy = STATUS_COPY[run.status];
   const pct =
     run.totalChunks > 0
       ? Math.round((run.processedChunks / run.totalChunks) * 100)
       : running
         ? 5
-        : 0
+        : 0;
 
   return (
     <Card>
@@ -311,7 +315,7 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -320,7 +324,7 @@ function Stat({ label, value }: { label: string; value: string }) {
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="font-mono text-sm tabular-nums">{value}</dd>
     </div>
-  )
+  );
 }
 
 function StatusBadge({ status }: { status: IndexRun["status"] }) {
@@ -329,8 +333,8 @@ function StatusBadge({ status }: { status: IndexRun["status"] }) {
       <Badge className="bg-primary/12 text-primary hover:bg-primary/12">
         Ready
       </Badge>
-    )
-  if (status === "failed") return <Badge variant="destructive">Failed</Badge>
+    );
+  if (status === "failed") return <Badge variant="destructive">Failed</Badge>;
   if (ACTIVE.includes(status))
     return (
       <span className="flex items-center gap-1.5 text-xs text-primary">
@@ -340,6 +344,6 @@ function StatusBadge({ status }: { status: IndexRun["status"] }) {
         </span>
         live
       </span>
-    )
-  return null
+    );
+  return null;
 }

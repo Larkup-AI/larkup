@@ -1,8 +1,8 @@
-import { promises as fs } from "node:fs"
-import path from "node:path"
-import { randomUUID } from "node:crypto"
-import { exec } from "node:child_process"
-import { promisify } from "node:util"
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 
 /**
  * Manages a LOCAL, self-hosted Firecrawl instance via Docker.
@@ -17,25 +17,25 @@ import { promisify } from "node:util"
  * it to decide whether to talk to the local instance or the Firecrawl cloud.
  */
 
-const execAsync = promisify(exec)
+const execAsync = promisify(exec);
 
-const DATA_DIR = path.join(process.cwd(), ".ragtoolkit")
-const STATE_PATH = path.join(DATA_DIR, "firecrawl-local.json")
-const COMPOSE_PATH = path.join(DATA_DIR, "firecrawl", "docker-compose.yml")
+const DATA_DIR = path.join(process.cwd(), ".ragtoolkit");
+const STATE_PATH = path.join(DATA_DIR, "firecrawl-local.json");
+const COMPOSE_PATH = path.join(DATA_DIR, "firecrawl", "docker-compose.yml");
 
-const CONTAINER_PREFIX = "ragtoolkit-firecrawl"
-const DEFAULT_PORT = 3002
-const IMAGE = "ghcr.io/firecrawl/firecrawl:latest"
+const CONTAINER_PREFIX = "ragtoolkit-firecrawl";
+const DEFAULT_PORT = 3002;
+const IMAGE = "ghcr.io/firecrawl/firecrawl:latest";
 
 export interface LocalFirecrawlState {
-  running: boolean
-  endpoint: string
-  apiKey: string
-  port: number
+  running: boolean;
+  endpoint: string;
+  apiKey: string;
+  port: number;
   /** docker compose project name */
-  project: string
-  startedAt?: string
-  lastError?: string
+  project: string;
+  startedAt?: string;
+  lastError?: string;
 }
 
 const EMPTY: LocalFirecrawlState = {
@@ -44,66 +44,66 @@ const EMPTY: LocalFirecrawlState = {
   apiKey: "",
   port: DEFAULT_PORT,
   project: CONTAINER_PREFIX,
-}
+};
 
 /* ----------------------------- state io ----------------------------- */
 
 export async function readLocalState(): Promise<LocalFirecrawlState> {
   try {
-    const raw = await fs.readFile(STATE_PATH, "utf8")
-    return { ...EMPTY, ...(JSON.parse(raw) as Partial<LocalFirecrawlState>) }
+    const raw = await fs.readFile(STATE_PATH, "utf8");
+    return { ...EMPTY, ...(JSON.parse(raw) as Partial<LocalFirecrawlState>) };
   } catch {
-    return EMPTY
+    return EMPTY;
   }
 }
 
 async function writeState(state: LocalFirecrawlState) {
-  await fs.mkdir(DATA_DIR, { recursive: true })
-  await fs.writeFile(STATE_PATH, JSON.stringify(state, null, 2), "utf8")
-  return state
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(STATE_PATH, JSON.stringify(state, null, 2), "utf8");
+  return state;
 }
 
 /* --------------------------- docker helpers ------------------------- */
 
 /** Resolve `docker compose` (v2) vs legacy `docker-compose`, or null if absent. */
 async function resolveDocker(): Promise<{
-  docker: boolean
-  compose: string | null
+  docker: boolean;
+  compose: string | null;
 }> {
   try {
-    await execAsync("docker version")
+    await execAsync("docker --version");
   } catch {
-    return { docker: false, compose: null }
+    return { docker: false, compose: null };
   }
   try {
-    await execAsync("docker compose version")
-    return { docker: true, compose: "docker compose" }
+    await execAsync("docker compose version");
+    return { docker: true, compose: "docker compose" };
   } catch {
     // fall through
   }
   try {
-    await execAsync("docker-compose version")
-    return { docker: true, compose: "docker-compose" }
+    await execAsync("docker-compose version");
+    return { docker: true, compose: "docker-compose" };
   } catch {
-    return { docker: true, compose: null }
+    return { docker: true, compose: null };
   }
 }
 
 export interface DockerAvailability {
-  docker: boolean
-  compose: boolean
-  message: string
+  docker: boolean;
+  compose: boolean;
+  message: string;
 }
 
 export async function checkDocker(): Promise<DockerAvailability> {
-  const { docker, compose } = await resolveDocker()
+  const { docker, compose } = await resolveDocker();
   if (!docker) {
     return {
       docker: false,
       compose: false,
       message:
         "Docker isn't available on this machine. Install Docker Desktop (or the Docker engine) and make sure it's running.",
-    }
+    };
   }
   if (!compose) {
     return {
@@ -111,9 +111,9 @@ export async function checkDocker(): Promise<DockerAvailability> {
       compose: false,
       message:
         "Docker is installed but the Compose plugin was not found. Install `docker compose` to launch Firecrawl locally.",
-    }
+    };
   }
-  return { docker: true, compose: true, message: "Docker is ready." }
+  return { docker: true, compose: true, message: "Docker is ready." };
 }
 
 /**
@@ -123,6 +123,27 @@ export async function checkDocker(): Promise<DockerAvailability> {
 function composeFile(apiKey: string, port: number) {
   return `# Auto-generated by RAG Toolkit. Do not edit by hand.
 services:
+  db:
+    image: ghcr.io/firecrawl/nuq-postgres:latest
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
   redis:
     image: redis:alpine
     command: redis-server --save "" --appendonly no
@@ -137,6 +158,8 @@ services:
   api:
     image: ${IMAGE}
     depends_on:
+      - db
+      - rabbitmq
       - redis
       - playwright-service
     ports:
@@ -150,46 +173,54 @@ services:
       USE_DB_AUTHENTICATION: "false"
       TEST_API_KEY: "${apiKey}"
       BULL_AUTH_KEY: "${apiKey}"
+      DATABASE_URL: "postgresql://user:password@db:5432/postgres"
+      NUQ_DATABASE_URL: "postgresql://user:password@db:5432/postgres"
+      NUQ_RABBITMQ_URL: "amqp://user:password@rabbitmq:5672"
     restart: unless-stopped
-`
+`;
 }
 
 /* ------------------------------ actions ----------------------------- */
 
 /** Launch (or re-attach to) a local Firecrawl via docker compose. */
 export async function startLocal(): Promise<LocalFirecrawlState> {
-  const avail = await checkDocker()
+  const avail = await checkDocker();
   if (!avail.compose) {
-    return writeState({ ...(await readLocalState()), running: false, lastError: avail.message })
+    return writeState({
+      ...(await readLocalState()),
+      running: false,
+      lastError: avail.message,
+    });
   }
 
-  const { compose } = await resolveDocker()
-  const prev = await readLocalState()
+  const { compose } = await resolveDocker();
+  const prev = await readLocalState();
   // Reuse an existing token if we have one, otherwise generate a fresh key.
-  const apiKey = prev.apiKey || `fc-local-${randomUUID()}`
-  const port = prev.port || DEFAULT_PORT
+  const apiKey = prev.apiKey || `fc-local-${randomUUID()}`;
+  const port = prev.port || DEFAULT_PORT;
 
-  await fs.mkdir(path.dirname(COMPOSE_PATH), { recursive: true })
-  await fs.writeFile(COMPOSE_PATH, composeFile(apiKey, port), "utf8")
+  await fs.mkdir(path.dirname(COMPOSE_PATH), { recursive: true });
+  await fs.writeFile(COMPOSE_PATH, composeFile(apiKey, port), "utf8");
 
   try {
     await execAsync(
       `${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" up -d`,
       { timeout: 180_000 },
-    )
+    );
   } catch (err) {
-    const message = err instanceof Error ? err.message : "docker compose failed"
+    const message =
+      err instanceof Error ? err.message : "docker compose failed";
     return writeState({
       ...prev,
       apiKey,
       port,
       running: false,
       lastError: message,
-    })
+    });
   }
 
-  const endpoint = `http://localhost:${port}`
-  const healthy = await waitForHealth(endpoint, 60_000)
+  const endpoint = `http://localhost:${port}`;
+  const healthy = await waitForHealth(endpoint, 60_000);
 
   return writeState({
     running: healthy,
@@ -201,35 +232,35 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
     lastError: healthy
       ? undefined
       : "Containers started but the API did not become healthy in time. It may still be warming up — try refreshing in a moment.",
-  })
+  });
 }
 
 /** Stop and remove the local Firecrawl containers. */
 export async function stopLocal(): Promise<LocalFirecrawlState> {
-  const { compose } = await resolveDocker()
-  const prev = await readLocalState()
+  const { compose } = await resolveDocker();
+  const prev = await readLocalState();
   if (compose) {
     try {
       await execAsync(
         `${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" down`,
         { timeout: 60_000 },
-      )
+      );
     } catch {
       // best-effort
     }
   }
-  return writeState({ ...prev, running: false, startedAt: undefined })
+  return writeState({ ...prev, running: false, startedAt: undefined });
 }
 
 /** Re-check whether the local instance is actually responding. */
 export async function refreshLocalStatus(): Promise<LocalFirecrawlState> {
-  const state = await readLocalState()
-  if (!state.startedAt) return state
-  const healthy = await isHealthy(state.endpoint)
+  const state = await readLocalState();
+  if (!state.startedAt) return state;
+  const healthy = await isHealthy(state.endpoint);
   if (healthy !== state.running) {
-    return writeState({ ...state, running: healthy })
+    return writeState({ ...state, running: healthy });
   }
-  return state
+  return state;
 }
 
 /* ------------------------------ health ------------------------------ */
@@ -239,19 +270,19 @@ async function isHealthy(endpoint: string): Promise<boolean> {
     const res = await fetch(endpoint, {
       method: "GET",
       signal: AbortSignal.timeout(4000),
-    })
+    });
     // Self-hosted Firecrawl root returns a friendly 200; any response means it's up.
-    return res.status > 0
+    return res.status > 0;
   } catch {
-    return false
+    return false;
   }
 }
 
 async function waitForHealth(endpoint: string, timeoutMs: number) {
-  const deadline = Date.now() + timeoutMs
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await isHealthy(endpoint)) return true
-    await new Promise((r) => setTimeout(r, 3000))
+    if (await isHealthy(endpoint)) return true;
+    await new Promise((r) => setTimeout(r, 3000));
   }
-  return false
+  return false;
 }
