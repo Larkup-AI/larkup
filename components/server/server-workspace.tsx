@@ -230,10 +230,10 @@ function LaunchPanel({ config }: { config: RagConfig }) {
           Launch locally
         </CardTitle>
         {state?.running && (
-          <span className="flex items-center gap-1.5 text-xs text-primary">
+          <span className="flex items-center gap-1.5 text-xs text-green-700">
             <span className="relative flex size-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex size-2 rounded-full bg-primary" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-600 opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-green-600" />
             </span>
             running on :{state.port}
           </span>
