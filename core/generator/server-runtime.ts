@@ -115,23 +115,13 @@ async function isHealthy(endpoint: string): Promise<boolean> {
 }
 
 /**
- * Launch the generated server locally. Only supported for LanceDB-local, since
- * cloud stores have nothing to run on the host.
+ * Launch the generated server locally.
  */
-export async function startServer(config: RagConfig): Promise<LocalServerState> {
+export async function startServer(config: RagConfig, serverApiKey?: string): Promise<LocalServerState> {
   const port = await resolvePort()
   const endpoint = `http://localhost:${port}`
 
-  const isLocalLance =
-    config.vectorStore === "lancedb" && config.storeConfig.mode !== "cloud"
-
-  if (!isLocalLance) {
-    return writeState({
-      ...emptyState(port),
-      lastError:
-        "Local launch is only available for LanceDB (local mode). For cloud stores, download the server and deploy it.",
-    })
-  }
+  // We allow running locally for all stores now.
 
   // Already running? reuse it.
   const prev = await readServerState()
@@ -163,10 +153,16 @@ export async function startServer(config: RagConfig): Promise<LocalServerState> 
     env: {
       ...process.env,
       PORT: String(port),
-      LANCEDB_MODE: "local",
-      LANCEDB_PATH: absDb,
-      LANCEDB_TABLE: config.storeConfig.tableName || "documents",
       TOP_K: String(config.topK),
+      SERVER_API_KEY: serverApiKey || "",
+      PINECONE_API_KEY: config.storeConfig.apiKey || "",
+      PINECONE_INDEX: config.storeConfig.indexName || "",
+      PINECONE_NAMESPACE: config.storeConfig.namespace || "",
+      LANCEDB_MODE: config.storeConfig.mode || "local",
+      LANCEDB_PATH: absDb,
+      LANCEDB_URI: config.storeConfig.uri || "",
+      LANCEDB_API_KEY: config.storeConfig.apiKey || "",
+      LANCEDB_TABLE: config.storeConfig.tableName || "documents",
     },
   })
   child.unref()

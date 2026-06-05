@@ -33,6 +33,9 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { CodeViewer } from "@/components/server/code-viewer"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -66,9 +69,19 @@ export function ServerWorkspace() {
 
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
-      <ServerSummary config={data.config} server={data.server} />
-      <LaunchPanel config={data.config} />
-      <FileExplorer files={data.server.files} project={data.server.projectName} />
+      <Tabs defaultValue="run" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="run">Run & Deploy</TabsTrigger>
+          <TabsTrigger value="code">Generated Code</TabsTrigger>
+        </TabsList>
+        <TabsContent value="run" className="space-y-6 mt-0">
+          <LaunchPanel config={data.config} />
+        </TabsContent>
+        <TabsContent value="code" className="space-y-6 mt-0">
+          <ServerSummary config={data.config} server={data.server} />
+          <FileExplorer files={data.server.files} project={data.server.projectName} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
@@ -166,8 +179,7 @@ function ServerSummary({
 
 function LaunchPanel({ config }: { config: RagConfig }) {
   const [busy, setBusy] = useState<"start" | "stop" | null>(null)
-  const isLocalLance =
-    config.vectorStore === "lancedb" && config.storeConfig.mode !== "cloud"
+  const [serverApiKey, setServerApiKey] = useState("")
 
   const { data, mutate } = useSWR<{ state: LocalServerState }>(
     "/api/server/local",
@@ -182,7 +194,7 @@ function LaunchPanel({ config }: { config: RagConfig }) {
       const res = await fetch("/api/server/local", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, serverApiKey }),
       })
       const body = await res.json()
       if (action === "start") {
@@ -197,6 +209,10 @@ function LaunchPanel({ config }: { config: RagConfig }) {
     } finally {
       setBusy(null)
     }
+  }
+
+  function handleDeploy() {
+    toast.info("Vercel requirements and SSH key to Hetzner deployment will be implemented later.")
   }
 
   return (
@@ -216,61 +232,66 @@ function LaunchPanel({ config }: { config: RagConfig }) {
           </span>
         )}
       </CardHeader>
-      <CardContent className="space-y-4">
-        {!isLocalLance ? (
+      <CardContent className="space-y-6">
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Spin up the generated server right here to test your RAG endpoints.
+          </p>
+
+          <div className="grid gap-2 max-w-sm">
+            <Label htmlFor="serverApiKey">Server API Key</Label>
+            <Input
+              id="serverApiKey"
+              placeholder="Set an API key to secure your server endpoints"
+              value={serverApiKey}
+              onChange={(e) => setServerApiKey(e.target.value)}
+            />
+          </div>
+
           <Alert>
             <ExternalLink className="size-4" />
-            <AlertTitle>Deploy-only for cloud stores</AlertTitle>
+            <AlertTitle>API Documentation</AlertTitle>
             <AlertDescription>
-              {getVectorStore(config.vectorStore).label} runs in the cloud, so
-              there&apos;s nothing to launch on this machine. Download the
-              server above and deploy it to Docker or Vercel.
+              We will use <a href="https://scalar.com/" target="_blank" rel="noreferrer" className="text-primary hover:underline">scalar.com</a> for full API endpoint documentation once the server handles all operations (add document, delete, scrape, query).
             </AlertDescription>
           </Alert>
-        ) : (
-          <>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Spin up the generated server right here. It points at the same
-              on-disk LanceDB table you indexed into, installs its minimal deps,
-              and serves <code className="font-mono text-xs">/query</code> on a
-              local port.
-            </p>
 
-            {state?.lastError && !state.running && (
-              <Alert variant="destructive">
-                <AlertTitle>Launch failed</AlertTitle>
-                <AlertDescription className="break-words">
-                  {state.lastError}
-                </AlertDescription>
-              </Alert>
-            )}
+          {state?.lastError && !state.running && (
+            <Alert variant="destructive">
+              <AlertTitle>Launch failed</AlertTitle>
+              <AlertDescription className="break-words">
+                {state.lastError}
+              </AlertDescription>
+            </Alert>
+          )}
 
-            <div className="flex flex-wrap items-center gap-3">
-              {state?.running ? (
-                <>
-                  <Button
-                    variant="destructive"
-                    onClick={() => control("stop")}
-                    disabled={busy !== null}
-                  >
-                    {busy === "stop" ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Square className="size-4" />
-                    )}
-                    Stop server
-                  </Button>
-                  <a
-                    href={`${state.endpoint}/health`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={buttonVariants({ variant: "outline" })}
-                  >
-                    <ExternalLink className="size-4" />
-                    {state.endpoint}
-                  </a>
-                </>
-              ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            {state?.running ? (
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={() => control("stop")}
+                  disabled={busy !== null}
+                >
+                  {busy === "stop" ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Square className="size-4" />
+                  )}
+                  Stop server
+                </Button>
+                <a
+                  href={`${state.endpoint}/health`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={buttonVariants({ variant: "outline" })}
+                >
+                  <ExternalLink className="size-4" />
+                  {state.endpoint}
+                </a>
+              </>
+            ) : (
+              <>
                 <Button onClick={() => control("start")} disabled={busy !== null}>
                   {busy === "start" ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -279,8 +300,14 @@ function LaunchPanel({ config }: { config: RagConfig }) {
                   )}
                   {busy === "start" ? "Starting…" : "Launch local server"}
                 </Button>
-              )}
-            </div>
+                <Button variant="secondary" onClick={handleDeploy}>
+                  <Rocket className="size-4 mr-2" />
+                  Deploy
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
 
             {state?.running && (
               <div className="rounded-lg border border-border bg-muted/40 p-3">
@@ -293,8 +320,6 @@ function LaunchPanel({ config }: { config: RagConfig }) {
                 />
               </div>
             )}
-          </>
-        )}
       </CardContent>
     </Card>
   )

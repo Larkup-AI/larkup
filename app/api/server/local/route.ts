@@ -19,9 +19,11 @@ export async function GET() {
 /** POST { action: "start" | "stop" } — control the local generated server. */
 export async function POST(req: Request) {
   let action = "start"
+  let serverApiKey = ""
   try {
     const body = await req.json()
     if (body?.action) action = String(body.action)
+    if (body?.serverApiKey) serverApiKey = String(body.serverApiKey)
   } catch {
     // default to start
   }
@@ -35,6 +37,6 @@ export async function POST(req: Request) {
   }
 
   const config = await readConfig()
-  const state = await startServer(config)
+  const state = await startServer(config, serverApiKey)
   return NextResponse.json({ state })
 }
