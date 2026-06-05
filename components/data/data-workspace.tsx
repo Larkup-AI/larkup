@@ -81,14 +81,14 @@ export function DataWorkspace() {
         <FirecrawlNotice cloudConfigured={configured} onChange={refreshAll} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 lg:items-stretch">
         {/* Ingest */}
-        <div className="lg:col-span-2">
-          <Card>
+        <div className="lg:col-span-2 flex flex-col">
+          <Card className="flex flex-col flex-1">
             <CardHeader>
               <CardTitle className="text-base">Load data</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1">
               <Tabs defaultValue="scrape">
                 <TabsList>
                   <TabsTrigger value="scrape">
@@ -119,9 +119,9 @@ export function DataWorkspace() {
         </div>
 
         {/* Jobs */}
-        <div className="lg:col-span-1">
-          <Card className="h-full">
-            <CardHeader className="flex-row items-center justify-between">
+        <div className="lg:col-span-1 flex flex-col">
+          <Card className="flex flex-col flex-1">
+            <CardHeader className="flex-row items-center justify-between shrink-0">
               <CardTitle className="text-base">ETL jobs</CardTitle>
               {hasActive && (
                 <span className="flex items-center gap-1.5 text-xs text-primary">
@@ -133,11 +133,12 @@ export function DataWorkspace() {
                 </span>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 overflow-y-auto min-h-0">
               {jobsQuery.isLoading ? (
                 <div className="space-y-3">
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
                 </div>
               ) : (
                 <JobsPanel jobs={jobs} onChanged={refreshAll} />
