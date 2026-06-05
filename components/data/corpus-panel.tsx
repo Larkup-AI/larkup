@@ -404,7 +404,7 @@ function DocumentDialog({
           <ScrollArea className="max-h-[60vh] rounded-md border border-border bg-muted/30">
             <pre
               className={cn(
-                "whitespace-pre-wrap px-4 py-3 font-mono text-xs leading-relaxed text-foreground",
+                "whitespace-pre-wrap break-all px-4 py-3 font-mono text-xs leading-relaxed text-foreground",
               )}
             >
               {doc?.content}
