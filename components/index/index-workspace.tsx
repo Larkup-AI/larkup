@@ -41,6 +41,7 @@ interface IndexStatus {
   charCount: number;
   ready: boolean;
   blockers: string[];
+  unindexedCount: number;
   config: {
     embeddingModelId: string;
     vectorStore: VectorStoreId;
@@ -70,13 +71,17 @@ export function IndexWorkspace() {
     );
   }
 
-  const { run, ready, blockers, docCount, charCount, config } = data;
+  const { run, ready, blockers, docCount, charCount, unindexedCount, config } = data;
   const running = Boolean(run && ACTIVE.includes(run.status));
 
-  async function build() {
+  async function build(incremental = false) {
     setStarting(true);
     try {
-      const res = await fetch("/api/index", { method: "POST" });
+      const res = await fetch("/api/index", { 
+        method: "POST",
+        body: JSON.stringify({ incremental }),
+        headers: { "Content-Type": "application/json" },
+      });
       const body = await res.json();
       if (!res.ok) {
         toast.error(body.error ?? "Could not start indexing.");
@@ -117,27 +122,31 @@ export function IndexWorkspace() {
 
       <div className="flex items-center gap-3">
         <Button
-          onClick={build}
-          disabled={!ready || running || starting}
+          onClick={() => build(run?.status === "completed")}
+          disabled={!ready || running || starting || (run?.status === "completed" && unindexedCount === 0)}
           size="lg"
         >
           {running || starting ? (
             <Loader2 className="size-4 animate-spin" />
-          ) : run?.status === "completed" ? (
-            <RotateCcw className="size-4" />
           ) : (
             <Play className="size-4" />
           )}
           {running
             ? "Indexing…"
             : run?.status === "completed"
-              ? "Re-build index"
+              ? `Index new documents (${unindexedCount})`
               : "Build index"}
         </Button>
         {run?.status === "completed" && (
-          <p className="text-sm text-muted-foreground">
-            Re-building replaces all existing vectors.
-          </p>
+          <Button
+            onClick={() => build(false)}
+            disabled={!ready || running || starting}
+            size="lg"
+            variant="outline"
+          >
+            <RotateCcw className="size-4 mr-2" />
+            Re-build index
+          </Button>
         )}
       </div>
     </div>

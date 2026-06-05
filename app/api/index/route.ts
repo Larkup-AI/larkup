@@ -41,6 +41,15 @@ export async function GET() {
   ])
   const { ready, blockers } = assessReadiness(config, stats.docCount)
 
+  let unindexedCount = 0
+  if (run?.status === "completed") {
+    const { readDocuments } = await import("@/core/documents-store")
+    const docs = await readDocuments()
+    unindexedCount = docs.filter(d => d.createdAt > run.startedAt).length
+  } else if (!run) {
+    unindexedCount = stats.docCount
+  }
+
   return NextResponse.json({
     run,
     running: await isRunning(),
@@ -48,6 +57,7 @@ export async function GET() {
     charCount: stats.charCount,
     ready,
     blockers,
+    unindexedCount,
     config: {
       embeddingModelId: config.embeddingModelId,
       vectorStore: config.vectorStore,
@@ -57,7 +67,7 @@ export async function GET() {
   })
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   if (await isRunning()) {
     return NextResponse.json(
       { error: "An indexing run is already in progress." },
@@ -74,9 +84,17 @@ export async function POST() {
     )
   }
 
+  let body: any = {}
+  try {
+    body = await req.json()
+  } catch {}
+  
+  const incremental = body.incremental === true
+  const previousRun = await readRun()
+
   const run = await createRun(config)
   // Fire-and-forget: the request returns immediately and the UI polls progress.
-  void runIndexer(run.id, config)
+  void runIndexer(run.id, config, incremental ? previousRun : null)
 
   return NextResponse.json({ run }, { status: 202 })
 }

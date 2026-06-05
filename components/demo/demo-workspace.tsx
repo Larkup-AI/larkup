@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import useSWR from "swr"
+import { useEffect, useState } from "react";
+import useSWR from "swr";
 import {
   AlertTriangle,
   CornerDownLeft,
@@ -13,120 +13,120 @@ import {
   Cpu,
   Database,
   ExternalLink,
-} from "lucide-react"
-import type { IndexType, VectorStoreId } from "@/core/types"
-import type { QueryHit } from "@/core/vector-stores/adapter"
-import { getEmbeddingModel } from "@/core/embeddings/registry"
-import { getVectorStore } from "@/core/vector-stores/registry"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "lucide-react";
+import type { IndexType, VectorStoreId } from "@/core/types";
+import type { QueryHit } from "@/core/vector-stores/adapter";
+import { getEmbeddingModel } from "@/core/embeddings/registry";
+import { getVectorStore } from "@/core/vector-stores/registry";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { useWorkspace } from "@/components/workspace/workspace-provider"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/select";
+import { useWorkspace } from "@/components/workspace/workspace-provider";
+import { cn } from "@/lib/utils";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface DemoStatus {
-  ready: boolean
-  blockers: string[]
-  indexed: boolean
-  server: { running: boolean; endpoint: string }
+  ready: boolean;
+  blockers: string[];
+  indexed: boolean;
+  server: { running: boolean; endpoint: string };
   config: {
-    projectName: string
-    embeddingModelId: string
-    vectorStore: VectorStoreId
-    indexType: IndexType
-    topK: number
-  }
+    projectName: string;
+    embeddingModelId: string;
+    vectorStore: VectorStoreId;
+    indexType: IndexType;
+    topK: number;
+  };
 }
 
 interface DemoResult {
-  query: string
-  hits: QueryHit[]
-  source: "server" | "direct"
-  endpoint?: string
-  tookMs: number
+  query: string;
+  hits: QueryHit[];
+  source: "server" | "direct";
+  endpoint?: string;
+  tookMs: number;
 }
 
-const TOP_K_PRESETS = [3, 5, 8, 10]
+const TOP_K_PRESETS = [1, 3, 5, 8, 10];
 
 const SAMPLE_QUERIES = [
   "What is this corpus about?",
   "Summarize the key concepts.",
   "How does retrieval work?",
-]
+];
 
 export function DemoWorkspace() {
-  const { servers, activeServer } = useWorkspace()
-  const [serverId, setServerId] = useState<string | null>(null)
+  const { servers, activeServer } = useWorkspace();
+  const [serverId, setServerId] = useState<string | null>(null);
 
   // Default the demo target to the active server once the workspace loads.
   useEffect(() => {
-    if (!serverId && activeServer) setServerId(activeServer.id)
-  }, [serverId, activeServer])
+    if (!serverId && activeServer) setServerId(activeServer.id);
+  }, [serverId, activeServer]);
 
   const statusKey = serverId
     ? `/api/demo?serverId=${encodeURIComponent(serverId)}`
-    : "/api/demo"
+    : "/api/demo";
   const { data, isLoading } = useSWR<DemoStatus>(statusKey, fetcher, {
     refreshInterval: 5000,
-  })
+  });
 
-  const [query, setQuery] = useState("")
-  const [topK, setTopK] = useState<number>(5)
-  const [running, setRunning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<DemoResult | null>(null)
+  const [query, setQuery] = useState("");
+  const [topK, setTopK] = useState<number>(5);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<DemoResult | null>(null);
 
   // Clear any stale result when switching the target server.
   useEffect(() => {
-    setResult(null)
-    setError(null)
-  }, [serverId])
+    setResult(null);
+    setError(null);
+  }, [serverId]);
 
   if (isLoading || !data) {
     return (
       <div className="px-6 py-6 md:px-8">
         <Skeleton className="h-40 w-full" />
       </div>
-    )
+    );
   }
 
-  const { ready, blockers, server, config } = data
+  const { ready, blockers, server, config } = data;
 
   async function run(q: string) {
-    const question = q.trim()
-    if (!question) return
-    setRunning(true)
-    setError(null)
+    const question = q.trim();
+    if (!question) return;
+    setRunning(true);
+    setError(null);
     try {
       const res = await fetch("/api/demo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: question, topK, serverId }),
-      })
-      const body = await res.json()
+      });
+      const body = await res.json();
       if (!res.ok) {
-        setError(body.error ?? "Query failed.")
-        setResult(null)
-        return
+        setError(body.error ?? "Query failed.");
+        setResult(null);
+        return;
       }
-      setResult(body as DemoResult)
+      setResult(body as DemoResult);
     } catch {
-      setError("Could not reach the retrieval endpoint.")
-      setResult(null)
+      setError("Could not reach the retrieval endpoint.");
+      setResult(null);
     } finally {
-      setRunning(false)
+      setRunning(false);
     }
   }
 
@@ -195,8 +195,8 @@ export function DemoWorkspace() {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault()
-                  run(query)
+                  e.preventDefault();
+                  run(query);
                 }
               }}
               placeholder="Ask a question to retrieve the most relevant chunks…"
@@ -218,7 +218,7 @@ export function DemoWorkspace() {
                     className={cn(
                       "min-w-8 rounded-md px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
                       topK === k
-                        ? "bg-background text-foreground shadow-sm"
+                        ? "bg-white border text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
@@ -254,8 +254,8 @@ export function DemoWorkspace() {
                   key={s}
                   type="button"
                   onClick={() => {
-                    setQuery(s)
-                    run(s)
+                    setQuery(s);
+                    run(s);
                   }}
                   className="rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
@@ -279,18 +279,18 @@ export function DemoWorkspace() {
 
       {!running && result && <Results result={result} />}
     </div>
-  )
+  );
 }
 
 function SourceSummary({
   server,
   config,
 }: {
-  server: DemoStatus["server"]
-  config: DemoStatus["config"]
+  server: DemoStatus["server"];
+  config: DemoStatus["config"];
 }) {
-  const model = getEmbeddingModel(config.embeddingModelId)
-  const store = getVectorStore(config.vectorStore)
+  const model = getEmbeddingModel(config.embeddingModelId);
+  const store = getVectorStore(config.vectorStore);
 
   return (
     <Card>
@@ -312,15 +312,27 @@ function SourceSummary({
           )}
         </div>
 
-        <Meta icon={Cpu} label="Model" value={model?.label ?? config.embeddingModelId} />
-        <Meta icon={Database} label="Store" value={store?.label ?? config.vectorStore} />
-        <Meta icon={Sparkles} label="Index" value={config.indexType.toUpperCase()} />
+        <Meta
+          icon={Cpu}
+          label="Model"
+          value={model?.label ?? config.embeddingModelId}
+        />
+        <Meta
+          icon={Database}
+          label="Store"
+          value={store?.label ?? config.vectorStore}
+        />
+        <Meta
+          icon={Sparkles}
+          label="Index"
+          value={config.indexType.toUpperCase()}
+        />
         {server.running && (
           <Meta icon={Server} label="Endpoint" value={server.endpoint} mono />
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function Meta({
@@ -329,10 +341,10 @@ function Meta({
   value,
   mono,
 }: {
-  icon: typeof Cpu
-  label: string
-  value: string
-  mono?: boolean
+  icon: typeof Cpu;
+  label: string;
+  value: string;
+  mono?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -341,12 +353,15 @@ function Meta({
         {label}
       </span>
       <span
-        className={cn("text-sm font-medium leading-tight", mono && "font-mono text-xs")}
+        className={cn(
+          "text-sm font-medium leading-tight",
+          mono && "font-mono text-xs",
+        )}
       >
         {value}
       </span>
     </div>
-  )
+  );
 }
 
 function Results({ result }: { result: DemoResult }) {
@@ -362,7 +377,7 @@ function Results({ result }: { result: DemoResult }) {
           </p>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -381,11 +396,11 @@ function Results({ result }: { result: DemoResult }) {
         <HitCard key={hit.id || i} hit={hit} rank={i + 1} />
       ))}
     </div>
-  )
+  );
 }
 
 function HitCard({ hit, rank }: { hit: QueryHit; rank: number }) {
-  const pct = Math.round(Math.min(Math.max(hit.score, 0), 1) * 100)
+  const pct = Math.round(Math.min(Math.max(hit.score, 0), 1) * 100);
   return (
     <Card className="overflow-hidden">
       <CardContent className="flex gap-4 py-4">
@@ -412,7 +427,9 @@ function HitCard({ hit, rank }: { hit: QueryHit; rank: number }) {
           </div>
 
           <p className="text-sm leading-relaxed text-muted-foreground">
-            {hit.text.length > 360 ? `${hit.text.slice(0, 360).trim()}…` : hit.text}
+            {hit.text.length > 360
+              ? `${hit.text.slice(0, 360).trim()}…`
+              : hit.text}
           </p>
 
           {hit.url && (
@@ -429,7 +446,7 @@ function HitCard({ hit, rank }: { hit: QueryHit; rank: number }) {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function ResultsSkeleton({ count }: { count: number }) {
@@ -448,5 +465,5 @@ function ResultsSkeleton({ count }: { count: number }) {
         </Card>
       ))}
     </div>
-  )
+  );
 }

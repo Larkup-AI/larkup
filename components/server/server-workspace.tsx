@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import useSWR from "swr"
+import { useState } from "react";
+import useSWR from "swr";
 import {
   CheckCircle2,
   Copy,
@@ -16,61 +16,61 @@ import {
   Server,
   Square,
   Terminal,
-} from "lucide-react"
-import type { RagConfig } from "@/core/types"
+} from "lucide-react";
+import type { RagConfig } from "@/core/types";
 import type {
   GeneratedFile,
   GeneratedServer,
-} from "@/core/generator/generate-server"
-import { getVectorStore } from "@/core/vector-stores/registry"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Skeleton } from "@/components/ui/skeleton"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
-import { toast } from "sonner"
-import { CodeViewer } from "@/components/server/code-viewer"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/core/generator/generate-server";
+import { getVectorStore } from "@/core/vector-stores/registry";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { CodeViewer } from "@/components/server/code-viewer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface GenerateResponse {
-  config: RagConfig
-  server: GeneratedServer
+  config: RagConfig;
+  server: GeneratedServer;
 }
 
 interface LocalServerState {
-  running: boolean
-  pid?: number
-  port: number
-  endpoint: string
-  startedAt?: string
-  lastError?: string
+  running: boolean;
+  pid?: number;
+  port: number;
+  endpoint: string;
+  startedAt?: string;
+  lastError?: string;
 }
 
 export function ServerWorkspace() {
   const { data, isLoading } = useSWR<GenerateResponse>(
     "/api/server/generate",
     fetcher,
-  )
+  );
 
   if (isLoading || !data) {
     return (
       <div className="px-6 py-6 md:px-8">
-        <Skeleton className="h-[28rem] w-full" />
+        <Skeleton className="h-112 w-full" />
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
       <Tabs defaultValue="run" className="w-full">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4  border">
           <TabsTrigger value="run">Run & Deploy</TabsTrigger>
           <TabsTrigger value="code">Generated Code</TabsTrigger>
         </TabsList>
@@ -79,23 +79,26 @@ export function ServerWorkspace() {
         </TabsContent>
         <TabsContent value="code" className="space-y-6 mt-0">
           <ServerSummary config={data.config} server={data.server} />
-          <FileExplorer files={data.server.files} project={data.server.projectName} />
+          <FileExplorer
+            files={data.server.files}
+            project={data.server.projectName}
+          />
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
 
 function ServerSummary({
   config,
   server,
 }: {
-  config: RagConfig
-  server: GeneratedServer
+  config: RagConfig;
+  server: GeneratedServer;
 }) {
-  const store = getVectorStore(config.vectorStore)
-  const deps = Object.entries(server.dependencies)
-  const requiredEnv = server.envVars.filter((e) => e.required)
+  const store = getVectorStore(config.vectorStore);
+  const deps = Object.entries(server.dependencies);
+  const requiredEnv = server.envVars.filter((e) => e.required);
 
   return (
     <Card>
@@ -110,7 +113,8 @@ function ServerSummary({
           A standalone, dependency-minimal RAG server tailored to your{" "}
           <span className="font-medium text-foreground">{store.label}</span>{" "}
           configuration. It ships only the packages this store needs — no build
-          step, runs with <code className="font-mono text-xs">node server.mjs</code>.
+          step, runs with{" "}
+          <code className="font-mono text-xs">node server.mjs</code>.
         </p>
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -152,7 +156,8 @@ function ServerSummary({
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              Set these in <code className="font-mono">.env</code> before running.
+              Set these in <code className="font-mono">.env</code> before
+              running.
             </p>
           </div>
         </div>
@@ -174,45 +179,47 @@ function ServerSummary({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function LaunchPanel({ config }: { config: RagConfig }) {
-  const [busy, setBusy] = useState<"start" | "stop" | null>(null)
-  const [serverApiKey, setServerApiKey] = useState("")
+  const [busy, setBusy] = useState<"start" | "stop" | null>(null);
+  const [serverApiKey, setServerApiKey] = useState("");
 
   const { data, mutate } = useSWR<{ state: LocalServerState }>(
     "/api/server/local",
     fetcher,
     { refreshInterval: (d) => (d?.state.running ? 5000 : 0) },
-  )
-  const state = data?.state
+  );
+  const state = data?.state;
 
   async function control(action: "start" | "stop") {
-    setBusy(action)
+    setBusy(action);
     try {
       const res = await fetch("/api/server/local", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, serverApiKey }),
-      })
-      const body = await res.json()
+      });
+      const body = await res.json();
       if (action === "start") {
-        if (body.state?.running) toast.success("Local server is running.")
-        else toast.error(body.state?.lastError ?? "Server did not start.")
+        if (body.state?.running) toast.success("Local server is running.");
+        else toast.error(body.state?.lastError ?? "Server did not start.");
       } else {
-        toast.success("Local server stopped.")
+        toast.success("Local server stopped.");
       }
-      mutate()
+      mutate();
     } catch {
-      toast.error("Could not reach the local server controller.")
+      toast.error("Could not reach the local server controller.");
     } finally {
-      setBusy(null)
+      setBusy(null);
     }
   }
 
   function handleDeploy() {
-    toast.info("Vercel requirements and SSH key to Hetzner deployment will be implemented later.")
+    toast.info(
+      "Vercel requirements and SSH key to Hetzner deployment will be implemented later.",
+    );
   }
 
   return (
@@ -252,14 +259,24 @@ function LaunchPanel({ config }: { config: RagConfig }) {
             <ExternalLink className="size-4" />
             <AlertTitle>API Documentation</AlertTitle>
             <AlertDescription>
-              We will use <a href="https://scalar.com/" target="_blank" rel="noreferrer" className="text-primary hover:underline">scalar.com</a> for full API endpoint documentation once the server handles all operations (add document, delete, scrape, query).
+              We will use{" "}
+              <a
+                href="https://scalar.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary hover:underline"
+              >
+                scalar.com
+              </a>{" "}
+              for full API endpoint documentation once the server handles all
+              operations (add document, delete, scrape, query).
             </AlertDescription>
           </Alert>
 
           {state?.lastError && !state.running && (
             <Alert variant="destructive">
               <AlertTitle>Launch failed</AlertTitle>
-              <AlertDescription className="break-words">
+              <AlertDescription className="wrap-break-word">
                 {state.lastError}
               </AlertDescription>
             </Alert>
@@ -292,7 +309,10 @@ function LaunchPanel({ config }: { config: RagConfig }) {
               </>
             ) : (
               <>
-                <Button onClick={() => control("start")} disabled={busy !== null}>
+                <Button
+                  onClick={() => control("start")}
+                  disabled={busy !== null}
+                >
                   {busy === "start" ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
@@ -309,33 +329,33 @@ function LaunchPanel({ config }: { config: RagConfig }) {
           </div>
         </div>
 
-            {state?.running && (
-              <div className="rounded-lg border border-border bg-muted/40 p-3">
-                <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <Terminal className="size-3.5" />
-                  Try it
-                </div>
-                <CodeLine
-                  text={`curl -X POST ${state.endpoint}/query -H "Content-Type: application/json" -d '{"query":"hello"}'`}
-                />
-              </div>
-            )}
+        {state?.running && (
+          <div className="rounded-lg border border-border bg-muted/40 p-3">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Terminal className="size-3.5" />
+              Try it
+            </div>
+            <CodeLine
+              text={`curl -X POST ${state.endpoint}/query -H "Content-Type: application/json" -d '{"query":"hello"}'`}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function FileExplorer({
   files,
   project,
 }: {
-  files: GeneratedFile[]
-  project: string
+  files: GeneratedFile[];
+  project: string;
 }) {
   const [active, setActive] = useState(
     files.find((f) => f.path === "server.mjs")?.path ?? files[0]?.path,
-  )
-  const current = files.find((f) => f.path === active)
+  );
+  const current = files.find((f) => f.path === active);
 
   return (
     <Card className="overflow-hidden">
@@ -348,7 +368,7 @@ function FileExplorer({
       <CardContent className="p-0">
         <div className="grid grid-cols-1 md:grid-cols-[220px_1fr]">
           <nav className="border-b border-border md:border-b-0 md:border-r">
-            <ScrollArea className="h-auto md:h-[28rem]">
+            <ScrollArea className="h-auto md:h-112">
               <ul className="p-2">
                 {files.map((f) => (
                   <li key={f.path}>
@@ -380,7 +400,7 @@ function FileExplorer({
                   </span>
                   <CopyButton text={current.contents} />
                 </div>
-                <div className="h-[24rem] md:h-[26rem]">
+                <div className="h-96 md:h-104">
                   <CodeViewer
                     value={current.contents}
                     language={current.language}
@@ -393,20 +413,20 @@ function FileExplorer({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false);
   return (
     <Button
       variant="ghost"
       size="sm"
       className="h-7 gap-1.5 text-xs"
       onClick={async () => {
-        await navigator.clipboard.writeText(text)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1500)
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
       }}
     >
       {copied ? (
@@ -416,7 +436,7 @@ function CopyButton({ text }: { text: string }) {
       )}
       {copied ? "Copied" : "Copy"}
     </Button>
-  )
+  );
 }
 
 function CodeLine({ text }: { text: string }) {
@@ -427,5 +447,5 @@ function CodeLine({ text }: { text: string }) {
       </code>
       <CopyButton text={text} />
     </div>
-  )
+  );
 }

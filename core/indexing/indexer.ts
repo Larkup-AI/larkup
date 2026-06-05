@@ -44,16 +44,31 @@ export async function createRun(config: RagConfig): Promise<IndexRun> {
 export async function runIndexer(
   runId: string,
   config: RagConfig,
+  previousRun: IndexRun | null = null,
 ): Promise<void> {
   const started = Date.now()
   try {
-    const docs = await readDocuments()
+    let docs = await readDocuments()
+    
+    if (previousRun && previousRun.status === "completed") {
+      docs = docs.filter(d => d.createdAt > previousRun.startedAt)
+    }
+
     if (docs.length === 0) {
-      await patchRun({
-        status: "failed",
-        error: "The corpus is empty. Load documents before indexing.",
-        finishedAt: new Date().toISOString(),
-      })
+      if (previousRun) {
+        await patchRun({
+          status: "completed",
+          docCount: 0,
+          finishedAt: new Date().toISOString(),
+          durationMs: Date.now() - started,
+        })
+      } else {
+        await patchRun({
+          status: "failed",
+          error: "The corpus is empty. Load documents before indexing.",
+          finishedAt: new Date().toISOString(),
+        })
+      }
       return
     }
 
@@ -61,16 +76,24 @@ export async function runIndexer(
     await patchRun({ status: "chunking", docCount: docs.length })
     const chunks = chunkCorpus(docs, config.chunking)
     if (chunks.length === 0) {
-      await patchRun({
-        status: "failed",
-        error: "No chunks were produced from the corpus.",
-        finishedAt: new Date().toISOString(),
-      })
+      if (previousRun) {
+        await patchRun({
+          status: "completed",
+          finishedAt: new Date().toISOString(),
+          durationMs: Date.now() - started,
+        })
+      } else {
+        await patchRun({
+          status: "failed",
+          error: "No chunks were produced from the corpus.",
+          finishedAt: new Date().toISOString(),
+        })
+      }
       return
     }
     await patchRun({ totalChunks: chunks.length, status: "embedding" })
 
-    // 2) Prepare the store (fresh full re-index)
+    // 2) Prepare the store
     const adapter = await createAdapter(config)
     let dimensions = expectedDimensions(config.embeddingModelId)
 
@@ -91,7 +114,9 @@ export async function runIndexer(
       // Initialize + reset the store once we know the real vector size.
       if (!initialized) {
         await adapter.init(dimensions)
-        await adapter.reset()
+        if (!previousRun) {
+          await adapter.reset()
+        }
         initialized = true
         await patchRun({ dimensions })
       }
