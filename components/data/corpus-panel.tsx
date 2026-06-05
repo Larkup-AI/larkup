@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { toast } from "sonner"
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   FileText,
   Trash2,
@@ -11,14 +11,14 @@ import {
   Pencil,
   Loader2,
   X,
-} from "lucide-react"
-import type { DocumentSource, SourceDocument } from "@/core/types"
-import { ConfirmModal } from "@/components/ui/confirm-modal"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "lucide-react";
+import type { DocumentSource, SourceDocument } from "@/core/types";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -26,7 +26,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -34,10 +34,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Checkbox } from "@/components/ui/checkbox"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 
 const SOURCE_META: Record<
   DocumentSource,
@@ -46,42 +46,47 @@ const SOURCE_META: Record<
   scrape: { label: "Scraped", icon: Globe },
   paste: { label: "Pasted", icon: ClipboardPaste },
   upload: { label: "Uploaded", icon: FileUp },
-}
+};
 
 export function CorpusPanel({
   documents,
   onChanged,
 }: {
-  documents: SourceDocument[]
-  onChanged: () => void
+  documents: SourceDocument[];
+  onChanged: () => void;
 }) {
-  const [active, setActive] = useState<SourceDocument | null>(null)
-  const [deleteTask, setDeleteTask] = useState<{ type: "single"; doc: SourceDocument } | { type: "all" } | { type: "selected" } | null>(null)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [active, setActive] = useState<SourceDocument | null>(null);
+  const [deleteTask, setDeleteTask] = useState<
+    | { type: "single"; doc: SourceDocument }
+    | { type: "all" }
+    | { type: "selected" }
+    | null
+  >(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   async function del(id: string) {
-    await fetch(`/api/documents?id=${id}`, { method: "DELETE" })
-    toast.message("Document deleted")
+    await fetch(`/api/documents?id=${id}`, { method: "DELETE" });
+    toast.message("Document deleted");
     setSelectedIds((prev) => {
-      const next = new Set(prev)
-      next.delete(id)
-      return next
-    })
-    onChanged()
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    onChanged();
   }
   async function delSelected() {
-    if (selectedIds.size === 0) return
-    const ids = Array.from(selectedIds).join(",")
-    await fetch(`/api/documents?ids=${ids}`, { method: "DELETE" })
-    toast.message(`Deleted ${selectedIds.size} document(s)`)
-    setSelectedIds(new Set())
-    onChanged()
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds).join(",");
+    await fetch(`/api/documents?ids=${ids}`, { method: "DELETE" });
+    toast.message(`Deleted ${selectedIds.size} document(s)`);
+    setSelectedIds(new Set());
+    onChanged();
   }
   async function clearAll() {
-    await fetch("/api/documents", { method: "DELETE" })
-    toast.message("Corpus cleared")
-    setSelectedIds(new Set())
-    onChanged()
+    await fetch("/api/documents", { method: "DELETE" });
+    toast.message("Corpus cleared");
+    setSelectedIds(new Set());
+    onChanged();
   }
 
   if (documents.length === 0) {
@@ -94,7 +99,7 @@ export function CorpusPanel({
           stored locally and ready to index in the next step.
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -136,12 +141,15 @@ export function CorpusPanel({
             <TableRow className="bg-muted/50">
               <TableHead className="w-12">
                 <Checkbox
-                  checked={documents.length > 0 && selectedIds.size === documents.length}
+                  checked={
+                    documents.length > 0 &&
+                    selectedIds.size === documents.length
+                  }
                   onCheckedChange={(checked) => {
                     if (checked) {
-                      setSelectedIds(new Set(documents.map((d) => d.id)))
+                      setSelectedIds(new Set(documents.map((d) => d.id)));
                     } else {
-                      setSelectedIds(new Set())
+                      setSelectedIds(new Set());
                     }
                   }}
                   aria-label="Select all"
@@ -155,18 +163,18 @@ export function CorpusPanel({
           </TableHeader>
           <TableBody>
             {documents.map((doc) => {
-              const meta = SOURCE_META[doc.source]
-              const Icon = meta.icon
+              const meta = SOURCE_META[doc.source];
+              const Icon = meta.icon;
               return (
                 <TableRow key={doc.id}>
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.has(doc.id)}
                       onCheckedChange={(checked) => {
-                        const next = new Set(selectedIds)
-                        if (checked) next.add(doc.id)
-                        else next.delete(doc.id)
-                        setSelectedIds(next)
+                        const next = new Set(selectedIds);
+                        if (checked) next.add(doc.id);
+                        else next.delete(doc.id);
+                        setSelectedIds(next);
                       }}
                       aria-label="Select document"
                     />
@@ -217,7 +225,7 @@ export function CorpusPanel({
                     </div>
                   </TableCell>
                 </TableRow>
-              )
+              );
             })}
           </TableBody>
         </Table>
@@ -227,12 +235,12 @@ export function CorpusPanel({
         doc={active}
         onOpenChange={(o) => !o && setActive(null)}
         onSaved={() => {
-          setActive(null)
-          onChanged()
+          setActive(null);
+          onChanged();
         }}
         onDelete={(id) => {
           if (active) {
-            setDeleteTask({ type: "single", doc: active })
+            setDeleteTask({ type: "single", doc: active });
           }
         }}
       />
@@ -240,7 +248,7 @@ export function CorpusPanel({
       <ConfirmModal
         open={deleteTask !== null}
         onOpenChange={(open) => {
-          if (!open) setDeleteTask(null)
+          if (!open) setDeleteTask(null);
         }}
         title={
           deleteTask?.type === "all"
@@ -262,19 +270,19 @@ export function CorpusPanel({
         variant="destructive"
         onConfirm={() => {
           if (deleteTask?.type === "all") {
-            clearAll()
+            clearAll();
           } else if (deleteTask?.type === "selected") {
-            delSelected()
+            delSelected();
           } else if (deleteTask?.type === "single") {
-            del(deleteTask.doc.id)
+            del(deleteTask.doc.id);
             if (active?.id === deleteTask.doc.id) {
-              setActive(null)
+              setActive(null);
             }
           }
         }}
       />
     </>
-  )
+  );
 }
 
 function DocumentDialog({
@@ -283,34 +291,34 @@ function DocumentDialog({
   onSaved,
   onDelete,
 }: {
-  doc: SourceDocument | null
-  onOpenChange: (open: boolean) => void
-  onSaved: () => void
-  onDelete: (id: string) => void
+  doc: SourceDocument | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+  onDelete: (id: string) => void;
 }) {
-  const [editing, setEditing] = useState(false)
-  const [title, setTitle] = useState("")
-  const [url, setUrl] = useState("")
-  const [content, setContent] = useState("")
-  const [saving, setSaving] = useState(false)
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState("");
+  const [url, setUrl] = useState("");
+  const [content, setContent] = useState("");
+  const [saving, setSaving] = useState(false);
 
   // Reset local state whenever a different document is opened.
   useEffect(() => {
     if (doc) {
-      setEditing(false)
-      setTitle(doc.title)
-      setUrl(doc.url ?? "")
-      setContent(doc.content)
+      setEditing(false);
+      setTitle(doc.title);
+      setUrl(doc.url ?? "");
+      setContent(doc.content);
     }
-  }, [doc])
+  }, [doc]);
 
   async function save() {
-    if (!doc) return
+    if (!doc) return;
     if (!content.trim()) {
-      toast.error("Content can't be empty.")
-      return
+      toast.error("Content can't be empty.");
+      return;
     }
-    setSaving(true)
+    setSaving(true);
     try {
       const res = await fetch("/api/documents", {
         method: "PATCH",
@@ -321,24 +329,24 @@ function DocumentDialog({
           url: url.trim(),
           content,
         }),
-      })
+      });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        toast.error(body.error ?? "Failed to save document.")
-        return
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error ?? "Failed to save document.");
+        return;
       }
-      toast.success("Document saved")
-      onSaved()
+      toast.success("Document saved");
+      onSaved();
     } catch {
-      toast.error("Could not reach the server.")
+      toast.error("Could not reach the server.");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   return (
     <Dialog open={!!doc} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="w-full max-w-2xl ">
         <DialogHeader>
           <DialogTitle className="text-balance">
             {editing ? "Edit document" : doc?.title}
@@ -439,5 +447,5 @@ function DocumentDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
