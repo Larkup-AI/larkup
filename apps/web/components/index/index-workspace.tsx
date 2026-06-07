@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
 import {
   AlertTriangle,
@@ -63,6 +63,21 @@ export function IndexWorkspace() {
     },
   );
 
+  // Show a warning toast whenever the run's warning message changes
+  const lastWarning = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const warning = data?.run?.warning;
+    if (warning && warning !== lastWarning.current) {
+      toast.warning(warning, { id: "rate-limit-warning", duration: 70_000 });
+    } else if (!warning && lastWarning.current) {
+      toast.dismiss("rate-limit-warning");
+      toast.success("Rate limit resolved — resuming indexing.", {
+        duration: 3000,
+      });
+    }
+    lastWarning.current = warning;
+  }, [data?.run?.warning]);
+
   if (isLoading || !data) {
     return (
       <div className="px-6 py-6 md:px-8">
@@ -71,13 +86,14 @@ export function IndexWorkspace() {
     );
   }
 
-  const { run, ready, blockers, docCount, charCount, unindexedCount, config } = data;
+  const { run, ready, blockers, docCount, charCount, unindexedCount, config } =
+    data;
   const running = Boolean(run && ACTIVE.includes(run.status));
 
   async function build(incremental = false) {
     setStarting(true);
     try {
-      const res = await fetch("/api/index", { 
+      const res = await fetch("/api/index", {
         method: "POST",
         body: JSON.stringify({ incremental }),
         headers: { "Content-Type": "application/json" },
@@ -140,7 +156,12 @@ export function IndexWorkspace() {
       <div className="flex items-center gap-3">
         <Button
           onClick={() => build(run?.status === "completed")}
-          disabled={!ready || running || starting || (run?.status === "completed" && unindexedCount === 0)}
+          disabled={
+            !ready ||
+            running ||
+            starting ||
+            (run?.status === "completed" && unindexedCount === 0)
+          }
           size="lg"
         >
           {running || starting ? (
@@ -152,7 +173,7 @@ export function IndexWorkspace() {
             ? "Indexing…"
             : run?.status === "completed"
               ? `Index new documents (${unindexedCount})`
-              : "Build index"}
+              : "Start indexing"}
         </Button>
         {running && (
           <Button
@@ -172,7 +193,7 @@ export function IndexWorkspace() {
             variant="outline"
           >
             <RotateCcw className="size-4 mr-2" />
-            Re-build index
+            Re-Index
           </Button>
         )}
       </div>
@@ -326,7 +347,10 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
                   chunks
                 </span>
               </div>
-              <Progress value={pct} className="[&_[data-slot=progress-indicator]]:bg-green-600" />
+              <Progress
+                value={pct}
+                className="[&_[data-slot=progress-indicator]]:bg-green-600"
+              />
             </div>
 
             <dl className="grid grid-cols-2 gap-4 pt-1 sm:grid-cols-4">

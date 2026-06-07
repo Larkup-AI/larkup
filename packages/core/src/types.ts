@@ -247,6 +247,8 @@ export interface IndexRun {
   /** vector dimensions of the embeddings */
   dimensions: number
   error?: string
+  /** Transient warning (e.g. rate-limit pause). Cleared when resolved. */
+  warning?: string
   startedAt: string
   updatedAt: string
   finishedAt?: string

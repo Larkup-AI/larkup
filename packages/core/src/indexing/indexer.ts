@@ -94,7 +94,11 @@ export async function runIndexer(
     await patchRun({ totalChunks: chunks.length, status: "embedding" })
 
     // 2) Prepare the store
-    const adapter = await createAdapter(config)
+    const adapter = await createAdapter(config, async (waitSecs, attempt) => {
+      await patchRun({
+        warning: `Sparse model rate-limited — pausing ${waitSecs}s (retry ${attempt}/${3})…`,
+      })
+    })
     let dimensions = expectedDimensions(config.embeddingModelId)
 
     // 3) Embed + upsert in batches
@@ -136,7 +140,7 @@ export async function runIndexer(
       await adapter.upsert(records)
 
       processed += batch.length
-      await patchRun({ processedChunks: processed, status: "embedding" })
+      await patchRun({ processedChunks: processed, status: "embedding", warning: undefined })
     }
 
     await patchRun({

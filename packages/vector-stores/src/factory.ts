@@ -12,6 +12,7 @@ import type { VectorStoreAdapter } from "./adapter"
  */
 export async function createAdapter(
   config: RagConfig,
+  onRateLimit?: (waitSecs: number, attempt: number) => void | Promise<void>,
 ): Promise<VectorStoreAdapter> {
   switch (config.vectorStore) {
     case "pinecone": {
@@ -24,6 +25,7 @@ export async function createAdapter(
         namespace: config.storeConfig.namespace,
         sparseModel: config.storeConfig.sparseModel,
         indexType: config.indexType,
+        onRateLimit,
       })
     }
     case "lancedb":

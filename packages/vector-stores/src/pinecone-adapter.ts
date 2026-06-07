@@ -16,15 +16,15 @@ import type {
  * ── Hybrid / Lexical ───────────────────────────────────────────────────────
  *   Index metric: MUST be dotproduct
  *   Upsert: dense `values` + sparse `sparseValues` in the SAME record.
- *           Sparse vectors are generated via the Pinecone Inference API
- *           using the configured `sparseModel`
- *           (default: "pinecone-sparse-english-v0").
+ *           Sparse vectors are generated via Pinecone Inference API.
  *   Query:  dense ANN + sparse keyword search run in parallel,
- *           results merged with Reciprocal Rank Fusion (RRF, k=60).
+ *           merged via Reciprocal Rank Fusion (RRF, k=60).
  *
- * There is only ONE Pinecone index involved. The same `indexName` index
- * stores both dense and sparse vectors per record. No separate sparse index
- * is needed or used.
+ * ── Rate limiting ─────────────────────────────────────────────────────────
+ *   Pinecone's free plan caps the sparse model at 250k tokens/min.
+ *   The adapter uses a conservative batch size + inter-batch delay to stay
+ *   within that budget. On a 429 it pauses and retries automatically, calling
+ *   the optional `onRateLimit` hook so the caller can surface a UI warning.
  */
 
 interface PineconeConfig {
@@ -35,6 +35,11 @@ interface PineconeConfig {
   sparseModel?: string
   /** indexType drives whether sparse vectors are generated */
   indexType?: string
+  /**
+   * Called just before each rate-limit sleep so the caller can update UI.
+   * `waitSecs` is how long we'll wait; `attempt` is which retry (1-based).
+   */
+  onRateLimit?: (waitSecs: number, attempt: number) => void | Promise<void>
 }
 
 /** Must carry an index-signature to satisfy RecordMetadata */
@@ -48,11 +53,44 @@ interface PineMeta {
   [key: string]: string | number | boolean | string[]
 }
 
-/** Batch size for Pinecone Inference API sparse embed calls */
-const SPARSE_BATCH = 96
+/**
+ * Chunks per Inference API call.
+ * 48 chunks × 512 tokens (max) = 24,576 tokens per batch.
+ * With INTER_BATCH_DELAY_MS between calls that keeps us comfortably
+ * under Pinecone's 250k tokens/min starter limit.
+ */
+const SPARSE_BATCH = 48
 
-/** RRF constant — larger k reduces the impact of high-rank differences */
+/**
+ * Delay between consecutive sparse-embed batches (ms).
+ * 48 chunks × 512 tokens = 24,576 tokens; 250,000 ÷ 24,576 ≈ 10 safe
+ * batches/min → at least 6 000 ms between calls to stay in budget.
+ * We use 7 000 ms to give a comfortable margin.
+ */
+const INTER_BATCH_DELAY_MS = 7_000
+
+/** How long to wait on a 429 before retrying (ms). */
+const RATE_LIMIT_WAIT_MS = 65_000
+
+/** Maximum number of 429-retry attempts per batch. */
+const RATE_LIMIT_MAX_RETRIES = 3
+
+/** RRF constant */
 const RRF_K = 60
+
+function sleep(ms: number) {
+  return new Promise<void>((r) => setTimeout(r, ms))
+}
+
+function is429(err: unknown): boolean {
+  const e = err as any
+  return (
+    e?.status === 429 ||
+    e?.statusCode === 429 ||
+    String(e?.message ?? "").includes("429") ||
+    String(e?.message ?? "").includes("RESOURCE_EXHAUSTED")
+  )
+}
 
 export class PineconeAdapter implements VectorStoreAdapter {
   private client: Pinecone | null = null
@@ -89,7 +127,6 @@ export class PineconeAdapter implements VectorStoreAdapter {
     const exists = (indexes ?? []).some((i) => i.name === this.indexName)
 
     if (!exists) {
-      // Hybrid/lexical requires dotproduct; semantic works with cosine.
       const metric = this.needsSparse ? "dotproduct" : "cosine"
       await pc.createIndex({
         name: this.indexName,
@@ -111,42 +148,85 @@ export class PineconeAdapter implements VectorStoreAdapter {
     try { await this.ns().deleteAll() } catch { /* fresh index — ok */ }
   }
 
-  // ── Sparse vector generation via Pinecone Inference API ───────────────────
+  // ── Sparse vector generation with rate-limit handling ─────────────────────
+
+  /**
+   * Call Pinecone Inference API for one batch of texts, retrying on 429.
+   * Before each retry-sleep the `onRateLimit` hook is called so the indexer
+   * can patch the run store with a warning that the UI polls.
+   */
+  private async embedSparseWithRetry(texts: string[]): Promise<RecordSparseValues[]> {
+    const pc = this.getClient()
+
+    for (let attempt = 1; attempt <= RATE_LIMIT_MAX_RETRIES + 1; attempt++) {
+      try {
+        const result = await pc.inference.embed({
+          model: this.config.sparseModel!,
+          inputs: texts,
+          parameters: { input_type: "passage", truncate: "END" },
+        })
+        return result.data.map((emb) => {
+          const s = emb as any
+          return {
+            indices: (s.sparseIndices as number[]) ?? [],
+            values:  (s.sparseValues  as number[]) ?? [],
+          }
+        })
+      } catch (err) {
+        if (is429(err) && attempt <= RATE_LIMIT_MAX_RETRIES) {
+          const waitSecs = Math.round(RATE_LIMIT_WAIT_MS / 1000)
+          await this.config.onRateLimit?.(waitSecs, attempt)
+          await sleep(RATE_LIMIT_WAIT_MS)
+          continue
+        }
+        throw err
+      }
+    }
+    // Unreachable but TypeScript needs it
+    throw new Error("Sparse embedding failed after max retries.")
+  }
 
   private async buildSparseVectors(texts: string[]): Promise<RecordSparseValues[]> {
-    const pc = this.getClient()
     const result: RecordSparseValues[] = []
 
     for (let i = 0; i < texts.length; i += SPARSE_BATCH) {
       const batch = texts.slice(i, i + SPARSE_BATCH)
-      const embedResult = await pc.inference.embed({
-        model: this.config.sparseModel!,
-        inputs: batch,
-        parameters: { input_type: "passage", truncate: "END" },
-      })
-      for (const emb of embedResult.data) {
-        const s = emb as any
-        result.push({
-          indices: (s.sparseIndices as number[]) ?? [],
-          values:  (s.sparseValues  as number[]) ?? [],
-        })
+      const vecs = await this.embedSparseWithRetry(batch)
+      result.push(...vecs)
+
+      // Rate-limit guard: delay between batches (skip after the last one)
+      if (i + SPARSE_BATCH < texts.length) {
+        await sleep(INTER_BATCH_DELAY_MS)
       }
     }
+
     return result
   }
 
   private async buildQuerySparseVector(text: string): Promise<RecordSparseValues> {
     const pc = this.getClient()
-    const embedResult = await pc.inference.embed({
-      model: this.config.sparseModel!,
-      inputs: [text],
-      parameters: { input_type: "query", truncate: "END" },
-    })
-    const s = embedResult.data[0] as any
-    return {
-      indices: (s.sparseIndices as number[]) ?? [],
-      values:  (s.sparseValues  as number[]) ?? [],
+
+    for (let attempt = 1; attempt <= RATE_LIMIT_MAX_RETRIES + 1; attempt++) {
+      try {
+        const result = await pc.inference.embed({
+          model: this.config.sparseModel!,
+          inputs: [text],
+          parameters: { input_type: "query", truncate: "END" },
+        })
+        const s = result.data[0] as any
+        return {
+          indices: (s.sparseIndices as number[]) ?? [],
+          values:  (s.sparseValues  as number[]) ?? [],
+        }
+      } catch (err) {
+        if (is429(err) && attempt <= RATE_LIMIT_MAX_RETRIES) {
+          await sleep(RATE_LIMIT_WAIT_MS)
+          continue
+        }
+        throw err
+      }
     }
+    throw new Error("Sparse query embedding failed after max retries.")
   }
 
   // ── Upsert ─────────────────────────────────────────────────────────────────
@@ -164,7 +244,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
     })
 
     if (!this.needsSparse || !this.config.sparseModel) {
-      // ── Semantic-only: dense upsert ────────────────────────────────────────
+      // ── Semantic-only ──────────────────────────────────────────────────────
       await this.ns().upsert({
         records: records.map((r) => ({
           id: r.id,
@@ -175,8 +255,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
       return
     }
 
-    // ── Hybrid / Lexical: dense + sparse in same record ────────────────────
-    // Generate sparse vectors for all chunk texts via Pinecone Inference API
+    // ── Hybrid / Lexical ───────────────────────────────────────────────────
     const sparseVecs = await this.buildSparseVectors(records.map((r) => r.text))
 
     await this.ns().upsert({
@@ -191,16 +270,6 @@ export class PineconeAdapter implements VectorStoreAdapter {
 
   // ── Query ──────────────────────────────────────────────────────────────────
 
-  /**
-   * Semantic: pure dense ANN search.
-   *
-   * Hybrid/Lexical (when `queryText` is provided):
-   *   1. Dense ANN search  → semantic relevance ranking.
-   *   2. Generate sparse vector for `queryText` → keyword relevance ranking.
-   *   3. Merge both ranked lists with Reciprocal Rank Fusion (RRF, k=60).
-   *
-   * If `queryText` is omitted the adapter falls back to dense-only search.
-   */
   async query(vector: number[], topK: number, queryText?: string): Promise<QueryHit[]> {
     const canHybrid = this.needsSparse && this.config.sparseModel && queryText
 
@@ -208,7 +277,6 @@ export class PineconeAdapter implements VectorStoreAdapter {
       return this.denseQuery(vector, topK)
     }
 
-    // Fetch a larger pool for better RRF coverage, then trim to topK
     const fetchN = Math.min(topK * 2, 100)
     const [denseHits, sparseHits] = await Promise.all([
       this.denseQuery(vector, fetchN),
@@ -219,11 +287,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
   }
 
   private async denseQuery(vector: number[], topK: number): Promise<QueryHit[]> {
-    const res = await this.ns().query({
-      vector,
-      topK,
-      includeMetadata: true,
-    })
+    const res = await this.ns().query({ vector, topK, includeMetadata: true })
     return (res.matches ?? []).map(hitFromMatch)
   }
 
@@ -234,7 +298,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
       sparseVector,
       topK,
       includeMetadata: true,
-    } as any) // SDK overload requires vector; API accepts empty for sparse-only
+    } as any)
     return (res.matches ?? []).map(hitFromMatch)
   }
 
@@ -293,8 +357,6 @@ export class PineconeAdapter implements VectorStoreAdapter {
         )
       }
 
-      // The single index must use dotproduct so records can carry both
-      // dense `values` and sparse `sparseValues` together.
       const metric =
         (indexModel as any).metric ??
         (indexModel as any).spec?.metric
@@ -323,11 +385,6 @@ function hitFromMatch(m: any): QueryHit {
   }
 }
 
-/**
- * Reciprocal Rank Fusion merges two ranked lists.
- *   score(d) = Σ  1 / (k + rank(d))   summed over every list d appears in
- * Higher score = better combined rank. De-duplicated by id, trimmed to topK.
- */
 function rrfMerge(denseHits: QueryHit[], sparseHits: QueryHit[], topK: number): QueryHit[] {
   const scores = new Map<string, { hit: QueryHit; score: number }>()
 
