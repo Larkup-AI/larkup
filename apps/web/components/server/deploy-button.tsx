@@ -8,8 +8,8 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
-  ExternalLink,
-  ArrowUpRight,
+  CheckCircle2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { deployToVercel } from "@/app/actions/vercel";
@@ -30,38 +30,75 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function DeployButton() {
+// ─── Storage helpers ──────────────────────────────────────────────────────────
+// Token is stored globally so it loads on every server automatically.
+// Project name is stored per-server (keyed by serverId).
+
+const GLOBAL_TOKEN_KEY = "vercel_token";
+
+function projectKey(serverId: string) {
+  return `vercel_project_${serverId}`;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+interface DeployButtonProps {
+  /** Unique identifier for this server instance (used to scope the project name). */
+  serverId?: string;
+}
+
+export function DeployButton({ serverId = "default" }: DeployButtonProps) {
   const [vercelModalOpen, setVercelModalOpen] = useState(false);
   const [vercelToken, setVercelToken] = useState("");
   const [vercelProject, setVercelProject] = useState("");
   const [isDeploying, setIsDeploying] = useState(false);
   const [showToken, setShowToken] = useState(false);
 
+  // ── Was the token already saved globally?
+  const [tokenWasSaved, setTokenWasSaved] = useState(false);
+
+  // Load on mount: token is global, project is per-server
   useEffect(() => {
-    const token = localStorage.getItem("vercel_token");
-    const project = localStorage.getItem("vercel_project");
-    if (token) setVercelToken(token);
-    if (project) setVercelProject(project);
-  }, []);
+    const savedToken = localStorage.getItem(GLOBAL_TOKEN_KEY);
+    const savedProject = localStorage.getItem(projectKey(serverId));
+
+    if (savedToken) {
+      setVercelToken(savedToken);
+      setTokenWasSaved(true);
+    }
+    if (savedProject) {
+      setVercelProject(savedProject);
+    }
+  }, [serverId]);
+
+  const handleClearToken = () => {
+    localStorage.removeItem(GLOBAL_TOKEN_KEY);
+    setVercelToken("");
+    setTokenWasSaved(false);
+    toast.info("Vercel token cleared.");
+  };
 
   const handleHetznerDeploy = () => {
-    toast.info("Later");
+    toast.info("Hetzner deployment coming soon.");
   };
 
   const handleDeployToVercel = async () => {
     if (!vercelToken || !vercelProject) {
-      toast.error("Please enter both Vercel Token and Project ID/Name.");
+      toast.error("Please enter both a Vercel Token and a Project name.");
       return;
     }
 
     setIsDeploying(true);
-    toast.info("Triggering deployment on Vercel...");
+    toast.info("Triggering deployment on Vercel…");
 
     try {
       const res = await deployToVercel(vercelToken, vercelProject);
+
       if (res.success) {
-        localStorage.setItem("vercel_token", vercelToken);
-        localStorage.setItem("vercel_project", vercelProject);
+        // ── Persist: token globally, project per-server
+        localStorage.setItem(GLOBAL_TOKEN_KEY, vercelToken);
+        localStorage.setItem(projectKey(serverId), vercelProject);
+        setTokenWasSaved(true);
 
         const title = res.projectCreated
           ? "Project created & deployment triggered!"
@@ -128,30 +165,55 @@ export function DeployButton() {
           <DialogHeader>
             <DialogTitle>Deploy to Vercel</DialogTitle>
             <DialogDescription>
-              Enter your Vercel credentials. We will save them locally for
-              future deployments.
+              Your Vercel token is saved globally — it will be available on
+              every server automatically. The project name is saved per server.
             </DialogDescription>
           </DialogHeader>
+
           <div className="grid gap-4 py-4">
+            {/* ── Token ── */}
             <div className="grid gap-2">
-              <div className="flex items-center justify-start gap-1">
-                <Label htmlFor="token">Vercel Access Token</Label>
-                <a
-                  href="https://vercel.com/account/tokens"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs flex items-center gap-0 text-muted-foreground underline hover:text-foreground transition-colors"
-                >
-                  Get token
-                </a>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="vercel-token">Vercel Access Token</Label>
+                  {tokenWasSaved && (
+                    <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                      <CheckCircle2 className="size-3" />
+                      Saved globally
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="https://vercel.com/account/tokens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
+                  >
+                    Get token ↗
+                  </a>
+                  {tokenWasSaved && (
+                    <button
+                      type="button"
+                      onClick={handleClearToken}
+                      className="text-xs text-destructive underline hover:opacity-80 transition-opacity"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
+
               <div className="relative">
                 <Input
-                  id="token"
+                  id="vercel-token"
                   type={showToken ? "text" : "password"}
                   placeholder="Enter your Vercel Access Token"
                   value={vercelToken}
-                  onChange={(e) => setVercelToken(e.target.value)}
+                  onChange={(e) => {
+                    setVercelToken(e.target.value);
+                    setTokenWasSaved(false);
+                  }}
                   className="pr-9"
                 />
                 <button
@@ -168,16 +230,24 @@ export function DeployButton() {
                 </button>
               </div>
             </div>
+
+            {/* ── Project ── */}
             <div className="grid gap-2">
-              <Label htmlFor="project">Project ID or Name</Label>
+              <Label htmlFor="vercel-project">
+                Project ID or Name
+                <span className="ml-2 text-xs text-muted-foreground font-normal">
+                  (saved per server)
+                </span>
+              </Label>
               <Input
-                id="project"
-                placeholder="Enter your Vercel Project ID or Name"
+                id="vercel-project"
+                placeholder="my-rag-server"
                 value={vercelProject}
                 onChange={(e) => setVercelProject(e.target.value)}
               />
             </div>
           </div>
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -187,9 +257,9 @@ export function DeployButton() {
               Cancel
             </Button>
             <Button onClick={handleDeployToVercel} disabled={isDeploying}>
-              {isDeploying ? (
+              {isDeploying && (
                 <Loader2 className="mr-2 size-4 animate-spin" />
-              ) : null}
+              )}
               Deploy
             </Button>
           </DialogFooter>
