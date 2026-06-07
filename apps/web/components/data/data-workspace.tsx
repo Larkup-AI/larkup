@@ -1,23 +1,27 @@
-"use client"
+"use client";
 
-import useSWR from "swr"
-import { ClipboardPaste, FileUp, Globe, Layers } from "lucide-react"
-import type { CrawlJob, SourceDocument } from "@buddy-rag/core/types"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Skeleton } from "@/components/ui/skeleton"
-import { ScrapePanel } from "@/components/data/scrape-panel"
-import { PastePanel } from "@/components/data/paste-panel"
-import { UploadPanel } from "@/components/data/upload-panel"
-import { JobsPanel } from "@/components/data/jobs-panel"
-import { CorpusPanel } from "@/components/data/corpus-panel"
-import { FirecrawlNotice } from "@/components/data/firecrawl-notice"
+import useSWR from "swr";
+import { ClipboardPaste, FileUp, Globe, Layers } from "lucide-react";
+import type { CrawlJob, SourceDocument } from "@buddy-rag/core/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ScrapePanel } from "@/components/data/scrape-panel";
+import { PastePanel } from "@/components/data/paste-panel";
+import { UploadPanel } from "@/components/data/upload-panel";
+import { JobsPanel } from "@/components/data/jobs-panel";
+import { CorpusPanel } from "@/components/data/corpus-panel";
+import { FirecrawlNotice } from "@/components/data/firecrawl-notice";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface DocsResponse {
-  documents: SourceDocument[]
-  stats: { docCount: number; charCount: number; bySource: Record<string, number> }
+  documents: SourceDocument[];
+  stats: {
+    docCount: number;
+    charCount: number;
+    bySource: Record<string, number>;
+  };
 }
 
 /**
@@ -26,17 +30,17 @@ interface DocsResponse {
  * drives the whole live-crawl experience.
  */
 async function fetchJobsWithSync(url: string): Promise<{
-  jobs: CrawlJob[]
-  configured: boolean
+  jobs: CrawlJob[];
+  configured: boolean;
 }> {
   const { jobs, configured } = (await fetcher(url)) as {
-    jobs: CrawlJob[]
-    configured: boolean
-  }
+    jobs: CrawlJob[];
+    configured: boolean;
+  };
   const active = jobs.filter(
     (j) => j.status === "running" || j.status === "queued",
-  )
-  if (active.length === 0) return { jobs, configured }
+  );
+  if (active.length === 0) return { jobs, configured };
 
   const advanced = await Promise.all(
     active.map((j) =>
@@ -45,9 +49,9 @@ async function fetchJobsWithSync(url: string): Promise<{
         .then((d) => d.job as CrawlJob)
         .catch(() => j),
     ),
-  )
-  const map = new Map(advanced.map((j) => [j.id, j]))
-  return { jobs: jobs.map((j) => map.get(j.id) ?? j), configured }
+  );
+  const map = new Map(advanced.map((j) => [j.id, j]));
+  return { jobs: jobs.map((j) => map.get(j.id) ?? j), configured };
 }
 
 export function DataWorkspace() {
@@ -56,24 +60,24 @@ export function DataWorkspace() {
       data?.jobs.some((j) => j.status === "running" || j.status === "queued")
         ? 4000
         : 0,
-  })
-  const jobs = jobsQuery.data?.jobs ?? []
-  const configured = jobsQuery.data?.configured ?? true
+  });
+  const jobs = jobsQuery.data?.jobs ?? [];
+  const configured = jobsQuery.data?.configured ?? true;
   const hasActive = jobs.some(
     (j) => j.status === "running" || j.status === "queued",
-  )
+  );
 
   const docsQuery = useSWR<DocsResponse>("/api/documents", fetcher, {
     // While a crawl runs, keep the corpus fresh as new docs land.
     refreshInterval: hasActive ? 5000 : 0,
-  })
-  const documents = docsQuery.data?.documents ?? []
-  const stats = docsQuery.data?.stats
+  });
+  const documents = docsQuery.data?.documents ?? [];
+  const stats = docsQuery.data?.stats;
 
   const refreshAll = () => {
-    jobsQuery.mutate()
-    docsQuery.mutate()
-  }
+    jobsQuery.mutate();
+    docsQuery.mutate();
+  };
 
   return (
     <div className="px-6 py-6 md:px-8">
@@ -124,10 +128,10 @@ export function DataWorkspace() {
             <CardHeader className="flex-row items-center justify-between shrink-0">
               <CardTitle className="text-base">ETL jobs</CardTitle>
               {hasActive && (
-                <span className="flex items-center gap-1.5 text-xs text-primary">
+                <span className="flex items-center gap-1.5 text-xs text-green-600">
                   <span className="relative flex size-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex size-2 rounded-full bg-primary" />
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-600 opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-green-600" />
                   </span>
                   live
                 </span>
@@ -171,5 +175,5 @@ export function DataWorkspace() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

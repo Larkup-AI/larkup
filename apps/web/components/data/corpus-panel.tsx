@@ -11,6 +11,8 @@ import {
   Pencil,
   Loader2,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { DocumentSource, SourceDocument } from "@buddy-rag/core/types";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
@@ -63,6 +65,20 @@ export function CorpusPanel({
     | null
   >(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const [page, setPage] = useState(0);
+
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(documents.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageDocuments = documents.slice(
+    safePage * PAGE_SIZE,
+    (safePage + 1) * PAGE_SIZE,
+  );
+
+  const allPageSelected =
+    pageDocuments.length > 0 &&
+    pageDocuments.every((d) => selectedIds.has(d.id));
 
   async function del(id: string) {
     await fetch(`/api/documents?id=${id}`, { method: "DELETE" });
@@ -141,18 +157,19 @@ export function CorpusPanel({
             <TableRow className="bg-muted/50">
               <TableHead className="w-12">
                 <Checkbox
-                  checked={
-                    documents.length > 0 &&
-                    selectedIds.size === documents.length
-                  }
+                  checked={allPageSelected}
                   onCheckedChange={(checked) => {
                     if (checked) {
-                      setSelectedIds(new Set(documents.map((d) => d.id)));
+                      const next = new Set(selectedIds);
+                      pageDocuments.forEach((d) => next.add(d.id));
+                      setSelectedIds(next);
                     } else {
-                      setSelectedIds(new Set());
+                      const next = new Set(selectedIds);
+                      pageDocuments.forEach((d) => next.delete(d.id));
+                      setSelectedIds(next);
                     }
                   }}
-                  aria-label="Select all"
+                  aria-label="Select all on page"
                 />
               </TableHead>
               <TableHead>Title</TableHead>
@@ -162,7 +179,7 @@ export function CorpusPanel({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {documents.map((doc) => {
+            {pageDocuments.map((doc) => {
               const meta = SOURCE_META[doc.source];
               const Icon = meta.icon;
               return (
@@ -230,6 +247,36 @@ export function CorpusPanel({
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {safePage * PAGE_SIZE + 1}–
+            {Math.min((safePage + 1) * PAGE_SIZE, documents.length)} of{" "}
+            {documents.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              disabled={safePage === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              className="rounded p-1 hover:bg-muted disabled:opacity-40 transition-colors cursor-pointer"
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+            <span className="tabular-nums">
+              {safePage + 1} / {totalPages}
+            </span>
+            <button
+              disabled={safePage >= totalPages - 1}
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              className="rounded p-1 hover:bg-muted disabled:opacity-40 transition-colors cursor-pointer"
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <DocumentDialog
         doc={active}

@@ -52,7 +52,7 @@ export function AppSidebar() {
             <img src={"/logo2.png"} className="size-6.5" alt="logo" />
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
-            buddy-rag
+            Buddy RAG
           </TooltipContent>
         </Tooltip>
 

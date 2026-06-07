@@ -190,6 +190,7 @@ export async function startCrawl(url: string, limit: number): Promise<string> {
     body: JSON.stringify({
       url,
       limit,
+      allowExternalLinks: false,
       scrapeOptions: {
         ...STEALTH_OPTIONS,
         formats: ["markdown"],

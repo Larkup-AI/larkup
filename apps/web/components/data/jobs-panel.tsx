@@ -12,6 +12,9 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  Copy,
+  XIcon,
+  Square,
 } from "lucide-react";
 import type { CrawlJob, CrawlJobStatus } from "@buddy-rag/core/types";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +97,12 @@ export function JobsPanel({
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [confirmCancel, setConfirmCancel] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+
   const totalPages = Math.max(1, Math.ceil(jobs.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
   const pageJobs = jobs.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
@@ -118,10 +127,21 @@ export function JobsPanel({
     setSelected(next);
   }
 
-  async function cancel(id: string) {
-    await fetch(`/api/jobs/${id}`, { method: "DELETE" });
-    toast.message("Job cancelled");
-    onChanged();
+  async function executeCancel(id: string) {
+    setCancelling(true);
+    try {
+      await fetch(`/api/jobs/${id}`, { method: "DELETE" });
+      toast.message("Job cancelled");
+      onChanged();
+    } finally {
+      setCancelling(false);
+      setConfirmCancel(null);
+    }
+  }
+
+  function requestCancel(id: string) {
+    const label = `"${jobs.find((j) => j.id === id)?.keywords ?? id}"`;
+    setConfirmCancel({ id, label });
   }
 
   async function executeDelete(ids: string[]) {
@@ -226,6 +246,9 @@ export function JobsPanel({
                 job.status === "running" || job.status === "queued";
               const pct = progressFor(job);
 
+              const domainTargets = job.targets.filter((t) => t.scope === "domain").length;
+              const denom = domainTargets > 0 ? domainTargets * job.pageLimit : job.targets.length;
+
               return (
                 <tr
                   key={job.id}
@@ -257,11 +280,13 @@ export function JobsPanel({
 
                   {/* Pages crawled + progress */}
                   <td className="py-2 pr-3 text-right tabular-nums">
-                    <span className="text-foreground">{job.pagesCrawled}</span>
+                    <span className="text-green-700">
+                      {job.pagesCrawled} / {denom}
+                    </span>
                     {active && (
                       <div className="mt-1 h-0.5 w-full rounded-full bg-muted overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-primary transition-all"
+                          className="h-full rounded-full bg-green-600 transition-all"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -273,8 +298,8 @@ export function JobsPanel({
                     <Badge
                       variant="outline"
                       className={cn(
-                        "gap-1 px-1.5 py-0.5 font-mono text-[10px] whitespace-nowrap",
                         s.className,
+                        "gap-1 px-1.5 py-0.5 border-orange-300 font-mono text-[10px] whitespace-nowrap bg-orange-100 text-orange-500",
                       )}
                     >
                       <Icon
@@ -289,23 +314,41 @@ export function JobsPanel({
 
                   {/* Action */}
                   <td className="py-2 text-right">
-                    {active ? (
-                      <button
-                        onClick={() => cancel(job.id)}
-                        className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
-                        title="Cancel job"
-                      >
-                        <Octagon className="size-3" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => requestDelete([job.id])}
-                        className="rounded p-1 text-muted-foreground hover:text-destructive transition-colors"
-                        title="Remove job"
-                      >
-                        <Trash2 className="size-3" />
-                      </button>
-                    )}
+                    <div className="flex items-center justify-end gap-1">
+                      {job.targets.some((t) => t.status === "failed") && (
+                        <button
+                          onClick={() => {
+                            const failedUrls = job.targets
+                              .filter((t) => t.status === "failed")
+                              .map((t) => t.url)
+                              .join("\n");
+                            navigator.clipboard.writeText(failedUrls);
+                            toast.success("Failed URLs copied to clipboard");
+                          }}
+                          className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
+                          title="Copy failed URLs"
+                        >
+                          <Copy className="size-3" />
+                        </button>
+                      )}
+                      {active ? (
+                        <button
+                          onClick={() => requestCancel(job.id)}
+                          className="cursor-pointer rounded-xl  p-1 text-muted-foreground hover:text-foreground transition-colors"
+                          title="Cancel job"
+                        >
+                          <Square className="size-3.5 text-orange-400" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => requestDelete([job.id])}
+                          className="rounded p-1 text-muted-foreground hover:text-destructive transition-colors"
+                          title="Remove job"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -383,6 +426,51 @@ export function JobsPanel({
                 <Trash2 className="size-3" />
               )}
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm cancel dialog */}
+      <Dialog
+        open={!!confirmCancel}
+        onOpenChange={(open) => !open && setConfirmCancel(null)}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-4 text-orange-500" />
+              Confirm cancellation
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel the job{" "}
+              <span className="font-medium text-foreground">
+                {confirmCancel?.label}
+              </span>
+              ? In-progress pages will be discarded.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmCancel(null)}
+              disabled={cancelling}
+            >
+              Go Back
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              disabled={cancelling}
+              onClick={() => confirmCancel && executeCancel(confirmCancel.id)}
+            >
+              {cancelling ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Octagon className="size-3" />
+              )}
+              Cancel Job
             </Button>
           </DialogFooter>
         </DialogContent>
