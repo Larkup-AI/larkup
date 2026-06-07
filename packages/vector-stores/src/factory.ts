@@ -23,7 +23,6 @@ export async function createAdapter(
         indexName: config.storeConfig.indexName,
         namespace: config.storeConfig.namespace,
         sparseModel: config.storeConfig.sparseModel,
-        sparseIndexName: config.storeConfig.sparseIndexName,
         indexType: config.indexType,
       })
     }

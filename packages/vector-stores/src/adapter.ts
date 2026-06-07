@@ -35,8 +35,12 @@ export interface VectorStoreAdapter {
   upsert(records: VectorRecord[]): Promise<void>
   /** Number of vectors currently stored, if cheaply knowable. */
   count(): Promise<number | null>
-  /** Nearest-neighbour search for a query vector. */
-  query(vector: number[], topK: number): Promise<QueryHit[]>
+  /**
+   * Nearest-neighbour search for a query vector.
+   * Pass `queryText` for hybrid/lexical stores so they can also generate a
+   * sparse vector and merge dense + sparse results (RRF).
+   */
+  query(vector: number[], topK: number, queryText?: string): Promise<QueryHit[]>
   /** Test connection to the vector store. Throws if invalid. */
   testConnection(dimensions: number): Promise<void>
 }

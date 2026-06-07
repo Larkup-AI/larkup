@@ -98,3 +98,16 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ run }, { status: 202 })
 }
+
+export async function DELETE() {
+  const { readRun, patchRun } = await import("@buddy-rag/core/index-store")
+  const run = await readRun()
+  if (run && ["chunking", "embedding", "upserting"].includes(run.status)) {
+    await patchRun({
+      status: "failed",
+      error: "Cancelled by user.",
+      finishedAt: new Date().toISOString(),
+    })
+  }
+  return NextResponse.json({ success: true })
+}

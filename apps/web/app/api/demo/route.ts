@@ -159,7 +159,7 @@ async function runQuery(
   try {
     const vector = await embedQuery(config.embeddingModelId, query);
     const adapter = await createAdapter(config);
-    const hits = await adapter.query(vector, topK);
+    const hits = await adapter.query(vector, topK, query);
 
     const result: DemoResult = {
       query,

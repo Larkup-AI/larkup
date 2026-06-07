@@ -96,6 +96,23 @@ export function IndexWorkspace() {
     }
   }
 
+  async function cancel() {
+    setStarting(true);
+    try {
+      const res = await fetch("/api/index", { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("Could not cancel indexing.");
+        return;
+      }
+      toast.success("Indexing cancelled.");
+      mutate();
+    } catch {
+      toast.error("Could not cancel indexing.");
+    } finally {
+      setStarting(false);
+    }
+  }
+
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
       <ConfigSummary
@@ -137,6 +154,16 @@ export function IndexWorkspace() {
               ? `Index new documents (${unindexedCount})`
               : "Build index"}
         </Button>
+        {running && (
+          <Button
+            onClick={cancel}
+            disabled={starting}
+            size="lg"
+            variant="destructive"
+          >
+            Cancel
+          </Button>
+        )}
         {run?.status === "completed" && (
           <Button
             onClick={() => build(false)}
@@ -299,7 +326,7 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
                   chunks
                 </span>
               </div>
-              <Progress value={pct} />
+              <Progress value={pct} className="[&_[data-slot=progress-indicator]]:bg-green-600" />
             </div>
 
             <dl className="grid grid-cols-2 gap-4 pt-1 sm:grid-cols-4">
@@ -346,12 +373,12 @@ function StatusBadge({ status }: { status: IndexRun["status"] }) {
   if (status === "failed") return <Badge variant="destructive">Failed</Badge>;
   if (ACTIVE.includes(status))
     return (
-      <span className="flex items-center gap-1.5 text-xs text-primary">
+      <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">
         <span className="relative flex size-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-          <span className="relative inline-flex size-2 rounded-full bg-primary" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-600 opacity-75" />
+          <span className="relative inline-flex size-2 rounded-full bg-green-600" />
         </span>
-        live
+        Live
       </span>
     );
   return null;

@@ -389,7 +389,7 @@ async function cmdQuery(args: Args) {
     const started = Date.now();
     const vector = await embedQuery(config.embeddingModelId, question);
     const adapter = await createAdapter(config);
-    const hits = await adapter.query(vector, topK);
+    const hits = await adapter.query(vector, topK, question);
     const took = Date.now() - started;
 
     log(`\n${c.bold("Query:")} ${question}`);
