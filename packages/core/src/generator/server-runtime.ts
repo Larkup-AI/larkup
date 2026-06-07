@@ -25,6 +25,22 @@ import {
 const execAsync = promisify(exec)
 const FALLBACK_PORT = 8080
 
+/** Kill any process listening on the given TCP port (best-effort). */
+async function killPort(port: number): Promise<void> {
+  try {
+    // macOS / Linux: find pids using lsof and SIGKILL them
+    const { stdout } = await execAsync(`lsof -ti tcp:${port}`)
+    const pids = stdout.split("\n").map((s) => s.trim()).filter(Boolean)
+    for (const pid of pids) {
+      try { process.kill(Number(pid), 9) } catch { /* already gone */ }
+    }
+    // Give OS a moment to release the port
+    await new Promise((r) => setTimeout(r, 300))
+  } catch {
+    // lsof returned nothing (port was free) — that's fine
+  }
+}
+
 export interface LocalServerState {
   running: boolean
   pid?: number
@@ -121,14 +137,15 @@ export async function startServer(config: RagConfig, serverApiKey?: string): Pro
   const port = await resolvePort()
   const endpoint = `http://localhost:${port}`
 
-  // We allow running locally for all stores now.
-
-  // Already running? reuse it.
+  // Always stop any existing server first so the new key is picked up.
   const prev = await readServerState()
-  if (prev.running && pidAlive(prev.pid) && (await isHealthy(endpoint))) {
-    return prev
+  if (prev.pid && pidAlive(prev.pid)) {
+    try { process.kill(prev.pid, 9) } catch { /* already gone */ }
   }
+  // Also kill anything squatting on the port (e.g. orphaned detached processes).
+  await killPort(port)
 
+  // Emit fresh generated files (always refreshes server.mjs with latest config).
   const dir = await emitToDisk(config)
 
   // Install minimal deps (idempotent).
@@ -145,7 +162,10 @@ export async function startServer(config: RagConfig, serverApiKey?: string): Pro
     ? dbPath
     : path.join(process.cwd(), dbPath)
 
-  const logFd = await fs.open(path.join(dir, "server.log"), "a")
+  // Truncate log so auth debug lines are easy to spot.
+  const logPath = path.join(dir, "server.log")
+  await fs.writeFile(logPath, "", "utf8")
+  const logFd = await fs.open(logPath, "a")
   const script = ["server", "mjs"].join(".")
   const child = spawn("node", [script], {
     cwd: dir,
@@ -159,6 +179,8 @@ export async function startServer(config: RagConfig, serverApiKey?: string): Pro
       PINECONE_API_KEY: config.storeConfig.apiKey || "",
       PINECONE_INDEX: config.storeConfig.indexName || "",
       PINECONE_NAMESPACE: config.storeConfig.namespace || "",
+      PINECONE_SPARSE_MODEL: config.storeConfig.sparseModel || "",
+      PINECONE_SPARSE_INDEX: config.storeConfig.sparseIndexName || "",
       LANCEDB_MODE: config.storeConfig.mode || "local",
       LANCEDB_PATH: absDb,
       LANCEDB_URI: config.storeConfig.uri || "",
@@ -186,13 +208,13 @@ export async function startServer(config: RagConfig, serverApiKey?: string): Pro
 
 export async function stopServer(): Promise<LocalServerState> {
   const state = await readServerState()
+  const port = state.port || FALLBACK_PORT
+  // Kill the tracked pid
   if (state.pid && pidAlive(state.pid)) {
-    try {
-      process.kill(state.pid)
-    } catch {
-      // already gone
-    }
+    try { process.kill(state.pid, 9) } catch { /* already gone */ }
   }
+  // Kill anything still on the port (detached orphans)
+  await killPort(port)
   return writeState({
     ...state,
     running: false,

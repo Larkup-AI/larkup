@@ -21,7 +21,12 @@ import {
 // Vercel triangle icon
 function VercelIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
       <path d="M12 2L2 19.778h20L12 2z" />
     </svg>
   );
@@ -193,25 +198,19 @@ function ServerSummary({
 
 function LaunchPanel({ config }: { config: RagConfig }) {
   const [busy, setBusy] = useState<"start" | "stop" | null>(null);
-  const [serverApiKey, setServerApiKey] = useState("");
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
   const [remoteProvider, setRemoteProvider] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState("");
 
   useEffect(() => {
-    const saved = localStorage.getItem("rag_server_api_key");
-    if (saved) setServerApiKey(saved);
-
     // Read deployed remote URL (set by DeployButton on success)
     const url = localStorage.getItem("vercel_deployed_url_default");
     const provider = localStorage.getItem("vercel_deployed_provider_default");
+    const savedApiKey = localStorage.getItem("rag_server_api_key");
     if (url) setRemoteUrl(url);
     if (provider) setRemoteProvider(provider);
+    if (savedApiKey) setApiKey(savedApiKey);
   }, []);
-
-  const handleSaveApiKey = () => {
-    localStorage.setItem("rag_server_api_key", serverApiKey);
-    toast.success("Server API key saved.");
-  };
 
   const { data, mutate } = useSWR<{ state: LocalServerState }>(
     "/api/server/local",
@@ -223,10 +222,11 @@ function LaunchPanel({ config }: { config: RagConfig }) {
   async function control(action: "start" | "stop") {
     setBusy(action);
     try {
+      const currentApiKey = localStorage.getItem("rag_server_api_key") || "";
       const res = await fetch("/api/server/local", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, serverApiKey }),
+        body: JSON.stringify({ action, serverApiKey: currentApiKey }),
       });
       const body = await res.json();
       if (action === "start") {
@@ -264,22 +264,9 @@ function LaunchPanel({ config }: { config: RagConfig }) {
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-muted-foreground">
             Spin up the generated server right here to test your RAG endpoints.
+            Settings and API keys configured in the Deploy menu will be
+            automatically applied.
           </p>
-
-          <div className="grid gap-2 max-w-sm">
-            <Label htmlFor="serverApiKey">Server API Key</Label>
-            <div className="flex gap-2">
-              <Input
-                id="serverApiKey"
-                placeholder="Set an API key to secure your server endpoints"
-                value={serverApiKey}
-                onChange={(e) => setServerApiKey(e.target.value)}
-              />
-              <Button onClick={handleSaveApiKey} variant="secondary">
-                Save
-              </Button>
-            </div>
-          </div>
 
           <Alert>
             <ExternalLink className="size-4" />
@@ -301,7 +288,10 @@ function LaunchPanel({ config }: { config: RagConfig }) {
                     href={`${state.endpoint}/reference`}
                     target="_blank"
                     rel="noreferrer"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "sm",
+                    })}
                   >
                     Open API Reference
                   </a>
@@ -330,11 +320,12 @@ function LaunchPanel({ config }: { config: RagConfig }) {
                   variant="destructive"
                   onClick={() => control("stop")}
                   disabled={busy !== null}
+                  className={""}
                 >
                   {busy === "stop" ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
-                    <Square className="size-4" />
+                    <Square className="size-4 text-white!" />
                   )}
                   Stop server
                 </Button>
@@ -373,7 +364,7 @@ function LaunchPanel({ config }: { config: RagConfig }) {
               Try it
             </div>
             <CodeLine
-              text={`curl -X POST ${state.endpoint}/query -H "Content-Type: application/json" -d '{"query":"hello"}'`}
+              text={`curl -X POST ${state.endpoint}/query -H "Content-Type: application/json"${apiKey ? ` -H "Authorization: Bearer ${apiKey}"` : ""} -d '{"query":"hello"}'`}
             />
           </div>
         )}
@@ -406,7 +397,7 @@ function LaunchPanel({ config }: { config: RagConfig }) {
                 Try remote
               </div>
               <CodeLine
-                text={`curl -X POST ${remoteUrl}/query -H "Content-Type: application/json" -d '{"query":"hello"}'`}
+                text={`curl -X POST ${remoteUrl}/query -H "Content-Type: application/json"${apiKey ? ` -H "Authorization: Bearer ${apiKey}"` : ""} -d '{"query":"hello"}'`}
               />
             </div>
           </>
