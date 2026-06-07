@@ -21,8 +21,19 @@ import {
 /** Max Firecrawl result pages to pull per sync, to keep each call snappy. */
 const MAX_PAGES_PER_SYNC = 5
 
-/** In-process guard so overlapping polls of the same job don't double-work. */
 const inFlight = new Set<string>()
+
+function isBlockedPage(content: string): boolean {
+  if (!content) return false
+  const lower = content.toLowerCase()
+  return (
+    lower.includes("verification successful. waiting for") ||
+    lower.includes("please verify you are a human") ||
+    lower.includes("checking if the site connection is secure") ||
+    lower.includes("just a moment...") ||
+    lower.includes("enable javascript and cookies to continue")
+  )
+}
 
 function rollUpStatus(targets: CrawlTarget[]): CrawlJobStatus {
   if (targets.every((t) => t.status === "completed")) return "completed"
@@ -42,6 +53,9 @@ async function advancePageTarget(
 ): Promise<{ target: CrawlTarget; added: number }> {
   try {
     const page = await scrapePage(target.url)
+    if (isBlockedPage(page.markdown)) {
+      throw new Error("Scraping blocked by anti-bot protection (e.g. Cloudflare)")
+    }
     const added = await addCrawledDocuments(jobId, [
       { title: page.title, url: page.url, content: page.markdown, source: "scrape" },
     ])
@@ -86,7 +100,9 @@ async function advanceDomainTarget(
       const status = await getCrawlStatus(cursor, isCursor)
       pagesCrawled = status.completed || pagesCrawled
       for (const p of status.pages) {
-        batch.push({ title: p.title, url: p.url, content: p.markdown, source: "scrape" })
+        if (!isBlockedPage(p.markdown)) {
+          batch.push({ title: p.title, url: p.url, content: p.markdown, source: "scrape" })
+        }
       }
       pulled++
 
