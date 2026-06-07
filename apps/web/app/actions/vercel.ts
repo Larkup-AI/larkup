@@ -101,24 +101,17 @@ async function getLatestDeployment(
   return deployments.length > 0 ? deployments[0] : null;
 }
 
-/** Trigger a new deployment (redeploy latest, or create a blank one if none). */
-async function triggerDeployment(
+/** Redeploy from an existing deployment. Only called when latestDeployment exists. */
+async function triggerRedeployment(
   token: string,
   project: VercelProject,
-  latestDeployment: VercelDeployment | null
+  latestDeployment: VercelDeployment
 ): Promise<VercelDeployment> {
   const body: Record<string, any> = {
     name: project.name,
     target: "production",
+    deploymentId: latestDeployment.uid || latestDeployment.id,
   };
-
-  if (latestDeployment) {
-    // Redeploy from existing deployment
-    body.deploymentId = latestDeployment.uid || latestDeployment.id;
-  } else {
-    // No existing deployment — create a minimal empty one
-    body.files = [];
-  }
 
   const data = await vercelFetch(`/v13/deployments`, token, {
     method: "POST",
@@ -139,6 +132,7 @@ export async function deployToVercel(token: string, projectIdOrName: string) {
   try {
     // 1. Find existing project or create one
     let project = await getProject(token, projectIdOrName);
+    const wasNew = !project;
 
     if (!project) {
       console.log(`Project "${projectIdOrName}" not found. Creating it...`);
@@ -146,22 +140,35 @@ export async function deployToVercel(token: string, projectIdOrName: string) {
       console.log(`Created project: ${project.id} (${project.name})`);
     }
 
-    // 2. Get latest deployment (may be null for brand-new projects)
+    // 2. Get latest deployment (null for brand-new projects)
     const latestDeployment = await getLatestDeployment(token, project.id);
 
-    // 3. Trigger deployment
-    const deployRes = await triggerDeployment(token, project, latestDeployment);
+    // 3. For brand-new projects with no code yet, skip the empty deployment
+    //    (deploying files:[] creates an empty build that returns 404).
+    //    Instead, return the Vercel project dashboard so the user can
+    //    connect their GitHub repo.
+    if (!latestDeployment) {
+      const dashboardUrl = `https://vercel.com/new/import?s=https://github.com&teamSlug=&project=${encodeURIComponent(project.name)}`;
+      return {
+        success: true,
+        url: dashboardUrl,
+        deploymentId: undefined,
+        projectCreated: true,
+      };
+    }
 
-    // 4. Build the URL
-    const url = deployRes?.url
-      ? `https://${deployRes.url}`
-      : `https://vercel.com/${project.name}`;
+    // 4. Redeploy from existing deployment
+    const deployRes = await triggerRedeployment(token, project, latestDeployment);
+
+    // 5. Build canonical production URL: <project-name>.vercel.app
+    //    The raw deployRes.url is a per-deployment SHA URL (not the production alias).
+    const url = `https://${project.name}.vercel.app`;
 
     return {
       success: true,
       url,
       deploymentId: deployRes?.id,
-      projectCreated: !latestDeployment,
+      projectCreated: wasNew,
     };
   } catch (error: any) {
     console.error("Vercel Deploy Error:", error);

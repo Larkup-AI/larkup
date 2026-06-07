@@ -9,7 +9,6 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { deployToVercel } from "@/app/actions/vercel";
@@ -32,12 +31,32 @@ import { Label } from "@/components/ui/label";
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 // Token is stored globally so it loads on every server automatically.
-// Project name is stored per-server (keyed by serverId).
+// Project name and deployed URL are stored per-server (keyed by serverId).
 
 const GLOBAL_TOKEN_KEY = "vercel_token";
 
 function projectKey(serverId: string) {
   return `vercel_project_${serverId}`;
+}
+function deployedUrlKey(serverId: string) {
+  return `vercel_deployed_url_${serverId}`;
+}
+function deployedProviderKey(serverId: string) {
+  return `vercel_deployed_provider_${serverId}`;
+}
+
+// ─── Vercel triangle SVG icon ─────────────────────────────────────────────────
+function VercelIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M12 2L2 19.778h20L12 2z" />
+    </svg>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -57,10 +76,16 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
   // ── Was the token already saved globally?
   const [tokenWasSaved, setTokenWasSaved] = useState(false);
 
-  // Load on mount: token is global, project is per-server
+  // ── Persisted deployment info (shown in UI after successful deploy)
+  const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
+  const [deployedProvider, setDeployedProvider] = useState<string | null>(null);
+
+  // Load on mount: token is global, project/url are per-server
   useEffect(() => {
     const savedToken = localStorage.getItem(GLOBAL_TOKEN_KEY);
     const savedProject = localStorage.getItem(projectKey(serverId));
+    const savedUrl = localStorage.getItem(deployedUrlKey(serverId));
+    const savedProvider = localStorage.getItem(deployedProviderKey(serverId));
 
     if (savedToken) {
       setVercelToken(savedToken);
@@ -68,6 +93,12 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
     }
     if (savedProject) {
       setVercelProject(savedProject);
+    }
+    if (savedUrl) {
+      setDeployedUrl(savedUrl);
+    }
+    if (savedProvider) {
+      setDeployedProvider(savedProvider);
     }
   }, [serverId]);
 
@@ -95,10 +126,14 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
       const res = await deployToVercel(vercelToken, vercelProject);
 
       if (res.success) {
-        // ── Persist: token globally, project per-server
+        // ── Persist: token globally, project + url per-server
         localStorage.setItem(GLOBAL_TOKEN_KEY, vercelToken);
         localStorage.setItem(projectKey(serverId), vercelProject);
+        localStorage.setItem(deployedUrlKey(serverId), res.url!);
+        localStorage.setItem(deployedProviderKey(serverId), "vercel");
         setTokenWasSaved(true);
+        setDeployedUrl(res.url!);
+        setDeployedProvider("vercel");
 
         const title = res.projectCreated
           ? "Project created & deployment triggered!"
@@ -116,6 +151,11 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               >
                 View on Vercel ↗
               </a>
+            )}
+            {res.projectCreated && (
+              <span className="text-xs text-muted-foreground">
+                Connect your GitHub repo in the Vercel dashboard to deploy code.
+              </span>
             )}
           </div>,
         );
@@ -246,6 +286,22 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
                 onChange={(e) => setVercelProject(e.target.value)}
               />
             </div>
+
+            {/* ── Current deployed URL ── */}
+            {deployedUrl && (
+              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs">
+                <VercelIcon className="size-3 shrink-0 text-foreground" />
+                <span className="text-muted-foreground">Currently deployed at:</span>
+                <a
+                  href={deployedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono font-medium text-foreground hover:underline truncate"
+                >
+                  {deployedUrl.replace(/^https?:\/\//, "")}
+                </a>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

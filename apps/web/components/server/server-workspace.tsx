@@ -17,6 +17,15 @@ import {
   Square,
   Terminal,
 } from "lucide-react";
+
+// Vercel triangle icon
+function VercelIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M12 2L2 19.778h20L12 2z" />
+    </svg>
+  );
+}
 import type { RagConfig } from "@buddy-rag/core/types";
 import type {
   GeneratedFile,
@@ -185,10 +194,18 @@ function ServerSummary({
 function LaunchPanel({ config }: { config: RagConfig }) {
   const [busy, setBusy] = useState<"start" | "stop" | null>(null);
   const [serverApiKey, setServerApiKey] = useState("");
+  const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
+  const [remoteProvider, setRemoteProvider] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("rag_server_api_key");
     if (saved) setServerApiKey(saved);
+
+    // Read deployed remote URL (set by DeployButton on success)
+    const url = localStorage.getItem("vercel_deployed_url_default");
+    const provider = localStorage.getItem("vercel_deployed_provider_default");
+    if (url) setRemoteUrl(url);
+    if (provider) setRemoteProvider(provider);
   }, []);
 
   const handleSaveApiKey = () => {
@@ -359,6 +376,40 @@ function LaunchPanel({ config }: { config: RagConfig }) {
               text={`curl -X POST ${state.endpoint}/query -H "Content-Type: application/json" -d '{"query":"hello"}'`}
             />
           </div>
+        )}
+
+        {/* ── Remote server (deployed via Vercel / Hetzner) ── */}
+        {remoteUrl && (
+          <>
+            <div className="flex items-center gap-3 pt-2 border-t border-border">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground min-w-[110px]">
+                {remoteProvider === "vercel" ? (
+                  <VercelIcon className="size-4 shrink-0" />
+                ) : (
+                  <Server className="size-4 shrink-0" />
+                )}
+                Remote server
+              </div>
+              <a
+                href={remoteUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonVariants({ variant: "outline" })}
+              >
+                <ExternalLink className="size-4" />
+                {remoteUrl.replace(/^https?:\/\//, "")}
+              </a>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Terminal className="size-3.5" />
+                Try remote
+              </div>
+              <CodeLine
+                text={`curl -X POST ${remoteUrl}/query -H "Content-Type: application/json" -d '{"query":"hello"}'`}
+              />
+            </div>
+          </>
         )}
       </CardContent>
     </Card>
