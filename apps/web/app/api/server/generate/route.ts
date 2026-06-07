@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import JSZip from "jszip"
 import { readConfig } from "@buddy-rag/core/config-store"
 import { generateServer } from "@buddy-rag/core/generator/generate-server"
+import { getActiveServer } from "@buddy-rag/core/workspace"
 
 export const dynamic = "force-dynamic"
 
@@ -17,6 +18,8 @@ export const dynamic = "force-dynamic"
 export async function GET(req: Request) {
   const config = await readConfig()
   const server = generateServer(config)
+  const activeServer = await getActiveServer()
+  const serverId = activeServer?.id ?? "default"
 
   const url = new URL(req.url)
   if (url.searchParams.get("download") === "1") {
@@ -35,5 +38,5 @@ export async function GET(req: Request) {
     })
   }
 
-  return NextResponse.json({ config, server })
+  return NextResponse.json({ config, server, serverId })
 }

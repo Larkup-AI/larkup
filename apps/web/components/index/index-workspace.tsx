@@ -349,7 +349,7 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
               </div>
               <Progress
                 value={pct}
-                className="[&_[data-slot=progress-indicator]]:bg-green-600"
+                className="**:data-[slot=progress-indicator]:bg-green-600"
               />
             </div>
 

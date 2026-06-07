@@ -56,6 +56,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 interface GenerateResponse {
   config: RagConfig;
   server: GeneratedServer;
+  serverId: string;
 }
 
 interface LocalServerState {
@@ -67,11 +68,16 @@ interface LocalServerState {
   lastError?: string;
 }
 
-export function ServerWorkspace() {
+export function ServerWorkspace({ onServerId }: { onServerId?: (id: string) => void }) {
   const { data, isLoading } = useSWR<GenerateResponse>(
     "/api/server/generate",
     fetcher,
   );
+
+  // Notify parent of the active serverId as soon as we have it
+  useEffect(() => {
+    if (data?.serverId) onServerId?.(data.serverId);
+  }, [data?.serverId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isLoading || !data) {
     return (
@@ -89,7 +95,7 @@ export function ServerWorkspace() {
           <TabsTrigger value="code">Generated Code</TabsTrigger>
         </TabsList>
         <TabsContent value="run" className="space-y-6 mt-0">
-          <LaunchPanel config={data.config} />
+          <LaunchPanel config={data.config} serverId={data.serverId} />
         </TabsContent>
         <TabsContent value="code" className="space-y-6 mt-0">
           <ServerSummary config={data.config} server={data.server} />
@@ -196,21 +202,22 @@ function ServerSummary({
   );
 }
 
-function LaunchPanel({ config }: { config: RagConfig }) {
+function LaunchPanel({ config, serverId }: { config: RagConfig; serverId: string }) {
   const [busy, setBusy] = useState<"start" | "stop" | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
   const [remoteProvider, setRemoteProvider] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
 
   useEffect(() => {
-    // Read deployed remote URL (set by DeployButton on success)
-    const url = localStorage.getItem("vercel_deployed_url_default");
-    const provider = localStorage.getItem("vercel_deployed_provider_default");
+    // Read deployed remote URL (set by DeployButton on success).
+    // Keys are scoped per-server to avoid stale URLs from old servers.
+    const url = localStorage.getItem(`vercel_deployed_url_${serverId}`);
+    const provider = localStorage.getItem(`vercel_deployed_provider_${serverId}`);
     const savedApiKey = localStorage.getItem("rag_server_api_key");
     if (url) setRemoteUrl(url);
     if (provider) setRemoteProvider(provider);
     if (savedApiKey) setApiKey(savedApiKey);
-  }, []);
+  }, [serverId]);
 
   const { data, mutate } = useSWR<{ state: LocalServerState }>(
     "/api/server/local",
