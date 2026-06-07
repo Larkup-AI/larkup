@@ -74,16 +74,26 @@ export async function query(vector, topK) {
   }))
 }
 
-export async function list() {
+export async function list({ page = 1, limit = 20 } = {}) {
   const t = await table()
-  const rows = await t.query().limit(100).toArray()
-  return rows.map((row) => ({
-    id: row.id,
-    text: row.text,
-    title: row.title,
-    url: row.url || undefined,
-    documentId: row.documentId,
-  }))
+  // Fetch all rows to get total count, then slice for the page
+  const allRows = await t.query().toArray()
+  const total = allRows.length
+  const start = (page - 1) * limit
+  const pageRows = allRows.slice(start, start + limit)
+  return {
+    documents: pageRows.map((row) => ({
+      id: row.id,
+      text: row.text,
+      title: row.title,
+      url: row.url || undefined,
+      documentId: row.documentId,
+    })),
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  }
 }
 
 export async function add(docs) {
@@ -135,13 +145,26 @@ export async function query(vector, topK) {
   })
 }
 
-export async function list() {
-  const res = await ns.listPaginated({ limit: 100 })
-  if (!res.vectors) return []
-  const ids = res.vectors.map(v => v.id)
-  if (ids.length === 0) return []
-  const fetched = await ns.fetch(ids)
-  return Object.values(fetched.records).map(r => {
+export async function list({ page = 1, limit = 20 } = {}) {
+  // Collect all IDs via Pinecone's cursor-based pagination
+  const allIds = []
+  let paginationToken = undefined
+  do {
+    const res = await ns.listPaginated({ limit: 100, paginationToken })
+    if (res.vectors) allIds.push(...res.vectors.map(v => v.id))
+    paginationToken = res.pagination?.next
+  } while (paginationToken)
+
+  const total = allIds.length
+  const start = (page - 1) * limit
+  const pageIds = allIds.slice(start, start + limit)
+
+  if (pageIds.length === 0) {
+    return { documents: [], total, page, limit, totalPages: Math.ceil(total / limit) }
+  }
+
+  const fetched = await ns.fetch(pageIds)
+  const documents = Object.values(fetched.records).map(r => {
     const meta = r.metadata ?? {}
     return {
       id: r.id,
@@ -151,6 +174,7 @@ export async function list() {
       documentId: meta.documentId ?? "",
     }
   })
+  return { documents, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
 export async function add(docs) {
@@ -290,8 +314,10 @@ const server = createServer(async (req, res) => {
 
   if (req.method === "GET" && url.pathname === "/documents") {
     try {
-      const docs = await store.list()
-      return send(res, 200, { documents: docs })
+      const page  = Math.max(1, parseInt(url.searchParams.get("page")  || "1",  10) || 1)
+      const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10) || 20))
+      const result = await store.list({ page, limit })
+      return send(res, 200, result)
     } catch (err) {
       return send(res, 500, { error: String(err?.message || err) })
     }
@@ -351,9 +377,31 @@ const server = createServer(async (req, res) => {
         },
         "/documents": {
           get: {
-            summary: "List documents",
+            summary: "List documents (paginated)",
             security: [{ bearerAuth: [] }],
-            responses: { "200": { description: "Successful response" } }
+            parameters: [
+              { name: "page",  in: "query", required: false, schema: { type: "integer", default: 1,  minimum: 1 }, description: "Page number (1-indexed)" },
+              { name: "limit", in: "query", required: false, schema: { type: "integer", default: 20, minimum: 1, maximum: 100 }, description: "Items per page" }
+            ],
+            responses: {
+              "200": {
+                description: "Paginated list of documents",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        documents:  { type: "array",   items: { type: "object" } },
+                        total:      { type: "integer", description: "Total number of documents" },
+                        page:       { type: "integer", description: "Current page" },
+                        limit:      { type: "integer", description: "Items per page" },
+                        totalPages: { type: "integer", description: "Total number of pages" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           post: {
             summary: "Add a new document",

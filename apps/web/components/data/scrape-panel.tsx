@@ -16,6 +16,7 @@ import {
   Clock,
   AlertTriangle,
   X,
+  Target,
 } from "lucide-react";
 import type { CrawlScope, SearchResultItem } from "@buddy-rag/core/types";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -100,6 +102,8 @@ export function ScrapePanel({
   const [pageLimit, setPageLimit] = useState(25);
   const [manualUrl, setManualUrl] = useState("");
   const [starting, setStarting] = useState(false);
+  /** When true: only the exact custom URLs are scraped — no deep crawl/pagination */
+  const [specificUrls, setSpecificUrls] = useState(false);
   const [serperConfigured, setSerperConfigured] = useState<boolean | null>(
     null,
   );
@@ -449,7 +453,7 @@ export function ScrapePanel({
 
     const items: SearchResultItem[] = urls.map((url) => ({
       url,
-      title: domainOf(url),
+      title: url,
     }));
 
     setSearchState((prev) => {
@@ -506,14 +510,16 @@ export function ScrapePanel({
   async function startJob() {
     setStarting(true);
     setConfirmOpen(false);
+    // When "Specific URLs" is on, force page-level scrape (no crawl)
+    const effectiveScope: CrawlScope = specificUrls ? "page" : scope;
     try {
       const res = await fetch("/api/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           keywords: query || selectedUrls[0],
-          pageLimit,
-          targets: selectedUrls.map((url) => ({ url, scope })),
+          pageLimit: specificUrls ? 1 : pageLimit,
+          targets: selectedUrls.map((url) => ({ url, scope: effectiveScope })),
         }),
       });
       const data = await res.json();
@@ -521,12 +527,14 @@ export function ScrapePanel({
 
       const { totalPages, estimatedSeconds } = estimateEtlDuration(
         selectedUrls.length,
-        scope,
-        pageLimit,
+        effectiveScope,
+        specificUrls ? 1 : pageLimit,
       );
 
       toast.success("ETL job started — running in background", {
-        description: `${selectedUrls.length} ${scope === "domain" ? "domain(s)" : "page(s)"} · ~${totalPages} pages · ETA ${formatDuration(estimatedSeconds)}. You can navigate away — progress is tracked automatically.`,
+        description: specificUrls
+          ? `Scraping ${selectedUrls.length} specific URL(s) only — no deep crawl. You can navigate away — progress is tracked automatically.`
+          : `${selectedUrls.length} ${effectiveScope === "domain" ? "domain(s)" : "page(s)"} · ~${totalPages} pages · ETA ${formatDuration(estimatedSeconds)}. You can navigate away — progress is tracked automatically.`,
         duration: 8000,
       });
 
@@ -546,9 +554,10 @@ export function ScrapePanel({
     !gatheringAll;
 
   // Estimate for confirmation modal
+  const effectiveScopeForEstimate: CrawlScope = specificUrls ? "page" : scope;
   const estimate = useMemo(
-    () => estimateEtlDuration(selectedUrls.length, scope, pageLimit),
-    [selectedUrls.length, scope, pageLimit],
+    () => estimateEtlDuration(selectedUrls.length, effectiveScopeForEstimate, specificUrls ? 1 : pageLimit),
+    [selectedUrls.length, effectiveScopeForEstimate, specificUrls, pageLimit],
   );
 
   return (
@@ -724,9 +733,32 @@ export function ScrapePanel({
 
       {/* Manual URL input */}
       <div className="flex flex-col gap-2">
+        {/* Specific URLs switch */}
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <Target className="size-4 text-primary shrink-0" />
+            <div>
+              <p className="text-sm font-medium leading-none">Specific URLs</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {specificUrls
+                  ? "Scraping exact URLs only — no deep crawl or pagination"
+                  : "Enable to scrape only the exact URLs you add below"}
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="specific-urls"
+            checked={specificUrls}
+            onCheckedChange={setSpecificUrls}
+            disabled={disabled}
+          />
+        </div>
+
         <div className="flex gap-2">
           <Input
-            placeholder="…or paste multiple URLs directly (separated by comma or newline)"
+            placeholder={specificUrls
+              ? "Paste exact URLs to scrape (comma or newline separated)"
+              : "…or paste multiple URLs directly (separated by comma or newline)"}
             value={manualUrl}
             disabled={disabled}
             onChange={(e) => setManualUrl(e.target.value)}
@@ -881,36 +913,54 @@ export function ScrapePanel({
 
       {/* Scope + launch */}
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:flex-row sm:items-end">
-        <div className="flex-1 space-y-1">
-          <Label className="text-xs">Scope</Label>
-          <Select
-            defaultValue={scope}
-            value={scope}
-            onValueChange={(v) => setScope(v as CrawlScope)}
-          >
-            <SelectTrigger className="w-full bg-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="page">Scrape selected pages only</SelectItem>
-              <SelectItem value="domain">Crawl whole domain</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {scope === "domain" && (
-          <div className="space-y-1 pb-1 sm:w-32">
-            <Label htmlFor="limit" className="text-xs">
-              Max pages
-            </Label>
-            <Input
-              id="limit"
-              type="number"
-              min={1}
-              max={500}
-              value={pageLimit}
-              onChange={(e) => setPageLimit(Number(e.target.value) || 1)}
-            />
+        {specificUrls ? (
+          // When "Specific URLs" is active, show a locked badge instead of the scope selector
+          <div className="flex flex-1 items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+            <Target className="size-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-primary">Specific URLs mode</p>
+              <p className="text-xs text-muted-foreground">
+                Scraping {selectedUrls.length > 0 ? selectedUrls.length : "selected"} exact URL{selectedUrls.length !== 1 ? "s" : ""} only — no deep crawl
+              </p>
+            </div>
+            <Badge variant="outline" className="text-xs shrink-0 border-primary/40 text-primary">
+              page scope
+            </Badge>
           </div>
+        ) : (
+          <>
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs">Scope</Label>
+              <Select
+                defaultValue={scope}
+                value={scope}
+                onValueChange={(v) => setScope(v as CrawlScope)}
+              >
+                <SelectTrigger className="w-full bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="page">Scrape selected pages only</SelectItem>
+                  <SelectItem value="domain">Crawl whole domain</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {scope === "domain" && (
+              <div className="space-y-1 pb-1 sm:w-32">
+                <Label htmlFor="limit" className="text-xs">
+                  Max pages
+                </Label>
+                <Input
+                  id="limit"
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={pageLimit}
+                  onChange={(e) => setPageLimit(Number(e.target.value) || 1)}
+                />
+              </div>
+            )}
+          </>
         )}
         <Button
           className={"mb-1"}
@@ -936,8 +986,9 @@ export function ScrapePanel({
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Clock className="size-3.5" />
           <span>
-            Estimated: {estimate.totalPages.toLocaleString()} pages ·{" "}
-            {formatDuration(estimate.estimatedSeconds)}
+            {specificUrls
+              ? `Scraping ${selectedUrls.length} specific URL${selectedUrls.length !== 1 ? "s" : ""} — exact pages only, no pagination`
+              : `Estimated: ${estimate.totalPages.toLocaleString()} pages · ${formatDuration(estimate.estimatedSeconds)}`}
           </span>
         </div>
       )}
@@ -947,7 +998,11 @@ export function ScrapePanel({
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Start ETL Job?"
-        description={`This will scrape ${selectedUrls.length} ${scope === "domain" ? "domain(s)" : "page(s)"}${scope === "domain" ? ` with up to ${pageLimit} pages each` : ""}.\n\n• Total pages: ~${estimate.totalPages.toLocaleString()}\n• Estimated time: ${formatDuration(estimate.estimatedSeconds)}\n\nThe job will run in the background. You can navigate away and check progress anytime.`}
+        description={
+          specificUrls
+            ? `This will scrape ${selectedUrls.length} specific URL${selectedUrls.length !== 1 ? "s" : ""} exactly as provided — no deep crawl or pagination.\n\nThe job will run in the background. You can navigate away and check progress anytime.`
+            : `This will scrape ${selectedUrls.length} ${scope === "domain" ? "domain(s)" : "page(s)"}${scope === "domain" ? ` with up to ${pageLimit} pages each` : ""}.\n\n• Total pages: ~${estimate.totalPages.toLocaleString()}\n• Estimated time: ${formatDuration(estimate.estimatedSeconds)}\n\nThe job will run in the background. You can navigate away and check progress anytime.`
+        }
         confirmText="Start ETL Job"
         onConfirm={startJob}
       />

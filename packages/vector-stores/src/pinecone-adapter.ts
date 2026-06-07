@@ -280,7 +280,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
     const fetchN = Math.min(topK * 2, 100)
     const [denseHits, sparseHits] = await Promise.all([
       this.denseQuery(vector, fetchN),
-      this.sparseQuery(queryText!, fetchN),
+      this.sparseQuery(vector, queryText!, fetchN),
     ])
 
     return rrfMerge(denseHits, sparseHits, topK)
@@ -291,14 +291,23 @@ export class PineconeAdapter implements VectorStoreAdapter {
     return (res.matches ?? []).map(hitFromMatch)
   }
 
-  private async sparseQuery(queryText: string, topK: number): Promise<QueryHit[]> {
+  /**
+   * Sparse-weighted query for hybrid search.
+   *
+   * Pinecone's dotproduct index ALWAYS requires a non-empty dense `vector`
+   * array — even when the call is primarily sparse. Passing `[]` triggers the
+   * "You must enter an array of RecordValues" error. We pass the real dense
+   * query vector here; Pinecone's scoring blends both dimensions and the RRF
+   * merge downstream takes care of the final ranking.
+   */
+  private async sparseQuery(denseVector: number[], queryText: string, topK: number): Promise<QueryHit[]> {
     const sparseVector = await this.buildQuerySparseVector(queryText)
     const res = await this.ns().query({
-      vector: [],
+      vector: denseVector,
       sparseVector,
       topK,
       includeMetadata: true,
-    } as any)
+    })
     return (res.matches ?? []).map(hitFromMatch)
   }
 
