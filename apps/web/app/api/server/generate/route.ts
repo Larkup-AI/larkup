@@ -26,7 +26,11 @@ export async function GET(req: Request) {
     const zip = new JSZip()
     const root = server.projectName || "rag-server"
     for (const file of server.files) {
-      zip.file(`${root}/${file.path}`, file.contents)
+      if (file.encoding === "base64") {
+        zip.file(`${root}/${file.path}`, file.contents, { base64: true })
+      } else {
+        zip.file(`${root}/${file.path}`, file.contents)
+      }
     }
     const buf = await zip.generateAsync({ type: "nodebuffer" })
     return new NextResponse(new Uint8Array(buf), {

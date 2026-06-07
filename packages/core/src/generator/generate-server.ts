@@ -6,6 +6,7 @@ export interface GeneratedFile {
   path: string;
   contents: string;
   language: string;
+  encoding?: "utf8" | "base64";
 }
 
 export interface GeneratedServer {
@@ -229,6 +230,8 @@ function serverSource(config: RagConfig): string {
   return `import { createServer } from "node:http"
 import { embedQuery } from "./embed.mjs"
 import * as store from "./store.mjs"
+import fs from "node:fs"
+import path from "node:path"
 
 const PORT = process.env.PORT || 8080
 const DEFAULT_TOP_K = Number(process.env.TOP_K || ${config.topK})
@@ -262,6 +265,21 @@ const server = createServer(async (req, res) => {
 
   const url = new URL(req.url, \`http://\${req.headers.host}\`)
 
+  if (req.method === "GET" && url.pathname === "/favicon2.ico") {
+    try {
+      const filepath = path.join(process.cwd(), "public", "favicon2.ico")
+      if (fs.existsSync(filepath)) {
+        res.writeHead(200, { "Content-Type": "image/x-icon" })
+        return res.end(fs.readFileSync(filepath))
+      }
+      const rootFilepath = path.join(process.cwd(), "favicon2.ico")
+      if (fs.existsSync(rootFilepath)) {
+        res.writeHead(200, { "Content-Type": "image/x-icon" })
+        return res.end(fs.readFileSync(rootFilepath))
+      }
+    } catch {}
+  }
+
   const expectedKey = process.env.SERVER_API_KEY
   
   if (expectedKey) {
@@ -288,7 +306,10 @@ const server = createServer(async (req, res) => {
     return res.end(\`
       <!DOCTYPE html>
       <html>
-        <head><title>\${${JSON.stringify(config.projectName)}} - RAG Server</title></head>
+        <head>
+          <title>\${${JSON.stringify(config.projectName)}} - RAG Server</title>
+          <link rel="icon" href="/favicon2.ico" type="image/x-icon" />
+        </head>
         <body style="font-family: sans-serif; padding: 2rem;">
           <h1>\${${JSON.stringify(config.projectName)}} is running</h1>
           <p>Powered by buddy-rag</p>
@@ -457,6 +478,7 @@ const server = createServer(async (req, res) => {
           <title>API Reference</title>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <link rel="icon" href="/favicon2.ico" type="image/x-icon" />
         </head>
         <body>
           <script id="api-reference" data-url="/openapi.json"></script>
@@ -596,7 +618,10 @@ function vercelJson(): string {
   return `{
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "builds": [{ "src": "server.mjs", "use": "@vercel/node" }],
-  "routes": [{ "src": "/(.*)", "dest": "server.mjs" }]
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "server.mjs" }
+  ]
 }
 `;
 }
@@ -793,6 +818,32 @@ export function generateServer(config: RagConfig): GeneratedServer {
     { path: ".env.example", contents: envExample(server) },
     { path: "README.md", contents: readme(config, server) },
   ].map((f) => ({ ...f, language: lang(f.path) }));
+
+  try {
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const faviconPath = path.resolve(process.cwd(), "public/favicon2.ico");
+    if (fs.existsSync(faviconPath)) {
+      files.push({
+        path: "public/favicon2.ico",
+        contents: fs.readFileSync(faviconPath).toString("base64"),
+        language: "ico",
+        encoding: "base64"
+      });
+    } else {
+      const webFaviconPath = path.resolve(process.cwd(), "apps/web/public/favicon2.ico");
+      if (fs.existsSync(webFaviconPath)) {
+        files.push({
+          path: "public/favicon2.ico",
+          contents: fs.readFileSync(webFaviconPath).toString("base64"),
+          language: "ico",
+          encoding: "base64"
+        });
+      }
+    }
+  } catch (e) {
+    // Ignore if not found or fs fails
+  }
 
   void model;
 

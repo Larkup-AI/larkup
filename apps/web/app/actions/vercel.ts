@@ -350,7 +350,7 @@ export async function deployToVercel(
     
     const files = generated.files.map((f) => ({
       file: f.path,
-      data: Buffer.from(f.contents).toString("base64"),
+      data: f.encoding === "base64" ? f.contents : Buffer.from(f.contents).toString("base64"),
       encoding: "base64",
     }));
 

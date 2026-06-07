@@ -114,7 +114,11 @@ export async function emitToDisk(config: RagConfig): Promise<string> {
   for (const file of server.files) {
     const dest = path.join(dir, file.path)
     await fs.mkdir(path.dirname(dest), { recursive: true })
-    await fs.writeFile(dest, file.contents, "utf8")
+    if (file.encoding === "base64") {
+      await fs.writeFile(dest, Buffer.from(file.contents, "base64"))
+    } else {
+      await fs.writeFile(dest, file.contents, "utf8")
+    }
   }
   return dir
 }
