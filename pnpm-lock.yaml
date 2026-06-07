@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@vercel/sdk':
+        specifier: ^1.21.9
+        version: 1.21.9
     devDependencies:
       '@turbo/gen':
         specifier: ^2.9.16
@@ -149,6 +153,8 @@ importers:
       typescript:
         specifier: 5.7.3
         version: 5.7.3
+
+  packages/deploy: {}
 
   packages/scraper:
     dependencies:
@@ -1497,6 +1503,10 @@ packages:
   '@vercel/oidc@3.2.0':
     resolution: {integrity: sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug==}
     engines: {node: '>= 20'}
+
+  '@vercel/sdk@1.21.9':
+    resolution: {integrity: sha512-HbmrcF/uwio8HwVA7oyvfzyqk2QxM2yqP2EakLqQ/9ZHA1VWi05D9mBZW5J/PnLs5sJLdFa5+J6mzGey6lq8KQ==}
+    hasBin: true
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -4168,6 +4178,14 @@ snapshots:
       react: 19.2.7
 
   '@vercel/oidc@3.2.0': {}
+
+  '@vercel/sdk@1.21.9':
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - supports-color
 
   accepts@2.0.0:
     dependencies:

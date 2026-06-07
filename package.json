@@ -12,5 +12,8 @@
     "@turbo/gen": "^2.9.16",
     "turbo": "^2.5.0"
   },
-  "packageManager": "pnpm@10.11.0"
+  "packageManager": "pnpm@10.11.0",
+  "dependencies": {
+    "@vercel/sdk": "^1.21.9"
+  }
 }

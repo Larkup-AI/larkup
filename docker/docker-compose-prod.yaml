@@ -1,0 +1,77 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+      args:
+        NEXT_PUBLIC_DOCKER_ENV: "true"
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - app_data:/app/data
+      - app_web_data:/app/apps/web/data
+    environment:
+      # Node.js Configuration
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=2048
+      NEXT_TELEMETRY_DISABLED: 1
+
+      # Application Configuration
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_DOCKER_ENV: true
+      DOCKER_ENV: true
+
+      # Database Configuration
+      DATABASE_URL: ${DATABASE_URL:-file:/app/data/database.db}
+
+      # Authentication Configuration (REQUIRED - set in .env)
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+
+      # Vector Store Configuration
+      VECTOR_STORE_PATH: /app/data/vector_stores
+
+      # Chroma Configuration
+      CHROMA_SERVER_CORS_ALLOW_ORIGINS: '["*"]'
+
+      # Optional: Telemetry
+      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-false}
+
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: "4"
+        reservations:
+          memory: 4G
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    networks:
+      - app_network
+
+volumes:
+  app_data:
+    driver: local
+  app_web_data:
+    driver: local
+
+networks:
+  app_network:
+    driver: bridge

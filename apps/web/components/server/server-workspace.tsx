@@ -226,12 +226,6 @@ function LaunchPanel({ config }: { config: RagConfig }) {
     }
   }
 
-  function handleDeploy() {
-    toast.info(
-      "Vercel requirements and SSH key to Hetzner deployment will be implemented later.",
-    );
-  }
-
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
@@ -349,10 +343,6 @@ function LaunchPanel({ config }: { config: RagConfig }) {
                     <Play className="size-4" />
                   )}
                   {busy === "start" ? "Starting…" : "Launch local server"}
-                </Button>
-                <Button variant="secondary" onClick={handleDeploy}>
-                  <Rocket className="size-4 mr-2" />
-                  Deploy
                 </Button>
               </>
             )}
