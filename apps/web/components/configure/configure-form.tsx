@@ -523,6 +523,7 @@ export function ConfigureForm() {
             </Card>
 
             <Button
+              variant={"success"}
               className="w-full"
               onClick={handleSave}
               disabled={saving || !dirty}
