@@ -44,7 +44,7 @@ const STATUS: Record<
   queued: {
     label: "Queued",
     icon: CircleDashed,
-    className: "text-muted-foreground border-muted-foreground/30 bg-muted/30",
+    className: "text-orange-500 border-orange-500/30 bg-orange-500/10",
     badgeVariant: "outline",
   },
   running: {
@@ -56,7 +56,7 @@ const STATUS: Record<
   completed: {
     label: "Completed",
     icon: CheckCircle2,
-    className: "text-emerald-500 border-emerald-500/30 bg-emerald-500/10",
+    className: "text-green-600 border-green-600/50 bg-green-600/10",
     badgeVariant: "outline",
   },
   failed: {
@@ -246,8 +246,13 @@ export function JobsPanel({
                 job.status === "running" || job.status === "queued";
               const pct = progressFor(job);
 
-              const domainTargets = job.targets.filter((t) => t.scope === "domain").length;
-              const denom = domainTargets > 0 ? domainTargets * job.pageLimit : job.targets.length;
+              const domainTargets = job.targets.filter(
+                (t) => t.scope === "domain",
+              ).length;
+              const denom =
+                domainTargets > 0
+                  ? domainTargets * job.pageLimit
+                  : job.targets.length;
 
               return (
                 <tr
@@ -299,7 +304,7 @@ export function JobsPanel({
                       variant="outline"
                       className={cn(
                         s.className,
-                        "gap-1 px-1.5 py-0.5 border-orange-300 font-mono text-[10px] whitespace-nowrap bg-orange-100 text-orange-500",
+                        "gap-1 px-1.5 py-0.5 font-mono text-[10px] whitespace-nowrap",
                       )}
                     >
                       <Icon
