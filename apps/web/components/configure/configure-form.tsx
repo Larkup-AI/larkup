@@ -521,9 +521,8 @@ export function ConfigureForm() {
                 <SummaryRow label="Top-K" value={String(form.topK)} mono />
               </CardContent>
             </Card>
-
             <Button
-              variant={"success"}
+              variant={"default"}
               className="w-full"
               onClick={handleSave}
               disabled={saving || !dirty}
