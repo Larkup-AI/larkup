@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+// [#CDA1FE]
 const STAGE_ICONS: Record<StageId, LucideIcon> = {
   configure: SlidersHorizontal,
   data: FileStack,
@@ -44,7 +45,7 @@ export function AppSidebar() {
               <Link
                 href="/configure"
                 aria-label="buddy-rag home"
-                className="mb-2 flex size-11 items-center justify-center rounded-xl bg-[#CDA1FE] text-primary-foreground shadow-sm transition-transform hover:scale-105"
+                className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
               />
             }
           >
@@ -70,7 +71,7 @@ export function AppSidebar() {
                 {/* active accent bar (Teams-style) */}
                 <span
                   className={cn(
-                    "absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-[#CDA1FE] transition-opacity",
+                    "absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-primary transition-opacity",
                     active ? "opacity-100" : "opacity-0",
                   )}
                 />
@@ -78,7 +79,7 @@ export function AppSidebar() {
                   className={cn(
                     "relative flex size-10 items-center justify-center rounded-xl transition-colors",
                     active
-                      ? "bg-white border text-[#CDA1FE]"
+                      ? "bg-white border text-primary"
                       : locked
                         ? "text-muted-foreground/50"
                         : "text-foreground/70 group-hover:bg-white/90 group-hover:text-foreground",
@@ -98,7 +99,7 @@ export function AppSidebar() {
                   className={cn(
                     "text-[10.5px] leading-none tracking-tight",
                     active
-                      ? "font-semibold text-[#CDA1FE]"
+                      ? "font-semibold text-primary"
                       : locked
                         ? "text-muted-foreground/50"
                         : "text-muted-foreground",

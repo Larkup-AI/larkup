@@ -68,7 +68,11 @@ interface LocalServerState {
   lastError?: string;
 }
 
-export function ServerWorkspace({ onServerId }: { onServerId?: (id: string) => void }) {
+export function ServerWorkspace({
+  onServerId,
+}: {
+  onServerId?: (id: string) => void;
+}) {
   const { data, isLoading } = useSWR<GenerateResponse>(
     "/api/server/generate",
     fetcher,
@@ -202,7 +206,13 @@ function ServerSummary({
   );
 }
 
-function LaunchPanel({ config, serverId }: { config: RagConfig; serverId: string }) {
+function LaunchPanel({
+  config,
+  serverId,
+}: {
+  config: RagConfig;
+  serverId: string;
+}) {
   const [busy, setBusy] = useState<"start" | "stop" | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
   const [remoteProvider, setRemoteProvider] = useState<string | null>(null);
@@ -212,7 +222,9 @@ function LaunchPanel({ config, serverId }: { config: RagConfig; serverId: string
     // Read deployed remote URL (set by DeployButton on success).
     // Keys are scoped per-server to avoid stale URLs from old servers.
     const url = localStorage.getItem(`vercel_deployed_url_${serverId}`);
-    const provider = localStorage.getItem(`vercel_deployed_provider_${serverId}`);
+    const provider = localStorage.getItem(
+      `vercel_deployed_provider_${serverId}`,
+    );
     const savedApiKey = localStorage.getItem("rag_server_api_key");
     if (url) setRemoteUrl(url);
     if (provider) setRemoteProvider(provider);
@@ -340,7 +352,7 @@ function LaunchPanel({ config, serverId }: { config: RagConfig; serverId: string
                   href={`${state.endpoint}/health`}
                   target="_blank"
                   rel="noreferrer"
-                  className={buttonVariants({ variant: "outline" })}
+                  className={buttonVariants({ variant: "secondary" })}
                 >
                   <ExternalLink className="size-4" />
                   {state.endpoint}
