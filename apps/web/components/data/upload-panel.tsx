@@ -250,6 +250,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
     }
 
     setSaving(false);
+    setProgress(null);
     setStaged([]);
     if (ok > 0) {
       toast.success(
