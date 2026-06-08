@@ -420,8 +420,33 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                     </div>
 
                     <div className="space-y-3 pt-2 border-t border-border">
-                      <Label>Content Columns</Label>
-                      <p className="text-[11px] text-muted-foreground mb-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Content Columns</Label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-[10px] uppercase font-medium text-primary hover:underline cursor-pointer"
+                            onClick={() => {
+                              updateEditingFile({ 
+                                contentKeys: editingFile.keys || []
+                              });
+                            }}
+                          >
+                            Select All
+                          </button>
+                          <span className="text-muted-foreground text-[10px]">|</span>
+                          <button
+                            type="button"
+                            className="text-[10px] uppercase font-medium text-muted-foreground hover:underline cursor-pointer"
+                            onClick={() => {
+                              updateEditingFile({ contentKeys: [] });
+                            }}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
                         Selected columns will be combined to form the searchable
                         content.
                       </p>
@@ -490,17 +515,41 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                     </div>
 
                     <div className="space-y-3 pt-2 border-t border-border">
-                      <Label>Metadata Columns</Label>
-                      <p className="text-[11px] text-muted-foreground mb-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Metadata Columns</Label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-[10px] uppercase font-medium text-primary hover:underline cursor-pointer"
+                            onClick={() => {
+                              const availableKeys = editingFile.keys?.filter(k => k !== editingFile.titleKey) || [];
+                              updateEditingFile({ 
+                                metadataKeys: availableKeys
+                              });
+                            }}
+                          >
+                            Select All
+                          </button>
+                          <span className="text-muted-foreground text-[10px]">|</span>
+                          <button
+                            type="button"
+                            className="text-[10px] uppercase font-medium text-muted-foreground hover:underline cursor-pointer"
+                            onClick={() => {
+                              updateEditingFile({ metadataKeys: [] });
+                            }}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
                         These columns will be stored as searchable metadata.
                       </p>
                       <div className="max-h-[120px] overflow-y-auto space-y-2 pr-2">
                         {editingFile.keys?.map((k) => {
                           const isSelected =
                             editingFile.metadataKeys?.includes(k);
-                          const disabled =
-                            editingFile.contentKeys?.includes(k) ||
-                            k === editingFile.titleKey;
+                          const disabled = k === editingFile.titleKey;
                           return (
                             <div
                               key={k}
