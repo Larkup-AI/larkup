@@ -62,12 +62,11 @@ interface PineMeta {
 const SPARSE_BATCH = 48
 
 /**
- * Delay between consecutive sparse-embed batches (ms).
- * 48 chunks × 512 tokens = 24,576 tokens; 250,000 ÷ 24,576 ≈ 10 safe
- * batches/min → at least 6 000 ms between calls to stay in budget.
- * We use 7 000 ms to give a comfortable margin.
+ * Initial delay between consecutive sparse-embed batches (ms).
+ * Starts at 0 to index fast, but if a rate limit is hit, it will be
+ * increased dynamically to stay in budget.
  */
-const INTER_BATCH_DELAY_MS = 7_000
+const BASE_INTER_BATCH_DELAY_MS = 7_000
 
 /** How long to wait on a 429 before retrying (ms). */
 const RATE_LIMIT_WAIT_MS = 65_000
@@ -97,6 +96,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
   private index: Index | null = null
   private readonly indexName: string
   private readonly namespace: string
+  private currentInterBatchDelayMs = 0
 
   constructor(private readonly config: PineconeConfig) {
     if (!config.apiKey) throw new Error("Pinecone requires an API key.")
@@ -177,6 +177,8 @@ export class PineconeAdapter implements VectorStoreAdapter {
           const waitSecs = Math.round(RATE_LIMIT_WAIT_MS / 1000)
           await this.config.onRateLimit?.(waitSecs, attempt)
           await sleep(RATE_LIMIT_WAIT_MS)
+          // Slow down future batches to avoid hitting the rate limit again
+          this.currentInterBatchDelayMs = Math.max(this.currentInterBatchDelayMs, BASE_INTER_BATCH_DELAY_MS)
           continue
         }
         throw err
@@ -195,8 +197,8 @@ export class PineconeAdapter implements VectorStoreAdapter {
       result.push(...vecs)
 
       // Rate-limit guard: delay between batches (skip after the last one)
-      if (i + SPARSE_BATCH < texts.length) {
-        await sleep(INTER_BATCH_DELAY_MS)
+      if (i + SPARSE_BATCH < texts.length && this.currentInterBatchDelayMs > 0) {
+        await sleep(this.currentInterBatchDelayMs)
       }
     }
 
