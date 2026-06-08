@@ -2,8 +2,9 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { FileUp, Loader2, X, Settings2, Columns } from "lucide-react";
+import { FileUp, Loader2, X, Settings2, Columns, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -40,8 +41,10 @@ interface StagedFile {
   keys?: string[];
   // mapping for structured
   titleKey?: string;
-  contentKey?: string;
+  contentKeys?: string[];
+  contentSeparator?: string;
   metadataKeys?: string[];
+  globalMetadata?: { key: string; value: string }[];
 }
 
 export function UploadPanel({ onAdded }: { onAdded: () => void }) {
@@ -80,8 +83,10 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
               rows: result.data,
               keys,
               titleKey: keys[0],
-              contentKey: keys.length > 1 ? keys[1] : keys[0],
-              metadataKeys: keys.slice(2),
+              contentKeys: keys,
+              contentSeparator: ", ",
+              metadataKeys: [],
+              globalMetadata: [],
             });
           }
         } else if (ext === "xlsx" || ext === "xls") {
@@ -99,8 +104,10 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
               rows,
               keys,
               titleKey: keys[0],
-              contentKey: keys.length > 1 ? keys[1] : keys[0],
-              metadataKeys: keys.slice(2),
+              contentKeys: keys,
+              contentSeparator: ", ",
+              metadataKeys: [],
+              globalMetadata: [],
             });
           }
         } else if (ext === "json") {
@@ -121,8 +128,10 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                 rows: parsed,
                 keys,
                 titleKey: keys[0],
-                contentKey: keys.length > 1 ? keys[1] : keys[0],
-                metadataKeys: keys.slice(2),
+                contentKeys: keys,
+                contentSeparator: ", ",
+                metadataKeys: [],
+                globalMetadata: [],
               });
             } else {
               // fallback to plain
@@ -192,15 +201,31 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
           const title = f.titleKey
             ? String(row[f.titleKey] || `Row ${i + 1}`)
             : `Row ${i + 1}`;
-          const content = f.contentKey
-            ? String(row[f.contentKey] || "")
-            : JSON.stringify(row);
+            
+          let content = "";
+          if (f.contentKeys && f.contentKeys.length > 0) {
+            content = f.contentKeys
+              .map((k) => String(row[k] || ""))
+              .filter(Boolean)
+              .join(f.contentSeparator || " ");
+          } else {
+            content = JSON.stringify(row);
+          }
+
           const metadata: Record<string, any> = {};
           if (f.metadataKeys) {
             for (const mk of f.metadataKeys) {
               metadata[mk] = row[mk];
             }
           }
+          if (f.globalMetadata) {
+            for (const gm of f.globalMetadata) {
+              if (gm.key.trim()) {
+                metadata[gm.key.trim()] = gm.value;
+              }
+            }
+          }
+
           if (content.trim()) {
             payloads.push({ title, content, metadata, source: "upload" });
           }
@@ -394,77 +419,97 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                       </p>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>Content Column</Label>
-                      <Select
-                        value={editingFile.contentKey}
-                        onValueChange={(val) =>
-                          updateEditingFile({ contentKey: val || undefined })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select column" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {editingFile.keys?.map((k) => (
-                            <SelectItem key={k} value={k}>
-                              {k}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[11px] text-muted-foreground">
-                        The primary text to be embedded and searched.
+                    <div className="space-y-3 pt-2 border-t border-border">
+                      <Label>Content Columns</Label>
+                      <p className="text-[11px] text-muted-foreground mb-2">
+                        Selected columns will be combined to form the searchable content.
                       </p>
-                    </div>
-                  </div>
+                      <div className="max-h-[120px] overflow-y-auto space-y-2 pr-2">
+                        {editingFile.keys?.map((k) => {
+                          const isSelected = editingFile.contentKeys?.includes(k);
+                          return (
+                            <div key={k} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`content-${k}`}
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  const current = editingFile.contentKeys || [];
+                                  if (checked) {
+                                    updateEditingFile({ contentKeys: [...current, k] });
+                                  } else {
+                                    updateEditingFile({ contentKeys: current.filter((x) => x !== k) });
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor={`content-${k}`}
+                                className="text-sm font-medium leading-none"
+                              >
+                                {k}
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
 
-                  <div className="space-y-3 pt-2 border-t border-border">
-                    <Label>Metadata Columns</Label>
-                    <p className="text-[11px] text-muted-foreground mb-2">
-                      Selected columns will be stored as searchable metadata
-                      alongside the document.
-                    </p>
-                    <div className="max-h-[160px] overflow-y-auto space-y-2 pr-2">
-                      {editingFile.keys?.map((k) => {
-                        const isSelected =
-                          editingFile.metadataKeys?.includes(k);
-                        const disabled =
-                          k === editingFile.contentKey ||
-                          k === editingFile.titleKey;
-                        return (
-                          <div key={k} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`meta-${k}`}
-                              checked={isSelected}
-                              disabled={disabled}
-                              onCheckedChange={(checked) => {
-                                const current = editingFile.metadataKeys || [];
-                                if (checked) {
-                                  updateEditingFile({
-                                    metadataKeys: [...current, k],
-                                  });
-                                } else {
-                                  updateEditingFile({
-                                    metadataKeys: current.filter(
-                                      (x) => x !== k,
-                                    ),
-                                  });
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`meta-${k}`}
-                              className={cn(
-                                "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-                                disabled && "text-muted-foreground",
-                              )}
-                            >
-                              {k} {disabled && "(used)"}
-                            </label>
-                          </div>
-                        );
-                      })}
+                      {editingFile.contentKeys && editingFile.contentKeys.length > 1 && (
+                        <div className="pt-2">
+                          <Label className="mb-2 block">Separator</Label>
+                          <Select
+                            value={editingFile.contentSeparator || " "}
+                            onValueChange={(val) => updateEditingFile({ contentSeparator: val || undefined })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select separator" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value=" ">Space</SelectItem>
+                              <SelectItem value=", ">Comma</SelectItem>
+                              <SelectItem value="\n">Newline</SelectItem>
+                              <SelectItem value=" - ">Hyphen</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3 pt-2 border-t border-border">
+                      <Label>Metadata Columns</Label>
+                      <p className="text-[11px] text-muted-foreground mb-2">
+                        These columns will be stored as searchable metadata.
+                      </p>
+                      <div className="max-h-[120px] overflow-y-auto space-y-2 pr-2">
+                        {editingFile.keys?.map((k) => {
+                          const isSelected = editingFile.metadataKeys?.includes(k);
+                          const disabled = editingFile.contentKeys?.includes(k) || k === editingFile.titleKey;
+                          return (
+                            <div key={k} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`meta-${k}`}
+                                checked={isSelected}
+                                disabled={disabled}
+                                onCheckedChange={(checked) => {
+                                  const current = editingFile.metadataKeys || [];
+                                  if (checked) {
+                                    updateEditingFile({ metadataKeys: [...current, k] });
+                                  } else {
+                                    updateEditingFile({ metadataKeys: current.filter((x) => x !== k) });
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor={`meta-${k}`}
+                                className={cn(
+                                  "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+                                  disabled && "text-muted-foreground",
+                                )}
+                              >
+                                {k} {disabled && "(used)"}
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </>
@@ -488,6 +533,67 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                   </div>
                 </div>
               )}
+
+              <div className="space-y-3 pt-4 border-t border-border">
+                <div className="flex items-center justify-between">
+                  <Label>Global Custom Metadata</Label>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 px-2 text-xs"
+                    onClick={() => {
+                      const current = editingFile.globalMetadata || [];
+                      updateEditingFile({ globalMetadata: [...current, { key: "", value: "" }] });
+                    }}
+                  >
+                    <Plus className="size-3 mr-1" /> Add Field
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground mb-2">
+                  Apply custom key-value pairs to every document generated from this file.
+                </p>
+                <div className="space-y-2">
+                  {(editingFile.globalMetadata || []).map((gm, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input 
+                        placeholder="Key" 
+                        value={gm.key}
+                        className="h-8 text-xs font-mono"
+                        onChange={(e) => {
+                          const next = [...(editingFile.globalMetadata || [])];
+                          next[i].key = e.target.value;
+                          updateEditingFile({ globalMetadata: next });
+                        }}
+                      />
+                      <Input 
+                        placeholder="Value" 
+                        value={gm.value}
+                        className="h-8 text-xs font-mono"
+                        onChange={(e) => {
+                          const next = [...(editingFile.globalMetadata || [])];
+                          next[i].value = e.target.value;
+                          updateEditingFile({ globalMetadata: next });
+                        }}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground shrink-0"
+                        onClick={() => {
+                          const next = [...(editingFile.globalMetadata || [])];
+                          next.splice(i, 1);
+                          updateEditingFile({ globalMetadata: next });
+                        }}
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                  {(!editingFile.globalMetadata || editingFile.globalMetadata.length === 0) && (
+                    <p className="text-xs text-muted-foreground italic text-center py-2">No custom metadata.</p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
