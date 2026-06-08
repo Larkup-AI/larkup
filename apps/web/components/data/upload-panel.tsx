@@ -201,7 +201,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
           const title = f.titleKey
             ? String(row[f.titleKey] || `Row ${i + 1}`)
             : `Row ${i + 1}`;
-            
+
           let content = "";
           if (f.contentKeys && f.contentKeys.length > 0) {
             content = f.contentKeys
@@ -334,7 +334,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                   type="button"
                   aria-label={`Configure ${f.name}`}
                   onClick={() => setEditingFileId(f.id)}
-                  className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-md transition-colors"
+                  className="p-1.5 bg-secondary cursor-pointer border text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-md transition-colors"
                 >
                   <Settings2 className="size-3.5" />
                 </button>
@@ -344,9 +344,9 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                   onClick={() =>
                     setStaged((p) => p.filter((item) => item.id !== f.id))
                   }
-                  className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-md transition-colors"
+                  className="p-1.5 border bg-muted hover:bg-muted/50 cursor-pointer text-muted-foreground hover:text-foreground rounded-md transition-colors"
                 >
-                  <X className="size-3.5" />
+                  <X className="size-3.5 text-red-500" />
                 </button>
               </div>
             </li>
@@ -382,7 +382,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
         open={!!editingFile}
         onOpenChange={(open) => !open && setEditingFileId(null)}
       >
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-xl max-h-[80%]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Columns className="size-4 text-primary" />
@@ -391,7 +391,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
           </DialogHeader>
 
           {editingFile && (
-            <div className="py-4 space-y-6">
+            <div className="py-4 space-y-6 overflow-y-auto pr-2" style={{ maxHeight: "calc(80vh - 120px)" }}>
               {editingFile.format === "structured" ? (
                 <>
                   <div className="space-y-4">
@@ -422,22 +422,33 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                     <div className="space-y-3 pt-2 border-t border-border">
                       <Label>Content Columns</Label>
                       <p className="text-[11px] text-muted-foreground mb-2">
-                        Selected columns will be combined to form the searchable content.
+                        Selected columns will be combined to form the searchable
+                        content.
                       </p>
                       <div className="max-h-[120px] overflow-y-auto space-y-2 pr-2">
                         {editingFile.keys?.map((k) => {
-                          const isSelected = editingFile.contentKeys?.includes(k);
+                          const isSelected =
+                            editingFile.contentKeys?.includes(k);
                           return (
-                            <div key={k} className="flex items-center space-x-2">
+                            <div
+                              key={k}
+                              className="flex items-center space-x-2"
+                            >
                               <Checkbox
                                 id={`content-${k}`}
                                 checked={isSelected}
                                 onCheckedChange={(checked) => {
                                   const current = editingFile.contentKeys || [];
                                   if (checked) {
-                                    updateEditingFile({ contentKeys: [...current, k] });
+                                    updateEditingFile({
+                                      contentKeys: [...current, k],
+                                    });
                                   } else {
-                                    updateEditingFile({ contentKeys: current.filter((x) => x !== k) });
+                                    updateEditingFile({
+                                      contentKeys: current.filter(
+                                        (x) => x !== k,
+                                      ),
+                                    });
                                   }
                                 }}
                               />
@@ -452,25 +463,30 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                         })}
                       </div>
 
-                      {editingFile.contentKeys && editingFile.contentKeys.length > 1 && (
-                        <div className="pt-2">
-                          <Label className="mb-2 block">Separator</Label>
-                          <Select
-                            value={editingFile.contentSeparator || " "}
-                            onValueChange={(val) => updateEditingFile({ contentSeparator: val || undefined })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select separator" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value=" ">Space</SelectItem>
-                              <SelectItem value=", ">Comma</SelectItem>
-                              <SelectItem value="\n">Newline</SelectItem>
-                              <SelectItem value=" - ">Hyphen</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
+                      {editingFile.contentKeys &&
+                        editingFile.contentKeys.length > 1 && (
+                          <div className="pt-2">
+                            <Label className="mb-2 block">Separator</Label>
+                            <Select
+                              value={editingFile.contentSeparator || " "}
+                              onValueChange={(val) =>
+                                updateEditingFile({
+                                  contentSeparator: val || undefined,
+                                })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select separator" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value=" ">Space</SelectItem>
+                                <SelectItem value=", ">Comma</SelectItem>
+                                <SelectItem value="\n">Newline</SelectItem>
+                                <SelectItem value=" - ">Hyphen</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                     </div>
 
                     <div className="space-y-3 pt-2 border-t border-border">
@@ -480,20 +496,33 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                       </p>
                       <div className="max-h-[120px] overflow-y-auto space-y-2 pr-2">
                         {editingFile.keys?.map((k) => {
-                          const isSelected = editingFile.metadataKeys?.includes(k);
-                          const disabled = editingFile.contentKeys?.includes(k) || k === editingFile.titleKey;
+                          const isSelected =
+                            editingFile.metadataKeys?.includes(k);
+                          const disabled =
+                            editingFile.contentKeys?.includes(k) ||
+                            k === editingFile.titleKey;
                           return (
-                            <div key={k} className="flex items-center space-x-2">
+                            <div
+                              key={k}
+                              className="flex items-center space-x-2"
+                            >
                               <Checkbox
                                 id={`meta-${k}`}
                                 checked={isSelected}
                                 disabled={disabled}
                                 onCheckedChange={(checked) => {
-                                  const current = editingFile.metadataKeys || [];
+                                  const current =
+                                    editingFile.metadataKeys || [];
                                   if (checked) {
-                                    updateEditingFile({ metadataKeys: [...current, k] });
+                                    updateEditingFile({
+                                      metadataKeys: [...current, k],
+                                    });
                                   } else {
-                                    updateEditingFile({ metadataKeys: current.filter((x) => x !== k) });
+                                    updateEditingFile({
+                                      metadataKeys: current.filter(
+                                        (x) => x !== k,
+                                      ),
+                                    });
                                   }
                                 }}
                               />
@@ -537,26 +566,29 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
               <div className="space-y-3 pt-4 border-t border-border">
                 <div className="flex items-center justify-between">
                   <Label>Global Custom Metadata</Label>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-6 px-2 text-xs"
                     onClick={() => {
                       const current = editingFile.globalMetadata || [];
-                      updateEditingFile({ globalMetadata: [...current, { key: "", value: "" }] });
+                      updateEditingFile({
+                        globalMetadata: [...current, { key: "", value: "" }],
+                      });
                     }}
                   >
                     <Plus className="size-3 mr-1" /> Add Field
                   </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground mb-2">
-                  Apply custom key-value pairs to every document generated from this file.
+                  Apply custom key-value pairs to every document generated from
+                  this file.
                 </p>
                 <div className="space-y-2">
                   {(editingFile.globalMetadata || []).map((gm, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <Input 
-                        placeholder="Key" 
+                      <Input
+                        placeholder="Key"
                         value={gm.key}
                         className="h-8 text-xs font-mono"
                         onChange={(e) => {
@@ -565,8 +597,8 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                           updateEditingFile({ globalMetadata: next });
                         }}
                       />
-                      <Input 
-                        placeholder="Value" 
+                      <Input
+                        placeholder="Value"
                         value={gm.value}
                         className="h-8 text-xs font-mono"
                         onChange={(e) => {
@@ -589,8 +621,11 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                       </Button>
                     </div>
                   ))}
-                  {(!editingFile.globalMetadata || editingFile.globalMetadata.length === 0) && (
-                    <p className="text-xs text-muted-foreground italic text-center py-2">No custom metadata.</p>
+                  {(!editingFile.globalMetadata ||
+                    editingFile.globalMetadata.length === 0) && (
+                    <p className="text-xs text-muted-foreground italic text-center py-2">
+                      No custom metadata.
+                    </p>
                   )}
                 </div>
               </div>

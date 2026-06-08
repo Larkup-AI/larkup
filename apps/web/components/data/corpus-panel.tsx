@@ -393,7 +393,7 @@ function DocumentDialog({
 
   return (
     <Dialog open={!!doc} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-2xl ">
+      <DialogContent className="w-full max-w-2xl max-h-[80%]">
         <DialogHeader>
           <DialogTitle className="text-balance">
             {editing ? "Edit document" : doc?.title}
@@ -412,7 +412,7 @@ function DocumentDialog({
         </DialogHeader>
 
         {editing ? (
-          <div className="grid gap-4">
+          <div className="grid gap-4 overflow-y-auto pr-2 pb-2" style={{ maxHeight: "calc(80vh - 150px)" }}>
             <div className="grid gap-2">
               <Label htmlFor="doc-title">Title</Label>
               <Input
@@ -434,7 +434,7 @@ function DocumentDialog({
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="doc-content">Content</Label>
-                <span className="text-xs text-muted-foreground tabular-nums">
+                <span className="text-xs text-muted-foreground tabular-nums ">
                   {content.length.toLocaleString()} chars
                 </span>
               </div>
