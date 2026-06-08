@@ -1,81 +1,264 @@
-"use client"
+"use client";
 
-import { useRef, useState } from "react"
-import { toast } from "sonner"
-import { FileUp, Loader2, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+import { FileUp, Loader2, X, Settings2, Columns } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 
-const ACCEPT = ".txt,.md,.markdown,.json,.csv,.html,.htm,.log"
+const ACCEPT = ".txt,.md,.markdown,.json,.csv,.html,.htm,.log,.xlsx,.xls";
 
-interface Staged {
-  name: string
-  size: number
-  content: string
+type FileFormat = "plain" | "lines" | "structured";
+
+interface StagedFile {
+  id: string;
+  name: string;
+  size: number;
+  format: FileFormat;
+  rawContent?: string;
+  rows?: any[];
+  keys?: string[];
+  // mapping for structured
+  titleKey?: string;
+  contentKey?: string;
+  metadataKeys?: string[];
 }
 
 export function UploadPanel({ onAdded }: { onAdded: () => void }) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [staged, setStaged] = useState<Staged[]>([])
-  const [dragging, setDragging] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [staged, setStaged] = useState<StagedFile[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
+
+  // Mapping state
+  const [editingFileId, setEditingFileId] = useState<string | null>(null);
+  const editingFile = staged.find((f) => f.id === editingFileId);
 
   async function readFiles(files: FileList | File[]) {
-    const next: Staged[] = []
+    const next: StagedFile[] = [];
     for (const file of Array.from(files)) {
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      const id = Math.random().toString(36).slice(2);
       try {
-        const content = await file.text()
-        next.push({ name: file.name, size: file.size, content })
+        if (ext === "csv") {
+          const content = await file.text();
+          const result = Papa.parse(content, {
+            header: true,
+            skipEmptyLines: true,
+          });
+          if (result.data.length > 0) {
+            const keys = Object.keys(result.data[0] as object);
+            next.push({
+              id,
+              name: file.name,
+              size: file.size,
+              format: "structured",
+              rows: result.data,
+              keys,
+              titleKey: keys[0],
+              contentKey: keys.length > 1 ? keys[1] : keys[0],
+              metadataKeys: keys.slice(2),
+            });
+          }
+        } else if (ext === "xlsx" || ext === "xls") {
+          const data = await file.arrayBuffer();
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet);
+          if (rows.length > 0) {
+            const keys = Object.keys(rows[0] as object);
+            next.push({
+              id,
+              name: file.name,
+              size: file.size,
+              format: "structured",
+              rows,
+              keys,
+              titleKey: keys[0],
+              contentKey: keys.length > 1 ? keys[1] : keys[0],
+              metadataKeys: keys.slice(2),
+            });
+          }
+        } else if (ext === "json") {
+          const content = await file.text();
+          try {
+            const parsed = JSON.parse(content);
+            if (
+              Array.isArray(parsed) &&
+              parsed.length > 0 &&
+              typeof parsed[0] === "object"
+            ) {
+              const keys = Object.keys(parsed[0]);
+              next.push({
+                id,
+                name: file.name,
+                size: file.size,
+                format: "structured",
+                rows: parsed,
+                keys,
+                titleKey: keys[0],
+                contentKey: keys.length > 1 ? keys[1] : keys[0],
+                metadataKeys: keys.slice(2),
+              });
+            } else {
+              // fallback to plain
+              next.push({
+                id,
+                name: file.name,
+                size: file.size,
+                format: "plain",
+                rawContent: content,
+              });
+            }
+          } catch {
+            next.push({
+              id,
+              name: file.name,
+              size: file.size,
+              format: "plain",
+              rawContent: content,
+            });
+          }
+        } else {
+          const content = await file.text();
+          next.push({
+            id,
+            name: file.name,
+            size: file.size,
+            format: "plain",
+            rawContent: content,
+          });
+        }
       } catch {
-        toast.error(`Could not read ${file.name} — text files only.`)
+        toast.error(`Could not read ${file.name}.`);
       }
     }
-    setStaged((prev) => [...prev, ...next])
+    setStaged((prev) => [...prev, ...next]);
   }
 
   async function ingest() {
-    if (staged.length === 0) return
-    setSaving(true)
-    let ok = 0
+    if (staged.length === 0) return;
+    setSaving(true);
+    let ok = 0;
+
+    const payloads: any[] = [];
+
     for (const f of staged) {
+      if (f.format === "plain" && f.rawContent) {
+        payloads.push({
+          title: f.name,
+          content: f.rawContent,
+          source: "upload",
+        });
+      } else if (f.format === "lines" && f.rawContent) {
+        const lines = f.rawContent
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+        lines.forEach((line, i) => {
+          payloads.push({
+            title: `${f.name} - Line ${i + 1}`,
+            content: line,
+            source: "upload",
+          });
+        });
+      } else if (f.format === "structured" && f.rows) {
+        for (let i = 0; i < f.rows.length; i++) {
+          const row = f.rows[i];
+          const title = f.titleKey
+            ? String(row[f.titleKey] || `Row ${i + 1}`)
+            : `Row ${i + 1}`;
+          const content = f.contentKey
+            ? String(row[f.contentKey] || "")
+            : JSON.stringify(row);
+          const metadata: Record<string, any> = {};
+          if (f.metadataKeys) {
+            for (const mk of f.metadataKeys) {
+              metadata[mk] = row[mk];
+            }
+          }
+          if (content.trim()) {
+            payloads.push({ title, content, metadata, source: "upload" });
+          }
+        }
+      }
+    }
+
+    setProgress({ current: 0, total: payloads.length });
+
+    for (const [index, p] of payloads.entries()) {
       try {
         const res = await fetch("/api/documents", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: f.name, content: f.content, source: "upload" }),
-        })
-        if (res.ok) ok++
+          body: JSON.stringify(p),
+        });
+        if (res.ok) ok++;
       } catch {
         /* continue */
       }
+      setProgress({ current: index + 1, total: payloads.length });
     }
-    setSaving(false)
-    setStaged([])
+
+    setSaving(false);
+    setStaged([]);
     if (ok > 0) {
-      toast.success(`Added ${ok} file${ok > 1 ? "s" : ""} to corpus`)
-      onAdded()
+      toast.success(
+        `Added ${ok} document${ok > 1 ? "s" : ""} from ${staged.length} file${staged.length > 1 ? "s" : ""}`,
+      );
+      onAdded();
     } else {
-      toast.error("No files could be added.")
+      toast.error("No documents could be added.");
     }
   }
 
+  function updateEditingFile(patch: Partial<StagedFile>) {
+    setStaged((prev) =>
+      prev.map((f) => (f.id === editingFileId ? { ...f, ...patch } : f)),
+    );
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 cursor-pointer">
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {
-          e.preventDefault()
-          setDragging(true)
+          e.preventDefault();
+          setDragging(true);
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
-          e.preventDefault()
-          setDragging(false)
-          if (e.dataTransfer.files?.length) readFiles(e.dataTransfer.files)
+          e.preventDefault();
+          setDragging(false);
+          if (e.dataTransfer.files?.length) readFiles(e.dataTransfer.files);
         }}
         className={cn(
-          "flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-6 py-10 text-center transition-colors hover:bg-muted/70",
+          "flex w-full flex-col cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-6 py-10 text-center transition-colors hover:bg-muted/70",
           dragging && "border-primary bg-accent",
         )}
       >
@@ -84,7 +267,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
           Drop files here or click to browse
         </span>
         <span className="text-xs text-muted-foreground">
-          Text-based files: .txt, .md, .json, .csv, .html, .log
+          Text, JSON, CSV, and Excel files
         </span>
       </button>
       <input
@@ -94,35 +277,68 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
         accept={ACCEPT}
         className="sr-only"
         onChange={(e) => {
-          if (e.target.files?.length) readFiles(e.target.files)
-          e.target.value = ""
+          if (e.target.files?.length) readFiles(e.target.files);
+          e.target.value = "";
         }}
       />
 
       {staged.length > 0 && (
         <ul className="space-y-1.5">
-          {staged.map((f, i) => (
+          {staged.map((f) => (
             <li
-              key={`${f.name}-${i}`}
+              key={f.id}
               className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm"
             >
-              <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                {f.name}
-              </span>
+              <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                <span className="truncate font-mono text-xs">{f.name}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                  {f.format === "structured"
+                    ? "STRUCTURED"
+                    : f.format === "lines"
+                      ? "SPLIT BY LINE"
+                      : "PLAIN TEXT"}
+                  {f.format === "structured" && ` • ${f.rows?.length} ROWS`}
+                </span>
+              </div>
               <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                 {(f.size / 1024).toFixed(1)} KB
               </span>
-              <button
-                type="button"
-                aria-label={`Remove ${f.name}`}
-                onClick={() => setStaged((p) => p.filter((_, idx) => idx !== i))}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  aria-label={`Configure ${f.name}`}
+                  onClick={() => setEditingFileId(f.id)}
+                  className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-md transition-colors"
+                >
+                  <Settings2 className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Remove ${f.name}`}
+                  onClick={() =>
+                    setStaged((p) => p.filter((item) => item.id !== f.id))
+                  }
+                  className="p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground rounded-md transition-colors"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {progress && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Uploading documents...</span>
+            <span className="tabular-nums font-mono">
+              {progress.current} / {progress.total}
+            </span>
+          </div>
+          <Progress value={(progress.current / progress.total) * 100} />
+        </div>
       )}
 
       <Button onClick={ingest} disabled={saving || staged.length === 0}>
@@ -131,9 +347,155 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
         ) : (
           <FileUp className="size-4" />
         )}
-        Add {staged.length > 0 ? staged.length : ""} file
-        {staged.length === 1 ? "" : "s"} to corpus
+        {saving && progress
+          ? `Adding ${progress.current} of ${progress.total}`
+          : `Add ${staged.length > 0 ? staged.length : ""} file${staged.length === 1 ? "" : "s"} to corpus`}
       </Button>
+
+      {/* Mapping Dialog */}
+      <Dialog
+        open={!!editingFile}
+        onOpenChange={(open) => !open && setEditingFileId(null)}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Columns className="size-4 text-primary" />
+              Configure Ingestion
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingFile && (
+            <div className="py-4 space-y-6">
+              {editingFile.format === "structured" ? (
+                <>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Title Column</Label>
+                      <Select
+                        value={editingFile.titleKey}
+                        onValueChange={(val) =>
+                          updateEditingFile({ titleKey: val || undefined })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select column" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {editingFile.keys?.map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {k}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        Used as the document name.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Content Column</Label>
+                      <Select
+                        value={editingFile.contentKey}
+                        onValueChange={(val) =>
+                          updateEditingFile({ contentKey: val || undefined })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select column" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {editingFile.keys?.map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {k}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        The primary text to be embedded and searched.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2 border-t border-border">
+                    <Label>Metadata Columns</Label>
+                    <p className="text-[11px] text-muted-foreground mb-2">
+                      Selected columns will be stored as searchable metadata
+                      alongside the document.
+                    </p>
+                    <div className="max-h-[160px] overflow-y-auto space-y-2 pr-2">
+                      {editingFile.keys?.map((k) => {
+                        const isSelected =
+                          editingFile.metadataKeys?.includes(k);
+                        const disabled =
+                          k === editingFile.contentKey ||
+                          k === editingFile.titleKey;
+                        return (
+                          <div key={k} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`meta-${k}`}
+                              checked={isSelected}
+                              disabled={disabled}
+                              onCheckedChange={(checked) => {
+                                const current = editingFile.metadataKeys || [];
+                                if (checked) {
+                                  updateEditingFile({
+                                    metadataKeys: [...current, k],
+                                  });
+                                } else {
+                                  updateEditingFile({
+                                    metadataKeys: current.filter(
+                                      (x) => x !== k,
+                                    ),
+                                  });
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`meta-${k}`}
+                              className={cn(
+                                "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+                                disabled && "text-muted-foreground",
+                              )}
+                            >
+                              {k} {disabled && "(used)"}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div className="space-y-0.5">
+                      <Label>Split by Line</Label>
+                      <p className="text-[11px] text-muted-foreground">
+                        Treat each line as a completely separate document.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={editingFile.format === "lines"}
+                      onCheckedChange={(checked) =>
+                        updateEditingFile({
+                          format: checked ? "lines" : "plain",
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button onClick={() => setEditingFileId(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }

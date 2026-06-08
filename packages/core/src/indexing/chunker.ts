@@ -23,6 +23,7 @@ export interface Chunk {
   url?: string
   source: string
   charCount: number
+  metadata?: Record<string, any>
 }
 
 function tokensToChars(tokens: number) {
@@ -131,6 +132,7 @@ export function chunkDocument(
     url: doc.url,
     source: doc.source,
     charCount: textChunk.length,
+    metadata: doc.metadata,
   }))
 }
 

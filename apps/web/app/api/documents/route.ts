@@ -30,6 +30,7 @@ export async function POST(req: Request) {
       content?: string
       source?: DocumentSource
       url?: string
+      metadata?: Record<string, any>
     }
     if (!body.content || !body.content.trim()) {
       return NextResponse.json({ error: "Content is empty." }, { status: 400 })
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
       content: body.content,
       source: body.source === "upload" ? "upload" : "paste",
       url: body.url,
+      metadata: body.metadata,
     })
     return NextResponse.json({ document: doc }, { status: 201 })
   } catch (err) {
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
  * Body: { id, title?, content?, url? }
  */
 export async function PATCH(req: Request) {
-  let body: { id?: string; title?: string; content?: string; url?: string }
+  let body: { id?: string; title?: string; content?: string; url?: string; metadata?: Record<string, any> }
   try {
     body = await req.json()
   } catch {
@@ -68,6 +70,7 @@ export async function PATCH(req: Request) {
     title: body.title,
     content: body.content,
     url: body.url,
+    metadata: body.metadata,
   })
   if (!doc) {
     return NextResponse.json({ error: "Document not found." }, { status: 404 })

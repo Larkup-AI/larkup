@@ -234,7 +234,24 @@ export class PineconeAdapter implements VectorStoreAdapter {
   async upsert(records: VectorRecord[]): Promise<void> {
     if (records.length === 0) return
 
+    const sanitizeMeta = (meta?: Record<string, any>): Record<string, any> => {
+      if (!meta) return {}
+      const safe: Record<string, any> = {}
+      for (const [k, v] of Object.entries(meta)) {
+        if (v === null || v === undefined) continue
+        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+          safe[k] = v
+        } else if (Array.isArray(v) && v.every(item => typeof item === "string")) {
+          safe[k] = v
+        } else {
+          safe[k] = JSON.stringify(v)
+        }
+      }
+      return safe
+    }
+
     const metaOf = (r: VectorRecord): PineMeta => ({
+      ...sanitizeMeta(r.metadata),
       text: r.text,
       title: r.title,
       url: r.url ?? "",
@@ -384,13 +401,16 @@ export class PineconeAdapter implements VectorStoreAdapter {
 
 function hitFromMatch(m: any): QueryHit {
   const meta = (m.metadata ?? {}) as PineMeta
+  const { text, title, url, source, documentId, chunkIndex, ...customMetadata } = meta
+
   return {
     id: m.id,
     score: m.score ?? 0,
-    text:  (meta.text       as string) ?? "",
-    title: (meta.title      as string) ?? "Untitled",
-    url:   (meta.url as string) || undefined,
-    documentId: (meta.documentId as string) ?? "",
+    text:  (text       as string) ?? "",
+    title: (title      as string) ?? "Untitled",
+    url:   (url as string) || undefined,
+    documentId: (documentId as string) ?? "",
+    metadata: Object.keys(customMetadata).length > 0 ? customMetadata : undefined,
   }
 }
 

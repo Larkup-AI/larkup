@@ -49,6 +49,7 @@ export interface NewDocumentInput {
   source: DocumentSource
   url?: string
   jobId?: string
+  metadata?: Record<string, any>
 }
 
 function normalize(input: NewDocumentInput): SourceDocument {
@@ -61,6 +62,7 @@ function normalize(input: NewDocumentInput): SourceDocument {
     content,
     charCount: content.length,
     jobId: input.jobId,
+    metadata: input.metadata,
     createdAt: new Date().toISOString(),
   }
 }
@@ -108,7 +110,7 @@ export function addCrawledDocuments(
 /** Edit a document's title / content / url in place. Returns the updated doc. */
 export function updateDocument(
   id: string,
-  patch: { title?: string; content?: string; url?: string },
+  patch: { title?: string; content?: string; url?: string; metadata?: Record<string, any> },
 ): Promise<SourceDocument | undefined> {
   return serialize(async () => {
     const docs = await readDocuments()
@@ -126,6 +128,7 @@ export function updateDocument(
       content,
       charCount: content.length,
       url: patch.url !== undefined ? patch.url || undefined : current.url,
+      metadata: patch.metadata !== undefined ? patch.metadata : current.metadata,
     }
     docs[idx] = next
     await writeAll(docs)

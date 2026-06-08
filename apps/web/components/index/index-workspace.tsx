@@ -138,9 +138,11 @@ export function IndexWorkspace() {
       />
 
       {!ready && (
-        <Alert variant="destructive">
-          <AlertTriangle className="size-4" />
-          <AlertTitle>Not ready to index</AlertTitle>
+        <Alert variant="default">
+          <AlertTriangle className="size-4 text-orange-500!" />
+          <AlertTitle className="text-orange-500!">
+            Not ready to index
+          </AlertTitle>
           <AlertDescription>
             <ul className="list-disc pl-4">
               {blockers.map((b) => (

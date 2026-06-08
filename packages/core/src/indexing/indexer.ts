@@ -134,6 +134,7 @@ export async function runIndexer(
         source: c.source,
         documentId: c.documentId,
         chunkIndex: c.index,
+        metadata: c.metadata,
       }))
 
       await patchRun({ status: "upserting" })

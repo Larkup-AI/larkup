@@ -163,6 +163,8 @@ export interface SourceDocument {
   charCount: number
   /** crawl job that produced this doc, if any */
   jobId?: string
+  /** custom metadata fields mapped during ingestion */
+  metadata?: Record<string, any>
   createdAt: string
 }
 

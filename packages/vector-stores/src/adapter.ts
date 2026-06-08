@@ -15,6 +15,7 @@ export interface VectorRecord {
   source: string
   documentId: string
   chunkIndex: number
+  metadata?: Record<string, any>
 }
 
 export interface QueryHit {
@@ -24,6 +25,7 @@ export interface QueryHit {
   title: string
   url?: string
   documentId: string
+  metadata?: Record<string, any>
 }
 
 export interface VectorStoreAdapter {

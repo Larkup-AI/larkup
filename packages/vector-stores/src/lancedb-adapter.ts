@@ -31,6 +31,7 @@ interface LanceRow extends Record<string, unknown> {
   source: string
   documentId: string
   chunkIndex: number
+  metadata?: string
 }
 
 export class LanceDBAdapter implements VectorStoreAdapter {
@@ -112,6 +113,7 @@ export class LanceDBAdapter implements VectorStoreAdapter {
       source: r.source,
       documentId: r.documentId,
       chunkIndex: r.chunkIndex,
+      metadata: r.metadata ? JSON.stringify(r.metadata) : undefined,
     }
   }
 
@@ -157,13 +159,14 @@ export class LanceDBAdapter implements VectorStoreAdapter {
       .toArray()) as Array<LanceRow & { _distance?: number }>
 
     return rows.map((row) => ({
-      id: row.id,
+      id: row.id as string,
       // Convert L2 distance → a 0..1 similarity-ish score for display.
       score: typeof row._distance === "number" ? 1 / (1 + row._distance) : 0,
-      text: row.text,
-      title: row.title,
-      url: row.url || undefined,
-      documentId: row.documentId,
+      text: row.text as string,
+      title: row.title as string,
+      url: (row.url as string) || undefined,
+      documentId: row.documentId as string,
+      metadata: typeof row.metadata === "string" ? JSON.parse(row.metadata) : undefined,
     }))
   }
 
