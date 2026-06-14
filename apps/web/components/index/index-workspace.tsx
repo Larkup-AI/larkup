@@ -10,6 +10,7 @@ import {
   Database,
   FileText,
   Hash,
+  Info,
   Layers,
   Loader2,
   Play,
@@ -154,6 +155,41 @@ export function IndexWorkspace() {
       )}
 
       <RunCard run={run} running={running} />
+
+      {/* Pre-indexing warning — only shown before the very first run */}
+      {ready && !run && (
+        <Alert>
+          <Info className="size-4 text-blue-500!" />
+          <AlertTitle className="text-blue-600 dark:text-blue-400">
+            Before you start indexing
+          </AlertTitle>
+          <AlertDescription className="text-muted-foreground space-y-1">
+            <p>
+              Once indexing begins, two settings become{" "}
+              <span className="font-medium text-foreground">locked</span> to
+              the existing index:
+            </p>
+            <ul className="list-disc pl-4 space-y-0.5">
+              <li>
+                <span className="font-medium text-foreground">
+                  Embedding model
+                </span>{" "}
+                — you can swap to any model with the{" "}
+                <span className="font-medium text-foreground">
+                  same vector dimensions
+                </span>, but switching to a model with different dimensions
+                will require a full re-index.
+              </li>
+              <li>
+                <span className="font-medium text-foreground">
+                  Vector store
+                </span>{" "}
+                — changing the store after indexing requires starting fresh.
+              </li>
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex items-center gap-3">
         <Button

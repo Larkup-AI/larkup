@@ -13,6 +13,8 @@ import {
   Eye,
   EyeOff,
   Trash2,
+  AlertCircle,
+  ExternalLink,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -229,8 +231,13 @@ const EMBEDDING_BY_PROVIDER = EMBEDDING_MODELS.reduce<
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+const indexFetcher = (url: string) => fetch(url).then((r) => r.json());
+
 export function ConfigureForm() {
   const { data, isLoading, mutate } = useSWR("/api/config", fetcher);
+  const { data: indexData } = useSWR("/api/index", indexFetcher, {
+    refreshInterval: 0,
+  });
   const [form, setForm] = useState<RagConfig>(DEFAULT_CONFIG);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -239,6 +246,9 @@ export function ConfigureForm() {
   const [hydrated, setHydrated] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  // Blocking alert dialogs when index already exists
+  const [storeBlockAlertOpen, setStoreBlockAlertOpen] = useState(false);
+  const [modelBlockAlertOpen, setModelBlockAlertOpen] = useState(false);
   // Cache storeConfig per store id so switching A→B→A restores A's values.
   const storeConfigCache = useRef<Record<string, Record<string, string>>>({});
 
@@ -280,8 +290,18 @@ export function ConfigureForm() {
     });
   };
 
+  // Whether a completed index already exists
+  const indexedRun = indexData?.run?.status === "completed" ? indexData.run : null;
+  const indexedDimensions: number | null = indexedRun?.dimensions ?? null;
+  const indexedVectorStore: VectorStoreId | null = indexedRun?.vectorStore ?? null;
+
   const selectStore = (id: VectorStoreId) => {
     if (id === form.vectorStore) return;
+    // Block if a completed index exists with a different vector store
+    if (indexedVectorStore && id !== indexedVectorStore) {
+      setStoreBlockAlertOpen(true);
+      return;
+    }
     storeConfigCache.current[form.vectorStore] = form.storeConfig;
     const next = getVectorStore(id);
     const cached = storeConfigCache.current[id];
@@ -295,6 +315,30 @@ export function ConfigureForm() {
       setForm((f) => ({ ...f, vectorStore: id, storeConfig: seeded }));
     }
     setErrors({});
+  };
+
+  // Returns true if the given model ID would have different dimensions than the indexed run
+  function wouldBreakDimensions(newModelId: string): boolean {
+    if (!indexedDimensions) return false;
+    if (newModelId.startsWith("custom:")) {
+      const name = newModelId.slice("custom:".length);
+      const custom = (form.customEmbeddings ?? []).find(
+        (m) => m.modelName === name,
+      );
+      if (!custom) return false;
+      return custom.dimensions !== indexedDimensions;
+    }
+    const model = getEmbeddingModel(newModelId);
+    if (!model) return false;
+    return model.dimensions !== indexedDimensions;
+  }
+
+  const handleEmbeddingModelChange = (v: string) => {
+    if (wouldBreakDimensions(v)) {
+      setModelBlockAlertOpen(true);
+      return;
+    }
+    set("embeddingModelId", v);
   };
 
   const dirty = useMemo(
@@ -449,9 +493,7 @@ export function ConfigureForm() {
               <div className="flex gap-2 items-start">
                 <Select
                   value={form.embeddingModelId}
-                  onValueChange={(v) =>
-                    set("embeddingModelId", (v as string) ?? "")
-                  }
+                  onValueChange={(v) => handleEmbeddingModelChange((v as string) ?? "")}
                 >
                   <SelectTrigger className="w-full flex-1">
                     {activeCustomModel ? (
@@ -995,6 +1037,91 @@ export function ConfigureForm() {
           });
         }}
       />
+
+      {/* ── Block: vector store change after index ─────────────────── */}
+      <AlertDialog open={storeBlockAlertOpen} onOpenChange={setStoreBlockAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="size-5 text-destructive" />
+              Cannot change vector store
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                Your index was built with{" "}
+                <span className="font-semibold text-foreground">
+                  {indexedVectorStore
+                    ? getVectorStore(indexedVectorStore)?.label ?? indexedVectorStore
+                    : form.vectorStore}
+                </span>. Switching to a different vector store would make the
+                existing index incompatible — vectors are bound to the store
+                they were written to.
+              </span>
+              <span className="block">
+                To use a different vector store, go to the{" "}
+                <strong className="text-foreground">Index</strong> page and
+                run a full re-index with your new settings.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep current store</AlertDialogCancel>
+            <AlertDialogAction
+              className="gap-2 bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                setStoreBlockAlertOpen(false);
+                window.location.href = "/index";
+              }}
+            >
+              <ExternalLink className="size-4" />
+              Re-index from scratch
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Block: embedding model dimension change after index ──────── */}
+      <AlertDialog open={modelBlockAlertOpen} onOpenChange={setModelBlockAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="size-5 text-destructive" />
+              Incompatible embedding dimensions
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                Your index was built with{" "}
+                <span className="font-semibold text-foreground">
+                  {indexedDimensions} dimensions
+                </span>. The selected model outputs a different vector size,
+                which is incompatible with the existing index.
+              </span>
+              <span className="block">
+                ✓ You can freely switch to any model that also produces{" "}
+                <span className="font-semibold text-foreground">
+                  {indexedDimensions}d
+                </span>{" "}
+                vectors. To use a different dimension size, go to the{" "}
+                <strong className="text-foreground">Index</strong> page and
+                run a full re-index.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep current model</AlertDialogCancel>
+            <AlertDialogAction
+              className="gap-2 bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                setModelBlockAlertOpen(false);
+                window.location.href = "/index";
+              }}
+            >
+              <ExternalLink className="size-4" />
+              Re-index from scratch
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Delete custom model confirmation ─────────────────────────── */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
