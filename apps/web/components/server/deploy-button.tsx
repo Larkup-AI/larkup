@@ -13,6 +13,7 @@ import {
   Copy,
   Settings2,
   KeyRound,
+  Cloud,
 } from "lucide-react";
 import { toast } from "sonner";
 import { deployToVercel, getServerEnvRequirements } from "@/app/actions/vercel";
@@ -21,6 +22,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -379,6 +383,107 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               Hetzner
             </p>
           </DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Cloud className="size-4 mr-2" />
+              Azure
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem onClick={() => toast.info("Azure App Service deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>App Service</span>
+                  <span className="text-[10px] text-muted-foreground">Managed PaaS</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info("Azure Container Apps deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>Container Apps</span>
+                  <span className="text-[10px] text-muted-foreground">Serverless containers</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info("Azure Virtual Machines deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>Virtual Machines</span>
+                  <span className="text-[10px] text-muted-foreground">Full IaaS</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Cloud className="size-4 mr-2" />
+              AWS
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem onClick={() => toast.info("AWS Elastic Beanstalk deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>Elastic Beanstalk</span>
+                  <span className="text-[10px] text-muted-foreground">Managed PaaS</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info("AWS App Runner / Fargate deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>App Runner / Fargate</span>
+                  <span className="text-[10px] text-muted-foreground">Serverless containers</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info("AWS EC2 deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>EC2</span>
+                  <span className="text-[10px] text-muted-foreground">Full IaaS</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Cloud className="size-4 mr-2" />
+              GCP
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem onClick={() => toast.info("GCP App Engine deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>App Engine</span>
+                  <span className="text-[10px] text-muted-foreground">Managed PaaS</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info("GCP Cloud Run deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>Cloud Run</span>
+                  <span className="text-[10px] text-muted-foreground">Serverless containers</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info("GCP Compute Engine deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>Compute Engine</span>
+                  <span className="text-[10px] text-muted-foreground">Full IaaS</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Cloud className="size-4 mr-2" />
+              DigitalOcean
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem onClick={() => toast.info("DigitalOcean App Platform deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>App Platform</span>
+                  <span className="text-[10px] text-muted-foreground">Managed PaaS / Containers</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast.info("DigitalOcean Droplets deployment coming soon.")}>
+                <div className="flex flex-col gap-0.5">
+                  <span>Droplets</span>
+                  <span className="text-[10px] text-muted-foreground">Full IaaS</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         </DropdownMenuContent>
       </DropdownMenu>
 
