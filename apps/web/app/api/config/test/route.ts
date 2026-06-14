@@ -32,14 +32,17 @@ export async function POST(request: Request) {
   }
 
   let dimensions = 1536
-  if (body.embeddingModelId === "custom") {
-    if (!body.customEmbedding) {
+  const isCustom = body.embeddingModelId.startsWith("custom:")
+  if (isCustom) {
+    const modelName = body.embeddingModelId.slice("custom:".length)
+    const found = body.customEmbeddings?.find((m) => m.modelName === modelName)
+    if (!found) {
       return NextResponse.json(
-        { error: `Missing custom embedding configuration` },
+        { error: `Custom embedding model "${modelName}" not found in customEmbeddings` },
         { status: 400 },
       )
     }
-    dimensions = body.customEmbedding.dimensions
+    dimensions = found.dimensions
   } else {
     const embeddingModel = await import("@buddy-rag/core/embeddings/registry").then(m => m.getEmbeddingModel(body.embeddingModelId))
     if (!embeddingModel) {

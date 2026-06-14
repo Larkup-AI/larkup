@@ -241,7 +241,13 @@ export function ConfigureForm() {
   }, [data, hydrated]);
 
   const store = getVectorStore(form.vectorStore);
-  const embeddingModel = getEmbeddingModel(form.embeddingModelId);
+  // Resolve the active custom model from the array when id starts with "custom:"
+  const activeCustomModel = form.embeddingModelId.startsWith("custom:")
+    ? (form.customEmbeddings ?? []).find(
+        (m) => m.modelName === form.embeddingModelId.slice("custom:".length),
+      )
+    : undefined;
+  const embeddingModel = activeCustomModel ? null : getEmbeddingModel(form.embeddingModelId);
   const embeddingMeta = embeddingModel
     ? PROVIDER_META[embeddingModel.provider as EmbeddingProvider]
     : null;
@@ -434,15 +440,17 @@ export function ConfigureForm() {
                   }
                 >
                   <SelectTrigger className="w-full flex-1">
-                    {form.embeddingModelId === "custom" &&
-                    form.customEmbedding ? (
+                    {activeCustomModel ? (
                       <span className="flex items-center gap-2.5">
-                        <span className="flex items-center justify-center rounded bg-slate-100 dark:bg-slate-800 shrink-0 w-5 h-5 text-[10px] font-bold">
-                          C
-                        </span>
+                        <ProviderIcon
+                          src={PROVIDER_META.custom.iconSrc}
+                          alt="Custom"
+                          pillBg={PROVIDER_META.custom.pillBg}
+                          size={20}
+                        />
                         <span className="flex flex-col items-start leading-none">
-                          <span className="font-medium text-sm ">
-                            {form.customEmbedding.modelName}
+                          <span className="font-medium text-sm">
+                            {activeCustomModel.modelName}
                           </span>
                         </span>
                       </span>
@@ -455,9 +463,6 @@ export function ConfigureForm() {
                           size={20}
                         />
                         <span className="flex flex-col items-start leading-none">
-                          {/* <span className="text-[10px] text-muted-foreground">
-                          {embeddingMeta.label}
-                        </span> */}
                           <span className="font-medium text-sm ">
                             {embeddingModel.label}
                           </span>
@@ -507,21 +512,34 @@ export function ConfigureForm() {
                         );
                       },
                     )}
-                    <SelectGroup>
-                      <SelectLabel className="flex items-center gap-2 py-1.5">
-                        <span className="font-medium">Custom</span>
-                      </SelectLabel>
-                      {form.customEmbedding && (
-                        <SelectItem value="custom" className="pl-8">
-                          <span className="flex items-center gap-2">
-                            <span>{form.customEmbedding.modelName}</span>
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                              {form.customEmbedding.dimensions}d
+                    {/* Custom models group — one entry per saved custom model */}
+                    {(form.customEmbeddings ?? []).length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="flex items-center gap-2 py-1.5">
+                          <ProviderIcon
+                            src={PROVIDER_META.custom.iconSrc}
+                            alt="Custom"
+                            pillBg={PROVIDER_META.custom.pillBg}
+                            size={18}
+                          />
+                          <span className="font-medium">Custom</span>
+                        </SelectLabel>
+                        {(form.customEmbeddings ?? []).map((m) => (
+                          <SelectItem
+                            key={`custom:${m.modelName}`}
+                            value={`custom:${m.modelName}`}
+                            className="pl-8"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>{m.modelName}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {m.dimensions}d
+                              </span>
                             </span>
-                          </span>
-                        </SelectItem>
-                      )}
-                    </SelectGroup>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
                   </SelectContent>
                 </Select>
                 <TooltipProvider delay={0}>
@@ -546,10 +564,10 @@ export function ConfigureForm() {
               </div>
 
               {/* Model info badges */}
-              {form.embeddingModelId === "custom" && form.customEmbedding ? (
+              {activeCustomModel ? (
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <Badge variant="secondary" className="font-mono">
-                    {form.customEmbedding.dimensions} dims
+                    {activeCustomModel.dimensions} dims
                   </Badge>
                   <Badge variant="outline" className="font-mono">
                     OpenAI Compatible
@@ -847,8 +865,8 @@ export function ConfigureForm() {
                 <SummaryRow
                   label="Dimensions"
                   value={
-                    form.embeddingModelId === "custom"
-                      ? String(form.customEmbedding?.dimensions ?? "—")
+                    activeCustomModel
+                      ? String(activeCustomModel.dimensions)
                       : String(embeddingModel?.dimensions ?? "—")
                   }
                   mono
@@ -889,13 +907,53 @@ export function ConfigureForm() {
       <CustomEmbeddingModal
         open={customModalOpen}
         onOpenChange={setCustomModalOpen}
-        initialConfig={form.customEmbedding}
-        onSave={(cfg) => {
-          setForm((f) => ({
-            ...f,
-            embeddingModelId: "custom",
-            customEmbedding: cfg,
-          }));
+        onSave={async (cfg) => {
+          // Upsert: replace existing model with same name, or append a new one.
+          const existing = form.customEmbeddings ?? [];
+          const updatedList = existing.some((m) => m.modelName === cfg.modelName)
+            ? existing.map((m) => (m.modelName === cfg.modelName ? cfg : m))
+            : [...existing, cfg];
+
+          const nextForm = {
+            ...form,
+            embeddingModelId: `custom:${cfg.modelName}`,
+            customEmbeddings: updatedList,
+          };
+          setForm(nextForm);
+
+          // Auto-save: attempt to persist immediately.
+          const storeToSave = getVectorStore(nextForm.vectorStore);
+          const fieldErrors = validateStoreConfig(
+            storeToSave,
+            nextForm.storeConfig,
+            nextForm.indexType,
+          );
+
+          if (Object.keys(fieldErrors).length === 0) {
+            setSaving(true);
+            try {
+              const res = await fetch("/api/config", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(nextForm),
+              });
+              if (res.ok) {
+                const json = await res.json();
+                await mutate(json, { revalidate: false });
+                setForm(json.config);
+                toast.success(`Custom model "${cfg.modelName}" saved`);
+                return;
+              }
+            } catch {
+              // fall through to reminder
+            } finally {
+              setSaving(false);
+            }
+          }
+
+          toast.info("Custom model added", {
+            description: "Click 'Save configuration' to persist your changes.",
+          });
         }}
       />
     </div>
@@ -906,30 +964,28 @@ function CustomEmbeddingModal({
   open,
   onOpenChange,
   onSave,
-  initialConfig,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (config: CustomEmbeddingConfig) => void;
-  initialConfig?: CustomEmbeddingConfig;
 }) {
-  const [baseUrl, setBaseUrl] = useState(initialConfig?.baseUrl || "");
-  const [apiKey, setApiKey] = useState(initialConfig?.apiKey || "");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
-  const [modelName, setModelName] = useState(initialConfig?.modelName || "");
-  const [dimensions, setDimensions] = useState<number | null>(
-    initialConfig?.dimensions || null,
-  );
+  const [modelName, setModelName] = useState("");
+  const [dimensions, setDimensions] = useState<number | null>(null);
   const [testing, setTesting] = useState(false);
 
+  // Reset form every time the modal opens so users always start fresh.
   useEffect(() => {
     if (open) {
-      setBaseUrl(initialConfig?.baseUrl || "");
-      setApiKey(initialConfig?.apiKey || "");
-      setModelName(initialConfig?.modelName || "");
-      setDimensions(initialConfig?.dimensions || null);
+      setBaseUrl("");
+      setApiKey("");
+      setModelName("");
+      setDimensions(null);
+      setShowApiKey(false);
     }
-  }, [open, initialConfig]);
+  }, [open]);
 
   const handleTest = async () => {
     if (!baseUrl || !modelName) {

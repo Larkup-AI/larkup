@@ -6,6 +6,7 @@ import type { RagConfig } from "@buddy-rag/core/types"
 
 // Uses node:fs — must run on the Node.js runtime, not edge.
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 export async function GET() {
   const config = await readConfig()
@@ -21,17 +22,22 @@ export async function PUT(request: Request) {
   }
 
   // Validate the embedding model exists.
-  if (body.embeddingModelId !== "custom" && !getEmbeddingModel(body.embeddingModelId)) {
+  const isCustom = body.embeddingModelId.startsWith("custom:")
+  if (!isCustom && !getEmbeddingModel(body.embeddingModelId)) {
     return NextResponse.json(
       { error: `Unknown embedding model: ${body.embeddingModelId}` },
       { status: 400 },
     )
   }
-  if (body.embeddingModelId === "custom" && !body.customEmbedding) {
-    return NextResponse.json(
-      { error: `Missing custom embedding configuration` },
-      { status: 400 },
-    )
+  if (isCustom) {
+    const modelName = body.embeddingModelId.slice("custom:".length)
+    const found = body.customEmbeddings?.find((m) => m.modelName === modelName)
+    if (!found) {
+      return NextResponse.json(
+        { error: `Custom embedding model "${modelName}" not found in customEmbeddings` },
+        { status: 400 },
+      )
+    }
   }
 
   // Validate the store + its dynamic, store-specific fields.

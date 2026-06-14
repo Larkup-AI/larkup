@@ -119,7 +119,7 @@ export interface RagConfig {
   /** project label, used when generating the server */
   projectName: string
   embeddingModelId: string
-  customEmbedding?: CustomEmbeddingConfig
+  customEmbeddings?: CustomEmbeddingConfig[]
   indexType: IndexType
   chunking: ChunkingParams
   vectorStore: VectorStoreId
