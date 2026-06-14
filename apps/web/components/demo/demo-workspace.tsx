@@ -139,8 +139,8 @@ export function DemoWorkspace() {
             Query server
           </span>
           <Select
-            value={serverId ?? undefined}
-            onValueChange={(v) => setServerId((v as string) ?? null)}
+            value={serverId ?? ""}
+            onValueChange={(v) => setServerId((v as string) || null)}
           >
             <SelectTrigger className="w-64">
               <SelectValue placeholder="Select a server">
