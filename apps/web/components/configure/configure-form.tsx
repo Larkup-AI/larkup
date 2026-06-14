@@ -12,7 +12,18 @@ import {
   Plus,
   Eye,
   EyeOff,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -227,6 +238,7 @@ export function ConfigureForm() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   // Cache storeConfig per store id so switching A→B→A restores A's values.
   const storeConfigCache = useRef<Record<string, Record<string, string>>>({});
 
@@ -247,7 +259,9 @@ export function ConfigureForm() {
         (m) => m.modelName === form.embeddingModelId.slice("custom:".length),
       )
     : undefined;
-  const embeddingModel = activeCustomModel ? null : getEmbeddingModel(form.embeddingModelId);
+  const embeddingModel = activeCustomModel
+    ? null
+    : getEmbeddingModel(form.embeddingModelId);
   const embeddingMeta = embeddingModel
     ? PROVIDER_META[embeddingModel.provider as EmbeddingProvider]
     : null;
@@ -557,10 +571,33 @@ export function ConfigureForm() {
                       }
                     />
                     <TooltipContent>
-                      <p>Configure custom embedding model</p>
+                      <p>Add custom embedding model</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+                {/* Trash button — only visible when a custom model is selected */}
+                {activeCustomModel && (
+                  <TooltipProvider delay={0}>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            type="button"
+                            onClick={() => setDeleteConfirmOpen(true)}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 hover:border-destructive/50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>
+                        <p>Delete "{activeCustomModel.modelName}"</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
 
               {/* Model info badges */}
@@ -910,7 +947,9 @@ export function ConfigureForm() {
         onSave={async (cfg) => {
           // Upsert: replace existing model with same name, or append a new one.
           const existing = form.customEmbeddings ?? [];
-          const updatedList = existing.some((m) => m.modelName === cfg.modelName)
+          const updatedList = existing.some(
+            (m) => m.modelName === cfg.modelName,
+          )
             ? existing.map((m) => (m.modelName === cfg.modelName ? cfg : m))
             : [...existing, cfg];
 
@@ -956,6 +995,68 @@ export function ConfigureForm() {
           });
         }}
       />
+
+      {/* ── Delete custom model confirmation ─────────────────────────── */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete custom model?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove{" "}
+              <span className="font-semibold text-foreground">
+                &quot;{activeCustomModel?.modelName}&quot;
+              </span>{" "}
+              from your saved custom models. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={async () => {
+                if (!activeCustomModel) return;
+                const modelName = activeCustomModel.modelName;
+                const updatedList = (form.customEmbeddings ?? []).filter(
+                  (m) => m.modelName !== modelName,
+                );
+                // Fall back to the first remaining custom model or the default.
+                const nextId =
+                  updatedList.length > 0
+                    ? `custom:${updatedList[0].modelName}`
+                    : DEFAULT_CONFIG.embeddingModelId;
+                const nextForm = {
+                  ...form,
+                  embeddingModelId: nextId,
+                  customEmbeddings: updatedList,
+                };
+                setForm(nextForm);
+
+                // Auto-save the deletion.
+                setSaving(true);
+                try {
+                  const res = await fetch("/api/config", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(nextForm),
+                  });
+                  if (res.ok) {
+                    const json = await res.json();
+                    await mutate(json, { revalidate: false });
+                    setForm(json.config);
+                    toast.success(`Custom model "${modelName}" deleted`);
+                  }
+                } catch {
+                  toast.error("Failed to save after deletion");
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
