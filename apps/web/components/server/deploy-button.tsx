@@ -185,7 +185,9 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
       const { state } = await statusRes.json();
 
       if (state?.running) {
-        toast.loading("Restarting local server with new API key…", { id: "restart" });
+        toast.loading("Restarting local server with new API key…", {
+          id: "restart",
+        });
         const restartRes = await fetch("/api/server/local", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -193,9 +195,14 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
         });
         const body = await restartRes.json();
         if (body.state?.running) {
-          toast.success("Local server restarted with new API key.", { id: "restart" });
+          toast.success("Local server restarted with new API key.", {
+            id: "restart",
+          });
         } else {
-          toast.error(body.state?.lastError ?? "Restart failed — relaunch manually.", { id: "restart" });
+          toast.error(
+            body.state?.lastError ?? "Restart failed — relaunch manually.",
+            { id: "restart" },
+          );
         }
       } else {
         toast.success("Environment configuration saved.");
@@ -369,7 +376,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
             <ChevronDown />
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className={"w-[200px]"}>
           <DropdownMenuItem onClick={() => setVercelModalOpen(true)}>
             <p className="flex items-center">
               <img src={"/vercel.svg"} className="size-4 mr-2" alt="vercel" />
@@ -388,22 +395,40 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               Azure
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
-              <DropdownMenuItem onClick={() => toast.info("Azure App Service deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() =>
+                  toast.info("Azure App Service deployment coming soon.")
+                }
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>App Service</span>
-                  <span className="text-[10px] text-muted-foreground">Managed PaaS</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Managed PaaS
+                  </span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info("Azure Container Apps deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() =>
+                  toast.info("Azure Container Apps deployment coming soon.")
+                }
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>Container Apps</span>
-                  <span className="text-[10px] text-muted-foreground">Serverless containers</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Serverless containers
+                  </span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info("Azure Virtual Machines deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() =>
+                  toast.info("Azure Virtual Machines deployment coming soon.")
+                }
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>Virtual Machines</span>
-                  <span className="text-[10px] text-muted-foreground">Full IaaS</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Full IaaS
+                  </span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuSubContent>
@@ -415,22 +440,38 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               AWS
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
-              <DropdownMenuItem onClick={() => toast.info("AWS Elastic Beanstalk deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() =>
+                  toast.info("AWS Elastic Beanstalk deployment coming soon.")
+                }
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>Elastic Beanstalk</span>
-                  <span className="text-[10px] text-muted-foreground">Managed PaaS</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Managed PaaS
+                  </span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info("AWS App Runner / Fargate deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() =>
+                  toast.info("AWS App Runner / Fargate deployment coming soon.")
+                }
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>App Runner / Fargate</span>
-                  <span className="text-[10px] text-muted-foreground">Serverless containers</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Serverless containers
+                  </span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info("AWS EC2 deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() => toast.info("AWS EC2 deployment coming soon.")}
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>EC2</span>
-                  <span className="text-[10px] text-muted-foreground">Full IaaS</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Full IaaS
+                  </span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuSubContent>
@@ -442,22 +483,40 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               GCP
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
-              <DropdownMenuItem onClick={() => toast.info("GCP App Engine deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() =>
+                  toast.info("GCP App Engine deployment coming soon.")
+                }
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>App Engine</span>
-                  <span className="text-[10px] text-muted-foreground">Managed PaaS</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Managed PaaS
+                  </span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info("GCP Cloud Run deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() =>
+                  toast.info("GCP Cloud Run deployment coming soon.")
+                }
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>Cloud Run</span>
-                  <span className="text-[10px] text-muted-foreground">Serverless containers</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Serverless containers
+                  </span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info("GCP Compute Engine deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() =>
+                  toast.info("GCP Compute Engine deployment coming soon.")
+                }
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>Compute Engine</span>
-                  <span className="text-[10px] text-muted-foreground">Full IaaS</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Full IaaS
+                  </span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuSubContent>
@@ -465,20 +524,38 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <img src="/icons/digital-ocean.webp" className="size-4 mr-2" alt="DigitalOcean" />
+              <img
+                src="/icons/digital-ocean.webp"
+                className="size-4 mr-2"
+                alt="DigitalOcean"
+              />
               DigitalOcean
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
-              <DropdownMenuItem onClick={() => toast.info("DigitalOcean App Platform deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() =>
+                  toast.info(
+                    "DigitalOcean App Platform deployment coming soon.",
+                  )
+                }
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>App Platform</span>
-                  <span className="text-[10px] text-muted-foreground">Managed PaaS / Containers</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Managed PaaS / Containers
+                  </span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info("DigitalOcean Droplets deployment coming soon.")}>
+              <DropdownMenuItem
+                onClick={() =>
+                  toast.info("DigitalOcean Droplets deployment coming soon.")
+                }
+              >
                 <div className="flex flex-col gap-0.5">
                   <span>Droplets</span>
-                  <span className="text-[10px] text-muted-foreground">Full IaaS</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Full IaaS
+                  </span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuSubContent>
