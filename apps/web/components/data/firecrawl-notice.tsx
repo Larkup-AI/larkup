@@ -148,7 +148,7 @@ export function FirecrawlNotice({
           <p className="text-sm">
             {cloudConfigured
               ? "You have a cloud key set. You can also run Firecrawl locally in Docker."
-              : "Launch a self-hosted Firecrawl in Docker. A key is generated for you automatically — no signup required. Pasting and uploading work without it."}
+              : "Launch a self-hosted Firecrawl in Docker. A key is generated for you automatically, no signup required. Pasting and uploading work without it."}
           </p>
         )}
 
@@ -199,8 +199,15 @@ export function FirecrawlNotice({
           )}
 
           {dockerReady && !running && (
-            <span className="flex items-center gap-1 text-xs text-green-700">
-              <CheckCircle2 className="size-3.5 " />
+            <span className="flex items-center gap-1 text-xs text-cyan-700">
+              {/* <CheckCircle2 className="size-3.5 " /> */}
+              <img
+                src={"/docker.png"}
+                alt="docker"
+                // className="size-4.5"
+                width={20}
+                height={20}
+              />
               Docker ready
             </span>
           )}

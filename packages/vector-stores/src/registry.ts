@@ -122,6 +122,195 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
       },
     ],
   },
+
+  weaviate: {
+    id: "weaviate",
+    label: "Weaviate",
+    description:
+      "Open-source AI-native vector database with built-in hybrid search, BM25, and multi-tenancy.",
+    runtime: "both",
+    docsUrl: "https://weaviate.io/developers/weaviate",
+    serverDependencies: {
+      weaviate: "^3.0.0",
+    },
+    fields: [
+      {
+        key: "host",
+        label: "Host URL",
+        type: "text",
+        required: true,
+        placeholder: "https://my-cluster.weaviate.network",
+        help: "Weaviate Cloud URL or self-hosted host address.",
+      },
+      {
+        key: "apiKey",
+        label: "API key",
+        type: "password",
+        required: false,
+        secret: true,
+        placeholder: "weaviate-api-key",
+        help: "Weaviate Cloud API key (optional for self-hosted).",
+      },
+      {
+        key: "className",
+        label: "Collection name",
+        type: "text",
+        required: true,
+        defaultValue: "Documents",
+        help: "The Weaviate collection (class) that holds your embedded chunks.",
+      },
+    ],
+  },
+
+  qdrant: {
+    id: "qdrant",
+    label: "Qdrant",
+    description:
+      "High-performance vector search engine with rich filtering, built for production-scale RAG.",
+    runtime: "both",
+    docsUrl: "https://qdrant.tech/documentation/",
+    serverDependencies: {
+      "@qdrant/js-client-rest": "^1.9.0",
+    },
+    fields: [
+      {
+        key: "url",
+        label: "Host URL",
+        type: "text",
+        required: true,
+        placeholder: "http://localhost:6333",
+        help: "Qdrant server URL (local or Qdrant Cloud endpoint).",
+      },
+      {
+        key: "apiKey",
+        label: "API key",
+        type: "password",
+        required: false,
+        secret: true,
+        placeholder: "qdrant-api-key",
+        help: "Qdrant Cloud API key (leave blank for local).",
+      },
+      {
+        key: "collectionName",
+        label: "Collection name",
+        type: "text",
+        required: true,
+        defaultValue: "documents",
+        help: "Qdrant collection to upsert into and query.",
+      },
+    ],
+  },
+
+  chroma: {
+    id: "chroma",
+    label: "Chroma",
+    description:
+      "Open-source, developer-friendly embedding database. Great for rapid local prototyping.",
+    runtime: "both",
+    docsUrl: "https://docs.trychroma.com/",
+    serverDependencies: {
+      chromadb: "^1.9.0",
+    },
+    fields: [
+      {
+        key: "host",
+        label: "Host URL",
+        type: "text",
+        required: true,
+        placeholder: "http://localhost:8000",
+        defaultValue: "http://localhost:8000",
+        help: "Chroma server URL (local Docker or remote).",
+      },
+      {
+        key: "collectionName",
+        label: "Collection name",
+        type: "text",
+        required: true,
+        defaultValue: "documents",
+        help: "Chroma collection to store and retrieve embeddings.",
+      },
+      {
+        key: "authToken",
+        label: "Auth token",
+        type: "password",
+        required: false,
+        secret: true,
+        placeholder: "chroma-token",
+        help: "Optional static auth token for Chroma server.",
+      },
+    ],
+  },
+
+  pgvector: {
+    id: "pgvector",
+    label: "pgvector",
+    description:
+      "PostgreSQL extension for vector similarity search. Self-host vectors alongside your relational data.",
+    runtime: "both",
+    docsUrl: "https://github.com/pgvector/pgvector",
+    serverDependencies: {
+      pg: "^8.11.0",
+      pgvector: "^0.2.0",
+    },
+    fields: [
+      {
+        key: "connectionString",
+        label: "Connection string",
+        type: "password",
+        required: true,
+        secret: true,
+        placeholder: "postgresql://user:pass@localhost:5432/db",
+        help: "Full PostgreSQL connection string.",
+      },
+      {
+        key: "tableName",
+        label: "Table name",
+        type: "text",
+        required: true,
+        defaultValue: "embeddings",
+        help: "The table used to store vector embeddings. Created automatically if absent.",
+      },
+    ],
+  },
+
+  supabase: {
+    id: "supabase",
+    label: "Supabase",
+    description:
+      "Postgres-backed vector store via the pgvector extension with Supabase's managed infrastructure.",
+    runtime: "cloud",
+    docsUrl: "https://supabase.com/docs/guides/ai",
+    serverDependencies: {
+      "@supabase/supabase-js": "^2.43.0",
+    },
+    fields: [
+      {
+        key: "url",
+        label: "Project URL",
+        type: "text",
+        required: true,
+        placeholder: "https://xyz.supabase.co",
+        help: "Your Supabase project URL.",
+      },
+      {
+        key: "serviceKey",
+        label: "Service role key",
+        type: "password",
+        required: true,
+        secret: true,
+        placeholder: "eyJhbGci...",
+        help: "Supabase service_role key (not the anon key). Stored as an env var.",
+      },
+      {
+        key: "tableName",
+        label: "Table name",
+        type: "text",
+        required: true,
+        defaultValue: "documents",
+        help: "Supabase table with a vector column for embeddings.",
+      },
+    ],
+  },
 }
 
 export const VECTOR_STORE_LIST: VectorStoreDescriptor[] =

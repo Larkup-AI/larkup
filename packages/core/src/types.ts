@@ -13,7 +13,7 @@
 /* Vector stores                                                       */
 /* ------------------------------------------------------------------ */
 
-export type VectorStoreId = "lancedb" | "pinecone"
+export type VectorStoreId = "lancedb" | "pinecone" | "weaviate" | "qdrant" | "chroma" | "pgvector" | "supabase"
 
 /** Where a given store is able to run. */
 export type StoreRuntime = "local" | "cloud" | "both"
@@ -76,7 +76,7 @@ export interface VectorStoreDescriptor {
 /* Embeddings                                                          */
 /* ------------------------------------------------------------------ */
 
-export type EmbeddingProvider = "openai" | "google" | "cohere"
+export type EmbeddingProvider = "openai" | "google" | "cohere" | "voyage" | "mistral" | "jina" | "nomic"
 
 export interface EmbeddingModelDescriptor {
   id: string

@@ -9,6 +9,8 @@ import {
   Loader2,
   Save,
   Sparkles,
+  Database,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -27,8 +29,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
@@ -41,6 +44,7 @@ import {
   type IndexType,
   type RagConfig,
   type VectorStoreId,
+  type EmbeddingProvider,
 } from "@buddy-rag/core/types";
 import {
   EMBEDDING_MODELS,
@@ -56,16 +60,180 @@ import { StoreFields } from "@/components/configure/store-fields";
 const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
-const INDEX_TYPES: { value: IndexType; label: string; hint: string }[] = [
-  { value: "lexical", label: "Lexical", hint: "Keyword / BM25 matching" },
-  { value: "semantic", label: "Semantic", hint: "Pure vector similarity" },
-  { value: "hybrid", label: "Hybrid", hint: "Lexical + semantic, reranked" },
+const INDEX_TYPES: { value: IndexType; label: string; hint: string; icon: typeof Zap }[] = [
+  { value: "lexical", label: "Lexical", hint: "Keyword / BM25 matching", icon: Zap },
+  { value: "semantic", label: "Semantic", hint: "Pure vector similarity", icon: Sparkles },
+  { value: "hybrid", label: "Hybrid", hint: "Lexical + semantic, reranked", icon: Database },
 ];
 
-const STORE_ICON: Record<VectorStoreId, typeof Cloud> = {
-  lancedb: HardDrive,
-  pinecone: Cloud,
+// ── Provider branding ────────────────────────────────────────────────────────
+
+type ProviderMeta = {
+  label: string;
+  color: string;        // tailwind bg colour class for the icon pill
+  textColor: string;    // text colour on the pill
+  icon: React.ReactNode;
 };
+
+const PROVIDER_META: Record<EmbeddingProvider, ProviderMeta> = {
+  openai: {
+    label: "OpenAI",
+    color: "bg-emerald-500/15",
+    textColor: "text-emerald-600 dark:text-emerald-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3">
+        <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.759a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 8.072a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 8.072zm16.597 3.855-5.833-3.387L15.119 7.4a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.671zm2.01-3.023-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08-4.778 2.758a.795.795 0 0 0-.393.681zm1.097-2.365 2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z" />
+      </svg>
+    ),
+  },
+  google: {
+    label: "Google",
+    color: "bg-blue-500/15",
+    textColor: "text-blue-600 dark:text-blue-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3">
+        <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
+      </svg>
+    ),
+  },
+  cohere: {
+    label: "Cohere",
+    color: "bg-coral-500/15 bg-orange-500/15",
+    textColor: "text-orange-600 dark:text-orange-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3">
+        <path d="M21.6 0H2.4A2.4 2.4 0 0 0 0 2.4v19.2A2.4 2.4 0 0 0 2.4 24h19.2a2.4 2.4 0 0 0 2.4-2.4V2.4A2.4 2.4 0 0 0 21.6 0zM12 19.2a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4z" />
+      </svg>
+    ),
+  },
+  voyage: {
+    label: "Voyage AI",
+    color: "bg-violet-500/15",
+    textColor: "text-violet-600 dark:text-violet-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </svg>
+    ),
+  },
+  mistral: {
+    label: "Mistral",
+    color: "bg-amber-500/15",
+    textColor: "text-amber-600 dark:text-amber-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3">
+        <rect x="0" y="0" width="6" height="6" />
+        <rect x="9" y="0" width="6" height="6" />
+        <rect x="18" y="0" width="6" height="6" />
+        <rect x="0" y="9" width="6" height="6" />
+        <rect x="9" y="9" width="6" height="6" />
+        <rect x="0" y="18" width="6" height="6" />
+        <rect x="9" y="18" width="6" height="6" />
+        <rect x="18" y="18" width="6" height="6" />
+      </svg>
+    ),
+  },
+  jina: {
+    label: "Jina AI",
+    color: "bg-rose-500/15",
+    textColor: "text-rose-600 dark:text-rose-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" />
+      </svg>
+    ),
+  },
+  nomic: {
+    label: "Nomic",
+    color: "bg-teal-500/15",
+    textColor: "text-teal-600 dark:text-teal-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2a10 10 0 0 1 10 10A10 10 0 0 1 12 22 10 10 0 0 1 2 12 10 10 0 0 1 12 2m0 2a8 8 0 0 0-8 8 8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8z" />
+      </svg>
+    ),
+  },
+};
+
+// ── Vector-store branding ────────────────────────────────────────────────────
+
+type StoreMeta = {
+  color: string;
+  textColor: string;
+  icon: React.ReactNode;
+};
+
+const STORE_META: Record<VectorStoreId, StoreMeta> = {
+  lancedb: {
+    color: "bg-yellow-500/15",
+    textColor: "text-yellow-600 dark:text-yellow-400",
+    icon: <HardDrive className="size-3.5" />,
+  },
+  pinecone: {
+    color: "bg-green-500/15",
+    textColor: "text-green-600 dark:text-green-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
+        <path d="M12 2L8 8l4-1 4 1-4-6zM8 8l-4 6h4l4-1-4-5zM16 8l4 6h-4l-4-1 4-5zM4 14l4 6 4-3-8-3zM20 14l-4 6-4-3 8-3z" />
+      </svg>
+    ),
+  },
+  weaviate: {
+    color: "bg-green-500/15",
+    textColor: "text-green-700 dark:text-green-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
+        <path d="M12 2 3 7v10l9 5 9-5V7L12 2zm0 2.236L19.09 8 12 11.764 4.91 8 12 4.236zM4 9.618l7 3.888V20.5l-7-3.888V9.618zm9 3.888 7-3.888v7l-7 3.888v-7z" />
+      </svg>
+    ),
+  },
+  qdrant: {
+    color: "bg-red-500/15",
+    textColor: "text-red-600 dark:text-red-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
+        <path d="m12 1-9 5.197V17.8L12 23l9-5.197V6.197L12 1zm6.75 14.948L12 19.646l-6.75-3.698V8.052L12 4.354l6.75 3.698v7.896z" />
+      </svg>
+    ),
+  },
+  chroma: {
+    color: "bg-purple-500/15",
+    textColor: "text-purple-600 dark:text-purple-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+      </svg>
+    ),
+  },
+  pgvector: {
+    color: "bg-blue-500/15",
+    textColor: "text-blue-600 dark:text-blue-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
+        <path d="M12 2C6.477 2 2 4.686 2 8v8c0 3.314 4.477 6 10 6s10-2.686 10-6V8c0-3.314-4.477-6-10-6zm0 2c4.411 0 8 1.79 8 4s-3.589 4-8 4-8-1.79-8-4 3.589-4 8-4zm8 6.277V16c0 2.21-3.589 4-8 4s-8-1.79-8-4v-5.723C5.799 11.343 8.702 12 12 12s6.201-.657 8-1.723z" />
+      </svg>
+    ),
+  },
+  supabase: {
+    color: "bg-emerald-500/15",
+    textColor: "text-emerald-600 dark:text-emerald-400",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
+        <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C.113 12.907.697 14.142 1.78 14.142h9.217c.97 0 1.755.784 1.755 1.75v7.072c.015.986 1.26 1.41 1.874.638l9.262-11.652c.651-.856.067-2.091-1.016-2.091h-9.218c-.97 0-1.754-.784-1.754-1.75V1.036z" />
+      </svg>
+    ),
+  },
+};
+
+// Group embedding models by provider for the grouped select
+const EMBEDDING_BY_PROVIDER = EMBEDDING_MODELS.reduce<
+  Record<string, typeof EMBEDDING_MODELS>
+>((acc, m) => {
+  (acc[m.provider] ??= []).push(m);
+  return acc;
+}, {});
 
 export function ConfigureForm() {
   const { data, isLoading, mutate } = useSWR("/api/config", fetcher);
@@ -91,6 +259,10 @@ export function ConfigureForm() {
 
   const store = getVectorStore(form.vectorStore);
   const embeddingModel = getEmbeddingModel(form.embeddingModelId);
+  const embeddingMeta = embeddingModel
+    ? PROVIDER_META[embeddingModel.provider as EmbeddingProvider]
+    : null;
+  const storeMeta = STORE_META[form.vectorStore];
 
   const set = <K extends keyof RagConfig>(key: K, value: RagConfig[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -107,13 +279,11 @@ export function ConfigureForm() {
   // When switching stores, seed defaults for the new store's fields
   // but restore from cache if the user already filled them in before.
   const selectStore = (id: VectorStoreId) => {
-    if (id === form.vectorStore) return; // already selected — nothing to do
+    if (id === form.vectorStore) return;
 
-    // Save current storeConfig to cache before switching away.
     storeConfigCache.current[form.vectorStore] = form.storeConfig;
 
     const next = getVectorStore(id);
-    // Restore from cache if available, otherwise seed from field defaults.
     const cached = storeConfigCache.current[id];
     if (cached) {
       setForm((f) => ({ ...f, vectorStore: id, storeConfig: cached }));
@@ -146,7 +316,6 @@ export function ConfigureForm() {
 
     setSaving(true);
     try {
-      // Test connection before saving
       const testRes = await fetch("/api/config/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -286,14 +455,56 @@ export function ConfigureForm() {
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  {embeddingModel && embeddingMeta ? (
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "inline-flex items-center justify-center rounded size-5 shrink-0",
+                          embeddingMeta.color,
+                          embeddingMeta.textColor,
+                        )}
+                      >
+                        {embeddingMeta.icon}
+                      </span>
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {embeddingMeta.label}
+                      </span>
+                      <span className="font-medium">{embeddingModel.label}</span>
+                    </span>
+                  ) : (
+                    <SelectValue placeholder="Select a model…" />
+                  )}
                 </SelectTrigger>
-                <SelectContent>
-                  {EMBEDDING_MODELS.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-[320px]">
+                  {Object.entries(EMBEDDING_BY_PROVIDER).map(([provider, models]) => {
+                    const meta = PROVIDER_META[provider as EmbeddingProvider];
+                    return (
+                      <SelectGroup key={provider}>
+                        <SelectLabel className="flex items-center gap-2 py-1.5">
+                          <span
+                            className={cn(
+                              "inline-flex items-center justify-center rounded size-5",
+                              meta?.color,
+                              meta?.textColor,
+                            )}
+                          >
+                            {meta?.icon}
+                          </span>
+                          {meta?.label ?? provider}
+                        </SelectLabel>
+                        {models.map((m) => (
+                          <SelectItem key={m.id} value={m.id} className="pl-8">
+                            <span className="flex items-center gap-2">
+                              {m.label}
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {m.dimensions}d
+                              </span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               {embeddingModel && (
@@ -312,42 +523,208 @@ export function ConfigureForm() {
             </CardContent>
           </Card>
 
-          {/* Index type + chunking */}
+          {/* Indexing + Vector Store — merged card */}
           <Card>
             <CardHeader>
-              <CardTitle>Indexing</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="size-4 text-primary" />
+                Indexing &amp; Vector store
+              </CardTitle>
               <CardDescription>
-                How documents are matched at retrieval time.
+                Choose how documents are matched at retrieval time and where
+                vectors are stored.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
-              <Tabs
-                value={form.indexType}
-                onValueChange={(v) => set("indexType", v as IndexType)}
-              >
-                <TabsList className="grid w-full grid-cols-3">
-                  {INDEX_TYPES.map((t) => (
-                    <TabsTrigger key={t.value} value={t.value}>
-                      {t.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-              <p className="text-xs text-muted-foreground">
-                {INDEX_TYPES.find((t) => t.value === form.indexType)?.hint}
+            <CardContent className="space-y-6">
+              {/* Row: index type (radio) + vector store (dropdown) side-by-side */}
+              <div className="grid gap-5 sm:grid-cols-2">
+                {/* Index type — vertical radio group */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Index type
+                  </Label>
+                  <div className="flex flex-col gap-1.5">
+                    {INDEX_TYPES.map((t) => {
+                      const active = form.indexType === t.value;
+                      const Icon = t.icon;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => set("indexType", t.value)}
+                          className={cn(
+                            "group relative flex items-center gap-3 rounded-lg border px-3.5 py-2.5 text-left transition-all duration-200",
+                            active
+                              ? "border-primary/50 bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.2)]"
+                              : "border-border hover:border-muted-foreground/30 hover:bg-accent/50",
+                          )}
+                        >
+                          {/* Radio dot */}
+                          <span
+                            className={cn(
+                              "flex size-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
+                              active
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground/40 group-hover:border-muted-foreground/70",
+                            )}
+                          >
+                            {active && (
+                              <span className="size-1.5 rounded-full bg-primary-foreground" />
+                            )}
+                          </span>
+                          <span
+                            className={cn(
+                              "flex items-center gap-2 transition-colors duration-150",
+                              active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground",
+                            )}
+                          >
+                            <Icon className={cn("size-3.5", active && "text-primary")} />
+                            <span className="font-medium text-sm">{t.label}</span>
+                          </span>
+                          <span className="ml-auto text-[11px] text-muted-foreground/70 hidden sm:block">
+                            {t.hint}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Hint below on mobile */}
+                  <p className="text-xs text-muted-foreground sm:hidden">
+                    {INDEX_TYPES.find((t) => t.value === form.indexType)?.hint}
+                  </p>
+                </div>
+
+                {/* Vector store — dropdown with provider icon */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Vector store
+                  </Label>
+                  <Select
+                    value={form.vectorStore}
+                    onValueChange={(v) => selectStore(v as VectorStoreId)}
+                  >
+                    <SelectTrigger className="w-full h-auto py-2.5">
+                      {storeMeta ? (
+                        <span className="flex items-center gap-2.5">
+                          <span
+                            className={cn(
+                              "inline-flex items-center justify-center rounded size-6 shrink-0",
+                              storeMeta.color,
+                              storeMeta.textColor,
+                            )}
+                          >
+                            {storeMeta.icon}
+                          </span>
+                          <span className="flex flex-col items-start">
+                            <span className="font-medium text-sm leading-tight">
+                              {store.label}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground leading-tight">
+                              {store.runtime === "both"
+                                ? "local / cloud"
+                                : store.runtime}
+                            </span>
+                          </span>
+                        </span>
+                      ) : (
+                        <SelectValue placeholder="Select a vector store…" />
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VECTOR_STORE_LIST.map((s) => {
+                        const meta = STORE_META[s.id];
+                        return (
+                          <SelectItem key={s.id} value={s.id}>
+                            <span className="flex items-center gap-2.5 w-full">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center justify-center rounded size-6 shrink-0",
+                                  meta?.color,
+                                  meta?.textColor,
+                                )}
+                              >
+                                {meta?.icon}
+                              </span>
+                              <span className="flex flex-col">
+                                <span className="font-medium text-sm leading-tight">
+                                  {s.label}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground leading-tight">
+                                  {s.description.split(".")[0]}
+                                </span>
+                              </span>
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Store badges */}
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] font-mono uppercase">
+                      {store.runtime}
+                    </Badge>
+                    {store.docsUrl && (
+                      <a
+                        href={store.docsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-muted-foreground underline-offset-2 hover:underline hover:text-foreground transition-colors"
+                      >
+                        docs ↗
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Store description */}
+              <p className="text-xs leading-relaxed text-muted-foreground border-t pt-4">
+                {store.description}
               </p>
 
+              {/* Store config fields */}
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4 transition-all duration-300">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  {store.label} configuration
+                </p>
+                <StoreFields
+                  store={store}
+                  values={form.storeConfig}
+                  errors={errors}
+                  onChange={setStoreValue}
+                  indexType={form.indexType}
+                />
+                <div className="flex justify-end pt-1">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleTestConnection}
+                    disabled={testing}
+                  >
+                    {testing ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <Cloud className="mr-2 size-4" />
+                    )}
+                    Test Connection
+                  </Button>
+                </div>
+              </div>
+
+              {/* Advanced chunking */}
               <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
                 <CollapsibleTrigger className="-ml-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                   <ChevronDown
                     className={cn(
-                      "size-4 transition-transform",
+                      "size-4 transition-transform duration-200",
                       advancedOpen && "rotate-180",
                     )}
                   />
                   Advanced chunking
                 </CollapsibleTrigger>
-                <CollapsibleContent className="pt-4">
+                <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-1 data-[state=open]:slide-in-from-top-1 pt-4">
                   <div className="grid gap-5 sm:grid-cols-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="chunkSize">Chunk size</Label>
@@ -407,87 +784,6 @@ export function ConfigureForm() {
               </Collapsible>
             </CardContent>
           </Card>
-
-          {/* Vector store */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Vector store</CardTitle>
-              <CardDescription>
-                The generated server ships only the selected store&apos;s
-                dependencies — nothing else.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid gap-3 sm:grid-cols-2">
-                {VECTOR_STORE_LIST.map((s) => {
-                  const Icon = STORE_ICON[s.id];
-                  const active = form.vectorStore === s.id;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => selectStore(s.id)}
-                      className={cn(
-                        "flex flex-col gap-2 rounded-lg border p-4 text-left transition-colors",
-                        active
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                          : "border-border hover:border-foreground/20 hover:bg-accent/40",
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-2 font-medium">
-                          <Icon
-                            className={cn(
-                              "size-4",
-                              active ? "text-primary" : "text-muted-foreground",
-                            )}
-                          />
-                          {s.label}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] font-mono uppercase"
-                        >
-                          {s.runtime}
-                        </Badge>
-                      </div>
-                      <p className="text-xs leading-relaxed text-muted-foreground">
-                        {s.description}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <p className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {store.label} configuration
-                </p>
-                <StoreFields
-                  store={store}
-                  values={form.storeConfig}
-                  errors={errors}
-                  onChange={setStoreValue}
-                  indexType={form.indexType}
-                />
-                <div className="mt-4 flex justify-end">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleTestConnection}
-                    disabled={testing}
-                  >
-                    {testing ? (
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                    ) : (
-                      <Cloud className="mr-2 size-4" />
-                    )}
-                    Test Connection
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Summary rail */}
@@ -505,6 +801,10 @@ export function ConfigureForm() {
                 <SummaryRow
                   label="Embeddings"
                   value={embeddingModel?.label ?? form.embeddingModelId}
+                />
+                <SummaryRow
+                  label="Provider"
+                  value={embeddingMeta?.label ?? (embeddingModel?.provider ?? "—")}
                 />
                 <SummaryRow
                   label="Dimensions"
