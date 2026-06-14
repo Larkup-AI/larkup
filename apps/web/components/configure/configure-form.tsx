@@ -1015,6 +1015,7 @@ export function ConfigureForm() {
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={async () => {
                 if (!activeCustomModel) return;
+                setDeleteConfirmOpen(false);
                 const modelName = activeCustomModel.modelName;
                 const updatedList = (form.customEmbeddings ?? []).filter(
                   (m) => m.modelName !== modelName,
