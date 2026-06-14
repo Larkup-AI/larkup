@@ -394,9 +394,9 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               <img src="/icons/azure.svg" className="size-4 mr-2" alt="Azure" />
               Azure
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[240px] p-2 space-y-1.5">
+            <DropdownMenuSubContent className="w-[240px]">
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() =>
                   toast.info("Azure App Service deployment coming soon.")
                 }
@@ -409,7 +409,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() =>
                   toast.info("Azure Container Apps deployment coming soon.")
                 }
@@ -422,7 +422,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() =>
                   toast.info("Azure Virtual Machines deployment coming soon.")
                 }
@@ -442,9 +442,9 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               <img src="/icons/aws.svg" className="size-4 mr-2" alt="AWS" />
               AWS
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[240px] p-2 space-y-1.5">
+            <DropdownMenuSubContent className="w-[240px] ">
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() =>
                   toast.info("AWS Elastic Beanstalk deployment coming soon.")
                 }
@@ -457,7 +457,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() =>
                   toast.info("AWS App Runner / Fargate deployment coming soon.")
                 }
@@ -470,7 +470,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() => toast.info("AWS EC2 deployment coming soon.")}
               >
                 <div className="flex flex-col gap-0.5">
@@ -488,9 +488,9 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               <img src="/icons/gcp.svg" className="size-4 mr-2" alt="GCP" />
               GCP
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[240px] p-2 space-y-1.5">
+            <DropdownMenuSubContent className="w-[240px]  ">
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() =>
                   toast.info("GCP App Engine deployment coming soon.")
                 }
@@ -503,7 +503,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() =>
                   toast.info("GCP Cloud Run deployment coming soon.")
                 }
@@ -516,7 +516,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() =>
                   toast.info("GCP Compute Engine deployment coming soon.")
                 }
@@ -540,9 +540,9 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               />
               DigitalOcean
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[240px] p-2 space-y-1.5">
+            <DropdownMenuSubContent className="w-[240px] ">
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() =>
                   toast.info(
                     "DigitalOcean App Platform deployment coming soon.",
@@ -557,7 +557,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="h-auto p-2"
+                className="h-auto"
                 onClick={() =>
                   toast.info("DigitalOcean Droplets deployment coming soon.")
                 }

@@ -27,14 +27,6 @@ const CONTAINER_PREFIX = "ragtoolkit-firecrawl";
 const DEFAULT_PORT = 3002;
 const IMAGE = "ghcr.io/firecrawl/firecrawl:latest";
 
-// Webshare Rotating Proxy Endpoint (Fallback)
-// Automatically assigns a random IP from your 500+ proxy list.
-const ROTATING_PROXY = { 
-  server: "http://p.webshare.io:80", 
-  username: "ftutuguj-rotate", 
-  password: "de26hosclc1i" 
-};
-
 async function getProxy(): Promise<{ server: string; username?: string; password?: string } | null> {
   // Option 1 (Most Efficient): Try reading from proxies.txt for direct connections
   // By picking a direct IP ourselves, we bypass the rotating proxy load balancer 
@@ -57,11 +49,19 @@ async function getProxy(): Promise<{ server: string; username?: string; password
       }
     }
   } catch (err) {
-    // If proxies.txt isn't found, silently fall through to the rotating proxy
+    // If proxies.txt isn't found, silently fall through to the env variables fallback
   }
 
-  // Option 2 (Convenient Fallback): Use the Webshare rotating proxy endpoint
-  return ROTATING_PROXY;
+  // Option 2 (Convenient Fallback): Use the proxy endpoint from environment variables
+  if (process.env.SCRAPER_PROXY_SERVER) {
+    return {
+      server: process.env.SCRAPER_PROXY_SERVER,
+      username: process.env.SCRAPER_PROXY_USERNAME,
+      password: process.env.SCRAPER_PROXY_PASSWORD
+    };
+  }
+
+  return null;
 }
 
 export interface LocalFirecrawlState {
