@@ -13,7 +13,6 @@ import {
   Copy,
   Settings2,
   KeyRound,
-  Cloud,
 } from "lucide-react";
 import { toast } from "sonner";
 import { deployToVercel, getServerEnvRequirements } from "@/app/actions/vercel";
@@ -385,7 +384,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <Cloud className="size-4 mr-2" />
+              <img src="/icons/azure.svg" className="size-4 mr-2" alt="Azure" />
               Azure
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
@@ -412,7 +411,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <Cloud className="size-4 mr-2" />
+              <img src="/icons/aws.svg" className="size-4 mr-2" alt="AWS" />
               AWS
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
@@ -439,7 +438,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <Cloud className="size-4 mr-2" />
+              <img src="/icons/gcp.svg" className="size-4 mr-2" alt="GCP" />
               GCP
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
@@ -466,7 +465,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <Cloud className="size-4 mr-2" />
+              <img src="/icons/digital-ocean.webp" className="size-4 mr-2" alt="DigitalOcean" />
               DigitalOcean
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
