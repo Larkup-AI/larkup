@@ -47,7 +47,9 @@ export function AppTopNav() {
         >
           <img src={"/logo2.png"} className="size-5" alt="logo" />
         </Link>
-        <span className="font-semibold tracking-tight hidden sm:inline-block">Buddy RAG</span>
+        <span className="font-semibold tracking-tight hidden sm:inline-block">
+          Buddy RAG
+        </span>
 
         {/* Pipeline rail */}
         <nav className="flex flex-1 items-center gap-2 md:gap-4 ml-4">
@@ -70,7 +72,10 @@ export function AppTopNav() {
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
-                  <Icon className="size-[18px]" strokeWidth={active ? 2.25 : 2} />
+                  <Icon
+                    className="size-[18px]"
+                    strokeWidth={active ? 2.25 : 2}
+                  />
                   {locked && (
                     <span className="absolute -right-0.5 -top-0.5 flex size-3 items-center justify-center rounded-full bg-background">
                       <Lock className="size-2 text-muted-foreground" />
@@ -119,7 +124,11 @@ export function AppTopNav() {
                 >
                   {body}
                 </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={10} className="max-w-56">
+                <TooltipContent
+                  side="bottom"
+                  sideOffset={10}
+                  className="max-w-56"
+                >
                   <div className="flex flex-col gap-0.5">
                     <span className="font-medium">
                       {index + 1}. {stage.label}
@@ -146,7 +155,8 @@ export function AppTopNav() {
           <ServerSwitcher />
           {username && (
             <span className="hidden text-sm text-muted-foreground md:block">
-              Hi, <span className="font-medium text-foreground">{username}</span>
+              Hi,{" "}
+              <span className="font-medium text-foreground">{username}</span>
             </span>
           )}
           <ThemeSwitcher floating={false} />

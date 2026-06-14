@@ -21,9 +21,15 @@ export async function PUT(request: Request) {
   }
 
   // Validate the embedding model exists.
-  if (!getEmbeddingModel(body.embeddingModelId)) {
+  if (body.embeddingModelId !== "custom" && !getEmbeddingModel(body.embeddingModelId)) {
     return NextResponse.json(
       { error: `Unknown embedding model: ${body.embeddingModelId}` },
+      { status: 400 },
+    )
+  }
+  if (body.embeddingModelId === "custom" && !body.customEmbedding) {
+    return NextResponse.json(
+      { error: `Missing custom embedding configuration` },
       { status: 400 },
     )
   }

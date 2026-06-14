@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/popover";
 
 const THEMES: { id: ThemeVariant; name: string; color: string }[] = [
-  { id: "default", name: "Default Light", color: "oklch(0.99 0 0)" },
-  { id: "theme-gaia", name: "Emerald Green", color: "#50cf8e" },
+  { id: "default", name: "Caffee", color: "#f2efe4" },
+  { id: "theme-gaia", name: "Emerald Green", color: "#2b935f" },
   { id: "theme-docker", name: "Ocean Blue", color: "#1d63ed" },
   { id: "theme-pinecone", name: "Deep Indigo", color: "#6e56cf" },
   { id: "theme-vercel", name: "Minimal Black", color: "#000000" },
@@ -48,20 +48,37 @@ const PAGE_STYLES: { id: PageStyleVariant; name: string }[] = [
 ];
 
 export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
-  const { theme, setTheme, layout, setLayout, radius, setRadius, pageStyle, setPageStyle, isMounted } =
-    useThemeCustomizer();
+  const {
+    theme,
+    setTheme,
+    layout,
+    setLayout,
+    radius,
+    setRadius,
+    pageStyle,
+    setPageStyle,
+    isMounted,
+  } = useThemeCustomizer();
 
   if (!isMounted) return null;
 
-  const wrapperClass = floating ? "fixed bottom-6 right-6 z-50" : "flex items-center";
-  const buttonClass = floating ? "h-12 w-12 rounded-full shadow-xl" : "size-9 rounded-lg border border-border bg-card text-primary shadow-sm hover:bg-accent hover:text-accent-foreground";
+  const wrapperClass = floating
+    ? "fixed bottom-6 right-6 z-50"
+    : "flex items-center";
+  const buttonClass = floating
+    ? "h-12 w-12 rounded-full shadow-xl"
+    : "size-9 rounded-lg border border-border bg-card text-primary shadow-sm hover:bg-accent hover:text-accent-foreground";
 
   return (
     <div className={wrapperClass}>
       <Popover>
         <PopoverTrigger
           render={
-            <Button variant={floating ? "default" : "ghost"} size="icon" className={buttonClass}>
+            <Button
+              variant={floating ? "default" : "ghost"}
+              size="icon"
+              className={buttonClass}
+            >
               <SlidersHorizontal className={floating ? "h-5 w-5" : "h-4 w-4"} />
             </Button>
           }
@@ -126,8 +143,8 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
             {/* Page Style */}
             <div className="space-y-3">
               <label className="text-sm font-medium flex items-center gap-2">
-                <SquareDashed className="h-4 w-4 text-muted-foreground" />{" "}
-                Page Style
+                <SquareDashed className="h-4 w-4 text-muted-foreground" /> Page
+                Style
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {PAGE_STYLES.map((ps) => (

@@ -9,9 +9,26 @@ import {
   Save,
   Sparkles,
   Database,
+  Plus,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Card,
   CardContent,
@@ -42,6 +59,7 @@ import {
   type RagConfig,
   type VectorStoreId,
   type EmbeddingProvider,
+  type CustomEmbeddingConfig,
 } from "@buddy-rag/core/types";
 import {
   EMBEDDING_MODELS,
@@ -110,6 +128,11 @@ const PROVIDER_META: Record<EmbeddingProvider, ProviderMeta> = {
     label: "Nomic",
     iconSrc: "/icons/nomic.png",
     pillBg: "bg-teal-50 dark:bg-teal-950/40",
+  },
+  custom: {
+    label: "Custom",
+    iconSrc: "/logo.png",
+    pillBg: "bg-slate-100 dark:bg-slate-800",
   },
 };
 
@@ -203,6 +226,7 @@ export function ConfigureForm() {
   const [testing, setTesting] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [customModalOpen, setCustomModalOpen] = useState(false);
   // Cache storeConfig per store id so switching A→B→A restores A's values.
   const storeConfigCache = useRef<Record<string, Record<string, string>>>({});
 
@@ -402,78 +426,139 @@ export function ConfigureForm() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Model selector */}
-              <Select
-                value={form.embeddingModelId}
-                onValueChange={(v) =>
-                  set("embeddingModelId", (v as string) ?? "")
-                }
-              >
-                <SelectTrigger className="w-full">
-                  {embeddingModel && embeddingMeta ? (
-                    <span className="flex items-center gap-2.5">
-                      <ProviderIcon
-                        src={embeddingMeta.iconSrc}
-                        alt={embeddingMeta.label}
-                        pillBg={embeddingMeta.pillBg}
-                        size={20}
-                      />
-                      <span className="flex flex-col items-start leading-none">
-                        {/* <span className="text-[10px] text-muted-foreground">
-                          {embeddingMeta.label}
-                        </span> */}
-                        <span className="font-medium text-sm ">
-                          {embeddingModel.label}
+              <div className="flex gap-2 items-start">
+                <Select
+                  value={form.embeddingModelId}
+                  onValueChange={(v) =>
+                    set("embeddingModelId", (v as string) ?? "")
+                  }
+                >
+                  <SelectTrigger className="w-full flex-1">
+                    {form.embeddingModelId === "custom" &&
+                    form.customEmbedding ? (
+                      <span className="flex items-center gap-2.5">
+                        <span className="flex items-center justify-center rounded bg-slate-100 dark:bg-slate-800 shrink-0 w-5 h-5 text-[10px] font-bold">
+                          C
+                        </span>
+                        <span className="flex flex-col items-start leading-none">
+                          <span className="font-medium text-sm ">
+                            {form.customEmbedding.modelName}
+                          </span>
                         </span>
                       </span>
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">
-                      Select a model…
-                    </span>
-                  )}
-                </SelectTrigger>
-                <SelectContent className="max-h-[320px]">
-                  {Object.entries(EMBEDDING_BY_PROVIDER).map(
-                    ([provider, models]) => {
-                      const meta = PROVIDER_META[provider as EmbeddingProvider];
-                      return (
-                        <SelectGroup key={provider}>
-                          <SelectLabel className="flex items-center gap-2 py-1.5">
-                            {meta && (
-                              <ProviderIcon
-                                src={meta.iconSrc}
-                                alt={meta.label}
-                                pillBg={meta.pillBg}
-                                size={18}
-                              />
-                            )}
-                            <span className="font-medium">
-                              {meta?.label ?? provider}
-                            </span>
-                          </SelectLabel>
-                          {models.map((m) => (
-                            <SelectItem
-                              key={m.id}
-                              value={m.id}
-                              className="pl-8"
-                            >
-                              <span className="flex items-center gap-2">
-                                <span>{m.label}</span>
-                                <span className="text-[10px] text-muted-foreground font-mono">
-                                  {m.dimensions}d
-                                </span>
+                    ) : embeddingModel && embeddingMeta ? (
+                      <span className="flex items-center gap-2.5">
+                        <ProviderIcon
+                          src={embeddingMeta.iconSrc}
+                          alt={embeddingMeta.label}
+                          pillBg={embeddingMeta.pillBg}
+                          size={20}
+                        />
+                        <span className="flex flex-col items-start leading-none">
+                          {/* <span className="text-[10px] text-muted-foreground">
+                          {embeddingMeta.label}
+                        </span> */}
+                          <span className="font-medium text-sm ">
+                            {embeddingModel.label}
+                          </span>
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Select a model…
+                      </span>
+                    )}
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[320px]">
+                    {Object.entries(EMBEDDING_BY_PROVIDER).map(
+                      ([provider, models]) => {
+                        const meta =
+                          PROVIDER_META[provider as EmbeddingProvider];
+                        return (
+                          <SelectGroup key={provider}>
+                            <SelectLabel className="flex items-center gap-2 py-1.5">
+                              {meta && (
+                                <ProviderIcon
+                                  src={meta.iconSrc}
+                                  alt={meta.label}
+                                  pillBg={meta.pillBg}
+                                  size={18}
+                                />
+                              )}
+                              <span className="font-medium">
+                                {meta?.label ?? provider}
                               </span>
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      );
-                    },
-                  )}
-                </SelectContent>
-              </Select>
+                            </SelectLabel>
+                            {models.map((m) => (
+                              <SelectItem
+                                key={m.id}
+                                value={m.id}
+                                className="pl-8"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span>{m.label}</span>
+                                  <span className="text-[10px] text-muted-foreground font-mono">
+                                    {m.dimensions}d
+                                  </span>
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        );
+                      },
+                    )}
+                    <SelectGroup>
+                      <SelectLabel className="flex items-center gap-2 py-1.5">
+                        <span className="font-medium">Custom</span>
+                      </SelectLabel>
+                      {form.customEmbedding && (
+                        <SelectItem value="custom" className="pl-8">
+                          <span className="flex items-center gap-2">
+                            <span>{form.customEmbedding.modelName}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {form.customEmbedding.dimensions}d
+                            </span>
+                          </span>
+                        </SelectItem>
+                      )}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <TooltipProvider delay={0}>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setCustomModalOpen(true)}
+                          type="button"
+                        >
+                          <Plus className="size-4" />
+                        </Button>
+                      }
+                    />
+                    <TooltipContent>
+                      <p>Configure custom embedding model</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
 
               {/* Model info badges */}
-              {embeddingModel && (
+              {form.embeddingModelId === "custom" && form.customEmbedding ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <Badge variant="secondary" className="font-mono">
+                    {form.customEmbedding.dimensions} dims
+                  </Badge>
+                  <Badge variant="outline" className="font-mono">
+                    OpenAI Compatible
+                  </Badge>
+                  <span className="text-muted-foreground">
+                    Custom configuration
+                  </span>
+                </div>
+              ) : embeddingModel ? (
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <Badge variant="secondary" className="font-mono">
                     {embeddingModel.dimensions} dims
@@ -485,7 +570,7 @@ export function ConfigureForm() {
                     {embeddingModel.description}
                   </span>
                 </div>
-              )}
+              ) : null}
 
               {/* Advanced chunking — directly under embedding model */}
               <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
@@ -761,7 +846,11 @@ export function ConfigureForm() {
                 />
                 <SummaryRow
                   label="Dimensions"
-                  value={String(embeddingModel?.dimensions ?? "—")}
+                  value={
+                    form.embeddingModelId === "custom"
+                      ? String(form.customEmbedding?.dimensions ?? "—")
+                      : String(embeddingModel?.dimensions ?? "—")
+                  }
                   mono
                 />
                 <SummaryRow label="Index" value={form.indexType} />
@@ -796,7 +885,172 @@ export function ConfigureForm() {
           </div>
         </div>
       </div>
+
+      <CustomEmbeddingModal
+        open={customModalOpen}
+        onOpenChange={setCustomModalOpen}
+        initialConfig={form.customEmbedding}
+        onSave={(cfg) => {
+          setForm((f) => ({
+            ...f,
+            embeddingModelId: "custom",
+            customEmbedding: cfg,
+          }));
+        }}
+      />
     </div>
+  );
+}
+
+function CustomEmbeddingModal({
+  open,
+  onOpenChange,
+  onSave,
+  initialConfig,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (config: CustomEmbeddingConfig) => void;
+  initialConfig?: CustomEmbeddingConfig;
+}) {
+  const [baseUrl, setBaseUrl] = useState(initialConfig?.baseUrl || "");
+  const [apiKey, setApiKey] = useState(initialConfig?.apiKey || "");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [modelName, setModelName] = useState(initialConfig?.modelName || "");
+  const [dimensions, setDimensions] = useState<number | null>(
+    initialConfig?.dimensions || null,
+  );
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setBaseUrl(initialConfig?.baseUrl || "");
+      setApiKey(initialConfig?.apiKey || "");
+      setModelName(initialConfig?.modelName || "");
+      setDimensions(initialConfig?.dimensions || null);
+    }
+  }, [open, initialConfig]);
+
+  const handleTest = async () => {
+    if (!baseUrl || !modelName) {
+      toast.error("Base URL and Model Name are required");
+      return;
+    }
+    setTesting(true);
+    try {
+      const res = await fetch("/api/config/test-embedding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseUrl, apiKey, modelName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Connection failed");
+
+      setDimensions(data.dimensions);
+      toast.success(`Success! Detected ${data.dimensions} dimensions.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Test failed");
+      setDimensions(null);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = () => {
+    if (!baseUrl || !modelName || !dimensions) {
+      toast.error("Please test the connection to fetch dimensions first.");
+      return;
+    }
+    onSave({ baseUrl, apiKey, modelName, dimensions });
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={"max-w-xl "}>
+        <DialogHeader>
+          <DialogTitle>Custom Embedding Model</DialogTitle>
+          <DialogDescription>
+            Connect an OpenAI-compatible embedding model.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="baseUrl">Base URL</Label>
+            <Input
+              id="baseUrl"
+              placeholder="https://api.example.com/v1"
+              value={baseUrl}
+              onChange={(e) => {
+                setBaseUrl(e.target.value);
+                setDimensions(null); // Require re-test on change
+              }}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="apiKey">API Key (Optional)</Label>
+            <div className="relative">
+              <Input
+                id="apiKey"
+                type={showApiKey ? "text" : "password"}
+                placeholder="sk-..."
+                value={apiKey}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  setDimensions(null);
+                }}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+              >
+                {showApiKey ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="modelName">Model Name</Label>
+            <Input
+              id="modelName"
+              placeholder="my-embedding-model"
+              value={modelName}
+              onChange={(e) => {
+                setModelName(e.target.value);
+                setDimensions(null);
+              }}
+            />
+          </div>
+          {dimensions && (
+            <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+              ✓ Connection verified ({dimensions} dimensions)
+            </div>
+          )}
+        </div>
+        <DialogFooter className="flex flex-row justify-between sm:justify-between items-center gap-2">
+          <Button variant="outline" onClick={handleTest} disabled={testing}>
+            {testing ? (
+              <Loader2 className="size-4 animate-spin mr-2" />
+            ) : (
+              <Cloud className="size-4 mr-2" />
+            )}
+            Test Connection
+          </Button>
+          <Button
+            className={"px-5"}
+            onClick={handleSave}
+            disabled={!dimensions}
+          >
+            Add Model
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -31,17 +31,29 @@ export async function POST(request: Request) {
     )
   }
 
-  const embeddingModel = await import("@buddy-rag/core/embeddings/registry").then(m => m.getEmbeddingModel(body.embeddingModelId))
-  if (!embeddingModel) {
-    return NextResponse.json(
-      { error: `Unknown embedding model: ${body.embeddingModelId}` },
-      { status: 400 },
-    )
+  let dimensions = 1536
+  if (body.embeddingModelId === "custom") {
+    if (!body.customEmbedding) {
+      return NextResponse.json(
+        { error: `Missing custom embedding configuration` },
+        { status: 400 },
+      )
+    }
+    dimensions = body.customEmbedding.dimensions
+  } else {
+    const embeddingModel = await import("@buddy-rag/core/embeddings/registry").then(m => m.getEmbeddingModel(body.embeddingModelId))
+    if (!embeddingModel) {
+      return NextResponse.json(
+        { error: `Unknown embedding model: ${body.embeddingModelId}` },
+        { status: 400 },
+      )
+    }
+    dimensions = embeddingModel.dimensions
   }
 
   try {
     const adapter = await createAdapter(body)
-    await adapter.testConnection(embeddingModel.dimensions)
+    await adapter.testConnection(dimensions)
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json(

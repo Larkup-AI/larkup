@@ -76,7 +76,14 @@ export interface VectorStoreDescriptor {
 /* Embeddings                                                          */
 /* ------------------------------------------------------------------ */
 
-export type EmbeddingProvider = "openai" | "google" | "cohere" | "voyage" | "mistral" | "jina" | "nomic"
+export type EmbeddingProvider = "openai" | "google" | "cohere" | "voyage" | "mistral" | "jina" | "nomic" | "custom"
+
+export interface CustomEmbeddingConfig {
+  baseUrl: string
+  apiKey?: string
+  modelName: string
+  dimensions: number
+}
 
 export interface EmbeddingModelDescriptor {
   id: string
@@ -112,6 +119,7 @@ export interface RagConfig {
   /** project label, used when generating the server */
   projectName: string
   embeddingModelId: string
+  customEmbedding?: CustomEmbeddingConfig
   indexType: IndexType
   chunking: ChunkingParams
   vectorStore: VectorStoreId
