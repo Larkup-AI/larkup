@@ -60,9 +60,9 @@ const fetcher = (url: string) =>
 // ── Index types ───────────────────────────────────────────────────────────────
 
 const INDEX_TYPES: { value: IndexType; label: string; hint: string }[] = [
-  { value: "lexical",  label: "Lexical",  hint: "Keyword / BM25 matching" },
+  { value: "lexical", label: "Lexical", hint: "Keyword / BM25 matching" },
   { value: "semantic", label: "Semantic", hint: "Pure vector similarity" },
-  { value: "hybrid",   label: "Hybrid",   hint: "Lexical + semantic, reranked" },
+  { value: "hybrid", label: "Hybrid", hint: "Lexical + semantic, reranked" },
 ];
 
 // ── Provider branding (real icons from /icons/) ───────────────────────────────
@@ -76,13 +76,41 @@ type ProviderMeta = {
 };
 
 const PROVIDER_META: Record<EmbeddingProvider, ProviderMeta> = {
-  openai:  { label: "OpenAI",    iconSrc: "/icons/openai.svg",       pillBg: "bg-neutral-100 dark:bg-neutral-800" },
-  google:  { label: "Google",    iconSrc: "/icons/gemini.svg",       pillBg: "bg-blue-50 dark:bg-blue-950/40" },
-  cohere:  { label: "Cohere",    iconSrc: "/icons/cohere.svg",       pillBg: "bg-orange-50 dark:bg-orange-950/40" },
-  voyage:  { label: "Voyage AI", iconSrc: "/icons/voyage-light.png", pillBg: "bg-slate-100 dark:bg-slate-800" },
-  mistral: { label: "Mistral",   iconSrc: "/icons/mistral.svg",      pillBg: "bg-amber-50 dark:bg-amber-950/40" },
-  jina:    { label: "Jina AI",   iconSrc: "/icons/jina.svg",         pillBg: "bg-rose-50 dark:bg-rose-950/40" },
-  nomic:   { label: "Nomic",     iconSrc: "/icons/nomic.png",        pillBg: "bg-teal-50 dark:bg-teal-950/40" },
+  openai: {
+    label: "OpenAI",
+    iconSrc: "/icons/openai.svg",
+    pillBg: "bg-neutral-100 dark:bg-neutral-800",
+  },
+  google: {
+    label: "Google",
+    iconSrc: "/icons/gemini.svg",
+    pillBg: "bg-blue-50 dark:bg-blue-950/40",
+  },
+  cohere: {
+    label: "Cohere",
+    iconSrc: "/icons/cohere.svg",
+    pillBg: "bg-orange-50 dark:bg-orange-950/40",
+  },
+  voyage: {
+    label: "Voyage AI",
+    iconSrc: "/icons/voyage-light.png",
+    pillBg: "bg-slate-100 dark:bg-slate-800",
+  },
+  mistral: {
+    label: "Mistral",
+    iconSrc: "/icons/mistral.svg",
+    pillBg: "bg-amber-50 dark:bg-amber-950/40",
+  },
+  jina: {
+    label: "Jina AI",
+    iconSrc: "/icons/jina.svg",
+    pillBg: "bg-rose-50 dark:bg-rose-950/40",
+  },
+  nomic: {
+    label: "Nomic",
+    iconSrc: "/icons/nomic.png",
+    pillBg: "bg-teal-50 dark:bg-teal-950/40",
+  },
 };
 
 // ── Vector-store branding (real icons from /icons/) ───────────────────────────
@@ -93,13 +121,34 @@ type StoreMeta = {
 };
 
 const STORE_META: Record<VectorStoreId, StoreMeta> = {
-  lancedb:  { iconSrc: "/icons/lancedb2.png",  pillBg: "bg-yellow-50 dark:bg-yellow-950/40" },
-  pinecone: { iconSrc: "/icons/pinecone.png",  pillBg: "bg-green-50 dark:bg-green-950/40" },
-  weaviate: { iconSrc: "/icons/weaviate.webp", pillBg: "bg-teal-50 dark:bg-teal-950/40" },
-  qdrant:   { iconSrc: "/icons/qdrant.svg",    pillBg: "bg-red-50 dark:bg-red-950/40" },
-  chroma:   { iconSrc: "/icons/chroma.png",    pillBg: "bg-purple-50 dark:bg-purple-950/40" },
-  pgvector: { iconSrc: "/icons/pgvector2.png", pillBg: "bg-blue-50 dark:bg-blue-950/40" },
-  supabase: { iconSrc: "/icons/supabase.png",  pillBg: "bg-emerald-50 dark:bg-emerald-950/40" },
+  lancedb: {
+    iconSrc: "/icons/lancedb2.png",
+    pillBg: "bg-yellow-50 dark:bg-yellow-950/40",
+  },
+  pinecone: {
+    iconSrc: "/icons/pinecone.png",
+    pillBg: "bg-green-50 dark:bg-green-950/40",
+  },
+  weaviate: {
+    iconSrc: "/icons/weaviate.webp",
+    pillBg: "bg-teal-50 dark:bg-teal-950/40",
+  },
+  qdrant: {
+    iconSrc: "/icons/qdrant.svg",
+    pillBg: "bg-red-50 dark:bg-red-950/40",
+  },
+  chroma: {
+    iconSrc: "/icons/chroma.png",
+    pillBg: "bg-purple-50 dark:bg-purple-950/40",
+  },
+  pgvector: {
+    iconSrc: "/icons/pgvector2.png",
+    pillBg: "bg-blue-50 dark:bg-blue-950/40",
+  },
+  supabase: {
+    iconSrc: "/icons/supabase.png",
+    pillBg: "bg-emerald-50 dark:bg-emerald-950/40",
+  },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -161,7 +210,8 @@ export function ConfigureForm() {
   useEffect(() => {
     if (data?.config && !hydrated) {
       setForm(data.config);
-      storeConfigCache.current[data.config.vectorStore] = data.config.storeConfig;
+      storeConfigCache.current[data.config.vectorStore] =
+        data.config.storeConfig;
       setHydrated(true);
     }
   }, [data, hydrated]);
@@ -209,7 +259,11 @@ export function ConfigureForm() {
   );
 
   async function handleSave() {
-    const fieldErrors = validateStoreConfig(store, form.storeConfig, form.indexType);
+    const fieldErrors = validateStoreConfig(
+      store,
+      form.storeConfig,
+      form.indexType,
+    );
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
       toast.error("Please complete the required vector store fields.");
@@ -225,7 +279,9 @@ export function ConfigureForm() {
       const testJson = await testRes.json();
       if (!testRes.ok) {
         if (testJson.fieldErrors) setErrors(testJson.fieldErrors);
-        throw new Error(`Connection test failed: ${testJson.error ?? "Invalid credentials"}`);
+        throw new Error(
+          `Connection test failed: ${testJson.error ?? "Invalid credentials"}`,
+        );
       }
       const res = await fetch("/api/config", {
         method: "PUT",
@@ -250,7 +306,11 @@ export function ConfigureForm() {
   }
 
   async function handleTestConnection() {
-    const fieldErrors = validateStoreConfig(store, form.storeConfig, form.indexType);
+    const fieldErrors = validateStoreConfig(
+      store,
+      form.storeConfig,
+      form.indexType,
+    );
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
       toast.error("Please complete the required vector store fields.");
@@ -292,7 +352,6 @@ export function ConfigureForm() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* ── Main column ────────────────────────────────────────────── */}
         <div className="space-y-6 lg:col-span-2">
-
           {/* Project */}
           <Card>
             <CardHeader>
@@ -345,59 +404,71 @@ export function ConfigureForm() {
               {/* Model selector */}
               <Select
                 value={form.embeddingModelId}
-                onValueChange={(v) => set("embeddingModelId", (v as string) ?? "")}
+                onValueChange={(v) =>
+                  set("embeddingModelId", (v as string) ?? "")
+                }
               >
-                <SelectTrigger className="w-full h-auto py-2">
+                <SelectTrigger className="w-full">
                   {embeddingModel && embeddingMeta ? (
                     <span className="flex items-center gap-2.5">
                       <ProviderIcon
                         src={embeddingMeta.iconSrc}
                         alt={embeddingMeta.label}
                         pillBg={embeddingMeta.pillBg}
-                        size={24}
+                        size={20}
                       />
                       <span className="flex flex-col items-start leading-none">
-                        <span className="text-[10px] text-muted-foreground">
+                        {/* <span className="text-[10px] text-muted-foreground">
                           {embeddingMeta.label}
-                        </span>
-                        <span className="font-medium text-sm mt-0.5">
+                        </span> */}
+                        <span className="font-medium text-sm ">
                           {embeddingModel.label}
                         </span>
                       </span>
                     </span>
                   ) : (
-                    <span className="text-muted-foreground">Select a model…</span>
+                    <span className="text-muted-foreground">
+                      Select a model…
+                    </span>
                   )}
                 </SelectTrigger>
                 <SelectContent className="max-h-[320px]">
-                  {Object.entries(EMBEDDING_BY_PROVIDER).map(([provider, models]) => {
-                    const meta = PROVIDER_META[provider as EmbeddingProvider];
-                    return (
-                      <SelectGroup key={provider}>
-                        <SelectLabel className="flex items-center gap-2 py-1.5">
-                          {meta && (
-                            <ProviderIcon
-                              src={meta.iconSrc}
-                              alt={meta.label}
-                              pillBg={meta.pillBg}
-                              size={18}
-                            />
-                          )}
-                          <span className="font-medium">{meta?.label ?? provider}</span>
-                        </SelectLabel>
-                        {models.map((m) => (
-                          <SelectItem key={m.id} value={m.id} className="pl-8">
-                            <span className="flex items-center gap-2">
-                              <span>{m.label}</span>
-                              <span className="text-[10px] text-muted-foreground font-mono">
-                                {m.dimensions}d
-                              </span>
+                  {Object.entries(EMBEDDING_BY_PROVIDER).map(
+                    ([provider, models]) => {
+                      const meta = PROVIDER_META[provider as EmbeddingProvider];
+                      return (
+                        <SelectGroup key={provider}>
+                          <SelectLabel className="flex items-center gap-2 py-1.5">
+                            {meta && (
+                              <ProviderIcon
+                                src={meta.iconSrc}
+                                alt={meta.label}
+                                pillBg={meta.pillBg}
+                                size={18}
+                              />
+                            )}
+                            <span className="font-medium">
+                              {meta?.label ?? provider}
                             </span>
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    );
-                  })}
+                          </SelectLabel>
+                          {models.map((m) => (
+                            <SelectItem
+                              key={m.id}
+                              value={m.id}
+                              className="pl-8"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span>{m.label}</span>
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  {m.dimensions}d
+                                </span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      );
+                    },
+                  )}
                 </SelectContent>
               </Select>
 
@@ -503,7 +574,6 @@ export function ConfigureForm() {
             <CardContent className="space-y-5">
               {/* Side-by-side row: index type select + vector store select */}
               <div className="grid gap-4 sm:grid-cols-2">
-
                 {/* Index type — select (same height as vector store) */}
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -513,18 +583,20 @@ export function ConfigureForm() {
                     value={form.indexType}
                     onValueChange={(v) => set("indexType", v as IndexType)}
                   >
-                    <SelectTrigger className="w-full h-auto py-2">
+                    <SelectTrigger className="w-full">
                       {indexTypeMeta ? (
                         <span className="flex flex-col items-start leading-none">
                           <span className="font-medium text-sm">
                             {indexTypeMeta.label}
                           </span>
-                          <span className="text-[10px] text-muted-foreground mt-0.5">
+                          {/* <span className="text-[10px] text-muted-foreground mt-0.5">
                             {indexTypeMeta.hint}
-                          </span>
+                          </span> */}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">Select index type…</span>
+                        <span className="text-muted-foreground">
+                          Select index type…
+                        </span>
                       )}
                     </SelectTrigger>
                     <SelectContent>
@@ -551,26 +623,30 @@ export function ConfigureForm() {
                     value={form.vectorStore}
                     onValueChange={(v) => selectStore(v as VectorStoreId)}
                   >
-                    <SelectTrigger className="w-full h-auto py-2">
+                    <SelectTrigger className="w-full">
                       {storeMeta ? (
                         <span className="flex items-center gap-2.5">
                           <ProviderIcon
                             src={storeMeta.iconSrc}
                             alt={store.label}
                             pillBg={storeMeta.pillBg}
-                            size={24}
+                            size={20}
                           />
                           <span className="flex flex-col items-start leading-none">
                             <span className="font-medium text-sm">
                               {store.label}
                             </span>
-                            <span className="text-[10px] text-muted-foreground mt-0.5">
-                              {store.runtime === "both" ? "local / cloud" : store.runtime}
-                            </span>
+                            {/* <span className="text-[10px] text-muted-foreground mt-0.5">
+                              {store.runtime === "both"
+                                ? "local / cloud"
+                                : store.runtime}
+                            </span> */}
                           </span>
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">Select a vector store…</span>
+                        <span className="text-muted-foreground">
+                          Select a vector store…
+                        </span>
                       )}
                     </SelectTrigger>
                     <SelectContent>
@@ -604,7 +680,10 @@ export function ConfigureForm() {
 
                   {/* Store badges */}
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px] font-mono uppercase">
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-mono uppercase"
+                    >
                       {store.runtime}
                     </Badge>
                     {store.docsUrl && (
@@ -614,7 +693,7 @@ export function ConfigureForm() {
                         rel="noopener noreferrer"
                         className="text-[11px] text-muted-foreground underline-offset-2 hover:underline hover:text-foreground transition-colors"
                       >
-                        docs ↗
+                        docs
                       </a>
                     )}
                   </div>
@@ -676,7 +755,9 @@ export function ConfigureForm() {
                 />
                 <SummaryRow
                   label="Provider"
-                  value={embeddingMeta?.label ?? (embeddingModel?.provider ?? "—")}
+                  value={
+                    embeddingMeta?.label ?? embeddingModel?.provider ?? "—"
+                  }
                 />
                 <SummaryRow
                   label="Dimensions"

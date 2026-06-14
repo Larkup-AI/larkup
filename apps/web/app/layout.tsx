@@ -7,6 +7,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { WorkspaceProvider } from "@/components/workspace/workspace-provider";
 import { WorkspaceTopBar } from "@/components/workspace/workspace-top-bar";
 import { OnboardingDialog } from "@/components/workspace/onboarding-dialog";
+import { ThemeCustomizerProvider } from "@/components/theme-customizer-provider";
+import { ClientLayoutWrapper } from "@/components/client-layout-wrapper";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({
@@ -31,18 +33,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} bg-background`}
     >
       <body className="font-sans antialiased">
-        <WorkspaceProvider>
-          <div className="flex min-h-screen bg-background">
-            <AppSidebar />
-            <main className="min-w-0 flex-1 p-3 pl-3 md:pl-0">
-              <div className="min-h-[calc(100vh-1.5rem)] rounded-2xl border border-border bg-panel text-panel-foreground shadow-sm">
-                <WorkspaceTopBar />
-                {children}
-              </div>
-            </main>
-          </div>
-          <OnboardingDialog />
-        </WorkspaceProvider>
+        <ThemeCustomizerProvider>
+          <WorkspaceProvider>
+            <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+            <OnboardingDialog />
+          </WorkspaceProvider>
+        </ThemeCustomizerProvider>
         <Toaster position="bottom-right" />
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>

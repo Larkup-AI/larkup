@@ -1,0 +1,293 @@
+/* Theme Variations */
+
+/* 
+  1. GAIA Theme 
+  Green primary, soft grays, rounded corners
+*/
+.theme-gaia {
+  --background: oklch(0.9911 0 0);
+  --foreground: oklch(0.2046 0 0);
+  --card: oklch(0.9911 0 0);
+  --card-foreground: oklch(0.2046 0 0);
+  --panel: oklch(0.97 0 0);
+  --panel-foreground: oklch(0.2046 0 0);
+  --popover: oklch(0.9911 0 0);
+  --popover-foreground: oklch(0.4386 0 0);
+  --primary: oklch(0.68 0.17 150); /* Emerald green */
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.95 0 0);
+  --secondary-foreground: oklch(0.2046 0 0);
+  --muted: oklch(0.9461 0 0);
+  --muted-foreground: oklch(0.4 0 0);
+  --accent: oklch(0.9461 0 0);
+  --accent-foreground: oklch(0.2435 0 0);
+  --border: oklch(0.9037 0 0);
+  --input: oklch(0.93 0 0);
+  --ring: oklch(0.68 0.17 150);
+  --sidebar: oklch(0.9911 0 0);
+  --sidebar-foreground: oklch(0.5452 0 0);
+  --sidebar-primary: oklch(0.68 0.17 150);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.9037 0 0);
+}
+.dark.theme-gaia, .theme-gaia .dark {
+  --background: oklch(0.1822 0 0);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.2046 0 0);
+  --card-foreground: oklch(0.95 0 0);
+  --panel: oklch(0.16 0 0);
+  --panel-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.2603 0 0);
+  --popover-foreground: oklch(0.8 0 0);
+  --primary: oklch(0.68 0.17 150);
+  --primary-foreground: oklch(0.1 0 0);
+  --secondary: oklch(0.2603 0 0);
+  --secondary-foreground: oklch(0.9851 0 0);
+  --muted: oklch(0.2393 0 0);
+  --muted-foreground: oklch(0.7122 0 0);
+  --accent: oklch(0.3132 0 0);
+  --accent-foreground: oklch(0.9851 0 0);
+  --border: oklch(0.2809 0 0);
+  --input: oklch(0.2603 0 0);
+  --ring: oklch(0.68 0.17 150);
+  --sidebar: oklch(0.1822 0 0);
+  --sidebar-foreground: oklch(0.6301 0 0);
+  --sidebar-primary: oklch(0.68 0.17 150);
+  --sidebar-primary-foreground: oklch(0.1 0 0);
+  --sidebar-border: oklch(0.2809 0 0);
+}
+
+/* 
+  2. DOCKER Theme 
+  Docker Blue, stark whites, light grays, semi-box UI
+*/
+.theme-docker {
+  --background: oklch(0.98 0.002 240);
+  --foreground: oklch(0.2 0.01 240);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.01 240);
+  --panel: oklch(1 0 0);
+  --panel-foreground: oklch(0.2 0.01 240);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.01 240);
+  --primary: #1d63ed;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.005 240);
+  --secondary-foreground: #1d63ed;
+  --muted: oklch(0.94 0.005 240);
+  --muted-foreground: oklch(0.4 0.01 240);
+  --accent: oklch(0.95 0.005 240);
+  --accent-foreground: #1d63ed;
+  --border: oklch(0.85 0.005 240);
+  --input: oklch(0.9 0.005 240);
+  --ring: #1d63ed;
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.4 0.01 240);
+  --sidebar-primary: #1d63ed;
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.85 0.005 240);
+}
+.dark.theme-docker, .theme-docker .dark {
+  --background: oklch(0.15 0.01 240);
+  --foreground: oklch(0.95 0.005 240);
+  --card: oklch(0.18 0.01 240);
+  --card-foreground: oklch(0.95 0.005 240);
+  --panel: oklch(0.18 0.01 240);
+  --panel-foreground: oklch(0.95 0.005 240);
+  --popover: oklch(0.18 0.01 240);
+  --popover-foreground: oklch(0.95 0.005 240);
+  --primary: #1d63ed;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.22 0.01 240);
+  --secondary-foreground: oklch(0.95 0.005 240);
+  --muted: oklch(0.2 0.01 240);
+  --muted-foreground: oklch(0.6 0.01 240);
+  --accent: oklch(0.22 0.01 240);
+  --accent-foreground: oklch(0.95 0.005 240);
+  --border: oklch(0.25 0.01 240);
+  --input: oklch(0.25 0.01 240);
+  --ring: #1d63ed;
+  --sidebar: oklch(0.15 0.01 240);
+  --sidebar-foreground: oklch(0.7 0.01 240);
+  --sidebar-primary: #1d63ed;
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.25 0.01 240);
+}
+
+/* 
+  3. PINECONE Theme
+  Deep indigo/purple, technical, sharp contrast
+*/
+.theme-pinecone {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.15 0.02 280);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.02 280);
+  --panel: oklch(1 0 0);
+  --panel-foreground: oklch(0.15 0.02 280);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.02 280);
+  --primary: #6e56cf;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.94 0.01 280);
+  --secondary-foreground: #6e56cf;
+  --muted: oklch(0.95 0.01 280);
+  --muted-foreground: oklch(0.45 0.01 280);
+  --accent: oklch(0.94 0.01 280);
+  --accent-foreground: #6e56cf;
+  --border: oklch(0.88 0.01 280);
+  --input: oklch(0.9 0.01 280);
+  --ring: #6e56cf;
+  --sidebar: oklch(0.99 0.005 280);
+  --sidebar-foreground: oklch(0.45 0.01 280);
+  --sidebar-primary: #6e56cf;
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.88 0.01 280);
+}
+.dark.theme-pinecone, .theme-pinecone .dark {
+  --background: oklch(0.1 0.01 280);
+  --foreground: oklch(0.96 0.005 280);
+  --card: oklch(0.13 0.01 280);
+  --card-foreground: oklch(0.96 0.005 280);
+  --panel: oklch(0.12 0.01 280);
+  --panel-foreground: oklch(0.96 0.005 280);
+  --popover: oklch(0.13 0.01 280);
+  --popover-foreground: oklch(0.96 0.005 280);
+  --primary: #8a73ed;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.18 0.01 280);
+  --secondary-foreground: oklch(0.96 0.005 280);
+  --muted: oklch(0.16 0.01 280);
+  --muted-foreground: oklch(0.6 0.01 280);
+  --accent: oklch(0.18 0.01 280);
+  --accent-foreground: oklch(0.96 0.005 280);
+  --border: oklch(0.2 0.01 280);
+  --input: oklch(0.2 0.01 280);
+  --ring: #8a73ed;
+  --sidebar: oklch(0.12 0.01 280);
+  --sidebar-foreground: oklch(0.6 0.01 280);
+  --sidebar-primary: #8a73ed;
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.2 0.01 280);
+}
+
+/* 
+  4. VERCEL Theme
+  Black/white stark minimal, zero border radius by default
+*/
+.theme-vercel {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.1 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.1 0 0);
+  --panel: oklch(0.98 0 0);
+  --panel-foreground: oklch(0.1 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.1 0 0);
+  --primary: oklch(0.1 0 0);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0 0);
+  --secondary-foreground: oklch(0.1 0 0);
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.4 0 0);
+  --accent: oklch(0.96 0 0);
+  --accent-foreground: oklch(0.1 0 0);
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.92 0 0);
+  --ring: oklch(0.1 0 0);
+  --sidebar: oklch(0.98 0 0);
+  --sidebar-foreground: oklch(0.4 0 0);
+  --sidebar-primary: oklch(0.1 0 0);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.9 0 0);
+}
+.dark.theme-vercel, .theme-vercel .dark {
+  --background: oklch(0.1 0 0);
+  --foreground: oklch(0.98 0 0);
+  --card: oklch(0.1 0 0);
+  --card-foreground: oklch(0.98 0 0);
+  --panel: oklch(0.12 0 0);
+  --panel-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.1 0 0);
+  --popover-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.98 0 0);
+  --primary-foreground: oklch(0.1 0 0);
+  --secondary: oklch(0.15 0 0);
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted: oklch(0.15 0 0);
+  --muted-foreground: oklch(0.6 0 0);
+  --accent: oklch(0.15 0 0);
+  --accent-foreground: oklch(0.98 0 0);
+  --border: oklch(0.2 0 0);
+  --input: oklch(0.2 0 0);
+  --ring: oklch(0.98 0 0);
+  --sidebar: oklch(0.1 0 0);
+  --sidebar-foreground: oklch(0.6 0 0);
+  --sidebar-primary: oklch(0.98 0 0);
+  --sidebar-primary-foreground: oklch(0.1 0 0);
+  --sidebar-border: oklch(0.2 0 0);
+}
+
+/* 
+  5. ELEVENLABS Theme
+  Cream/soft backgrounds, very rounded, subtle red/orange accents
+*/
+.theme-elevenlabs {
+  --background: #faf9f5; /* Creamy white from screenshot */
+  --foreground: oklch(0.2 0.01 40);
+  --card: #ffffff;
+  --card-foreground: oklch(0.2 0.01 40);
+  --panel: #faf9f5;
+  --panel-foreground: oklch(0.2 0.01 40);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.01 40);
+  --primary: oklch(0.2 0.01 40);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.94 0.01 85);
+  --secondary-foreground: oklch(0.2 0.01 40);
+  --muted: oklch(0.95 0.01 85);
+  --muted-foreground: oklch(0.5 0.01 40);
+  --accent: oklch(0.94 0.01 85);
+  --accent-foreground: oklch(0.2 0.01 40);
+  --border: oklch(0.9 0.01 85);
+  --input: oklch(0.92 0.01 85);
+  --ring: oklch(0.2 0.01 40);
+  --sidebar: oklch(0.99 0.002 85);
+  --sidebar-foreground: oklch(0.4 0.01 40);
+  --sidebar-primary: oklch(0.2 0.01 40);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.9 0.01 85);
+}
+.dark.theme-elevenlabs, .theme-elevenlabs .dark {
+  --background: oklch(0.15 0.01 40);
+  --foreground: oklch(0.96 0.005 85);
+  --card: oklch(0.18 0.01 40);
+  --card-foreground: oklch(0.96 0.005 85);
+  --panel: oklch(0.16 0.01 40);
+  --panel-foreground: oklch(0.96 0.005 85);
+  --popover: oklch(0.18 0.01 40);
+  --popover-foreground: oklch(0.96 0.005 85);
+  --primary: oklch(0.96 0.005 85);
+  --primary-foreground: oklch(0.15 0.01 40);
+  --secondary: oklch(0.22 0.01 40);
+  --secondary-foreground: oklch(0.96 0.005 85);
+  --muted: oklch(0.2 0.01 40);
+  --muted-foreground: oklch(0.7 0.01 40);
+  --accent: oklch(0.22 0.01 40);
+  --accent-foreground: oklch(0.96 0.005 85);
+  --border: oklch(0.25 0.01 40);
+  --input: oklch(0.25 0.01 40);
+  --ring: oklch(0.96 0.005 85);
+  --sidebar: oklch(0.15 0.01 40);
+  --sidebar-foreground: oklch(0.7 0.01 40);
+  --sidebar-primary: oklch(0.96 0.005 85);
+  --sidebar-primary-foreground: oklch(0.15 0.01 40);
+  --sidebar-border: oklch(0.25 0.01 40);
+}
+
+/* Border Radius Overrides */
+.radius-0 { --radius: 0rem !important; }
+.radius-sm { --radius: 0.3rem !important; }
+.radius-default { --radius: 0.625rem !important; }
+.radius-lg { --radius: 1.0rem !important; }
+.radius-full { --radius: 9999px !important; }

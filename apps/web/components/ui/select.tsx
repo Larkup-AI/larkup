@@ -46,13 +46,13 @@ function SelectTrigger({
         "pr-3 pl-3 text-sm whitespace-nowrap select-none outline-none",
         // transitions & hover
         "transition-all duration-150",
-        "hover:border-foreground/30 hover:bg-accent/40",
+        "hover:border-foreground/15 hover:bg-accent/40",
         // focus ring
         "focus:border-primary/60 focus:ring-2 focus:ring-primary/15",
         // data-open ring
         "data-[state=open]:border-primary/60 data-[state=open]:ring-2 data-[state=open]:ring-primary/15",
         // sizes
-        "data-[size=default]:min-h-9 data-[size=sm]:min-h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)]",
+        "data-[size=default]:h-9 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)]",
         // value placeholder
         "*:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5",
         // disabled / invalid

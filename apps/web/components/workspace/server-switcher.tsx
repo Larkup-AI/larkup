@@ -41,12 +41,12 @@ export function ServerSwitcher() {
           render={
             <button
               type="button"
-              className="flex min-w-[300px] items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex min-w-[200px] md:min-w-[240px] items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5 text-left transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           }
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
-            <Server className="size-4" />
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/12 text-primary">
+            <Server className="size-3.5" />
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">

@@ -22,6 +22,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useThemeCustomizer } from "./theme-customizer-provider";
 
 // [#CDA1FE]
 const STAGE_ICONS: Record<StageId, LucideIcon> = {
@@ -34,10 +35,14 @@ const STAGE_ICONS: Record<StageId, LucideIcon> = {
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { pageStyle } = useThemeCustomizer();
 
   return (
     <TooltipProvider delay={150}>
-      <aside className="sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start bg-background py-3 md:flex">
+      <aside className={cn(
+        "sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start bg-background py-3 md:flex",
+        pageStyle === "fused" ? "border-r border-border" : ""
+      )}>
         {/* Brand */}
         <Tooltip>
           <TooltipTrigger
