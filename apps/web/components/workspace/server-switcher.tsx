@@ -49,9 +49,9 @@ export function ServerSwitcher() {
             <Server className="size-3.5" />
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            {/* <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Server
-            </span>
+            </span> */}
             <span className="flex items-center gap-1.5">
               <span className="truncate text-sm font-medium text-foreground">
                 {activeServer?.name ?? "No server"}

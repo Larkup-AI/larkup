@@ -30,7 +30,8 @@
   --sidebar-primary-foreground: oklch(0.98 0 0);
   --sidebar-border: oklch(0.9037 0 0);
 }
-.dark.theme-gaia, .theme-gaia .dark {
+.dark.theme-gaia,
+.theme-gaia .dark {
   --background: oklch(0.1822 0 0);
   --foreground: oklch(0.95 0 0);
   --card: oklch(0.2046 0 0);
@@ -62,7 +63,7 @@
   Docker Blue, stark whites, light grays, semi-box UI
 */
 .theme-docker {
-  --background: oklch(0.98 0.002 240);
+  --background: #fbfaf8; /* oklch(0.98 0.002 240); */
   --foreground: oklch(0.2 0.01 240);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.2 0.01 240);
@@ -87,7 +88,8 @@
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-border: oklch(0.85 0.005 240);
 }
-.dark.theme-docker, .theme-docker .dark {
+.dark.theme-docker,
+.theme-docker .dark {
   --background: oklch(0.15 0.01 240);
   --foreground: oklch(0.95 0.005 240);
   --card: oklch(0.18 0.01 240);
@@ -144,7 +146,8 @@
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-border: oklch(0.88 0.01 280);
 }
-.dark.theme-pinecone, .theme-pinecone .dark {
+.dark.theme-pinecone,
+.theme-pinecone .dark {
   --background: oklch(0.1 0.01 280);
   --foreground: oklch(0.96 0.005 280);
   --card: oklch(0.13 0.01 280);
@@ -201,7 +204,8 @@
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-border: oklch(0.9 0 0);
 }
-.dark.theme-vercel, .theme-vercel .dark {
+.dark.theme-vercel,
+.theme-vercel .dark {
   --background: oklch(0.1 0 0);
   --foreground: oklch(0.98 0 0);
   --card: oklch(0.1 0 0);
@@ -233,7 +237,7 @@
   Cream/soft backgrounds, very rounded, subtle red/orange accents
 */
 .theme-elevenlabs {
-  --background: #faf9f5; /* Creamy white from screenshot */
+  --background: #fbfaf8; /* Creamy white from screenshot */
   --foreground: oklch(0.2 0.01 40);
   --card: #ffffff;
   --card-foreground: oklch(0.2 0.01 40);
@@ -258,7 +262,8 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-border: oklch(0.9 0.01 85);
 }
-.dark.theme-elevenlabs, .theme-elevenlabs .dark {
+.dark.theme-elevenlabs,
+.theme-elevenlabs .dark {
   --background: oklch(0.15 0.01 40);
   --foreground: oklch(0.96 0.005 85);
   --card: oklch(0.18 0.01 40);
@@ -286,8 +291,18 @@
 }
 
 /* Border Radius Overrides */
-.radius-0 { --radius: 0rem !important; }
-.radius-sm { --radius: 0.3rem !important; }
-.radius-default { --radius: 0.625rem !important; }
-.radius-lg { --radius: 1.0rem !important; }
-.radius-full { --radius: 9999px !important; }
+.radius-0 {
+  --radius: 0rem !important;
+}
+.radius-sm {
+  --radius: 0.3rem !important;
+}
+.radius-default {
+  --radius: 0.625rem !important;
+}
+.radius-lg {
+  --radius: 1rem !important;
+}
+.radius-full {
+  --radius: 9999px !important;
+}
