@@ -13,7 +13,7 @@ export type ThemeVariant =
   | "theme-sienna"
   | "theme-caramel";
 
-export type BackgroundVariant = "bg-default" | "bg-warm" | "bg-soft" | "bg-pure";
+export type BackgroundVariant = "bg-default" | "bg-warm" | "bg-soft" | "bg-pure" | "bg-offwhite";
 
 export type LayoutVariant = "sidebar" | "topnav" | "collapsed";
 

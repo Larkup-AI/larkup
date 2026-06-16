@@ -38,6 +38,7 @@ const BACKGROUNDS: { id: BackgroundVariant; name: string; color: string }[] = [
   { id: "bg-default", name: "Theme Default", color: "transparent" },
   { id: "bg-warm", name: "Warm Cream", color: "#F7F1EA" },
   { id: "bg-soft", name: "Soft White", color: "#FBFAF8" },
+  { id: "bg-offwhite", name: "Off White", color: "#FCFBF8" },
   { id: "bg-pure", name: "Pure White", color: "#FFFFFF" },
 ];
 
