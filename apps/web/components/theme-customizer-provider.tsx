@@ -60,10 +60,10 @@ export function ThemeCustomizerProvider({
   children: React.ReactNode;
 }) {
   const [isMounted, setIsMounted] = useState(false);
-  const [theme, setTheme] = useState<ThemeVariant>("default");
-  const [layout, setLayout] = useState<LayoutVariant>("sidebar");
+  const [theme, setTheme] = useState<ThemeVariant>("theme-caramel");
+  const [layout, setLayout] = useState<LayoutVariant>("topnav");
   const [radius, setRadius] = useState<RadiusVariant>("radius-default");
-  const [background, setBackground] = useState<BackgroundVariant>("bg-default");
+  const [background, setBackground] = useState<BackgroundVariant>("bg-soft");
   const [pageStyle, setPageStyle] = useState<PageStyleVariant>("card");
 
   useEffect(() => {

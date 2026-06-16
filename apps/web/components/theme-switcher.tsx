@@ -96,7 +96,10 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
             </Button>
           }
         />
-        <PopoverContent align="end" className="w-80 p-0 shadow-2xl flex flex-col max-h-[85vh]">
+        <PopoverContent
+          align="end"
+          className="w-80 p-0 shadow-2xl flex flex-col max-h-[85vh]"
+        >
           <div className="border-b px-4 py-3 font-semibold flex items-center gap-2 shrink-0">
             <Palette className="h-4 w-4" /> Theme Customizer
           </div>
@@ -133,8 +136,8 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
             {/* Background Style */}
             <div className="space-y-3">
               <label className="text-sm font-medium flex items-center gap-2">
-                <SquareDashed className="h-4 w-4 text-muted-foreground" /> Background
-                Style
+                <SquareDashed className="h-4 w-4 text-muted-foreground" />{" "}
+                Background Style
               </label>
               <div className="flex flex-wrap gap-2">
                 {BACKGROUNDS.map((bg) => (
@@ -149,7 +152,7 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
                     }`}
                   >
                     <div
-                      className={`h-6 w-6 rounded-full border flex-shrink-0 ${bg.id === "bg-default" ? "border-dashed" : "shadow-sm"}`}
+                      className={`h-6 w-6 rounded-full border shrink-0 ${bg.id === "bg-default" ? "border-dashed" : "shadow-sm"}`}
                       style={{ background: bg.color }}
                     />
                   </button>
