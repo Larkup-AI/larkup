@@ -8,7 +8,12 @@ export type ThemeVariant =
   | "theme-docker"
   | "theme-pinecone"
   | "theme-vercel"
-  | "theme-elevenlabs";
+  | "theme-elevenlabs"
+  | "theme-espresso"
+  | "theme-sienna"
+  | "theme-caramel";
+
+export type BackgroundVariant = "bg-default" | "bg-warm" | "bg-soft" | "bg-pure";
 
 export type LayoutVariant = "sidebar" | "topnav" | "collapsed";
 
@@ -28,6 +33,8 @@ interface ThemeCustomizerContextValue {
   setLayout: (layout: LayoutVariant) => void;
   radius: RadiusVariant;
   setRadius: (radius: RadiusVariant) => void;
+  background: BackgroundVariant;
+  setBackground: (bg: BackgroundVariant) => void;
   pageStyle: PageStyleVariant;
   setPageStyle: (style: PageStyleVariant) => void;
   isMounted: boolean;
@@ -56,6 +63,7 @@ export function ThemeCustomizerProvider({
   const [theme, setTheme] = useState<ThemeVariant>("default");
   const [layout, setLayout] = useState<LayoutVariant>("sidebar");
   const [radius, setRadius] = useState<RadiusVariant>("radius-default");
+  const [background, setBackground] = useState<BackgroundVariant>("bg-default");
   const [pageStyle, setPageStyle] = useState<PageStyleVariant>("card");
 
   useEffect(() => {
@@ -63,11 +71,13 @@ export function ThemeCustomizerProvider({
     const savedTheme = localStorage.getItem("app-theme") as ThemeVariant;
     const savedLayout = localStorage.getItem("app-layout") as LayoutVariant;
     const savedRadius = localStorage.getItem("app-radius") as RadiusVariant;
+    const savedBackground = localStorage.getItem("app-background") as BackgroundVariant;
     const savedPageStyle = localStorage.getItem("app-pagestyle") as PageStyleVariant;
 
     if (savedTheme) setTheme(savedTheme);
     if (savedLayout) setLayout(savedLayout);
     if (savedRadius) setRadius(savedRadius);
+    if (savedBackground) setBackground(savedBackground);
     if (savedPageStyle) setPageStyle(savedPageStyle);
   }, []);
 
@@ -76,6 +86,7 @@ export function ThemeCustomizerProvider({
     localStorage.setItem("app-theme", theme);
     localStorage.setItem("app-layout", layout);
     localStorage.setItem("app-radius", radius);
+    localStorage.setItem("app-background", background);
     localStorage.setItem("app-pagestyle", pageStyle);
 
     // Update body classes
@@ -83,7 +94,7 @@ export function ThemeCustomizerProvider({
     
     // Remove old classes
     body.classList.forEach((cls) => {
-      if (cls.startsWith("theme-") || cls.startsWith("radius-")) {
+      if (cls.startsWith("theme-") || cls.startsWith("radius-") || cls.startsWith("bg-")) {
         body.classList.remove(cls);
       }
     });
@@ -91,7 +102,8 @@ export function ThemeCustomizerProvider({
     // Add new classes
     if (theme !== "default") body.classList.add(theme);
     if (radius !== "radius-default") body.classList.add(radius);
-  }, [theme, layout, radius, pageStyle, isMounted]);
+    if (background !== "bg-default") body.classList.add(background);
+  }, [theme, layout, radius, background, pageStyle, isMounted]);
 
   return (
     <ThemeCustomizerContext.Provider
@@ -102,6 +114,8 @@ export function ThemeCustomizerProvider({
         setLayout,
         radius,
         setRadius,
+        background,
+        setBackground,
         pageStyle,
         setPageStyle,
         isMounted,

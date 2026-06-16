@@ -3,6 +3,7 @@
 import {
   useThemeCustomizer,
   ThemeVariant,
+  BackgroundVariant,
   LayoutVariant,
   RadiusVariant,
   PageStyleVariant,
@@ -28,6 +29,16 @@ const THEMES: { id: ThemeVariant; name: string; color: string }[] = [
   { id: "theme-pinecone", name: "Deep Indigo", color: "#6e56cf" },
   { id: "theme-vercel", name: "Minimal Black", color: "#000000" },
   { id: "theme-elevenlabs", name: "Soft Cream", color: "#f8f7f5" },
+  { id: "theme-espresso", name: "Espresso", color: "#6B3F2A" },
+  { id: "theme-sienna", name: "Warm Sienna", color: "#A0522D" },
+  { id: "theme-caramel", name: "Caramel", color: "#C47C3E" },
+];
+
+const BACKGROUNDS: { id: BackgroundVariant; name: string; color: string }[] = [
+  { id: "bg-default", name: "Theme Default", color: "transparent" },
+  { id: "bg-warm", name: "Warm Cream", color: "#F7F1EA" },
+  { id: "bg-soft", name: "Soft White", color: "#FBFAF8" },
+  { id: "bg-pure", name: "Pure White", color: "#FFFFFF" },
 ];
 
 const LAYOUTS: { id: LayoutVariant; name: string }[] = [
@@ -51,6 +62,8 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
   const {
     theme,
     setTheme,
+    background,
+    setBackground,
     layout,
     setLayout,
     radius,
@@ -112,6 +125,33 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
                     <span className="truncate w-full text-center">
                       {t.name}
                     </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Background Style */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <SquareDashed className="h-4 w-4 text-muted-foreground" /> Background
+                Style
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {BACKGROUNDS.map((bg) => (
+                  <button
+                    key={bg.id}
+                    onClick={() => setBackground(bg.id)}
+                    className={`flex items-center gap-2 rounded-md border-2 p-2 text-xs transition-all hover:bg-muted ${
+                      background === bg.id
+                        ? "border-primary bg-primary/5"
+                        : "border-border"
+                    }`}
+                  >
+                    <div
+                      className={`h-4 w-4 rounded-full border flex-shrink-0 ${bg.id === "bg-default" ? "border-dashed" : "shadow-sm"}`}
+                      style={{ background: bg.color }}
+                    />
+                    <span className="truncate">{bg.name}</span>
                   </button>
                 ))}
               </div>
