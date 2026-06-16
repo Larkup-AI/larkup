@@ -96,11 +96,11 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
             </Button>
           }
         />
-        <PopoverContent align="end" className="w-80 p-0 shadow-2xl">
-          <div className="border-b px-4 py-3 font-semibold flex items-center gap-2">
+        <PopoverContent align="end" className="w-80 p-0 shadow-2xl flex flex-col max-h-[85vh]">
+          <div className="border-b px-4 py-3 font-semibold flex items-center gap-2 shrink-0">
             <Palette className="h-4 w-4" /> Theme Customizer
           </div>
-          <div className="p-4 space-y-6">
+          <div className="p-4 space-y-6 overflow-y-auto">
             {/* Color Theme */}
             <div className="space-y-3">
               <label className="text-sm font-medium flex items-center gap-2">
@@ -136,22 +136,22 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
                 <SquareDashed className="h-4 w-4 text-muted-foreground" /> Background
                 Style
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-wrap gap-2">
                 {BACKGROUNDS.map((bg) => (
                   <button
                     key={bg.id}
                     onClick={() => setBackground(bg.id)}
-                    className={`flex items-center gap-2 rounded-md border-2 p-2 text-xs transition-all hover:bg-muted ${
+                    title={bg.name}
+                    className={`flex items-center justify-center rounded-full border-2 p-0.5 transition-all hover:scale-110 ${
                       background === bg.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
+                        ? "border-primary"
+                        : "border-transparent"
                     }`}
                   >
                     <div
-                      className={`h-4 w-4 rounded-full border flex-shrink-0 ${bg.id === "bg-default" ? "border-dashed" : "shadow-sm"}`}
+                      className={`h-6 w-6 rounded-full border flex-shrink-0 ${bg.id === "bg-default" ? "border-dashed" : "shadow-sm"}`}
                       style={{ background: bg.color }}
                     />
-                    <span className="truncate">{bg.name}</span>
                   </button>
                 ))}
               </div>
