@@ -555,16 +555,14 @@ export function FeatureTabs() {
           </div>
 
           {/* Right: preview panel */}
-          <div className="flex-1 relative flex flex-col bg-noise bg-card min-h-[520px]">
-            <div
+          <div className="flex-1 relative flex flex-col  bg-card min-h-[520px]">
+                
+              <img
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 opacity-70 transition-opacity duration-500"
-              style={{
-                backgroundImage:
-                  "radial-gradient(100% 80% at 50% 0%, color-mix(in oklch, var(--primary) 12%, transparent), transparent 60%)",
-              }}
-            />
-
+              src="/noise5.jpg"
+              className="pointer-events-none absolute inset-0 w-full h-full object-cover"
+              style={{ opacity: 0.35 }} 
+              />
             <div key={active} className="relative z-1 flex flex-1 flex-col">
               <Preview />
             </div>

@@ -6,6 +6,7 @@ import { FeatureTabs } from "@/components/landing2/feature-tabs"
 import { FaqSection } from "@/components/landing2/faq-section"
 import { CtaSection } from "@/components/landing2/cta-section"
 import { SiteFooter } from "@/components/landing2/site-footer"
+import { CookieConsent } from "@/components/landing2/cookie-consent"
 import "./globals.css"
 
 export function LandingPage2() {
@@ -21,6 +22,7 @@ export function LandingPage2() {
         <CtaSection />
       </main>
       <SiteFooter />
+      <CookieConsent />
     </div>
   )
 }
