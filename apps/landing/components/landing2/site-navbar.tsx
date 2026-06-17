@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Menu, X, Code2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { BrewMark } from "@/components/landing2/brew-mark"
+import Image from "next/image"
 import Link from "next/link"
 
 const links = [
@@ -21,7 +21,7 @@ export function SiteNavbar() {
     <header className="fixed inset-x-0 top-0 z-50">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2.5">
-          <BrewMark className="h-7 w-7 text-primary" />
+          <Image src="/logo1.png" alt="Brew Logo" width={28} height={28} className="h-7 w-auto object-contain dark:invert" />
           <span className="text-lg font-semibold tracking-tight">Brew</span>
           <span className="hidden rounded-full border border-border bg-secondary/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline">
             v2.1

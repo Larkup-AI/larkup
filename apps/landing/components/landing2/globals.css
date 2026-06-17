@@ -75,7 +75,7 @@
   --card-foreground: oklch(0.22 0.025 55);
   --popover: oklch(0.995 0.006 85);
   --popover-foreground: oklch(0.22 0.025 55);
-  --primary: oklch(0.62 0.13 58);
+  --primary: oklch(0 0 0);
   --primary-foreground: oklch(0.99 0.01 85);
   --secondary: oklch(0.95 0.012 75);
   --secondary-foreground: oklch(0.28 0.03 55);
@@ -112,7 +112,7 @@
   --card-foreground: oklch(0.94 0.012 75);
   --popover: oklch(0.12 0.008 50);
   --popover-foreground: oklch(0.94 0.012 75);
-  --primary: oklch(0.74 0.13 62);
+  --primary: oklch(1 0 0);
   --primary-foreground: oklch(0.16 0.02 50);
   --secondary: oklch(0.17 0.01 52);
   --secondary-foreground: oklch(0.94 0.012 75);
@@ -195,7 +195,7 @@
   }
 }
 .animate-marquee {
-  animation: marquee var(--marquee-duration, 70s) linear infinite;
+  animation: marquee var(--marquee-duration, 150s) linear infinite;
 }
 .marquee-pause:hover .animate-marquee {
   animation-play-state: paused;

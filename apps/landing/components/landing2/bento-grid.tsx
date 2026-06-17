@@ -72,7 +72,7 @@ export function BentoGrid() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
           eyebrow="Everything in the box"
-          title="A complete retrieval engine, not just a wrapper"
+          title="A complete retrieval engine not just a wrapper"
           description="Brew ships the primitives you actually need to take RAG from prototype to production — typed, composable, and observable end to end."
         />
 

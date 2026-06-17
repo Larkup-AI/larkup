@@ -38,7 +38,7 @@ export function Hero() {
           <ArrowRight className="h-3 w-3" />
         </a>
 
-        <h1 className="mt-7 text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
+        <h1 className="mt-7 text-balance text-4xl font-medium leading-[1.05] tracking-normal sm:text-6xl lg:text-7xl">
           The RAG framework for <span className="text-primary">grounded</span> AI
           in production
         </h1>

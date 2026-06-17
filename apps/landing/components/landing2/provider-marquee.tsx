@@ -1,28 +1,34 @@
-import {
-  ArrowUpRight,
-  Boxes,
-  Bot,
-  Brain,
-  Cloud,
-  Cpu,
-  Database,
-  Layers,
-  Network,
-  Sparkles,
-  Zap,
-} from "lucide-react"
+import Image from "next/image"
 
 const providers = [
-  { name: "OpenAI", icon: Sparkles },
-  { name: "Anthropic", icon: Bot },
-  { name: "Mistral", icon: Zap },
-  { name: "Cohere", icon: Layers },
-  { name: "Llama", icon: Brain },
-  { name: "Pinecone", icon: Network },
-  { name: "Weaviate", icon: Boxes },
-  { name: "pgvector", icon: Database },
-  { name: "Bedrock", icon: Cloud },
-  { name: "Vertex", icon: Cpu },
+  { name: "AWS", src: "/icons/aws.svg" },
+  { name: "Azure", src: "/icons/azure.svg" },
+  { name: "Chroma", src: "/icons/chroma.png" },
+  { name: "Cohere", src: "/icons/cohere.svg" },
+  { name: "DeepSeek", src: "/icons/deepseek.svg" },
+  { name: "Digital Ocean", src: "/icons/digital-ocean.webp" },
+  { name: "Docker", src: "/icons/docker.png" },
+  { name: "GCP", src: "/icons/gcp.svg" },
+  { name: "Gemini", src: "/icons/gemini.svg" },
+  { name: "GitHub", src: "/icons/github.svg" },
+  { name: "Google", src: "/icons/google.png" },
+  { name: "Groq", src: "/icons/groq-light.png" },
+  { name: "Hetzner", src: "/icons/hetzner.svg" },
+  { name: "Jina", src: "/icons/jina.svg" },
+  { name: "LanceDB", src: "/icons/lancedb2.png" },
+  { name: "Milvus", src: "/icons/milvus.png" },
+  { name: "Mistral", src: "/icons/mistral.svg" },
+  { name: "Nomic", src: "/icons/nomic.png" },
+  { name: "OpenAI", src: "/icons/openai.svg" },
+  { name: "PGVector", src: "/icons/pgvector2.png" },
+  { name: "Pinecone", src: "/icons/pinecone.png" },
+  { name: "Qdrant", src: "/icons/qdrant.svg" },
+  { name: "Qwen", src: "/icons/qwen-color.svg" },
+  { name: "Supabase", src: "/icons/supabase.png" },
+  { name: "Vercel", src: "/icons/vercel.svg" },
+  { name: "Voyage", src: "/icons/voyage-light.png" },
+  { name: "Weaviate", src: "/icons/weaviate.webp" },
+  { name: "xAI", src: "/icons/xai.svg" },
 ]
 
 export function ProviderMarquee() {
@@ -39,15 +45,13 @@ export function ProviderMarquee() {
       <div className="marquee-pause group relative overflow-hidden border-t border-border [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]">
         <div className="animate-marquee flex w-max">
           {row.map((p, i) => {
-            const Icon = p.icon
             return (
               <div
                 key={i}
-                className="group/cell relative flex h-28 w-52 shrink-0 flex-col items-center justify-center gap-2.5 border-r border-border"
+                className="group/cell relative flex h-28 w-56 shrink-0 flex-row items-center justify-center gap-3 border-r border-border hover:bg-card/50 transition-colors"
               >
-                <ArrowUpRight className="absolute right-4 top-4 h-3.5 w-3.5 text-muted-foreground/40 transition-colors group-hover/cell:text-primary" />
-                <Icon className="h-6 w-6 text-foreground/70 transition-colors group-hover/cell:text-foreground" />
-                <span className="text-sm font-semibold tracking-tight text-foreground/90">
+                <Image src={p.src} alt={p.name} width={28} height={28} className="h-7 w-auto object-contain" />
+                <span className="text-lg font-semibold tracking-tight text-foreground/90">
                   {p.name}
                 </span>
                 {/* caramel underline accent */}
