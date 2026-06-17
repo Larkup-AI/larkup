@@ -4,12 +4,12 @@ import { useState } from "react"
 import { ArrowRight, Check, Copy, Star, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-
+import {motion} from "framer-motion"
 export function Hero() {
   const [copied, setCopied] = useState(false)
 
   function copyCmd() {
-    navigator.clipboard?.writeText("npm i @brew/core")
+    navigator.clipboard?.writeText("npm i buddy-rag")
     setCopied(true)
     setTimeout(() => setCopied(false), 1600)
   }
@@ -28,54 +28,54 @@ export function Hero() {
         </div>
       </div>
 
-      <div className="relative mx-auto flex max-w-3xl flex-col items-center px-4 text-center sm:px-6 lg:px-8">
-        <a
-          href="#docs"
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-3.5 py-1.5 text-xs text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
-        >
-          <span className="flex h-1.5 w-1.5 rounded-full bg-primary" />
-          Brew 2.1 — streaming reranker is live
-          <ArrowRight className="h-3 w-3" />
-        </a>
+      <div className="relative mx-auto flex max-w-4xl flex-col items-center px-4 text-center sm:px-6 lg:px-8">
+         <motion.a
+            href="https://github.com/BuddyHere-AI/buddy-rag"
+            target="_blank"
+            rel="noopener noreferrer"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1 }}
+            className="mb-6 flex cursor-pointer items-center gap-2 rounded-full border 
+             border-black/20 dark:border-white/10 
+             bg-white/80 dark:bg-white/10 
+             px-4 py-1.5 
+             transition-colors hover:bg-[#F2F2F2] dark:hover:bg-white/20"
+          >
+            {/* <Sparkles className="h-4 w-4 text-green-600" /> */}
+            <img src={"/icons/github.svg"} className="h-4 w-4 dark:text-white" />
+            <span className="text-xs dark:text-white">
+              Open Source RAG Framework
+            </span>
+          </motion.a>
 
-        <h1 className="mt-7 text-balance text-4xl font-medium leading-[1.05] tracking-normal sm:text-6xl lg:text-7xl">
+        <h1 className="mt-0 text-balance text-4xl font-medium leading-[1.05] tracking-normal sm:text-6xl lg:text-6xl">
           The RAG framework for <span className="text-primary">grounded</span> AI
           in production
         </h1>
 
         <p className="mt-6 max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Brew connects any model to any source. Ingest, embed, retrieve, and
-          rerank with a single typed pipeline — fully observable, framework
-          agnostic, and open source.
+          Larkup RAG makes it easy to create fully functional RAG applications from ingestion to deployment. Connect any model to any source with a single typed pipeline ,fully observable, framework agnostic, and open source.
         </p>
 
         <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
-          <Button asChild size="lg" className="w-full transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:w-auto">
+          <Button asChild size="lg" className="w-full transition-all duration-300 hover:-translate-y-0.5 rounded-none sm:w-auto">
             <Link href="/contact">
-              Start brewing
+              Get Started
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
-          <button
-            type="button"
+          <Button
+            variant={"outline"}
+            size={"lg"}
             onClick={copyCmd}
-            className="group flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5 font-mono text-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg sm:w-auto"
+            className="group cursor-pointer flex w-full rounded-none items-center justify-center gap-3 border border-border bg-card/80 hover:bg-card px-4 py-2.5 font-mono text-sm transition-all duration-300 hover:-translate-y-0.5   sm:w-auto"
           >
-            <span className="text-muted-foreground">$</span>
-            <span className="text-foreground">npm i @brew/core</span>
-            {copied ? (
-              <Check className="h-4 w-4 text-primary" />
-            ) : (
-              <Copy className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
-            )}
-          </button>
+           View Documentation
+          </Button>
         </div>
 
-        <div className="mt-7 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Star className="h-4 w-4 fill-primary text-primary" />
-          <span className="font-medium text-foreground">14.2k</span> stars on
-          GitHub — MIT licensed
-        </div>
+       
       </div>
     </section>
   )

@@ -2,70 +2,97 @@
 
 import { useState } from "react"
 import { Plus } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 
 const FAQS = [
   {
-    q: "What is Brew, exactly?",
-    a: "Brew is an open-source RAG framework. It gives you a typed, composable pipeline to ingest data, embed it, store it in any vector database, and retrieve grounded context for your LLM — without stitching together a dozen libraries yourself.",
+    q: "What is Larkup RAG?",
+    a: "Larkup RAG is an open-source framework for building production-grade Retrieval-Augmented Generation applications. It provides a fully typed, composable pipeline covering everything from data ingestion and chunking to embedding, vector storage, retrieval, and deployment — without stitching together a dozen libraries yourself.",
   },
   {
-    q: "Which models and vector stores are supported?",
-    a: "Any of them. Brew ships first-class adapters for OpenAI, Anthropic, Mistral, Cohere and local models, plus Pinecone, Weaviate, pgvector, and more. Swapping a provider is a one-line change.",
+    q: "Can I build a custom agentic RAG app with it?",
+    a: "Absolutely. Larkup's pipeline is modular and framework-agnostic. You can compose retrieval steps with any agent loop — LangChain, custom tool-calling agents, or plain async Node. Each stage (ingest → chunk → embed → retrieve) is individually swappable so you can plug it into any agentic workflow.",
   },
   {
-    q: "Do I have to self-host?",
-    a: "No. Brew runs anywhere Node runs — your laptop, a serverless function, or your own cluster. Self-hosting is fully supported for teams with strict data-residency requirements, but it is never required.",
+    q: "Which LLM providers and vector stores are supported?",
+    a: "Larkup ships first-class adapters for OpenAI, Anthropic, Mistral, Cohere, and local models via Ollama. For vector stores, it supports Pinecone, Weaviate, pgvector, LanceDB, and more. Swapping a provider is a one-line config change.",
   },
   {
-    q: "How is Brew different from a vector database?",
-    a: "A vector database only stores and searches embeddings. Brew orchestrates the entire retrieval lifecycle around it: ingestion, chunking, embedding, hybrid search, reranking, and observability — with the vector store as one pluggable piece.",
+    q: "How does the data ingestion pipeline work?",
+    a: "You can feed data in three ways: paste text directly, upload files (PDF, Markdown, JSON), or scrape the web via Firecrawl ETL. Larkup then chunks your corpus, generates embeddings, and stores them in your chosen vector store — all orchestrated through a single typed pipeline.",
   },
   {
-    q: "Is it really free and open source?",
-    a: "Yes. The core framework is MIT licensed and free forever. We offer optional enterprise support, managed hosting, and SSO for teams that want them, but the framework itself has no paywall.",
+    q: "How do I deploy the generated RAG server?",
+    a: "Running `larkup generate` emits a standalone, dependency-light Node ESM server tailored exactly to your config — only the packages you actually use are bundled. It ships with a Dockerfile, docker-compose.yml, and vercel.json so you can deploy to any platform in minutes.",
   },
   {
-    q: "How do I get started?",
-    a: "Run npm i @brew/core, point Brew at a data source, and call query(). Most teams have a working retrieval pipeline in under ten minutes by following the quick-start guide in the docs.",
+    q: "Is Larkup RAG free and open source?",
+    a: "Yes. The core framework is MIT-licensed and free forever. Optional enterprise support, managed hosting, and SSO are available for teams that need them, but the framework itself has no paywall and no feature limits.",
+  },
+  {
+    q: "How quickly can I get a working RAG pipeline?",
+    a: "Most developers have a working retrieval pipeline in under ten minutes. Run `npm i larkup`, point it at a data source, configure your model and vector store, and call `query()`. The Web UI and CLI both guide you through the five stages step by step.",
   },
 ]
 
-function FaqItem({ q, a }: { q: string; a: string }) {
+function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
   const [open, setOpen] = useState(false)
+
   return (
-    <div className="bg-card transition-colors hover:bg-secondary/30">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4, delay: index * 0.06, ease: "easeOut" }}
+      className="bg-card transition-colors hover:bg-secondary"
+    >
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-6 px-6 py-5 text-left"
       >
         <span className="text-base font-medium text-foreground">{q}</span>
-        <Plus
-          className={`h-5 w-5 shrink-0 text-primary transition-transform duration-300 ${
-            open ? "rotate-45" : ""
-          }`}
-        />
+        <motion.div
+          animate={{ rotate: open ? 45 : 0 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+          className="shrink-0"
+        >
+          <Plus className="h-5 w-5 text-primary" />
+        </motion.div>
       </button>
-      <div
-        className={`grid transition-all duration-300 ease-out ${
-          open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-        }`}
-      >
-        <div className="overflow-hidden">
-          <p className="px-6 pb-5 text-sm leading-relaxed text-muted-foreground">
-            {a}
-          </p>
-        </div>
-      </div>
-    </div>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="answer"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            <p className="px-6 pb-5 text-sm leading-relaxed text-muted-foreground">
+              {a}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 }
 
 export function FaqSection() {
   return (
     <section id="faq" className="py-20 sm:py-28">
-      <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[minmax(0,360px)_1fr] lg:gap-16 lg:px-8">
-        <div className="lg:sticky lg:top-28 lg:self-start">
+      <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[minmax(0,340px)_1fr] lg:gap-16 lg:px-8">
+        {/* Left sticky header */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="lg:sticky lg:top-28 lg:self-start"
+        >
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
             FAQ
           </p>
@@ -73,18 +100,20 @@ export function FaqSection() {
             Frequently asked questions
           </h2>
           <p className="mt-4 text-pretty leading-relaxed text-muted-foreground">
-            Everything you need to know about Brew. Can&apos;t find an answer?{" "}
-            <a href="#contact" className="text-primary hover:underline">
+            Everything you need to know about Larkup RAG. Can&apos;t find an
+            answer?{" "}
+            <a href="/contact" className="text-primary hover:underline">
               Talk to our team
             </a>
             .
           </p>
-        </div>
+        </motion.div>
 
+        {/* Right FAQ list */}
         <div className="overflow-hidden rounded-2xl border border-border bg-border">
           <div className="flex flex-col gap-px">
-            {FAQS.map((f) => (
-              <FaqItem key={f.q} q={f.q} a={f.a} />
+            {FAQS.map((f, i) => (
+              <FaqItem key={f.q} q={f.q} a={f.a} index={i} />
             ))}
           </div>
         </div>

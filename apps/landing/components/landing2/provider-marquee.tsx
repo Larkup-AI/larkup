@@ -35,14 +35,14 @@ export function ProviderMarquee() {
   const row = [...providers, ...providers]
 
   return (
-    <section id="providers" className="border-y border-border bg-card/30">
+    <section id="providers" className="border-y border-border bg-card/10">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <p className="text-center text-xs font-medium uppercase tracking-[0.25em] text-muted-foreground">
           Plug into every model &amp; vector store
         </p>
       </div>
 
-      <div className="marquee-pause group relative overflow-hidden border-t border-border [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]">
+      <div className="marquee-pause group relative overflow-hidden border-t border-bordermask-[linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]">
         <div className="animate-marquee flex w-max">
           {row.map((p, i) => {
             return (

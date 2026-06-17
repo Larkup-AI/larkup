@@ -182,7 +182,7 @@ export function FeatureTabs() {
             />
             
             {/* Animated content container based on active tab */}
-            <div key={active} className="relative z-[1] flex flex-1 flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 fill-mode-both">
+            <div key={active} className="relative z-1 flex flex-1 flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 fill-mode-both">
               <div className="flex items-center gap-2.5 border-b border-border px-6 py-4 bg-background/50 backdrop-blur-sm">
                 <span className="flex h-2 w-2 rounded-full bg-primary" />
                 <span className="text-sm font-medium text-foreground">
