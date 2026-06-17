@@ -72,8 +72,8 @@ export function BentoGrid() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
           eyebrow="Everything in the box"
-          title="A complete retrieval engine not just a wrapper"
-          description="Brew ships the primitives you actually need to take RAG from prototype to production — typed, composable, and observable end to end."
+          title="A complete retrieval engine, not just a wrapper"
+          description="Larkup RAG ships the primitives you actually need to take RAG from prototype to production — typed, composable, and observable end to end."
         />
 
         {/* Outer frame — gap-px over a border-colored backdrop creates seamless stitched borders */}
@@ -100,7 +100,7 @@ export function BentoGrid() {
                 </div>
                 <pre className="overflow-x-auto p-4 font-mono text-[12.5px] leading-relaxed">
                   <code>
-                    <span className="text-primary">const</span> brew ={" "}
+                    <span className="text-primary">const</span> pipeline ={" "}
                     <span className="text-primary">createPipeline</span>({"{"}
                     {"\n"} {"  "}embed: openai(
                     <span className="text-foreground/70">
@@ -108,15 +108,12 @@ export function BentoGrid() {
                     </span>
                     ),
                     {"\n"} {"  "}store: pgvector(db),
-                    {"\n"} {"  "}rerank: cohere(
-                    <span className="text-foreground/70">
-                      &quot;rerank-v3&quot;
-                    </span>
-                    ),
+                    {"\n"} {"  "}indexType: 
+                    <span className="text-foreground/70">&quot;hybrid&quot;</span>,
                     {"\n"}
                     {"}"})
                     {"\n\n"}
-                    <span className="text-primary">await</span> brew.query(question)
+                    <span className="text-primary">await</span> pipeline.query(question)
                   </code>
                 </pre>
               </div>
@@ -145,29 +142,28 @@ export function BentoGrid() {
             {/* Connectors */}
             <Cell>
               <Plug className="h-5 w-5 text-primary" />
-              <h3 className="mt-3 font-semibold">40+ connectors</h3>
+              <h3 className="mt-3 font-semibold">10+ vector stores</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                S3, Notion, Postgres, GitHub, Drive and more — incremental sync
-                out of the box.
+                Pinecone, pgvector, Qdrant, LanceDB, Weaviate, Chroma and more — swap with one line.
               </p>
             </Cell>
 
-            {/* Versioned indexes */}
+            {/* Deploy */}
             <Cell>
               <GitBranch className="h-5 w-5 text-primary" />
-              <h3 className="mt-3 font-semibold">Versioned indexes</h3>
+              <h3 className="mt-3 font-semibold">Deploy anywhere</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                Branch, diff, and roll back your knowledge base like code.
+                Ship a standalone Node server from the CLI — includes Dockerfile, docker-compose, and vercel.json.
               </p>
             </Cell>
 
-            {/* Security */}
+            {/* Open source */}
             <Cell glow={GLOW.rose}>
               <Lock className="h-5 w-5 text-primary" />
-              <h3 className="mt-3 font-semibold">Private by default</h3>
+              <h3 className="mt-3 font-semibold">MIT Licensed</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                Row-level access control and PII redaction on ingest. Self-host
-                anywhere.
+                Fully open source, self-host on your own infra. No paywalls, no
+                feature limits.
               </p>
             </Cell>
           </div>

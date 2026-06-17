@@ -25,7 +25,7 @@ export function CtaSection() {
           <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
             Whether you&apos;re wiring up a custom knowledge-base bot, an
             agentic research assistant, or a fully observable production
-            pipeline — Larkup gets you there, fast.
+            pipeline — Larkup RAG gets you there, fast.
           </p>
 
           {/* CTA button */}

@@ -261,13 +261,10 @@
 /* Mesh Gradient Background — noise on ::after for isolated opacity control */
 .bg-mesh-light {
   position: relative; /* needed for ::after to position correctly */
-  background-color: #F2EDE8;
+  /* background-color: #F2EDE8; */
   background-image:
-    /* warm amber pool top-left */
     radial-gradient(ellipse 55% 45% at 8% 4%, color-mix(in oklch, var(--primary) 12%, transparent), transparent 70%),
-    /* muted rose hint bottom-right */
     radial-gradient(ellipse 45% 40% at 94% 92%, color-mix(in oklch, oklch(0.62 0.08 30) 7%, transparent), transparent 65%),
-    /* diffuse center wash */
     radial-gradient(ellipse 70% 55% at 50% 50%, color-mix(in oklch, var(--primary) 3%, transparent), transparent 80%);
 }
 

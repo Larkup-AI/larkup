@@ -75,7 +75,7 @@ export function SiteNavbar() {
             ))}
             <Button asChild size="lg" className="mt-0">
               <Link href="/contact" onClick={() => setOpen(false)}>
-                Start brewing
+                Get started
               </Link>
             </Button>
           </div>

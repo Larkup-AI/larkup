@@ -11,19 +11,19 @@ const FAQS = [
   },
   {
     q: "Can I build a custom agentic RAG app with it?",
-    a: "Absolutely. Larkup's pipeline is modular and framework-agnostic. You can compose retrieval steps with any agent loop — LangChain, custom tool-calling agents, or plain async Node. Each stage (ingest → chunk → embed → retrieve) is individually swappable so you can plug it into any agentic workflow.",
+    a: "Absolutely. Larkup RAG's pipeline is modular and framework-agnostic. You can compose retrieval steps with any agent loop — LangChain, custom tool-calling agents, or plain async Node. Each stage (ingest → chunk → embed → retrieve) is individually swappable so you can plug it into any agentic workflow.",
   },
   {
     q: "Which LLM providers and vector stores are supported?",
-    a: "Larkup ships first-class adapters for OpenAI, Anthropic, Mistral, Cohere, and local models via Ollama. For vector stores, it supports Pinecone, Weaviate, pgvector, LanceDB, and more. Swapping a provider is a one-line config change.",
+    a: "Larkup RAG ships first-class adapters for OpenAI, Anthropic, Mistral, Cohere, Gemini, and local models via Ollama. For vector stores, it supports Pinecone, Weaviate, pgvector, Qdrant, LanceDB, Chroma, and Supabase. Swapping a provider is a one-line config change.",
   },
   {
     q: "How does the data ingestion pipeline work?",
-    a: "You can feed data in three ways: paste text directly, upload files (PDF, Markdown, JSON), or scrape the web via Firecrawl ETL. Larkup then chunks your corpus, generates embeddings, and stores them in your chosen vector store — all orchestrated through a single typed pipeline.",
+    a: "You can feed data in three ways: paste text directly, upload files (PDF, Markdown, CSV, JSON), or configure a web source. Larkup RAG then chunks your corpus, generates embeddings, and stores them in your chosen vector store — all orchestrated through a single typed pipeline with real-time progress.",
   },
   {
     q: "How do I deploy the generated RAG server?",
-    a: "Running `larkup generate` emits a standalone, dependency-light Node ESM server tailored exactly to your config — only the packages you actually use are bundled. It ships with a Dockerfile, docker-compose.yml, and vercel.json so you can deploy to any platform in minutes.",
+    a: "Configure your pipeline in the Web UI, run indexing, then deploy the generated standalone Node ESM server. It ships with a Dockerfile and vercel.json so you can go live on any platform in minutes — only the packages you actually use are bundled.",
   },
   {
     q: "Is Larkup RAG free and open source?",
@@ -31,7 +31,7 @@ const FAQS = [
   },
   {
     q: "How quickly can I get a working RAG pipeline?",
-    a: "Most developers have a working retrieval pipeline in under ten minutes. Run `npm i larkup`, point it at a data source, configure your model and vector store, and call `query()`. The Web UI and CLI both guide you through the five stages step by step.",
+    a: "Most developers have a working retrieval pipeline in under ten minutes. Install Larkup RAG, point it at a data source, configure your embedding model and vector store through the Web UI, run indexing, and start querying. The step-by-step UI guides you through each stage.",
   },
 ]
 
@@ -44,7 +44,7 @@ function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.4, delay: index * 0.06, ease: "easeOut" }}
-      className="bg-card transition-colors hover:bg-secondary"
+      className="bg-card transition-colors cursor-pointer! hover:bg-[#F6F6F6] dark:bg-secondary/10"
     >
       <button
         onClick={() => setOpen((v) => !v)}

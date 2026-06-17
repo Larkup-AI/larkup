@@ -1,5 +1,5 @@
 import { Code2, Send } from "lucide-react"
-import { BrewMark } from "@/components/landing2/brew-mark"
+import Image from "next/image"
 
 const groups = [
   {
@@ -23,8 +23,8 @@ export function SiteFooter() {
         <div className="grid gap-10 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
           <div>
             <a href="#" className="flex items-center gap-2.5">
-              <BrewMark className="h-7 w-7 text-primary" />
-              <span className="text-lg font-semibold tracking-tight">Brew</span>
+              <Image src="/logos/logo7.png" alt="Larkup RAG Logo" width={28} height={28} className="h-7 w-auto object-contain dark:invert" />
+              <span className="text-lg font-semibold tracking-tight">Larkup-RAG</span>
             </a>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
               The open-source RAG framework for grounded, production-grade AI
@@ -68,7 +68,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border/60 pt-8 text-sm text-muted-foreground sm:flex-row">
-          <p>© {new Date().getFullYear()} Brew Labs, Inc. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} BuddyHere AI. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <a href="#" className="transition-colors hover:text-foreground">
               Privacy

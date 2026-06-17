@@ -1,8 +1,8 @@
 const stats = [
-  { value: "14.2k", label: "GitHub stars" },
-  { value: "40+", label: "Source connectors" },
-  { value: "8M+", label: "Monthly queries served" },
-  { value: "99.98%", label: "Index uptime" },
+  { value: "10+", label: "Vector store adapters" },
+  { value: "8+", label: "Embedding providers" },
+  { value: "42ms", label: "Median retrieval latency" },
+  { value: "MIT", label: "Open source license" },
 ]
 
 export function StatsBand() {
