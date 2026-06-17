@@ -62,7 +62,7 @@
   --paper-noise-dark:  url("/noise7.jpg");  /* ← dark mode texture */
 
   /* ── Noise opacity — THE single knob to control texture strength ── */
-  --noise-opacity-light: 0.23;   /* light mode: 0 = invisible, 1 = full */
+  --noise-opacity-light: 0.21;   /* light mode: 0 = invisible, 1 = full */
   --noise-opacity-dark:  0.20;   /* dark mode:  higher needed on dark bg  */
 }
 

@@ -16,15 +16,15 @@ export function Hero() {
 
   return (
     <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
-      {/* Vercel-style modern lines and pluses */}
-      <div className="absolute inset-x-0 top-0 bottom-0 flex justify-center pointer-events-none">
+      {/* Vercel-style modern lines and pluses — vertical lines start at first horizontal, not at top */}
+      <div className="absolute inset-x-0 top-28 bottom-0 flex justify-center pointer-events-none">
         <div className="relative w-full max-w-5xl border-x border-border/30">
           {/* Horizontal lines */}
-          <div className="absolute top-28 -left-[100vw] w-[300vw] h-px bg-border/30" />
-          <div className="absolute bottom-16 -left-[100vw] w-[300vw] h-px bg-border/30" />
-          
+          <div className="absolute top-0 left-[-100vw] w-[300vw] h-px bg-border/30" />
+          <div className="absolute bottom-16 left-[-100vw] w-[300vw] h-px bg-border/30" />
+
           {/* Plus icon at top-left intersection */}
-          <Plus className="absolute top-28 left-0 w-8 h-8 text-muted-foreground/50 -translate-x-1/2 -translate-y-1/2" strokeWidth={1} />
+          <Plus className="absolute top-0 left-0 w-8 h-8 text-muted-foreground/50 -translate-x-1/2 -translate-y-1/2" strokeWidth={1} />
         </div>
       </div>
 
