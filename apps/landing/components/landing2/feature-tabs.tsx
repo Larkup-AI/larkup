@@ -137,9 +137,9 @@ export function FeatureTabs() {
           </p>
         </div>
 
-        <div className="mt-14 flex flex-col gap-10">
-          {/* Top: Horizontal tab list */}
-          <div className="mx-auto flex flex-wrap justify-center gap-2.5">
+        <div className="mt-14 flex flex-col lg:flex-row rounded border border-border/50 bg-card/50 overflow-hidden  mx-auto max-w-6xl">
+          {/* Left: Vertical tab list */}
+          <div className="flex flex-col w-full lg:w-[340px] shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-secondary/10">
             {TABS.map((t) => {
               const isActive = t.id === active
               const Icon = t.icon
@@ -147,91 +147,98 @@ export function FeatureTabs() {
                 <button
                   key={t.id}
                   onClick={() => setActive(t.id)}
-                  className={`group relative flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-300 ${
+                  className={`group relative flex flex-col items-start p-6 text-left transition-all duration-300 border-l-2 border-b border-b-border/40 last:border-b-0 ${
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-md scale-105"
-                      : "bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                      ? "border-l-primary bg-primary/5"
+                      : "border-l-transparent hover:bg-secondary/40"
                   }`}
                 >
-                  <Icon className={`h-4 w-4 transition-colors ${isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"}`} />
-                  {t.label}
+                  <div className="flex items-center gap-2.5">
+                    <Icon className={`h-4 w-4 transition-colors ${isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
+                    <span className={`font-semibold text-base ${isActive ? "text-foreground" : "text-foreground/80"}`}>{t.label}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2 text-balance leading-relaxed">
+                    {t.description}
+                  </p>
+                  {isActive && (
+                    <span className="mt-3 text-xs font-semibold text-primary inline-flex items-center gap-1.5 opacity-0 animate-in fade-in slide-in-from-left-1 duration-300 fill-mode-both">
+                      Learn more <ArrowRight className="h-3 w-3" />
+                    </span>
+                  )}
                 </button>
               )
             })}
           </div>
 
-          {/* Bottom: preview panel */}
-          <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-noise relative flex min-h-[420px] flex-col bg-card shadow-sm transition-all duration-500">
+          {/* Right: preview panel */}
+          <div className="flex-1 relative flex flex-col bg-noise bg-card min-h-[480px]">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 opacity-70"
+              className="pointer-events-none absolute inset-0 opacity-70 transition-opacity duration-500"
               style={{
                 backgroundImage:
                   "radial-gradient(100% 80% at 50% 0%, color-mix(in oklch, var(--primary) 12%, transparent), transparent 60%)",
               }}
             />
-            <div className="relative z-[1] flex items-center gap-2.5 border-b border-border px-6 py-4 bg-background/50 backdrop-blur-sm">
-              <span className="flex h-2 w-2 rounded-full bg-primary" />
-              <span className="text-sm font-medium text-foreground">
-                {tab.preview.title}
-              </span>
-            </div>
-
-            <div className="relative z-[1] flex flex-1 flex-col p-6 sm:p-10">
-              <div className="mb-8 max-w-2xl">
-                <h3 className="text-xl font-semibold text-foreground mb-2">{tab.label}</h3>
-                <p className="text-base text-muted-foreground leading-relaxed">
-                  {tab.description}
-                </p>
+            
+            {/* Animated content container based on active tab */}
+            <div key={active} className="relative z-[1] flex flex-1 flex-col animate-in fade-in slide-in-from-bottom-2 duration-500 fill-mode-both">
+              <div className="flex items-center gap-2.5 border-b border-border px-6 py-4 bg-background/50 backdrop-blur-sm">
+                <span className="flex h-2 w-2 rounded-full bg-primary" />
+                <span className="text-sm font-medium text-foreground">
+                  {tab.preview.title}
+                </span>
               </div>
 
-              <div className="grid gap-6 md:grid-cols-2 mt-auto">
-                <div className="overflow-hidden rounded-xl border border-border bg-background/60 backdrop-blur">
-                  {tab.preview.rows.map((row, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center border-b border-border last:border-b-0"
-                    >
-                      <div className="w-2/5 border-r border-border bg-secondary/30 px-5 py-3.5 text-sm text-muted-foreground">
-                        {row.label}
-                      </div>
-                      <div className="flex-1 px-5 py-3.5 text-sm font-medium text-foreground">
-                        {row.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="overflow-hidden rounded-xl border border-border bg-background/60 backdrop-blur">
-                  <div className="flex items-center gap-2 border-b border-border bg-secondary/30 px-4 py-3">
-                    <Search className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">
-                      {tab.preview.detail.title}
-                    </span>
-                  </div>
-                  <div className="divide-y divide-border">
-                    {tab.preview.detail.items.map((item, i) => (
-                      <div key={i} className="px-4 py-3">
-                        <p className="text-sm font-semibold text-foreground">
-                          {item.name}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {item.desc}
-                        </p>
+              <div className="flex flex-1 flex-col p-6 sm:p-10 justify-center">
+                <div className="grid gap-6 md:grid-cols-2 mt-auto">
+                  <div className="overflow-hidden rounded-xl border border-border bg-background/60 backdrop-blur">
+                    {tab.preview.rows.map((row, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center border-b border-border last:border-b-0"
+                      >
+                        <div className="w-2/5 border-r border-border bg-secondary/30 px-5 py-3.5 text-sm text-muted-foreground">
+                          {row.label}
+                        </div>
+                        <div className="flex-1 px-5 py-3.5 text-sm font-medium text-foreground">
+                          {row.value}
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              </div>
 
-              <div className="mt-8 flex justify-end">
-                <a
-                  href="#docs"
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-all hover:gap-2 hover:opacity-80"
-                >
-                  View documentation
-                  <ArrowRight className="h-4 w-4" />
-                </a>
+                  <div className="overflow-hidden rounded-xl border border-border bg-background/60 backdrop-blur">
+                    <div className="flex items-center gap-2 border-b border-border bg-secondary/30 px-4 py-3">
+                      <Search className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground">
+                        {tab.preview.detail.title}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {tab.preview.detail.items.map((item, i) => (
+                        <div key={i} className="px-4 py-3">
+                          <p className="text-sm font-semibold text-foreground">
+                            {item.name}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {item.desc}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 flex justify-end">
+                  <a
+                    href="#docs"
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-all hover:gap-2 hover:opacity-80"
+                  >
+                    View documentation
+                    <ArrowRight className="h-4 w-4" />
+                  </a>
+                </div>
               </div>
             </div>
           </div>
