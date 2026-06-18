@@ -82,7 +82,7 @@ export function CookieConsent() {
       {!showCustomize && (
         <div className="fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-sm animate-float-soft sm:w-96">
           <div className="bg-noise overflow-hidden rounded-2xl border border-border bg-background p-6 shadow-2xl">
-            <div className="relative z-[1]">
+            <div className="relative z-1">
               <h3 className="text-base font-semibold text-foreground">
                 We value your privacy
               </h3>
@@ -117,9 +117,9 @@ export function CookieConsent() {
 
       {/* Customize Modal */}
       {showCustomize && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm sm:p-6">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm sm:p-6">
           <div className="bg-noise relative w-full max-w-2xl overflow-hidden rounded-3xl border border-border bg-background p-6 shadow-2xl sm:p-8">
-            <div className="relative z-[1]">
+            <div className="relative z-1">
               <div className="mb-6">
                 <h2 className="text-2xl font-semibold text-foreground">Cookie Settings</h2>
                 <p className="mt-2 text-sm text-muted-foreground">

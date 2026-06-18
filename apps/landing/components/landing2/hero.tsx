@@ -69,7 +69,7 @@ export function Hero() {
             variant={"outline"}
             size={"lg"}
             onClick={copyCmd}
-            className="group cursor-pointer flex w-full rounded-none items-center justify-center gap-3 border border-border bg-card/80 hover:bg-card px-4 py-2.5 font-mono text-sm transition-all duration-300 hover:-translate-y-0.5   sm:w-auto"
+            className="group cursor-pointer flex w-full rounded-none items-center justify-center gap-3 border border-border bg-card/80 dark:bg-card! dark:hover:bg-black/80! hover:bg-card px-4 py-2.5 font-mono text-sm transition-all duration-300 hover:-translate-y-0.5   sm:w-auto"
           >
            View Documentation
           </Button>

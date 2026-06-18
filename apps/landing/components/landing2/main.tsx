@@ -11,7 +11,7 @@ import "./globals.css"
 
 export function LandingPage2() {
   return (
-    <div className="min-h-screen bg-transparent">
+    <div className="min-h-screen ">
       <SiteNavbar />
       <main className="relative z-1">
         <Hero />

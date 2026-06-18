@@ -58,12 +58,12 @@
      noise5.jpg  — rough stucco plaster, more textured > 0.21
   **/
 
-  --paper-noise-light: url("/noise2.png");  /* ← swap to try different texture */
-  --paper-noise-dark:  url("/noise7.jpg");  /* ← dark mode texture */
+  --paper-noise-light: url("/noise222.png");  /* ← swap to try different texture */
+  --paper-noise-dark:  url("/noise7.png");  /* ← dark mode texture */
 
   /* ── Noise opacity — THE single knob to control texture strength ── */
-  --noise-opacity-light: 0.21;   /* light mode: 0 = invisible, 1 = full */
-  --noise-opacity-dark:  0.20;   /* dark mode:  higher needed on dark bg  */
+  --noise-opacity-light: 0.79;   /* light mode: 0 = invisible, 1 = full */
+  --noise-opacity-dark:  0.90;   /* dark mode:  higher needed on dark bg  */
 }
 
 /* LIGHT THEME — warm caramel-cream + espresso ink + caramel accent */
