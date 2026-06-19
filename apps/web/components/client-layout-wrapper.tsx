@@ -13,26 +13,23 @@ export function ClientLayoutWrapper({
 }) {
   const { layout, pageStyle } = useThemeCustomizer();
 
-  const containerClasses = 
+  const containerClasses =
     pageStyle === "fused"
       ? "min-h-[calc(100vh-8rem)] text-foreground"
       : "min-h-[calc(100vh-8rem)] rounded-2xl border border-border bg-panel text-panel-foreground shadow-sm";
 
-  const sidebarContainerClasses = 
+  const sidebarContainerClasses =
     pageStyle === "fused"
       ? "min-h-[calc(100vh-1.5rem)] text-foreground"
       : "min-h-[calc(100vh-1.5rem)] rounded-2xl border border-border bg-panel text-panel-foreground shadow-sm";
 
-
   if (layout === "topnav") {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
+      <div className="flex min-h-screen flex-col ">
         <AppTopNav />
         <main className="flex-1 p-4 md:p-6 lg:p-8">
           <div className="mx-auto max-w-7xl">
-            <div className={containerClasses}>
-              {children}
-            </div>
+            <div className={containerClasses}>{children}</div>
           </div>
         </main>
       </div>
@@ -41,7 +38,7 @@ export function ClientLayoutWrapper({
 
   // Default Sidebar Layout
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen ">
       <AppSidebar />
       <main className="min-w-0 flex-1 p-3 pl-3 md:pl-0">
         <div className={sidebarContainerClasses}>
@@ -49,7 +46,6 @@ export function ClientLayoutWrapper({
           {children}
         </div>
       </main>
-      <ThemeSwitcher />
     </div>
   );
 }

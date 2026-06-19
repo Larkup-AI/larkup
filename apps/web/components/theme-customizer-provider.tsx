@@ -13,7 +13,12 @@ export type ThemeVariant =
   | "theme-sienna"
   | "theme-caramel";
 
-export type BackgroundVariant = "bg-default" | "bg-warm" | "bg-soft" | "bg-pure" | "bg-offwhite";
+export type BackgroundVariant =
+  | "bg-default"
+  | "bg-warm"
+  | "bg-soft"
+  | "bg-pure"
+  | "bg-offwhite";
 
 export type LayoutVariant = "sidebar" | "topnav" | "collapsed";
 
@@ -24,7 +29,6 @@ export type RadiusVariant =
   | "radius-lg";
 
 export type PageStyleVariant = "card" | "fused";
-
 
 interface ThemeCustomizerContextValue {
   theme: ThemeVariant;
@@ -40,9 +44,8 @@ interface ThemeCustomizerContextValue {
   isMounted: boolean;
 }
 
-const ThemeCustomizerContext = createContext<ThemeCustomizerContextValue | null>(
-  null,
-);
+const ThemeCustomizerContext =
+  createContext<ThemeCustomizerContextValue | null>(null);
 
 export function useThemeCustomizer() {
   const ctx = useContext(ThemeCustomizerContext);
@@ -60,7 +63,9 @@ export function ThemeCustomizerProvider({
   children: React.ReactNode;
 }) {
   const [isMounted, setIsMounted] = useState(false);
-  const [theme, setTheme] = useState<ThemeVariant>("theme-caramel");
+  // Theme is intentionally hard-locked to "default" (black primary).
+  // We do NOT load it from localStorage so stale colour themes never surface.
+  const [theme] = useState<ThemeVariant>("default");
   const [layout, setLayout] = useState<LayoutVariant>("topnav");
   const [radius, setRadius] = useState<RadiusVariant>("radius-default");
   const [background, setBackground] = useState<BackgroundVariant>("bg-soft");
@@ -68,13 +73,18 @@ export function ThemeCustomizerProvider({
 
   useEffect(() => {
     setIsMounted(true);
-    const savedTheme = localStorage.getItem("app-theme") as ThemeVariant;
+    // Clear any stale theme saved from a previous session
+    localStorage.removeItem("app-theme");
+
     const savedLayout = localStorage.getItem("app-layout") as LayoutVariant;
     const savedRadius = localStorage.getItem("app-radius") as RadiusVariant;
-    const savedBackground = localStorage.getItem("app-background") as BackgroundVariant;
-    const savedPageStyle = localStorage.getItem("app-pagestyle") as PageStyleVariant;
+    const savedBackground = localStorage.getItem(
+      "app-background",
+    ) as BackgroundVariant;
+    const savedPageStyle = localStorage.getItem(
+      "app-pagestyle",
+    ) as PageStyleVariant;
 
-    if (savedTheme) setTheme(savedTheme);
     if (savedLayout) setLayout(savedLayout);
     if (savedRadius) setRadius(savedRadius);
     if (savedBackground) setBackground(savedBackground);
@@ -83,7 +93,7 @@ export function ThemeCustomizerProvider({
 
   useEffect(() => {
     if (!isMounted) return;
-    localStorage.setItem("app-theme", theme);
+    // Do NOT persist theme — it is always "default"
     localStorage.setItem("app-layout", layout);
     localStorage.setItem("app-radius", radius);
     localStorage.setItem("app-background", background);
@@ -91,10 +101,14 @@ export function ThemeCustomizerProvider({
 
     // Update body classes
     const body = document.body;
-    
+
     // Remove old classes
     body.classList.forEach((cls) => {
-      if (cls.startsWith("theme-") || cls.startsWith("radius-") || cls.startsWith("bg-")) {
+      if (
+        cls.startsWith("theme-") ||
+        cls.startsWith("radius-") ||
+        cls.startsWith("bg-")
+      ) {
         body.classList.remove(cls);
       }
     });
@@ -109,7 +123,7 @@ export function ThemeCustomizerProvider({
     <ThemeCustomizerContext.Provider
       value={{
         theme,
-        setTheme,
+        setTheme: () => {}, // theme is locked to "default"; setter is a no-op
         layout,
         setLayout,
         radius,

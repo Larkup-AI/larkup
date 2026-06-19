@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useThemeCustomizer } from "./theme-customizer-provider";
+import { ThemeSwitcher } from "./theme-switcher";
 
 // [#CDA1FE]
 const STAGE_ICONS: Record<StageId, LucideIcon> = {
@@ -39,26 +40,28 @@ export function AppSidebar() {
 
   return (
     <TooltipProvider delay={150}>
-      <aside className={cn(
-        "sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start bg-background py-3 md:flex",
-        pageStyle === "fused" ? "border-r border-border" : ""
-      )}>
+      <aside
+        className={cn(
+          "sticky top-0 hidden  h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start bg-background py-3 md:flex",
+          pageStyle === "fused" ? "border-r border-border" : "",
+        )}
+      >
         {/* Brand */}
         <Tooltip>
           <TooltipTrigger
             render={
               <Link
                 href="/configure"
-                aria-label="buddy-rag home"
+                aria-label="larkup-rag home"
                 className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
               />
             }
           >
             {/* <Boxes className="size-5" /> */}
-            <img src={"/logo2.png"} className="size-6.5" alt="logo" />
+            <img src={"/logo9.png"} className="size-6.5" alt="logo" />
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
-            Buddy RAG
+            Larkup RAG
           </TooltipContent>
         </Tooltip>
 
@@ -162,23 +165,7 @@ export function AppSidebar() {
         </nav>
 
         {/* Footer — dual-mode indicator */}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <div className="flex size-10 items-center justify-center rounded-xl border border-border bg-card text-primary shadow-sm" />
-            }
-          >
-            <Terminal className="size-4" />
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="max-w-56">
-            <div className="flex flex-col gap-0.5">
-              <span className="font-medium">Dual-mode</span>
-              <span className="text-[11px] leading-snug opacity-80">
-                Web UI + CLI, powered by the shared core/ library.
-              </span>
-            </div>
-          </TooltipContent>
-        </Tooltip>
+        <ThemeSwitcher floating={false} />
       </aside>
     </TooltipProvider>
   );

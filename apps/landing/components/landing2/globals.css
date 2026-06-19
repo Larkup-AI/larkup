@@ -159,7 +159,7 @@
     background-image: var(--paper-noise-light);
     background-size: 512px 512px;
     background-repeat: repeat;
-    opacity: var(--noise-opacity-light); /* ← controlled by --noise-opacity-light */
+    opacity: var(--noise-opacity-light); 
     mix-blend-mode: overlay;
   }
 

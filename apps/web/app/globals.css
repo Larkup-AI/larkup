@@ -85,6 +85,13 @@
   --chart-3: oklch(0.68 0.15 145);
   --chart-4: oklch(0.7 0.16 60);
   --chart-5: oklch(0.62 0.2 25);
+
+  --paper-noise-light: url("/noises/noise222.png"); /* ← swap file to change texture */
+  --paper-noise-dark: url("/noises/noise7.png"); /* ← dark-mode texture */
+
+  /* ── Noise opacity — single knob per mode ── */
+  --noise-opacity-light: 0.79; /* 0 = invisible → 1 = full strength */
+  --noise-opacity-dark: 0.9; /* higher opacity needed on dark backgrounds */
 }
 
 .dark {
@@ -96,8 +103,8 @@
   --panel-foreground: oklch(0.96 0.005 85);
   --popover: #242220;
   --popover-foreground: oklch(0.96 0.005 85);
-  --primary: #ffffff;
-  --primary-foreground: #000000;
+  --primary: #000000;
+  --primary-foreground: #ffffff;
   --secondary: #33302c;
   --secondary-foreground: oklch(0.96 0.005 85);
   --muted: #33302c;
@@ -106,11 +113,11 @@
   --accent-foreground: oklch(0.96 0.005 85);
   --border: #3d3935;
   --input: #3d3935;
-  --ring: #ffffff;
+  --ring: #000000;
   --sidebar: #1a1918;
   --sidebar-foreground: oklch(0.7 0.01 40);
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #000000;
+  --sidebar-primary: #000000;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-border: #3d3935;
 }
 
@@ -120,9 +127,42 @@
   }
   body {
     @apply bg-background text-foreground;
+    position: relative;
   }
+
+  /* ── Full-viewport noise overlay — light mode ── */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: var(--paper-noise-light);
+    background-size: 512px 512px;
+    background-repeat: repeat;
+    opacity: var(--noise-opacity-light);
+    mix-blend-mode: overlay;
+  }
+
+  /* ── Dark mode: swap texture + blend mode ── */
+  .dark body::before {
+    content: "";
+    display: block;
+    background-image: var(--paper-noise-dark);
+    background-size: 512px 512px;
+    background-repeat: repeat;
+    opacity: var(--noise-opacity-dark);
+    mix-blend-mode: screen;
+  }
+
   html {
     @apply font-sans;
+  }
+
+  /* Ensure content sits above the grain layer */
+  body > * {
+    position: relative;
+    z-index: 1;
   }
 }
 
@@ -151,4 +191,55 @@
   [data-slot="select-content"]::-webkit-scrollbar-thumb:hover {
     background-color: color-mix(in oklch, var(--foreground) 65%, transparent);
   }
+}
+
+/* ── Mesh gradient + noise utility (same as landing) ── */
+
+/* Apply on the layout root div to get the mesh gradient backdrop */
+.bg-mesh-light {
+  position: relative;
+  background-image:
+    radial-gradient(
+      ellipse 55% 45% at 8% 4%,
+      color-mix(in oklch, var(--primary) 6%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 45% 40% at 94% 92%,
+      color-mix(in oklch, oklch(0.62 0.08 30) 5%, transparent),
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 70% 55% at 50% 50%,
+      color-mix(in oklch, var(--primary) 2%, transparent),
+      transparent 80%
+    );
+}
+
+/* Noise sits on its own pseudo-layer with its own opacity */
+.bg-mesh-light::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: var(--paper-noise-light);
+  background-size: 512px 512px;
+  background-repeat: repeat;
+  opacity: var(--noise-opacity-light);
+  mix-blend-mode: overlay;
+}
+
+.dark .bg-mesh-light {
+  background-image: radial-gradient(
+    circle at 20% 0%,
+    color-mix(in oklch, var(--primary) 8%, transparent),
+    transparent 40%
+  );
+}
+
+.dark .bg-mesh-light::after {
+  background-image: var(--paper-noise-dark);
+  opacity: var(--noise-opacity-dark);
+  mix-blend-mode: screen;
 }

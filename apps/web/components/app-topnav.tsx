@@ -45,10 +45,10 @@ export function AppTopNav() {
           aria-label="buddy-rag home"
           className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
         >
-          <img src={"/logo2.png"} className="size-5" alt="logo" />
+          <img src={"/logo9.png"} className="size-5" alt="logo" />
         </Link>
         <span className="font-semibold tracking-tight hidden sm:inline-block">
-          Buddy RAG
+          Larkup RAG
         </span>
 
         {/* Pipeline rail */}
@@ -66,10 +66,10 @@ export function AppTopNav() {
                   className={cn(
                     "flex size-9 items-center justify-center rounded-lg transition-colors",
                     active
-                      ? "bg-primary/10 text-primary"
+                      ? "text-primary"
                       : locked
                         ? "text-muted-foreground/50"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        : "text-muted-foreground group-hover:text-foreground",
                   )}
                 >
                   <Icon
@@ -89,7 +89,7 @@ export function AppTopNav() {
                       ? "font-semibold text-primary"
                       : locked
                         ? "text-muted-foreground/50"
-                        : "text-muted-foreground",
+                        : "text-muted-foreground group-hover:text-foreground",
                   )}
                 >
                   {index + 1}. {stage.label}
@@ -111,13 +111,16 @@ export function AppTopNav() {
                     locked ? (
                       <div
                         aria-disabled
-                        className="group relative flex cursor-not-allowed items-center gap-2 h-16 px-1"
+                        className="group relative flex cursor-not-allowed items-center gap-2 h-16 px-3 rounded-md transition-colors"
                       />
                     ) : (
                       <Link
                         href={stage.href}
                         aria-current={active ? "page" : undefined}
-                        className="group relative flex items-center gap-2 h-16 px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className={cn(
+                          "group relative flex items-center gap-2 h-16 px-3 rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          active ? "bg-primary/8" : "hover:bg-muted/70",
+                        )}
                       />
                     )
                   }
@@ -159,7 +162,7 @@ export function AppTopNav() {
               <span className="font-medium text-foreground">{username}</span>
             </span>
           )}
-          <ThemeSwitcher floating={false} />
+          <ThemeSwitcher floating={false} />{" "}
         </div>
       </header>
     </TooltipProvider>

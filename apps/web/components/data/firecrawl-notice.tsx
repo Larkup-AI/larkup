@@ -161,7 +161,7 @@ export function FirecrawlNotice({
         )}
 
         {state?.lastError && !running && (
-          <div className="flex items-start gap-2 max-h-[200px]! overflow-auto rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <div className="flex items-start mb-3 gap-2 max-h-[200px]! overflow-auto rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
             <span>{state.lastError}</span>
           </div>
