@@ -6,7 +6,8 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "rag": "pnpm --filter @larkup-rag/cli rag"
+    "rag": "pnpm --filter @larkup-rag/cli rag",
+    "test:publish": "pnpm build && pnpm publish -r --dry-run --no-git-checks"
   },
   "devDependencies": {
     "@turbo/gen": "^2.9.16",
