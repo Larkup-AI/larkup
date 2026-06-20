@@ -24,13 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import { useWorkspace } from "@/components/workspace/workspace-provider";
 import { cn } from "@/lib/utils";
 
@@ -132,44 +126,7 @@ export function DemoWorkspace() {
 
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
-      {servers.length > 1 && (
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Server className="size-4" />
-            Query server
-          </span>
-          <Select
-            value={serverId ?? ""}
-            onValueChange={(v) => setServerId((v as string) || null)}
-          >
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Select a server">
-                {(value: string) =>
-                  servers.find((s) => s.id === value)?.name ?? "Select a server"
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {servers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  <span className="flex items-center gap-2">
-                    <span className="truncate">{s.name}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {s.docCount} docs{s.indexed ? " · indexed" : ""}
-                      {s.running ? " · live" : ""}
-                    </span>
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {serverId && activeServer && serverId !== activeServer.id && (
-            <Badge variant="secondary" className="text-xs">
-              previewing another server
-            </Badge>
-          )}
-        </div>
-      )}
+
 
       <SourceSummary server={server} config={config} />
 

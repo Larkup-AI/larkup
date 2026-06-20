@@ -32,6 +32,17 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -166,8 +177,8 @@ export function IndexWorkspace() {
           <AlertDescription className="text-muted-foreground space-y-1">
             <p>
               Once indexing begins, two settings become{" "}
-              <span className="font-medium text-foreground">locked</span> to
-              the existing index:
+              <span className="font-medium text-foreground">locked</span> to the
+              existing index:
             </p>
             <ul className="list-disc pl-4 space-y-0.5">
               <li>
@@ -177,8 +188,9 @@ export function IndexWorkspace() {
                 — you can swap to any model with the{" "}
                 <span className="font-medium text-foreground">
                   same vector dimensions
-                </span>, but switching to a model with different dimensions
-                will require a full re-index.
+                </span>
+                , but switching to a model with different dimensions will
+                require a full re-index.
               </li>
               <li>
                 <span className="font-medium text-foreground">
@@ -224,15 +236,37 @@ export function IndexWorkspace() {
           </Button>
         )}
         {run?.status === "completed" && (
-          <Button
-            onClick={() => build(false)}
-            disabled={!ready || running || starting}
-            size="lg"
-            variant="outline"
-          >
-            <RotateCcw className="size-4 mr-2" />
-            Re-Index
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger
+              render={
+                <Button
+                  disabled={!ready || running || starting}
+                  size="lg"
+                  variant="outline"
+                >
+                  <RotateCcw className="size-4 mr-2" />
+                  Re-Index
+                </Button>
+              }
+            />
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Are you sure you want to re-index?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will rebuild the entire index from scratch. All documents
+                  will be re-processed.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => build(false)}>
+                  Continue
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
       </div>
     </div>
@@ -334,7 +368,8 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
           <Hash className="mb-1 size-6 text-muted-foreground/60" />
           <p className="text-sm font-medium">No index built yet</p>
           <p className="text-sm text-muted-foreground">
-            Build a Larkup-RAG index to embed your corpus and make it searchable.
+            Build a Larkup-RAG index to embed your corpus and make it
+            searchable.
           </p>
         </CardContent>
       </Card>
