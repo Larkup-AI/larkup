@@ -255,6 +255,9 @@ importers:
         specifier: ^7.2.0
         version: 7.2.0
     devDependencies:
+      '@larkup-rag/core':
+        specifier: workspace:*
+        version: link:../core
       typescript:
         specifier: 5.7.3
         version: 5.7.3

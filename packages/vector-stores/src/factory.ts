@@ -1,5 +1,5 @@
-import type { RagConfig } from "@larkup-rag/core/types"
-import type { VectorStoreAdapter } from "./adapter"
+import type { RagConfig } from "@larkup-rag/core/types";
+import type { VectorStoreAdapter } from "./adapters/base";
 
 /**
  * Build the right adapter from the persisted config. Centralizing this keeps
@@ -16,9 +16,7 @@ export async function createAdapter(
 ): Promise<VectorStoreAdapter> {
   switch (config.vectorStore) {
     case "pinecone": {
-      const { PineconeAdapter } = await import(
-        "./pinecone-adapter"
-      )
+      const { PineconeAdapter } = await import("./adapters/pinecone");
       return new PineconeAdapter({
         apiKey: config.storeConfig.apiKey,
         indexName: config.storeConfig.indexName,
@@ -26,20 +24,18 @@ export async function createAdapter(
         sparseModel: config.storeConfig.sparseModel,
         indexType: config.indexType,
         onRateLimit,
-      })
+      });
     }
     case "lancedb":
     default: {
-      const { LanceDBAdapter } = await import(
-        "./lancedb-adapter"
-      )
+      const { LanceDBAdapter } = await import("./adapters/lancedb");
       return new LanceDBAdapter({
         mode: config.storeConfig.mode,
         dbPath: config.storeConfig.dbPath,
         uri: config.storeConfig.uri,
         apiKey: config.storeConfig.apiKey,
         tableName: config.storeConfig.tableName,
-      })
+      });
     }
   }
 }
