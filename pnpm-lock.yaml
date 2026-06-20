@@ -251,9 +251,6 @@ importers:
       '@lancedb/lancedb':
         specifier: ^0.30.0
         version: 0.30.0(apache-arrow@18.1.0)
-      '@larkup-rag/core':
-        specifier: workspace:*
-        version: link:../core
       '@pinecone-database/pinecone':
         specifier: ^7.2.0
         version: 7.2.0
