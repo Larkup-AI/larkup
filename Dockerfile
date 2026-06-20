@@ -25,7 +25,7 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 WORKDIR /app
 RUN corepack enable pnpm
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app /app
 COPY . .
 
 # Next.js collects completely anonymous telemetry data about general usage.
