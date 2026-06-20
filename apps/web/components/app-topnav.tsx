@@ -38,7 +38,7 @@ export function AppTopNav() {
 
   return (
     <TooltipProvider delay={150}>
-      <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background px-4 md:px-6">
+      <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-white px-4 md:px-6">
         {/* Brand */}
         <Link
           href="/configure"
@@ -52,7 +52,7 @@ export function AppTopNav() {
         </span>
 
         {/* Pipeline rail */}
-        <nav className="flex flex-1 items-center gap-2 md:gap-4 ml-4">
+        <nav className="flex flex-1 h-full items-end pb-0 gap-2 md:gap-4 ml-4">
           {STAGES.map((stage, index) => {
             const Icon = STAGE_ICONS[stage.id];
             const active =
@@ -61,7 +61,7 @@ export function AppTopNav() {
             const locked = stage.phase > CURRENT_PHASE;
 
             const body = (
-              <>
+              <div className="flex items-center ">
                 <span
                   className={cn(
                     "flex size-9 items-center justify-center rounded-lg transition-colors",
@@ -98,10 +98,12 @@ export function AppTopNav() {
                 <span
                   className={cn(
                     "absolute bottom-0 left-0 h-0.5 w-full bg-primary transition-opacity",
-                    active ? "opacity-100" : "opacity-0",
+                    active
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100",
                   )}
                 />
-              </>
+              </div>
             );
 
             return (
@@ -111,15 +113,15 @@ export function AppTopNav() {
                     locked ? (
                       <div
                         aria-disabled
-                        className="group relative flex cursor-not-allowed items-center gap-2 h-16 px-3 rounded-md transition-colors"
+                        className="group relative flex cursor-not-allowed items-center gap-2 h-10 px-3 rounded-md transition-colors"
                       />
                     ) : (
                       <Link
                         href={stage.href}
                         aria-current={active ? "page" : undefined}
                         className={cn(
-                          "group relative flex items-center gap-2 h-16 px-3 rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          active ? "bg-primary/8" : "hover:bg-muted/70",
+                          "group relative flex items-center gap-2 h-10 px-3 rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          active ? "bg-muted/0" : "hover:bg-muted/30",
                         )}
                       />
                     )
