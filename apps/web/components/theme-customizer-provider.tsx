@@ -63,9 +63,8 @@ export function ThemeCustomizerProvider({
   children: React.ReactNode;
 }) {
   const [isMounted, setIsMounted] = useState(false);
-  // Theme is intentionally hard-locked to "default" (black primary).
-  // We do NOT load it from localStorage so stale colour themes never surface.
-  const [theme] = useState<ThemeVariant>("default");
+  // Default to "default" theme (black primary). User can switch themes freely.
+  const [theme, setThemeState] = useState<ThemeVariant>("default");
   const [layout, setLayout] = useState<LayoutVariant>("topnav");
   const [radius, setRadius] = useState<RadiusVariant>("radius-default");
   const [background, setBackground] = useState<BackgroundVariant>("bg-soft");
@@ -73,9 +72,8 @@ export function ThemeCustomizerProvider({
 
   useEffect(() => {
     setIsMounted(true);
-    // Clear any stale theme saved from a previous session
-    localStorage.removeItem("app-theme");
 
+    const savedTheme = localStorage.getItem("app-theme") as ThemeVariant;
     const savedLayout = localStorage.getItem("app-layout") as LayoutVariant;
     const savedRadius = localStorage.getItem("app-radius") as RadiusVariant;
     const savedBackground = localStorage.getItem(
@@ -85,6 +83,7 @@ export function ThemeCustomizerProvider({
       "app-pagestyle",
     ) as PageStyleVariant;
 
+    if (savedTheme) setThemeState(savedTheme);
     if (savedLayout) setLayout(savedLayout);
     if (savedRadius) setRadius(savedRadius);
     if (savedBackground) setBackground(savedBackground);
@@ -93,7 +92,7 @@ export function ThemeCustomizerProvider({
 
   useEffect(() => {
     if (!isMounted) return;
-    // Do NOT persist theme — it is always "default"
+    localStorage.setItem("app-theme", theme);
     localStorage.setItem("app-layout", layout);
     localStorage.setItem("app-radius", radius);
     localStorage.setItem("app-background", background);
@@ -123,7 +122,7 @@ export function ThemeCustomizerProvider({
     <ThemeCustomizerContext.Provider
       value={{
         theme,
-        setTheme: () => {}, // theme is locked to "default"; setter is a no-op
+        setTheme: setThemeState,
         layout,
         setLayout,
         radius,
