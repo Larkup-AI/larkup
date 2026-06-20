@@ -1,14 +1,17 @@
 {
   "name": "@larkup-rag/vector-stores",
   "version": "0.1.0",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "exports": {
-    "./adapter": "./src/adapter.ts",
+    "./adapter": "./src/adapters/base.ts",
     "./factory": "./src/factory.ts",
     "./registry": "./src/registry.ts",
-    "./lancedb-adapter": "./src/lancedb-adapter.ts",
-    "./pinecone-adapter": "./src/pinecone-adapter.ts"
+    "./lancedb": "./src/adapters/lancedb.ts",
+    "./pinecone": "./src/adapters/pinecone.ts",
+    "./chroma": "./src/adapters/chroma.ts"
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.30.0",
@@ -16,6 +19,7 @@
   },
   "devDependencies": {
     "@larkup-rag/core": "workspace:*",
+    "chromadb": "^1.10.5",
     "typescript": "5.7.3"
   }
 }

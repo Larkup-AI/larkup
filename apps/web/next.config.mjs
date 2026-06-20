@@ -4,7 +4,7 @@ const nextConfig = {
   transpilePackages: ['@larkup-rag/core', '@larkup-rag/vector-stores', '@larkup-rag/scraper'],
   // LanceDB ships a native (.node) binding that must not be bundled — keep it
   // external so it's required at runtime from node_modules.
-  serverExternalPackages: ['@lancedb/lancedb'],
+  serverExternalPackages: ['@lancedb/lancedb', 'chromadb'],
   typescript: {
     ignoreBuildErrors: true,
   },

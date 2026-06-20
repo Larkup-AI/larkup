@@ -16,6 +16,8 @@ import {
   AlertCircle,
   ExternalLink,
   CheckCircle2,
+  Download,
+  Clock,
 } from "lucide-react";
 import { GenericAlert } from "@/components/alerts/generic-alert";
 import {
@@ -243,10 +245,17 @@ export function ConfigureForm({
   const { data: indexData } = useSWR("/api/index", indexFetcher, {
     refreshInterval: 0,
   });
+  // Fetch install status for optional vector stores
+  const { data: storeStatusData, mutate: mutateStoreStatus } = useSWR(
+    "/api/vector-stores/status",
+    (url: string) => fetch(url).then((r) => r.json()),
+    { refreshInterval: 0 },
+  );
   const [form, setForm] = useState<RagConfig>(DEFAULT_CONFIG);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [installing, setInstalling] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
@@ -259,6 +268,20 @@ export function ConfigureForm({
   // Blocking alert dialogs when index already exists
   const [storeBlockAlertOpen, setStoreBlockAlertOpen] = useState(false);
   const [modelBlockAlertOpen, setModelBlockAlertOpen] = useState(false);
+
+  // Is the currently selected store actually installed (for installable stores)?
+  const isStoreInstalled = useCallback(
+    (storeId: VectorStoreId) => {
+      const desc = getVectorStore(storeId);
+      if (desc.installStatus === "installed") return true;
+      if (desc.installStatus === "coming-soon") return false;
+      // installable — check runtime status
+      return storeStatusData?.stores?.[storeId]?.installed === true;
+    },
+    [storeStatusData],
+  );
+
+  const currentStoreInstalled = isStoreInstalled(form.vectorStore);
   // Cache storeConfig per store id so switching A→B→A restores A's values.
   const storeConfigCache = useRef<Record<string, Record<string, string>>>({});
 
@@ -309,6 +332,12 @@ export function ConfigureForm({
 
   const selectStore = (id: VectorStoreId) => {
     if (id === form.vectorStore) return;
+    // Block "coming soon" stores
+    const desc = getVectorStore(id);
+    if (desc.installStatus === "coming-soon") {
+      toast.info(`${desc.label} support is coming soon!`);
+      return;
+    }
     // Block if a completed index exists with a different vector store
     if (indexedVectorStore && id !== indexedVectorStore) {
       setStoreBlockAlertOpen(true);
@@ -327,6 +356,39 @@ export function ConfigureForm({
       setForm((f) => ({ ...f, vectorStore: id, storeConfig: seeded }));
     }
     setErrors({});
+  };
+
+  const handleInstallStore = async (storeId: VectorStoreId) => {
+    setInstalling(true);
+    try {
+      const res = await fetch("/api/vector-stores/install", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Installation failed");
+      }
+      toast.success(`${getVectorStore(storeId).label} installed successfully!`, {
+        description: `The ${json.package} package has been added to your project.`,
+      });
+      // Refresh install status optimistically so the UI instantly hides the install card
+      await mutateStoreStatus(
+        (current: any) => ({
+          ...current,
+          stores: {
+            ...(current?.stores || {}),
+            [storeId]: { installed: true },
+          },
+        }),
+        { revalidate: true }
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Installation failed");
+    } finally {
+      setInstalling(false);
+    }
   };
 
   // Returns true if the given model ID would have different dimensions than the indexed run
@@ -922,9 +984,17 @@ export function ConfigureForm({
                   <SelectContent>
                     {VECTOR_STORE_LIST.map((s) => {
                       const meta = STORE_META[s.id];
+                      const isComingSoon = s.installStatus === "coming-soon";
+                      const isInstallable = s.installStatus === "installable";
+                      const installed = isStoreInstalled(s.id);
                       return (
-                        <SelectItem key={s.id} value={s.id}>
-                          <span className="flex items-center gap-2.5">
+                        <SelectItem
+                          key={s.id}
+                          value={s.id}
+                          disabled={isComingSoon}
+                          className={isComingSoon ? "opacity-50" : ""}
+                        >
+                          <span className="flex items-center gap-2.5 w-full">
                             {meta && (
                               <ProviderIcon
                                 src={meta.iconSrc}
@@ -933,9 +1003,29 @@ export function ConfigureForm({
                                 size={22}
                               />
                             )}
-                            <span className="flex flex-col">
-                              <span className="font-medium text-sm leading-tight">
-                                {s.label}
+                            <span className="flex flex-col flex-1 min-w-0">
+                              <span className="flex items-center gap-2">
+                                <span className="font-medium text-sm leading-tight">
+                                  {s.label}
+                                </span>
+                                {isComingSoon && (
+                                  <Badge
+                                    variant="outline"
+                                    className="h-4 px-1.5 text-[9px] font-medium shrink-0 text-muted-foreground border-muted-foreground/30"
+                                  >
+                                    <Clock className="size-2.5 mr-0.5" />
+                                    Coming Soon
+                                  </Badge>
+                                )}
+                                {isInstallable && !installed && (
+                                  <Badge
+                                    variant="outline"
+                                    className="h-4 px-1.5 text-[9px] font-medium shrink-0 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                  >
+                                    <Download className="size-2.5 mr-0.5" />
+                                    Not Installed
+                                  </Badge>
+                                )}
                               </span>
                               <span className="text-[10px] text-muted-foreground leading-tight">
                                 {s.description.split(".")[0]}
@@ -975,34 +1065,89 @@ export function ConfigureForm({
               {store.description}
             </p>
 
-            {/* Store config fields */}
-            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4 transition-all duration-300">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {store.label} configuration
-              </p>
-              <StoreFields
-                store={store}
-                values={form.storeConfig}
-                errors={errors}
-                onChange={setStoreValue}
-                indexType={form.indexType}
-              />
-              <div className="flex justify-end pt-1">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleTestConnection}
-                  disabled={testing}
-                >
-                  {testing ? (
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                  ) : (
-                    <Cloud className="mr-2 size-4" />
-                  )}
-                  Test Connection
-                </Button>
+            {/* Store config fields — or install prompt if not yet installed */}
+            {store.installStatus === "installable" && !currentStoreInstalled ? (
+              /* ── Install panel for installable stores ─────────────────── */
+              <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-50/50 dark:bg-amber-950/20 p-6 space-y-4 transition-all duration-300">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg bg-amber-100 dark:bg-amber-900/40 p-2 shrink-0">
+                    <Download className="size-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {store.label} is not installed
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {store.label} is an optional dependency and not included by default.
+                      Click <strong>Install</strong> to add the{" "}
+                      <code className="text-[11px] font-mono bg-muted px-1 py-0.5 rounded">
+                        {Object.keys(store.serverDependencies)[0]}
+                      </code>{" "}
+                      package to your project.
+                    </p>
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400/80 leading-relaxed mt-2">
+                      ⚠ Install only works in local development. For production
+                      deployments, add the package to your dependencies before deploying.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={() => handleInstallStore(form.vectorStore)}
+                    disabled={installing}
+                    className="gap-2"
+                  >
+                    {installing ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Download className="size-4" />
+                    )}
+                    {installing ? "Installing…" : `Install ${store.label}`}
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : store.installStatus === "coming-soon" ? (
+              /* ── Coming Soon panel ──────────────────────────────────── */
+              <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-6 space-y-2 transition-all duration-300">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="size-4" />
+                  <p className="text-sm font-medium">Coming Soon</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {store.label} support is under development. Stay tuned!
+                </p>
+              </div>
+            ) : (
+              /* ── Normal config fields ──────────────────────────────── */
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4 transition-all duration-300">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  {store.label} configuration
+                </p>
+                <StoreFields
+                  store={store}
+                  values={form.storeConfig}
+                  errors={errors}
+                  onChange={setStoreValue}
+                  indexType={form.indexType}
+                />
+                <div className="flex justify-end pt-1">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleTestConnection}
+                    disabled={testing}
+                  >
+                    {testing ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <Cloud className="mr-2 size-4" />
+                    )}
+                    Test Connection
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

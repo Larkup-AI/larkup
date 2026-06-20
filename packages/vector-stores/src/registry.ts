@@ -19,6 +19,7 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
     description:
       "Embedded, file-based vector DB. Runs fully local for dev or against LanceDB Cloud for production.",
     runtime: "both",
+    installStatus: "installed",
     docsUrl: "https://lancedb.github.io/lancedb/",
     serverDependencies: {
       "@lancedb/lancedb": "^0.21.0",
@@ -81,6 +82,7 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
     description:
       "Fully-managed cloud vector database. Cloud-only — requires an API key and an existing index.",
     runtime: "cloud",
+    installStatus: "installed",
     docsUrl: "https://docs.pinecone.io/",
     serverDependencies: {
       "@pinecone-database/pinecone": "^6.0.0",
@@ -129,6 +131,7 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
     description:
       "Open-source AI-native vector database with built-in hybrid search, BM25, and multi-tenancy.",
     runtime: "both",
+    installStatus: "coming-soon",
     docsUrl: "https://weaviate.io/developers/weaviate",
     serverDependencies: {
       weaviate: "^3.0.0",
@@ -168,6 +171,7 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
     description:
       "High-performance vector search engine with rich filtering, built for production-scale RAG.",
     runtime: "both",
+    installStatus: "coming-soon",
     docsUrl: "https://qdrant.tech/documentation/",
     serverDependencies: {
       "@qdrant/js-client-rest": "^1.9.0",
@@ -207,19 +211,71 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
     description:
       "Open-source, developer-friendly embedding database. Great for rapid local prototyping.",
     runtime: "both",
+    installStatus: "installable",
     docsUrl: "https://docs.trychroma.com/",
     serverDependencies: {
       chromadb: "^1.9.0",
     },
     fields: [
       {
+        key: "mode",
+        label: "Mode",
+        type: "select",
+        required: true,
+        defaultValue: "server",
+        help: "Server connects to a self-hosted Chroma instance. Cloud connects to Chroma Cloud.",
+        options: [
+          { label: "Server (Self-hosted)", value: "server" },
+          { label: "Cloud (Chroma Cloud)", value: "cloud" },
+        ],
+      },
+      {
         key: "host",
-        label: "Host URL",
+        label: "Server URL",
         type: "text",
         required: true,
         placeholder: "http://localhost:8000",
         defaultValue: "http://localhost:8000",
         help: "Chroma server URL (local Docker or remote).",
+        showWhen: { key: "mode", equals: ["server"] },
+      },
+      {
+        key: "authToken",
+        label: "Auth Token",
+        type: "password",
+        required: false,
+        secret: true,
+        placeholder: "chroma-token",
+        help: "Optional static auth token for Chroma server.",
+        showWhen: { key: "mode", equals: ["server"] },
+      },
+      {
+        key: "apiKey",
+        label: "API Key",
+        type: "password",
+        required: true,
+        secret: true,
+        placeholder: "sk_...",
+        help: "Chroma Cloud API Key.",
+        showWhen: { key: "mode", equals: ["cloud"] },
+      },
+      {
+        key: "tenant",
+        label: "Tenant",
+        type: "text",
+        required: true,
+        defaultValue: "default_tenant",
+        help: "Tenant name for Chroma Cloud.",
+        showWhen: { key: "mode", equals: ["cloud"] },
+      },
+      {
+        key: "database",
+        label: "Database",
+        type: "text",
+        required: true,
+        defaultValue: "default_database",
+        help: "Database name for Chroma Cloud.",
+        showWhen: { key: "mode", equals: ["cloud"] },
       },
       {
         key: "collectionName",
@@ -228,15 +284,6 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
         required: true,
         defaultValue: "documents",
         help: "Chroma collection to store and retrieve embeddings.",
-      },
-      {
-        key: "authToken",
-        label: "Auth token",
-        type: "password",
-        required: false,
-        secret: true,
-        placeholder: "chroma-token",
-        help: "Optional static auth token for Chroma server.",
       },
     ],
   },
@@ -247,6 +294,7 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
     description:
       "PostgreSQL extension for vector similarity search. Self-host vectors alongside your relational data.",
     runtime: "both",
+    installStatus: "coming-soon",
     docsUrl: "https://github.com/pgvector/pgvector",
     serverDependencies: {
       pg: "^8.11.0",
@@ -279,6 +327,7 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
     description:
       "Postgres-backed vector store via the pgvector extension with Supabase's managed infrastructure.",
     runtime: "cloud",
+    installStatus: "coming-soon",
     docsUrl: "https://supabase.com/docs/guides/ai",
     serverDependencies: {
       "@supabase/supabase-js": "^2.43.0",

@@ -1,6 +1,7 @@
 "use client"
 
-import { KeyRound } from "lucide-react"
+import { useState } from "react"
+import { KeyRound, Eye, EyeOff } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -37,6 +38,11 @@ export function StoreFields({
   indexType,
 }: StoreFieldsProps) {
   const fields = visibleFields(store, values, indexType)
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({})
+
+  const togglePassword = (key: string) => {
+    setShowPasswords((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
 
   return (
     <div className="grid gap-5 sm:grid-cols-2">
@@ -87,17 +93,44 @@ export function StoreFields({
                   ))}
                 </SelectContent>
               </Select>
+            ) : field.type === "password" ? (
+              <div className="relative">
+                <Input
+                  id={fieldId}
+                  type={showPasswords[field.key] ? "text" : "password"}
+                  placeholder={field.placeholder}
+                  value={value}
+                  spellCheck={false}
+                  autoComplete="off"
+                  className={cn(
+                    "font-mono text-sm pr-9",
+                    error && "border-destructive",
+                  )}
+                  onChange={(e) => onChange(field.key, e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePassword(field.key)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPasswords[field.key] ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </button>
+              </div>
             ) : (
               <Input
                 id={fieldId}
-                type={field.type === "password" ? "password" : "text"}
+                type="text"
                 placeholder={field.placeholder}
                 value={value}
                 spellCheck={false}
                 autoComplete="off"
                 className={cn(
-                  (field.type === "path" || field.type === "password") &&
-                    "font-mono text-sm",
+                  field.type === "path" && "font-mono text-sm",
                   error && "border-destructive",
                 )}
                 onChange={(e) => onChange(field.key, e.target.value)}

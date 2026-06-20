@@ -26,6 +26,19 @@ export async function createAdapter(
         onRateLimit,
       });
     }
+    case "chroma": {
+      const { ChromaAdapter } = await import("./adapters/chroma");
+      return new ChromaAdapter({
+        mode: config.storeConfig.mode,
+        host: config.storeConfig.host,
+        authToken: config.storeConfig.authToken,
+        apiKey: config.storeConfig.apiKey,
+        tenant: config.storeConfig.tenant,
+        database: config.storeConfig.database,
+        collectionName: config.storeConfig.collectionName,
+        indexType: config.indexType,
+      });
+    }
     case "lancedb":
     default: {
       const { LanceDBAdapter } = await import("./adapters/lancedb");
@@ -38,4 +51,5 @@ export async function createAdapter(
       });
     }
   }
+
 }

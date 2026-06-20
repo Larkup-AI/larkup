@@ -64,6 +64,8 @@ export interface VectorStoreDescriptor {
   label: string
   description: string
   runtime: StoreRuntime
+  /** Whether this store is pre-installed, installable on demand, or coming soon */
+  installStatus: "installed" | "installable" | "coming-soon"
   /** npm packages the GENERATED server needs when this store is selected */
   serverDependencies: Record<string, string>
   /** the dynamic config/credential fields */
