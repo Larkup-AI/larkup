@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Boxes,
   FileStack,
   Layers,
   Lock,
@@ -11,7 +10,6 @@ import {
   MessageSquareText,
   Server,
   SlidersHorizontal,
-  Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STAGES, CURRENT_PHASE } from "@larkup-rag/core/stages";

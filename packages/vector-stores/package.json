@@ -1,7 +1,7 @@
 {
   "name": "@larkup-rag/vector-stores",
   "version": "0.1.0",
-  "private": true,
+  "publishConfig": { "access": "public" },
   "type": "module",
   "exports": {
     "./adapter": "./src/adapter.ts",

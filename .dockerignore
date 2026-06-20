@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.turbo
+*.md
+.dockerignore
+Dockerfile
+docker-compose.yml
+.env*
+!.env.example
+.ragtoolkit
+gen
+lancedb
+proxies.txt

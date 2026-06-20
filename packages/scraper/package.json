@@ -1,7 +1,7 @@
 {
   "name": "@larkup-rag/scraper",
   "version": "0.1.0",
-  "private": true,
+  "publishConfig": { "access": "public" },
   "type": "module",
   "exports": {
     "./firecrawl": "./src/firecrawl.ts",
