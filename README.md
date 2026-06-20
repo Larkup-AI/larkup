@@ -1,4 +1,4 @@
-# buddy-rag
+# larkup-rag
 
 A dual-mode (**Web UI + CLI**) toolkit to build, index, and serve a lightweight,
 deployable RAG pipeline. Both modes are thin shells over the same `core/`

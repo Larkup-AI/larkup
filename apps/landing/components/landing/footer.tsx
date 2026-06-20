@@ -60,7 +60,7 @@ export function Footer() {
                 </svg>
               </div>
               <span className="text-lg font-semibold tracking-tight">
-                Buddy<span className="gradient-text">RAG</span>
+                Larkup<span className="gradient-text">RAG</span>
               </span>
             </a>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
@@ -112,7 +112,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-14 pt-6 border-t border-border/30 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} BuddyRAG. All rights reserved.
+            © {new Date().getFullYear()} LarkupRAG. All rights reserved.
           </p>
           <div className="flex items-center gap-5">
             <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">

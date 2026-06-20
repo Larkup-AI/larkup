@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import JSZip from "jszip"
-import { readConfig } from "@buddy-rag/core/config-store"
-import { generateServer } from "@buddy-rag/core/generator/generate-server"
-import { getActiveServer } from "@buddy-rag/core/workspace"
+import { readConfig } from "@larkup-rag/core/config-store"
+import { generateServer } from "@larkup-rag/core/generator/generate-server"
+import { getActiveServer } from "@larkup-rag/core/workspace"
 
 export const dynamic = "force-dynamic"
 

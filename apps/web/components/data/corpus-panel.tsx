@@ -14,7 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import type { DocumentSource, SourceDocument } from "@buddy-rag/core/types";
+import type { DocumentSource, SourceDocument } from "@larkup-rag/core/types";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

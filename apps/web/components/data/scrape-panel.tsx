@@ -18,7 +18,7 @@ import {
   X,
   Target,
 } from "lucide-react";
-import type { CrawlScope, SearchResultItem } from "@buddy-rag/core/types";
+import type { CrawlScope, SearchResultItem } from "@larkup-rag/core/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

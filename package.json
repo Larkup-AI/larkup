@@ -1,12 +1,12 @@
 {
-  "name": "buddy-rag",
+  "name": "larkup-rag",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "rag": "pnpm --filter @buddy-rag/cli rag"
+    "rag": "pnpm --filter @larkup-rag/cli rag"
   },
   "devDependencies": {
     "@turbo/gen": "^2.9.16",

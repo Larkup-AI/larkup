@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * buddy-rag CLI — the second half of the toolkit's dual-mode design.
+ * larkup-rag CLI — the second half of the toolkit's dual-mode design.
  *
  * Everything here is a thin wrapper around the SAME `core/` library the Web UI
  * uses, so the CLI and UI stay perfectly in sync: they read/write the identical
@@ -30,21 +30,21 @@ import {
   runWithServer,
   setActiveServer,
   type ServerMeta,
-} from "@buddy-rag/core/workspace";
-import { readConfig } from "@buddy-rag/core/config-store";
+} from "@larkup-rag/core/workspace";
+import { readConfig } from "@larkup-rag/core/config-store";
 import {
   addDocument,
   corpusStats,
   readDocuments,
-} from "@buddy-rag/core/documents-store";
-import { createRun, runIndexer } from "@buddy-rag/core/indexing/indexer";
-import { readRun } from "@buddy-rag/core/index-store";
-import { generateServer } from "@buddy-rag/core/generator/generate-server";
-import { emitToDisk } from "@buddy-rag/core/generator/server-runtime";
-import { embedQuery } from "@buddy-rag/core/indexing/embedder";
-import { createAdapter } from "@buddy-rag/vector-stores/factory";
-import { getVectorStore } from "@buddy-rag/vector-stores/registry";
-import { getEmbeddingModel } from "@buddy-rag/core/embeddings/registry";
+} from "@larkup-rag/core/documents-store";
+import { createRun, runIndexer } from "@larkup-rag/core/indexing/indexer";
+import { readRun } from "@larkup-rag/core/index-store";
+import { generateServer } from "@larkup-rag/core/generator/generate-server";
+import { emitToDisk } from "@larkup-rag/core/generator/server-runtime";
+import { embedQuery } from "@larkup-rag/core/indexing/embedder";
+import { createAdapter } from "@larkup-rag/vector-stores/factory";
+import { getVectorStore } from "@larkup-rag/vector-stores/registry";
+import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry";
 
 /* ------------------------------- arg parsing ----------------------------- */
 
@@ -427,7 +427,7 @@ function run(cmd: string, argv: string[], cwd: string): Promise<void> {
 /* --------------------------------- help ---------------------------------- */
 
 function help() {
-  log(`${c.bold("buddy-rag")} — build, index, and serve a RAG pipeline from the terminal.
+  log(`${c.bold("larkup-rag")} — build, index, and serve a RAG pipeline from the terminal.
 
 ${c.bold("Usage")}
   pnpm rag <command> [options]

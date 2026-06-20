@@ -1,5 +1,5 @@
 {
-  "name": "@buddy-rag/cli",
+  "name": "@larkup-rag/cli",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,8 +8,8 @@
     "rag": "tsx src/index.ts"
   },
   "dependencies": {
-    "@buddy-rag/core": "workspace:*",
-    "@buddy-rag/vector-stores": "workspace:*"
+    "@larkup-rag/core": "workspace:*",
+    "@larkup-rag/vector-stores": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.22.4",

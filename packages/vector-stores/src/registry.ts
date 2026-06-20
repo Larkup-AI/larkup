@@ -1,4 +1,4 @@
-import type { IndexType, VectorStoreDescriptor, VectorStoreId } from "@buddy-rag/core/types"
+import type { IndexType, VectorStoreDescriptor, VectorStoreId } from "@larkup-rag/core/types"
 
 /**
  * Declarative registry of supported vector stores.

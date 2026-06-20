@@ -225,7 +225,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
 
   const handleGenerateKey = () => {
     const randomKey =
-      "buddy-" +
+      "larkup-" +
       Math.random().toString(36).substring(2, 15) +
       Math.random().toString(36).substring(2, 15);
     setApiKey(randomKey);

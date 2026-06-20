@@ -7,12 +7,12 @@ import {
   Package,
   Rocket,
 } from "lucide-react";
-import type { RagConfig } from "@buddy-rag/core/types";
+import type { RagConfig } from "@larkup-rag/core/types";
 import type {
   GeneratedFile,
   GeneratedServer,
-} from "@buddy-rag/core/generator/generate-server";
-import { getVectorStore } from "@buddy-rag/vector-stores/registry";
+} from "@larkup-rag/core/generator/generate-server";
+import { getVectorStore } from "@larkup-rag/vector-stores/registry";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

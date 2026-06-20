@@ -90,7 +90,7 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
           ? `\nNext steps:\n  cd ${dir}/${answers?.name}\n  pnpm dev`
           : `\nNext steps:\n  pnpm install\n  cd ${dir}/${answers?.name}\n  pnpm dev`;
 
-        return `\n✅ Package @buddy-rag/${answers?.name} created successfully!${steps}`;
+        return `\n✅ Package @larkup-rag/${answers?.name} created successfully!${steps}`;
       });
 
       return actions;

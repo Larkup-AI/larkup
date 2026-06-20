@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import { ClipboardPaste, FileUp, Globe, Layers } from "lucide-react";
-import type { CrawlJob, SourceDocument } from "@buddy-rag/core/types";
+import type { CrawlJob, SourceDocument } from "@larkup-rag/core/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";

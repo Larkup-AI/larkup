@@ -44,7 +44,7 @@ export function Navbar() {
             </svg>
           </div>
           <span className="text-lg font-semibold tracking-tight">
-            Buddy<span className="gradient-text">RAG</span>
+            Larkup<span className="gradient-text">RAG</span>
           </span>
         </a>
 

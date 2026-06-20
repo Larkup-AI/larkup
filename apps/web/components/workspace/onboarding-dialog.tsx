@@ -50,7 +50,7 @@ export function OnboardingDialog() {
           </span>
           <div>
             <h2 className="text-lg font-semibold text-foreground">
-              Welcome to buddy-rag
+              Welcome to larkup-rag
             </h2>
             <p className="mt-1 text-pretty text-sm text-muted-foreground">
               Build, index, and serve your own RAG pipelines. Let&apos;s create

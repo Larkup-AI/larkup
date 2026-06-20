@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
-import { readConfig, writeConfig } from "@buddy-rag/core/config-store"
-import { getVectorStore, validateStoreConfig } from "@buddy-rag/vector-stores/registry"
-import { getEmbeddingModel } from "@buddy-rag/core/embeddings/registry"
-import type { RagConfig } from "@buddy-rag/core/types"
+import { readConfig, writeConfig } from "@larkup-rag/core/config-store"
+import { getVectorStore, validateStoreConfig } from "@larkup-rag/vector-stores/registry"
+import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry"
+import type { RagConfig } from "@larkup-rag/core/types"
 
 // Uses node:fs — must run on the Node.js runtime, not edge.
 export const runtime = "nodejs"

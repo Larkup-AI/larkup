@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-echo "🚀 Starting buddy-rag monorepo..."
+echo "🚀 Starting larkup-rag monorepo..."
 
 # Ensure we are in the root directory
 cd "$(dirname "$0")"

@@ -2,7 +2,7 @@
 
 import fs from "fs";
 import path from "path";
-import { getActiveServer } from "@buddy-rag/core/workspace";
+import { getActiveServer } from "@larkup-rag/core/workspace";
 
 const VERCEL_API = "https://api.vercel.com";
 
@@ -345,7 +345,7 @@ export async function deployToVercel(
     }
 
     // 4. Generate the server files in memory based on current config
-    const { generateServer } = await import("@buddy-rag/core/generator/generate-server");
+    const { generateServer } = await import("@larkup-rag/core/generator/generate-server");
     const generated = generateServer(config);
     
     const files = generated.files.map((f) => ({

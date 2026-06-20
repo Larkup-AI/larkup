@@ -7,8 +7,8 @@ import {
   deleteDocuments,
   readDocuments,
   updateDocument,
-} from "@buddy-rag/core/documents-store"
-import type { DocumentSource } from "@buddy-rag/core/types"
+} from "@larkup-rag/core/documents-store"
+import type { DocumentSource } from "@larkup-rag/core/types"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"

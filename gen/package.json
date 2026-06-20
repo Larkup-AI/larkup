@@ -1,5 +1,5 @@
 {
-  "name": "@buddy-rag/gen",
+  "name": "@larkup-rag/gen",
   "version": "1.0.0",
   "description": "Package generators for the monorepo",
   "scripts": {

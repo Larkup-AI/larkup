@@ -207,11 +207,11 @@ export function FeatureTabs() {
             <div className="mt-auto border-t border-border bg-[#f8fafc] dark:bg-white/5 px-8 py-6 flex items-center gap-6">
               <div className="px-3 py-1.5 border border-border bg-background rounded-md flex items-center gap-2 shrink-0">
                 <DatabaseIcon className="size-3 text-caramel" />
-                <span className="text-xs font-bold text-caramel">BuddyRAG</span>
+                <span className="text-xs font-bold text-caramel">LarkupRAG</span>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  BuddyRAG powers your AI agents with clean data and instant retrieval.
+                  LarkupRAG powers your AI agents with clean data and instant retrieval.
                 </p>
                 <a href="#" className="mt-1 inline-flex items-center gap-1 text-[13px] font-semibold text-caramel hover:underline">
                   View documentation <ChevronRight className="size-3.5" />

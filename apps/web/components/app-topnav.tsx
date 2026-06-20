@@ -12,8 +12,8 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { STAGES, CURRENT_PHASE } from "@buddy-rag/core/stages";
-import type { StageId } from "@buddy-rag/core/types";
+import { STAGES, CURRENT_PHASE } from "@larkup-rag/core/stages";
+import type { StageId } from "@larkup-rag/core/types";
 import {
   Tooltip,
   TooltipContent,
@@ -42,7 +42,7 @@ export function AppTopNav() {
         {/* Brand */}
         <Link
           href="/configure"
-          aria-label="buddy-rag home"
+          aria-label="larkup-rag home"
           className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
         >
           <img src={"/logo9.png"} className="size-5" alt="logo" />

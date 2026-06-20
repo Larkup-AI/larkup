@@ -11,13 +11,13 @@ const fontMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "BuddyRAG — RAG Pipeline Made Simple",
+  title: "LarkupRAG — RAG Pipeline Made Simple",
   description:
     "Build, index, and deploy production-ready RAG pipelines in minutes. From data ingestion to deployment — configure, chunk, embed, and serve with zero friction.",
   keywords:
     "RAG, retrieval augmented generation, vector database, AI pipeline, LLM, embeddings, deployment, Pinecone, LanceDB, Qdrant",
   openGraph: {
-    title: "BuddyRAG — RAG Pipeline Made Simple",
+    title: "LarkupRAG — RAG Pipeline Made Simple",
     description:
       "Build, index, and deploy production-ready RAG pipelines in minutes.",
     type: "website",

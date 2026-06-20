@@ -73,16 +73,16 @@ import {
   type VectorStoreId,
   type EmbeddingProvider,
   type CustomEmbeddingConfig,
-} from "@buddy-rag/core/types";
+} from "@larkup-rag/core/types";
 import {
   EMBEDDING_MODELS,
   getEmbeddingModel,
-} from "@buddy-rag/core/embeddings/registry";
+} from "@larkup-rag/core/embeddings/registry";
 import {
   getVectorStore,
   validateStoreConfig,
   VECTOR_STORE_LIST,
-} from "@buddy-rag/vector-stores/registry";
+} from "@larkup-rag/vector-stores/registry";
 import { StoreFields } from "@/components/configure/store-fields";
 
 const fetcher = (url: string) =>

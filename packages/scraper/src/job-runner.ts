@@ -1,6 +1,6 @@
-import type { CrawlJob, CrawlJobStatus, CrawlTarget } from "@buddy-rag/core/types"
-import { getJob, updateJob } from "@buddy-rag/core/jobs-store"
-import { addCrawledDocuments, type NewDocumentInput } from "@buddy-rag/core/documents-store"
+import type { CrawlJob, CrawlJobStatus, CrawlTarget } from "@larkup-rag/core/types"
+import { getJob, updateJob } from "@larkup-rag/core/jobs-store"
+import { addCrawledDocuments, type NewDocumentInput } from "@larkup-rag/core/documents-store"
 import {
   cancelCrawl,
   getCrawlStatus,

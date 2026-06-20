@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
-import { getVectorStore, validateStoreConfig } from "@buddy-rag/vector-stores/registry"
-import { createAdapter } from "@buddy-rag/vector-stores/factory"
-import type { RagConfig } from "@buddy-rag/core/types"
+import { getVectorStore, validateStoreConfig } from "@larkup-rag/vector-stores/registry"
+import { createAdapter } from "@larkup-rag/vector-stores/factory"
+import type { RagConfig } from "@larkup-rag/core/types"
 
 // Uses node:fs — must run on the Node.js runtime, not edge.
 export const runtime = "nodejs"
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     }
     dimensions = found.dimensions
   } else {
-    const embeddingModel = await import("@buddy-rag/core/embeddings/registry").then(m => m.getEmbeddingModel(body.embeddingModelId))
+    const embeddingModel = await import("@larkup-rag/core/embeddings/registry").then(m => m.getEmbeddingModel(body.embeddingModelId))
     if (!embeddingModel) {
       return NextResponse.json(
         { error: `Unknown embedding model: ${body.embeddingModelId}` },

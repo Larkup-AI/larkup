@@ -8,10 +8,10 @@ import {
   setActiveServer,
   setUsername,
   type ServerMeta,
-} from "@buddy-rag/core/workspace"
-import { corpusStats } from "@buddy-rag/core/documents-store"
-import { readRun } from "@buddy-rag/core/index-store"
-import { readServerState } from "@buddy-rag/core/generator/server-runtime"
+} from "@larkup-rag/core/workspace"
+import { corpusStats } from "@larkup-rag/core/documents-store"
+import { readRun } from "@larkup-rag/core/index-store"
+import { readServerState } from "@larkup-rag/core/generator/server-runtime"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -113,7 +113,7 @@ export async function DELETE(req: Request) {
   }
   // Stop any running instance in the target server's context first.
   try {
-    const { stopServer } = await import("@buddy-rag/core/generator/server-runtime")
+    const { stopServer } = await import("@larkup-rag/core/generator/server-runtime")
     await runWithServer(id, () => stopServer())
   } catch {
     // best effort — still remove the data

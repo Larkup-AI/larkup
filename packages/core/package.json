@@ -1,5 +1,5 @@
 {
-  "name": "@buddy-rag/core",
+  "name": "@larkup-rag/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.68",
-    "@buddy-rag/vector-stores": "workspace:*",
+    "@larkup-rag/vector-stores": "workspace:*",
     "ai": "^6.0.197"
   },
   "devDependencies": {

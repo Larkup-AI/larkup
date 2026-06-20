@@ -1,5 +1,5 @@
 {
-  "name": "@buddy-rag/vector-stores",
+  "name": "@larkup-rag/vector-stores",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "./pinecone-adapter": "./src/pinecone-adapter.ts"
   },
   "dependencies": {
-    "@buddy-rag/core": "workspace:*",
+    "@larkup-rag/core": "workspace:*",
     "@lancedb/lancedb": "^0.30.0",
     "@pinecone-database/pinecone": "^7.2.0"
   },

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { readConfig } from "@buddy-rag/core/config-store";
-import { readRun } from "@buddy-rag/core/index-store";
-import { refreshServerStatus } from "@buddy-rag/core/generator/server-runtime";
-import { createAdapter } from "@buddy-rag/vector-stores/factory";
-import { getEmbeddingModel } from "@buddy-rag/core/embeddings/registry";
-import { getVectorStore } from "@buddy-rag/vector-stores/registry";
-import type { QueryHit } from "@buddy-rag/vector-stores/adapter";
-import { runWithServer } from "@buddy-rag/core/workspace";
-import { embedQuery } from "@buddy-rag/core/indexing/embedder";
+import { readConfig } from "@larkup-rag/core/config-store";
+import { readRun } from "@larkup-rag/core/index-store";
+import { refreshServerStatus } from "@larkup-rag/core/generator/server-runtime";
+import { createAdapter } from "@larkup-rag/vector-stores/factory";
+import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry";
+import { getVectorStore } from "@larkup-rag/vector-stores/registry";
+import type { QueryHit } from "@larkup-rag/vector-stores/adapter";
+import { runWithServer } from "@larkup-rag/core/workspace";
+import { embedQuery } from "@larkup-rag/core/indexing/embedder";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +39,7 @@ async function snapshot() {
   const blockers: string[] = [];
   if (!ready) {
     blockers.push(
-      "Build a buddy-rag index (or launch a generated server) before running a demo query.",
+      "Build a larkup-rag index (or launch a generated server) before running a demo query.",
     );
   }
 

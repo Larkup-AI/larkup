@@ -9,7 +9,7 @@ export function Hero() {
   const [copied, setCopied] = useState(false)
 
   function copyCmd() {
-    navigator.clipboard?.writeText("npm i buddy-rag")
+    navigator.clipboard?.writeText("npm i larkup-rag")
     setCopied(true)
     setTimeout(() => setCopied(false), 1600)
   }
@@ -30,7 +30,7 @@ export function Hero() {
 
       <div className="relative mx-auto flex max-w-4xl flex-col items-center px-4 text-center sm:px-6 lg:px-8">
          <motion.a
-            href="https://github.com/BuddyHere-AI/buddy-rag"
+            href="https://github.com/BuddyHere-AI/larkup-rag"
             target="_blank"
             rel="noopener noreferrer"
             initial={{ opacity: 0, scale: 0.9 }}

@@ -17,9 +17,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "buddy-rag",
+  title: "larkup-rag",
   description:
-    "buddy-rag — a dual-mode (Web + CLI) toolkit to build, index, and serve a lightweight, deployable RAG pipeline.",
+    "larkup-rag — a dual-mode (Web + CLI) toolkit to build, index, and serve a lightweight, deployable RAG pipeline.",
 };
 
 export default function RootLayout({

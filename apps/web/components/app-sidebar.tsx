@@ -14,8 +14,8 @@ import {
   Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { STAGES, CURRENT_PHASE } from "@buddy-rag/core/stages";
-import type { StageId } from "@buddy-rag/core/types";
+import { STAGES, CURRENT_PHASE } from "@larkup-rag/core/stages";
+import type { StageId } from "@larkup-rag/core/types";
 import {
   Tooltip,
   TooltipContent,
