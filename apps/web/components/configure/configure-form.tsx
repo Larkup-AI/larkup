@@ -17,16 +17,7 @@ import {
   ExternalLink,
   CheckCircle2,
 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { GenericAlert } from "@/components/alerts/generic-alert";
 import {
   Dialog,
   DialogContent,
@@ -1079,34 +1070,20 @@ export function ConfigureForm({
       </Dialog>
 
       {/* ── Unsaved changes navigation blocker ──────────────────────────── */}
-      <AlertDialog open={navBlockOpen} onOpenChange={setNavBlockOpen}>
-        <AlertDialogContent className={"max-w-xl! w-full!"}>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertCircle className="size-5 text-amber-500" />
-              Unsaved changes
-            </AlertDialogTitle>
-            <AlertDialogDescription className={"pb-3"}>
-              You have unsaved changes to your configuration. If you leave now,
-              your changes will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setNavBlockOpen(false)}>
-              Stay on page
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-white hover:bg-destructive/90"
-              onClick={() => {
-                setNavBlockOpen(false);
-                if (pendingHref) router.push(pendingHref);
-              }}
-            >
-              Leave without saving
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <GenericAlert
+        open={navBlockOpen}
+        onOpenChange={setNavBlockOpen}
+        contentClassName="max-w-xl! w-full!"
+        icon={<AlertCircle className="size-5 text-amber-500" />}
+        title="Unsaved changes"
+        description="You have unsaved changes to your configuration. If you leave now, your changes will be lost."
+        cancelText="Stay on page"
+        actionText="Leave without saving"
+        variant="destructive"
+        onAction={() => {
+          if (pendingHref) router.push(pendingHref);
+        }}
+      />
 
       <CustomEmbeddingModal
         open={customModalOpen}
@@ -1164,161 +1141,139 @@ export function ConfigureForm({
       />
 
       {/* ── Block: vector store change after index ─────────────────── */}
-      <AlertDialog
+      <GenericAlert
         open={storeBlockAlertOpen}
         onOpenChange={setStoreBlockAlertOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertCircle className="size-5 text-destructive" />
-              Cannot change vector store
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <span className="block">
-                Your index was built with{" "}
-                <span className="font-semibold text-foreground">
-                  {indexedVectorStore
-                    ? (getVectorStore(indexedVectorStore)?.label ??
-                      indexedVectorStore)
-                    : form.vectorStore}
-                </span>
-                . Switching to a different vector store would make the existing
-                index incompatible — vectors are bound to the store they were
-                written to.
+        icon={<AlertCircle className="size-5 text-destructive" />}
+        title="Cannot change vector store"
+        description={
+          <>
+            <span className="block">
+              Your index was built with{" "}
+              <span className="font-semibold text-foreground">
+                {indexedVectorStore
+                  ? (getVectorStore(indexedVectorStore)?.label ??
+                    indexedVectorStore)
+                  : form.vectorStore}
               </span>
-              <span className="block">
-                To use a different vector store, go to the{" "}
-                <strong className="text-foreground">Index</strong> page and run
-                a full re-index with your new settings.
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep current store</AlertDialogCancel>
-            <AlertDialogAction
-              className="gap-2 bg-destructive text-white hover:bg-destructive/90"
-              onClick={() => {
-                setStoreBlockAlertOpen(false);
-                window.location.href = "/index";
-              }}
-            >
-              <ExternalLink className="size-4" />
-              Re-index from scratch
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              . Switching to a different vector store would make the existing
+              index incompatible — vectors are bound to the store they were
+              written to.
+            </span>
+            <span className="block">
+              To use a different vector store, go to the{" "}
+              <strong className="text-foreground">Index</strong> page and run
+              a full re-index with your new settings.
+            </span>
+          </>
+        }
+        cancelText="Keep current store"
+        actionText={
+          <>
+            <ExternalLink className="size-4" />
+            Re-index from scratch
+          </>
+        }
+        variant="destructive"
+        onAction={() => {
+          window.location.href = "/index";
+        }}
+      />
 
       {/* ── Block: embedding model dimension change after index ──────── */}
-      <AlertDialog
+      <GenericAlert
         open={modelBlockAlertOpen}
         onOpenChange={setModelBlockAlertOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertCircle className="size-5 text-destructive" />
-              Incompatible embedding dimensions
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <span className="block">
-                Your index was built with{" "}
-                <span className="font-semibold text-foreground">
-                  {indexedDimensions} dimensions
-                </span>
-                . The selected model outputs a different vector size, which is
-                incompatible with the existing index.
+        icon={<AlertCircle className="size-5 text-destructive" />}
+        title="Incompatible embedding dimensions"
+        description={
+          <>
+            <span className="block">
+              Your index was built with{" "}
+              <span className="font-semibold text-foreground">
+                {indexedDimensions} dimensions
               </span>
-              <span className="block">
-                ✓ You can freely switch to any model that also produces{" "}
-                <span className="font-semibold text-foreground">
-                  {indexedDimensions}d
-                </span>{" "}
-                vectors. To use a different dimension size, go to the{" "}
-                <strong className="text-foreground">Index</strong> page and run
-                a full re-index.
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep current model</AlertDialogCancel>
-            <AlertDialogAction
-              className="gap-2 bg-destructive text-white hover:bg-destructive/90"
-              onClick={() => {
-                setModelBlockAlertOpen(false);
-                window.location.href = "/index";
-              }}
-            >
-              <ExternalLink className="size-4" />
-              Re-index from scratch
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              . The selected model outputs a different vector size, which is
+              incompatible with the existing index.
+            </span>
+            <span className="block">
+              ✓ You can freely switch to any model that also produces{" "}
+              <span className="font-semibold text-foreground">
+                {indexedDimensions}d
+              </span>{" "}
+              vectors. To use a different dimension size, go to the{" "}
+              <strong className="text-foreground">Index</strong> page and run
+              a full re-index.
+            </span>
+          </>
+        }
+        cancelText="Keep current model"
+        actionText={
+          <>
+            <ExternalLink className="size-4" />
+            Re-index from scratch
+          </>
+        }
+        variant="destructive"
+        onAction={() => {
+          window.location.href = "/index";
+        }}
+      />
 
       {/* ── Delete custom model confirmation ─────────────────────────── */}
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete custom model?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove{" "}
-              <span className="font-semibold text-foreground">
-                &quot;{activeCustomModel?.modelName}&quot;
-              </span>{" "}
-              from your saved custom models. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-white hover:bg-destructive/90"
-              onClick={async () => {
-                if (!activeCustomModel) return;
-                setDeleteConfirmOpen(false);
-                const modelName = activeCustomModel.modelName;
-                const updatedList = (form.customEmbeddings ?? []).filter(
-                  (m) => m.modelName !== modelName,
-                );
-                // Fall back to the first remaining custom model or the default.
-                const nextId =
-                  updatedList.length > 0
-                    ? `custom:${updatedList[0].modelName}`
-                    : DEFAULT_CONFIG.embeddingModelId;
-                const nextForm = {
-                  ...form,
-                  embeddingModelId: nextId,
-                  customEmbeddings: updatedList,
-                };
-                setForm(nextForm);
+      <GenericAlert
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete custom model?"
+        description={
+          <>
+            This will remove{" "}
+            <span className="font-semibold text-foreground">
+              &quot;{activeCustomModel?.modelName}&quot;
+            </span>{" "}
+            from your saved custom models. This action cannot be undone.
+          </>
+        }
+        cancelText="Cancel"
+        actionText="Delete"
+        variant="destructive"
+        onAction={async () => {
+          if (!activeCustomModel) return;
+          const modelName = activeCustomModel.modelName;
+          const updatedList = (form.customEmbeddings ?? []).filter(
+            (m) => m.modelName !== modelName,
+          );
+          const nextId =
+            updatedList.length > 0
+              ? `custom:${updatedList[0].modelName}`
+              : DEFAULT_CONFIG.embeddingModelId;
+          const nextForm = {
+            ...form,
+            embeddingModelId: nextId,
+            customEmbeddings: updatedList,
+          };
+          setForm(nextForm);
 
-                // Auto-save the deletion.
-                setSaving(true);
-                try {
-                  const res = await fetch("/api/config", {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(nextForm),
-                  });
-                  if (res.ok) {
-                    const json = await res.json();
-                    await mutate(json, { revalidate: false });
-                    setForm(json.config);
-                    toast.success(`Custom model "${modelName}" deleted`);
-                  }
-                } catch {
-                  toast.error("Failed to save after deletion");
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          setSaving(true);
+          try {
+            const res = await fetch("/api/config", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(nextForm),
+            });
+            if (res.ok) {
+              const json = await res.json();
+              await mutate(json, { revalidate: false });
+              setForm(json.config);
+              toast.success(`Custom model "${modelName}" deleted`);
+            }
+          } catch {
+            toast.error("Failed to save after deletion");
+          } finally {
+            setSaving(false);
+          }
+        }}
+      />
     </div>
   );
 }

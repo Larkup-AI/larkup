@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useSWR from "swr";
 import {
   CheckCircle2,
@@ -12,6 +12,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatErrorMessage } from "@/lib/error-formatter";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,9 +48,11 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 export function FirecrawlNotice({
   cloudConfigured = false,
   onChange,
+  onErrorChange,
 }: {
   cloudConfigured?: boolean;
   onChange?: () => void;
+  onErrorChange?: (hasError: boolean) => void;
 }) {
   const { data, mutate, isLoading } = useSWR<LocalResponse>(
     "/api/firecrawl/local",
@@ -64,6 +67,14 @@ export function FirecrawlNotice({
   const state = data?.state;
   const docker = data?.docker;
   const running = state?.running ?? false;
+  const dockerReady = docker?.compose ?? false;
+  const hasError = !cloudConfigured && (!dockerReady || !!state?.lastError);
+
+  useEffect(() => {
+    if (!isLoading) {
+      onErrorChange?.(hasError);
+    }
+  }, [hasError, isLoading, onErrorChange]);
 
   async function control(action: "start" | "stop") {
     setBusy(action);
@@ -100,7 +111,7 @@ export function FirecrawlNotice({
       onChange?.();
     } catch (err) {
       toast.error("Could not control local Firecrawl", {
-        description: err instanceof Error ? err.message : undefined,
+        description: formatErrorMessage(err),
       });
     } finally {
       setBusy(null);
@@ -109,8 +120,6 @@ export function FirecrawlNotice({
 
   // Cloud key present and no local instance running → nothing to show.
   if (cloudConfigured && !running && !state?.startedAt) return null;
-
-  const dockerReady = docker?.compose ?? false;
 
   return (
     <Alert>
@@ -153,17 +162,17 @@ export function FirecrawlNotice({
         )}
 
         {/* Docker readiness hint */}
-        {!isLoading && !dockerReady && !running && (
+        {!isLoading && !dockerReady && !running && docker?.message && (
           <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-destructive" />
-            <span>{docker?.message}</span>
+            <span>{formatErrorMessage(docker.message)}</span>
           </div>
         )}
 
         {state?.lastError && !running && (
           <div className="flex items-start mb-3 gap-2 max-h-[200px]! overflow-auto rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-            <span>{state.lastError}</span>
+            <span>{formatErrorMessage(state.lastError)}</span>
           </div>
         )}
 

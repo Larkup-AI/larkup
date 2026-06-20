@@ -47,7 +47,7 @@ export function GenericAlert({
             {title}
           </AlertDialogTitle>
           {description && (
-            <AlertDialogDescription className={typeof description === "string" ? "" : "space-y-2"}>
+            <AlertDialogDescription className={typeof description === "string" ? "whitespace-pre-wrap" : "space-y-2"}>
               {description}
             </AlertDialogDescription>
           )}

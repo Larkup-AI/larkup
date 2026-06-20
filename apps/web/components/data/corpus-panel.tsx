@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { formatErrorMessage } from "@/lib/error-formatter";
 import {
   FileText,
   Trash2,
@@ -15,7 +16,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { DocumentSource, SourceDocument } from "@larkup-rag/core/types";
-import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { GenericAlert } from "@/components/alerts/generic-alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -292,7 +293,7 @@ export function CorpusPanel({
         }}
       />
 
-      <ConfirmModal
+      <GenericAlert
         open={deleteTask !== null}
         onOpenChange={(open) => {
           if (!open) setDeleteTask(null);
@@ -313,9 +314,9 @@ export function CorpusPanel({
                   deleteTask?.type === "single" ? deleteTask.doc.title : ""
                 }"?`
         }
-        confirmText="Delete"
+        actionText="Delete"
         variant="destructive"
-        onConfirm={() => {
+        onAction={() => {
           if (deleteTask?.type === "all") {
             clearAll();
           } else if (deleteTask?.type === "selected") {
@@ -379,13 +380,13 @@ function DocumentDialog({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        toast.error(body.error ?? "Failed to save document.");
+        toast.error(body.error ? formatErrorMessage(new Error(body.error)) : "Failed to save document.");
         return;
       }
       toast.success("Document saved");
       onSaved();
-    } catch {
-      toast.error("Could not reach the server.");
+    } catch (err) {
+      toast.error(formatErrorMessage(err) || "Could not reach the server.");
     } finally {
       setSaving(false);
     }

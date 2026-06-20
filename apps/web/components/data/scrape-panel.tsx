@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
+import { formatErrorMessage } from "@/lib/error-formatter";
 import {
   Globe,
   Loader2,
@@ -33,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { GenericAlert } from "@/components/alerts/generic-alert";
 import { cn } from "@/lib/utils";
 
 function domainOf(url: string) {
@@ -233,9 +234,7 @@ export function ScrapePanel({
         fetchSerperTotalCount(q);
       }
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : `Search failed for "${q}"`,
-      );
+      toast.error(formatErrorMessage(err));
     }
   }
 
@@ -299,9 +298,7 @@ export function ScrapePanel({
         toast.message("No results — try different keywords.");
       }
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : `Search failed for "${q}"`,
-      );
+      toast.error(formatErrorMessage(err));
     } finally {
       if (appendPagination) setLoadingMore(false);
     }
@@ -361,9 +358,7 @@ export function ScrapePanel({
           queries.map((q) => searchSerper(q, 1, queries.length > 1, false)),
         );
       } else {
-        toast.error(
-          "No search provider available. Configure Firecrawl or add SERPER_API_KEY.",
-        );
+        toast.error(formatErrorMessage(new Error("No search provider available. Configure Firecrawl or add SERPER_API_KEY.")));
       }
     } finally {
       setSearching(false);
@@ -431,9 +426,7 @@ export function ScrapePanel({
       }
       toast.success("All available results gathered!");
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to gather all results",
-      );
+      toast.error(formatErrorMessage(err));
     } finally {
       setGatheringAll(false);
       setGatherProgress(0);
@@ -541,7 +534,7 @@ export function ScrapePanel({
       setSelected({});
       onStarted();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not start job");
+      toast.error(formatErrorMessage(err));
     } finally {
       setStarting(false);
     }
@@ -994,7 +987,7 @@ export function ScrapePanel({
       )}
 
       {/* Confirmation modal */}
-      <ConfirmModal
+      <GenericAlert
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Start ETL Job?"
@@ -1003,8 +996,8 @@ export function ScrapePanel({
             ? `This will scrape ${selectedUrls.length} specific URL${selectedUrls.length !== 1 ? "s" : ""} exactly as provided — no deep crawl or pagination.\n\nThe job will run in the background. You can navigate away and check progress anytime.`
             : `This will scrape ${selectedUrls.length} ${scope === "domain" ? "domain(s)" : "page(s)"}${scope === "domain" ? ` with up to ${pageLimit} pages each` : ""}.\n\n• Total pages: ~${estimate.totalPages.toLocaleString()}\n• Estimated time: ${formatDuration(estimate.estimatedSeconds)}\n\nThe job will run in the background. You can navigate away and check progress anytime.`
         }
-        confirmText="Start ETL Job"
-        onConfirm={startJob}
+        actionText="Start ETL Job"
+        onAction={startJob}
       />
     </div>
   );

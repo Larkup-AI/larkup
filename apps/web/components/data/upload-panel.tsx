@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { formatErrorMessage } from "@/lib/error-formatter";
 import { FileUp, Loader2, X, Settings2, Columns, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -162,8 +163,8 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
             rawContent: content,
           });
         }
-      } catch {
-        toast.error(`Could not read ${file.name}.`);
+      } catch (err) {
+        toast.error(`Could not read ${file.name}. ${formatErrorMessage(err)}`);
       }
     }
     setStaged((prev) => [...prev, ...next]);

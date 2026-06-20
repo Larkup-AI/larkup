@@ -1,24 +1,25 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { toast } from "sonner"
-import { Plus, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { useState } from "react";
+import { toast } from "sonner";
+import { formatErrorMessage } from "@/lib/error-formatter";
+import { Plus, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export function PastePanel({ onAdded }: { onAdded: () => void }) {
-  const [title, setTitle] = useState("")
-  const [content, setContent] = useState("")
-  const [saving, setSaving] = useState(false)
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [saving, setSaving] = useState(false);
 
   async function submit() {
     if (!content.trim()) {
-      toast.error("Nothing to add — paste some text first.")
-      return
+      toast.error("Nothing to add — paste some text first.");
+      return;
     }
-    setSaving(true)
+    setSaving(true);
     try {
       const res = await fetch("/api/documents", {
         method: "POST",
@@ -28,16 +29,16 @@ export function PastePanel({ onAdded }: { onAdded: () => void }) {
           content,
           source: "paste",
         }),
-      })
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed")
-      toast.success("Added to corpus")
-      setTitle("")
-      setContent("")
-      onAdded()
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      toast.success("Added to corpus");
+      setTitle("");
+      setContent("");
+      onAdded();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to add text")
+      toast.error(formatErrorMessage(err));
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
@@ -57,7 +58,7 @@ export function PastePanel({ onAdded }: { onAdded: () => void }) {
         <Textarea
           id="paste-content"
           placeholder="Paste any text, markdown, or notes here…"
-          className="min-h-48 font-mono text-xs leading-relaxed"
+          className="min-h-48 font-mono text-xs leading-relaxed bg-white"
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />
@@ -74,5 +75,5 @@ export function PastePanel({ onAdded }: { onAdded: () => void }) {
         Add to corpus
       </Button>
     </div>
-  )
+  );
 }

@@ -7,7 +7,7 @@ export default function DataPage() {
       <PageHeader
         eyebrow="Step 2 · Data"
         title="Load &amp; scrape data"
-        description="Aggregate everything publicly available about a source. Search the web and crawl whole domains with the Firecrawl ETL , long jobs stream documents into your corpus as they run or paste and upload text directly."
+        description="Manage your corpus and ETL jobs. Load new data via web scraping, pasting, or uploading files."
       />
       <DataWorkspace />
     </div>
