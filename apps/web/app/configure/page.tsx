@@ -1,15 +1,58 @@
+"use client";
+
+import { useState, useCallback } from "react";
 import { PageHeader } from "@/components/page-header";
-import { ConfigureForm } from "@/components/configure/configure-form";
+import {
+  ConfigureForm,
+  type ConfigureFormHandle,
+} from "@/components/configure/configure-form";
+import { Button } from "@/components/ui/button";
+import { Loader2, Save, Check } from "lucide-react";
 
 export default function ConfigurePage() {
+  const [handle, setHandle] = useState<ConfigureFormHandle | null>(null);
+
+  const onHandleReady = useCallback((h: ConfigureFormHandle) => {
+    setHandle({ ...h });
+  }, []);
+
+  const dirty = handle?.dirty ?? false;
+  const saving = handle?.saving ?? false;
+
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex  min-h-full flex-col">
       <PageHeader
         eyebrow="Step 1 · Configure"
         title="Pipeline configuration"
-        description="Choose your embedding model, indexing strategy, and vector store. Each store declares exactly the credentials it needs and the server you generate later ships only those dependencies."
+        description="Choose your embedding model, indexing strategy, and vector store. "
+        actions={
+          <Button
+            size="lg"
+            variant={dirty ? "default" : "default"}
+            disabled={saving || !dirty}
+            onClick={() => handle?.requestSave()}
+            className="min-w-[110px]  transition-all"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Saving…
+              </>
+            ) : dirty ? (
+              <>
+                <Save className="size-4" />
+                Save
+              </>
+            ) : (
+              <>
+                <Check className="size-4" />
+                Saved
+              </>
+            )}
+          </Button>
+        }
       />
-      <ConfigureForm />
+      <ConfigureForm onHandleReady={onHandleReady} />
     </div>
   );
 }

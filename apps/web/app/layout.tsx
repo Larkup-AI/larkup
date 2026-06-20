@@ -32,7 +32,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} bg-transparent`}
     >
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased ">
         <ThemeCustomizerProvider>
           <WorkspaceProvider>
             <ClientLayoutWrapper>{children}</ClientLayoutWrapper>

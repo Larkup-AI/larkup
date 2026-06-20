@@ -14,7 +14,7 @@ export function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 border-b border-border px-6 py-6 sm:flex-row sm:items-end sm:justify-between md:px-8">
+    <div className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
       <div className="space-y-1">
         {eyebrow && (
           <p className="text-[11px] font-medium uppercase tracking-wider text-primary font-mono">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import useSWR from "swr";
 import {
   ChevronDown,
@@ -15,6 +15,7 @@ import {
   Trash2,
   AlertCircle,
   ExternalLink,
+  CheckCircle2,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -84,6 +85,7 @@ import {
   VECTOR_STORE_LIST,
 } from "@larkup-rag/vector-stores/registry";
 import { StoreFields } from "@/components/configure/store-fields";
+import { useRouter } from "next/navigation";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
@@ -233,7 +235,19 @@ const EMBEDDING_BY_PROVIDER = EMBEDDING_MODELS.reduce<
 
 const indexFetcher = (url: string) => fetch(url).then((r) => r.json());
 
-export function ConfigureForm() {
+// Expose dirty state + save trigger so the configure page can place the button in the header
+export type ConfigureFormHandle = {
+  dirty: boolean;
+  saving: boolean;
+  requestSave: () => void;
+};
+
+export function ConfigureForm({
+  onHandleReady,
+}: {
+  onHandleReady?: (handle: ConfigureFormHandle) => void;
+}) {
+  const router = useRouter();
   const { data, isLoading, mutate } = useSWR("/api/config", fetcher);
   const { data: indexData } = useSWR("/api/index", indexFetcher, {
     refreshInterval: 0,
@@ -246,6 +260,11 @@ export function ConfigureForm() {
   const [hydrated, setHydrated] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  // Confirmation summary dialog before saving
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  // Unsaved-changes navigation blocker
+  const [navBlockOpen, setNavBlockOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   // Blocking alert dialogs when index already exists
   const [storeBlockAlertOpen, setStoreBlockAlertOpen] = useState(false);
   const [modelBlockAlertOpen, setModelBlockAlertOpen] = useState(false);
@@ -291,9 +310,11 @@ export function ConfigureForm() {
   };
 
   // Whether a completed index already exists
-  const indexedRun = indexData?.run?.status === "completed" ? indexData.run : null;
+  const indexedRun =
+    indexData?.run?.status === "completed" ? indexData.run : null;
   const indexedDimensions: number | null = indexedRun?.dimensions ?? null;
-  const indexedVectorStore: VectorStoreId | null = indexedRun?.vectorStore ?? null;
+  const indexedVectorStore: VectorStoreId | null =
+    indexedRun?.vectorStore ?? null;
 
   const selectStore = (id: VectorStoreId) => {
     if (id === form.vectorStore) return;
@@ -346,7 +367,54 @@ export function ConfigureForm() {
     [form, data, hydrated],
   );
 
-  async function handleSave() {
+  // Unsaved changes: block browser refresh / close
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
+  // Intercept Next.js App Router client-side link clicks when there are unsaved changes
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (!dirtyRef.current) return;
+      const anchor = (e.target as Element)?.closest("a[href]");
+      if (!anchor) return;
+      const href = anchor.getAttribute("href") ?? "";
+      // Only intercept same-origin relative navigation (not # links or external)
+      if (!href || href.startsWith("#") || href.startsWith("http")) return;
+      // Skip if it's already the configure page
+      if (href === "/configure" || href === "/") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPendingHref(href);
+      setNavBlockOpen(true);
+    };
+    document.addEventListener("click", handleClick, { capture: true });
+    return () =>
+      document.removeEventListener("click", handleClick, { capture: true });
+  }, []);
+
+  // Expose handle to parent
+  useEffect(() => {
+    if (onHandleReady) {
+      onHandleReady({
+        dirty,
+        saving,
+        requestSave: () => setSaveConfirmOpen(true),
+      });
+    }
+  }, [dirty, saving, onHandleReady]);
+
+  async function performSave() {
     const fieldErrors = validateStoreConfig(
       store,
       form.storeConfig,
@@ -435,20 +503,54 @@ export function ConfigureForm() {
     );
   }
 
+  // Build summary rows for confirm dialog
+  const summaryItems = [
+    { label: "Project", value: form.projectName },
+    {
+      label: "Embedding model",
+      value:
+        activeCustomModel?.modelName ??
+        embeddingModel?.label ??
+        form.embeddingModelId,
+    },
+    {
+      label: "Provider",
+      value: activeCustomModel
+        ? "Custom (OpenAI-compatible)"
+        : (embeddingMeta?.label ?? embeddingModel?.provider ?? "—"),
+    },
+    {
+      label: "Dimensions",
+      value: String(
+        activeCustomModel?.dimensions ?? embeddingModel?.dimensions ?? "—",
+      ),
+      mono: true,
+    },
+    { label: "Index type", value: indexTypeMeta?.label ?? form.indexType },
+    { label: "Vector store", value: store.label },
+    {
+      label: "Chunk size / overlap",
+      value: `${form.chunking.chunkSize} / ${form.chunking.chunkOverlap} tokens`,
+      mono: true,
+    },
+    { label: "Top-K", value: String(form.topK), mono: true },
+  ];
+
   return (
     <div className="px-6 py-6 md:px-8">
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* ── Main column ────────────────────────────────────────────── */}
-        <div className="space-y-6 lg:col-span-2">
+      {/* ── Cards: first two side-by-side, last card full-width below ── */}
+      <div className="mx-auto  space-y-5">
+        {/* Row 1: Project + Embedding side-by-side */}
+        <div className="grid gap-5 lg:grid-cols-2">
           {/* Project */}
           <Card>
-            <CardHeader>
-              <CardTitle>Project</CardTitle>
-              <CardDescription>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Project</CardTitle>
+              <CardDescription className="text-xs">
                 Identifies this pipeline and names the generated server.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-5 sm:grid-cols-2">
+            <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="projectName">Project name</Label>
                 <Input
@@ -477,23 +579,25 @@ export function ConfigureForm() {
             </CardContent>
           </Card>
 
-          {/* ── Embedding model + chunking ─────────────────────────── */}
+          {/* Embedding model */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <Sparkles className="size-4 text-primary" />
                 Embedding model
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs">
                 Used to embed chunks at index time and queries at runtime.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               {/* Model selector */}
               <div className="flex gap-2 items-start">
                 <Select
                   value={form.embeddingModelId}
-                  onValueChange={(v) => handleEmbeddingModelChange((v as string) ?? "")}
+                  onValueChange={(v) =>
+                    handleEmbeddingModelChange((v as string) ?? "")
+                  }
                 >
                   <SelectTrigger className="w-full flex-1">
                     {activeCustomModel ? (
@@ -669,7 +773,7 @@ export function ConfigureForm() {
                 </div>
               ) : null}
 
-              {/* Advanced chunking — directly under embedding model */}
+              {/* Advanced chunking */}
               <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
                 <CollapsibleTrigger className="-ml-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                   <ChevronDown
@@ -681,7 +785,7 @@ export function ConfigureForm() {
                   Advanced chunking
                 </CollapsibleTrigger>
                 <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-1 data-[state=open]:slide-in-from-top-1 pt-3">
-                  <div className="grid gap-5 sm:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="chunkSize">Chunk size</Label>
                       <Input
@@ -740,248 +844,269 @@ export function ConfigureForm() {
               </Collapsible>
             </CardContent>
           </Card>
+        </div>
 
-          {/* ── Indexing & Vector Store ────────────────────────────── */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="size-4 text-primary" />
-                Indexing &amp; Vector store
-              </CardTitle>
-              <CardDescription>
-                Choose how documents are matched at retrieval time and where
-                vectors are stored.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {/* Side-by-side row: index type select + vector store select */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                {/* Index type — select (same height as vector store) */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Index type
-                  </Label>
-                  <Select
-                    value={form.indexType}
-                    onValueChange={(v) => set("indexType", v as IndexType)}
-                  >
-                    <SelectTrigger className="w-full">
-                      {indexTypeMeta ? (
+        {/* Row 2: Indexing & Vector Store — full width */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Database className="size-4 text-primary" />
+              Indexing &amp; Vector store
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Choose how documents are matched at retrieval time and where
+              vectors are stored.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Side-by-side row: index type select + vector store select */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* Index type */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Index type
+                </Label>
+                <Select
+                  value={form.indexType}
+                  onValueChange={(v) => set("indexType", v as IndexType)}
+                >
+                  <SelectTrigger className="w-full">
+                    {indexTypeMeta ? (
+                      <span className="flex flex-col items-start leading-none">
+                        <span className="font-medium text-sm">
+                          {indexTypeMeta.label}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Select index type…
+                      </span>
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INDEX_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        <span className="flex flex-col">
+                          <span className="font-medium">{t.label}</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {t.hint}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Vector store */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Vector store
+                </Label>
+                <Select
+                  value={form.vectorStore}
+                  onValueChange={(v) => selectStore(v as VectorStoreId)}
+                >
+                  <SelectTrigger className="w-full">
+                    {storeMeta ? (
+                      <span className="flex items-center gap-2.5">
+                        <ProviderIcon
+                          src={storeMeta.iconSrc}
+                          alt={store.label}
+                          pillBg={storeMeta.pillBg}
+                          size={20}
+                        />
                         <span className="flex flex-col items-start leading-none">
                           <span className="font-medium text-sm">
-                            {indexTypeMeta.label}
+                            {store.label}
                           </span>
-                          {/* <span className="text-[10px] text-muted-foreground mt-0.5">
-                            {indexTypeMeta.hint}
-                          </span> */}
                         </span>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          Select index type…
-                        </span>
-                      )}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INDEX_TYPES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          <span className="flex flex-col">
-                            <span className="font-medium">{t.label}</span>
-                            <span className="text-[11px] text-muted-foreground">
-                              {t.hint}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Select a vector store…
+                      </span>
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VECTOR_STORE_LIST.map((s) => {
+                      const meta = STORE_META[s.id];
+                      return (
+                        <SelectItem key={s.id} value={s.id}>
+                          <span className="flex items-center gap-2.5">
+                            {meta && (
+                              <ProviderIcon
+                                src={meta.iconSrc}
+                                alt={s.label}
+                                pillBg={meta.pillBg}
+                                size={22}
+                              />
+                            )}
+                            <span className="flex flex-col">
+                              <span className="font-medium text-sm leading-tight">
+                                {s.label}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground leading-tight">
+                                {s.description.split(".")[0]}
+                              </span>
                             </span>
                           </span>
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
 
-                {/* Vector store — select with real icons */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Vector store
-                  </Label>
-                  <Select
-                    value={form.vectorStore}
-                    onValueChange={(v) => selectStore(v as VectorStoreId)}
+                {/* Store badges */}
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] font-mono uppercase"
                   >
-                    <SelectTrigger className="w-full">
-                      {storeMeta ? (
-                        <span className="flex items-center gap-2.5">
-                          <ProviderIcon
-                            src={storeMeta.iconSrc}
-                            alt={store.label}
-                            pillBg={storeMeta.pillBg}
-                            size={20}
-                          />
-                          <span className="flex flex-col items-start leading-none">
-                            <span className="font-medium text-sm">
-                              {store.label}
-                            </span>
-                            {/* <span className="text-[10px] text-muted-foreground mt-0.5">
-                              {store.runtime === "both"
-                                ? "local / cloud"
-                                : store.runtime}
-                            </span> */}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          Select a vector store…
-                        </span>
-                      )}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {VECTOR_STORE_LIST.map((s) => {
-                        const meta = STORE_META[s.id];
-                        return (
-                          <SelectItem key={s.id} value={s.id}>
-                            <span className="flex items-center gap-2.5">
-                              {meta && (
-                                <ProviderIcon
-                                  src={meta.iconSrc}
-                                  alt={s.label}
-                                  pillBg={meta.pillBg}
-                                  size={22}
-                                />
-                              )}
-                              <span className="flex flex-col">
-                                <span className="font-medium text-sm leading-tight">
-                                  {s.label}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground leading-tight">
-                                  {s.description.split(".")[0]}
-                                </span>
-                              </span>
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Store badges */}
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] font-mono uppercase"
+                    {store.runtime}
+                  </Badge>
+                  {store.docsUrl && (
+                    <a
+                      href={store.docsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-muted-foreground underline-offset-2 hover:underline hover:text-foreground transition-colors"
                     >
-                      {store.runtime}
-                    </Badge>
-                    {store.docsUrl && (
-                      <a
-                        href={store.docsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-muted-foreground underline-offset-2 hover:underline hover:text-foreground transition-colors"
-                      >
-                        docs
-                      </a>
-                    )}
-                  </div>
+                      docs
+                    </a>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* Store description */}
-              <p className="text-xs leading-relaxed text-muted-foreground border-t pt-4">
-                {store.description}
+            {/* Store description */}
+            <p className="text-xs leading-relaxed text-muted-foreground border-t pt-4">
+              {store.description}
+            </p>
+
+            {/* Store config fields */}
+            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4 transition-all duration-300">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                {store.label} configuration
               </p>
-
-              {/* Store config fields */}
-              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4 transition-all duration-300">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {store.label} configuration
-                </p>
-                <StoreFields
-                  store={store}
-                  values={form.storeConfig}
-                  errors={errors}
-                  onChange={setStoreValue}
-                  indexType={form.indexType}
-                />
-                <div className="flex justify-end pt-1">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleTestConnection}
-                    disabled={testing}
-                  >
-                    {testing ? (
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                    ) : (
-                      <Cloud className="mr-2 size-4" />
-                    )}
-                    Test Connection
-                  </Button>
-                </div>
+              <StoreFields
+                store={store}
+                values={form.storeConfig}
+                errors={errors}
+                onChange={setStoreValue}
+                indexType={form.indexType}
+              />
+              <div className="flex justify-end pt-1">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleTestConnection}
+                  disabled={testing}
+                >
+                  {testing ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  ) : (
+                    <Cloud className="mr-2 size-4" />
+                  )}
+                  Test Connection
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* ── Summary rail ───────────────────────────────────────────── */}
-        <div className="lg:col-span-1">
-          <div className="lg:sticky lg:top-6 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Summary</CardTitle>
-                <CardDescription>
-                  This config drives indexing and the generated server.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <SummaryRow label="Project" value={form.projectName} mono />
-                <SummaryRow
-                  label="Embeddings"
-                  value={embeddingModel?.label ?? form.embeddingModelId}
-                />
-                <SummaryRow
-                  label="Provider"
-                  value={
-                    embeddingMeta?.label ?? embeddingModel?.provider ?? "—"
-                  }
-                />
-                <SummaryRow
-                  label="Dimensions"
-                  value={
-                    activeCustomModel
-                      ? String(activeCustomModel.dimensions)
-                      : String(embeddingModel?.dimensions ?? "—")
-                  }
-                  mono
-                />
-                <SummaryRow label="Index" value={form.indexType} />
-                <SummaryRow
-                  label="Chunk"
-                  value={`${form.chunking.chunkSize}/${form.chunking.chunkOverlap}`}
-                  mono
-                />
-                <SummaryRow label="Store" value={store.label} />
-                <SummaryRow label="Top-K" value={String(form.topK)} mono />
-              </CardContent>
-            </Card>
+        {/* Last saved timestamp */}
+        {data?.config?.updatedAt &&
+          data.config.updatedAt !== new Date(0).toISOString() && (
+            <p className="text-center text-xs text-muted-foreground pb-2">
+              Last saved {new Date(data.config.updatedAt).toLocaleString()}
+            </p>
+          )}
+      </div>
+
+      {/* ── Save confirmation dialog ─────────────────────────────────────── */}
+      <Dialog open={saveConfirmOpen} onOpenChange={setSaveConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="size-5 text-primary" />
+              Confirm configuration
+            </DialogTitle>
+            <DialogDescription>
+              Review your settings before saving.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="divide-y divide-border rounded-lg border border-border overflow-hidden text-sm">
+            {summaryItems.map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center justify-between px-3 py-2 gap-3"
+              >
+                <span className="text-muted-foreground text-xs">
+                  {item.label}
+                </span>
+                <span
+                  className={cn(
+                    "font-medium text-right truncate",
+                    item.mono && "font-mono text-xs",
+                  )}
+                >
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="mt-2 gap-2">
+            <Button variant="outline" onClick={() => setSaveConfirmOpen(false)}>
+              Cancel
+            </Button>
             <Button
-              variant={"default"}
-              className="w-full"
-              onClick={handleSave}
-              disabled={saving || !dirty}
+              onClick={async () => {
+                setSaveConfirmOpen(false);
+                await performSave();
+              }}
+              disabled={saving}
             >
               {saving ? (
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin mr-2" />
               ) : (
-                <Save className="size-4" />
+                <Save className="size-4 mr-2" />
               )}
-              {saving ? "Saving…" : dirty ? "Save configuration" : "Saved"}
+              Save
             </Button>
-            {data?.config?.updatedAt &&
-              data.config.updatedAt !== new Date(0).toISOString() && (
-                <p className="text-center text-xs text-muted-foreground">
-                  Last saved {new Date(data.config.updatedAt).toLocaleString()}
-                </p>
-              )}
-          </div>
-        </div>
-      </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Unsaved changes navigation blocker ──────────────────────────── */}
+      <AlertDialog open={navBlockOpen} onOpenChange={setNavBlockOpen}>
+        <AlertDialogContent className={"max-w-xl! w-full!"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="size-5 text-amber-500" />
+              Unsaved changes
+            </AlertDialogTitle>
+            <AlertDialogDescription className={"pb-3"}>
+              You have unsaved changes to your configuration. If you leave now,
+              your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setNavBlockOpen(false)}>
+              Stay on page
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                setNavBlockOpen(false);
+                if (pendingHref) router.push(pendingHref);
+              }}
+            >
+              Leave without saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <CustomEmbeddingModal
         open={customModalOpen}
@@ -1039,7 +1164,10 @@ export function ConfigureForm() {
       />
 
       {/* ── Block: vector store change after index ─────────────────── */}
-      <AlertDialog open={storeBlockAlertOpen} onOpenChange={setStoreBlockAlertOpen}>
+      <AlertDialog
+        open={storeBlockAlertOpen}
+        onOpenChange={setStoreBlockAlertOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -1051,16 +1179,18 @@ export function ConfigureForm() {
                 Your index was built with{" "}
                 <span className="font-semibold text-foreground">
                   {indexedVectorStore
-                    ? getVectorStore(indexedVectorStore)?.label ?? indexedVectorStore
+                    ? (getVectorStore(indexedVectorStore)?.label ??
+                      indexedVectorStore)
                     : form.vectorStore}
-                </span>. Switching to a different vector store would make the
-                existing index incompatible — vectors are bound to the store
-                they were written to.
+                </span>
+                . Switching to a different vector store would make the existing
+                index incompatible — vectors are bound to the store they were
+                written to.
               </span>
               <span className="block">
                 To use a different vector store, go to the{" "}
-                <strong className="text-foreground">Index</strong> page and
-                run a full re-index with your new settings.
+                <strong className="text-foreground">Index</strong> page and run
+                a full re-index with your new settings.
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1081,7 +1211,10 @@ export function ConfigureForm() {
       </AlertDialog>
 
       {/* ── Block: embedding model dimension change after index ──────── */}
-      <AlertDialog open={modelBlockAlertOpen} onOpenChange={setModelBlockAlertOpen}>
+      <AlertDialog
+        open={modelBlockAlertOpen}
+        onOpenChange={setModelBlockAlertOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -1093,8 +1226,9 @@ export function ConfigureForm() {
                 Your index was built with{" "}
                 <span className="font-semibold text-foreground">
                   {indexedDimensions} dimensions
-                </span>. The selected model outputs a different vector size,
-                which is incompatible with the existing index.
+                </span>
+                . The selected model outputs a different vector size, which is
+                incompatible with the existing index.
               </span>
               <span className="block">
                 ✓ You can freely switch to any model that also produces{" "}
@@ -1102,8 +1236,8 @@ export function ConfigureForm() {
                   {indexedDimensions}d
                 </span>{" "}
                 vectors. To use a different dimension size, go to the{" "}
-                <strong className="text-foreground">Index</strong> page and
-                run a full re-index.
+                <strong className="text-foreground">Index</strong> page and run
+                a full re-index.
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1336,29 +1470,5 @@ function CustomEmbeddingModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function SummaryRow({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-muted-foreground">{label}</span>
-      <span
-        className={cn(
-          "truncate text-right font-medium",
-          mono && "font-mono text-xs",
-        )}
-      >
-        {value}
-      </span>
-    </div>
   );
 }
