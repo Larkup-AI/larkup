@@ -61,13 +61,8 @@ const SAMPLE_QUERIES = [
 ];
 
 export function DemoWorkspace() {
-  const { servers, activeServer } = useWorkspace();
-  const [serverId, setServerId] = useState<string | null>(null);
-
-  // Default the demo target to the active server once the workspace loads.
-  useEffect(() => {
-    if (!serverId && activeServer) setServerId(activeServer.id);
-  }, [serverId, activeServer]);
+  const { activeServer } = useWorkspace();
+  const serverId = activeServer?.id ?? null;
 
   const statusKey = serverId
     ? `/api/demo?serverId=${encodeURIComponent(serverId)}`

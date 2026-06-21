@@ -97,6 +97,14 @@ export async function list({ page = 1, limit = 20 } = {}) {
   }
 }
 
+export async function get(id) {
+  const t = await table()
+  const rows = await t.query().filter(\`id = '\${id}'\`).limit(1).toArray()
+  if (!rows.length) return null;
+  const row = rows[0];
+  return { id: row.id, text: row.text, title: row.title, url: row.url || undefined, documentId: row.documentId }
+}
+
 export async function add(docs) {
   const t = await table()
   await t.add(docs)
@@ -178,6 +186,20 @@ export async function list({ page = 1, limit = 20 } = {}) {
   return { documents, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
+export async function get(id) {
+  const fetched = await ns.fetch([id])
+  const r = fetched.records[id]
+  if (!r) return null;
+  const meta = r.metadata ?? {}
+  return {
+    id: r.id,
+    text: meta.text ?? "",
+    title: meta.title ?? "Untitled",
+    url: meta.url || undefined,
+    documentId: meta.documentId ?? "",
+  }
+}
+
 export async function add(docs) {
   const vectors = docs.map(d => ({
     id: d.id,
@@ -232,6 +254,7 @@ import { embedQuery } from "./embed.mjs"
 import * as store from "./store.mjs"
 import fs from "node:fs"
 import path from "node:path"
+import * as cheerio from "cheerio"
 
 const PORT = process.env.PORT || 8080
 const DEFAULT_TOP_K = Number(process.env.TOP_K || ${config.topK})
@@ -303,20 +326,65 @@ const server = createServer(async (req, res) => {
 
   if (req.method === "GET" && url.pathname === "/") {
     res.writeHead(200, { "Content-Type": "text/html" })
-    return res.end(\`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>\${${JSON.stringify(config.projectName)}} - RAG Server</title>
-          <link rel="icon" href="/favicon2.ico" type="image/x-icon" />
-        </head>
-        <body style="font-family: sans-serif; padding: 2rem;">
-          <h1>\${${JSON.stringify(config.projectName)}} is running</h1>
-          <p>Powered by larkup-rag</p>
-          <a href="/reference">View API Documentation &rarr;</a>
-        </body>
-      </html>
-    \`)
+    return res.end(\`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>\${${JSON.stringify(config.projectName)}} — RAG Server</title>
+  <link rel="icon" href="/favicon2.ico" type="image/x-icon" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F2EDE8;color:#18181b;overflow:hidden;position:relative}
+    body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.28 0 0 0 0 0.23 0 0 0 0 0.16 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:512px 512px;background-repeat:repeat;opacity:0.79;mix-blend-mode:overlay}
+    .bg-mesh{position:fixed;inset:0;z-index:0;background-image:radial-gradient(ellipse 55% 45% at 8% 4%,rgba(0,0,0,0.12),transparent 70%),radial-gradient(ellipse 45% 40% at 94% 92%,rgba(220,160,120,0.15),transparent 65%),radial-gradient(ellipse 70% 55% at 50% 50%,rgba(0,0,0,0.05),transparent 80%)}
+    .container{position:relative;z-index:1;text-align:center;max-width:800px;padding:2rem;}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:100px;font-size:0.75rem;font-weight:500;color:#000;background:rgba(255,255,255,0.8);border:1px solid rgba(0,0,0,0.1);margin-bottom:2rem;backdrop-filter:blur(4px);transition:colors .2s}
+    .badge:hover{background:#fff}
+    .badge .dot{width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 6px rgba(16,185,129,.4);animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    h1{font-size:3.5rem;font-weight:500;letter-spacing:-0.02em;color:#000;margin-bottom:1.5rem;line-height:1.05;}
+    .subtitle{font-size:1.125rem;color:#52525b;line-height:1.6;margin-bottom:3rem;max-width:600px;margin-left:auto;margin-right:auto;}
+    .actions{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0.75rem 1.5rem;font-size:0.875rem;font-weight:500;text-decoration:none;transition:all .2s ease;cursor:pointer;border:none;}
+    .btn-primary{background:#000000;color:#fff;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,0,0,.25)}
+    .btn-outline{background:transparent;color:#000;border:1px solid rgba(0,0,0,.12);}
+    .btn-outline:hover{background:rgba(255,255,255,0.5);border-color:rgba(0,0,0,.2);transform:translateY(-1px);}
+    .footer{margin-top:4rem;font-size:.875rem;color:#71717a}
+    .footer a{color:#000;text-decoration:underline;text-underline-offset:2px;}
+    .footer a:hover{color:#333;}
+    .icon{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    @media (max-width: 640px){ h1{font-size:2.5rem;} }
+  </style>
+</head>
+<body>
+  <div class="bg-mesh"></div>
+  <div class="container">
+    <div class="badge"><span class="dot"></span> Server Online</div>
+    <h1>\${${JSON.stringify(config.projectName)}}</h1>
+    <p class="subtitle">Your RAG retrieval server is live and ready to accept queries.<br/>Powered by <strong style="color:#000000">Larkup RAG</strong></p>
+    <div class="actions">
+      <a href="/reference" class="btn btn-primary">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        API Reference
+      </a>
+      <a href="https://github.com/BuddyHere-AI" target="_blank" rel="noopener" class="btn btn-outline">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Larkup RAG Team
+      </a>
+      <a href="mailto:contact@larkup.dev" class="btn btn-outline">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        Contact
+      </a>
+    </div>
+    <div class="footer">Built with <a href="https://github.com/BuddyHere-AI/buddy-rag" target="_blank" rel="noopener">larkup-rag</a> · v1.0</div>
+  </div>
+</body>
+</html>\`)
   }
 
   if (req.method === "POST" && url.pathname === "/query") {
@@ -339,6 +407,17 @@ const server = createServer(async (req, res) => {
       const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10) || 20))
       const result = await store.list({ page, limit })
       return send(res, 200, result)
+    } catch (err) {
+      return send(res, 500, { error: String(err?.message || err) })
+    }
+  }
+
+  if (req.method === "GET" && url.pathname.match(/^\\/documents\\/[^/]+$/) && !url.pathname.endsWith("/documents")) {
+    try {
+      const id = url.pathname.split("/").pop()
+      const doc = await store.get(id)
+      if (!doc) return send(res, 404, { error: "Document not found" })
+      return send(res, 200, doc)
     } catch (err) {
       return send(res, 500, { error: String(err?.message || err) })
     }
@@ -375,6 +454,40 @@ const server = createServer(async (req, res) => {
       const id = url.pathname.split("/").pop()
       await store.remove(id)
       return send(res, 200, { success: true })
+    } catch (err) {
+      return send(res, 500, { error: String(err?.message || err) })
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/scrape") {
+    try {
+      const { url: targetUrl } = await readBody(req)
+      if (!targetUrl || typeof targetUrl !== "string") {
+        return send(res, 400, { error: "Body must include a 'url' string." })
+      }
+      const fetchRes = await fetch(targetUrl)
+      if (!fetchRes.ok) return send(res, 502, { error: \`Failed to fetch \${targetUrl}: \${fetchRes.status}\` })
+      const html = await fetchRes.text()
+      const $ = cheerio.load(html)
+      $("script, style, nav, footer, header, iframe, noscript").remove()
+      const rawText = $("body").text().replace(/\\s+/g, " ").trim()
+      if (!rawText) return send(res, 422, { error: "No text content extracted from URL." })
+
+      const title = $("title").text().trim() || new URL(targetUrl).hostname
+      const CHUNK_SIZE = 1000
+      const chunks = []
+      for (let i = 0; i < rawText.length; i += CHUNK_SIZE) {
+        chunks.push(rawText.slice(i, i + CHUNK_SIZE))
+      }
+
+      const documentId = Math.random().toString(36).slice(2)
+      for (const [idx, chunk] of chunks.entries()) {
+        const id = \`\${documentId}-\${idx}\`
+        const vector = await embedQuery(chunk)
+        await store.add([{ id, vector, text: chunk, title: \`\${title} (part \${idx + 1})\`, url: targetUrl, documentId }])
+      }
+
+      return send(res, 200, { success: true, documentId, chunks: chunks.length })
     } catch (err) {
       return send(res, 500, { error: String(err?.message || err) })
     }
@@ -434,6 +547,15 @@ const server = createServer(async (req, res) => {
           }
         },
         "/documents/{id}": {
+          get: {
+            summary: "Get a single document by ID",
+            security: [{ bearerAuth: [] }],
+            parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+            responses: {
+              "200": { description: "Document object" },
+              "404": { description: "Document not found" }
+            }
+          },
           put: {
             summary: "Update a document",
             security: [{ bearerAuth: [] }],
@@ -448,6 +570,19 @@ const server = createServer(async (req, res) => {
             security: [{ bearerAuth: [] }],
             parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
             responses: { "200": { description: "Successful response" } }
+          }
+        },
+        "/scrape": {
+          post: {
+            summary: "Scrape a URL and ingest into the corpus",
+            security: [{ bearerAuth: [] }],
+            requestBody: {
+              content: { "application/json": { schema: { type: "object", required: ["url"], properties: { url: { type: "string", description: "URL to scrape" } } } } }
+            },
+            responses: {
+              "200": { description: "Scrape successful", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, documentId: { type: "string" }, chunks: { type: "integer" } } } } } },
+              "502": { description: "Failed to fetch the target URL" }
+            }
           }
         },
         "/health": {
@@ -682,10 +817,12 @@ vercel deploy
 - \`GET  /health\`           → \`{ ok: true }\`
 - \`GET  /reference\`        → Scalar API docs UI
 - \`POST /query\`            → \`{ query, hits: [{ id, score, title, url, text, documentId }] }\`
-- \`GET  /documents\`        → list all documents
+- \`GET  /documents\`        → list all documents (paginated)
+- \`GET  /documents/:id\`    → get a single document
 - \`POST /documents\`        → add a document
 - \`PUT  /documents/:id\`    → update a document
 - \`DELETE /documents/:id\`  → delete a document
+- \`POST /scrape\`           → scrape a URL and ingest into the corpus
 `;
 }
 
@@ -697,6 +834,7 @@ export function generateServer(config: RagConfig): GeneratedServer {
 
   const dependencies: Record<string, string> = {
     ai: "^6.0.0",
+    cheerio: "^1.0.0",
     ...store.serverDependencies,
   };
 
@@ -828,16 +966,19 @@ export function generateServer(config: RagConfig): GeneratedServer {
         path: "public/favicon2.ico",
         contents: fs.readFileSync(faviconPath).toString("base64"),
         language: "ico",
-        encoding: "base64"
+        encoding: "base64",
       });
     } else {
-      const webFaviconPath = path.resolve(process.cwd(), "apps/web/public/favicon2.ico");
+      const webFaviconPath = path.resolve(
+        process.cwd(),
+        "apps/web/public/favicon2.ico",
+      );
       if (fs.existsSync(webFaviconPath)) {
         files.push({
           path: "public/favicon2.ico",
           contents: fs.readFileSync(webFaviconPath).toString("base64"),
           language: "ico",
-          encoding: "base64"
+          encoding: "base64",
         });
       }
     }

@@ -31,7 +31,7 @@ export default function ConfigurePage() {
             variant={dirty ? "default" : "default"}
             disabled={saving || !dirty}
             onClick={() => handle?.requestSave()}
-            className="min-w-[110px]  transition-all"
+            className="min-w-[110px] h-9.5 rounded-sm transition-all text-white/90 text-[14px]"
           >
             {saving ? (
               <>
@@ -41,7 +41,7 @@ export default function ConfigurePage() {
             ) : dirty ? (
               <>
                 <Save className="size-4" />
-                Save
+                Save Configuration
               </>
             ) : (
               <>

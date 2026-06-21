@@ -370,9 +370,12 @@ export function ConfigureForm({
       if (!res.ok) {
         throw new Error(json.error ?? "Installation failed");
       }
-      toast.success(`${getVectorStore(storeId).label} installed successfully!`, {
-        description: `The ${json.package} package has been added to your project.`,
-      });
+      toast.success(
+        `${getVectorStore(storeId).label} installed successfully!`,
+        {
+          description: `The ${json.package} package has been added to your project.`,
+        },
+      );
       // Refresh install status optimistically so the UI instantly hides the install card
       await mutateStoreStatus(
         (current: any) => ({
@@ -382,7 +385,7 @@ export function ConfigureForm({
             [storeId]: { installed: true },
           },
         }),
-        { revalidate: true }
+        { revalidate: true },
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Installation failed");
@@ -1078,8 +1081,8 @@ export function ConfigureForm({
                       {store.label} is not installed
                     </p>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      {store.label} is an optional dependency and not included by default.
-                      Click <strong>Install</strong> to add the{" "}
+                      {store.label} is an optional dependency and not included
+                      by default. Click <strong>Install</strong> to add the{" "}
                       <code className="text-[11px] font-mono bg-muted px-1 py-0.5 rounded">
                         {Object.keys(store.serverDependencies)[0]}
                       </code>{" "}
@@ -1087,7 +1090,8 @@ export function ConfigureForm({
                     </p>
                     <p className="text-[11px] text-amber-700 dark:text-amber-400/80 leading-relaxed mt-2">
                       ⚠ Install only works in local development. For production
-                      deployments, add the package to your dependencies before deploying.
+                      deployments, add the package to your dependencies before
+                      deploying.
                     </p>
                   </div>
                 </div>
@@ -1307,8 +1311,8 @@ export function ConfigureForm({
             </span>
             <span className="block">
               To use a different vector store, go to the{" "}
-              <strong className="text-foreground">Index</strong> page and run
-              a full re-index with your new settings.
+              <strong className="text-foreground">Index</strong> page and run a
+              full re-index with your new settings.
             </span>
           </>
         }
@@ -1347,8 +1351,8 @@ export function ConfigureForm({
                 {indexedDimensions}d
               </span>{" "}
               vectors. To use a different dimension size, go to the{" "}
-              <strong className="text-foreground">Index</strong> page and run
-              a full re-index.
+              <strong className="text-foreground">Index</strong> page and run a
+              full re-index.
             </span>
           </>
         }

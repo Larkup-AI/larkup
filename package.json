@@ -6,6 +6,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
+    "test": "turbo test",
     "rag": "pnpm --filter @larkup-rag/cli rag",
     "test:publish": "pnpm build && pnpm publish -r --dry-run --no-git-checks"
   },

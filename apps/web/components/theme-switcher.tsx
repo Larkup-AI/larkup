@@ -35,9 +35,8 @@ const THEMES: { id: ThemeVariant; name: string; color: string }[] = [
 ];
 
 const BACKGROUNDS: { id: BackgroundVariant; name: string; color: string }[] = [
-  { id: "bg-default", name: "Theme Default", color: "transparent" },
+  { id: "bg-soft", name: "Theme Default", color: "#FBFAF8" },
   { id: "bg-warm", name: "Warm Cream", color: "#F7F1EA" },
-  { id: "bg-soft", name: "Soft White", color: "#FBFAF8" },
   { id: "bg-offwhite", name: "Off White", color: "#FCFBF8" },
   { id: "bg-pure", name: "Pure White", color: "#FFFFFF" },
 ];
@@ -134,7 +133,6 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
               </div>
             </div>
 
-            {/* Background Style */}
             <div className="space-y-3">
               <label className="text-sm font-medium flex items-center gap-2">
                 <SquareDashed className="h-4 w-4 text-muted-foreground" />{" "}
@@ -153,7 +151,7 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
                     }`}
                   >
                     <div
-                      className={`h-6 w-6 rounded-full border shrink-0 ${bg.id === "bg-default" ? "border-dashed" : "shadow-sm"}`}
+                      className={`h-6 w-6 rounded-full border shrink-0 ${bg.id === "bg-soft" ? "border-dashed" : "shadow-sm"}`}
                       style={{ background: bg.color }}
                     />
                   </button>

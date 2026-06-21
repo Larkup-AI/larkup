@@ -228,7 +228,7 @@ function LaunchPanel({
                   Stop server
                 </Button>
                 <a
-                  href={`${state.endpoint}/health`}
+                  href={`${state.endpoint}`}
                   target="_blank"
                   rel="noreferrer"
                   className={buttonVariants({ variant: "secondary" })}
