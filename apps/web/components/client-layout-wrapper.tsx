@@ -4,7 +4,6 @@ import { useThemeCustomizer } from "./theme-customizer-provider";
 import { AppSidebar } from "./app-sidebar";
 import { AppTopNav } from "./app-topnav";
 import { WorkspaceTopBar } from "@/components/workspace/workspace-top-bar";
-import { ThemeSwitcher } from "./theme-switcher";
 import { cn } from "@/lib/utils";
 
 export function ClientLayoutWrapper({
@@ -49,9 +48,7 @@ export function ClientLayoutWrapper({
           <WorkspaceTopBar />
           {/* Main layout container */}
           <div className="flex-1 overflow-auto">
-            <div className="container mx-auto pb-8">
-              {children}
-            </div>
+            <div className="container mx-auto pb-8">{children}</div>
           </div>
         </div>
       </main>

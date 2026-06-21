@@ -243,3 +243,7 @@
   opacity: var(--noise-opacity-dark);
   mix-blend-mode: screen;
 }
+
+[data-sonner-toaster] {
+  z-index: 999999 !important;
+}

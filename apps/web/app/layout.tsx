@@ -36,10 +36,10 @@ export default function RootLayout({
         <ThemeCustomizerProvider>
           <WorkspaceProvider>
             <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+            <Toaster position="bottom-right" />
             <OnboardingDialog />
           </WorkspaceProvider>
         </ThemeCustomizerProvider>
-        <Toaster position="bottom-right" />
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>

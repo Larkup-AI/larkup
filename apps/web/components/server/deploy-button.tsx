@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Rocket,
@@ -13,9 +13,11 @@ import {
   Copy,
   Settings2,
   KeyRound,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { deployToVercel, getServerEnvRequirements } from "@/app/actions/vercel";
+// import removed
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,11 +101,29 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showEnvVars, setShowEnvVars] = useState<Record<string, boolean>>({});
 
+  // ── SSH Deployment State
+  const [sshModalOpen, setSshModalOpen] = useState(false);
+  const [sshHost, setSshHost] = useState("");
+  const [sshUsername, setSshUsername] = useState("root");
+  const [sshAuthType, setSshAuthType] = useState<"key" | "password">("password");
+  const [sshKeyOrPassword, setSshKeyOrPassword] = useState("");
+  const [showSshPassword, setShowSshPassword] = useState(false);
+
+  // ── Password Change Dialog State (Hetzner first-login)
+  const [passwordChangeOpen, setPasswordChangeOpen] = useState(false);
+  const [newSshPassword, setNewSshPassword] = useState("");
+  const [confirmNewSshPassword, setConfirmNewSshPassword] = useState("");
+  const [showNewSshPassword, setShowNewSshPassword] = useState(false);
+  const [showConfirmSshPassword, setShowConfirmSshPassword] = useState(false);
+  // Store deploy params so we can retry after password change
+  const pendingDeployRef = useRef<{ host: string; username: string; auth: { type: string; value: string }; envVars: Record<string, string> } | null>(null);
+
   // Dynamic Environment Variables
   const [requiredEnv, setRequiredEnv] = useState<
     { key: string; help: string; required: boolean; defaultValue?: string }[]
   >([]);
   const [envValues, setEnvValues] = useState<Record<string, string>>({});
+  const [sshLogs, setSshLogs] = useState<string[]>([]);
 
   // ── Was the token already saved globally?
   const [tokenWasSaved, setTokenWasSaved] = useState(false);
@@ -150,7 +170,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
   }, [serverId]);
 
   useEffect(() => {
-    if ((vercelModalOpen || envModalOpen) && serverId) {
+    if ((vercelModalOpen || envModalOpen || sshModalOpen) && serverId) {
       getServerEnvRequirements(serverId).then((reqs) => {
         setRequiredEnv(reqs);
         // Only pre-fill keys that are present in the CURRENT config's .env.example.
@@ -168,7 +188,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
         setEnvValues(initialVals);
       });
     }
-  }, [vercelModalOpen, envModalOpen, serverId]);
+  }, [vercelModalOpen, envModalOpen, sshModalOpen, serverId]);
 
   const handleSaveEnv = async () => {
     if (apiKey) {
@@ -219,8 +239,14 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
     toast.info("Vercel token cleared.");
   };
 
-  const handleHetznerDeploy = () => {
-    toast.info("Hetzner deployment coming soon.");
+  const handleSSHDeploy = () => {
+    setSshLogs([]);
+    setSshModalOpen(true);
+  };
+
+  const handleDownload = (provider: string) => {
+    toast.success(`Downloading deployment package for ${provider}...`);
+    window.open(`/api/server/download?provider=${provider}`);
   };
 
   const handleGenerateKey = () => {
@@ -317,6 +343,181 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
     }
   };
 
+  /** Core SSH deploy logic — optionally accepts a newPassword for expired-password retry */
+  const executeSSHDeploy = async (overrideNewPassword?: string) => {
+    setIsDeploying(true);
+    toast.info("Connecting to server and deploying via SSH...", { duration: 10000 });
+
+    const deployHost = pendingDeployRef.current?.host || sshHost;
+    const deployUser = pendingDeployRef.current?.username || sshUsername;
+    const deployAuth = pendingDeployRef.current?.auth || { type: sshAuthType, value: sshKeyOrPassword };
+    const deployEnv = pendingDeployRef.current?.envVars || (() => {
+      const finalEnvVars = { ...envValues };
+      if (apiKey) {
+        finalEnvVars["SERVER_API_KEY"] = apiKey;
+        localStorage.setItem("rag_server_api_key", apiKey);
+      }
+      return finalEnvVars;
+    })();
+
+    try {
+      const bodyPayload: Record<string, any> = {
+        serverId,
+        host: deployHost,
+        username: deployUser,
+        privateKeyOrPassword: deployAuth,
+        envVars: deployEnv,
+      };
+      if (overrideNewPassword) {
+        bodyPayload.newPassword = overrideNewPassword;
+      }
+
+      const response = await fetch('/api/deploy/ssh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload),
+      });
+
+      if (!response.body) throw new Error("No response from server.");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let doneReading = false;
+      let buffer = "";
+
+      while (!doneReading) {
+        const { value, done } = await reader.read();
+        doneReading = done;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() || "";
+          for (const part of parts) {
+            if (part.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(part.slice(6));
+                if (data.type === "log") {
+                  setSshLogs(prev => [...prev, data.message]);
+                } else if (data.type === "password_change_required") {
+                  // Server's password is expired — ask the user for a new one
+                  pendingDeployRef.current = {
+                    host: deployHost,
+                    username: deployUser,
+                    auth: deployAuth,
+                    envVars: deployEnv,
+                  };
+                  setIsDeploying(false);
+                  setNewSshPassword("");
+                  setConfirmNewSshPassword("");
+                  setPasswordChangeOpen(true);
+                  return; // stop processing this stream
+                } else if (data.type === "password_changed") {
+                  navigator.clipboard.writeText(data.newPassword);
+                  toast.warning(
+                    <div className="flex flex-col gap-1">
+                      <span className="font-semibold">🔑 Password Changed</span>
+                      <p className="text-xs">Server password updated successfully:</p>
+                      <code className="block p-1 bg-background border border-border rounded font-mono text-xs select-all">
+                        {data.newPassword}
+                      </code>
+                      <p className="text-xs text-muted-foreground">Copied to clipboard. Save this!</p>
+                    </div>,
+                    { duration: 60000 }
+                  );
+                } else if (data.type === "done") {
+                  if (data.success) {
+                    localStorage.setItem(deployedUrlKey(serverId), data.url!);
+                    localStorage.setItem(deployedProviderKey(serverId), "hetzner");
+                    setDeployedUrl(data.url!);
+                    setDeployedProvider("hetzner");
+
+                    toast.success(
+                      <div className="flex flex-col gap-1">
+                        <span>Server deployed via SSH successfully!</span>
+                        {data.url && (
+                          <a
+                            href={data.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline font-medium hover:text-blue-500 transition-colors"
+                          >
+                            View Live Deployment ↗
+                          </a>
+                        )}
+                        {data.newPassword && (
+                          <div className="mt-2 p-2 bg-black/10 dark:bg-white/10 rounded text-xs">
+                            <p className="font-semibold text-destructive mb-1">Password was changed during deployment</p>
+                            <p>Your new root password is:</p>
+                            <code className="block mt-1 p-1 bg-background border border-border rounded font-mono select-all">
+                              {data.newPassword}
+                            </code>
+                            <p className="mt-1 text-muted-foreground">It has been copied to your clipboard.</p>
+                          </div>
+                        )}
+                      </div>,
+                      { duration: data.newPassword ? 30000 : undefined }
+                    );
+
+                    if (data.newPassword) {
+                      navigator.clipboard.writeText(data.newPassword);
+                    }
+                    pendingDeployRef.current = null;
+                    setSshModalOpen(false);
+                  } else {
+                    toast.error(data.error || "Failed to deploy via SSH.");
+                  }
+                } else if (data.type === "error") {
+                  toast.error(data.error || "Failed to deploy via SSH.");
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      }
+    } catch (e: any) {
+      toast.error(e.message || "An unexpected error occurred.");
+    } finally {
+      setIsDeploying(false);
+    }
+  };
+
+  const handleDeployToSSH = async () => {
+    if (!sshHost || !sshUsername || !sshKeyOrPassword) {
+      toast.error("Please fill in all SSH connection details.");
+      return;
+    }
+
+    for (const req of requiredEnv) {
+      if (req.required && !envValues[req.key]) {
+        toast.error(`Please provide a value for ${req.key}.`);
+        return;
+      }
+    }
+
+    setSshLogs([]);
+    pendingDeployRef.current = null;
+    await executeSSHDeploy();
+  };
+
+  /** Called when the user submits the password-change dialog */
+  const handlePasswordChangeAndRedeploy = async () => {
+    if (!newSshPassword) {
+      toast.error("Please enter a new password.");
+      return;
+    }
+    if (newSshPassword !== confirmNewSshPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+    if (newSshPassword.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    setPasswordChangeOpen(false);
+    setSshLogs(prev => [...prev, "", "--- Retrying with new password ---"]);
+    await executeSSHDeploy(newSshPassword);
+  };
+
   return (
     <div className="flex items-center gap-2">
       <TooltipProvider>
@@ -383,7 +584,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               Vercel
             </p>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleHetznerDeploy}>
+          <DropdownMenuItem onClick={handleSSHDeploy}>
             <p className="flex items-center">
               <img src={"/hetzner.svg"} className="size-4 mr-2" alt="vercel" />
               Hetzner
@@ -397,9 +598,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
             <DropdownMenuSubContent className="w-[240px]">
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() =>
-                  toast.info("Azure App Service deployment coming soon.")
-                }
+                onClick={() => handleDownload("azure-app-service")}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>App Service</span>
@@ -410,9 +609,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() =>
-                  toast.info("Azure Container Apps deployment coming soon.")
-                }
+                onClick={() => handleDownload("azure-container-apps")}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>Container Apps</span>
@@ -423,9 +620,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() =>
-                  toast.info("Azure Virtual Machines deployment coming soon.")
-                }
+                onClick={handleSSHDeploy}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>Virtual Machines</span>
@@ -445,9 +640,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
             <DropdownMenuSubContent className="w-[240px] ">
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() =>
-                  toast.info("AWS Elastic Beanstalk deployment coming soon.")
-                }
+                onClick={() => handleDownload("aws-elastic-beanstalk")}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>Elastic Beanstalk</span>
@@ -458,9 +651,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() =>
-                  toast.info("AWS App Runner / Fargate deployment coming soon.")
-                }
+                onClick={() => handleDownload("aws-app-runner")}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>App Runner / Fargate</span>
@@ -471,7 +662,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() => toast.info("AWS EC2 deployment coming soon.")}
+                onClick={handleSSHDeploy}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>EC2</span>
@@ -491,9 +682,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
             <DropdownMenuSubContent className="w-[240px]  ">
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() =>
-                  toast.info("GCP App Engine deployment coming soon.")
-                }
+                onClick={() => handleDownload("gcp-app-engine")}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>App Engine</span>
@@ -504,9 +693,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() =>
-                  toast.info("GCP Cloud Run deployment coming soon.")
-                }
+                onClick={() => handleDownload("gcp-cloud-run")}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>Cloud Run</span>
@@ -517,9 +704,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() =>
-                  toast.info("GCP Compute Engine deployment coming soon.")
-                }
+                onClick={handleSSHDeploy}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>Compute Engine</span>
@@ -543,11 +728,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
             <DropdownMenuSubContent className="w-[240px] ">
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() =>
-                  toast.info(
-                    "DigitalOcean App Platform deployment coming soon.",
-                  )
-                }
+                onClick={() => handleDownload("do-app-platform")}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>App Platform</span>
@@ -558,9 +739,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="h-auto"
-                onClick={() =>
-                  toast.info("DigitalOcean Droplets deployment coming soon.")
-                }
+                onClick={handleSSHDeploy}
               >
                 <div className="flex flex-col gap-0.5">
                   <span>Droplets</span>
@@ -732,6 +911,265 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
             <Button onClick={handleDeployToVercel} disabled={isDeploying}>
               {isDeploying && <Loader2 className="mr-2 size-4 animate-spin" />}
               Deploy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Main SSH Modal ── */}
+      <Dialog open={sshModalOpen} onOpenChange={setSshModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deploy via SSH (Hetzner, EC2, Droplets)</DialogTitle>
+            <DialogDescription>
+              BuddyHere will automatically connect, install Docker, and launch your server.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-5 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="ssh-host">Server IP / Hostname</Label>
+              <Input
+                id="ssh-host"
+                placeholder="e.g. 192.168.1.1 or myserver.com"
+                value={sshHost}
+                onChange={(e) => setSshHost(e.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="ssh-user">SSH Username</Label>
+              <Input
+                id="ssh-user"
+                placeholder="root"
+                value={sshUsername}
+                onChange={(e) => setSshUsername(e.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <Label>Authentication Type</Label>
+                <div className="flex gap-2">
+                  <Badge
+                    variant={sshAuthType === "key" ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => setSshAuthType("key")}
+                  >
+                    Private Key
+                  </Badge>
+                  <Badge
+                    variant={sshAuthType === "password" ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => setSshAuthType("password")}
+                  >
+                    Password
+                  </Badge>
+                </div>
+              </div>
+
+              {sshAuthType === "key" ? (
+                <textarea
+                  className="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                  placeholder="-----BEGIN OPENSSH PRIVATE KEY-----\n..."
+                  value={sshKeyOrPassword}
+                  onChange={(e) => setSshKeyOrPassword(e.target.value)}
+                />
+              ) : (
+                <div className="relative">
+                  <Input
+                    type={showSshPassword ? "text" : "password"}
+                    placeholder="SSH Password"
+                    value={sshKeyOrPassword}
+                    onChange={(e) => setSshKeyOrPassword(e.target.value)}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowSshPassword(!showSshPassword)}
+                  >
+                    {showSshPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {isDeploying && sshLogs.length > 0 && (
+              <div className="mt-2 bg-black text-[#00ff00] font-mono text-[10px] p-3 rounded-md h-[200px] overflow-y-auto break-all whitespace-pre-wrap leading-tight shadow-inner flex flex-col-reverse">
+                <div>
+                  {sshLogs.map((log, i) => (
+                    <div key={i}>{log}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+
+            {/* ── Environment Variables Summary + Button ── */}
+            <div className="border-t border-border pt-4 mt-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium">Environment Variables</h4>
+                  {envSummary.filled > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="text-[11px] font-normal tabular-nums"
+                    >
+                      {envSummary.filled}/{envSummary.total} configured
+                    </Badge>
+                  )}
+                  {envSummary.requiredMissing > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="text-[11px] font-normal"
+                    >
+                      {envSummary.requiredMissing} required
+                    </Badge>
+                  )}
+                  {envSummary.requiredMissing === 0 &&
+                    envSummary.filled > 0 && (
+                      <CheckCircle2 className="size-3.5 text-emerald-500" />
+                    )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-[11px] gap-1.5"
+                  onClick={() => setEnvModalOpen(true)}
+                >
+                  <Settings2 className="size-3.5" />
+                  Configure
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSshModalOpen(false)}
+              disabled={isDeploying}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleDeployToSSH} disabled={isDeploying}>
+              {isDeploying && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Deploy via SSH
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Password Change Dialog (Hetzner first-login) ── */}
+      <Dialog open={passwordChangeOpen} onOpenChange={(open) => {
+        if (!open) pendingDeployRef.current = null;
+        setPasswordChangeOpen(open);
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center justify-center size-9 rounded-full bg-amber-500/10 text-amber-500">
+                <ShieldAlert className="size-4.5" />
+              </div>
+              <DialogTitle>Password Change Required</DialogTitle>
+            </div>
+            <DialogDescription>
+              Your server requires a password change on first login.
+              Please set a new root password to continue the deployment.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-3">
+            <div className="grid gap-2">
+              <Label htmlFor="new-ssh-password">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="new-ssh-password"
+                  type={showNewSshPassword ? "text" : "password"}
+                  placeholder="Enter new root password"
+                  value={newSshPassword}
+                  onChange={(e) => setNewSshPassword(e.target.value)}
+                  className="pr-10"
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowNewSshPassword(!showNewSshPassword)}
+                >
+                  {showNewSshPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="confirm-ssh-password">Confirm Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirm-ssh-password"
+                  type={showConfirmSshPassword ? "text" : "password"}
+                  placeholder="Re-enter new password"
+                  value={confirmNewSshPassword}
+                  onChange={(e) => setConfirmNewSshPassword(e.target.value)}
+                  className="pr-10"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handlePasswordChangeAndRedeploy();
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmSshPassword(!showConfirmSshPassword)}
+                >
+                  {showConfirmSshPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {newSshPassword && confirmNewSshPassword && newSshPassword !== confirmNewSshPassword && (
+              <p className="text-xs text-destructive">Passwords do not match.</p>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              This is common for first-time logins on Hetzner, AWS EC2, and similar providers.
+              Your chosen password will be used to continue deployment.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPasswordChangeOpen(false);
+                pendingDeployRef.current = null;
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePasswordChangeAndRedeploy}
+              disabled={!newSshPassword || !confirmNewSshPassword || newSshPassword !== confirmNewSshPassword}
+            >
+              Change Password & Deploy
             </Button>
           </DialogFooter>
         </DialogContent>
