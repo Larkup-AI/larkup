@@ -20,3 +20,9 @@ lancedb/
 
 # Turbo
 .turbo/
+
+__pycache__
+venv
+.venv
+.pytest_cache
+apps/docs
