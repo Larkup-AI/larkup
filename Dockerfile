@@ -13,7 +13,6 @@ RUN corepack enable pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 # Copy package.json of apps and packages
 COPY apps/web/package.json ./apps/web/
-COPY apps/landing/package.json ./apps/landing/
 COPY apps/cli/package.json ./apps/cli/
 COPY packages/core/package.json ./packages/core/
 COPY packages/scraper/package.json ./packages/scraper/
