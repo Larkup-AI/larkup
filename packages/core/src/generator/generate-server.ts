@@ -1020,6 +1020,7 @@ export function generateServer(config: RagConfig): GeneratedServer {
     { path: "vercel.json", contents: vercelJson() },
     { path: ".env.example", contents: envExample(server) },
     { path: ".env", contents: generatedEnv },
+    { path: ".gitignore", contents: "node_modules\n.env\n.DS_Store\n" },
     { path: "README.md", contents: readme(config, server) },
   ].map((f) => ({ ...f, language: lang(f.path) }));
 
