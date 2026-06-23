@@ -31,7 +31,7 @@ COPY . .
 # Learn more here: https://nextjs.org/telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm --filter @larkup-rag/web build
+RUN pnpm --filter larkup-rag build
 
 # Production image, copy all the files and run next
 FROM base AS runner
