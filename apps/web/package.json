@@ -1,16 +1,21 @@
 {
-  "name": "@larkup-rag/web",
-  "version": "0.1.0",
-  "private": true,
+  "name": "larkup-rag",
+  "version": "0.1.2",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 4567",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 4567",
     "lint": "eslint ."
   },
   "dependencies": {
+    "@ai-sdk/cohere": "^3.0.39",
+    "@ai-sdk/deepseek": "^2.0.39",
+    "@ai-sdk/gateway": "^3.0.133",
+    "@ai-sdk/google": "^3.0.83",
+    "@ai-sdk/mistral": "^3.0.40",
     "@ai-sdk/openai": "^3.0.68",
+    "@ai-sdk/openai-compatible": "^2.0.51",
     "@base-ui/react": "^1.5.0",
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/lang-json": "^6.0.2",

@@ -1,0 +1,7 @@
+.next/
+.ragtoolkit/
+.turbo/
+node_modules/
+*.log
+.DS_Store
+tsconfig.tsbuildinfo

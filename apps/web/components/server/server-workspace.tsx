@@ -11,6 +11,7 @@ import {
   Server,
   Square,
   Terminal,
+  Trash2,
 } from "lucide-react";
 
 // Vercel triangle icon
@@ -34,6 +35,17 @@ import type {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -109,6 +121,14 @@ function LaunchPanel({
     if (provider) setRemoteProvider(provider);
     if (savedApiKey) setApiKey(savedApiKey);
   }, [serverId]);
+
+  function removeRemoteServer() {
+    localStorage.removeItem(`vercel_deployed_url_${serverId}`);
+    localStorage.removeItem(`vercel_deployed_provider_${serverId}`);
+    setRemoteUrl(null);
+    setRemoteProvider(null);
+    toast.success("Remote server removed.");
+  }
 
   const { data, mutate } = useSWR<{ state: LocalServerState }>(
     "/api/server/local",
@@ -288,6 +308,38 @@ function LaunchPanel({
                 <ExternalLink className="size-4" />
                 {remoteUrl.replace(/^https?:\/\//, "")}
               </a>
+              <AlertDialog>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  }
+                />
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Remove remote server?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will remove the remote server connection from this
+                      workspace. The deployed server itself will not be deleted
+                      from your provider.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={removeRemoteServer}
+                      className="bg-destructive  hover:bg-destructive/90"
+                    >
+                      Remove
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
             <div className="rounded-lg border border-border bg-muted/40 p-3">
               <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">

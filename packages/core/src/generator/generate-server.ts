@@ -236,10 +236,61 @@ export async function update(id, doc) {
 `;
 }
 
-function embedSource(modelId: string): string {
-  return `import { embed } from "ai"
+function embedSource(config: RagConfig): string {
+  let imports = `import { embed } from "ai"\n`
+  let init = ``;
+  
+  if (config.embeddingModelId.startsWith("custom:")) {
+    const customName = config.embeddingModelId.slice("custom:".length)
+    const custom = (config.customEmbeddings ?? []).find(m => m.modelName === customName)
+    imports += `import { createOpenAICompatible } from "@ai-sdk/openai-compatible"\n`
+    init = `const provider = createOpenAICompatible({
+  name: "custom_provider",
+  baseURL: process.env.EMBEDDING_BASE_URL || ${JSON.stringify(custom?.baseUrl || "")},
+  apiKey: process.env.EMBEDDING_API_KEY
+})
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(custom?.modelName || "")})`
+  } else if (config.embeddingProvider === "deepseek") {
+    imports += `import { createDeepSeek } from "@ai-sdk/deepseek"\n`
+    init = `const provider = createDeepSeek({
+  apiKey: process.env.EMBEDDING_API_KEY
+})
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`
+  } else if (config.embeddingProvider === "google") {
+    imports += `import { createGoogleGenerativeAI } from "@ai-sdk/google"\n`
+    init = `const provider = createGoogleGenerativeAI({
+  apiKey: process.env.EMBEDDING_API_KEY
+})
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`
+  } else if (config.embeddingProvider === "cohere") {
+    imports += `import { createCohere } from "@ai-sdk/cohere"\n`
+    init = `const provider = createCohere({
+  apiKey: process.env.EMBEDDING_API_KEY
+})
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`
+  } else if (config.embeddingProvider === "mistral") {
+    imports += `import { createMistral } from "@ai-sdk/mistral"\n`
+    init = `const provider = createMistral({
+  apiKey: process.env.EMBEDDING_API_KEY
+})
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`
+  } else if (config.embeddingProvider === "vercel_ai_gateway") {
+    imports += `import { createGateway } from "@ai-sdk/gateway"\n`
+    init = `const gateway = createGateway({
+  apiKey: process.env.EMBEDDING_API_KEY
+})
+const MODEL = gateway.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`
+  } else {
+    imports += `import { createOpenAI } from "@ai-sdk/openai"\n`
+    init = `const provider = createOpenAI({
+  apiKey: process.env.EMBEDDING_API_KEY
+})
+const modelName = process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)};
+const MODEL = provider.embedding(modelName.includes("/") ? modelName.split("/")[1] : modelName)`
+  }
 
-const MODEL = process.env.EMBEDDING_MODEL || ${JSON.stringify(modelId)}
+  return `${imports}
+${init}
 
 export async function embedQuery(text) {
   const { embedding } = await embed({ model: MODEL, value: text })
@@ -840,9 +891,9 @@ export function generateServer(config: RagConfig): GeneratedServer {
 
   const envVars: GeneratedServer["envVars"] = [
     {
-      key: "AI_GATEWAY_API_KEY",
+      key: "EMBEDDING_API_KEY",
       required: true,
-      help: "Vercel AI Gateway key used to embed incoming queries.",
+      help: "API key used to embed incoming queries.",
     },
     {
       key: "PORT",
@@ -936,10 +987,24 @@ export function generateServer(config: RagConfig): GeneratedServer {
     engines: { node: ">=20" },
   };
 
+  const generatedEnv = server.envVars
+    .map((e) => {
+      let val = "";
+      if (e.key === "EMBEDDING_API_KEY") val = config.embeddingApiKey || "";
+      // Pre-fill other env vars if they are in storeConfig
+      if (e.key === "PINECONE_API_KEY") val = config.storeConfig.apiKey || "";
+      if (e.key === "PINECONE_INDEX") val = config.storeConfig.indexName || "";
+      if (e.key === "PINECONE_NAMESPACE") val = config.storeConfig.namespace || "";
+      if (e.key === "LANCEDB_URI") val = config.storeConfig.uri || "";
+      if (e.key === "LANCEDB_API_KEY") val = config.storeConfig.apiKey || "";
+      return `${e.key}=${val}`;
+    })
+    .join("\n");
+
   const files: GeneratedFile[] = [
     { path: "package.json", contents: JSON.stringify(pkg, null, 2) + "\n" },
     { path: "server.mjs", contents: serverSource(config) },
-    { path: "embed.mjs", contents: embedSource(config.embeddingModelId) },
+    { path: "embed.mjs", contents: embedSource(config) },
     {
       path: "store.mjs",
       contents:
@@ -954,6 +1019,7 @@ export function generateServer(config: RagConfig): GeneratedServer {
     },
     { path: "vercel.json", contents: vercelJson() },
     { path: ".env.example", contents: envExample(server) },
+    { path: ".env", contents: generatedEnv },
     { path: "README.md", contents: readme(config, server) },
   ].map((f) => ({ ...f, language: lang(f.path) }));
 

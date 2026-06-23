@@ -27,3 +27,5 @@ venv
 .pytest_cache
 apps/docs
 dist
+apps/web/demo
+npm-login.sh

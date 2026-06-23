@@ -78,7 +78,7 @@ export interface VectorStoreDescriptor {
 /* Embeddings                                                          */
 /* ------------------------------------------------------------------ */
 
-export type EmbeddingProvider = "openai" | "google" | "cohere" | "voyage" | "mistral" | "jina" | "nomic" | "custom"
+export type EmbeddingProvider = "openai" | "google" | "cohere" | "voyage" | "mistral" | "jina" | "nomic" | "custom" | "vercel_ai_gateway" | "deepseek"
 
 export interface CustomEmbeddingConfig {
   baseUrl: string
@@ -120,6 +120,8 @@ export interface ChunkingParams {
 export interface RagConfig {
   /** project label, used when generating the server */
   projectName: string
+  embeddingProvider: string
+  embeddingApiKey?: string
   embeddingModelId: string
   customEmbeddings?: CustomEmbeddingConfig[]
   indexType: IndexType
@@ -134,6 +136,8 @@ export interface RagConfig {
 
 export const DEFAULT_CONFIG: RagConfig = {
   projectName: "my-rag",
+  embeddingProvider: "openai",
+  embeddingApiKey: "",
   embeddingModelId: "openai/text-embedding-3-small",
   indexType: "hybrid",
   chunking: {

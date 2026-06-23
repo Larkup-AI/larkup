@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Download,
   Clock,
+  Settings,
 } from "lucide-react";
 import { GenericAlert } from "@/components/alerts/generic-alert";
 import {
@@ -141,6 +142,16 @@ const PROVIDER_META: Record<EmbeddingProvider, ProviderMeta> = {
     label: "Custom",
     iconSrc: "/logo.png",
     pillBg: "bg-slate-100 dark:bg-slate-800",
+  },
+  vercel_ai_gateway: {
+    label: "Vercel AI Gateway",
+    iconSrc: "/icons/vercel.svg",
+    pillBg: "bg-white dark:bg-white text-white dark:text-black",
+  },
+  deepseek: {
+    label: "DeepSeek",
+    iconSrc: "/logo.png", // Replace with DeepSeek icon if available
+    pillBg: "bg-blue-50 dark:bg-blue-950/40",
   },
 };
 
@@ -268,6 +279,9 @@ export function ConfigureForm({
   // Blocking alert dialogs when index already exists
   const [storeBlockAlertOpen, setStoreBlockAlertOpen] = useState(false);
   const [modelBlockAlertOpen, setModelBlockAlertOpen] = useState(false);
+  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
+  const [testingKey, setTestingKey] = useState(false);
+  const [showProviderApiKey, setShowProviderApiKey] = useState(false);
 
   // Is the currently selected store actually installed (for installable stores)?
   const isStoreInstalled = useCallback(
@@ -416,6 +430,13 @@ export function ConfigureForm({
       return;
     }
     set("embeddingModelId", v);
+    if (!form.embeddingApiKey) {
+      toast.error("API Key Required", {
+        description:
+          "Please set an API key for this provider. Recommended: Vercel AI Gateway Key.",
+      });
+      setApiKeyModalOpen(true);
+    }
   };
 
   const dirty = useMemo(
@@ -638,9 +659,19 @@ export function ConfigureForm({
           {/* Embedding model */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Sparkles className="size-4 text-primary" />
-                Embedding model
+              <CardTitle className="flex items-center justify-between text-base">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-primary" />
+                  Embedding model
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setApiKeyModalOpen(true)}
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                >
+                  <Settings className="size-4" />
+                </Button>
               </CardTitle>
               <CardDescription className="text-xs">
                 Used to embed chunks at index time and queries at runtime.
@@ -648,137 +679,137 @@ export function ConfigureForm({
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Model selector */}
-              <div className="flex gap-2 items-start">
-                <Select
-                  value={form.embeddingModelId}
-                  onValueChange={(v) =>
-                    handleEmbeddingModelChange((v as string) ?? "")
-                  }
-                >
-                  <SelectTrigger className="w-full flex-1">
-                    {activeCustomModel ? (
-                      <span className="flex items-center gap-2.5">
-                        <ProviderIcon
-                          src={PROVIDER_META.custom.iconSrc}
-                          alt="Custom"
-                          pillBg={PROVIDER_META.custom.pillBg}
-                          size={20}
-                        />
-                        <span className="flex flex-col items-start leading-none">
-                          <span className="font-medium text-sm">
-                            {activeCustomModel.modelName}
-                          </span>
-                        </span>
-                      </span>
-                    ) : embeddingModel && embeddingMeta ? (
-                      <span className="flex items-center gap-2.5">
-                        <ProviderIcon
-                          src={embeddingMeta.iconSrc}
-                          alt={embeddingMeta.label}
-                          pillBg={embeddingMeta.pillBg}
-                          size={20}
-                        />
-                        <span className="flex flex-col items-start leading-none">
-                          <span className="font-medium text-sm ">
-                            {embeddingModel.label}
-                          </span>
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        Select a model…
-                      </span>
-                    )}
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[320px]">
-                    {Object.entries(EMBEDDING_BY_PROVIDER).map(
-                      ([provider, models]) => {
-                        const meta =
-                          PROVIDER_META[provider as EmbeddingProvider];
-                        return (
-                          <SelectGroup key={provider}>
-                            <SelectLabel className="flex items-center gap-2 py-1.5">
-                              {meta && (
-                                <ProviderIcon
-                                  src={meta.iconSrc}
-                                  alt={meta.label}
-                                  pillBg={meta.pillBg}
-                                  size={18}
-                                />
-                              )}
-                              <span className="font-medium">
-                                {meta?.label ?? provider}
-                              </span>
-                            </SelectLabel>
-                            {models.map((m) => (
-                              <SelectItem
-                                key={m.id}
-                                value={m.id}
-                                className="pl-8"
-                              >
-                                <span className="flex items-center gap-2">
-                                  <span>{m.label}</span>
-                                  <span className="text-[10px] text-muted-foreground font-mono">
-                                    {m.dimensions}d
-                                  </span>
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        );
-                      },
-                    )}
-                    {/* Custom models group — one entry per saved custom model */}
-                    {(form.customEmbeddings ?? []).length > 0 && (
-                      <SelectGroup>
-                        <SelectLabel className="flex items-center gap-2 py-1.5">
+              <div className="space-y-1.5">
+                <Label>Model</Label>
+                <div className="flex gap-2 items-start">
+                  <Select
+                    value={form.embeddingModelId}
+                    onValueChange={(v) =>
+                      handleEmbeddingModelChange((v as string) ?? "")
+                    }
+                  >
+                    <SelectTrigger
+                      className="w-full flex-1"
+                      onPointerDown={(e) => {
+                        if (!form.embeddingApiKey) {
+                          e.preventDefault();
+                          toast.info("API Key Required", {
+                            description:
+                              "Please set an API key first. Recommended: Vercel AI Gateway Key.",
+                          });
+                          setApiKeyModalOpen(true);
+                        }
+                      }}
+                    >
+                      {activeCustomModel ? (
+                        <span className="flex items-center gap-2.5">
                           <ProviderIcon
                             src={PROVIDER_META.custom.iconSrc}
                             alt="Custom"
                             pillBg={PROVIDER_META.custom.pillBg}
-                            size={18}
+                            size={20}
                           />
-                          <span className="font-medium">Custom</span>
-                        </SelectLabel>
-                        {(form.customEmbeddings ?? []).map((m) => (
-                          <SelectItem
-                            key={`custom:${m.modelName}`}
-                            value={`custom:${m.modelName}`}
-                            className="pl-8"
-                          >
-                            <span className="flex items-center gap-2">
-                              <span>{m.modelName}</span>
-                              <span className="text-[10px] text-muted-foreground font-mono">
-                                {m.dimensions}d
-                              </span>
+                          <span className="flex flex-col items-start leading-none">
+                            <span className="font-medium text-sm">
+                              {activeCustomModel.modelName}
                             </span>
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    )}
-                  </SelectContent>
-                </Select>
-                <TooltipProvider delay={0}>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setCustomModalOpen(true)}
-                          type="button"
-                        >
-                          <Plus className="size-4" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>
-                      <p>Add custom embedding model</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                {/* Trash button — only visible when a custom model is selected */}
-                {activeCustomModel && (
+                          </span>
+                        </span>
+                      ) : embeddingModel && embeddingMeta ? (
+                        <span className="flex items-center gap-2.5">
+                          <ProviderIcon
+                            src={embeddingMeta.iconSrc}
+                            alt={embeddingMeta.label}
+                            pillBg={embeddingMeta.pillBg}
+                            size={20}
+                          />
+                          <span className="flex flex-col items-start leading-none">
+                            <span className="font-medium text-sm ">
+                              {embeddingModel.label}
+                            </span>
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          Select a model…
+                        </span>
+                      )}
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[320px]">
+                      {Object.entries(EMBEDDING_BY_PROVIDER)
+                        .filter(
+                          ([provider]) =>
+                            form.embeddingProvider === "vercel_ai_gateway" ||
+                            provider === form.embeddingProvider ||
+                            provider === "deepseek",
+                        )
+                        .map(([provider, models]) => {
+                          const meta =
+                            PROVIDER_META[
+                              provider as keyof typeof PROVIDER_META
+                            ];
+                          return (
+                            <SelectGroup key={provider}>
+                              <SelectLabel className="flex items-center gap-2 py-1.5">
+                                {meta && (
+                                  <ProviderIcon
+                                    src={meta.iconSrc}
+                                    alt={meta.label}
+                                    pillBg={meta.pillBg}
+                                    size={18}
+                                  />
+                                )}
+                                <span className="font-medium">
+                                  {meta?.label ?? provider}
+                                </span>
+                              </SelectLabel>
+                              {models.map((m) => (
+                                <SelectItem
+                                  key={m.id}
+                                  value={m.id}
+                                  className="pl-8"
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <span>{m.label}</span>
+                                    <span className="text-[10px] text-muted-foreground font-mono">
+                                      {m.dimensions}d
+                                    </span>
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          );
+                        })}
+                      {/* Custom models group — one entry per saved custom model */}
+                      {(form.customEmbeddings ?? []).length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel className="flex items-center gap-2 py-1.5">
+                            <ProviderIcon
+                              src={PROVIDER_META.custom.iconSrc}
+                              alt="Custom"
+                              pillBg={PROVIDER_META.custom.pillBg}
+                              size={18}
+                            />
+                            <span className="font-medium">Custom</span>
+                          </SelectLabel>
+                          {(form.customEmbeddings ?? []).map((m) => (
+                            <SelectItem
+                              key={`custom:${m.modelName}`}
+                              value={`custom:${m.modelName}`}
+                              className="pl-8"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span>{m.modelName}</span>
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  {m.dimensions}d
+                                </span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                    </SelectContent>
+                  </Select>
                   <TooltipProvider delay={0}>
                     <Tooltip>
                       <TooltipTrigger
@@ -786,48 +817,71 @@ export function ConfigureForm({
                           <Button
                             variant="outline"
                             size="icon"
+                            onClick={() => setCustomModalOpen(true)}
                             type="button"
-                            onClick={() => setDeleteConfirmOpen(true)}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10 hover:border-destructive/50"
                           >
-                            <Trash2 className="size-4" />
+                            <Plus className="size-4" />
                           </Button>
                         }
                       />
                       <TooltipContent>
-                        <p>Delete "{activeCustomModel.modelName}"</p>
+                        <p>Add custom embedding model</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                )}
-              </div>
+                  {/* Trash button — only visible when a custom model is selected */}
+                  {activeCustomModel && (
+                    <TooltipProvider delay={0}>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              type="button"
+                              onClick={() => setDeleteConfirmOpen(true)}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10 hover:border-destructive/50"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          }
+                        />
+                        <TooltipContent>
+                          <p>Delete "{activeCustomModel.modelName}"</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
 
-              {/* Model info badges */}
-              {activeCustomModel ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <Badge variant="secondary" className="font-mono">
-                    {activeCustomModel.dimensions} dims
-                  </Badge>
-                  <Badge variant="outline" className="font-mono">
-                    OpenAI Compatible
-                  </Badge>
-                  <span className="text-muted-foreground">
-                    Custom configuration
-                  </span>
-                </div>
-              ) : embeddingModel ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <Badge variant="secondary" className="font-mono">
-                    {embeddingModel.dimensions} dims
-                  </Badge>
-                  <Badge variant="outline" className="font-mono">
-                    {embeddingModel.maxInputTokens.toLocaleString()} max tokens
-                  </Badge>
-                  <span className="text-muted-foreground">
-                    {embeddingModel.description}
-                  </span>
-                </div>
-              ) : null}
+                {/* Model info badges */}
+                {activeCustomModel ? (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <Badge variant="secondary" className="font-mono">
+                      {activeCustomModel.dimensions} dims
+                    </Badge>
+                    <Badge variant="outline" className="font-mono">
+                      OpenAI Compatible
+                    </Badge>
+                    <span className="text-muted-foreground">
+                      Custom configuration
+                    </span>
+                  </div>
+                ) : embeddingModel ? (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <Badge variant="secondary" className="font-mono">
+                      {embeddingModel.dimensions} dims
+                    </Badge>
+                    <Badge variant="outline" className="font-mono">
+                      {embeddingModel.maxInputTokens.toLocaleString()} max
+                      tokens
+                    </Badge>
+                    <span className="text-muted-foreground">
+                      {embeddingModel.description}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
 
               {/* Advanced chunking */}
               <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
@@ -1423,6 +1477,147 @@ export function ConfigureForm({
           }
         }}
       />
+
+      {/* API Key settings modal */}
+      <Dialog open={apiKeyModalOpen} onOpenChange={setApiKeyModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Provider Settings</DialogTitle>
+            <DialogDescription>
+              Configure the active embedding provider and its API key.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Provider</Label>
+              <Select
+                value={form.embeddingProvider || "openai"}
+                onValueChange={(v) => {
+                  set("embeddingProvider", v as string);
+                  // Reset model when provider changes (except for vercel_ai_gateway which shows all)
+                  if (v !== "vercel_ai_gateway" && v !== "custom") {
+                    const firstModel = EMBEDDING_MODELS.find(
+                      (m) => m.provider === v,
+                    )?.id;
+                    if (firstModel) {
+                      set("embeddingModelId", firstModel);
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <span className="flex items-center gap-2">
+                    {PROVIDER_META[
+                      form.embeddingProvider as keyof typeof PROVIDER_META
+                    ]?.label || form.embeddingProvider}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    "vercel_ai_gateway",
+                    "openai",
+                    "deepseek",
+                    "google",
+                    "cohere",
+                    "voyage",
+                    "mistral",
+                    "jina",
+                    "nomic",
+                    "custom",
+                  ].map((providerKey) => {
+                    const meta =
+                      PROVIDER_META[providerKey as keyof typeof PROVIDER_META];
+                    if (!meta) return null;
+                    return (
+                      <SelectItem key={providerKey} value={providerKey}>
+                        <div className="flex items-center gap-2">
+                          <ProviderIcon
+                            src={meta.iconSrc}
+                            alt={meta.label}
+                            pillBg={meta.pillBg}
+                            size={16}
+                          />
+                          <span>
+                            {meta.label}
+                            {providerKey === "vercel_ai_gateway" &&
+                              " (Recommended)"}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="apiKey">API Key</Label>
+              <div className="relative">
+                <Input
+                  id="apiKey"
+                  type={showProviderApiKey ? "text" : "password"}
+                  placeholder="Enter API Key..."
+                  value={form.embeddingApiKey || ""}
+                  onChange={(e) => set("embeddingApiKey", e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowProviderApiKey(!showProviderApiKey)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showProviderApiKey ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Recommended: Use the Vercel AI Gateway key for best performance.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              type="button" 
+              disabled={testingKey}
+              onClick={async () => {
+                setTestingKey(true);
+                try {
+                  const res = await fetch("/api/config/test-provider", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      embeddingProvider: form.embeddingProvider,
+                      embeddingApiKey: form.embeddingApiKey,
+                      embeddingModelId: form.embeddingModelId,
+                      customEmbeddings: form.customEmbeddings,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || "Connection failed");
+
+                  toast.success("Settings saved", {
+                    description: `Connection verified for ${form.embeddingProvider}.`,
+                  });
+                  setApiKeyModalOpen(false);
+                } catch (err) {
+                  toast.error("Invalid API Key", {
+                    description: err instanceof Error ? err.message : "Could not connect to provider.",
+                  });
+                } finally {
+                  setTestingKey(false);
+                }
+              }}
+            >
+              {testingKey ? (
+                <Loader2 className="size-4 animate-spin mr-2" />
+              ) : null}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

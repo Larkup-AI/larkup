@@ -227,9 +227,9 @@ export async function getServerEnvRequirements(serverId: string) {
   // and intentionally omitted here.
   const envVarDefs: { key: string; required: boolean; help: string }[] = [
     {
-      key: "AI_GATEWAY_API_KEY",
+      key: "EMBEDDING_API_KEY",
       required: true,
-      help: "Vercel AI Gateway key used to embed incoming queries.",
+      help: "API key used to embed incoming queries.",
     },
   ];
 
@@ -270,13 +270,33 @@ export async function getServerEnvRequirements(serverId: string) {
     }
   }
 
-  // Priority: storeConfig (configure page) > .env file > empty
-  return envVarDefs.map((e) => ({
-    key: e.key,
-    help: e.help,
-    required: e.required,
-    defaultValue: storeDefaults[e.key] || envFileDefaults[e.key] || "",
-  }));
+  // Priority: config > storeConfig (configure page) > .env file > empty
+  return envVarDefs.map((e) => {
+    let defaultValue = storeDefaults[e.key] || envFileDefaults[e.key] || "";
+    if (e.key === "EMBEDDING_API_KEY" && !defaultValue) {
+      // try to read from config directly
+      const cwd = process.cwd();
+      const configCandidates = [
+        path.join(cwd, ".ragtoolkit", "servers", activeId, "config.json"),
+        path.join(cwd, ".ragtoolkit", "config.json"),
+      ];
+      for (const cfgPath of configCandidates) {
+        if (fs.existsSync(cfgPath)) {
+          try {
+            const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
+            if (cfg.embeddingApiKey) defaultValue = cfg.embeddingApiKey;
+            break;
+          } catch {}
+        }
+      }
+    }
+    return {
+      key: e.key,
+      help: e.help,
+      required: e.required,
+      defaultValue,
+    };
+  });
 }
 
 

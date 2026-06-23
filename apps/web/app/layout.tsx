@@ -30,9 +30,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} bg-transparent`}
     >
-      <body className="font-sans antialiased ">
+      <body suppressHydrationWarning className="font-sans antialiased ">
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('app-theme');var b=localStorage.getItem('app-background');var r=localStorage.getItem('app-radius');var d=document.body;if(t&&t!=='default')d.classList.add(t);if(b)d.classList.add(b);if(r&&r!=='radius-default')d.classList.add(r);}catch(e){}})();`,

@@ -30,7 +30,7 @@ export async function createRun(config: RagConfig): Promise<IndexRun> {
     totalChunks: 0,
     processedChunks: 0,
     docCount: 0,
-    dimensions: expectedDimensions(config.embeddingModelId),
+    dimensions: expectedDimensions(config),
     startedAt: now,
     updatedAt: now,
   }
@@ -99,7 +99,7 @@ export async function runIndexer(
         warning: `Sparse model rate-limited — pausing ${waitSecs}s (retry ${attempt}/${3})…`,
       })
     })
-    let dimensions = expectedDimensions(config.embeddingModelId)
+    let dimensions = expectedDimensions(config)
 
     // 3) Embed + upsert in batches
     let processed = 0
@@ -122,7 +122,7 @@ export async function runIndexer(
       while (true) {
         try {
           const { embeddings, dimensions: dim } = await embedTexts(
-            config.embeddingModelId,
+            config,
             batch.map((c) => c.text),
           )
           batchEmbeddings = embeddings

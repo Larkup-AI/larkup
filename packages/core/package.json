@@ -1,7 +1,9 @@
 {
   "name": "@larkup-rag/core",
   "version": "0.1.0",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "exports": {
     "./types": "./src/types.ts",
@@ -12,6 +14,7 @@
     "./jobs-store": "./src/jobs-store.ts",
     "./index-store": "./src/index-store.ts",
     "./embeddings/registry": "./src/embeddings/registry.ts",
+    "./embeddings/providers": "./src/embeddings/providers.ts",
     "./indexing/indexer": "./src/indexing/indexer.ts",
     "./indexing/embedder": "./src/indexing/embedder.ts",
     "./indexing/chunker": "./src/indexing/chunker.ts",
@@ -19,7 +22,13 @@
     "./generator/server-runtime": "./src/generator/server-runtime.ts"
   },
   "dependencies": {
+    "@ai-sdk/cohere": "^3.0.39",
+    "@ai-sdk/deepseek": "^2.0.39",
+    "@ai-sdk/gateway": "^3.0.133",
+    "@ai-sdk/google": "^3.0.83",
+    "@ai-sdk/mistral": "^3.0.40",
     "@ai-sdk/openai": "^3.0.68",
+    "@ai-sdk/openai-compatible": "^2.0.51",
     "@larkup-rag/vector-stores": "workspace:*",
     "ai": "^6.0.197"
   },
