@@ -1578,8 +1578,8 @@ export function ConfigureForm({
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              type="button" 
+            <Button
+              type="button"
               disabled={testingKey}
               onClick={async () => {
                 setTestingKey(true);
@@ -1595,7 +1595,8 @@ export function ConfigureForm({
                     }),
                   });
                   const data = await res.json();
-                  if (!res.ok) throw new Error(data.error || "Connection failed");
+                  if (!res.ok)
+                    throw new Error(data.error || "Connection failed");
 
                   toast.success("Settings saved", {
                     description: `Connection verified for ${form.embeddingProvider}.`,
@@ -1603,7 +1604,10 @@ export function ConfigureForm({
                   setApiKeyModalOpen(false);
                 } catch (err) {
                   toast.error("Invalid API Key", {
-                    description: err instanceof Error ? err.message : "Could not connect to provider.",
+                    description:
+                      err instanceof Error
+                        ? err.message
+                        : "Could not connect to provider.",
                   });
                 } finally {
                   setTestingKey(false);
