@@ -1137,15 +1137,15 @@ export function ConfigureForm({
                 />
                 <div className="flex justify-end pt-1">
                   <Button
-                    variant="secondary"
+                    variant="default"
                     size="sm"
                     onClick={handleTestConnection}
                     disabled={testing}
                   >
                     {testing ? (
-                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      <Loader2 className="mr-1 size-4 animate-spin" />
                     ) : (
-                      <Cloud className="mr-2 size-4" />
+                      <Cloud className="mr-1 size-4" />
                     )}
                     Test Connection
                   </Button>

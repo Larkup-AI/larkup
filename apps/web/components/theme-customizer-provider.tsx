@@ -18,7 +18,18 @@ export type BackgroundVariant =
   | "bg-warm"
   | "bg-soft"
   | "bg-pure"
-  | "bg-offwhite";
+  | "bg-silver"
+  | "bg-sage"
+  | "bg-stone";
+
+export type PanelBgVariant =
+  | "panel-default"
+  | "panel-white"
+  | "panel-fafafa"
+  | "panel-warm"
+  | "panel-soft"
+  | "panel-silver"
+  | "panel-stone";
 
 export type LayoutVariant = "sidebar" | "topnav" | "collapsed";
 
@@ -39,8 +50,12 @@ interface ThemeCustomizerContextValue {
   setRadius: (radius: RadiusVariant) => void;
   background: BackgroundVariant;
   setBackground: (bg: BackgroundVariant) => void;
+  panelBg: PanelBgVariant;
+  setPanelBg: (bg: PanelBgVariant) => void;
   pageStyle: PageStyleVariant;
   setPageStyle: (style: PageStyleVariant) => void;
+  username: string;
+  setUsername: (name: string) => void;
   isMounted: boolean;
 }
 
@@ -65,10 +80,12 @@ export function ThemeCustomizerProvider({
   const [isMounted, setIsMounted] = useState(false);
   // Default to "default" theme (black primary). User can switch themes freely.
   const [theme, setThemeState] = useState<ThemeVariant>("default");
-  const [layout, setLayout] = useState<LayoutVariant>("topnav");
+  const [layout, setLayout] = useState<LayoutVariant>("sidebar");
   const [radius, setRadius] = useState<RadiusVariant>("radius-default");
-  const [background, setBackground] = useState<BackgroundVariant>("bg-soft");
+  const [background, setBackground] = useState<BackgroundVariant>("bg-default");
+  const [panelBg, setPanelBg] = useState<PanelBgVariant>("panel-default");
   const [pageStyle, setPageStyle] = useState<PageStyleVariant>("card");
+  const [username, setUsername] = useState("");
 
   useEffect(() => {
     setIsMounted(true);
@@ -79,6 +96,9 @@ export function ThemeCustomizerProvider({
     const savedBackground = localStorage.getItem(
       "app-background",
     ) as BackgroundVariant;
+    const savedPanelBg = localStorage.getItem(
+      "app-panel-bg",
+    ) as PanelBgVariant;
     const savedPageStyle = localStorage.getItem(
       "app-pagestyle",
     ) as PageStyleVariant;
@@ -87,7 +107,11 @@ export function ThemeCustomizerProvider({
     if (savedLayout) setLayout(savedLayout);
     if (savedRadius) setRadius(savedRadius);
     if (savedBackground) setBackground(savedBackground);
+    if (savedPanelBg) setPanelBg(savedPanelBg);
     if (savedPageStyle) setPageStyle(savedPageStyle);
+
+    const savedUsername = localStorage.getItem("app-username");
+    if (savedUsername) setUsername(savedUsername);
   }, []);
 
   useEffect(() => {
@@ -96,13 +120,15 @@ export function ThemeCustomizerProvider({
     localStorage.setItem("app-layout", layout);
     localStorage.setItem("app-radius", radius);
     localStorage.setItem("app-background", background);
+    localStorage.setItem("app-panel-bg", panelBg);
     localStorage.setItem("app-pagestyle", pageStyle);
+    localStorage.setItem("app-username", username);
 
     // Update body classes
     const body = document.body;
 
     // Remove old classes
-    body.classList.forEach((cls) => {
+    Array.from(body.classList).forEach((cls) => {
       if (
         cls.startsWith("theme-") ||
         cls.startsWith("radius-") ||
@@ -115,8 +141,8 @@ export function ThemeCustomizerProvider({
     // Add new classes
     if (theme !== "default") body.classList.add(theme);
     if (radius !== "radius-default") body.classList.add(radius);
-    if (background !== "bg-default") body.classList.add(background);
-  }, [theme, layout, radius, background, pageStyle, isMounted]);
+    if (background) body.classList.add(background);
+  }, [theme, layout, radius, background, panelBg, pageStyle, username, isMounted]);
 
   return (
     <ThemeCustomizerContext.Provider
@@ -129,8 +155,12 @@ export function ThemeCustomizerProvider({
         setRadius,
         background,
         setBackground,
+        panelBg,
+        setPanelBg,
         pageStyle,
         setPageStyle,
+        username,
+        setUsername,
         isMounted,
       }}
     >

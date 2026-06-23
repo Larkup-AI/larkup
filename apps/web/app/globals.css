@@ -50,33 +50,33 @@
 }
 
 :root {
-  --background: #f2efe4;
-  --foreground: oklch(0.2 0.01 40);
-  --card: #ffffff;
-  --card-foreground: oklch(0.2 0.01 40);
-  --panel: #f2efe4;
-  --panel-foreground: oklch(0.2 0.01 40);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.01 40);
+  --background: #FAFAFA;
+  --foreground: #171717;
+  --card: #FFFFFF;
+  --card-foreground: #171717;
+  --panel: #F4F4F4;
+  --panel-foreground: #171717;
+  --popover: #FFFFFF;
+  --popover-foreground: #171717;
   --primary: #000000;
   --primary-foreground: #ffffff;
-  --secondary: oklch(0.9 0.01 80);
+  --secondary: #F5F5F5;
   --secondary-foreground: #000000;
-  --muted: oklch(0.9 0.01 80);
-  --muted-foreground: oklch(0.4 0.01 40);
-  --accent: oklch(0.9 0.01 80);
+  --muted: #F5F5F5;
+  --muted-foreground: #737373;
+  --accent: #F5F5F5;
   --accent-foreground: #000000;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.85 0.01 80);
-  --input: oklch(0.88 0.01 80);
+  --border: #E5E5E5;
+  --input: #E5E5E5;
   --ring: #000000;
-  --sidebar: oklch(0.95 0.01 80);
-  --sidebar-foreground: oklch(0.4 0.01 40);
+  --sidebar: #F4F4F4;
+  --sidebar-foreground: #525252;
   --sidebar-primary: #000000;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-border: oklch(0.85 0.01 80);
-  --sidebar-accent: oklch(0.9 0.01 80);
+  --sidebar-border: #E5E5E5;
+  --sidebar-accent: #F5F5F5;
   --sidebar-accent-foreground: #000000;
   --sidebar-ring: #000000;
   --radius: 0.625rem;
@@ -85,40 +85,33 @@
   --chart-3: oklch(0.68 0.15 145);
   --chart-4: oklch(0.7 0.16 60);
   --chart-5: oklch(0.62 0.2 25);
-
-  --paper-noise-light: url("/noises/noise222.png"); /* ← swap file to change texture */
-  --paper-noise-dark: url("/noises/noise7.png"); /* ← dark-mode texture */
-
-  /* ── Noise opacity — single knob per mode ── */
-  --noise-opacity-light: 0.79; /* 0 = invisible → 1 = full strength */
-  --noise-opacity-dark: 0.9; /* higher opacity needed on dark backgrounds */
 }
 
 .dark {
-  --background: #1a1918;
-  --foreground: oklch(0.96 0.005 85);
-  --card: #242220;
-  --card-foreground: oklch(0.96 0.005 85);
-  --panel: #1a1918;
-  --panel-foreground: oklch(0.96 0.005 85);
-  --popover: #242220;
-  --popover-foreground: oklch(0.96 0.005 85);
-  --primary: #000000;
-  --primary-foreground: #ffffff;
-  --secondary: #33302c;
-  --secondary-foreground: oklch(0.96 0.005 85);
-  --muted: #33302c;
-  --muted-foreground: oklch(0.7 0.01 40);
-  --accent: #33302c;
-  --accent-foreground: oklch(0.96 0.005 85);
-  --border: #3d3935;
-  --input: #3d3935;
-  --ring: #000000;
-  --sidebar: #1a1918;
-  --sidebar-foreground: oklch(0.7 0.01 40);
-  --sidebar-primary: #000000;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-border: #3d3935;
+  --background: #0A0A0A;
+  --foreground: #FAFAFA;
+  --card: #1C1C1C;
+  --card-foreground: #FAFAFA;
+  --panel: #141414;
+  --panel-foreground: #FAFAFA;
+  --popover: #1C1C1C;
+  --popover-foreground: #FAFAFA;
+  --primary: #FFFFFF;
+  --primary-foreground: #000000;
+  --secondary: #1A1A1A;
+  --secondary-foreground: #FAFAFA;
+  --muted: #1A1A1A;
+  --muted-foreground: #A1A1A1;
+  --accent: #1A1A1A;
+  --accent-foreground: #FAFAFA;
+  --border: #2E2E2E;
+  --input: #2E2E2E;
+  --ring: #FFFFFF;
+  --sidebar: #141414;
+  --sidebar-foreground: #A1A1A1;
+  --sidebar-primary: #FFFFFF;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-border: #2E2E2E;
 }
 
 @layer base {
@@ -127,42 +120,10 @@
   }
   body {
     @apply bg-background text-foreground;
-    position: relative;
-  }
-
-  /* ── Full-viewport noise overlay — light mode ── */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    background-image: var(--paper-noise-light);
-    background-size: 512px 512px;
-    background-repeat: repeat;
-    opacity: var(--noise-opacity-light);
-    mix-blend-mode: overlay;
-  }
-
-  /* ── Dark mode: swap texture + blend mode ── */
-  .dark body::before {
-    content: "";
-    display: block;
-    background-image: var(--paper-noise-dark);
-    background-size: 512px 512px;
-    background-repeat: repeat;
-    opacity: var(--noise-opacity-dark);
-    mix-blend-mode: screen;
   }
 
   html {
     @apply font-sans;
-  }
-
-  /* Ensure content sits above the grain layer */
-  body > * {
-    position: relative;
-    z-index: 1;
   }
 }
 
@@ -216,32 +177,12 @@
     );
 }
 
-/* Noise sits on its own pseudo-layer with its own opacity */
-.bg-mesh-light::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image: var(--paper-noise-light);
-  background-size: 512px 512px;
-  background-repeat: repeat;
-  opacity: var(--noise-opacity-light);
-  mix-blend-mode: overlay;
-}
-
 .dark .bg-mesh-light {
   background-image: radial-gradient(
     circle at 20% 0%,
     color-mix(in oklch, var(--primary) 8%, transparent),
     transparent 40%
   );
-}
-
-.dark .bg-mesh-light::after {
-  background-image: var(--paper-noise-dark);
-  opacity: var(--noise-opacity-dark);
-  mix-blend-mode: screen;
 }
 
 [data-sonner-toaster] {

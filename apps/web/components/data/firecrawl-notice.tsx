@@ -176,7 +176,7 @@ export function FirecrawlNotice({
           </div>
         )}
 
-        <div className="flex items-center gap-2 ">
+        <div className="flex items-center gap-2 pb-2">
           {running ? (
             <Button
               size="sm"
@@ -197,29 +197,38 @@ export function FirecrawlNotice({
               size="sm"
               onClick={() => control("start")}
               disabled={busy !== null || isLoading || !dockerReady}
+              className="
+    inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium
+    bg-[#F97316] hover:bg-[#EA6C0A]
+    text-white border-none
+    rounded-md transition-all duration-200
+    disabled:opacity-70 disabled:cursor-not-allowed
+  "
             >
               {busy === "start" ? (
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin text-white" />
               ) : (
-                <Play className="size-4" />
+                <img
+                  src="/icons/firecrawl2.png"
+                  alt="Firecrawl"
+                  className="size-4 object-contain"
+                />
               )}
               Launch Firecrawl locally
             </Button>
           )}
 
-          {dockerReady && !running && (
-            <span className="flex items-center gap-1 text-xs text-cyan-700">
-              {/* <CheckCircle2 className="size-3.5 " /> */}
+          {/* {dockerReady && !running && (
+            <span className="flex items-center gap-1 text-xs text-cyan-700  bg-white px-3 p-1 rounded-md">
               <img
                 src={"/docker.png"}
                 alt="docker"
-                // className="size-4.5"
                 width={20}
                 height={20}
               />
               Docker ready
             </span>
-          )}
+          )} */}
         </div>
       </AlertDescription>
     </Alert>

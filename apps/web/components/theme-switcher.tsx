@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   useThemeCustomizer,
   ThemeVariant,
   BackgroundVariant,
+  PanelBgVariant,
   LayoutVariant,
   RadiusVariant,
   PageStyleVariant,
@@ -14,6 +17,9 @@ import {
   Palette,
   Monitor,
   SquareDashed,
+  PanelTop,
+  User,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +27,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const THEMES: { id: ThemeVariant; name: string; color: string }[] = [
   { id: "default", name: "Caffee", color: "#f2efe4" },
@@ -35,10 +47,27 @@ const THEMES: { id: ThemeVariant; name: string; color: string }[] = [
 ];
 
 const BACKGROUNDS: { id: BackgroundVariant; name: string; color: string }[] = [
-  { id: "bg-soft", name: "Theme Default", color: "#FBFAF8" },
-  { id: "bg-warm", name: "Warm Cream", color: "#F7F1EA" },
-  { id: "bg-offwhite", name: "Off White", color: "#FCFBF8" },
+  { id: "bg-default", name: "White", color: "#FFFFFF" },
   { id: "bg-pure", name: "Pure White", color: "#FFFFFF" },
+  { id: "bg-silver", name: "Silver", color: "#F8F8F8" },
+  { id: "bg-soft", name: "Soft", color: "#FBFAF8" },
+  { id: "bg-stone", name: "Stone", color: "#F5F5F2" },
+  { id: "bg-sage", name: "Sage", color: "#EDEDE8" },
+  { id: "bg-warm", name: "Warm Cream", color: "#F7F1EA" },
+];
+
+const PANEL_BACKGROUNDS: {
+  id: PanelBgVariant;
+  name: string;
+  color: string;
+}[] = [
+  { id: "panel-default", name: "Theme Default", color: "#FAFAFA" },
+  { id: "panel-white", name: "White", color: "#FFFFFF" },
+  { id: "panel-fafafa", name: "Near White", color: "#F4F4F4" },
+  { id: "panel-silver", name: "Silver", color: "#F8F8F8" },
+  { id: "panel-soft", name: "Soft", color: "#FBFAF8" },
+  { id: "panel-stone", name: "Stone", color: "#F5F5F2" },
+  { id: "panel-warm", name: "Warm Cream", color: "#F7F1EA" },
 ];
 
 const LAYOUTS: { id: LayoutVariant; name: string }[] = [
@@ -64,14 +93,31 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
     setTheme,
     background,
     setBackground,
+    panelBg,
+    setPanelBg,
     layout,
     setLayout,
     radius,
     setRadius,
     pageStyle,
     setPageStyle,
+    username,
+    setUsername,
     isMounted,
   } = useThemeCustomizer();
+
+  const [localName, setLocalName] = useState(username);
+
+  // Sync local input when context username changes (e.g. on mount)
+  const syncedRef = useState({ synced: false })[0];
+  if (isMounted && !syncedRef.synced && username && localName !== username) {
+    setLocalName(username);
+    syncedRef.synced = true;
+  }
+
+  const handleSaveUsername = () => {
+    setUsername(localName.trim());
+  };
 
   if (!isMounted) return null;
 
@@ -104,6 +150,31 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
             <Palette className="h-4 w-4" /> Theme Customizer
           </div>
           <div className="p-4 space-y-6 overflow-y-auto">
+            {/* Username */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" /> Username
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={localName}
+                  onChange={(e) => setLocalName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSaveUsername()}
+                  placeholder="Enter your name"
+                  className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 h-8 px-2.5"
+                  onClick={handleSaveUsername}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
             {/* Color Theme */}
             <div className="space-y-3">
               <label className="text-sm font-medium flex items-center gap-2">
@@ -133,31 +204,89 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
               </div>
             </div>
 
-            <div className="space-y-3">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <SquareDashed className="h-4 w-4 text-muted-foreground" />{" "}
-                Background Style
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {BACKGROUNDS.map((bg) => (
-                  <button
-                    key={bg.id}
-                    onClick={() => setBackground(bg.id)}
-                    title={bg.name}
-                    className={`flex items-center justify-center rounded-full border-2 p-0.5 transition-all hover:scale-110 ${
-                      background === bg.id
-                        ? "border-primary"
-                        : "border-transparent"
-                    }`}
-                  >
-                    <div
-                      className={`h-6 w-6 rounded-full border shrink-0 ${bg.id === "bg-soft" ? "border-dashed" : "shadow-sm"}`}
-                      style={{ background: bg.color }}
-                    />
-                  </button>
-                ))}
+            {/* Page Background */}
+            <TooltipProvider delay={200}>
+              <div className="space-y-3">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <SquareDashed className="h-4 w-4 text-muted-foreground" />{" "}
+                  Page Background
+                </label>
+                <p className="text-[11px] text-muted-foreground -mt-1">
+                  Full page background behind everything
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {BACKGROUNDS.map((bg) => (
+                    <Tooltip key={bg.id}>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            onClick={() => setBackground(bg.id)}
+                            className={`flex items-center justify-center rounded-full border-2 p-0.5 transition-all hover:scale-110 ${
+                              background === bg.id
+                                ? "border-primary"
+                                : "border-transparent"
+                            }`}
+                          />
+                        }
+                      >
+                        <div
+                          className={`h-6 w-6 rounded-full border shrink-0 ${bg.id === "bg-default" ? "border-dashed" : "shadow-sm"}`}
+                          style={{ background: bg.color }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" sideOffset={6}>
+                        <span className="text-xs font-medium">{bg.name}</span>
+                        <span className="text-[10px] text-muted-foreground ml-1.5">
+                          {bg.color}
+                        </span>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
               </div>
-            </div>
+            </TooltipProvider>
+
+            {/* Panel / Content Background */}
+            <TooltipProvider delay={200}>
+              <div className="space-y-3">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <PanelTop className="h-4 w-4 text-muted-foreground" /> Content
+                  Panel Background
+                </label>
+                <p className="text-[11px] text-muted-foreground -mt-1">
+                  Inner content area (card / main panel)
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {PANEL_BACKGROUNDS.map((pb) => (
+                    <Tooltip key={pb.id}>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            onClick={() => setPanelBg(pb.id)}
+                            className={`flex items-center justify-center rounded-full border-2 p-0.5 transition-all hover:scale-110 ${
+                              panelBg === pb.id
+                                ? "border-primary"
+                                : "border-transparent"
+                            }`}
+                          />
+                        }
+                      >
+                        <div
+                          className={`h-6 w-6 rounded-full border shrink-0 ${pb.id === "panel-default" ? "border-dashed" : "shadow-sm"}`}
+                          style={{ background: pb.color }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" sideOffset={6}>
+                        <span className="text-xs font-medium">{pb.name}</span>
+                        <span className="text-[10px] text-muted-foreground ml-1.5">
+                          {pb.color}
+                        </span>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
+            </TooltipProvider>
 
             {/* Layout */}
             <div className="space-y-3">

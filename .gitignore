@@ -26,3 +26,4 @@ venv
 .venv
 .pytest_cache
 apps/docs
+dist
