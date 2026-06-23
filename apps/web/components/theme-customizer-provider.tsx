@@ -54,8 +54,6 @@ interface ThemeCustomizerContextValue {
   setPanelBg: (bg: PanelBgVariant) => void;
   pageStyle: PageStyleVariant;
   setPageStyle: (style: PageStyleVariant) => void;
-  username: string;
-  setUsername: (name: string) => void;
   isMounted: boolean;
 }
 
@@ -85,7 +83,6 @@ export function ThemeCustomizerProvider({
   const [background, setBackground] = useState<BackgroundVariant>("bg-default");
   const [panelBg, setPanelBg] = useState<PanelBgVariant>("panel-default");
   const [pageStyle, setPageStyle] = useState<PageStyleVariant>("card");
-  const [username, setUsername] = useState("");
 
   useEffect(() => {
     setIsMounted(true);
@@ -109,9 +106,6 @@ export function ThemeCustomizerProvider({
     if (savedBackground) setBackground(savedBackground);
     if (savedPanelBg) setPanelBg(savedPanelBg);
     if (savedPageStyle) setPageStyle(savedPageStyle);
-
-    const savedUsername = localStorage.getItem("app-username");
-    if (savedUsername) setUsername(savedUsername);
   }, []);
 
   useEffect(() => {
@@ -122,7 +116,6 @@ export function ThemeCustomizerProvider({
     localStorage.setItem("app-background", background);
     localStorage.setItem("app-panel-bg", panelBg);
     localStorage.setItem("app-pagestyle", pageStyle);
-    localStorage.setItem("app-username", username);
 
     // Update body classes
     const body = document.body;
@@ -142,7 +135,7 @@ export function ThemeCustomizerProvider({
     if (theme !== "default") body.classList.add(theme);
     if (radius !== "radius-default") body.classList.add(radius);
     if (background) body.classList.add(background);
-  }, [theme, layout, radius, background, panelBg, pageStyle, username, isMounted]);
+  }, [theme, layout, radius, background, panelBg, pageStyle, isMounted]);
 
   return (
     <ThemeCustomizerContext.Provider
@@ -159,8 +152,6 @@ export function ThemeCustomizerProvider({
         setPanelBg,
         pageStyle,
         setPageStyle,
-        username,
-        setUsername,
         isMounted,
       }}
     >

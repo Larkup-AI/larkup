@@ -11,6 +11,7 @@ import {
   RadiusVariant,
   PageStyleVariant,
 } from "./theme-customizer-provider";
+import { useWorkspace } from "@/components/workspace/workspace-provider";
 import {
   SlidersHorizontal,
   LayoutTemplate,
@@ -33,6 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Input } from "./ui/input";
 
 const THEMES: { id: ThemeVariant; name: string; color: string }[] = [
   { id: "default", name: "Caffee", color: "#f2efe4" },
@@ -101,12 +103,12 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
     setRadius,
     pageStyle,
     setPageStyle,
-    username,
-    setUsername,
     isMounted,
   } = useThemeCustomizer();
 
-  const [localName, setLocalName] = useState(username);
+  const { username, setUsername } = useWorkspace();
+
+  const [localName, setLocalName] = useState(username || "");
 
   // Sync local input when context username changes (e.g. on mount)
   const syncedRef = useState({ synced: false })[0];
@@ -156,21 +158,21 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
                 <User className="h-4 w-4 text-muted-foreground" /> Username
               </label>
               <div className="flex gap-2">
-                <input
-                  type="text"
+                <Input
                   value={localName}
                   onChange={(e) => setLocalName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSaveUsername()}
                   placeholder="Enter your name"
-                  className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                  className="flex-1 rounded-md border border-input bg-background px-3 h-7 text-sm outline-none "
                 />
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="shrink-0 h-8 px-2.5"
+                  variant="default"
+                  className="shrink-0 h-7 px-3.5"
                   onClick={handleSaveUsername}
                 >
-                  <Check className="h-3.5 w-3.5" />
+                  save
+                  {/* <Check className="h-3.5 w-3.5 " /> */}
                 </Button>
               </div>
             </div>

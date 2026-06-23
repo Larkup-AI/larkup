@@ -31,22 +31,17 @@ export default function ConfigurePage() {
             variant={dirty ? "default" : "default"}
             disabled={saving || !dirty}
             onClick={() => handle?.requestSave()}
-            className="min-w-[110px] h-9.5 rounded-sm transition-all text-white/90 text-[14px]"
+            className="min-w-[110px] px-3.5 h-9.5 rounded-md transition-all text-white/90 text-[13px]"
           >
             {saving ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
                 Saving…
               </>
-            ) : dirty ? (
+            ) : (
               <>
                 <Save className="size-4" />
                 Save Configuration
-              </>
-            ) : (
-              <>
-                <Check className="size-4" />
-                Saved
               </>
             )}
           </Button>
