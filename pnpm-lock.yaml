@@ -197,6 +197,9 @@ importers:
       '@ai-sdk/deepseek':
         specifier: ^2.0.39
         version: 2.0.39(zod@4.3.6)
+      '@ai-sdk/gateway':
+        specifier: ^3.0.133
+        version: 3.0.133(zod@4.3.6)
       '@ai-sdk/google':
         specifier: ^3.0.83
         version: 3.0.83(zod@4.3.6)
@@ -238,13 +241,13 @@ importers:
       '@lancedb/lancedb':
         specifier: ^0.30.0
         version: 0.30.0(apache-arrow@18.1.0)
+      '@larkup-rag/core':
+        specifier: workspace:*
+        version: link:../core
       '@pinecone-database/pinecone':
         specifier: ^7.2.0
         version: 7.2.0
     devDependencies:
-      '@larkup-rag/core':
-        specifier: workspace:*
-        version: link:../core
       chromadb:
         specifier: ^1.10.5
         version: 1.10.5
@@ -3960,6 +3963,13 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.30(zod@3.25.76)
       '@vercel/oidc': 3.2.0
       zod: 3.25.76
+
+  '@ai-sdk/gateway@3.0.133(zod@4.3.6)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.10
+      '@ai-sdk/provider-utils': 4.0.30(zod@4.3.6)
+      '@vercel/oidc': 3.2.0
+      zod: 4.3.6
 
   '@ai-sdk/google@3.0.83(zod@3.25.76)':
     dependencies:
