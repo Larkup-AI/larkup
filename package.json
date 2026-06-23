@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "start": "pnpm build && pnpm --filter \"./apps/web\" start",
     "lint": "turbo lint",
     "test": "turbo test",
     "rag": "pnpm --filter @larkup-rag/cli rag",
