@@ -1,110 +1,62 @@
-# larkup-rag
+<div align="center">
+  <img src="./apps/docs/logo/logo-dark.png" alt="Larkup RAG Logo" width="400" />
 
-A dual-mode (**Web UI + CLI**) toolkit to build, index, and serve a lightweight,
-deployable RAG pipeline. Both modes are thin shells over the same `core/`
-library and the same on-disk `.ragtoolkit/` workspace, so anything you do in the
-browser is visible from the terminal and vice-versa.
+  <br />
+  <br />
 
-## The pipeline
+  **The easiest way to launch a production-ready RAG server from local to deployment in minutes.**
+</div>
 
-The toolkit walks you through five stages:
+---
 
-1. **Configure** — embedding model, index type, chunking, and vector store.
-2. **Data** — paste, upload, or scrape the web (Firecrawl ETL) into a corpus.
-3. **Index** — chunk → embed → store into your selected vector store.
-4. **Server** — generate and launch a minimal, dependency-light RAG server.
-5. **Demo** — send a test query and inspect the top-k retrieved chunks.
+## 🌟 What is Larkup RAG?
 
-## Workspaces & servers
+**Larkup RAG** is an open-source toolkit designed to take you from zero to a running Retrieval-Augmented Generation (RAG) server effortlessly. It eliminates the complexities of manual infrastructure setup, allowing you to seamlessly configure vector stores, chunking strategies, and embedding models through a unified interface.
 
-The toolkit is organized as a **workspace** of independent **servers**. Each
-server is a self-contained RAG project with its own config, corpus, index, and
-generated artifact, stored under `.ragtoolkit/servers/<id>/`. Switch between
-them from the top-left server switcher in the UI, or with `pnpm rag use <id>`.
+Part of the broader Larkup ecosystem—"Building a new learning system for the AI Era"—Larkup RAG handles the heavy lifting of ingestion, indexing, and retrieval, so you can focus entirely on building your AI applications.
 
-## Web UI
+## 🚀 Features
+
+- **Zero-Config Web UI**: Configure vector databases (e.g., LanceDB, Pinecone, Chroma) and embedding models (e.g., OpenAI, Cohere) visually.
+- **Robust Ingestion**: Load data sources easily via local file upload, raw text, or web scraping.
+- **Automated Indexing**: Built-in ETL jobs to process, chunk, and embed your loaded data automatically.
+- **Local & Cloud Deployments**: Spin up a server locally for fast iteration, and deploy seamlessly to platforms like Vercel or your own VPS.
+- **Built-in Demo UI**: Instantly test your retrieval and chat quality before connecting external agents.
+- **Language SDKs**: Native JavaScript/TypeScript and Python clients for connecting your AI applications.
+
+## 🏗️ Architecture
+
+The repository is structured as a monorepo, housing the full stack required to run and interact with a Larkup RAG pipeline:
+
+- **`apps/web`**: The Web Interface and API Server. Use this to create workspaces, configure your pipeline, ingest data, and manage deployments.
+- **`apps/cli`**: The Command-Line Interface (`@larkup-rag/cli`). Build, index, and query your RAG pipelines directly from your terminal.
+- **`apps/sdk/js-sdk`**: The JavaScript/TypeScript SDK (`@larkup-rag/client-js`) for integrating the RAG server into Node.js or browser applications.
+- **`apps/sdk/py-sdk`**: The Python SDK (`larkup-rag`) offering both synchronous and asynchronous clients for Python-based AI agents.
+- **`apps/docs`**: The Mintlify-powered documentation detailing installation, configuration, and API reference.
+
+## ⚡ Quickstart
+
+Get a RAG server running locally in minutes using the CLI or Web UI:
 
 ```bash
+# 1. Start the development server
 pnpm install
 pnpm dev
+
+# 2. Or initialize a project via the CLI
+npx @larkup-rag/cli init my-rag-server
 ```
 
-Open the app, complete the first-run onboarding, and work through the stages
-using the left rail. The server switcher (top-left) lets you create and swap
-between servers from anywhere. In the **Demo** stage you can point queries at
-any server in the workspace, not just the active one.
+1. **Launch the Web UI**: Open `http://localhost:4567`
+2. **Configure**: Select your Vector Store and Embedding Provider.
+3. **Ingest**: Add documents or scrape URLs in the Data tab.
+4. **Index**: Run the ETL pipeline to process your documents.
+5. **Chat**: Test your pipeline using the built-in Chat Demo.
 
-## CLI
+## 📚 Documentation
 
-The CLI mirrors the entire pipeline. It is wired to the `rag` script:
+For comprehensive guides on configuration, data ingestion, testing, and SDK integrations, please refer to our [Official Documentation](https://larkup.de/docs).
 
-```bash
-pnpm rag <command> [options]
-```
+## 🤝 Contributing
 
-| Command | Description |
-| --- | --- |
-| `init [name]` | Create a new RAG server (workspace project) and make it active |
-| `servers` | List all servers (`●` marks the active one) |
-| `use <serverId\|name>` | Switch the active server (matches by id, then by exact name) |
-| `config` | Show the active server's configuration and status |
-| `add-doc --file <path>` | Add a document from a file |
-| `add-doc --text "<text>"` | Add a document from inline text (`--title`, `--url` optional) |
-| `index` | Chunk → embed → store the corpus, with live progress |
-| `generate [--out <dir>]` | Emit the deployable RAG server to disk |
-| `serve` | Run the generated server locally in the foreground |
-| `query "<question>"` | Retrieve the top-k chunks (`--topK <n>` optional) |
-
-The stage commands (`config`, `add-doc`, `index`, `generate`, `serve`, `query`)
-accept `--server <id>` to target a specific server instead of the active one.
-
-### Example: a full pipeline from the terminal
-
-```bash
-export AI_GATEWAY_API_KEY=...        # required so queries can be embedded
-
-pnpm rag init "docs-bot"
-pnpm rag add-doc --file ./notes.md --title "Project notes"
-pnpm rag index
-pnpm rag generate --out ./docs-bot-server
-pnpm rag serve                        # installs deps, then serves on the
-                                      # server's assigned port (first = 8080)
-# in another shell:
-pnpm rag query "how does indexing work?" --topK 5
-```
-
-## The generated server
-
-`generate` (and the **Server** stage) emit a standalone server tailored to your
-config:
-
-- **Minimal deps** — only the selected vector store's packages are bundled
-  (pick Pinecone → no LanceDB, and vice-versa).
-- **No build step** — plain Node ESM (`node server.mjs`), embeddings via the
-  Vercel AI Gateway, so no provider SDKs ship with it.
-- **Deploy anywhere** — includes a `Dockerfile`, `docker-compose.yml`, and
-  `vercel.json`.
-
-It exposes:
-
-- `GET /health` → `{ ok: true }`
-- `POST /query` with `{ "query": string, "topK"?: number }` →
-  `{ query, hits: [{ id, score, title, url, text, documentId }] }`
-
-## Environment
-
-| Variable | Used for |
-| --- | --- |
-| `AI_GATEWAY_API_KEY` | Embedding queries/documents via the Vercel AI Gateway |
-| `FIRECRAWL_API_KEY` | Optional — cloud web scraping in the Data stage |
-
-## Project layout
-
-```
-app/                 Next.js routes (one page per stage) + API routes
-components/           UI: stage workspaces, the server switcher, dialogs
-core/                 Framework-agnostic library shared by the UI, CLI, and
-                      generated server (config, ETL, indexing, stores, codegen)
-cli/index.ts          The CLI entry point (run via `pnpm rag`)
-.ragtoolkit/          On-disk workspace (servers, corpora, indexes, artifacts)
-```
+We welcome contributions! Please open issues or submit pull requests to help improve the RAG server, add support for new vector databases, or enhance the SDKs.

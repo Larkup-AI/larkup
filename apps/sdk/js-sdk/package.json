@@ -1,16 +1,19 @@
 {
   "name": "@larkup-rag/client-js",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "JavaScript/TypeScript SDK for Larkup RAG servers",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "type": "module",
   "exports": {
     ".": {
-      "require": "./dist/index.js",
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
     }
   },
   "files": [

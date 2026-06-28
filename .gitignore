@@ -4,9 +4,10 @@
 # Environment variables
 .env*.local
 .env
+.env.dev
 
 # Common ignores
-node_modules
+node_modules/
 .next/
 .DS_Store
 
@@ -21,12 +22,24 @@ lancedb/
 # Turbo
 .turbo/
 
-__pycache__
-venv
-.venv
-.pytest_cache
+# Python
+__pycache__/
+*.egg-info/
+build/
+venv/
+.venv/
+.pytest_cache/
+
+# Build artifacts
+dist/
+
+# App-specific ignores
 apps/docs
-dist
 apps/web/demo
+apps/e2e/README.md
+
+# Sensitive scripts
 npm-login.sh
-archive
+
+# Archive
+archive/

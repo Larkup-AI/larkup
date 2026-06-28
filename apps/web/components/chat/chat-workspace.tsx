@@ -303,7 +303,7 @@ export function ChatWorkspace() {
 
       {/* Input area */}
       {ready && (
-        <div className="relative z-[10000] px-4 pb-5 pt-3 sm:px-6">
+        <div className="relative z-10000 px-4 pb-5 pt-3 sm:px-6">
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
             <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-1 focus-within:ring-ring">
               <textarea
