@@ -25,6 +25,7 @@ export async function useServerCommand(target: string) {
     
   if (!next) {
     log.error(`No server matching "${target}".`);
+    return;
   }
   
   await setActiveServer(next.id);

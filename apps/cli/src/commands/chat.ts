@@ -1,4 +1,4 @@
-import { streamText, tool, type CoreMessage } from "ai";
+import { streamText, tool, stepCountIs } from "ai";
 import { z } from "zod";
 import * as p from "@clack/prompts";
 import { readConfig } from "@larkup-rag/core/config-store";
@@ -61,7 +61,7 @@ async function queryKnowledgeBase(query: string, topK: number) {
         body: JSON.stringify({ query, topK }),
         signal: AbortSignal.timeout(15_000),
       });
-      const data = await res.json();
+      const data: any = await res.json();
       if (res.ok && data.hits) {
         return { query, hits: data.hits };
       }
@@ -106,7 +106,7 @@ export async function chatCommand(options: { server?: string; model?: string }) 
     log.dim(`Server: ${server.name} | Model: ${chatModelId}`);
 
     const aiModel = createChatModel(resolvedProvider, chatModelId);
-    const messages: CoreMessage[] = [];
+    const messages: any[] = [];
 
     while (true) {
       const input = await p.text({
@@ -135,12 +135,12 @@ export async function chatCommand(options: { server?: string; model?: string }) 
           model: aiModel,
           system: SYSTEM_PROMPT,
           messages,
-          maxSteps: 5,
+          stopWhen: stepCountIs(5),
           tools: {
             searchKnowledgeBase: tool({
               description: "Search the private knowledge base.",
-              parameters: z.object({ query: z.string() }),
-              execute: async ({ query }) => {
+              inputSchema: z.object({ query: z.string() }),
+              execute: async ({ query }: { query: string }) => {
                 log.dim(`\n[Tool: searching knowledge base for "${query}"]`);
                 const res = await queryKnowledgeBase(query, 5);
                 log.dim(`[Tool: found ${res.hits.length} results]\n`);

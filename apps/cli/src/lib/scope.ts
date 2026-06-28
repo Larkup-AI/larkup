@@ -20,5 +20,5 @@ export async function requireActive(): Promise<ServerMeta> {
   if (!server) {
     log.error('No active server. Create one first with: larkuprag init "my-rag"');
   }
-  return server;
+  return server as ServerMeta;
 }
