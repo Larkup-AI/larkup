@@ -57,16 +57,22 @@ export function ChatWorkspace() {
     }
   }, [status?.chatModelId, selectedModel]);
 
-  const { messages, sendMessage, status: chatStatus, setMessages, error, regenerate } =
-    useChat({
-      transport: new DefaultChatTransport({
-        api: "/api/chat",
-        body: {
-          serverId,
-          chatModelId: selectedModel || undefined,
-        },
-      }),
-    });
+  const {
+    messages,
+    sendMessage,
+    status: chatStatus,
+    setMessages,
+    error,
+    regenerate,
+  } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: {
+        serverId,
+        chatModelId: selectedModel || undefined,
+      },
+    }),
+  });
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const isBusy = chatStatus === "submitted" || chatStatus === "streaming";

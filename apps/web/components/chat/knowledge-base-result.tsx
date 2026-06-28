@@ -34,7 +34,7 @@ export function KnowledgeBaseResult({
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card">
       {isShimmering && (
-        <div className="pointer-events-none absolute inset-0 z-10 animate-pulse bg-gradient-to-r from-transparent via-foreground/5 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 z-10 animate-pulse bg-linear-to-r from-transparent via-foreground/5 to-transparent" />
       )}
       <button
         type="button"
