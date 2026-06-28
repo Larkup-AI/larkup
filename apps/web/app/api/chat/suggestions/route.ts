@@ -24,16 +24,23 @@ function createChatModel(provider: string, modelId: string, apiKey?: string) {
   const modelName = modelId.includes("/")
     ? modelId.split("/").slice(1).join("/")
     : modelId;
-  const key = apiKey || process.env.AI_GATEWAY_API_KEY || process.env.EMBEDDING_API_KEY;
+  const key =
+    apiKey || process.env.AI_GATEWAY_API_KEY || process.env.EMBEDDING_API_KEY;
 
   switch (provider) {
-    case "google": return createGoogleGenerativeAI({ apiKey: key })(modelName);
-    case "cohere": return createCohere({ apiKey: key })(modelName);
-    case "mistral": return createMistral({ apiKey: key })(modelName);
-    case "deepseek": return createDeepSeek({ apiKey: key })(modelName);
-    case "vercel_ai_gateway": return createGateway({ apiKey: key })(modelId);
+    case "google":
+      return createGoogleGenerativeAI({ apiKey: key })(modelName);
+    case "cohere":
+      return createCohere({ apiKey: key })(modelName);
+    case "mistral":
+      return createMistral({ apiKey: key })(modelName);
+    case "deepseek":
+      return createDeepSeek({ apiKey: key })(modelName);
+    case "vercel_ai_gateway":
+      return createGateway({ apiKey: key })(modelId);
     case "openai":
-    default: return createOpenAI({ apiKey: key })(modelName);
+    default:
+      return createOpenAI({ apiKey: key })(modelName);
   }
 }
 
@@ -49,16 +56,24 @@ export async function POST(req: Request) {
 
     const indexed = run?.status === "completed" && (run.totalChunks ?? 0) > 0;
     if (!indexed) {
-      return NextResponse.json({ suggestions: ["What is this corpus about?", "Summarize the key concepts"] });
+      return NextResponse.json({
+        suggestions: [
+          "What is this corpus about?",
+          "Summarize the key concepts",
+        ],
+      });
     }
 
     try {
       // Pull a dummy vector (just embedded "summary" or similar) to get some chunks
       const vector = await embedQuery(config, "overview summary");
       const adapter = await createAdapter(config);
-      const hits = await adapter.query(vector, 3, "overview summary");
-      
-      const context = hits.map(h => h.text).join("\n\n").slice(0, 3000);
+      const hits = await adapter.query(vector, 5, "overview summary");
+
+      const context = hits
+        ?.map((h) => h.text)
+        ?.join("\n\n")
+        ?.slice(0, 3000);
 
       const provider = config.chatProvider || config.embeddingProvider;
       const chatModelId = config.chatModelId || "openai/gpt-4o-mini";
@@ -67,16 +82,21 @@ export async function POST(req: Request) {
         provider === "vercel_ai_gateway"
           ? "vercel_ai_gateway"
           : descriptor?.provider || provider;
-      
-      const aiModel = createChatModel(resolvedProvider, chatModelId, config.chatApiKey);
+
+      const aiModel = createChatModel(
+        resolvedProvider,
+        chatModelId,
+        config.chatApiKey,
+      );
 
       const { object } = await generateObject({
         model: aiModel,
-        system: "You are an AI that suggests 3 very short and concise questions a user could ask based on the provided text.",
+        system:
+          "You are an AI that suggests 3 very short and concise questions a user could ask based on the provided text.",
         prompt: `Text:\n${context}`,
         schema: z.object({
-          suggestions: z.array(z.string()).length(3)
-        })
+          suggestions: z.array(z.string()).length(3),
+        }),
       });
 
       config.chatSuggestions = object.suggestions;
@@ -85,7 +105,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ suggestions: object.suggestions });
     } catch (e: any) {
       console.error("Failed to generate suggestions:", e.message);
-      return NextResponse.json({ suggestions: ["What is this corpus about?", "Summarize the key concepts"] });
+      return NextResponse.json({
+        suggestions: [
+          "What is this corpus about?",
+          "Summarize the key concepts",
+        ],
+      });
     }
   });
 }

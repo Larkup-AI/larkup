@@ -43,27 +43,27 @@ Guidelines:
 /**
  * Creates an AI SDK language model instance based on the provider and model ID.
  */
-function createChatModel(provider: string, modelId: string) {
+function createChatModel(provider: string, modelId: string, apiKey?: string) {
   const modelName = modelId.includes("/")
     ? modelId.split("/").slice(1).join("/")
     : modelId;
-  const apiKey =
-    process.env.AI_GATEWAY_API_KEY || process.env.EMBEDDING_API_KEY;
+  const key =
+    apiKey || process.env.AI_GATEWAY_API_KEY || process.env.EMBEDDING_API_KEY;
 
   switch (provider) {
     case "google":
-      return createGoogleGenerativeAI({ apiKey })(modelName);
+      return createGoogleGenerativeAI({ apiKey: key })(modelName);
     case "cohere":
-      return createCohere({ apiKey })(modelName);
+      return createCohere({ apiKey: key })(modelName);
     case "mistral":
-      return createMistral({ apiKey })(modelName);
+      return createMistral({ apiKey: key })(modelName);
     case "deepseek":
-      return createDeepSeek({ apiKey })(modelName);
+      return createDeepSeek({ apiKey: key })(modelName);
     case "vercel_ai_gateway":
-      return createGateway({ apiKey })(modelId);
+      return createGateway({ apiKey: key })(modelId);
     case "openai":
     default:
-      return createOpenAI({ apiKey })(modelName);
+      return createOpenAI({ apiKey: key })(modelName);
   }
 }
 
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
   } = await req.json();
 
   const config = await readConfig();
-  const provider = config.embeddingProvider;
+  const provider = config.chatProvider || config.embeddingProvider;
 
   // Resolve chat model: explicit request > config > default for provider
   const chatModelId =
@@ -157,7 +157,7 @@ export async function POST(req: Request) {
       ? "vercel_ai_gateway"
       : chatModelDescriptor?.provider || provider;
 
-  const model = createChatModel(resolvedProvider, chatModelId);
+  const model = createChatModel(resolvedProvider, chatModelId, config.chatApiKey);
 
   const result = streamText({
     model,
