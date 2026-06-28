@@ -1,13 +1,15 @@
 "use client";
 
-import { useThemeCustomizer, PanelBgVariant } from "./theme-customizer-provider";
+import {
+  useThemeCustomizer,
+  PanelBgVariant,
+} from "./theme-customizer-provider";
 import { AppSidebar } from "./app-sidebar";
 import { AppTopNav } from "./app-topnav";
 import { usePathname } from "next/navigation";
 import { WorkspaceTopBar } from "@/components/workspace/workspace-top-bar";
 import { cn } from "@/lib/utils";
 
-/** Maps panel-bg variant to a CSS color for the content panel */
 const PANEL_BG_COLORS: Record<PanelBgVariant, string | null> = {
   "panel-default": "#FAFAFA",
   "panel-white": "#FFFFFF",
@@ -32,22 +34,25 @@ export function ClientLayoutWrapper({
 
   const containerClasses =
     pageStyle === "fused"
-      ? "min-h-[calc(100vh-8rem)] bg-background text-foreground"
-      : "min-h-[calc(100vh-8rem)] rounded-2xl border border-border bg-panel text-panel-foreground";
+      ? "h-[calc(100vh-8rem)] bg-background text-foreground overflow-hidden"
+      : "h-[calc(100vh-8rem)] rounded-2xl border border-border bg-panel text-panel-foreground overflow-hidden";
 
   const sidebarContainerClasses =
     pageStyle === "fused"
-      ? "min-h-[calc(100vh-1.5rem)] flex flex-col bg-background text-foreground"
-      : "min-h-[calc(100vh-1.5rem)] flex flex-col rounded-2xl border border-border bg-panel text-panel-foreground overflow-hidden";
+      ? "h-[calc(100vh-1.5rem)] flex flex-col bg-background text-foreground overflow-hidden"
+      : "h-[calc(100vh-1.5rem)] flex flex-col rounded-2xl border border-border bg-panel text-panel-foreground overflow-hidden";
 
   if (layout === "topnav") {
     return (
-      <div className="flex min-h-screen flex-col">
-        {/* Full width header */}
+      <div className="flex h-screen flex-col overflow-hidden">
         <AppTopNav />
-        {/* Main layout container */}
-        <main className={cn("flex-1 p-4 md:p-6 lg:p-8", isChatPage && "h-[calc(100vh-4rem)] flex flex-col")}>
-          <div className={cn(containerClasses, "container mx-auto", isChatPage && "flex-1 flex flex-col overflow-hidden")} style={panelStyle}>
+        <main
+          className={cn("flex-1 min-h-0 overflow-hidden p-4 md:p-6 lg:p-8")}
+        >
+          <div
+            className={cn(containerClasses, "container mx-auto flex flex-col")}
+            style={panelStyle}
+          >
             {children}
           </div>
         </main>
@@ -57,15 +62,25 @@ export function ClientLayoutWrapper({
 
   // Default Sidebar Layout
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <AppSidebar />
-      <main className="min-w-0 flex-1 p-3 pl-3 md:pl-0">
+      <main className="min-w-0 flex-1 p-3 pl-3 md:pl-0 overflow-hidden">
         <div className={sidebarContainerClasses} style={panelStyle}>
-          {/* Full width (inside sidebar content area) top bar */}
           <WorkspaceTopBar />
-          {/* Main layout container */}
-          <div className={cn("flex-1", isChatPage ? "overflow-hidden flex flex-col" : "overflow-auto")}>
-            <div className={cn("container mx-auto", isChatPage ? "flex-1 flex flex-col" : "pb-8")}>{children}</div>
+          <div
+            className={cn(
+              "flex-1 min-h-0",
+              isChatPage ? "overflow-hidden flex flex-col" : "overflow-auto",
+            )}
+          >
+            <div
+              className={cn(
+                "container mx-auto",
+                isChatPage ? "flex-1 min-h-0 flex flex-col" : "pb-8",
+              )}
+            >
+              {children}
+            </div>
           </div>
         </div>
       </main>

@@ -120,7 +120,7 @@ export function ChatWorkspace() {
   }
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-border px-6 pb-3">
         <div className="flex items-center gap-3">
@@ -211,7 +211,7 @@ export function ChatWorkspace() {
       {/* Messages area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden"
+        className="min-h-0 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden"
       >
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
           {!ready ? (
