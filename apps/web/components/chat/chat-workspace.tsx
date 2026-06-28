@@ -303,7 +303,7 @@ export function ChatWorkspace() {
 
       {/* Input area */}
       {ready && (
-        <div className=" px-4 pb-5 pt-3 sm:px-6">
+        <div className="relative z-[10000] px-4 pb-5 pt-3 sm:px-6">
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
             <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-1 focus-within:ring-ring">
               <textarea
@@ -315,7 +315,7 @@ export function ChatWorkspace() {
                     handleSubmit(e);
                   }
                 }}
-                rows={1}
+                rows={2}
                 disabled={!ready}
                 placeholder="Ask about your knowledge base…"
                 className="max-h-40 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"

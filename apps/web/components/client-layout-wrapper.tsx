@@ -3,6 +3,7 @@
 import { useThemeCustomizer, PanelBgVariant } from "./theme-customizer-provider";
 import { AppSidebar } from "./app-sidebar";
 import { AppTopNav } from "./app-topnav";
+import { usePathname } from "next/navigation";
 import { WorkspaceTopBar } from "@/components/workspace/workspace-top-bar";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,8 @@ export function ClientLayoutWrapper({
   children: React.ReactNode;
 }) {
   const { layout, pageStyle, panelBg } = useThemeCustomizer();
+  const pathname = usePathname();
+  const isChatPage = pathname?.includes("/chat");
 
   const panelColor = PANEL_BG_COLORS[panelBg];
   const panelStyle = panelColor ? { backgroundColor: panelColor } : undefined;
@@ -43,8 +46,8 @@ export function ClientLayoutWrapper({
         {/* Full width header */}
         <AppTopNav />
         {/* Main layout container */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 ">
-          <div className={cn(containerClasses, "container mx-auto ")} style={panelStyle}>
+        <main className={cn("flex-1 p-4 md:p-6 lg:p-8", isChatPage && "h-[calc(100vh-4rem)]")}>
+          <div className={cn(containerClasses, "container mx-auto", isChatPage && "h-full overflow-hidden")} style={panelStyle}>
             {children}
           </div>
         </main>
@@ -61,8 +64,8 @@ export function ClientLayoutWrapper({
           {/* Full width (inside sidebar content area) top bar */}
           <WorkspaceTopBar />
           {/* Main layout container */}
-          <div className="flex-1 overflow-auto">
-            <div className="container mx-auto pb-8 ">{children}</div>
+          <div className={cn("flex-1", isChatPage ? "overflow-hidden" : "overflow-auto")}>
+            <div className={cn("container mx-auto", isChatPage ? "h-full" : "pb-8")}>{children}</div>
           </div>
         </div>
       </main>
