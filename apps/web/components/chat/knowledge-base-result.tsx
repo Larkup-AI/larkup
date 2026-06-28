@@ -10,6 +10,12 @@ interface KBHit {
   text: string;
 }
 
+/**
+ * Renders knowledge base retrieval results from tool-searchKnowledgeBase parts.
+ *
+ * UIMessage parts for tools look like:
+ *   { type: "tool-searchKnowledgeBase", state: "input-streaming" | "input-available" | "output", input: { query }, output: { query, hits } }
+ */
 export function KnowledgeBaseResult({
   parts,
   isShimmering,
@@ -20,15 +26,10 @@ export function KnowledgeBaseResult({
   const [open, setOpen] = useState(false);
   const isRunning = parts.some(
     (part) =>
-      part.toolInvocation?.state === "call" ||
-      part.toolInvocation?.state === "partial-call",
+      part.state === "input-streaming" || part.state === "input-available",
   );
-  const hits: KBHit[] = parts.flatMap(
-    (part) => part.toolInvocation?.result?.hits ?? [],
-  );
-  const queries = parts
-    .map((part) => part.toolInvocation?.args?.query)
-    .filter(Boolean);
+  const hits: KBHit[] = parts.flatMap((part) => part.output?.hits ?? []);
+  const queries = parts.map((part) => part.input?.query).filter(Boolean);
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card">

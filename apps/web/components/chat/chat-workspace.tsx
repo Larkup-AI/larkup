@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import {
   ArrowUp,
   SquarePen,
@@ -47,6 +48,7 @@ export function ChatWorkspace() {
 
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [showModelSelect, setShowModelSelect] = useState(false);
+  const [input, setInput] = useState("");
 
   // Update selected model when status loads
   useEffect(() => {
@@ -55,22 +57,16 @@ export function ChatWorkspace() {
     }
   }, [status?.chatModelId, selectedModel]);
 
-  const {
-    messages,
-    input,
-    setInput,
-    handleSubmit,
-    status: chatStatus,
-    setMessages,
-    error,
-    reload,
-  } = useChat({
-    api: "/api/chat",
-    body: {
-      serverId,
-      chatModelId: selectedModel || undefined,
-    },
-  });
+  const { messages, sendMessage, status: chatStatus, setMessages, error, regenerate } =
+    useChat({
+      transport: new DefaultChatTransport({
+        api: "/api/chat",
+        body: {
+          serverId,
+          chatModelId: selectedModel || undefined,
+        },
+      }),
+    });
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const isBusy = chatStatus === "submitted" || chatStatus === "streaming";
@@ -82,22 +78,17 @@ export function ChatWorkspace() {
     });
   }, [messages, chatStatus]);
 
-  function newChat() {
-    setMessages([]);
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || isBusy) return;
+    sendMessage({ text });
     setInput("");
   }
 
-  function sendSuggestion(text: string) {
-    setInput(text);
-    // We need to submit programmatically
-    const fakeEvent = {
-      preventDefault: () => {},
-    } as React.FormEvent;
-    // Use setInput + trigger submit on next tick
-    setTimeout(() => {
-      const form = document.getElementById("chat-form") as HTMLFormElement;
-      if (form) form.requestSubmit();
-    }, 50);
+  function newChat() {
+    setMessages([]);
+    setInput("");
   }
 
   const isEmpty = messages.length === 0;
@@ -206,7 +197,9 @@ export function ChatWorkspace() {
                   <button
                     key={s}
                     type="button"
-                    onClick={() => sendSuggestion(s)}
+                    onClick={() => {
+                      sendMessage({ text: s });
+                    }}
                     className="rounded-full border border-border bg-card px-3.5 py-1.5 text-xs text-foreground transition hover:bg-secondary"
                   >
                     {s}
@@ -240,7 +233,7 @@ export function ChatWorkspace() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => reload()}
+                      onClick={() => regenerate()}
                       className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-secondary"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -257,11 +250,7 @@ export function ChatWorkspace() {
       {/* Input area */}
       {ready && (
         <div className="bg-background px-4 pb-5 pt-3 sm:px-6">
-          <form
-            id="chat-form"
-            onSubmit={handleSubmit}
-            className="mx-auto w-full max-w-3xl"
-          >
+          <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
             <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-1 focus-within:ring-ring">
               <textarea
                 value={input}
@@ -269,7 +258,7 @@ export function ChatWorkspace() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    handleSubmit(e as any);
+                    handleSubmit(e);
                   }
                 }}
                 rows={1}
