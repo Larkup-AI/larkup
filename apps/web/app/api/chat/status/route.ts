@@ -27,7 +27,9 @@ export async function GET(req: Request) {
 
     const indexed = run?.status === "completed" && (run.totalChunks ?? 0) > 0;
     const hasApiKey = !!(
-      process.env.AI_GATEWAY_API_KEY || process.env.EMBEDDING_API_KEY
+      config.chatApiKey ||
+      process.env.AI_GATEWAY_API_KEY ||
+      process.env.EMBEDDING_API_KEY
     );
 
     const blockers: string[] = [];
@@ -38,11 +40,11 @@ export async function GET(req: Request) {
     }
     if (!hasApiKey) {
       blockers.push(
-        "Set AI_GATEWAY_API_KEY or EMBEDDING_API_KEY in your environment for the chat model.",
+        "Set an API Key in Chat Settings or environment variables.",
       );
     }
 
-    const provider = config.embeddingProvider;
+    const provider = config.chatProvider || config.embeddingProvider;
     const models = getChatModelsForProvider(provider);
     const defaultModel = getDefaultChatModel(provider);
     const chatModelId =
@@ -53,7 +55,8 @@ export async function GET(req: Request) {
       blockers,
       provider,
       chatModelId,
-      availableModels: models.map((m) => ({ id: m.id, label: m.label })),
+      availableModels: models.map((m) => ({ id: m.id, label: m.label, provider: m.provider })),
+      suggestions: config.chatSuggestions || [],
     });
   });
 }

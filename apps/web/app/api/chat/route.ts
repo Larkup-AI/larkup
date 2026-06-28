@@ -152,7 +152,10 @@ export async function POST(req: Request) {
     "openai/gpt-4o-mini";
 
   const chatModelDescriptor = getChatModel(chatModelId);
-  const resolvedProvider = chatModelDescriptor?.provider || provider;
+  const resolvedProvider =
+    provider === "vercel_ai_gateway"
+      ? "vercel_ai_gateway"
+      : chatModelDescriptor?.provider || provider;
 
   const model = createChatModel(resolvedProvider, chatModelId);
 

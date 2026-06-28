@@ -14,8 +14,10 @@ import {
 } from "lucide-react";
 import useSWR from "swr";
 import { MessageItem } from "@/components/chat/message-item";
+import { ChatSettingsModal } from "@/components/chat/chat-settings-modal";
 import { useWorkspace } from "@/components/workspace/workspace-provider";
 import { cn } from "@/lib/utils";
+import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -24,14 +26,9 @@ interface ChatStatus {
   blockers: string[];
   provider: string;
   chatModelId: string;
-  availableModels: { id: string; label: string }[];
+  availableModels: { id: string; label: string; provider: string }[];
+  suggestions: string[];
 }
-
-const SUGGESTIONS = [
-  "What is this corpus about?",
-  "Summarize the key concepts",
-  "What are the main topics covered?",
-];
 
 export function ChatWorkspace() {
   const { activeServer } = useWorkspace();
@@ -56,6 +53,20 @@ export function ChatWorkspace() {
       setSelectedModel(status.chatModelId);
     }
   }, [status?.chatModelId, selectedModel]);
+
+  // Fetch suggestions if missing
+  useEffect(() => {
+    if (
+      status?.ready &&
+      status.suggestions &&
+      status.suggestions.length === 0
+    ) {
+      const url = serverId
+        ? `/api/chat/suggestions?serverId=${encodeURIComponent(serverId)}`
+        : "/api/chat/suggestions";
+      fetch(url, { method: "POST" });
+    }
+  }, [status?.ready, status?.suggestions, serverId]);
 
   const {
     messages,
@@ -111,15 +122,18 @@ export function ChatWorkspace() {
   return (
     <div className="flex flex-1 flex-col">
       {/* Header bar */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-3">
+      <div className="flex items-center justify-between border-b border-border px-6 pb-3">
         <div className="flex items-center gap-3">
+          {/* We moved model selector to the right */}
+        </div>
+        <div className="flex items-center gap-2">
           {/* Model selector */}
           {status?.availableModels && status.availableModels.length > 0 && (
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowModelSelect((o) => !o)}
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs text-foreground transition hover:bg-muted"
+                className="flex w-[250px] justify-between items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-foreground transition hover:bg-muted"
               >
                 {status.availableModels.find((m) => m.id === selectedModel)
                   ?.label ||
@@ -133,7 +147,7 @@ export function ChatWorkspace() {
                     className="fixed inset-0 z-40"
                     onClick={() => setShowModelSelect(false)}
                   />
-                  <div className="absolute left-0 top-full z-50 mt-1 min-w-48 rounded-lg border border-border bg-card p-1 shadow-lg">
+                  <div className="absolute right-0 top-full z-50 mt-1 max-h-64 min-w-[250px] overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg [&::-webkit-scrollbar]:hidden">
                     {status.availableModels.map((m) => (
                       <button
                         key={m.id}
@@ -143,13 +157,35 @@ export function ChatWorkspace() {
                           setShowModelSelect(false);
                         }}
                         className={cn(
-                          "flex w-full items-center rounded-md px-3 py-2 text-left text-xs transition",
+                          "flex w-full gap-3 items-center justify-between rounded-md px-3 py-2 text-left text-xs transition",
                           m.id === selectedModel
                             ? "bg-primary/10 text-primary font-medium"
                             : "text-foreground hover:bg-muted",
                         )}
                       >
-                        {m.label}
+                        <span>{m.label}</span>
+                        {PROVIDER_META[
+                          m.provider as keyof typeof PROVIDER_META
+                        ] ? (
+                          <ProviderIcon
+                            src={
+                              PROVIDER_META[
+                                m.provider as keyof typeof PROVIDER_META
+                              ].iconSrc
+                            }
+                            alt={m.provider}
+                            pillBg={
+                              PROVIDER_META[
+                                m.provider as keyof typeof PROVIDER_META
+                              ].pillBg
+                            }
+                            size={16}
+                          />
+                        ) : (
+                          <span className="text-[10px] uppercase text-muted-foreground/60">
+                            {m.provider}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -157,8 +193,9 @@ export function ChatWorkspace() {
               )}
             </div>
           )}
-        </div>
-        <div className="flex items-center gap-1">
+
+          <div className="h-4 w-px bg-border mx-1" />
+
           <button
             type="button"
             onClick={newChat}
@@ -167,11 +204,15 @@ export function ChatWorkspace() {
           >
             <SquarePen className="h-[16px] w-[16px]" />
           </button>
+          <ChatSettingsModal />
         </div>
       </div>
 
       {/* Messages area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden"
+      >
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
           {!ready ? (
             <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
@@ -199,18 +240,25 @@ export function ChatWorkspace() {
                 indexed documents.
               </p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => {
-                      sendMessage({ text: s });
-                    }}
-                    className="rounded-full border border-border bg-card px-3.5 py-1.5 text-xs text-foreground transition hover:bg-secondary"
-                  >
-                    {s}
-                  </button>
-                ))}
+                {status?.suggestions && status.suggestions.length > 0 ? (
+                  status.suggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        sendMessage({ text: s });
+                      }}
+                      className="rounded-full border border-border bg-card px-3.5 py-1.5 text-xs text-foreground transition hover:bg-secondary"
+                    >
+                      {s}
+                    </button>
+                  ))
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="size-3 animate-spin" /> Generating
+                    suggestions...
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -255,7 +303,7 @@ export function ChatWorkspace() {
 
       {/* Input area */}
       {ready && (
-        <div className="bg-background px-4 pb-5 pt-3 sm:px-6">
+        <div className=" px-4 pb-5 pt-3 sm:px-6">
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
             <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-1 focus-within:ring-ring">
               <textarea

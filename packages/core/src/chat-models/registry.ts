@@ -1,4 +1,4 @@
-import type { EmbeddingProvider } from "../types"
+import type { EmbeddingProvider } from "../types";
 
 /**
  * A selectable chat/LLM model. Grouped by the same provider IDs used
@@ -7,12 +7,12 @@ import type { EmbeddingProvider } from "../types"
  */
 export interface ChatModelDescriptor {
   /** AI SDK model string, e.g. "openai/gpt-4o-mini" */
-  id: string
-  label: string
-  provider: EmbeddingProvider
+  id: string;
+  label: string;
+  provider: EmbeddingProvider;
   /** Whether this is the default (cheapest) model for its provider */
-  isDefault?: boolean
-  description: string
+  isDefault?: boolean;
+  description: string;
 }
 
 export const CHAT_MODELS: ChatModelDescriptor[] = [
@@ -112,27 +112,62 @@ export const CHAT_MODELS: ChatModelDescriptor[] = [
     description: "OpenAI GPT-4o Mini routed through Vercel AI Gateway.",
   },
   {
+    id: "openai/gpt-4o",
+    label: "GPT-4o (via Gateway)",
+    provider: "vercel_ai_gateway",
+    description: "OpenAI GPT-4o routed through Vercel AI Gateway.",
+  },
+  {
     id: "google/gemini-2.0-flash",
     label: "Gemini 2.0 Flash (via Gateway)",
     provider: "vercel_ai_gateway",
     description: "Google Gemini routed through Vercel AI Gateway.",
   },
-]
+  {
+    id: "cohere/command-r-plus",
+    label: "Command R+ (via Gateway)",
+    provider: "vercel_ai_gateway",
+    description: "Cohere Command R+ routed through Vercel AI Gateway.",
+  },
+  {
+    id: "mistral/mistral-large-latest",
+    label: "Mistral Large (via Gateway)",
+    provider: "vercel_ai_gateway",
+    description: "Mistral Large routed through Vercel AI Gateway.",
+  },
+  {
+    id: "anthropic/claude-3-5-sonnet-20240620",
+    label: "Claude 3.5 Sonnet (via Gateway)",
+    provider: "vercel_ai_gateway",
+    description: "Anthropic Claude 3.5 Sonnet via Vercel AI Gateway.",
+  },
+  {
+    id: "anthropic/claude-3-haiku-20240307",
+    label: "Claude 3 Haiku (via Gateway)",
+    provider: "vercel_ai_gateway",
+    description: "Anthropic Claude 3 Haiku via Vercel AI Gateway.",
+  },
+];
+
 
 /** Get all chat models for a given embedding provider. */
-export function getChatModelsForProvider(provider: string): ChatModelDescriptor[] {
-  return CHAT_MODELS.filter((m) => m.provider === provider)
+export function getChatModelsForProvider(
+  provider: string,
+): ChatModelDescriptor[] {
+  return CHAT_MODELS.filter((m) => m.provider === provider);
 }
 
 /** Get the default (cheapest) chat model for a provider. */
-export function getDefaultChatModel(provider: string): ChatModelDescriptor | undefined {
+export function getDefaultChatModel(
+  provider: string,
+): ChatModelDescriptor | undefined {
   return (
     CHAT_MODELS.find((m) => m.provider === provider && m.isDefault) ??
     CHAT_MODELS.find((m) => m.provider === provider)
-  )
+  );
 }
 
 /** Find a specific chat model by id. */
 export function getChatModel(id: string): ChatModelDescriptor | undefined {
-  return CHAT_MODELS.find((m) => m.id === id)
+  return CHAT_MODELS.find((m) => m.id === id);
 }

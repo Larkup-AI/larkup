@@ -132,7 +132,10 @@ export interface RagConfig {
   /** topK default used by the generated server + demo */
   topK: number
   /** Optional: LLM model for the Chat demo. Auto-selected from provider if omitted. */
-  chatModelId?: string
+  chatModelId?: string;
+  chatProvider?: string;
+  chatApiKey?: string;
+  chatSuggestions?: string[];
   updatedAt: string
 }
 
