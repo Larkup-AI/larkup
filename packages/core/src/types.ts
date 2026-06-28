@@ -136,6 +136,7 @@ export interface RagConfig {
   chatProvider?: string;
   chatApiKey?: string;
   chatSuggestions?: string[];
+  systemPrompt?: string;
   updatedAt: string
 }
 

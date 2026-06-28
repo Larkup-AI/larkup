@@ -26,17 +26,16 @@ import { createGateway } from "@ai-sdk/gateway";
 
 export const maxDuration = 60;
 
-const SYSTEM_PROMPT = `You are a helpful research assistant powered by a knowledge base.
+const DEFAULT_SYSTEM_PROMPT = `You are a helpful research assistant powered by a knowledge base.
 
 You have one tool:
 - "searchKnowledgeBase" — searches a private RAG knowledge base.
 
 Guidelines:
-- For factual questions about the knowledge base content, call searchKnowledgeBase.
+- ALWAYS call the searchKnowledgeBase tool to load required documents from the RAG server before answering the user's messages, even for general questions.
 - Synthesize a clear, well-structured answer based on the retrieved documents.
 - Cite sources inline using markdown links to their URLs when available.
 - Be concise and accurate. Never fabricate sources or facts.
-- For casual conversation or questions clearly unrelated to the knowledge base, respond naturally without using the tool.
 - Don't reply to the user with a question — try to give the answer unless you truly need clarification.
 `;
 
@@ -161,7 +160,7 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model,
-    system: SYSTEM_PROMPT,
+    system: config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(5),
     tools: {

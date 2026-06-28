@@ -40,6 +40,7 @@ export function ChatSettingsModal() {
 
   const [provider, setProvider] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
 
@@ -47,6 +48,7 @@ export function ChatSettingsModal() {
     if (config && open) {
       setProvider(config.chatProvider || config.embeddingProvider || "openai");
       setApiKey(config.chatApiKey || "");
+      setSystemPrompt(config.systemPrompt || "");
     }
   }, [config, open]);
 
@@ -65,6 +67,7 @@ export function ChatSettingsModal() {
             ...config,
             chatProvider: provider,
             chatApiKey: apiKey,
+            systemPrompt: systemPrompt,
           }),
         },
       );
@@ -161,6 +164,21 @@ export function ChatSettingsModal() {
             <p className="text-xs text-muted-foreground">
               If left blank, it falls back to <code>AI_GATEWAY_API_KEY</code> or{" "}
               <code>EMBEDDING_API_KEY</code> in your environment.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">
+              System Prompt
+            </label>
+            <textarea
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              placeholder="Leave blank to use default system prompt"
+              className="w-full min-h-[100px] rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+            />
+            <p className="text-xs text-muted-foreground">
+              Override the default instructions given to the agent.
             </p>
           </div>
 
