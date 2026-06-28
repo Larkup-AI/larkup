@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   FileStack,
+  FlaskConical,
   Layers,
   Lock,
   type LucideIcon,
-  MessageSquareText,
+  MessageCircle,
   Server,
   SlidersHorizontal,
 } from "lucide-react";
@@ -29,7 +30,8 @@ const STAGE_ICONS: Record<StageId, LucideIcon> = {
   data: FileStack,
   index: Layers,
   server: Server,
-  demo: MessageSquareText,
+  demo: FlaskConical,
+  chat: MessageCircle,
 };
 
 export function AppSidebar() {

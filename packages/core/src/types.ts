@@ -131,6 +131,8 @@ export interface RagConfig {
   storeConfig: Record<string, string>
   /** topK default used by the generated server + demo */
   topK: number
+  /** Optional: LLM model for the Chat demo. Auto-selected from provider if omitted. */
+  chatModelId?: string
   updatedAt: string
 }
 
@@ -276,7 +278,7 @@ export interface IndexRun {
 /* Pipeline stages (drive the sidebar nav + gating)                    */
 /* ------------------------------------------------------------------ */
 
-export type StageId = "configure" | "data" | "index" | "server" | "demo"
+export type StageId = "configure" | "data" | "index" | "server" | "demo" | "chat"
 
 export interface StageMeta {
   id: StageId

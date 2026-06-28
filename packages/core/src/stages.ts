@@ -35,12 +35,19 @@ export const STAGES: StageMeta[] = [
   },
   {
     id: "demo",
-    label: "Demo",
+    label: "Test",
     href: "/demo",
-    description: "Send a test query and inspect the top-k documents.",
+    description: "Send a test query and inspect the top-k retrieved documents.",
     phase: 5,
+  },
+  {
+    id: "chat",
+    label: "Chat",
+    href: "/chat",
+    description: "Chat with your knowledge base using an AI assistant.",
+    phase: 6,
   },
 ]
 
 /** The phase currently shipped. Stages above this render as "coming soon". */
-export const CURRENT_PHASE = 5
+export const CURRENT_PHASE = 6

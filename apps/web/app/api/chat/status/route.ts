@@ -1,0 +1,59 @@
+import { NextResponse } from "next/server";
+import { readConfig } from "@larkup-rag/core/config-store";
+import { readRun } from "@larkup-rag/core/index-store";
+import { runWithServer } from "@larkup-rag/core/workspace";
+import {
+  getChatModelsForProvider,
+  getDefaultChatModel,
+} from "@larkup-rag/core/chat-models/registry";
+
+export const dynamic = "force-dynamic";
+
+function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
+  return serverId ? runWithServer(serverId, fn) : fn();
+}
+
+/**
+ * GET /api/chat/status — readiness snapshot for the Chat stage.
+ *
+ * Reports whether there's an index ready to chat against, plus
+ * the available chat models for the user's selected provider.
+ */
+export async function GET(req: Request) {
+  const serverId = new URL(req.url).searchParams.get("serverId");
+  return withServer(serverId, async () => {
+    const config = await readConfig();
+    const run = await readRun();
+
+    const indexed = run?.status === "completed" && (run.totalChunks ?? 0) > 0;
+    const hasApiKey = !!(
+      process.env.AI_GATEWAY_API_KEY || process.env.EMBEDDING_API_KEY
+    );
+
+    const blockers: string[] = [];
+    if (!indexed) {
+      blockers.push(
+        "Build an index first (Index stage) so the chat can retrieve from your documents.",
+      );
+    }
+    if (!hasApiKey) {
+      blockers.push(
+        "Set AI_GATEWAY_API_KEY or EMBEDDING_API_KEY in your environment for the chat model.",
+      );
+    }
+
+    const provider = config.embeddingProvider;
+    const models = getChatModelsForProvider(provider);
+    const defaultModel = getDefaultChatModel(provider);
+    const chatModelId =
+      config.chatModelId || defaultModel?.id || "openai/gpt-4o-mini";
+
+    return NextResponse.json({
+      ready: indexed && hasApiKey,
+      blockers,
+      provider,
+      chatModelId,
+      availableModels: models.map((m) => ({ id: m.id, label: m.label })),
+    });
+  });
+}

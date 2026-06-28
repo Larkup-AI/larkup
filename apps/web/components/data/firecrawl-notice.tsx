@@ -129,7 +129,7 @@ export function FirecrawlNotice({
         <KeyRound className="size-4" />
       )}
       <AlertTitle className="flex items-center gap-2">
-        {running ? "Local Firecrawl is running" : "Run Firecrawl locally"}
+        {running ? "Web Crawler is running" : "Launch Web Crawler"}
         {running && (
           <Badge
             variant="secondary"
@@ -214,7 +214,7 @@ export function FirecrawlNotice({
                   className="size-4 object-contain"
                 />
               )}
-              Launch Firecrawl locally
+              Launch Web Crawler
             </Button>
           )}
 

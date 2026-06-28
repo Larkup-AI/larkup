@@ -567,7 +567,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
       </TooltipProvider>
       <Button
         variant="outline"
-        className="h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        className="h-9 gap-1.5 bg-muted/80  text-xs text-black/80 hover:text-black hover:bg-muted "
         onClick={() => {
           const currentKey =
             apiKey || localStorage.getItem("rag_server_api_key");
