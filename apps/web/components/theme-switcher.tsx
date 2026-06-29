@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { GlobalSettings } from "./global-settings";
 
@@ -93,6 +93,14 @@ const PAGE_STYLES: { id: PageStyleVariant; name: string }[] = [
 ];
 
 export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
+  return (
+    <Suspense fallback={<div className={floating ? "fixed bottom-6 right-6 z-50 h-12 w-12" : "size-9"} />}>
+      <ThemeSwitcherContent floating={floating} />
+    </Suspense>
+  );
+}
+
+function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
   const {
     theme,
     setTheme,
