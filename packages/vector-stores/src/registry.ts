@@ -42,6 +42,7 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
         label: "Database path",
         type: "path",
         required: true,
+        defaultValue: "./.ragtoolkit/lancedb",
         placeholder: "./.ragtoolkit/lancedb",
         help: "Directory where the LanceDB tables are stored.",
         showWhen: { key: "mode", equals: ["local"] },

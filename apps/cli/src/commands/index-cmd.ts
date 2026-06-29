@@ -6,6 +6,7 @@ import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry";
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
 import { prompts } from "../ui/prompts";
+import { ensureApiKey } from "../lib/keys";
 
 export async function indexCommand(options: { server?: string }) {
   await inServerScope(options.server, async () => {
@@ -21,9 +22,7 @@ export async function indexCommand(options: { server?: string }) {
       log.error(`Unknown embedding model "${config.embeddingModelId}". Set it in the Configure stage.`);
     }
 
-    if (!process.env.AI_GATEWAY_API_KEY && !process.env.EMBEDDING_API_KEY) {
-      log.warn("API Key is not set — embedding will likely fail.");
-    }
+    await ensureApiKey(config, "embedding");
 
     log.info(log.fmt.cyan(`Indexing ${docs.length} document(s) into ${config.vectorStore}…`));
     const run = await createRun(config);

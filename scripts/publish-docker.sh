@@ -1,10 +1,6 @@
 #!/bin/bash
 set -e
 
-#===========================================
-# Build and Push Docker Image
-#===========================================
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 

@@ -46,8 +46,7 @@ function createChatModel(provider: string, modelId: string, apiKey?: string) {
   const modelName = modelId.includes("/")
     ? modelId.split("/").slice(1).join("/")
     : modelId;
-  const key =
-    apiKey || process.env.AI_GATEWAY_API_KEY || process.env.EMBEDDING_API_KEY;
+  const key = apiKey;
 
   switch (provider) {
     case "google":
@@ -156,7 +155,7 @@ export async function POST(req: Request) {
       ? "vercel_ai_gateway"
       : chatModelDescriptor?.provider || provider;
 
-  const model = createChatModel(resolvedProvider, chatModelId, config.chatApiKey);
+  const model = createChatModel(resolvedProvider, chatModelId, config.chatApiKey || config.embeddingApiKey);
 
   const result = streamText({
     model,

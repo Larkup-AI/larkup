@@ -137,6 +137,11 @@ export interface RagConfig {
   chatApiKey?: string;
   chatSuggestions?: string[];
   systemPrompt?: string;
+  serperApiKey?: string;
+  scraperProxyServer?: string;
+  scraperProxyUsername?: string;
+  scraperProxyPassword?: string;
+  firecrawlApiKey?: string;
   updatedAt: string
 }
 
@@ -157,6 +162,11 @@ export const DEFAULT_CONFIG: RagConfig = {
     dbPath: "./.ragtoolkit/lancedb",
   },
   topK: 5,
+  serperApiKey: "",
+  scraperProxyServer: "",
+  scraperProxyUsername: "",
+  scraperProxyPassword: "",
+  firecrawlApiKey: "",
   updatedAt: new Date(0).toISOString(),
 }
 

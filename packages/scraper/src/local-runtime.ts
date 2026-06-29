@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import { readConfig } from "@larkup-rag/core/config-store";
 
 /**
  * Manages a LOCAL, self-hosted Firecrawl instance via Docker.
@@ -52,12 +53,13 @@ async function getProxy(): Promise<{ server: string; username?: string; password
     // If proxies.txt isn't found, silently fall through to the env variables fallback
   }
 
-  // Option 2 (Convenient Fallback): Use the proxy endpoint from environment variables
-  if (process.env.SCRAPER_PROXY_SERVER) {
+  // Option 2 (Convenient Fallback): Use the proxy endpoint from configuration
+  const config = await readConfig();
+  if (config.scraperProxyServer) {
     return {
-      server: process.env.SCRAPER_PROXY_SERVER,
-      username: process.env.SCRAPER_PROXY_USERNAME,
-      password: process.env.SCRAPER_PROXY_PASSWORD
+      server: config.scraperProxyServer,
+      username: config.scraperProxyUsername,
+      password: config.scraperProxyPassword
     };
   }
 

@@ -4,6 +4,7 @@ import { embedQuery } from "@larkup-rag/core/indexing/embedder";
 import { createAdapter } from "@larkup-rag/vector-stores/factory";
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
+import { ensureApiKey } from "../lib/keys";
 
 export async function queryCommand(question: string, options: { server?: string; topK?: string }) {
   await inServerScope(options.server, async () => {
@@ -17,9 +18,7 @@ export async function queryCommand(question: string, options: { server?: string;
       log.error("No index to query. Build one first: larkuprag index");
     }
 
-    if (!process.env.AI_GATEWAY_API_KEY && !process.env.EMBEDDING_API_KEY) {
-      log.warn("API Key is not set — embedding will likely fail.");
-    }
+    await ensureApiKey(config, "embedding");
 
     const topK = Math.min(
       Math.max(Number(options.topK) || config.topK, 1),

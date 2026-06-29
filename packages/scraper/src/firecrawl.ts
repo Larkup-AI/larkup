@@ -1,4 +1,5 @@
 import type { SearchResultItem } from "@larkup-rag/core/types";
+import { readConfig } from "@larkup-rag/core/config-store";
 import { readLocalState } from "./local-runtime";
 
 /**
@@ -38,11 +39,12 @@ async function resolveEndpoint(): Promise<Endpoint> {
   if (local.running && local.apiKey) {
     return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: "local" };
   }
-  const key = process.env.FIRECRAWL_API_KEY;
+  const config = await readConfig();
+  const key = config.firecrawlApiKey;
   if (key) return { base: CLOUD_BASE, key, mode: "cloud" };
 
   throw new FirecrawlError(
-    "No Firecrawl available. Launch a local instance or set FIRECRAWL_API_KEY to run web search and scraping.",
+    "No Firecrawl available. Launch a local instance or configure FIRECRAWL_API_KEY in the UI to run web search and scraping.",
     401,
   );
 }
@@ -54,7 +56,8 @@ async function resolveEndpoint(): Promise<Endpoint> {
 export async function isFirecrawlConfigured() {
   const local = await readLocalState();
   if (local.running && local.apiKey) return true;
-  return Boolean(process.env.FIRECRAWL_API_KEY);
+  const config = await readConfig();
+  return Boolean(config.firecrawlApiKey);
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {

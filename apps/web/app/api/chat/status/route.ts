@@ -26,11 +26,7 @@ export async function GET(req: Request) {
     const run = await readRun();
 
     const indexed = run?.status === "completed" && (run.totalChunks ?? 0) > 0;
-    const hasApiKey = !!(
-      config.chatApiKey ||
-      process.env.AI_GATEWAY_API_KEY ||
-      process.env.EMBEDDING_API_KEY
-    );
+    const hasApiKey = !!(config.chatApiKey || config.embeddingApiKey);
 
     const blockers: string[] = [];
     if (!indexed) {
@@ -40,7 +36,7 @@ export async function GET(req: Request) {
     }
     if (!hasApiKey) {
       blockers.push(
-        "Set an API Key in Chat Settings or environment variables.",
+        "Set an API Key in Settings.",
       );
     }
 

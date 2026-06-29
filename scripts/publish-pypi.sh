@@ -1,10 +1,6 @@
 #!/bin/bash
 set -e
 
-#===========================================
-# Publish Python SDK (larkup-rag) to PyPI
-#===========================================
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PY_SDK_DIR="$ROOT_DIR/apps/sdk/py-sdk"

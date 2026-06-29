@@ -24,8 +24,7 @@ function createChatModel(provider: string, modelId: string, apiKey?: string) {
   const modelName = modelId.includes("/")
     ? modelId.split("/").slice(1).join("/")
     : modelId;
-  const key =
-    apiKey || process.env.AI_GATEWAY_API_KEY || process.env.EMBEDDING_API_KEY;
+  const key = apiKey;
 
   switch (provider) {
     case "google":
@@ -86,7 +85,7 @@ export async function POST(req: Request) {
       const aiModel = createChatModel(
         resolvedProvider,
         chatModelId,
-        config.chatApiKey,
+        config.chatApiKey || config.embeddingApiKey,
       );
 
       const { object } = await generateObject({

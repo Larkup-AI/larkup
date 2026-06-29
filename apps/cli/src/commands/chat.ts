@@ -18,6 +18,7 @@ import { createGateway } from "@ai-sdk/gateway";
 
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
+import { ensureApiKey } from "../lib/keys";
 
 const SYSTEM_PROMPT = `You are a helpful research assistant powered by a knowledge base.
 You have one tool:
@@ -31,11 +32,10 @@ Guidelines:
 - For casual conversation, respond naturally without using the tool.
 `;
 
-function createChatModel(provider: string, modelId: string) {
+function createChatModel(provider: string, modelId: string, apiKey?: string) {
   const modelName = modelId.includes("/")
     ? modelId.split("/").slice(1).join("/")
     : modelId;
-  const apiKey = process.env.AI_GATEWAY_API_KEY || process.env.EMBEDDING_API_KEY;
 
   switch (provider) {
     case "google": return createGoogleGenerativeAI({ apiKey })(modelName);
@@ -98,14 +98,12 @@ export async function chatCommand(options: { server?: string; model?: string }) 
     const descriptor = getChatModel(chatModelId);
     const resolvedProvider = descriptor?.provider || provider;
     
-    if (!process.env.AI_GATEWAY_API_KEY && !process.env.EMBEDDING_API_KEY) {
-      log.warn("API Key is not set — chat will likely fail.");
-    }
+    await ensureApiKey(config, "chat");
 
     log.info(log.fmt.cyan(`Starting chat session... (Type 'exit' to quit)`));
     log.dim(`Server: ${server.name} | Model: ${chatModelId}`);
 
-    const aiModel = createChatModel(resolvedProvider, chatModelId);
+    const aiModel = createChatModel(resolvedProvider, chatModelId, config.chatApiKey || config.embeddingApiKey);
     const messages: any[] = [];
 
     while (true) {

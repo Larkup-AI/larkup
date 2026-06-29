@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { GlobalSettings } from "./global-settings";
 
 import {
   useThemeCustomizer,
@@ -21,6 +23,7 @@ import {
   PanelTop,
   User,
   Check,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -117,6 +120,17 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
     syncedRef.synced = true;
   }
 
+  const searchParams = useSearchParams();
+  const [view, setView] = useState<"main" | "settings">("main");
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams?.get("settings")) {
+      setOpen(true);
+      setView("settings");
+    }
+  }, [searchParams]);
+
   const handleSaveUsername = () => {
     setUsername(localName.trim());
   };
@@ -132,7 +146,7 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
 
   return (
     <div className={wrapperClass}>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           render={
             <Button
@@ -146,220 +160,233 @@ export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
         />
         <PopoverContent
           align="end"
-          className="w-80 p-0 shadow-2xl flex flex-col max-h-[85vh]"
+          className="w-80 p-0 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
         >
-          <div className="border-b px-4 py-3 font-semibold flex items-center gap-2 shrink-0">
-            <Palette className="h-4 w-4" /> Theme Customizer
-          </div>
-          <div className="p-4 space-y-6 overflow-y-auto">
-            {/* Username */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" /> Username
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  value={localName}
-                  onChange={(e) => setLocalName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSaveUsername()}
-                  placeholder="Enter your name"
-                  className="flex-1 rounded-md border border-input bg-background px-3 h-7 text-sm outline-none "
-                />
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="shrink-0 h-7 px-3.5"
-                  onClick={handleSaveUsername}
-                >
-                  save
-                  {/* <Check className="h-3.5 w-3.5 " /> */}
+          {view === "settings" ? (
+            <div className="flex flex-col min-h-0 flex-1 h-full animate-in slide-in-from-right-4 duration-300">
+              <GlobalSettings onBack={() => setView("main")} />
+            </div>
+          ) : (
+            <div className="flex flex-col min-h-0 flex-1 h-full animate-in slide-in-from-left-4 duration-300">
+              <div className="border-b px-4 py-3 font-semibold flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <Palette className="h-4 w-4" /> Preferences
+                </div>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setView("settings")}>
+                  <Settings className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </div>
-            </div>
-
-            {/* Color Theme */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Palette className="h-4 w-4 text-muted-foreground" /> Color
-                Palette
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {THEMES.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setTheme(t.id)}
-                    className={`flex flex-col items-center justify-center gap-2 rounded-md border-2 p-2 text-xs transition-all hover:bg-muted ${
-                      theme === t.id
-                        ? "border-primary bg-primary/5"
-                        : "border-transparent"
-                    }`}
-                  >
-                    <div
-                      className="h-6 w-6 rounded-full border shadow-sm"
-                      style={{ background: t.color }}
+              <div className="flex-1 min-h-0 p-4 space-y-6 overflow-y-auto">
+                {/* Username */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" /> Username
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={localName}
+                      onChange={(e) => setLocalName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSaveUsername()}
+                      placeholder="Enter your name"
+                      className="flex-1 rounded-md border border-input bg-background px-3 h-7 text-sm outline-none "
                     />
-                    <span className="truncate w-full text-center">
-                      {t.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="shrink-0 h-7 px-3.5"
+                      onClick={handleSaveUsername}
+                    >
+                      save
+                      {/* <Check className="h-3.5 w-3.5 " /> */}
+                    </Button>
+                  </div>
+                </div>
 
-            {/* Page Background */}
-            <TooltipProvider delay={200}>
-              <div className="space-y-3">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <SquareDashed className="h-4 w-4 text-muted-foreground" />{" "}
-                  Page Background
-                </label>
-                <p className="text-[11px] text-muted-foreground -mt-1">
-                  Full page background behind everything
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {BACKGROUNDS.map((bg) => (
-                    <Tooltip key={bg.id}>
-                      <TooltipTrigger
-                        render={
-                          <button
-                            onClick={() => setBackground(bg.id)}
-                            className={`flex items-center justify-center rounded-full border-2 p-0.5 transition-all hover:scale-110 ${
-                              background === bg.id
-                                ? "border-primary"
-                                : "border-transparent"
-                            }`}
-                          />
-                        }
+                {/* Color Theme */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Palette className="h-4 w-4 text-muted-foreground" /> Color
+                    Palette
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {THEMES.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setTheme(t.id)}
+                        className={`flex flex-col items-center justify-center gap-2 rounded-md border-2 p-2 text-xs transition-all hover:bg-muted ${
+                          theme === t.id
+                            ? "border-primary bg-primary/5"
+                            : "border-transparent"
+                        }`}
                       >
                         <div
-                          className={`h-6 w-6 rounded-full border shrink-0 ${bg.id === "bg-default" ? "border-dashed" : "shadow-sm"}`}
-                          style={{ background: bg.color }}
+                          className="h-6 w-6 rounded-full border shadow-sm"
+                          style={{ background: t.color }}
                         />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" sideOffset={6}>
-                        <span className="text-xs font-medium">{bg.name}</span>
-                        <span className="text-[10px] text-muted-foreground ml-1.5">
-                          {bg.color}
+                        <span className="truncate w-full text-center">
+                          {t.name}
                         </span>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </TooltipProvider>
 
-            {/* Panel / Content Background */}
-            <TooltipProvider delay={200}>
-              <div className="space-y-3">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <PanelTop className="h-4 w-4 text-muted-foreground" /> Content
-                  Panel Background
-                </label>
-                <p className="text-[11px] text-muted-foreground -mt-1">
-                  Inner content area (card / main panel)
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {PANEL_BACKGROUNDS.map((pb) => (
-                    <Tooltip key={pb.id}>
-                      <TooltipTrigger
-                        render={
-                          <button
-                            onClick={() => setPanelBg(pb.id)}
-                            className={`flex items-center justify-center rounded-full border-2 p-0.5 transition-all hover:scale-110 ${
-                              panelBg === pb.id
-                                ? "border-primary"
-                                : "border-transparent"
-                            }`}
-                          />
-                        }
+                {/* Page Background */}
+                <TooltipProvider delay={200}>
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <SquareDashed className="h-4 w-4 text-muted-foreground" />{" "}
+                      Page Background
+                    </label>
+                    <p className="text-[11px] text-muted-foreground -mt-1">
+                      Full page background behind everything
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {BACKGROUNDS.map((bg) => (
+                        <Tooltip key={bg.id}>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                onClick={() => setBackground(bg.id)}
+                                className={`flex items-center justify-center rounded-full border-2 p-0.5 transition-all hover:scale-110 ${
+                                  background === bg.id
+                                    ? "border-primary"
+                                    : "border-transparent"
+                                }`}
+                              />
+                            }
+                          >
+                            <div
+                              className={`h-6 w-6 rounded-full border shrink-0 ${bg.id === "bg-default" ? "border-dashed" : "shadow-sm"}`}
+                              style={{ background: bg.color }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" sideOffset={6}>
+                            <span className="text-xs font-medium">{bg.name}</span>
+                            <span className="text-[10px] text-muted-foreground ml-1.5">
+                              {bg.color}
+                            </span>
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  </div>
+                </TooltipProvider>
+
+                {/* Panel / Content Background */}
+                <TooltipProvider delay={200}>
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <PanelTop className="h-4 w-4 text-muted-foreground" /> Content
+                      Panel Background
+                    </label>
+                    <p className="text-[11px] text-muted-foreground -mt-1">
+                      Inner content area (card / main panel)
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {PANEL_BACKGROUNDS.map((pb) => (
+                        <Tooltip key={pb.id}>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                onClick={() => setPanelBg(pb.id)}
+                                className={`flex items-center justify-center rounded-full border-2 p-0.5 transition-all hover:scale-110 ${
+                                  panelBg === pb.id
+                                    ? "border-primary"
+                                    : "border-transparent"
+                                }`}
+                              />
+                            }
+                          >
+                            <div
+                              className={`h-6 w-6 rounded-full border shrink-0 ${pb.id === "panel-default" ? "border-dashed" : "shadow-sm"}`}
+                              style={{ background: pb.color }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" sideOffset={6}>
+                            <span className="text-xs font-medium">{pb.name}</span>
+                            <span className="text-[10px] text-muted-foreground ml-1.5">
+                              {pb.color}
+                            </span>
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  </div>
+                </TooltipProvider>
+
+                {/* Layout */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <LayoutTemplate className="h-4 w-4 text-muted-foreground" />{" "}
+                    Layout Style
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {LAYOUTS.map((l) => (
+                      <button
+                        key={l.id}
+                        onClick={() => setLayout(l.id)}
+                        className={`rounded-md border-2 p-2 text-sm transition-all hover:bg-muted ${
+                          layout === l.id
+                            ? "border-primary bg-primary/5"
+                            : "border-border"
+                        }`}
                       >
-                        <div
-                          className={`h-6 w-6 rounded-full border shrink-0 ${pb.id === "panel-default" ? "border-dashed" : "shadow-sm"}`}
-                          style={{ background: pb.color }}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" sideOffset={6}>
-                        <span className="text-xs font-medium">{pb.name}</span>
-                        <span className="text-[10px] text-muted-foreground ml-1.5">
-                          {pb.color}
-                        </span>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
+                        {l.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Page Style */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <SquareDashed className="h-4 w-4 text-muted-foreground" /> Page
+                    Style
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PAGE_STYLES.map((ps) => (
+                      <button
+                        key={ps.id}
+                        onClick={() => setPageStyle(ps.id)}
+                        className={`rounded-md border-2 p-2 text-xs transition-all hover:bg-muted ${
+                          pageStyle === ps.id
+                            ? "border-primary bg-primary/5"
+                            : "border-border"
+                        }`}
+                      >
+                        {ps.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Border Radius */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Monitor className="h-4 w-4 text-muted-foreground" /> Border
+                    Radius
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {RADIUSES.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => setRadius(r.id)}
+                        className={`rounded-md border-2 px-3 py-1 text-xs transition-all hover:bg-muted ${
+                          radius === r.id
+                            ? "border-primary bg-primary/5"
+                            : "border-border"
+                        }`}
+                        style={{ borderRadius: r.value }}
+                      >
+                        {r.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </TooltipProvider>
-
-            {/* Layout */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <LayoutTemplate className="h-4 w-4 text-muted-foreground" />{" "}
-                Layout Style
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {LAYOUTS.map((l) => (
-                  <button
-                    key={l.id}
-                    onClick={() => setLayout(l.id)}
-                    className={`rounded-md border-2 p-2 text-sm transition-all hover:bg-muted ${
-                      layout === l.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
-                    }`}
-                  >
-                    {l.name}
-                  </button>
-                ))}
-              </div>
             </div>
-
-            {/* Page Style */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <SquareDashed className="h-4 w-4 text-muted-foreground" /> Page
-                Style
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {PAGE_STYLES.map((ps) => (
-                  <button
-                    key={ps.id}
-                    onClick={() => setPageStyle(ps.id)}
-                    className={`rounded-md border-2 p-2 text-xs transition-all hover:bg-muted ${
-                      pageStyle === ps.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
-                    }`}
-                  >
-                    {ps.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Border Radius */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Monitor className="h-4 w-4 text-muted-foreground" /> Border
-                Radius
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {RADIUSES.map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => setRadius(r.id)}
-                    className={`rounded-md border-2 px-3 py-1 text-xs transition-all hover:bg-muted ${
-                      radius === r.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
-                    }`}
-                    style={{ borderRadius: r.value }}
-                  >
-                    {r.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          )}
         </PopoverContent>
       </Popover>
     </div>

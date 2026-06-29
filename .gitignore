@@ -5,7 +5,7 @@
 .env*.local
 .env
 .env.dev
-
+.env.e2e
 # Common ignores
 node_modules/
 .next/
