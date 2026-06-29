@@ -21,8 +21,18 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useThemeCustomizer } from "./theme-customizer-provider";
+import { useThemeCustomizer, type PanelBgVariant } from "./theme-customizer-provider";
 import { ThemeSwitcher } from "./theme-switcher";
+
+const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
+  "panel-default": undefined,
+  "panel-white": "#FFFFFF",
+  "panel-fafafa": "#F4F4F4",
+  "panel-warm": "#F7F1EA",
+  "panel-soft": "#FBFAF8",
+  "panel-silver": "#F8F8F8",
+  "panel-stone": "#F5F5F2",
+};
 
 // [#CDA1FE]
 const STAGE_ICONS: Record<StageId, LucideIcon> = {
@@ -36,15 +46,20 @@ const STAGE_ICONS: Record<StageId, LucideIcon> = {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { pageStyle } = useThemeCustomizer();
+  const { pageStyle, navBg } = useThemeCustomizer();
+
+  const navColor = navBg ? NAV_BG_COLORS[navBg] : undefined;
+  const navStyle = navColor ? { backgroundColor: navColor } : undefined;
 
   return (
     <TooltipProvider delay={150}>
       <aside
         className={cn(
-          "sticky top-0 hidden  h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start bg-background py-3 md:flex",
+          "sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start py-3 md:flex",
+          !navColor ? "bg-background" : "",
           pageStyle === "fused" ? "border-r border-border" : "",
         )}
+        style={navStyle}
       >
         {/* Brand */}
         <Tooltip>

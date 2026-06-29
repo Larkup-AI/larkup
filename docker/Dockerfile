@@ -19,7 +19,7 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the web app
-RUN pnpm --filter=@buddy-rag/web build
+RUN pnpm --filter=larkup-rag build
 
 # Stage 2: Runner
 FROM node:20-slim AS runner

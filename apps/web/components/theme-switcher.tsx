@@ -108,6 +108,8 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
     setBackground,
     panelBg,
     setPanelBg,
+    navBg,
+    setNavBg,
     layout,
     setLayout,
     radius,
@@ -300,6 +302,47 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                                 onClick={() => setPanelBg(pb.id)}
                                 className={`flex items-center justify-center rounded-full border-2 p-0.5 transition-all hover:scale-110 ${
                                   panelBg === pb.id
+                                    ? "border-primary"
+                                    : "border-transparent"
+                                }`}
+                              />
+                            }
+                          >
+                            <div
+                              className={`h-6 w-6 rounded-full border shrink-0 ${pb.id === "panel-default" ? "border-dashed" : "shadow-sm"}`}
+                              style={{ background: pb.color }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" sideOffset={6}>
+                            <span className="text-xs font-medium">{pb.name}</span>
+                            <span className="text-[10px] text-muted-foreground ml-1.5">
+                              {pb.color}
+                            </span>
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  </div>
+                </TooltipProvider>
+
+                {/* Nav/Sidebar Background */}
+                <TooltipProvider delay={200}>
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <LayoutTemplate className="h-4 w-4 text-muted-foreground" /> Sidebar / Topnav Background
+                    </label>
+                    <p className="text-[11px] text-muted-foreground -mt-1">
+                      Background color for the side or top navigation
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {PANEL_BACKGROUNDS.map((pb) => (
+                        <Tooltip key={`nav-${pb.id}`}>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                onClick={() => setNavBg(pb.id)}
+                                className={`flex items-center justify-center rounded-full border-2 p-0.5 transition-all hover:scale-110 ${
+                                  navBg === pb.id
                                     ? "border-primary"
                                     : "border-transparent"
                                 }`}

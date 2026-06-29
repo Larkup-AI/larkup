@@ -52,6 +52,8 @@ interface ThemeCustomizerContextValue {
   setBackground: (bg: BackgroundVariant) => void;
   panelBg: PanelBgVariant;
   setPanelBg: (bg: PanelBgVariant) => void;
+  navBg: PanelBgVariant;
+  setNavBg: (bg: PanelBgVariant) => void;
   pageStyle: PageStyleVariant;
   setPageStyle: (style: PageStyleVariant) => void;
   isMounted: boolean;
@@ -81,7 +83,8 @@ export function ThemeCustomizerProvider({
   const [layout, setLayout] = useState<LayoutVariant>("sidebar");
   const [radius, setRadius] = useState<RadiusVariant>("radius-default");
   const [background, setBackground] = useState<BackgroundVariant>("bg-default");
-  const [panelBg, setPanelBg] = useState<PanelBgVariant>("panel-default");
+  const [panelBg, setPanelBg] = useState<PanelBgVariant>("panel-white");
+  const [navBg, setNavBg] = useState<PanelBgVariant>("panel-silver");
   const [pageStyle, setPageStyle] = useState<PageStyleVariant>("card");
 
   useEffect(() => {
@@ -96,6 +99,9 @@ export function ThemeCustomizerProvider({
     const savedPanelBg = localStorage.getItem(
       "app-panel-bg",
     ) as PanelBgVariant;
+    const savedNavBg = localStorage.getItem(
+      "app-nav-bg",
+    ) as PanelBgVariant;
     const savedPageStyle = localStorage.getItem(
       "app-pagestyle",
     ) as PageStyleVariant;
@@ -105,6 +111,7 @@ export function ThemeCustomizerProvider({
     if (savedRadius) setRadius(savedRadius);
     if (savedBackground) setBackground(savedBackground);
     if (savedPanelBg) setPanelBg(savedPanelBg);
+    if (savedNavBg) setNavBg(savedNavBg);
     if (savedPageStyle) setPageStyle(savedPageStyle);
   }, []);
 
@@ -115,6 +122,7 @@ export function ThemeCustomizerProvider({
     localStorage.setItem("app-radius", radius);
     localStorage.setItem("app-background", background);
     localStorage.setItem("app-panel-bg", panelBg);
+    localStorage.setItem("app-nav-bg", navBg);
     localStorage.setItem("app-pagestyle", pageStyle);
 
     // Update body classes
@@ -135,7 +143,7 @@ export function ThemeCustomizerProvider({
     if (theme !== "default") body.classList.add(theme);
     if (radius !== "radius-default") body.classList.add(radius);
     if (background) body.classList.add(background);
-  }, [theme, layout, radius, background, panelBg, pageStyle, isMounted]);
+  }, [theme, layout, radius, background, panelBg, navBg, pageStyle, isMounted]);
 
   return (
     <ThemeCustomizerContext.Provider
@@ -150,6 +158,8 @@ export function ThemeCustomizerProvider({
         setBackground,
         panelBg,
         setPanelBg,
+        navBg,
+        setNavBg,
         pageStyle,
         setPageStyle,
         isMounted,

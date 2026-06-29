@@ -24,6 +24,17 @@ import {
 import { ServerSwitcher } from "@/components/workspace/server-switcher";
 import { useWorkspace } from "@/components/workspace/workspace-provider";
 import { ThemeSwitcher } from "./theme-switcher";
+import { useThemeCustomizer, type PanelBgVariant } from "./theme-customizer-provider";
+
+const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
+  "panel-default": undefined,
+  "panel-white": "#FFFFFF",
+  "panel-fafafa": "#F4F4F4",
+  "panel-warm": "#F7F1EA",
+  "panel-soft": "#FBFAF8",
+  "panel-silver": "#F8F8F8",
+  "panel-stone": "#F5F5F2",
+};
 
 const STAGE_ICONS: Record<StageId, LucideIcon> = {
   configure: SlidersHorizontal,
@@ -37,10 +48,20 @@ const STAGE_ICONS: Record<StageId, LucideIcon> = {
 export function AppTopNav() {
   const pathname = usePathname();
   const { username } = useWorkspace();
+  const { navBg } = useThemeCustomizer();
+
+  const navColor = navBg ? NAV_BG_COLORS[navBg] : undefined;
+  const navStyle = navColor ? { backgroundColor: navColor } : undefined;
 
   return (
     <TooltipProvider delay={150}>
-      <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-white px-4 md:px-6">
+      <header
+        className={cn(
+          "sticky top-0 z-50 flex h-16 shrink-0 items-center gap-4 border-b border-border px-4 md:px-6",
+          !navColor ? "bg-white" : "",
+        )}
+        style={navStyle}
+      >
         {/* Brand */}
         <Link
           href="/configure"
