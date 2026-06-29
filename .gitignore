@@ -37,6 +37,7 @@ dist/
 apps/docs
 apps/web/demo
 apps/e2e/README.md
+apps/e2e/demo-data
 
 # Sensitive scripts
 npm-login.sh

@@ -93,8 +93,6 @@ const INDEX_TYPES: { value: IndexType; label: string; hint: string }[] = [
   { value: "hybrid", label: "Hybrid", hint: "Lexical + semantic, reranked" },
 ];
 
-
-
 // ── Vector-store branding (real icons from /icons/) ───────────────────────────
 
 type StoreMeta = {
@@ -134,7 +132,6 @@ const STORE_META: Record<VectorStoreId, StoreMeta> = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
 
 // Group embedding models by provider for the grouped select
 const EMBEDDING_BY_PROVIDER = EMBEDDING_MODELS.reduce<
@@ -1427,7 +1424,7 @@ export function ConfigureForm({
                     "openai",
                     "deepseek",
                     "google",
-                    "cohere",
+                    // "cohere",
                     "voyage",
                     "mistral",
                     "jina",

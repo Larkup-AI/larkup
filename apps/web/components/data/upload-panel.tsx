@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 
-const ACCEPT = ".txt,.md,.markdown,.json,.csv,.html,.htm,.log,.xlsx,.xls";
+const ACCEPT = ".txt,.md,.markdown,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx";
 
 type FileFormat = "plain" | "lines" | "structured";
 
@@ -153,6 +153,27 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
               rawContent: content,
             });
           }
+        } else if (ext === "pdf" || ext === "doc" || ext === "docx") {
+          const formData = new FormData();
+          formData.append("file", file);
+          
+          const res = await fetch("/api/parse-file", {
+            method: "POST",
+            body: formData,
+          });
+          
+          if (!res.ok) {
+            throw new Error(`Failed to parse ${file.name}`);
+          }
+          
+          const { text } = await res.json();
+          next.push({
+            id,
+            name: file.name,
+            size: file.size,
+            format: "plain",
+            rawContent: text,
+          });
         } else {
           const content = await file.text();
           next.push({
@@ -294,7 +315,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
           Drop files here or click to browse
         </span>
         <span className="text-xs text-muted-foreground">
-          Text, JSON, CSV, and Excel files
+          Text, JSON, CSV, Excel, PDF, and Word files
         </span>
       </button>
       <input

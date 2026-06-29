@@ -237,56 +237,58 @@ export async function update(id, doc) {
 }
 
 function embedSource(config: RagConfig): string {
-  let imports = `import { embed } from "ai"\n`
+  let imports = `import { embed } from "ai"\n`;
   let init = ``;
-  
+
   if (config.embeddingModelId.startsWith("custom:")) {
-    const customName = config.embeddingModelId.slice("custom:".length)
-    const custom = (config.customEmbeddings ?? []).find(m => m.modelName === customName)
-    imports += `import { createOpenAICompatible } from "@ai-sdk/openai-compatible"\n`
+    const customName = config.embeddingModelId.slice("custom:".length);
+    const custom = (config.customEmbeddings ?? []).find(
+      (m) => m.modelName === customName,
+    );
+    imports += `import { createOpenAICompatible } from "@ai-sdk/openai-compatible"\n`;
     init = `const provider = createOpenAICompatible({
   name: "custom_provider",
   baseURL: process.env.EMBEDDING_BASE_URL || ${JSON.stringify(custom?.baseUrl || "")},
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(custom?.modelName || "")})`
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(custom?.modelName || "")})`;
   } else if (config.embeddingProvider === "deepseek") {
-    imports += `import { createDeepSeek } from "@ai-sdk/deepseek"\n`
+    imports += `import { createDeepSeek } from "@ai-sdk/deepseek"\n`;
     init = `const provider = createDeepSeek({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
   } else if (config.embeddingProvider === "google") {
-    imports += `import { createGoogleGenerativeAI } from "@ai-sdk/google"\n`
+    imports += `import { createGoogleGenerativeAI } from "@ai-sdk/google"\n`;
     init = `const provider = createGoogleGenerativeAI({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
   } else if (config.embeddingProvider === "cohere") {
-    imports += `import { createCohere } from "@ai-sdk/cohere"\n`
+    imports += `import { createCohere } from "@ai-sdk/cohere"\n`;
     init = `const provider = createCohere({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
   } else if (config.embeddingProvider === "mistral") {
-    imports += `import { createMistral } from "@ai-sdk/mistral"\n`
+    imports += `import { createMistral } from "@ai-sdk/mistral"\n`;
     init = `const provider = createMistral({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
   } else if (config.embeddingProvider === "vercel_ai_gateway") {
-    imports += `import { createGateway } from "@ai-sdk/gateway"\n`
+    imports += `import { createGateway } from "@ai-sdk/gateway"\n`;
     init = `const gateway = createGateway({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = gateway.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`
+const MODEL = gateway.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
   } else {
-    imports += `import { createOpenAI } from "@ai-sdk/openai"\n`
+    imports += `import { createOpenAI } from "@ai-sdk/openai"\n`;
     init = `const provider = createOpenAI({
   apiKey: process.env.EMBEDDING_API_KEY
 })
 const modelName = process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)};
-const MODEL = provider.embedding(modelName.includes("/") ? modelName.split("/")[1] : modelName)`
+const MODEL = provider.embedding(modelName.includes("/") ? modelName.split("/")[1] : modelName)`;
   }
 
   return `${imports}
@@ -427,7 +429,7 @@ const server = createServer(async (req, res) => {
         <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Larkup RAG Team
       </a>
-      <a href="mailto:contact@larkup.dev" class="btn btn-outline">
+      <a href="mailto:contact@larkup.de" class="btn btn-outline">
         <svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
         Contact
       </a>
@@ -994,7 +996,8 @@ export function generateServer(config: RagConfig): GeneratedServer {
       // Pre-fill other env vars if they are in storeConfig
       if (e.key === "PINECONE_API_KEY") val = config.storeConfig.apiKey || "";
       if (e.key === "PINECONE_INDEX") val = config.storeConfig.indexName || "";
-      if (e.key === "PINECONE_NAMESPACE") val = config.storeConfig.namespace || "";
+      if (e.key === "PINECONE_NAMESPACE")
+        val = config.storeConfig.namespace || "";
       if (e.key === "LANCEDB_URI") val = config.storeConfig.uri || "";
       if (e.key === "LANCEDB_API_KEY") val = config.storeConfig.apiKey || "";
       return `${e.key}=${val}`;
