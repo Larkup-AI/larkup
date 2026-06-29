@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { formatErrorMessage } from "@/lib/error-formatter";
 import {
@@ -12,12 +12,8 @@ import {
   ChevronDown,
   ChevronsDown,
   Info,
-  CheckCheck,
-  BarChart2,
   Clock,
-  AlertTriangle,
   X,
-  Target,
 } from "lucide-react";
 import type { CrawlScope, SearchResultItem } from "@larkup-rag/core/types";
 import { Button } from "@/components/ui/button";
@@ -25,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -34,8 +30,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { GenericAlert } from "@/components/alerts/generic-alert";
 import { cn } from "@/lib/utils";
+
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function domainOf(url: string) {
   try {
@@ -226,6 +230,10 @@ export function ScrapePanel({
           searchProvider: "firecrawl",
         };
       });
+
+      const newSelected = Object.fromEntries(newItems.map((r) => [r.url, true]));
+      setSelected((prev) => ({ ...prev, ...newSelected }));
+
       if (newItems.length === 0 && !isMulti)
         toast.message("No results — try different keywords.");
 
@@ -284,6 +292,9 @@ export function ScrapePanel({
           searchProvider: "serper",
         };
       });
+
+      const newSelected = Object.fromEntries(newItems.map((r) => [r.url, true]));
+      setSelected((prev) => ({ ...prev, ...newSelected }));
 
       if (!isMulti) {
         // Update Serper total
@@ -358,7 +369,13 @@ export function ScrapePanel({
           queries.map((q) => searchSerper(q, 1, queries.length > 1, false)),
         );
       } else {
-        toast.error(formatErrorMessage(new Error("No search provider available. Configure Firecrawl or add SERPER_API_KEY.")));
+        toast.error(
+          formatErrorMessage(
+            new Error(
+              "No search provider available. Configure Firecrawl or add SERPER_API_KEY.",
+            ),
+          ),
+        );
       }
     } finally {
       setSearching(false);
@@ -419,6 +436,9 @@ export function ScrapePanel({
             hasMore: data.hasMore ?? false,
           };
         });
+
+        const newSelected = Object.fromEntries(newItems.map((r) => [r.url, true]));
+        setSelected((prev) => ({ ...prev, ...newSelected }));
 
         if (!data.hasMore) break;
         page++;
@@ -549,67 +569,112 @@ export function ScrapePanel({
   // Estimate for confirmation modal
   const effectiveScopeForEstimate: CrawlScope = specificUrls ? "page" : scope;
   const estimate = useMemo(
-    () => estimateEtlDuration(selectedUrls.length, effectiveScopeForEstimate, specificUrls ? 1 : pageLimit),
+    () =>
+      estimateEtlDuration(
+        selectedUrls.length,
+        effectiveScopeForEstimate,
+        specificUrls ? 1 : pageLimit,
+      ),
     [selectedUrls.length, effectiveScopeForEstimate, specificUrls, pageLimit],
   );
 
+  const [inputMode, setInputMode] = useState<"search" | "url">("search");
+
   return (
-    <div className="space-y-5">
-      {/* Search bar */}
-      <div className="space-y-2">
-        <Label htmlFor="kw">Keywords / Organization</Label>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Input
-              ref={inputRef}
-              id="kw"
-              placeholder='e.g. "TUHH university Hamburg"'
-              value={query}
-              disabled={disabled}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setShowDropdown(true);
-              }}
-              onFocus={() => setShowDropdown(true)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  setShowDropdown(false);
-                  runSearch();
-                }
-              }}
-            />
-            {showDropdown && cachedQueries.length > 0 && (
-              <div
-                ref={dropdownRef}
-                className="absolute z-10 top-full left-0 mt-1 w-full rounded-md border border-border bg-popover shadow-md overflow-hidden"
+    <div className="space-y-4">
+      {/* Unified input area */}
+      <div className="space-y-3">
+        {/* Mode toggle + input */}
+        <div className="flex items-center gap-2">
+          <Tabs
+            value={inputMode}
+            onValueChange={(v) => setInputMode(v as "search" | "url")}
+            className="shrink-0"
+          >
+            <TabsList className="inline-flex h-9 items-center justify-center rounded-lg bg-muted/40 border border-border p-0.5 text-muted-foreground">
+              <TabsTrigger
+                value="search"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm hover:text-foreground h-full"
               >
-                <div className="py-1">
-                  {cachedQueries.map((cq) => (
-                    <div
-                      key={cq}
-                      className="flex items-center justify-between px-3 py-2 text-sm hover:bg-muted cursor-pointer group"
-                      onClick={() => {
-                        setQuery(cq);
-                        setShowDropdown(false);
-                      }}
-                    >
-                      <div className="flex items-center gap-2 truncate mr-2">
-                        <Clock className="size-3.5 text-muted-foreground shrink-0" />
-                        <span className="truncate">{cq}</span>
-                      </div>
-                      <button
-                        className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                        onClick={(e) => removeQuery(cq, e)}
-                      >
-                        <X className="size-3.5" />
-                      </button>
+                <Search className="size-3.5 mr-1.5" />
+                Search
+              </TabsTrigger>
+              <TabsTrigger
+                value="url"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm hover:text-foreground h-full"
+              >
+                <Globe className="size-3.5 mr-1.5" />
+                Direct URL
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Input field */}
+          <div className="relative flex-1">
+            {inputMode === "search" ? (
+              <>
+                <Input
+                  ref={inputRef}
+                  id="kw"
+                  placeholder='Search keywords, e.g. "RAG pipelines"'
+                  value={query}
+                  disabled={disabled}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setShowDropdown(false);
+                      runSearch();
+                    }
+                  }}
+                />
+                {showDropdown && cachedQueries.length > 0 && (
+                  <div
+                    ref={dropdownRef}
+                    className="absolute z-10 top-full left-0 mt-1 w-full rounded-md border border-border bg-popover shadow-md overflow-hidden"
+                  >
+                    <div className="py-1">
+                      {cachedQueries.map((cq) => (
+                        <div
+                          key={cq}
+                          className="flex items-center justify-between px-3 py-1.5 text-sm hover:bg-muted cursor-pointer group"
+                          onClick={() => {
+                            setQuery(cq);
+                            setShowDropdown(false);
+                          }}
+                        >
+                          <div className="flex items-center gap-2 truncate mr-2">
+                            <Clock className="size-3 text-muted-foreground shrink-0" />
+                            <span className="truncate text-xs">{cq}</span>
+                          </div>
+                          <button
+                            className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                            onClick={(e) => removeQuery(cq, e)}
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <Input
+                placeholder="Paste URLs (comma or space separated)"
+                value={manualUrl}
+                disabled={disabled}
+                onChange={(e) => setManualUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addManual()}
+              />
             )}
           </div>
-          <div className="w-24 shrink-0">
+
+          {/* Search limit (only in search mode) */}
+          {inputMode === "search" && (
             <Input
               type="number"
               min={1}
@@ -617,163 +682,159 @@ export function ScrapePanel({
               value={searchLimit}
               disabled={disabled || searching}
               onChange={(e) => setSearchLimit(Number(e.target.value) || 15)}
-              title="Max results per keyword"
+              title="Max results"
+              className="w-20 shrink-0 tabular-nums"
             />
-          </div>
-          <Button
-            onClick={() => {
-              setShowDropdown(false);
-              runSearch();
-            }}
-            disabled={disabled || searching}
-          >
-            {searching ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Search className="size-4" />
-            )}
-            Search
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {firecrawlConfigured
-            ? serperConfigured
-              ? "Using Firecrawl for search + Serper for total result count. Scraping powered by Firecrawl."
-              : "Using Firecrawl for search and scraping. Add SERPER_API_KEY for total result counts."
-            : serperConfigured
-              ? "Using Serper.dev for search. Set up Firecrawl for scraping."
-              : "No search provider configured. Set up Firecrawl or add SERPER_API_KEY."}
-        </p>
-      </div>
-
-      {/* Total count banner */}
-      {searchState && searchState.totalResults > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
-          <BarChart2 className="size-5 shrink-0 text-primary" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">
-              <span className="text-primary">{results.length}</span> URLs loaded
-              {searchState.searchProvider === "serper" &&
-                searchState.hasMore && (
-                  <span className="text-muted-foreground font-normal">
-                    {" "}
-                    · more pages available
-                  </span>
-                )}
-            </p>
-            {/* Show Serper total if available */}
-            {serperTotalForQuery &&
-              serperTotalForQuery.query === searchState.query && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Google has{" "}
-                  <span className="font-medium text-foreground">
-                    {formatCount(serperTotalForQuery.total)}
-                  </span>{" "}
-                  results for{" "}
-                  <span className="italic">
-                    &quot;{searchState.query}&quot;
-                  </span>
-                  {" · "}accessible: up to {serperTotalForQuery.totalPages * 10}{" "}
-                  URLs
-                </p>
-              )}
-            {fetchingCount && (
-              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                <Loader2 className="size-3 animate-spin" />
-                Fetching total result count from Google…
-              </p>
-            )}
-            {searchState.searchProvider === "serper" && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Page {searchState.currentPage}
-                {!searchState.totalResultsIsEstimate &&
-                  ` of ${searchState.totalPages}`}{" "}
-                · {results.length} URLs loaded
-              </p>
-            )}
-          </div>
-          {/* Gather-all progress */}
-          {gatheringAll && (
-            <div className="flex items-center gap-2 text-xs text-primary shrink-0">
-              <Loader2 className="size-3.5 animate-spin" />
-              Page {gatherProgress}/{searchState.totalPages}
-            </div>
           )}
-          {/* Gather all button */}
-          {gatherAllAvailable && (
+
+          {/* Action button */}
+          {inputMode === "search" ? (
             <Button
-              size="sm"
-              variant="outline"
-              className="shrink-0 gap-1.5"
-              onClick={gatherAll}
+              onClick={() => {
+                setShowDropdown(false);
+                runSearch();
+              }}
+              disabled={disabled || searching}
+              className="shrink-0"
             >
-              <ChevronsDown className="size-3.5" />
-              Gather all
+              {searching ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Search className="size-4" />
+              )}
+              Search
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={addManual}
+              disabled={disabled}
+              className="shrink-0"
+            >
+              <Plus className="size-4" />
+              Add
             </Button>
           )}
-          {/* Done indicator */}
-          {searchState.searchProvider === "serper" &&
-            !searchState.hasMore &&
-            !gatheringAll &&
-            searchState.totalPages > 1 && (
-              <Badge variant="secondary" className="gap-1 shrink-0">
-                <CheckCheck className="size-3" />
-                All loaded
-              </Badge>
-            )}
+        </div>
+      </div>
+
+      {/* No provider configured hint */}
+      {firecrawlConfigured === false && serperConfigured === false && (
+        <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
+          <Info className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            <strong className="text-foreground">
+              No search provider configured.
+            </strong>{" "}
+            Set up Firecrawl (recommended) for search and scraping, or add{" "}
+            <code className="rounded bg-muted px-1 font-mono">
+              SERPER_API_KEY
+            </code>{" "}
+            to your{" "}
+            <code className="rounded bg-muted px-1 font-mono">.env</code> for
+            Google search.
+          </span>
         </div>
       )}
 
-      {/* Manual URL input */}
-      <div className="flex flex-col gap-2">
-        {/* Specific URLs switch */}
-        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-          <div className="flex items-center gap-2">
-            <Target className="size-4 text-primary shrink-0" />
-            <div>
-              <p className="text-sm font-medium leading-none">Specific URLs</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {specificUrls
-                  ? "Scraping exact URLs only — no deep crawl or pagination"
-                  : "Enable to scrape only the exact URLs you add below"}
-              </p>
-            </div>
+      {/* Scope + launch — compact single row */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select
+          defaultValue={scope}
+          value={scope}
+          onValueChange={(v) => setScope(v as CrawlScope)}
+          disabled={specificUrls || disabled}
+        >
+          <SelectTrigger className="w-auto min-w-[180px] flex-1 bg-white h-9 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="page">Scrape pages only</SelectItem>
+            <SelectItem value="domain">Crawl whole domain</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {scope === "domain" && !specificUrls && (
+          <div className="flex items-center gap-1.5">
+            <Label
+              htmlFor="limit"
+              className="text-xs text-muted-foreground whitespace-nowrap"
+            >
+              Max pages
+            </Label>
+            <Input
+              id="limit"
+              type="number"
+              min={1}
+              max={500}
+              value={pageLimit}
+              disabled={specificUrls || disabled}
+              onChange={(e) => setPageLimit(Number(e.target.value) || 1)}
+              className="w-20 h-9 tabular-nums"
+            />
           </div>
+        )}
+
+        <div className="flex items-center gap-1.5">
           <Switch
-            id="specific-urls"
+            id="specific-urls-inline"
             checked={specificUrls}
             onCheckedChange={setSpecificUrls}
             disabled={disabled}
+            size="sm"
           />
+          <Label
+            htmlFor="specific-urls-inline"
+            className="text-xs font-medium cursor-pointer flex items-center gap-1"
+          >
+            Exact URLs
+            <TooltipProvider delay={0}>
+              <Tooltip>
+                <TooltipTrigger
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  <Info className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-[200px] text-center">
+                    Scrape exact URLs only — no deep crawl or pagination.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </Label>
         </div>
 
-        <div className="flex gap-2">
-          <Input
-            placeholder={specificUrls
-              ? "Paste exact URLs to scrape (comma or newline separated)"
-              : "…or paste multiple URLs directly (separated by comma or newline)"}
-            value={manualUrl}
-            disabled={disabled}
-            onChange={(e) => setManualUrl(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addManual()}
-          />
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={addManual} disabled={disabled}>
-              <Plus className="size-4" />
-              Add URLs
-            </Button>
-            <label className="flex h-8 w-max cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
-              <Plus className="size-4" />
-              Upload .txt
-              <input
-                type="file"
-                accept=".txt,.csv"
-                className="hidden"
-                onChange={handleFileUpload}
-                disabled={disabled}
-              />
-            </label>
-          </div>
+        <div className="flex items-center gap-2 ml-auto">
+          {/* ETL estimation inline */}
+          {selectedUrls.length > 0 && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Clock className="size-3" />
+              {specificUrls
+                ? `${selectedUrls.length} URL${selectedUrls.length !== 1 ? "s" : ""}`
+                : `~${estimate.totalPages.toLocaleString()} pages · ${formatDuration(estimate.estimatedSeconds)}`}
+            </span>
+          )}
+
+          <Button
+            onClick={handleStartClick}
+            disabled={disabled || starting || selectedUrls.length === 0}
+            className="shrink-0"
+          >
+            {starting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Rocket className="size-4" />
+            )}
+            Start ETL
+            {selectedUrls.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {selectedUrls.length}
+              </Badge>
+            )}
+          </Button>
         </div>
       </div>
 
@@ -882,107 +943,6 @@ export function ScrapePanel({
                 </div>
               </div>
             )}
-        </div>
-      )}
-
-      {/* No provider configured hint */}
-      {firecrawlConfigured === false && serperConfigured === false && (
-        <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
-          <Info className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            <strong className="text-foreground">
-              No search provider configured.
-            </strong>{" "}
-            Set up Firecrawl (recommended) for search and scraping, or add{" "}
-            <code className="rounded bg-muted px-1 font-mono">
-              SERPER_API_KEY
-            </code>{" "}
-            to your{" "}
-            <code className="rounded bg-muted px-1 font-mono">.env</code> for
-            Google search.
-          </span>
-        </div>
-      )}
-
-      {/* Scope + launch */}
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:flex-row sm:items-end">
-        {specificUrls ? (
-          // When "Specific URLs" is active, show a locked badge instead of the scope selector
-          <div className="flex flex-1 items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
-            <Target className="size-4 text-primary shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-primary">Specific URLs mode</p>
-              <p className="text-xs text-muted-foreground">
-                Scraping {selectedUrls.length > 0 ? selectedUrls.length : "selected"} exact URL{selectedUrls.length !== 1 ? "s" : ""} only — no deep crawl
-              </p>
-            </div>
-            <Badge variant="outline" className="text-xs shrink-0 border-primary/40 text-primary">
-              page scope
-            </Badge>
-          </div>
-        ) : (
-          <>
-            <div className="flex-1 space-y-1">
-              <Label className="text-xs">Scope</Label>
-              <Select
-                defaultValue={scope}
-                value={scope}
-                onValueChange={(v) => setScope(v as CrawlScope)}
-              >
-                <SelectTrigger className="w-full bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="page">Scrape selected pages only</SelectItem>
-                  <SelectItem value="domain">Crawl whole domain</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {scope === "domain" && (
-              <div className="space-y-1 pb-1 sm:w-32">
-                <Label htmlFor="limit" className="text-xs">
-                  Max pages
-                </Label>
-                <Input
-                  id="limit"
-                  type="number"
-                  min={1}
-                  max={500}
-                  value={pageLimit}
-                  onChange={(e) => setPageLimit(Number(e.target.value) || 1)}
-                />
-              </div>
-            )}
-          </>
-        )}
-        <Button
-          className={"mb-1"}
-          onClick={handleStartClick}
-          disabled={disabled || starting || selectedUrls.length === 0}
-        >
-          {starting ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Rocket className="size-4" />
-          )}
-          Start ETL job
-          {selectedUrls.length > 0 && (
-            <Badge variant="secondary" className="ml-1">
-              {selectedUrls.length}
-            </Badge>
-          )}
-        </Button>
-      </div>
-
-      {/* ETL estimation preview */}
-      {selectedUrls.length > 0 && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="size-3.5" />
-          <span>
-            {specificUrls
-              ? `Scraping ${selectedUrls.length} specific URL${selectedUrls.length !== 1 ? "s" : ""} — exact pages only, no pagination`
-              : `Estimated: ${estimate.totalPages.toLocaleString()} pages · ${formatDuration(estimate.estimatedSeconds)}`}
-          </span>
         </div>
       )}
 
