@@ -56,7 +56,7 @@ npx @larkup-rag/cli init my-rag-server
 
 ## 📚 Documentation
 
-For comprehensive guides on configuration, data ingestion, testing, and SDK integrations, please refer to our [Official Documentation](https://larkup.de/docs).
+For comprehensive guides on configuration, data ingestion, testing, and SDK integrations, please refer to our [Official Documentation](https://larkuprag.larkup.de/docs).
 
 ## 🤝 Contributing
 
