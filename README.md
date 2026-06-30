@@ -1,10 +1,11 @@
 <div align="center">
-  <img src="./apps/docs/logo/logo-dark.png" alt="Larkup RAG Logo" width="400" />
+  <img src="./apps/web/public/logo-light.png" alt="Larkup RAG Logo" width="400" />
 
   <br />
   <br />
 
-  **The easiest way to launch a production-ready RAG server from local to deployment in minutes.**
+**The easiest way to launch a production-ready RAG server from local to deployment in minutes.**
+
 </div>
 
 ---
