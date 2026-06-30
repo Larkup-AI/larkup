@@ -1,0 +1,21 @@
+{
+  "name": "@larkup-rag/e2e",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:web": "playwright test tests/web-ui/",
+    "test:api": "playwright test tests/api/",
+    "test:sdk": "playwright test tests/sdk/",
+    "test:cli": "playwright test tests/cli/",
+    "test:install": "playwright test tests/installation/",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@larkup-rag/client-js": "workspace:*",
+    "@playwright/test": "^1.61.1",
+    "dotenv": "^16.6.0",
+    "typescript": "5.7.3"
+  }
+}

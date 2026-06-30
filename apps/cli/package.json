@@ -1,6 +1,6 @@
 {
   "name": "@larkup-rag/cli",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "publishConfig": {
     "access": "public"
   },
@@ -13,8 +13,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "larkuprag": "tsx src/index.ts"
   },
   "dependencies": {

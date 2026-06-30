@@ -1,6 +1,6 @@
 {
   "name": "larkup-rag",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "type": "module",
   "scripts": {
     "dev": "next dev -p 4567",
@@ -54,7 +54,6 @@
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^24",
     "@types/papaparse": "^5.5.2",
-
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8.5",

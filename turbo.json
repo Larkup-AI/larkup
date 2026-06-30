@@ -9,6 +9,12 @@
       "dependsOn": ["^build"],
       "outputs": [".next/**", "dist/**"]
     },
+    "@larkup-rag/core#build": {
+      "dependsOn": []
+    },
+    "@larkup-rag/vector-stores#build": {
+      "dependsOn": []
+    },
     "lint": {
       "dependsOn": ["^build"]
     },

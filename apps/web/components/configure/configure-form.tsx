@@ -1285,7 +1285,7 @@ export function ConfigureForm({
         }
         variant="destructive"
         onAction={() => {
-          window.location.href = "/index";
+          window.location.href = "/index-data";
         }}
       />
 
@@ -1325,7 +1325,7 @@ export function ConfigureForm({
         }
         variant="destructive"
         onAction={() => {
-          window.location.href = "/index";
+          window.location.href = "/index-data";
         }}
       />
 
