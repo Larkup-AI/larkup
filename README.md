@@ -13,7 +13,15 @@
 
 ## ⚡ Getting Started
 
-### Option 1: Docker (recommended)
+### Option 1: CLI (quickest)
+
+```bash
+npx @larkup-rag/cli init my-rag-server
+cd my-rag-server
+npx @larkup-rag/cli dev
+```
+
+### Option 2: Docker
 
 ```bash
 docker run -d -p 4567:4567 \
@@ -29,7 +37,7 @@ cd larkup-rag
 docker-compose up -d
 ```
 
-### Option 2: From source
+### Option 3: From source
 
 ```bash
 git clone https://github.com/Larkup-AI/larkup-rag.git
