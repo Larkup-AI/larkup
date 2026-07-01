@@ -56,37 +56,37 @@ Once running, open **http://localhost:4567** and follow these steps:
 
 Pick your vector store (LanceDB, Pinecone, Chroma…) and embedding provider (OpenAI, Cohere…) — all from the UI.
 
-<img src="./docs/images/01-configure.png" alt="Configuration page — select vector store and embedding provider" width="800" />
+<img src="./apps/web/public/readme/01-configure.png" alt="Configuration page — select vector store and embedding provider" width="800" />
 
 ### 2. Ingest your data
 
 Upload files (PDF, TXT, DOCX), paste raw text, or scrape URLs directly from the Data tab.
 
-<img src="./docs/images/02-ingest.png" alt="Data page — upload files or scrape URLs" width="800" />
+<img src="./apps/web/public/readme/02-ingest.png" alt="Data page — upload files or scrape URLs" width="800" />
 
 ### 3. Run the ETL pipeline
 
 Kick off indexing to automatically chunk, embed, and store your documents into the vector database.
 
-<img src="./docs/images/03-index.png" alt="Index page — run ETL jobs to process documents" width="800" />
+<img src="./apps/web/public/readme/03-index.png" alt="Index page — run ETL jobs to process documents" width="800" />
 
 ### 4. Launch your RAG server
 
 Your server is ready — get a live API endpoint with built-in Scalar API docs.
 
-<img src="./docs/images/04-server.png" alt="Server page — live RAG API endpoint" width="800" />
+<img src="./apps/web/public/readme/04-server.png" alt="Server page — live RAG API endpoint" width="800" />
 
 ### 5. Test with the built-in Chat Demo
 
 Verify retrieval quality before connecting external agents.
 
-<img src="./docs/images/06-demo.png" alt="Demo page — chat with your RAG pipeline" width="800" />
+<img src="./apps/web/public/readme/06-demo.png" alt="Demo page — chat with your RAG pipeline" width="800" />
 
 ### 6. Deploy to production
 
 Ship to Vercel, Hetzner/VPS via SSH, or any Docker-compatible cloud — one click from the UI.
 
-<img src="./docs/images/05-deploy.png" alt="Deploy to Vercel modal" width="800" />
+<img src="./apps/web/public/readme/05-deploy.png" alt="Deploy to Vercel modal" width="800" />
 
 ---
 
@@ -107,7 +107,7 @@ import { z } from "zod";
 import { LarkupRAGClient } from "@larkup/rag-sdk";
 
 const rag = new LarkupRAGClient({
-  baseUrl: "https://my-rag-server.vercel.app",
+  baseUrl: "https://your-server-url.com", // or http://localhost:8080 for local
   apiKey: "your-api-key",
 });
 
@@ -140,7 +140,7 @@ class LarkupRetriever(BaseRetriever):
 
 retriever = LarkupRetriever(
     client=LarkupRAGClient(LarkupRAGClientOptions(
-        base_url="https://my-rag-server.vercel.app",
+        base_url="https://your-server-url.com",  # or http://localhost:8080
         api_key="your-api-key"
     ))
 )
@@ -155,7 +155,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
 const larkup = createOpenAI({
-  baseURL: "https://my-rag-server.vercel.app/v1",
+  baseURL: "https://your-server-url.com/v1", // or http://localhost:8080/v1
   apiKey: "your-api-key",
 });
 
