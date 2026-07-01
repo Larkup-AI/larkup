@@ -2,80 +2,146 @@
   <img src="./apps/web/public/logo-light.png" alt="Larkup RAG Logo" width="400" />
 
   <br />
-  <br />
 
-**The easiest way to launch a production-ready RAG server from local to deployment in minutes.**
+**Open-source RAG infrastructure — ingest, index, and deploy production-ready vector search APIs in minutes.**
+
+[Documentation](https://larkuprag.larkup.de/docs) · [GitHub Issues](https://github.com/Larkup-AI/larkup-rag/issues)
 
 </div>
 
 ---
 
-## 🌟 What is Larkup RAG?
+## ⚡ Getting Started
 
-**Larkup RAG** is an open-source toolkit designed to take you from zero to a running Retrieval-Augmented Generation (RAG) server effortlessly. It eliminates the complexities of manual infrastructure setup, allowing you to seamlessly configure vector stores, chunking strategies, and embedding models through a unified interface.
-
-Part of the broader Larkup ecosystem—"Building a new learning system for the AI Era"—Larkup RAG handles the heavy lifting of ingestion, indexing, and retrieval, so you can focus entirely on building your AI applications.
-
-## 🚀 Features
-
-- **Zero-Config Web UI**: Configure vector databases (e.g., LanceDB, Pinecone, Chroma) and embedding models (e.g., OpenAI, Cohere) visually.
-- **Robust Ingestion**: Load data sources easily via local file upload, raw text, or web scraping.
-- **Automated Indexing**: Built-in ETL jobs to process, chunk, and embed your loaded data automatically.
-- **Local & Cloud Deployments**: Spin up a server locally for fast iteration, and deploy seamlessly to platforms like Vercel or your own VPS.
-- **Built-in Demo UI**: Instantly test your retrieval and chat quality before connecting external agents.
-- **Language SDKs**: Native JavaScript/TypeScript and Python clients for connecting your AI applications.
-
-## 🏗️ Architecture
-
-The repository is structured as a monorepo, housing the full stack required to run and interact with a Larkup RAG pipeline:
-
-- **`apps/web`**: The Web Interface and API Server. Use this to create workspaces, configure your pipeline, ingest data, and manage deployments.
-- **`apps/cli`**: The Command-Line Interface (`@larkup-rag/cli`). Build, index, and query your RAG pipelines directly from your terminal.
-- **`apps/sdk/js-sdk`**: The JavaScript/TypeScript SDK (`@larkup-rag/client-js`) for integrating the RAG server into Node.js or browser applications.
-- **`apps/sdk/py-sdk`**: The Python SDK (`larkup-rag`) offering both synchronous and asynchronous clients for Python-based AI agents.
-- **`apps/docs`**: The Mintlify-powered documentation detailing installation, configuration, and API reference.
-
-## ⚡ Quickstart
-
-Get a RAG server running locally in minutes using the CLI or Web UI:
+### Option 1: Docker (recommended)
 
 ```bash
-# 1. Start the development server
-pnpm install
-pnpm dev
+docker run -d -p 4567:4567 \
+  -e OPENAI_API_KEY=your_key \
+  ghcr.io/larkup-ai/larkup-rag:latest
+```
 
-# 2. Or initialize a project via the CLI
-npx @larkup-rag/cli init my-rag-server
+Or with Docker Compose:
 
-# 3. Or run using Docker
+```bash
+git clone https://github.com/Larkup-AI/larkup-rag.git
+cd larkup-rag
 docker-compose up -d
 ```
 
-1. **Launch the Web UI**: Open `http://localhost:4567`
-2. **Configure**: Select your Vector Store and Embedding Provider.
-3. **Ingest**: Add documents or scrape URLs in the Data tab.
-4. **Index**: Run the ETL pipeline to process your documents.
-5. **Chat**: Test your pipeline using the built-in Chat Demo.
+### Option 2: From source
+
+```bash
+git clone https://github.com/Larkup-AI/larkup-rag.git
+cd larkup-rag
+pnpm install
+pnpm dev
+```
+
+Open **http://localhost:4567** → Configure your vector store & embeddings → Add documents → Run ETL → Chat.
+
+---
 
 ## 🔌 SDK Integration
 
-Easily connect your application using our official SDKs. For detailed examples, check out the SDK section in our [Documentation](https://larkuprag.larkup.de/docs).
+Install the SDK for your language:
 
-**TypeScript / Node.js**
 ```bash
-npm install @larkup-rag/client-js
-```
+# TypeScript / Node.js
+npm install @larkup/rag-sdk
 
-**Python**
-```bash
+# Python
 pip install larkup-rag
 ```
 
+### Vercel AI SDK
+
+```typescript
+import { tool } from "ai";
+import { z } from "zod";
+import { LarkupRAGClient } from "@larkup/rag-sdk";
+
+const rag = new LarkupRAGClient({
+  baseUrl: "http://localhost:8080",
+  apiKey: "your-api-key",
+});
+
+export const ragTool = tool({
+  description: "Search the knowledge base for relevant context.",
+  parameters: z.object({ query: z.string() }),
+  execute: async ({ query }) => {
+    const results = await rag.query(query, 5);
+    return results.hits.map((hit) => hit.text).join("\n\n");
+  },
+});
+```
+
+### LangChain (Python)
+
+```python
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.documents import Document
+from larkup_rag import LarkupRAGClient, LarkupRAGClientOptions
+
+class LarkupRetriever(BaseRetriever):
+    client: LarkupRAGClient
+
+    def _get_relevant_documents(self, query: str, **kwargs):
+        results = self.client.query(query, top_k=5)
+        return [
+            Document(page_content=hit.text, metadata={"score": hit.score})
+            for hit in results.hits
+        ]
+
+retriever = LarkupRetriever(
+    client=LarkupRAGClient(LarkupRAGClientOptions(
+        base_url="http://localhost:8080", api_key="your-api-key"
+    ))
+)
+docs = retriever.invoke("What is Larkup RAG?")
+```
+
+### OpenAI-Compatible Endpoint
+
+Every Larkup RAG server exposes an OpenAI-compatible API — use it with any framework that supports custom base URLs:
+
+```typescript
+import { createOpenAI } from "@ai-sdk/openai";
+import { generateText } from "ai";
+
+const larkup = createOpenAI({
+  baseURL: "http://localhost:8080/v1",
+  apiKey: "your-api-key",
+});
+
+const { text } = await generateText({
+  model: larkup("rag-model"),
+  prompt: "What is LarkupRAG?",
+});
+```
+
+---
+
+## 🏗️ Architecture
+
+| Package | Description |
+|---|---|
+| `apps/web` | Web UI & API server — configure pipelines, ingest data, deploy |
+| `apps/cli` | CLI to init, index, and query pipelines from the terminal |
+| `apps/sdk/js-sdk` | TypeScript/JS SDK (`@larkup/rag-sdk`) |
+| `apps/sdk/py-sdk` | Python SDK (`larkup-rag`) |
+| `apps/docs` | Documentation site (Mintlify) |
+
+---
 
 ## 📚 Documentation
 
-For comprehensive guides on configuration, data ingestion, testing, and SDK integrations, please refer to our [Official Documentation](https://larkuprag.larkup.de/docs).
+Full guides on configuration, data ingestion, deployment, and SDK integrations → [larkuprag.larkup.de/docs](https://larkuprag.larkup.de/docs)
 
 ## 🤝 Contributing
 
-We welcome contributions! Please open issues or submit pull requests to help improve the RAG server, add support for new vector databases, or enhance the SDKs.
+We welcome contributions! Open an [issue](https://github.com/Larkup-AI/larkup-rag/issues) or submit a pull request.
+
+## 📄 License
+
+[MIT](./LICENSE) — Copyright (c) 2024-2026 Larkup UG
