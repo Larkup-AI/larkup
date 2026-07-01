@@ -46,6 +46,9 @@ pnpm dev
 
 # 2. Or initialize a project via the CLI
 npx @larkup-rag/cli init my-rag-server
+
+# 3. Or run using Docker
+docker-compose up -d
 ```
 
 1. **Launch the Web UI**: Open `http://localhost:4567`
@@ -53,6 +56,21 @@ npx @larkup-rag/cli init my-rag-server
 3. **Ingest**: Add documents or scrape URLs in the Data tab.
 4. **Index**: Run the ETL pipeline to process your documents.
 5. **Chat**: Test your pipeline using the built-in Chat Demo.
+
+## 🔌 SDK Integration
+
+Easily connect your application using our official SDKs. For detailed examples, check out the SDK section in our [Documentation](https://larkuprag.larkup.de/docs).
+
+**TypeScript / Node.js**
+```bash
+npm install @larkup-rag/client-js
+```
+
+**Python**
+```bash
+pip install larkup-rag
+```
+
 
 ## 📚 Documentation
 
