@@ -185,7 +185,7 @@ async function migrateOrInit(): Promise<Workspace> {
     createdAt: now,
     updatedAt: now,
   }
-  return writeRaw({ username: null, activeServerId: id, servers: [meta] })
+  return writeRaw({ username: null, activeServerId: id, servers: [meta], mode: null })
 }
 
 /* ------------------------------ resolution ------------------------------- */

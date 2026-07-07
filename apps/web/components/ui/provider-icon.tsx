@@ -79,14 +79,16 @@ export function ProviderIcon({
       )}
       style={{ width: size, height: size }}
     >
-      <img
-        src={src}
-        alt={alt}
-        width={size - 4}
-        height={size - 4}
-        className="object-contain"
-        style={{ maxWidth: size - 4, maxHeight: size - 4 }}
-      />
+      {src ? (
+        <img
+          src={src}
+          alt={alt}
+          width={size - 4}
+          height={size - 4}
+          className="object-contain"
+          style={{ maxWidth: size - 4, maxHeight: size - 4 }}
+        />
+      ) : null}
     </span>
   );
 }

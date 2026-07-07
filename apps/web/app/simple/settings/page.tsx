@@ -480,7 +480,7 @@ export default function SimpleSettingsPage() {
               <div className="space-y-2">
                 <Label className="text-xs">Vector Store</Label>
                 <Select
-                  value={form.vectorStore}
+                  value={form.vectorStore || ""}
                   onValueChange={(v) => selectStore(v as VectorStoreId)}
                 >
                   <SelectTrigger className="w-full">
