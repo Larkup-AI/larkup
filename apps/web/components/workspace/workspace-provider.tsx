@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react"
 import useSWR, { mutate as globalMutate } from "swr"
+import type { WorkspaceMode } from "@larkup-rag/core/workspace"
 
 /** A workspace server enriched with the per-server status the UI shows. */
 export interface WorkspaceServer {
@@ -25,6 +26,7 @@ interface WorkspaceData {
   username: string | null
   activeServerId: string | null
   servers: WorkspaceServer[]
+  mode: WorkspaceMode | null
 }
 
 interface WorkspaceContextValue {
@@ -34,12 +36,15 @@ interface WorkspaceContextValue {
   activeServer?: WorkspaceServer
   /** No servers exist yet → run first-time onboarding. */
   isFirstRun: boolean
+  /** User-selected mode: tech, simple, or null (not yet chosen). */
+  mode: WorkspaceMode | null
   refresh: () => void
   createServer: (name: string) => Promise<WorkspaceServer | undefined>
   activateServer: (id: string) => Promise<void>
   renameServer: (id: string, name: string) => Promise<void>
   deleteServer: (id: string) => Promise<void>
   setUsername: (name: string) => Promise<void>
+  setMode: (mode: WorkspaceMode) => Promise<void>
 }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -134,12 +139,25 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [mutate],
   )
 
+  const setModeAction = useCallback(
+    async (mode: WorkspaceMode) => {
+      await fetch("/api/servers", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "setMode", mode }),
+      })
+      await mutate()
+    },
+    [mutate],
+  )
+
   const value: WorkspaceContextValue = {
     isLoading,
     username: data?.username ?? null,
     servers,
     activeServer,
     isFirstRun,
+    mode: data?.mode ?? null,
     refresh: () => {
       void mutate()
     },
@@ -148,6 +166,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     renameServer,
     deleteServer,
     setUsername,
+    setMode: setModeAction,
   }
 
   return (

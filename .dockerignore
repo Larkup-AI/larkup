@@ -8,7 +8,11 @@ Dockerfile
 docker-compose.yml
 .env*
 !.env.example
-.ragtoolkit
-gen
-lancedb
-proxies.txt
+**/.ragtoolkit
+**/gen
+**/lancedb
+**/proxies.txt
+**/.viminfo
+.viminfo
+**/.DS_Store
+.DS_Store

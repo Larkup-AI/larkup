@@ -7,7 +7,9 @@ import {
   runWithServer,
   setActiveServer,
   setUsername,
+  setMode,
   type ServerMeta,
+  type WorkspaceMode,
 } from "@larkup-rag/core/workspace"
 import { corpusStats } from "@larkup-rag/core/documents-store"
 import { readRun } from "@larkup-rag/core/index-store"
@@ -42,6 +44,7 @@ export async function GET() {
     username: ws.username,
     activeServerId: ws.activeServerId,
     servers,
+    mode: ws.mode,
   })
 }
 
@@ -67,6 +70,7 @@ export async function PATCH(req: Request) {
     serverId?: string
     name?: string
     username?: string
+    mode?: WorkspaceMode
   }
   try {
     body = await req.json()
@@ -98,6 +102,17 @@ export async function PATCH(req: Request) {
     case "setUsername": {
       return NextResponse.json({
         workspace: await setUsername(body.username ?? ""),
+      })
+    }
+    case "setMode": {
+      if (!body.mode || !(["tech", "simple"] as string[]).includes(body.mode)) {
+        return NextResponse.json(
+          { error: "mode must be 'tech' or 'simple'." },
+          { status: 400 },
+        )
+      }
+      return NextResponse.json({
+        workspace: await setMode(body.mode),
       })
     }
     default:

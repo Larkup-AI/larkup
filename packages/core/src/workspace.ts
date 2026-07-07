@@ -37,10 +37,14 @@ export interface ServerMeta {
   updatedAt: string
 }
 
+export type WorkspaceMode = "tech" | "simple"
+
 export interface Workspace {
   username: string | null
   activeServerId: string | null
   servers: ServerMeta[]
+  /** User-selected mode: tech (full pipeline) or simple (guided 3-page UI). */
+  mode: WorkspaceMode | null
 }
 
 const ROOT = path.join(process.cwd(), ".ragtoolkit")
@@ -48,7 +52,7 @@ const SERVERS_DIR = path.join(ROOT, "servers")
 const WORKSPACE_PATH = path.join(ROOT, "workspace.json")
 const BASE_PORT = 8080
 
-const EMPTY: Workspace = { username: null, activeServerId: null, servers: [] }
+const EMPTY: Workspace = { username: null, activeServerId: null, servers: [], mode: null }
 
 /* --------------------------- per-request scope --------------------------- */
 
@@ -299,6 +303,13 @@ export function setUsername(username: string): Promise<Workspace> {
   return serialize(async () => {
     const ws = await getWorkspace()
     return writeRaw({ ...ws, username: username.trim() || null })
+  })
+}
+
+export function setMode(mode: WorkspaceMode): Promise<Workspace> {
+  return serialize(async () => {
+    const ws = await getWorkspace()
+    return writeRaw({ ...ws, mode })
   })
 }
 

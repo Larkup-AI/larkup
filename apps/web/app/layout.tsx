@@ -6,7 +6,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { WorkspaceProvider } from "@/components/workspace/workspace-provider";
 import { WorkspaceTopBar } from "@/components/workspace/workspace-top-bar";
-import { OnboardingDialog } from "@/components/workspace/onboarding-dialog";
 import { ThemeCustomizerProvider } from "@/components/theme-customizer-provider";
 import { ClientLayoutWrapper } from "@/components/client-layout-wrapper";
 
@@ -43,7 +42,6 @@ export default function RootLayout({
           <WorkspaceProvider>
             <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
             <Toaster position="bottom-right" />
-            <OnboardingDialog />
           </WorkspaceProvider>
         </ThemeCustomizerProvider>
         {process.env.NODE_ENV === "production" && <Analytics />}
