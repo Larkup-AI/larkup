@@ -11,7 +11,7 @@ node_modules/
 .DS_Store
 
 # RAG Toolkit local state
-.ragtoolkit/
+.larkup/
 proxies.txt
 
 # LanceDB data

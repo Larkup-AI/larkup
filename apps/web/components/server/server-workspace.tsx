@@ -13,6 +13,7 @@ import {
   Terminal,
   Trash2,
 } from "lucide-react";
+import { SdkConnectDialog } from "@/components/simple/sdk-connect-dialog";
 
 // Vercel triangle icon
 function VercelIcon({ className }: { className?: string }) {
@@ -92,16 +93,14 @@ export function ServerWorkspace({
 
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
-      <LaunchPanel config={data.config} serverId={data.serverId} />
+      <LaunchPanel serverId={data.serverId} />
     </div>
   );
 }
 
-function LaunchPanel({
-  config,
+export function LaunchPanel({
   serverId,
 }: {
-  config: RagConfig;
   serverId: string;
 }) {
   const [busy, setBusy] = useState<"start" | "stop" | null>(null);
@@ -272,6 +271,7 @@ function LaunchPanel({
                 </Button>
               </>
             )}
+            <SdkConnectDialog serverUrl={state?.endpoint || "http://localhost:8080"} />
           </div>
         </div>
 

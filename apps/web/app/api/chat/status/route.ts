@@ -29,11 +29,6 @@ export async function GET(req: Request) {
     const hasApiKey = !!(config.chatApiKey || config.embeddingApiKey);
 
     const blockers: string[] = [];
-    if (!indexed) {
-      blockers.push(
-        "Build an index first (Index stage) so the chat can retrieve from your documents.",
-      );
-    }
     if (!hasApiKey) {
       blockers.push(
         "Set an API Key in Settings.",
@@ -47,7 +42,8 @@ export async function GET(req: Request) {
       config.chatModelId || defaultModel?.id || "openai/gpt-4o-mini";
 
     return NextResponse.json({
-      ready: indexed && hasApiKey,
+      ready: hasApiKey,
+      indexed,
       blockers,
       provider,
       chatModelId,
@@ -56,3 +52,4 @@ export async function GET(req: Request) {
     });
   });
 }
+

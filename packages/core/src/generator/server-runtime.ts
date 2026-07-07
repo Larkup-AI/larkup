@@ -161,7 +161,7 @@ export async function startServer(config: RagConfig, serverApiKey?: string): Pro
   }
 
   // Point the generated LanceDB server at this server's existing table.
-  const dbPath = config.storeConfig.dbPath || "./.ragtoolkit/lancedb"
+  const dbPath = config.storeConfig.dbPath || "./.larkup/lancedb"
   const absDb = path.isAbsolute(dbPath)
     ? dbPath
     : path.join(process.cwd(), dbPath)

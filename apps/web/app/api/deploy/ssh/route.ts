@@ -62,8 +62,8 @@ export async function POST(req: NextRequest) {
         const cwd = process.cwd();
         let config: any = null;
         const configCandidates = [
-          path.join(cwd, ".ragtoolkit", "servers", activeId, "config.json"),
-          path.join(cwd, ".ragtoolkit", "config.json"),
+          path.join(cwd, ".larkup", "servers", activeId, "config.json"),
+          path.join(cwd, ".larkup", "config.json"),
         ];
         for (const cfgPath of configCandidates) {
           if (fs.existsSync(cfgPath)) {
@@ -90,20 +90,20 @@ export async function POST(req: NextRequest) {
         const envLines = Object.entries(envVars).map(([k, v]) => `${k}=${v}`);
         const isLanceLocal = config.vectorStore === "lancedb" && config.storeConfig?.mode !== "cloud";
         if (isLanceLocal) {
-          envLines.push("LANCEDB_PATH=./.ragtoolkit/lancedb");
+          envLines.push("LANCEDB_PATH=./.larkup/lancedb");
         }
         filesToUpload.push({ contents: envLines.join("\n"), remotePath: ".env" });
 
         if (isLanceLocal) {
-          const lancedbDir = path.join(cwd, ".ragtoolkit", "servers", activeId, "lancedb");
+          const lancedbDir = path.join(cwd, ".larkup", "servers", activeId, "lancedb");
           if (fs.existsSync(lancedbDir)) {
             const lancedbFiles = getFilesRecursively(
               lancedbDir,
-              path.join(cwd, ".ragtoolkit", "servers", activeId)
+              path.join(cwd, ".larkup", "servers", activeId)
             );
             for (const f of lancedbFiles) {
               filesToUpload.push({
-                localPath: path.join(cwd, ".ragtoolkit", "servers", activeId, f.file),
+                localPath: path.join(cwd, ".larkup", "servers", activeId, f.file),
                 remotePath: f.file
               });
             }

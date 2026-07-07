@@ -234,12 +234,14 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
         vectorStore: "lancedb",
         storeConfig: {
           mode: "local",
-          dbPath: `./.ragtoolkit/servers/${server?.id}/lancedb`,
+          dbPath: `./.larkup/servers/${server?.id}/lancedb`,
+          tableName: "documents",
         },
         topK: 5,
         // Chat configuration
         chatProvider: isCloud ? provider : "custom",
         chatApiKey: isCloud ? apiKey : "",
+        chatModelId: isCloud ? "" : undefined, // empty string lets the chat router pick default
         updatedAt: new Date().toISOString(),
       };
 
@@ -260,17 +262,38 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
 
       // Save config via API
       if (server?.id) {
-        await fetch(`/api/config?serverId=${encodeURIComponent(server.id)}`, {
+        const configRes = await fetch(`/api/config?serverId=${encodeURIComponent(server.id)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(configBody),
         });
+        if (!configRes.ok) {
+          const err = await configRes.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to save configuration");
+        }
       }
 
       await setMode("simple");
+
+      // Fire-and-forget: generate + launch RAG server so it's ready for chat
+      (async () => {
+        try {
+          // Generate server code
+          await fetch("/api/server/generate");
+          // Launch it
+          await fetch("/api/server/local", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "start" }),
+          });
+        } catch {
+          // Non-blocking — server can be launched manually from settings
+        }
+      })();
+
       toast.success("All set! Let's get started.");
-    } catch {
-      toast.error("Setup failed. Please try again.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Setup failed. Please try again.");
       setBusy(false);
     }
   }

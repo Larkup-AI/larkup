@@ -39,8 +39,8 @@ export async function GET(req: NextRequest) {
     const cwd = process.cwd();
     let config: any = null;
     const configCandidates = [
-      path.join(cwd, ".ragtoolkit", "servers", activeId, "config.json"),
-      path.join(cwd, ".ragtoolkit", "config.json"),
+      path.join(cwd, ".larkup", "servers", activeId, "config.json"),
+      path.join(cwd, ".larkup", "config.json"),
     ];
     for (const cfgPath of configCandidates) {
       if (fs.existsSync(cfgPath)) {
@@ -74,11 +74,11 @@ export async function GET(req: NextRequest) {
     // Add LanceDB data if local
     const isLanceLocal = config.vectorStore === "lancedb" && config.storeConfig?.mode !== "cloud";
     if (isLanceLocal) {
-      const lancedbDir = path.join(cwd, ".ragtoolkit", "servers", activeId, "lancedb");
+      const lancedbDir = path.join(cwd, ".larkup", "servers", activeId, "lancedb");
       if (fs.existsSync(lancedbDir)) {
         const lancedbFiles = getFilesRecursively(
           lancedbDir,
-          path.join(cwd, ".ragtoolkit", "servers", activeId)
+          path.join(cwd, ".larkup", "servers", activeId)
         );
         for (const f of lancedbFiles) {
           zip.file(f.file, fs.readFileSync(f.fullPath));

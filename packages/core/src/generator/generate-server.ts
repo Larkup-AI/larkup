@@ -33,7 +33,7 @@ const MODE = process.env.LANCEDB_MODE || "local"
 // On Vercel (and other serverless platforms), /var/task is read-only.
 // Fall back to /tmp which is writable, though ephemeral per invocation.
 const IS_SERVERLESS = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME
-const DEFAULT_DB_PATH = IS_SERVERLESS ? "/tmp/lancedb" : "./.ragtoolkit/lancedb"
+const DEFAULT_DB_PATH = IS_SERVERLESS ? "/tmp/lancedb" : "./.larkup/lancedb"
 const DB_PATH = process.env.LANCEDB_PATH || DEFAULT_DB_PATH
 const URI = process.env.LANCEDB_URI || ""
 const API_KEY = process.env.LANCEDB_API_KEY || ""
@@ -787,7 +787,7 @@ npm-debug.log
 function dockerCompose(projectName: string, usesLocalLance: boolean): string {
   const volume = usesLocalLance
     ? `    volumes:
-      - ./.ragtoolkit:/app/.ragtoolkit
+      - ./.larkup:/app/.larkup
 `
     : "";
   return `services:

@@ -14,13 +14,13 @@ import { readConfig } from "@larkup-rag/core/config-store";
  * toolkit so web scraping works against localhost without the user touching
  * env vars.
  *
- * State lives in `.ragtoolkit/firecrawl-local.json`. The scraper client reads
+ * State lives in `.larkup/firecrawl-local.json`. The scraper client reads
  * it to decide whether to talk to the local instance or the Firecrawl cloud.
  */
 
 const execAsync = promisify(exec);
 
-const DATA_DIR = path.join(process.cwd(), ".ragtoolkit");
+const DATA_DIR = path.join(process.cwd(), ".larkup");
 const STATE_PATH = path.join(DATA_DIR, "firecrawl-local.json");
 const COMPOSE_PATH = path.join(DATA_DIR, "firecrawl", "docker-compose.yml");
 

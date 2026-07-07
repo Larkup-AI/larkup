@@ -15,6 +15,7 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useWorkspace } from "@/components/workspace/workspace-provider";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
@@ -28,6 +29,7 @@ export function GlobalSettings({ onBack }: { onBack: () => void }) {
   const highlightSerper = searchParams.get("settings") === "serper";
   const router = useRouter();
   const pathname = usePathname();
+  const { setMode } = useWorkspace();
 
   useEffect(() => {
     if (data?.config) {
@@ -255,6 +257,27 @@ export function GlobalSettings({ onBack }: { onBack: () => void }) {
                 placeholder="fc-..."
               />
             </div>
+          </div>
+
+          <div className="bg-card text-card-foreground p-3 space-y-3 rounded-lg border">
+            <h4 className="font-semibold leading-none tracking-tight text-sm">
+              Workspace Mode
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              Switch to simple mode for a streamlined experience without
+              pipeline configuration.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs"
+              onClick={async () => {
+                await setMode("simple");
+                router.push("/simple/chat");
+              }}
+            >
+              Switch to Simple Mode
+            </Button>
           </div>
         </div>
       </div>

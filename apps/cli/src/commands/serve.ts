@@ -31,7 +31,7 @@ export async function serveCommand(options: { server?: string }) {
     };
 
     if (isLocalLance) {
-      const dbPath = config.storeConfig.dbPath || "./.ragtoolkit/lancedb";
+      const dbPath = config.storeConfig.dbPath || "./.larkup/lancedb";
       env.LANCEDB_MODE = "local";
       env.LANCEDB_PATH = path.isAbsolute(dbPath)
         ? dbPath

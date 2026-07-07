@@ -11,7 +11,7 @@ import { DEFAULT_CONFIG, type RagConfig } from "./types"
  * and (its own port for a) running instance.
  *
  * Layout on disk:
- *   .ragtoolkit/
+ *   .larkup/
  *     workspace.json                 ← username + servers[] + activeServerId
  *     servers/<id>/
  *       config.json
@@ -47,7 +47,7 @@ export interface Workspace {
   mode: WorkspaceMode | null
 }
 
-const ROOT = path.join(process.cwd(), ".ragtoolkit")
+const ROOT = path.join(process.cwd(), ".larkup")
 const SERVERS_DIR = path.join(ROOT, "servers")
 const WORKSPACE_PATH = path.join(ROOT, "workspace.json")
 const BASE_PORT = 8080
@@ -80,7 +80,7 @@ export function serverDir(id: string) {
 
 /** Posix-relative path to a per-server subdir (used in saved config). */
 export function relServerPath(id: string, sub: string) {
-  return `./.ragtoolkit/servers/${id}/${sub}`
+  return `./.larkup/servers/${id}/${sub}`
 }
 
 async function exists(p: string) {

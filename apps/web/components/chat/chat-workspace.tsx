@@ -23,6 +23,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface ChatStatus {
   ready: boolean;
+  indexed: boolean;
   blockers: string[];
   provider: string;
   chatModelId: string;
@@ -224,7 +225,7 @@ export function ChatWorkspace() {
               </h1>
               <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
                 {status?.blockers?.join(" ") ||
-                  "Build an index first, then come back to chat with your documents."}
+                  "Set an API key in Settings to start chatting."}
               </p>
             </div>
           ) : isEmpty ? (
@@ -239,6 +240,13 @@ export function ChatWorkspace() {
                 Ask questions and get AI-powered answers grounded in your
                 indexed documents.
               </p>
+              {!status?.indexed && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  <TriangleAlert className="size-3.5 shrink-0" />
+                  No documents indexed yet, add documents in the Docs page. The
+                  agent can still answer general questions.
+                </div>
+              )}
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 {status?.suggestions && status.suggestions.length > 0 ? (
                   status.suggestions.map((s) => (
@@ -255,8 +263,8 @@ export function ChatWorkspace() {
                   ))
                 ) : (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="size-3 animate-spin" /> Generating
-                    suggestions...
+                    {/* <Loader2 className="size-3 animate-spin" /> Generating
+                    suggestions... */}
                   </div>
                 )}
               </div>

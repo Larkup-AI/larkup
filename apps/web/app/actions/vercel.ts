@@ -189,8 +189,8 @@ export async function getServerEnvRequirements(serverId: string) {
   let vectorStore: string = "lancedb";
   let storeConfig: Record<string, string> = {};
   const configCandidates = [
-    path.join(cwd, ".ragtoolkit", "servers", activeId, "config.json"),
-    path.join(cwd, ".ragtoolkit", "config.json"),
+    path.join(cwd, ".larkup", "servers", activeId, "config.json"),
+    path.join(cwd, ".larkup", "config.json"),
   ];
   for (const cfgPath of configCandidates) {
     if (fs.existsSync(cfgPath)) {
@@ -277,8 +277,8 @@ export async function getServerEnvRequirements(serverId: string) {
       // try to read from config directly
       const cwd = process.cwd();
       const configCandidates = [
-        path.join(cwd, ".ragtoolkit", "servers", activeId, "config.json"),
-        path.join(cwd, ".ragtoolkit", "config.json"),
+        path.join(cwd, ".larkup", "servers", activeId, "config.json"),
+        path.join(cwd, ".larkup", "config.json"),
       ];
       for (const cfgPath of configCandidates) {
         if (fs.existsSync(cfgPath)) {
@@ -348,8 +348,8 @@ export async function deployToVercel(
     const cwd = process.cwd();
     let config: any = null;
     const configCandidates = [
-      path.join(cwd, ".ragtoolkit", "servers", activeId, "config.json"),
-      path.join(cwd, ".ragtoolkit", "config.json"),
+      path.join(cwd, ".larkup", "servers", activeId, "config.json"),
+      path.join(cwd, ".larkup", "config.json"),
     ];
     for (const cfgPath of configCandidates) {
       if (fs.existsSync(cfgPath)) {
@@ -378,11 +378,11 @@ export async function deployToVercel(
     const isLanceLocal = config.vectorStore === "lancedb" && config.storeConfig?.mode !== "cloud";
     if (isLanceLocal) {
       await setProjectEnv(token, project.id, "LANCEDB_PATH", "./lancedb");
-      const lancedbDir = path.join(cwd, ".ragtoolkit", "servers", activeId, "lancedb");
+      const lancedbDir = path.join(cwd, ".larkup", "servers", activeId, "lancedb");
       if (fs.existsSync(lancedbDir)) {
         const lancedbFiles = getFilesRecursively(
           lancedbDir,
-          path.join(cwd, ".ragtoolkit", "servers", activeId)
+          path.join(cwd, ".larkup", "servers", activeId)
         );
         files.push(...lancedbFiles);
       }

@@ -2,10 +2,10 @@ import { test, expect } from "@playwright/test";
 import * as fs from "fs";
 import * as path from "path";
 
-const rootWorkspaceFile = path.join(process.cwd(), "../../.ragtoolkit/workspace.json");
-const rootWorkspaceBackup = path.join(process.cwd(), "../../.ragtoolkit/workspace.json.bak");
-const webWorkspaceFile = path.join(process.cwd(), "../web/.ragtoolkit/workspace.json");
-const webWorkspaceBackup = path.join(process.cwd(), "../web/.ragtoolkit/workspace.json.bak");
+const rootWorkspaceFile = path.join(process.cwd(), "../../.larkup/workspace.json");
+const rootWorkspaceBackup = path.join(process.cwd(), "../../.larkup/workspace.json.bak");
+const webWorkspaceFile = path.join(process.cwd(), "../web/.larkup/workspace.json");
+const webWorkspaceBackup = path.join(process.cwd(), "../web/.larkup/workspace.json.bak");
 
 function backupWorkspaces() {
   if (fs.existsSync(rootWorkspaceFile)) fs.copyFileSync(rootWorkspaceFile, rootWorkspaceBackup);

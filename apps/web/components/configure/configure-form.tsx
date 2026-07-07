@@ -435,7 +435,7 @@ export function ConfigureForm({
       await mutate(json, { revalidate: false });
       setForm(json.config);
       toast.success("Configuration saved", {
-        description: "Written to .ragtoolkit/config.json",
+        description: "Written to .larkup/config.json",
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");

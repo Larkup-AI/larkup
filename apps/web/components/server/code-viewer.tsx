@@ -6,7 +6,8 @@ import { javascript } from "@codemirror/lang-javascript"
 import { json } from "@codemirror/lang-json"
 import { markdown } from "@codemirror/lang-markdown"
 import { yaml } from "@codemirror/lang-yaml"
-import { githubLight } from "@uiw/codemirror-theme-github"
+import { python } from "@codemirror/lang-python"
+import { githubLight, githubDark } from "@uiw/codemirror-theme-github"
 
 /** Map a generated file's language hint to a CodeMirror language extension. */
 function languageExtension(language: string): Extension[] {
@@ -19,6 +20,8 @@ function languageExtension(language: string): Extension[] {
       return [markdown()]
     case "yaml":
       return [yaml()]
+    case "python":
+      return [python()]
     default:
       return []
   }
@@ -51,10 +54,12 @@ export function CodeViewer({
   value,
   language,
   height = "26rem",
+  theme = "light",
 }: {
   value: string
   language: string
   height?: string
+  theme?: "light" | "dark"
 }) {
   const extensions = useMemo(
     () => [...languageExtension(language), surfaceTheme, EditorView.lineWrapping],
@@ -67,7 +72,7 @@ export function CodeViewer({
       height={height}
       readOnly
       editable={false}
-      theme={githubLight}
+      theme={theme === "dark" ? githubDark : githubLight}
       extensions={extensions}
       basicSetup={{
         lineNumbers: true,

@@ -2,18 +2,27 @@ import { NextResponse } from "next/server"
 import { readConfig, writeConfig } from "@larkup-rag/core/config-store"
 import { getVectorStore, validateStoreConfig } from "@larkup-rag/vector-stores/registry"
 import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry"
+import { runWithServer } from "@larkup-rag/core/workspace"
 import type { RagConfig } from "@larkup-rag/core/types"
 
 // Uses node:fs — must run on the Node.js runtime, not edge.
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-export async function GET() {
-  const config = await readConfig()
-  return NextResponse.json({ config })
+function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
+  return serverId ? runWithServer(serverId, fn) : fn()
+}
+
+export async function GET(request: Request) {
+  const serverId = new URL(request.url).searchParams.get("serverId")
+  return withServer(serverId, async () => {
+    const config = await readConfig()
+    return NextResponse.json({ config })
+  })
 }
 
 export async function PUT(request: Request) {
+  const serverId = new URL(request.url).searchParams.get("serverId")
   let body: RagConfig
   try {
     body = (await request.json()) as RagConfig
@@ -56,6 +65,9 @@ export async function PUT(request: Request) {
     )
   }
 
-  const saved = await writeConfig(body)
-  return NextResponse.json({ config: saved })
+  return withServer(serverId, async () => {
+    const saved = await writeConfig(body)
+    return NextResponse.json({ config: saved })
+  })
 }
+

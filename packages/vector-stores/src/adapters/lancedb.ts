@@ -54,7 +54,7 @@ export class LanceDBAdapter implements VectorStoreAdapter {
         apiKey: this.config.apiKey,
       });
     } else {
-      const dir = this.config.dbPath?.trim() || "./.ragtoolkit/lancedb";
+      const dir = this.config.dbPath?.trim() || "./.larkup/lancedb";
       let abs = path.isAbsolute(dir) ? dir : path.join(process.cwd(), dir);
 
       try {

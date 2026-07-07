@@ -159,7 +159,7 @@ export const DEFAULT_CONFIG: RagConfig = {
   vectorStore: "lancedb",
   storeConfig: {
     mode: "local",
-    dbPath: "./.ragtoolkit/lancedb",
+    dbPath: "./.larkup/lancedb",
   },
   topK: 5,
   serperApiKey: "",

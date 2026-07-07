@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { CodeViewer } from "@/components/server/code-viewer";
 
 const TABS = [
   { id: "python", label: "Python" },
@@ -142,9 +143,9 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
         </div>
 
         {/* Code block */}
-        <div className="relative rounded-lg border bg-slate-950 text-slate-50">
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2">
-            <span className="text-xs text-slate-400 font-mono">
+        <div className="relative rounded-lg border bg-slate-50 overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2 bg-slate-100/50">
+            <span className="text-xs text-slate-500 font-mono">
               {activeTab === "python"
                 ? "main.py"
                 : activeTab === "typescript"
@@ -154,7 +155,7 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
             <button
               type="button"
               onClick={handleCopy}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-200 hover:text-slate-900"
             >
               {copied ? (
                 <>
@@ -169,9 +170,11 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
               )}
             </button>
           </div>
-          <pre className="overflow-x-auto p-4 text-[13px] leading-relaxed font-mono [&::-webkit-scrollbar]:hidden">
-            <code>{currentSnippet}</code>
-          </pre>
+          <CodeViewer 
+            value={currentSnippet} 
+            language={activeTab === "python" ? "python" : "javascript"} 
+            height="auto"
+          />
         </div>
 
         {/* Docs link */}
