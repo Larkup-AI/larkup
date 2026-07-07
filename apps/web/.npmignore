@@ -1,4 +1,5 @@
 .next/
+.larkup/
 .ragtoolkit/
 .turbo/
 node_modules/

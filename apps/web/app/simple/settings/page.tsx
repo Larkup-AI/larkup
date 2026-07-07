@@ -11,14 +11,13 @@ import {
   Copy,
   CheckCircle2,
   RefreshCw,
-  Server,
   Key,
   Sparkles,
   MessageCircle,
   Settings2,
   Database,
   Clock,
-  Download,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +35,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useWorkspace } from "@/components/workspace/workspace-provider";
 import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
@@ -102,6 +102,10 @@ export default function SimpleSettingsPage() {
   }, []);
 
   const dirty = JSON.stringify(form) !== JSON.stringify(data?.config ?? {});
+  const needsReindex =
+    data?.config &&
+    (form.vectorStore !== data.config.vectorStore ||
+      form.embeddingModelId !== data.config.embeddingModelId);
 
   async function handleSave() {
     if (!data?.config) return;
@@ -215,6 +219,22 @@ export default function SimpleSettingsPage() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 pb-8 md:px-8">
         <div className="mx-auto max-w-3xl space-y-6 pt-1">
+          {needsReindex && (
+            <Alert
+              variant="destructive"
+              className="bg-destructive/5 border-destructive/20 text-destructive mt-4"
+            >
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Warning: Re-indexing required</AlertTitle>
+              <AlertDescription>
+                Changing your vector store or embedding model will invalidate
+                your existing documents. When you click Save, the RAG server
+                will shut down and you will need to re-index your documents in
+                the Docs page.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* ── AI Provider & Keys ────────────────────────────────────── */}
           <Card>
             <CardHeader className="pb-3">
