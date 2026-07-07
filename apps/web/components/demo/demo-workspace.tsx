@@ -124,7 +124,7 @@ export function DemoWorkspace() {
       <SourceSummary server={server} config={config} />
 
       {!ready && (
-        <Alert variant="destructive">
+        <Alert variant="default" className="text-orange-500">
           <AlertTriangle className="size-4" />
           <AlertTitle>Nothing to query yet</AlertTitle>
           <AlertDescription>
