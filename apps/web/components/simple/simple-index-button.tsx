@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useState } from "react";
 import useSWR from "swr";
 import { Loader2, Play } from "lucide-react";
@@ -22,6 +23,17 @@ export function SimpleIndexButton() {
   const running = Boolean(run && ACTIVE.includes(run.status));
   const ready = data?.ready;
   const unindexedCount = data?.unindexedCount || 0;
+
+  const prevRunId = React.useRef<string | null>(null);
+  const prevStatus = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (run && run.status === "failed" && (run.id !== prevRunId.current || prevStatus.current !== "failed")) {
+      toast.error(`Indexing failed: ${run.error}`);
+    }
+    prevRunId.current = run?.id ?? null;
+    prevStatus.current = run?.status ?? null;
+  }, [run]);
 
   async function build() {
     setStarting(true);
@@ -65,7 +77,7 @@ export function SimpleIndexButton() {
         ? "Indexing…"
         : run?.status === "completed"
           ? `Index new (${unindexedCount})`
-          : "Start indexing"}
+          : `Start indexing (${unindexedCount})`}
     </Button>
   );
 }

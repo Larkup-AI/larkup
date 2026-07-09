@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { ClipboardPaste, FileUp, Globe, Layers, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { CrawlJob, SourceDocument } from "@larkup-rag/core/types";
@@ -98,9 +98,12 @@ export function DataWorkspace() {
   const documents = docsQuery.data?.documents ?? [];
   const stats = docsQuery.data?.stats;
 
+  const { mutate: mutateGlobal } = useSWRConfig();
+
   const refreshAll = () => {
     jobsQuery.mutate();
     docsQuery.mutate();
+    mutateGlobal("/api/index");
   };
 
   const handleDataAdded = () => {

@@ -1,6 +1,6 @@
 [project]
 name = "larkup-rag"
-version = "0.1.7"
+version = "0.1.12"
 description = "Official Python SDK for the Larkup RAG API"
 readme = "README.md"
 license = "MIT"

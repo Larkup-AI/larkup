@@ -223,7 +223,7 @@ export function IndexWorkspace() {
             ? "Indexing…"
             : run?.status === "completed"
               ? `Index new documents (${unindexedCount})`
-              : "Start indexing"}
+              : `Start indexing (${unindexedCount})`}
         </Button>
         {running && (
           <Button

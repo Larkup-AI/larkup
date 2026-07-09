@@ -46,7 +46,7 @@ export async function GET() {
     const { readDocuments } = await import("@larkup-rag/core/documents-store")
     const docs = await readDocuments()
     unindexedCount = docs.filter(d => d.createdAt > run.startedAt).length
-  } else if (!run) {
+  } else {
     unindexedCount = stats.docCount
   }
 
