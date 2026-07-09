@@ -1,6 +1,6 @@
 .next/
 .larkup/
-.ragtoolkit/
+.larkupdb/
 .turbo/
 node_modules/
 *.log
