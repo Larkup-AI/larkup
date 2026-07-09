@@ -21,10 +21,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Build the web app
 RUN pnpm --filter=larkup-rag build
 
-# Prepare @lancedb native bindings for the runner stage.
-# pnpm stores optional native deps (NAPI-RS .node files) inside its .pnpm
-# virtual store.  Next.js standalone output-file-trace misses them, so we
-# collect them here and copy them into the runner's node_modules.
 RUN mkdir -p /lancedb-native && \
     LANCEDB_DIR=$(find /app/node_modules/.pnpm -maxdepth 1 -name '@lancedb+lancedb@*' -type d | head -1) && \
     if [ -d "$LANCEDB_DIR/node_modules/@lancedb" ]; then \
@@ -45,7 +41,6 @@ RUN mkdir -p /app/data \
     chown -R nextjs:nodejs /app/data /app/apps && \
     chmod -R 755 /app/data /app/apps
 
-# Copy Next.js standalone server
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
