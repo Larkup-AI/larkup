@@ -21,15 +21,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Build the web app
 RUN pnpm --filter=larkup-rag build
 
-# Prepare @lancedb native bindings for the runner stage.
 RUN mkdir -p /lancedb-native && \
     LANCEDB_DIR=$(find /app/node_modules/.pnpm -maxdepth 1 -name '@lancedb+lancedb@*' -type d | head -1) && \
     if [ -d "$LANCEDB_DIR/node_modules/@lancedb" ]; then \
         cp -r "$LANCEDB_DIR/node_modules/@lancedb" /lancedb-native/; \
-    fi && \
-    ARROW_DIR=$(find /app/node_modules/.pnpm -maxdepth 1 -name 'apache-arrow@*' -type d | head -1) && \
-    if [ -d "$ARROW_DIR/node_modules/apache-arrow" ]; then \
-        cp -r "$ARROW_DIR/node_modules/apache-arrow" /lancedb-native/; \
     fi
     
 # Stage 2: Runner
@@ -52,7 +47,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 
 # Copy @lancedb native bindings (NAPI-RS) that standalone trace missed
 COPY --from=builder --chown=nextjs:nodejs /lancedb-native/@lancedb ./node_modules/@lancedb
-COPY --from=builder --chown=nextjs:nodejs /lancedb-native/apache-arrow ./node_modules/apache-arrow
 
 USER nextjs
 EXPOSE 4567
