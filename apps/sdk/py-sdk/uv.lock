@@ -121,7 +121,7 @@ wheels = [
 
 [[package]]
 name = "larkup-rag"
-version = "0.1.7"
+version = "0.1.13"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

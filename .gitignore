@@ -35,6 +35,7 @@ dist/
 # App-specific ignores
 apps/docs
 apps/web/demo
+apps/local-chat-connection-larkup
 
 # Sensitive scripts
 npm-login.sh
@@ -48,3 +49,4 @@ apps/e2e/playwright-report
 apps/e2e/test-results
 playwright-report
 .env.e2e
+hpi-connect.txtapps/web/webui.log
