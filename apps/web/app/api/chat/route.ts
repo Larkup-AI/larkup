@@ -157,7 +157,7 @@ export async function POST(req: Request) {
       ? "vercel_ai_gateway"
       : chatModelDescriptor?.provider || provider;
 
-  const apiKey = config.chatApiKey || config.embeddingApiKey;
+  const apiKey = config.chatApiKey || config.embeddingApiKey || undefined;
   console.log("Using API Key for chat:", apiKey ? `${apiKey.substring(0, 10)}...` : "NONE", "Provider:", resolvedProvider);
   const model = createChatModel(resolvedProvider, chatModelId, apiKey);
 
