@@ -29,6 +29,7 @@ test.describe("Installation Methods", () => {
       const output = execSync("npm install -g larkup-rag", {
         timeout: 90_000,
         encoding: "utf-8",
+        stdio: "pipe",
       });
       console.log(`  ✓ npm install successful:\n${output.trim()}`);
 
@@ -59,6 +60,7 @@ test.describe("Installation Methods", () => {
       const output = execSync("docker pull aboneda/larkup-rag:latest", {
         timeout: 150_000,
         encoding: "utf-8",
+        stdio: "pipe",
       });
       console.log(
         `  ✓ Remote Docker image pulled successfully:\n${output.trim()}`,
@@ -101,6 +103,7 @@ test.describe("Installation Methods", () => {
         cwd: REPO_ROOT,
         timeout: 120_000,
         encoding: "utf-8",
+        stdio: "pipe",
       });
       console.log("  ✓ pnpm build completed successfully");
 

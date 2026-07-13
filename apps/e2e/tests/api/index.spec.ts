@@ -71,7 +71,16 @@ test.describe("Index API (/api/index)", () => {
     const maxAttempts = 60; // 60 × 5s = 5 minutes
     while (attempts < maxAttempts) {
       await new Promise((r) => setTimeout(r, 5_000));
-      const pollRes = await request.get(`${BASE}/api/index`);
+      
+      let pollRes;
+      try {
+        pollRes = await request.get(`${BASE}/api/index`);
+      } catch (err: any) {
+        console.warn(`  ⚠ Polling network error: ${err.message}`);
+        attempts++;
+        continue;
+      }
+
       const pollBody = await pollRes.json();
 
       if (pollBody.run?.status === "completed") {

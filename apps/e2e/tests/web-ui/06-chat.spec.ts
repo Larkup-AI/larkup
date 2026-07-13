@@ -11,7 +11,7 @@ test.describe("Chat Page", () => {
   test("page loads with correct heading", async ({ page }) => {
     await expect(page.getByText("Step 6 · Chat")).toBeVisible();
     await expect(
-      page.getByText("Chat with your knowledge base")
+      page.getByText("Chat with your knowledge base").first()
     ).toBeVisible();
   });
 

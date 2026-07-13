@@ -126,6 +126,18 @@ test.describe("CLI — @larkup-rag/cli", () => {
     }
   });
 
+  test("cli index — build the vector index", async () => {
+    test.setTimeout(120_000); // Indexing can take a while
+
+    try {
+      const output = cli("index");
+      console.log(`  ✓ index output: ${output.substring(0, 200)}`);
+    } catch (err: any) {
+      const output = err.stdout || err.stderr || err.message;
+      console.log(`  ℹ index result: ${output.substring(0, 200)}`);
+    }
+  });
+
   test("cli query — query the pipeline", async () => {
     test.setTimeout(30_000);
 

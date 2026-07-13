@@ -31,9 +31,9 @@ test.describe("Config API (/api/config)", () => {
       data: {
         ...current,
         embeddingProvider: "openai",
-        llmProvider: "openai",
+        chatProvider: "openai",
         embeddingApiKey: env(ENV_KEYS.OPENAI_API_KEY),
-        llmApiKey: env(ENV_KEYS.OPENAI_API_KEY),
+        chatApiKey: env(ENV_KEYS.OPENAI_API_KEY),
         firecrawlApiKey: hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY) ? env(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY) : undefined,
         serperApiKey: hasEnv(ENV_KEYS.SERPER_API_KEY) ? env(ENV_KEYS.SERPER_API_KEY) : undefined,
       },

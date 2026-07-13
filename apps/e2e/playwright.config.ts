@@ -4,9 +4,9 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const WEB_UI_URL = "http://localhost:4567";
-const RAG_SERVER_URL = "http://localhost:8080";
-const DOCS_URL = "http://localhost:3000"; // mintlify dev default
+const WEB_UI_URL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:4567";
+const RAG_SERVER_URL = process.env.RAG_SERVER_URL || "http://localhost:8080";
+const DOCS_URL = process.env.DOCS_URL || "http://localhost:3000"; // mintlify dev default
 
 export default defineConfig({
   testDir: "./tests",

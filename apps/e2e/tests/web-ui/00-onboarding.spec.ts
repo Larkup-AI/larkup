@@ -82,7 +82,7 @@ test.describe("Onboarding Flow", () => {
 
     // Should redirect to simple chat
     await expect(page).toHaveURL(/\/simple\/chat/);
-    await expect(page.getByRole("heading", { name: "Chat" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Chat", exact: true })).toBeVisible();
   });
 
   test("Simple Mode Setup Flow — Custom Model", async ({ page }) => {
@@ -151,6 +151,6 @@ test.describe("Onboarding Flow", () => {
 
     // Should redirect to configure page (tech mode dashboard)
     await expect(page).toHaveURL(/\/configure/);
-    await expect(page.getByText("Pipeline configuration")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Pipeline configuration" })).toBeVisible();
   });
 });

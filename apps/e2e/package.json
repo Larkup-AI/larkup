@@ -10,6 +10,7 @@
     "test:sdk": "playwright test tests/sdk/",
     "test:cli": "playwright test tests/cli/",
     "test:install": "playwright test tests/installation/",
+    "test:docker": "docker compose -f ../../docker-compose.e2e.yml up --build --abort-on-container-exit && docker compose -f ../../docker-compose.e2e.yml down",
     "report": "playwright show-report"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import { waitForWebUI } from "./utils/wait-for-server";
+import { waitForServer } from "./utils/wait-for-server";
 import "./utils/env-loader"; // side-effect: loads .env.e2e
 
 async function globalSetup() {
@@ -15,12 +15,13 @@ async function globalSetup() {
   }
 
   // Wait for the web dev server to be up
-  console.log("  Waiting for web UI on :4567...");
+  const webUrl = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:4567";
+  console.log(`  Waiting for web UI at ${webUrl}...`);
   try {
-    await waitForWebUI(120_000);
+    await waitForServer(webUrl, { timeout: 120_000, label: "Web UI" });
   } catch {
     throw new Error(
-      "Web UI is not running on http://localhost:4567. " +
+      `Web UI is not running at ${webUrl}. ` +
         "Start it with: pnpm dev (from repo root)"
     );
   }
