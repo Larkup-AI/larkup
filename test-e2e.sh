@@ -2,7 +2,7 @@
 set -e
 
 #===========================================
-# Larkup RAG — E2E Test Runner
+# Larkup — E2E Test Runner
 #===========================================
 # Usage:
 #   ./test-e2e.sh                    # Run all tests (web UI must be running)
@@ -57,7 +57,7 @@ fi
 # ---- Check prerequisites ----
 echo ""
 echo "========================================="
-echo "  Larkup RAG — E2E Test Runner"
+echo "  Larkup — E2E Test Runner"
 echo "========================================="
 echo "  Suite:  $SUITE"
 echo "  E2E:    $E2E_DIR"
@@ -95,7 +95,7 @@ fi
 
 # ---- Install E2E dependencies ----
 echo "📦 Installing E2E dependencies..."
-cd "$SCRIPT_DIR" && pnpm install --filter @larkup-rag/e2e
+cd "$SCRIPT_DIR" && pnpm install --filter @larkup/e2e
 
 # ---- Run tests ----
 echo ""

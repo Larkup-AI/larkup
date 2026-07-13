@@ -1,5 +1,5 @@
-export interface LarkupRAGClientOptions {
-  /** The URL of the Larkup RAG Server (e.g. http://localhost:8080) */
+export interface LarkupClientOptions {
+  /** The URL of the Larkup Server (e.g. http://localhost:8080) */
   baseUrl?: string;
   /** The server API key, required if the server is protected */
   apiKey?: string;

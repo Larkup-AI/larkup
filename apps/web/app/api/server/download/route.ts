@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import JSZip from "jszip";
-import { getActiveServer } from "@larkup-rag/core/workspace";
+import { getActiveServer } from "@larkup/core/workspace";
 
 function getFilesRecursively(dir: string, baseDir: string): any[] {
   let results: any[] = [];
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Configuration not found." }, { status: 404 });
     }
 
-    const { generateServer } = await import("@larkup-rag/core/generator/generate-server");
+    const { generateServer } = await import("@larkup/core/generator/generate-server");
     const generated = generateServer(config);
     
     const zip = new JSZip();

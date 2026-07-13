@@ -43,9 +43,9 @@ import { LaunchPanel } from "@/components/server/server-workspace";
 import {
   VECTOR_STORE_LIST,
   getVectorStore,
-} from "@larkup-rag/vector-stores/registry";
+} from "@larkup/vector-stores/registry";
 import { StoreFields } from "@/components/configure/store-fields";
-import type { RagConfig, VectorStoreId } from "@larkup-rag/core/types";
+import type { RagConfig, VectorStoreId } from "@larkup/core/types";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);

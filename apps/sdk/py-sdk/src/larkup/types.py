@@ -43,6 +43,6 @@ class HealthResponse(BaseModel):
     ok: bool
     service: Optional[str] = None
 
-class LarkupRAGClientOptions(BaseModel):
+class LarkupClientOptions(BaseModel):
     base_url: Optional[str] = None
     api_key: Optional[str] = None

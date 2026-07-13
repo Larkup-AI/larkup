@@ -1,34 +1,34 @@
 import pytest
 import respx
 from httpx import Response
-from larkup_rag import LarkupRAGClient, AsyncLarkupRAGClient, Document, LarkupRAGClientOptions
+from larkup import LarkupClient, AsyncLarkupClient, Document, LarkupClientOptions
 
 BASE_URL = "http://localhost:8080"
 
 @pytest.fixture
 def sync_client():
-    options = LarkupRAGClientOptions(base_url=BASE_URL, api_key="test-key")
-    return LarkupRAGClient(options)
+    options = LarkupClientOptions(base_url=BASE_URL, api_key="test-key")
+    return LarkupClient(options)
 
 @pytest.fixture
 def async_client():
-    options = LarkupRAGClientOptions(base_url=BASE_URL, api_key="test-key")
-    return AsyncLarkupRAGClient(options)
+    options = LarkupClientOptions(base_url=BASE_URL, api_key="test-key")
+    return AsyncLarkupClient(options)
 
 @respx.mock
 def test_health_sync(sync_client):
-    respx.get(f"{BASE_URL}/health").mock(return_value=Response(200, json={"ok": True, "service": "larkup-rag"}))
+    respx.get(f"{BASE_URL}/health").mock(return_value=Response(200, json={"ok": True, "service": "larkup"}))
     response = sync_client.health()
     assert response.ok is True
-    assert response.service == "larkup-rag"
+    assert response.service == "larkup"
 
 @respx.mock
 @pytest.mark.asyncio
 async def test_health_async(async_client):
-    respx.get(f"{BASE_URL}/health").mock(return_value=Response(200, json={"ok": True, "service": "larkup-rag"}))
+    respx.get(f"{BASE_URL}/health").mock(return_value=Response(200, json={"ok": True, "service": "larkup"}))
     response = await async_client.health()
     assert response.ok is True
-    assert response.service == "larkup-rag"
+    assert response.service == "larkup"
 
 @respx.mock
 def test_query_sync(sync_client):

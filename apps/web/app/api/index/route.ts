@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server"
-import { readConfig } from "@larkup-rag/core/config-store"
-import { corpusStats } from "@larkup-rag/core/documents-store"
-import { isRunning, readRun } from "@larkup-rag/core/index-store"
-import { createRun, runIndexer } from "@larkup-rag/core/indexing/indexer"
-import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry"
-import type { RagConfig } from "@larkup-rag/core/types"
+import { readConfig } from "@larkup/core/config-store"
+import { corpusStats } from "@larkup/core/documents-store"
+import { isRunning, readRun } from "@larkup/core/index-store"
+import { createRun, runIndexer } from "@larkup/core/indexing/indexer"
+import { getEmbeddingModel } from "@larkup/core/embeddings/registry"
+import type { RagConfig } from "@larkup/core/types"
 
 export const dynamic = "force-dynamic"
 
@@ -43,7 +43,7 @@ export async function GET() {
 
   let unindexedCount = 0
   if (run?.status === "completed") {
-    const { readDocuments } = await import("@larkup-rag/core/documents-store")
+    const { readDocuments } = await import("@larkup/core/documents-store")
     const docs = await readDocuments()
     unindexedCount = docs.filter(d => d.createdAt > run.startedAt).length
   } else {
@@ -100,7 +100,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE() {
-  const { readRun, patchRun } = await import("@larkup-rag/core/index-store")
+  const { readRun, patchRun } = await import("@larkup/core/index-store")
   const run = await readRun()
   if (run && ["chunking", "embedding", "upserting"].includes(run.status)) {
     await patchRun({

@@ -34,7 +34,7 @@ test.describe("Chat Page", () => {
       .first();
 
     if (await chatInput.isVisible()) {
-      await chatInput.fill("What is Larkup RAG?");
+      await chatInput.fill("What is Larkup?");
 
       // Submit the message
       const sendBtn = page
@@ -78,7 +78,7 @@ test.describe("Chat Page", () => {
 
     if (await chatInput.isVisible()) {
       // First message
-      await chatInput.fill("What is Larkup RAG?");
+      await chatInput.fill("What is Larkup?");
       const sendBtn = page
         .getByRole("button", { name: /Send|Submit/i })
         .first();

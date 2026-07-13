@@ -1,6 +1,6 @@
 {
-  "name": "larkup-rag",
-  "version": "0.1.13",
+  "name": "larkup",
+  "version": "0.1.14",
   "private": true,
   "scripts": {
     "dev": "turbo dev",
@@ -8,7 +8,7 @@
     "start": "pnpm build && pnpm --filter \"./apps/web\" start",
     "lint": "turbo lint",
     "test": "turbo test",
-    "rag": "pnpm --filter @larkup-rag/cli rag",
+    "rag": "pnpm --filter @larkup/cli rag",
     "test:publish": "pnpm build && pnpm publish -r --dry-run --no-git-checks"
   },
   "devDependencies": {

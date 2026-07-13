@@ -1,5 +1,5 @@
 {
-  "name": "@larkup-rag/deploy",
+  "name": "@larkup/deploy",
   "version": "0.1.0",
   "private": true,
   "scripts": {}

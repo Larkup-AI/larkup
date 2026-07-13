@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react"
 import useSWR, { mutate as globalMutate } from "swr"
-import type { WorkspaceMode } from "@larkup-rag/core/workspace"
+import type { WorkspaceMode } from "@larkup/core/workspace"
 
 /** A workspace server enriched with the per-server status the UI shows. */
 export interface WorkspaceServer {

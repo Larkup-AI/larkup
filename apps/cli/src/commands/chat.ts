@@ -1,13 +1,13 @@
 import { streamText, tool, stepCountIs } from "ai";
 import { z } from "zod";
 import * as p from "@clack/prompts";
-import { readConfig } from "@larkup-rag/core/config-store";
-import { readRun } from "@larkup-rag/core/index-store";
-import { refreshServerStatus } from "@larkup-rag/core/generator/server-runtime";
-import { createAdapter } from "@larkup-rag/vector-stores/factory";
-import { embedQuery } from "@larkup-rag/core/indexing/embedder";
-import { getActiveServer } from "@larkup-rag/core/workspace";
-import { getDefaultChatModel, getChatModel } from "@larkup-rag/core/chat-models/registry";
+import { readConfig } from "@larkup/core/config-store";
+import { readRun } from "@larkup/core/index-store";
+import { refreshServerStatus } from "@larkup/core/generator/server-runtime";
+import { createAdapter } from "@larkup/vector-stores/factory";
+import { embedQuery } from "@larkup/core/indexing/embedder";
+import { getActiveServer } from "@larkup/core/workspace";
+import { getDefaultChatModel, getChatModel } from "@larkup/core/chat-models/registry";
 
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

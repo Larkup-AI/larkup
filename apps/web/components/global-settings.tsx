@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { RagConfig } from "@larkup-rag/core/types";
+import { RagConfig } from "@larkup/core/types";
 import {
   Select,
   SelectContent,

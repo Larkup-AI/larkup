@@ -1,4 +1,4 @@
-import { createServer } from "@larkup-rag/core/workspace";
+import { createServer } from "@larkup/core/workspace";
 import { log } from "../ui/logger";
 
 export async function initCommand(name?: string) {

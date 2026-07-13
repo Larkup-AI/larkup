@@ -1,10 +1,10 @@
-import { getWorkspace, setActiveServer } from "@larkup-rag/core/workspace";
+import { getWorkspace, setActiveServer } from "@larkup/core/workspace";
 import { log } from "../ui/logger";
 
 export async function listServersCommand() {
   const ws = await getWorkspace();
   if (ws.servers.length === 0) {
-    log.dim('No servers yet. Create one with: larkuprag init "my-rag"');
+    log.dim('No servers yet. Create one with: larkup init "my-rag"');
     return;
   }
   

@@ -43,5 +43,5 @@ echo "[3/3] Publishing to PyPI..."
 uv publish --token "$PYPI_TOKEN"
 
 echo ""
-echo "✅ Successfully published larkup-rag to PyPI!"
-echo "   View at: https://pypi.org/project/larkup-rag/"
+echo "✅ Successfully published larkup to PyPI!"
+echo "   View at: https://pypi.org/project/larkup/"

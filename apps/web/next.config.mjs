@@ -1,9 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: [
-    "@larkup-rag/core",
-    "@larkup-rag/vector-stores",
-    "@larkup-rag/scraper",
+    "@larkup/core",
+    "@larkup/vector-stores",
+    "@larkup/scraper",
   ],
   serverExternalPackages: ["@lancedb/lancedb", "chromadb"],
   typescript: {

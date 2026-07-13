@@ -6,7 +6,7 @@ import useSWR from "swr";
 import { Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import type { IndexRun } from "@larkup-rag/core/types";
+import type { IndexRun } from "@larkup/core/types";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 

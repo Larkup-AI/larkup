@@ -1,7 +1,7 @@
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { readConfig } from "@larkup-rag/core/config-store";
-import { emitToDisk } from "@larkup-rag/core/generator/server-runtime";
+import { readConfig } from "@larkup/core/config-store";
+import { emitToDisk } from "@larkup/core/generator/server-runtime";
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
 

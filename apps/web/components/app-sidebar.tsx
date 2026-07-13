@@ -13,8 +13,8 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { STAGES, CURRENT_PHASE } from "@larkup-rag/core/stages";
-import type { StageId } from "@larkup-rag/core/types";
+import { STAGES, CURRENT_PHASE } from "@larkup/core/stages";
+import type { StageId } from "@larkup/core/types";
 import {
   Tooltip,
   TooltipContent,
@@ -67,7 +67,7 @@ export function AppSidebar() {
             render={
               <Link
                 href="/configure"
-                aria-label="larkup-rag home"
+                aria-label="larkup home"
                 className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
               />
             }
@@ -76,7 +76,7 @@ export function AppSidebar() {
             <img src={"/logo9.png"} className="size-6.5" alt="logo" />
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
-            Larkup RAG
+            Larkup
           </TooltipContent>
         </Tooltip>
 

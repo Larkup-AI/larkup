@@ -9,14 +9,14 @@ import os
 import json
 import traceback
 
-BASE_URL = os.getenv("LARKUP_RAG_API_URL", "http://localhost:8080")
+BASE_URL = os.getenv("LARKUP_API_URL", "http://localhost:8080")
 
 
 def test_sync():
-    """Test the synchronous LarkupRAGClient."""
-    from larkup_rag import LarkupRAGClient, LarkupRAGClientOptions  # type: ignore[import-not-found]
+    """Test the synchronous LarkupClient."""
+    from larkup import LarkupClient, LarkupClientOptions  # type: ignore[import-not-found]
 
-    client = LarkupRAGClient(LarkupRAGClientOptions(base_url=BASE_URL))
+    client = LarkupClient(LarkupClientOptions(base_url=BASE_URL))
     results = []
 
     # 1. Health check
@@ -46,7 +46,7 @@ def test_sync():
 
     # 4. Add document
     try:
-        from larkup_rag.types import Document  # type: ignore[import-not-found]
+        from larkup.types import Document  # type: ignore[import-not-found]
         doc = Document(id="", text="Python SDK E2E test content", title="Py SDK Test")
         result = client.add_document(doc)
         assert result.get("success"), f"add_document returned {result}"
@@ -73,10 +73,10 @@ def test_sync():
 
 
 async def test_async():
-    """Test the async AsyncLarkupRAGClient."""
-    from larkup_rag import AsyncLarkupRAGClient, LarkupRAGClientOptions  # type: ignore[import-not-found]
+    """Test the async AsyncLarkupClient."""
+    from larkup import AsyncLarkupClient, LarkupClientOptions  # type: ignore[import-not-found]
 
-    client = AsyncLarkupRAGClient(LarkupRAGClientOptions(base_url=BASE_URL))
+    client = AsyncLarkupClient(LarkupClientOptions(base_url=BASE_URL))
     results = []
 
     # 1. Health check

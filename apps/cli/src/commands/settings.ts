@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
-import { readConfig, writeConfig } from "@larkup-rag/core/config-store";
-import { CHAT_MODELS } from "@larkup-rag/core/chat-models/registry";
+import { readConfig, writeConfig } from "@larkup/core/config-store";
+import { CHAT_MODELS } from "@larkup/core/chat-models/registry";
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
 

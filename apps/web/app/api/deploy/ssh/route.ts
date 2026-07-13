@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
-import { getActiveServer } from "@larkup-rag/core/workspace";
+import { getActiveServer } from "@larkup/core/workspace";
 import { NodeSSH } from "node-ssh";
 import crypto from "crypto";
 
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
           return errorMsg("Configuration not found. Please save your settings first.");
         }
 
-        const { generateServer } = await import("@larkup-rag/core/generator/generate-server");
+        const { generateServer } = await import("@larkup/core/generator/generate-server");
         const generated = generateServer(config);
         
         const filesToUpload: { localPath?: string; contents?: string; remotePath: string }[] = [];

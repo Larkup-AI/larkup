@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { embed } from "ai"
-import { getAIModel } from "@larkup-rag/core/embeddings/providers"
-import type { RagConfig } from "@larkup-rag/core/types"
+import { getAIModel } from "@larkup/core/embeddings/providers"
+import type { RagConfig } from "@larkup/core/types"
 
 export const runtime = "nodejs"
 

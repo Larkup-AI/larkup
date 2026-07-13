@@ -83,7 +83,7 @@ export function SimpleSidebar() {
             render={
               <Link
                 href="/simple/chat"
-                aria-label="larkup-rag home"
+                aria-label="larkup home"
                 className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
               />
             }
@@ -91,7 +91,7 @@ export function SimpleSidebar() {
             <img src={"/logo9.png"} className="size-6.5" alt="logo" />
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
-            Larkup RAG
+            Larkup
           </TooltipContent>
         </Tooltip>
 

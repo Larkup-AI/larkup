@@ -34,7 +34,7 @@ test.describe("Search API (/api/search)", () => {
     test.setTimeout(30_000);
 
     const res = await request.post(`${BASE}/api/search`, {
-      data: { query: "Larkup RAG", limit: 5 },
+      data: { query: "Larkup", limit: 5 },
     });
 
     // May return 401 if firecrawl isn't configured, which is valid

@@ -14,7 +14,7 @@
     "declaration": true,
     "declarationMap": true,
     "paths": {
-      "@larkup-rag/core/*": ["../core/src/*"]
+      "@larkup/core/*": ["../core/src/*"]
     }
   },
   "include": ["src/**/*.ts"],

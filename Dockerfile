@@ -24,7 +24,7 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm --filter larkup-rag build
+RUN pnpm --filter larkup build
 
 FROM base AS runner
 WORKDIR /app

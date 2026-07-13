@@ -210,7 +210,7 @@ test.describe("Data Page", () => {
     // Look for search functionality
     const searchInput = page.locator('input[placeholder*="search" i]').first();
     if (await searchInput.isVisible()) {
-      await searchInput.fill("Larkup RAG AI");
+      await searchInput.fill("Larkup AI");
       const searchBtn = page.getByRole("button", { name: /Search/i }).first();
       if (await searchBtn.isVisible()) {
         await searchBtn.click();

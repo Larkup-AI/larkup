@@ -1,10 +1,10 @@
 {
-  "name": "@larkup-rag/client-js",
-  "version": "0.1.13",
+  "name": "@larkup/sdk",
+  "version": "0.1.14",
   "publishConfig": {
     "access": "public"
   },
-  "description": "JavaScript/TypeScript SDK for Larkup RAG servers",
+  "description": "JavaScript/TypeScript SDK for Larkup servers",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

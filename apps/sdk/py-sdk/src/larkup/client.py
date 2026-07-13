@@ -8,23 +8,23 @@ from .types import (
     QueryResponse,
     ScrapeResponse,
     HealthResponse,
-    LarkupRAGClientOptions,
+    LarkupClientOptions,
 )
 
-class LarkupRAGError(Exception):
+class LarkupError(Exception):
     def __init__(self, message: str, status_code: Optional[int] = None):
         super().__init__(message)
         self.status_code = status_code
 
-class LarkupRAGClient:
-    """Synchronous client for Larkup RAG API."""
+class LarkupClient:
+    """Synchronous client for Larkup API."""
     
-    def __init__(self, options: Optional[LarkupRAGClientOptions] = None):
-        options = options or LarkupRAGClientOptions()
+    def __init__(self, options: Optional[LarkupClientOptions] = None):
+        options = options or LarkupClientOptions()
         
-        base_url = options.base_url or os.getenv("LARKUP_RAG_API_URL", "http://localhost:8080")
+        base_url = options.base_url or os.getenv("LARKUP_API_URL", "http://localhost:8080")
         self.base_url = base_url.rstrip("/")
-        self.api_key = options.api_key or os.getenv("LARKUP_RAG_API_KEY")
+        self.api_key = options.api_key or os.getenv("LARKUP_API_KEY")
         self._client = httpx.Client(base_url=self.base_url)
 
     def _get_headers(self) -> Dict[str, str]:
@@ -42,7 +42,7 @@ class LarkupRAGClient:
                     error_msg = err_body["error"]
             except Exception:
                 pass
-            raise LarkupRAGError(f"LarkupRAG API Error ({response.status_code}): {error_msg}", response.status_code)
+            raise LarkupError(f"Larkup API Error ({response.status_code}): {error_msg}", response.status_code)
 
     def _request(self, method: str, path: str, **kwargs) -> Any:
         headers = self._get_headers()
@@ -116,15 +116,15 @@ class LarkupRAGClient:
         self.close()
 
 
-class AsyncLarkupRAGClient:
-    """Asynchronous client for Larkup RAG API."""
+class AsyncLarkupClient:
+    """Asynchronous client for Larkup API."""
     
-    def __init__(self, options: Optional[LarkupRAGClientOptions] = None):
-        options = options or LarkupRAGClientOptions()
+    def __init__(self, options: Optional[LarkupClientOptions] = None):
+        options = options or LarkupClientOptions()
         
-        base_url = options.base_url or os.getenv("LARKUP_RAG_API_URL", "http://localhost:8080")
+        base_url = options.base_url or os.getenv("LARKUP_API_URL", "http://localhost:8080")
         self.base_url = base_url.rstrip("/")
-        self.api_key = options.api_key or os.getenv("LARKUP_RAG_API_KEY")
+        self.api_key = options.api_key or os.getenv("LARKUP_API_KEY")
         self._client = httpx.AsyncClient(base_url=self.base_url)
 
     def _get_headers(self) -> Dict[str, str]:
@@ -142,7 +142,7 @@ class AsyncLarkupRAGClient:
                     error_msg = err_body["error"]
             except Exception:
                 pass
-            raise LarkupRAGError(f"LarkupRAG API Error ({response.status_code}): {error_msg}", response.status_code)
+            raise LarkupError(f"Larkup API Error ({response.status_code}): {error_msg}", response.status_code)
 
     async def _request(self, method: str, path: str, **kwargs) -> Any:
         headers = self._get_headers()

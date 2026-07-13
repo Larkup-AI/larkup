@@ -39,7 +39,7 @@ export function fixtureExists(name: keyof typeof FIXTURES): boolean {
 }
 
 // Test constants
-export const TEST_QUERY = "What is Larkup RAG?";
-export const TEST_PASTE_TEXT = `Larkup RAG is an open-source toolkit designed to launch a production-ready RAG server from local to deployment in minutes. It eliminates the complexities of manual infrastructure setup, allowing you to seamlessly configure vector stores, chunking strategies, and embedding models through a unified interface.`;
+export const TEST_QUERY = "What is Larkup?";
+export const TEST_PASTE_TEXT = `Larkup is an open-source toolkit designed to launch a production-ready RAG server from local to deployment in minutes. It eliminates the complexities of manual infrastructure setup, allowing you to seamlessly configure vector stores, chunking strategies, and embedding models through a unified interface.`;
 export const TEST_PASTE_TITLE = "E2E Test Document — Pasted Text";
 export const TEST_SCRAPE_URL = "https://example.com";

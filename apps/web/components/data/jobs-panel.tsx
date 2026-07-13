@@ -16,7 +16,7 @@ import {
   XIcon,
   Square,
 } from "lucide-react";
-import type { CrawlJob, CrawlJobStatus } from "@larkup-rag/core/types";
+import type { CrawlJob, CrawlJobStatus } from "@larkup/core/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

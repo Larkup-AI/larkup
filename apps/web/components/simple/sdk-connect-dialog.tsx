@@ -24,18 +24,18 @@ type TabId = (typeof TABS)[number]["id"];
 
 function getSnippets(serverUrl: string): Record<TabId, string> {
   return {
-    python: `# Install: pip install larkup-rag
-from larkup_rag import LarkupRAGClient, LarkupRAGClientOptions
+    python: `# Install: pip install larkup
+from larkup import LarkupClient, LarkupClientOptions
 
-options = LarkupRAGClientOptions(
+options = LarkupClientOptions(
     base_url="${serverUrl}",
     api_key="your-api-key"
 )
 
-client = LarkupRAGClient(options)
+client = LarkupClient(options)
 
 # Add a document
-from larkup_rag import Document
+from larkup import Document
 
 doc = Document(
     id="doc-1",
@@ -49,10 +49,10 @@ results = client.query("What is this about?", top_k=5)
 for hit in results.hits:
     print(f"Score: {hit.score} | Text: {hit.text}")`,
 
-    typescript: `// Install: npm install @larkup/rag-sdk
-import { LarkupRAGClient } from "@larkup/rag-sdk";
+    typescript: `// Install: npm install @larkup/sdk
+import { LarkupClient } from "@larkup/sdk";
 
-const client = new LarkupRAGClient({
+const client = new LarkupClient({
   baseUrl: "${serverUrl}",
   apiKey: "your-api-key",
 });

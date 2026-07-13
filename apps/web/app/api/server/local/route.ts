@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import { readConfig } from "@larkup-rag/core/config-store"
+import { readConfig } from "@larkup/core/config-store"
 import {
   readServerState,
   refreshServerStatus,
   startServer,
   stopServer,
-} from "@larkup-rag/core/generator/server-runtime"
+} from "@larkup/core/generator/server-runtime"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 300

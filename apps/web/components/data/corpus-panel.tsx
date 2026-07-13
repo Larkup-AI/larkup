@@ -15,7 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import type { DocumentSource, SourceDocument } from "@larkup-rag/core/types";
+import type { DocumentSource, SourceDocument } from "@larkup/core/types";
 import { GenericAlert } from "@/components/alerts/generic-alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

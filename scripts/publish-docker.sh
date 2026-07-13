@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-DOCKER_IMAGE="aboneda/larkup-rag"
+DOCKER_IMAGE="aboneda/larkup"
 DOCKER_TAG="${1:-latest}"
 
 echo "========================================="

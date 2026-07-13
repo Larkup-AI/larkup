@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { searchWeb, isFirecrawlConfigured, FirecrawlError } from "@larkup-rag/scraper/firecrawl"
+import { searchWeb, isFirecrawlConfigured, FirecrawlError } from "@larkup/scraper/firecrawl"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"

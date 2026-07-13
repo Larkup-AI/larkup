@@ -28,11 +28,11 @@ function VercelIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-import type { RagConfig } from "@larkup-rag/core/types";
+import type { RagConfig } from "@larkup/core/types";
 import type {
   GeneratedFile,
   GeneratedServer,
-} from "@larkup-rag/core/generator/generate-server";
+} from "@larkup/core/generator/generate-server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";

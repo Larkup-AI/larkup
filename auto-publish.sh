@@ -2,7 +2,7 @@
 set -e
 
 #===========================================
-# Larkup RAG — Auto Publish All Packages
+# Larkup — Auto Publish All Packages
 #===========================================
 # Usage:
 #   ./auto-publish.sh                  # Publish everything (npm + pypi, skip docker)
@@ -144,7 +144,7 @@ if [ -n "$BUMP_TYPE" ] || [ -n "$CUSTOM_VERSION" ]; then
 fi
 
 echo "========================================="
-echo "  Larkup RAG — Auto Publish              "
+echo "  Larkup — Auto Publish              "
 echo "========================================="
 echo "  NPM:    $([ "$PUBLISH_NPM" = true ] && echo "✅" || echo "⏭️  skip")"
 echo "  PyPI:   $([ "$PUBLISH_PYPI" = true ] && echo "✅" || echo "⏭️  skip")"
@@ -184,7 +184,7 @@ fi
 
 echo "========================================="
 echo "🎉 All done! Published packages:"
-[ "$PUBLISH_NPM" = true ] && echo "  📦 npm: @larkup-rag/client-js, @larkup-rag/cli, larkup-rag"
-[ "$PUBLISH_PYPI" = true ] && echo "  🐍 PyPI: larkup-rag"
-[ "$PUBLISH_DOCKER" = true ] && echo "  🐳 Docker: aboneda/larkup-rag"
+[ "$PUBLISH_NPM" = true ] && echo "  📦 npm: @larkup/sdk, @larkup/cli, larkup"
+[ "$PUBLISH_PYPI" = true ] && echo "  🐍 PyPI: larkup"
+[ "$PUBLISH_DOCKER" = true ] && echo "  🐳 Docker: aboneda/larkup"
 echo "========================================="

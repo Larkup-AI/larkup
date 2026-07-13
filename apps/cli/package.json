@@ -1,13 +1,12 @@
 {
-  "name": "@larkup-rag/cli",
-  "version": "0.1.13",
+  "name": "@larkup/cli",
+  "version": "0.1.14",
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
   "bin": {
-    "larkuprag": "./dist/index.js",
-    "larkup-rag": "./dist/index.js"
+    "larkup": "./dist/index.js"
   },
   "files": [
     "dist"
@@ -15,7 +14,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "larkuprag": "tsx src/index.ts"
+    "larkup": "tsx src/index.ts"
   },
   "dependencies": {
     "@ai-sdk/cohere": "^3.0.39",
@@ -27,8 +26,8 @@
     "@ai-sdk/openai-compatible": "^2.0.51",
     "@clack/prompts": "^0.10.1",
     "@lancedb/lancedb": "^0.30.0",
-    "@larkup-rag/core": "workspace:*",
-    "@larkup-rag/vector-stores": "workspace:*",
+    "@larkup/core": "workspace:*",
+    "@larkup/vector-stores": "workspace:*",
     "@pinecone-database/pinecone": "^7.2.0",
     "ai": "^6.0.197",
     "chalk": "^5.6.2",

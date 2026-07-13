@@ -68,16 +68,16 @@ import {
   type VectorStoreId,
   type EmbeddingProvider,
   type CustomEmbeddingConfig,
-} from "@larkup-rag/core/types";
+} from "@larkup/core/types";
 import {
   EMBEDDING_MODELS,
   getEmbeddingModel,
-} from "@larkup-rag/core/embeddings/registry";
+} from "@larkup/core/embeddings/registry";
 import {
   getVectorStore,
   validateStoreConfig,
   VECTOR_STORE_LIST,
-} from "@larkup-rag/vector-stores/registry";
+} from "@larkup/vector-stores/registry";
 import { StoreFields } from "@/components/configure/store-fields";
 import { useRouter } from "next/navigation";
 import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";

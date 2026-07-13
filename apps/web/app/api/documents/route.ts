@@ -7,8 +7,8 @@ import {
   deleteDocuments,
   readDocuments,
   updateDocument,
-} from "@larkup-rag/core/documents-store"
-import type { DocumentSource } from "@larkup-rag/core/types"
+} from "@larkup/core/documents-store"
+import type { DocumentSource } from "@larkup/core/types"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"

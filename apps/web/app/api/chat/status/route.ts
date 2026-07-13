@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { readConfig } from "@larkup-rag/core/config-store";
-import { readRun } from "@larkup-rag/core/index-store";
-import { runWithServer } from "@larkup-rag/core/workspace";
+import { readConfig } from "@larkup/core/config-store";
+import { readRun } from "@larkup/core/index-store";
+import { runWithServer } from "@larkup/core/workspace";
 import {
   getChatModelsForProvider,
   getDefaultChatModel,
-} from "@larkup-rag/core/chat-models/registry";
+} from "@larkup/core/chat-models/registry";
 
 export const dynamic = "force-dynamic";
 

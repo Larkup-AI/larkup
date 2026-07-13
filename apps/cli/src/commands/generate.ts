@@ -1,8 +1,8 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { readConfig } from "@larkup-rag/core/config-store";
-import { generateServer } from "@larkup-rag/core/generator/generate-server";
-import { emitToDisk } from "@larkup-rag/core/generator/server-runtime";
+import { readConfig } from "@larkup/core/config-store";
+import { generateServer } from "@larkup/core/generator/generate-server";
+import { emitToDisk } from "@larkup/core/generator/server-runtime";
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
 
@@ -33,6 +33,6 @@ export async function generateCommand(options: { server?: string; out?: string }
       .join(", ");
     
     log.dim(`  deps: ${deps}`);
-    log.dim("  run it locally with: larkuprag serve");
+    log.dim("  run it locally with: larkup serve");
   });
 }

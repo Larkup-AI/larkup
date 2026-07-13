@@ -15,7 +15,7 @@ let RAG_SERVER = "http://localhost:8080";
  * Python SDK E2E tests — spawns a Python subprocess to test the SDK
  * against the running RAG server.
  */
-test.describe("Python SDK — larkup-rag", () => {
+test.describe("Python SDK — larkup", () => {
   test.beforeAll(async ({ request }) => {
     try {
       const statusRes = await request.get(`${WEB_API}/api/server/local`);
@@ -60,7 +60,7 @@ test.describe("Python SDK — larkup-rag", () => {
           encoding: "utf-8",
           env: {
             ...process.env,
-            LARKUP_RAG_API_URL: RAG_SERVER,
+            LARKUP_API_URL: RAG_SERVER,
             PYTHONPATH: path.join(PY_SDK_DIR, "src"),
           },
         }
@@ -85,7 +85,7 @@ test.describe("Python SDK — larkup-rag", () => {
           encoding: "utf-8",
           env: {
             ...process.env,
-            LARKUP_RAG_API_URL: RAG_SERVER,
+            LARKUP_API_URL: RAG_SERVER,
             PYTHONPATH: path.join(PY_SDK_DIR, "src"),
           },
         }

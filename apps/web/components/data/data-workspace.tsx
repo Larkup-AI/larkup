@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ClipboardPaste, FileUp, Globe, Layers, Plus } from "lucide-react";
 import { toast } from "sonner";
-import type { CrawlJob, SourceDocument } from "@larkup-rag/core/types";
+import type { CrawlJob, SourceDocument } from "@larkup/core/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";

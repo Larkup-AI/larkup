@@ -1,5 +1,5 @@
-import type { SearchResultItem } from "@larkup-rag/core/types";
-import { readConfig } from "@larkup-rag/core/config-store";
+import type { SearchResultItem } from "@larkup/core/types";
+import { readConfig } from "@larkup/core/config-store";
 import { readLocalState } from "./local-runtime";
 
 /**

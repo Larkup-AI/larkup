@@ -1,8 +1,8 @@
-import { readConfig } from "@larkup-rag/core/config-store";
-import { corpusStats } from "@larkup-rag/core/documents-store";
-import { readRun } from "@larkup-rag/core/index-store";
-import { getVectorStore } from "@larkup-rag/vector-stores/registry";
-import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry";
+import { readConfig } from "@larkup/core/config-store";
+import { corpusStats } from "@larkup/core/documents-store";
+import { readRun } from "@larkup/core/index-store";
+import { getVectorStore } from "@larkup/vector-stores/registry";
+import { getEmbeddingModel } from "@larkup/core/embeddings/registry";
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
 

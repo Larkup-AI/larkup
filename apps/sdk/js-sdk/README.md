@@ -1,26 +1,26 @@
-# Larkup RAG JavaScript SDK
+# Larkup JavaScript SDK
 
-The official JavaScript/TypeScript client for the **Larkup RAG** platform. 
+The official JavaScript/TypeScript client for the **Larkup** platform. 
 
-This SDK provides a convenient interface to connect your Node.js or browser applications to a running Larkup RAG server. It abstracts away the API layer so you can focus on building your AI agents and applications.
+This SDK provides a convenient interface to connect your Node.js or browser applications to a running Larkup server. It abstracts away the API layer so you can focus on building your AI agents and applications.
 
 ## Installation
 
 Install the SDK via npm, yarn, or pnpm:
 
 ```bash
-npm install @larkup-rag/client-js
+npm install @larkup/sdk
 ```
 
 ## Quick Start
 
-Initialize the `LarkupRAGClient` with the URL of your running Larkup RAG server. 
+Initialize the `LarkupClient` with the URL of your running Larkup server. 
 
 ```typescript
-import { LarkupRAGClient } from "@larkup-rag/client-js";
+import { LarkupClient } from "@larkup/sdk";
 
 // Initialize the client
-const client = new LarkupRAGClient({
+const client = new LarkupClient({
   baseUrl: "http://localhost:4567", // Replace with your deployed server URL
 });
 

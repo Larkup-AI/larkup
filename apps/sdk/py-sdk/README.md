@@ -1,17 +1,17 @@
-# Larkup RAG Python SDK
+# Larkup Python SDK
 
-The official Python client for the **Larkup RAG** platform.
+The official Python client for the **Larkup** platform.
 
-This SDK provides a simple, Pythonic interface to interact with your running Larkup RAG servers. It offers both synchronous and asynchronous clients, built on top of `httpx` and `pydantic`.
+This SDK provides a simple, Pythonic interface to interact with your running Larkup servers. It offers both synchronous and asynchronous clients, built on top of `httpx` and `pydantic`.
 
 ## Installation
 
 Install the package via pip or uv:
 
 ```bash
-pip install larkup-rag
+pip install larkup
 # or
-uv pip install larkup-rag
+uv pip install larkup
 ```
 
 ## Quick Start
@@ -19,10 +19,10 @@ uv pip install larkup-rag
 ### Synchronous Client
 
 ```python
-from larkup_rag import LarkupRAGClient
+from larkup import LarkupClient
 
 # Initialize the client
-client = LarkupRAGClient(base_url="http://localhost:4567")
+client = LarkupClient(base_url="http://localhost:4567")
 
 # 1. Query the RAG Pipeline
 response = client.query(
@@ -47,10 +47,10 @@ print("Documents indexed successfully.")
 
 ```python
 import asyncio
-from larkup_rag import AsyncLarkupRAGClient
+from larkup import AsyncLarkupClient
 
 async def main():
-    client = AsyncLarkupRAGClient(base_url="http://localhost:4567")
+    client = AsyncLarkupClient(base_url="http://localhost:4567")
     
     response = await client.query(
         query="What is the future of education?",
@@ -63,7 +63,7 @@ asyncio.run(main())
 
 ## Features
 
-- **Sync & Async Support**: Use `LarkupRAGClient` or `AsyncLarkupRAGClient`.
+- **Sync & Async Support**: Use `LarkupClient` or `AsyncLarkupClient`.
 - **Querying**: Execute semantic searches against your vector store.
 - **Data Ingestion**: Add documents and web pages programmatically.
 - **Strong Typing**: Built with Pydantic for validation and editor autocompletion.

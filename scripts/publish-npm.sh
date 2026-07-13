@@ -26,29 +26,29 @@ pnpm build
 
 # --- 1. JS SDK ---
 echo ""
-echo "[1/3] Publishing @larkup-rag/client-js..."
+echo "[1/3] Publishing @larkup/sdk..."
 cd "$ROOT_DIR/apps/sdk/js-sdk"
 npm publish --access public
-echo "✅ @larkup-rag/client-js published."
+echo "✅ @larkup/sdk published."
 
 # --- 2. CLI ---
 echo ""
-echo "[2/3] Publishing @larkup-rag/cli..."
+echo "[2/3] Publishing @larkup/cli..."
 cd "$ROOT_DIR/apps/cli"
 npm publish --access public
-echo "✅ @larkup-rag/cli published."
+echo "✅ @larkup/cli published."
 
-# --- 3. Web (larkup-rag) ---
+# --- 3. Web (larkup) ---
 echo ""
-echo "[3/3] Publishing larkup-rag (web)..."
+echo "[3/3] Publishing larkup (web)..."
 cd "$ROOT_DIR/apps/web"
 npm publish --access public
-echo "✅ larkup-rag (web) published."
+echo "✅ larkup (web) published."
 
 echo ""
 echo "========================================="
 echo "🎉 All NPM packages published!"
 echo "========================================="
-echo "  - @larkup-rag/client-js"
-echo "  - @larkup-rag/cli"
-echo "  - larkup-rag"
+echo "  - @larkup/sdk"
+echo "  - @larkup/cli"
+echo "  - larkup"

@@ -49,4 +49,5 @@ apps/e2e/playwright-report
 apps/e2e/test-results
 playwright-report
 .env.e2e
-hpi-connect.txtapps/web/webui.log
+hpi-connect.txt
+apps/web/webui.log

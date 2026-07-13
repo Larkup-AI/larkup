@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
-import { readConfig, writeConfig } from "@larkup-rag/core/config-store"
-import { getVectorStore, validateStoreConfig } from "@larkup-rag/vector-stores/registry"
-import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry"
-import { runWithServer } from "@larkup-rag/core/workspace"
-import type { RagConfig } from "@larkup-rag/core/types"
+import { readConfig, writeConfig } from "@larkup/core/config-store"
+import { getVectorStore, validateStoreConfig } from "@larkup/vector-stores/registry"
+import { getEmbeddingModel } from "@larkup/core/embeddings/registry"
+import { runWithServer } from "@larkup/core/workspace"
+import type { RagConfig } from "@larkup/core/types"
 
 // Uses node:fs — must run on the Node.js runtime, not edge.
 export const runtime = "nodejs"

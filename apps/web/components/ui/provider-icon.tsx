@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { EmbeddingProvider } from "@larkup-rag/core/types";
+import { EmbeddingProvider } from "@larkup/core/types";
 
 export type ProviderMeta = {
   label: string;

@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const cmd = `pnpm add ${entry.pkg}@${entry.version} --filter @larkup-rag/vector-stores`;
+    const cmd = `pnpm add ${entry.pkg}@${entry.version} --filter @larkup/vector-stores`;
     const { stdout, stderr } = await execAsync(cmd, {
       cwd: process.cwd(),
       timeout: 120_000, // 2 minute timeout

@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { visibleFields } from "@larkup-rag/vector-stores/registry"
-import type { IndexType, VectorStoreDescriptor } from "@larkup-rag/core/types"
+import { visibleFields } from "@larkup/vector-stores/registry"
+import type { IndexType, VectorStoreDescriptor } from "@larkup/core/types"
 
 interface StoreFieldsProps {
   store: VectorStoreDescriptor

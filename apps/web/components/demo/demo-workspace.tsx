@@ -14,10 +14,10 @@ import {
   Database,
   ExternalLink,
 } from "lucide-react";
-import type { IndexType, VectorStoreId } from "@larkup-rag/core/types";
-import type { QueryHit } from "@larkup-rag/vector-stores/adapter";
-import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry";
-import { getVectorStore } from "@larkup-rag/vector-stores/registry";
+import type { IndexType, VectorStoreId } from "@larkup/core/types";
+import type { QueryHit } from "@larkup/vector-stores/adapter";
+import { getEmbeddingModel } from "@larkup/core/embeddings/registry";
+import { getVectorStore } from "@larkup/vector-stores/registry";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

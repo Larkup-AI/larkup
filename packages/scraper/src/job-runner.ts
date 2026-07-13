@@ -1,6 +1,6 @@
-import type { CrawlJob, CrawlJobStatus, CrawlTarget } from "@larkup-rag/core/types"
-import { getJob, updateJob } from "@larkup-rag/core/jobs-store"
-import { addCrawledDocuments, type NewDocumentInput } from "@larkup-rag/core/documents-store"
+import type { CrawlJob, CrawlJobStatus, CrawlTarget } from "@larkup/core/types"
+import { getJob, updateJob } from "@larkup/core/jobs-store"
+import { addCrawledDocuments, type NewDocumentInput } from "@larkup/core/documents-store"
 import {
   cancelCrawl,
   getCrawlStatus,

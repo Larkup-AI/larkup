@@ -1,8 +1,8 @@
-import { readConfig } from "@larkup-rag/core/config-store";
-import { readDocuments } from "@larkup-rag/core/documents-store";
-import { createRun, runIndexer } from "@larkup-rag/core/indexing/indexer";
-import { readRun } from "@larkup-rag/core/index-store";
-import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry";
+import { readConfig } from "@larkup/core/config-store";
+import { readDocuments } from "@larkup/core/documents-store";
+import { createRun, runIndexer } from "@larkup/core/indexing/indexer";
+import { readRun } from "@larkup/core/index-store";
+import { getEmbeddingModel } from "@larkup/core/embeddings/registry";
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
 import { prompts } from "../ui/prompts";
@@ -15,7 +15,7 @@ export async function indexCommand(options: { server?: string }) {
     const docs = await readDocuments();
 
     if (docs.length === 0) {
-      log.error("Corpus is empty. Add documents first: larkuprag add-doc --file <path>");
+      log.error("Corpus is empty. Add documents first: larkup add-doc --file <path>");
     }
     
     if (!getEmbeddingModel(config.embeddingModelId)) {

@@ -19,7 +19,7 @@ import { settingsCommand } from "./commands/settings";
 const program = new Command();
 
 program
-  .name("larkuprag")
+  .name("larkup")
   .description("Build, index, and serve a RAG pipeline from the terminal.")
   .version("0.1.3");
 
@@ -27,7 +27,7 @@ program
   .command("init [name]")
   .description("Create a new RAG server (workspace project)")
   .action(async (name) => {
-    prompts.intro(log.fmt.bold("larkup-rag init"));
+    prompts.intro(log.fmt.bold("larkup init"));
     await initCommand(name);
     prompts.outro("Done!");
   });

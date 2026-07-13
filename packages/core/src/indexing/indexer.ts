@@ -4,8 +4,8 @@ import { readDocuments } from "../documents-store"
 import { patchRun, writeRun } from "../index-store"
 import { chunkCorpus } from "./chunker"
 import { embedTexts, expectedDimensions } from "./embedder"
-import { createAdapter } from "@larkup-rag/vector-stores/factory"
-import type { VectorRecord } from "@larkup-rag/vector-stores/adapter"
+import { createAdapter } from "@larkup/vector-stores/factory"
+import type { VectorRecord } from "@larkup/vector-stores/adapter"
 
 /**
  * The indexing pipeline: corpus → chunks → embeddings → vector store.

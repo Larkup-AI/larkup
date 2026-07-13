@@ -1,5 +1,5 @@
 {
-  "name": "@larkup-rag/e2e",
+  "name": "@larkup/e2e",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "report": "playwright show-report"
   },
   "devDependencies": {
-    "@larkup-rag/client-js": "workspace:*",
+    "@larkup/sdk": "workspace:*",
     "@playwright/test": "^1.61.1",
     "dotenv": "^16.6.0",
     "typescript": "5.7.3"

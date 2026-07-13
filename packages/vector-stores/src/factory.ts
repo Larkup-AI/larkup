@@ -1,4 +1,4 @@
-import type { RagConfig } from "@larkup-rag/core/types";
+import type { RagConfig } from "@larkup/core/types";
 import type { VectorStoreAdapter } from "./adapters/base";
 
 /**

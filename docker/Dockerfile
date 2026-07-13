@@ -19,7 +19,7 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the web app
-RUN pnpm --filter=larkup-rag build
+RUN pnpm --filter=larkup build
 
 RUN mkdir -p /lancedb-native && \
     LANCEDB_DIR=$(find /app/node_modules/.pnpm -maxdepth 1 -name '@lancedb+lancedb@*' -type d | head -1) && \

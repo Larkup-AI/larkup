@@ -28,11 +28,11 @@ export function WelcomeScreen({
         {/* Header */}
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <img src="/logo9.png" className="size-8" alt="Larkup RAG" />
+            <img src="/logo9.png" className="size-8" alt="Larkup" />
           </div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Welcome to Larkup RAG
+              Welcome to Larkup
             </h1>
             <p className="mt-2 text-base text-muted-foreground max-w-md mx-auto text-pretty">
               Build, index, and query your knowledge base with AI. How would you

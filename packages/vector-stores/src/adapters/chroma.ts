@@ -63,7 +63,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
       chromadb = await import("chromadb");
     } catch {
       throw new Error(
-        'The "chromadb" package is not installed. Please install it first via the Configure page or run: pnpm add chromadb --filter @larkup-rag/vector-stores',
+        'The "chromadb" package is not installed. Please install it first via the Configure page or run: pnpm add chromadb --filter @larkup/vector-stores',
       );
     }
 

@@ -1,4 +1,4 @@
-from .client import LarkupRAGClient, AsyncLarkupRAGClient, LarkupRAGError
+from .client import LarkupClient, AsyncLarkupClient, LarkupError
 from .types import (
     Document,
     QueryRequest,
@@ -8,13 +8,13 @@ from .types import (
     ScrapeRequest,
     ScrapeResponse,
     HealthResponse,
-    LarkupRAGClientOptions,
+    LarkupClientOptions,
 )
 
 __all__ = [
-    "LarkupRAGClient",
-    "AsyncLarkupRAGClient",
-    "LarkupRAGError",
+    "LarkupClient",
+    "AsyncLarkupClient",
+    "LarkupError",
     "Document",
     "QueryRequest",
     "QueryHit",
@@ -23,5 +23,5 @@ __all__ = [
     "ScrapeRequest",
     "ScrapeResponse",
     "HealthResponse",
-    "LarkupRAGClientOptions",
+    "LarkupClientOptions",
 ]

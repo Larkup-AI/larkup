@@ -51,7 +51,7 @@ test.describe("Onboarding Flow", () => {
     await page.goto("/");
     
     // Welcome Screen
-    await expect(page.getByText("Welcome to Larkup RAG")).toBeVisible();
+    await expect(page.getByText("Welcome to Larkup")).toBeVisible();
     await expect(page.getByText("Simple Mode")).toBeVisible();
     
     // Select Simple Mode
@@ -133,7 +133,7 @@ test.describe("Onboarding Flow", () => {
     await page.goto("/");
 
     // Welcome Screen
-    await expect(page.getByText("Welcome to Larkup RAG")).toBeVisible();
+    await expect(page.getByText("Welcome to Larkup")).toBeVisible();
     await expect(page.getByText("Developer Mode")).toBeVisible();
     
     // Select Tech Mode

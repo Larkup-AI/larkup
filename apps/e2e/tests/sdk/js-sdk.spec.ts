@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * JS SDK E2E tests — these test the actual @larkup-rag/client-js SDK
+ * JS SDK E2E tests — these test the actual @larkup/sdk SDK
  * against the running RAG server on port 8080.
  *
  * Prerequisites: RAG server must be launched first (via Server page or API).
@@ -9,7 +9,7 @@ import { test, expect } from "@playwright/test";
 const WEB_API = "http://localhost:4567";
 let RAG_SERVER = "http://localhost:8080";
 
-test.describe("JS SDK — @larkup-rag/client-js", () => {
+test.describe("JS SDK — @larkup/sdk", () => {
   // Ensure server is running before SDK tests
   test.beforeAll(async ({ request }) => {
     // Launch server via Web UI API

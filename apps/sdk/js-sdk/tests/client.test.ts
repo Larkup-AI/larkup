@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { LarkupRAGClient } from "../src/client";
+import { LarkupClient } from "../src/client";
 
 // Mock global fetch
 const fetchMock = vi.fn();
@@ -18,12 +18,12 @@ function err(status: number, body: unknown) {
   };
 }
 
-describe("LarkupRAGClient", () => {
-  let client: LarkupRAGClient;
+describe("LarkupClient", () => {
+  let client: LarkupClient;
 
   beforeEach(() => {
     fetchMock.mockClear();
-    client = new LarkupRAGClient({
+    client = new LarkupClient({
       baseUrl: "http://test.local:8080",
       apiKey: "test-key-123",
     });
@@ -40,7 +40,7 @@ describe("LarkupRAGClient", () => {
   });
 
   it("should not include Authorization when no apiKey", async () => {
-    const noAuth = new LarkupRAGClient({ baseUrl: "http://test.local:8080" });
+    const noAuth = new LarkupClient({ baseUrl: "http://test.local:8080" });
     fetchMock.mockResolvedValueOnce(ok({ ok: true }));
     await noAuth.health();
 
@@ -166,7 +166,7 @@ describe("LarkupRAGClient", () => {
       err(401, { error: "Missing Authorization header." })
     );
     await expect(client.query("test")).rejects.toThrow(
-      "LarkupRAG API Error (401): Missing Authorization header."
+      "Larkup API Error (401): Missing Authorization header."
     );
   });
 
@@ -180,13 +180,13 @@ describe("LarkupRAGClient", () => {
       },
     });
     await expect(client.health()).rejects.toThrow(
-      "LarkupRAG API Error (500): Internal Server Error"
+      "Larkup API Error (500): Internal Server Error"
     );
   });
 
   // ── Base URL handling ───────────────────────────────────────────────────
   it("strips trailing slash from baseUrl", async () => {
-    const c = new LarkupRAGClient({ baseUrl: "http://example.com/" });
+    const c = new LarkupClient({ baseUrl: "http://example.com/" });
     fetchMock.mockResolvedValueOnce(ok({ ok: true }));
     await c.health();
     expect(fetchMock.mock.calls[0][0]).toBe("http://example.com/health");

@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { readConfig } from "@larkup-rag/core/config-store";
+import { readConfig } from "@larkup/core/config-store";
 
 /**
  * Manages a LOCAL, self-hosted Firecrawl instance via Docker.

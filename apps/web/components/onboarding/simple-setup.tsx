@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useWorkspace } from "@/components/workspace/workspace-provider";
 import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
-import type { EmbeddingProvider } from "@larkup-rag/core/types";
+import type { EmbeddingProvider } from "@larkup/core/types";
 import { cn } from "@/lib/utils";
 
 interface SimpleSetupProps {
@@ -328,7 +328,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
         {/* Header */}
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <img src="/logo9.png" className="size-8" alt="Larkup RAG" />
+            <img src="/logo9.png" className="size-8" alt="Larkup" />
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">

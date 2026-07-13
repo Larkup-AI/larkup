@@ -16,3 +16,6 @@ docker-compose.yml
 .viminfo
 **/.DS_Store
 .DS_Store
+hpi-connect.txt
+apps/web/webui.log
+npm-login.sh

@@ -1,11 +1,11 @@
 <div align="center">
-  <img src="./apps/web/public/logo-light.png" alt="Larkup RAG Logo" width="400" />
+  <img src="./apps/web/public/logo-light.png" alt="Larkup Logo" width="400" />
 
   <br />
 
 **Open-source RAG infrastructure — ingest, index, and deploy production-ready vector search APIs in minutes.**
 
-[Documentation](https://larkuprag.larkup.de/docs) · [GitHub Issues](https://github.com/Larkup-AI/larkup-rag/issues)
+[Documentation](https://larkup.larkup.de/docs) · [GitHub Issues](https://github.com/Larkup-AI/larkup/issues)
 
 </div>
 
@@ -16,9 +16,9 @@
 ### Option 1: CLI (quickest)
 
 ```bash
-npx @larkup-rag/cli init my-rag-server
+npx @larkup/cli init my-rag-server
 cd my-rag-server
-npx @larkup-rag/cli dev
+npx @larkup/cli dev
 ```
 
 ### Option 2: Docker
@@ -26,22 +26,22 @@ npx @larkup-rag/cli dev
 ```bash
 docker run -d -p 4567:4567 \
   -e OPENAI_API_KEY=your_key \
-  ghcr.io/larkup-ai/larkup-rag:latest
+  ghcr.io/larkup-ai/larkup:latest
 ```
 
 Or with Docker Compose:
 
 ```bash
-git clone https://github.com/Larkup-AI/larkup-rag.git
-cd larkup-rag
+git clone https://github.com/Larkup-AI/larkup.git
+cd larkup
 docker-compose up -d
 ```
 
 ### Option 3: From source
 
 ```bash
-git clone https://github.com/Larkup-AI/larkup-rag.git
-cd larkup-rag
+git clone https://github.com/Larkup-AI/larkup.git
+cd larkup
 pnpm install
 pnpm dev
 ```
@@ -95,8 +95,8 @@ Ship to Vercel, Hetzner/VPS via SSH, or any Docker-compatible cloud — one clic
 Once your server is live (locally or deployed), connect your AI agents using our SDKs:
 
 ```bash
-npm install @larkup/rag-sdk    # TypeScript / Node.js
-pip install larkup-rag          # Python
+npm install @larkup/sdk    # TypeScript / Node.js
+pip install larkup          # Python
 ```
 
 ### Vercel AI SDK
@@ -104,9 +104,9 @@ pip install larkup-rag          # Python
 ```typescript
 import { tool } from "ai";
 import { z } from "zod";
-import { LarkupRAGClient } from "@larkup/rag-sdk";
+import { LarkupClient } from "@larkup/sdk";
 
-const rag = new LarkupRAGClient({
+const rag = new LarkupClient({
   baseUrl: "https://your-server-url.com", // or http://localhost:8080 for local
   apiKey: "your-api-key",
 });
@@ -126,10 +126,10 @@ export const ragTool = tool({
 ```python
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.documents import Document
-from larkup_rag import LarkupRAGClient, LarkupRAGClientOptions
+from larkup import LarkupClient, LarkupClientOptions
 
 class LarkupRetriever(BaseRetriever):
-    client: LarkupRAGClient
+    client: LarkupClient
 
     def _get_relevant_documents(self, query, **kwargs):
         results = self.client.query(query, top_k=5)
@@ -139,7 +139,7 @@ class LarkupRetriever(BaseRetriever):
         ]
 
 retriever = LarkupRetriever(
-    client=LarkupRAGClient(LarkupRAGClientOptions(
+    client=LarkupClient(LarkupClientOptions(
         base_url="https://your-server-url.com",  # or http://localhost:8080
         api_key="your-api-key"
     ))
@@ -161,7 +161,7 @@ const larkup = createOpenAI({
 
 const { text } = await generateText({
   model: larkup("rag-model"),
-  prompt: "What is LarkupRAG?",
+  prompt: "What is Larkup?",
 });
 ```
 
@@ -173,17 +173,17 @@ const { text } = await generateText({
 |---|---|
 | `apps/web` | Web UI & API server — configure pipelines, ingest data, deploy |
 | `apps/cli` | CLI to init, index, and query pipelines from the terminal |
-| `apps/sdk/js-sdk` | TypeScript/JS SDK (`@larkup/rag-sdk`) |
-| `apps/sdk/py-sdk` | Python SDK (`larkup-rag`) |
+| `apps/sdk/js-sdk` | TypeScript/JS SDK (`@larkup/sdk`) |
+| `apps/sdk/py-sdk` | Python SDK (`larkup`) |
 | `apps/docs` | Documentation site (Mintlify) |
 
 ## 📚 Documentation
 
-Full guides → [larkuprag.larkup.de/docs](https://larkuprag.larkup.de/docs)
+Full guides → [larkup.larkup.de/docs](https://larkup.larkup.de/docs)
 
 ## 🤝 Contributing
 
-We welcome contributions! Open an [issue](https://github.com/Larkup-AI/larkup-rag/issues) or submit a pull request.
+We welcome contributions! Open an [issue](https://github.com/Larkup-AI/larkup/issues) or submit a pull request.
 
 ## 📄 License
 

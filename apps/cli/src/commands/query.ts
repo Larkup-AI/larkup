@@ -1,7 +1,7 @@
-import { readConfig } from "@larkup-rag/core/config-store";
-import { readRun } from "@larkup-rag/core/index-store";
-import { embedQuery } from "@larkup-rag/core/indexing/embedder";
-import { createAdapter } from "@larkup-rag/vector-stores/factory";
+import { readConfig } from "@larkup/core/config-store";
+import { readRun } from "@larkup/core/index-store";
+import { embedQuery } from "@larkup/core/indexing/embedder";
+import { createAdapter } from "@larkup/vector-stores/factory";
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
 import { ensureApiKey } from "../lib/keys";
@@ -9,13 +9,13 @@ import { ensureApiKey } from "../lib/keys";
 export async function queryCommand(question: string, options: { server?: string; topK?: string }) {
   await inServerScope(options.server, async () => {
     await requireActive();
-    if (!question) log.error('Usage: larkuprag query "your question" [--topK 5]');
+    if (!question) log.error('Usage: larkup query "your question" [--topK 5]');
 
     const config = await readConfig();
     const run = await readRun();
     
     if (!run || run.status !== "completed" || (run.totalChunks ?? 0) === 0) {
-      log.error("No index to query. Build one first: larkuprag index");
+      log.error("No index to query. Build one first: larkup index");
     }
 
     await ensureApiKey(config, "embedding");

@@ -15,7 +15,7 @@ import {
   Clock,
   X,
 } from "lucide-react";
-import type { CrawlScope, SearchResultItem } from "@larkup-rag/core/types";
+import type { CrawlScope, SearchResultItem } from "@larkup/core/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

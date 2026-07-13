@@ -22,9 +22,9 @@ import type {
   IndexRun,
   IndexType,
   VectorStoreId,
-} from "@larkup-rag/core/types";
-import { getEmbeddingModel } from "@larkup-rag/core/embeddings/registry";
-import { getVectorStore } from "@larkup-rag/vector-stores/registry";
+} from "@larkup/core/types";
+import { getEmbeddingModel } from "@larkup/core/embeddings/registry";
+import { getVectorStore } from "@larkup/vector-stores/registry";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -368,7 +368,7 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
           <Hash className="mb-1 size-6 text-muted-foreground/60" />
           <p className="text-sm font-medium">No index built yet</p>
           <p className="text-sm text-muted-foreground">
-            Build a Larkup-RAG index to embed your corpus and make it
+            Build a Larkup index to embed your corpus and make it
             searchable.
           </p>
         </CardContent>

@@ -19,14 +19,14 @@ test.describe("Installation Methods", () => {
     console.log("  ✓ pnpm dev serving on :4567");
   });
 
-  test("npm install -g larkup-rag — CLI installable from registry", async () => {
+  test("npm install -g larkup — CLI installable from registry", async () => {
     test.setTimeout(120_000);
 
     try {
       // Actually try to install the package from npm globally
       // (Using a custom prefix so we don't pollute the actual global node_modules if possible,
       // but for the sake of mimicking a user, we'll just run it)
-      const output = execSync("npm install -g larkup-rag", {
+      const output = execSync("npm install -g larkup", {
         timeout: 90_000,
         encoding: "utf-8",
         stdio: "pipe",
@@ -34,7 +34,7 @@ test.describe("Installation Methods", () => {
       console.log(`  ✓ npm install successful:\n${output.trim()}`);
 
       // Verify we can run it
-      const version = execSync("larkup-rag --help", { encoding: "utf-8" });
+      const version = execSync("larkup --help", { encoding: "utf-8" });
       expect(version).toContain("larkup");
       console.log(`  ✓ CLI is executable after global install`);
     } catch (err: any) {
@@ -56,8 +56,8 @@ test.describe("Installation Methods", () => {
 
     try {
       // Actually pull the image from Docker Hub
-      console.log("Pulling aboneda/larkup-rag:latest...");
-      const output = execSync("docker pull aboneda/larkup-rag:latest", {
+      console.log("Pulling aboneda/larkup:latest...");
+      const output = execSync("docker pull aboneda/larkup:latest", {
         timeout: 150_000,
         encoding: "utf-8",
         stdio: "pipe",

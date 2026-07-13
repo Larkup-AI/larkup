@@ -63,7 +63,7 @@ export function TechSetup({ onBack }: TechSetupProps) {
         {/* Header */}
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <img src="/logo9.png" className="size-7" alt="Larkup RAG" />
+            <img src="/logo9.png" className="size-7" alt="Larkup" />
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">

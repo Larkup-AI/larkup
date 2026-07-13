@@ -1,2 +1,2 @@
 export * from "./types";
-export { LarkupRAGClient } from "./client";
+export { LarkupClient } from "./client";

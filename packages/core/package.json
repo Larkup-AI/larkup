@@ -1,6 +1,6 @@
 {
-  "name": "@larkup-rag/core",
-  "version": "0.1.13",
+  "name": "@larkup/core",
+  "version": "0.1.14",
   "publishConfig": {
     "access": "public"
   },
@@ -30,7 +30,7 @@
     "@ai-sdk/mistral": "^3.0.40",
     "@ai-sdk/openai": "^3.0.68",
     "@ai-sdk/openai-compatible": "^2.0.51",
-    "@larkup-rag/vector-stores": "workspace:*",
+    "@larkup/vector-stores": "workspace:*",
     "ai": "^6.0.197"
   },
   "devDependencies": {

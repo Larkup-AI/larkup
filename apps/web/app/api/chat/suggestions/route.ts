@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { readConfig, writeConfig } from "@larkup-rag/core/config-store";
-import { readRun } from "@larkup-rag/core/index-store";
-import { runWithServer } from "@larkup-rag/core/workspace";
-import { createAdapter } from "@larkup-rag/vector-stores/factory";
-import { embedQuery } from "@larkup-rag/core/indexing/embedder";
+import { readConfig, writeConfig } from "@larkup/core/config-store";
+import { readRun } from "@larkup/core/index-store";
+import { runWithServer } from "@larkup/core/workspace";
+import { createAdapter } from "@larkup/vector-stores/factory";
+import { embedQuery } from "@larkup/core/indexing/embedder";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { getChatModel } from "@larkup-rag/core/chat-models/registry";
+import { getChatModel } from "@larkup/core/chat-models/registry";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createCohere } from "@ai-sdk/cohere";

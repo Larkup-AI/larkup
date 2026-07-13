@@ -1,5 +1,5 @@
 import {
-  LarkupRAGClientOptions,
+  LarkupClientOptions,
   QueryRequest,
   QueryResponse,
   Document,
@@ -8,17 +8,17 @@ import {
   HealthResponse,
 } from "./types";
 
-export class LarkupRAGClient {
+export class LarkupClient {
   private baseUrl: string;
   private apiKey?: string;
 
-  constructor(options: LarkupRAGClientOptions = {}) {
+  constructor(options: LarkupClientOptions = {}) {
     this.baseUrl = (
       options.baseUrl ??
-      process.env.LARKUP_RAG_API_URL ??
+      process.env.LARKUP_API_URL ??
       "http://localhost:8080"
     ).replace(/\/$/, "");
-    this.apiKey = options.apiKey ?? process.env.LARKUP_RAG_API_KEY;
+    this.apiKey = options.apiKey ?? process.env.LARKUP_API_KEY;
   }
 
   private async fetchApi<T>(
@@ -48,7 +48,7 @@ export class LarkupRAGClient {
       } catch {
         // ignore JSON parse error for error bodies
       }
-      throw new Error(`LarkupRAG API Error (${response.status}): ${errorMsg}`);
+      throw new Error(`Larkup API Error (${response.status}): ${errorMsg}`);
     }
 
     return response.json();

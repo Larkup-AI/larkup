@@ -1,6 +1,6 @@
-# Larkup RAG CLI
+# Larkup CLI
 
-The official Command Line Interface for **Larkup RAG**. 
+The official Command Line Interface for **Larkup**. 
 Build, index, and serve a Retrieval-Augmented Generation (RAG) pipeline directly from your terminal.
 
 ## Installation
@@ -8,9 +8,9 @@ Build, index, and serve a Retrieval-Augmented Generation (RAG) pipeline directly
 You can install the CLI globally via npm or run it via npx:
 
 ```bash
-npm install -g @larkup-rag/cli
+npm install -g @larkup/cli
 # or
-npx @larkup-rag/cli
+npx @larkup/cli
 ```
 
 ## Usage
@@ -18,7 +18,7 @@ npx @larkup-rag/cli
 The CLI provides a set of commands to manage your RAG workspaces, configure vector stores, ingest documents, and query your data.
 
 ```bash
-larkuprag <command> [options]
+larkup <command> [options]
 ```
 
 ### Core Commands
@@ -41,16 +41,16 @@ larkuprag <command> [options]
 
 ```bash
 # 1. Initialize a new project
-larkuprag init my-rag-server
+larkup init my-rag-server
 
 # 2. Add documents to the project
-larkuprag add-doc ./data/knowledge-base.txt
+larkup add-doc ./data/knowledge-base.txt
 
 # 3. Index the documents into the vector store
-larkuprag index
+larkup index
 
 # 4. Start an interactive chat session with your data
-larkuprag chat
+larkup chat
 ```
 
 ## Documentation

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Starting Larkup-RAG in production mode..."
+echo "Starting Larkup in production mode..."
 
 # Check if pnpm is installed, install if missing
 if ! command -v pnpm &> /dev/null; then

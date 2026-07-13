@@ -24,13 +24,13 @@ function cli(args: string, timeout = 30_000): string {
   });
 }
 
-test.describe("CLI — @larkup-rag/cli", () => {
+test.describe("CLI — @larkup/cli", () => {
   test.beforeAll(async () => {
     // Ensure CLI is built
     if (!fs.existsSync(CLI_BIN)) {
       console.log("  Building CLI...");
       try {
-        execSync("pnpm --filter @larkup-rag/cli build", {
+        execSync("pnpm --filter @larkup/cli build", {
           cwd: REPO_ROOT,
           timeout: 60_000,
           encoding: "utf-8",

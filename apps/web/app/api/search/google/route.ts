@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readConfig } from "@larkup-rag/core/config-store";
+import { readConfig } from "@larkup/core/config-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

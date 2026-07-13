@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { addDocument, corpusStats } from "@larkup-rag/core/documents-store";
+import { addDocument, corpusStats } from "@larkup/core/documents-store";
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
 

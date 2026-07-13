@@ -1,5 +1,5 @@
 import * as p from "@clack/prompts";
-import { readConfig, writeConfig } from "@larkup-rag/core/config-store";
+import { readConfig, writeConfig } from "@larkup/core/config-store";
 import { log } from "../ui/logger";
 
 export async function ensureApiKey(
