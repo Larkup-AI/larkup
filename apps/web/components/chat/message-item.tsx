@@ -20,7 +20,7 @@ export function MessageItem({
       .map((p: any) => p.text)
       .join("");
     return (
-      <div className="flex justify-end">
+      <div className="message user-message flex justify-end" data-role="user">
         <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary/10 px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
           {text}
         </div>
@@ -40,7 +40,7 @@ export function MessageItem({
     isStreaming;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="message assistant-message flex flex-col gap-3" data-role="assistant">
       {kbParts.length > 0 ? (
         <KnowledgeBaseResult parts={kbParts} isShimmering={isShimmering} />
       ) : null}

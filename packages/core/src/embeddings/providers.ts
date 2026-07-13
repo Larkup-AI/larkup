@@ -25,7 +25,7 @@ export function getAIModel(config: RagConfig): any {
       const customProvider = createOpenAICompatible({
         name: "custom_provider",
         baseURL: custom.baseUrl,
-        apiKey: custom.apiKey || config.embeddingApiKey || "empty",
+        apiKey: custom.apiKey || config.embeddingApiKey || undefined,
       });
       return customProvider.embeddingModel(custom.modelName);
     }
@@ -33,35 +33,35 @@ export function getAIModel(config: RagConfig): any {
 
   if (config.embeddingProvider === "deepseek") {
     const deepseek = createDeepSeek({
-      apiKey: config.embeddingApiKey || "empty",
+      apiKey: config.embeddingApiKey || undefined,
     });
     return deepseek.embeddingModel(modelName);
   }
 
   if (config.embeddingProvider === "google") {
     const google = createGoogleGenerativeAI({
-      apiKey: config.embeddingApiKey || "empty",
+      apiKey: config.embeddingApiKey || undefined,
     });
     return google.embedding(modelName);
   }
 
   if (config.embeddingProvider === "cohere") {
     const cohere = createCohere({
-      apiKey: config.embeddingApiKey || "empty",
+      apiKey: config.embeddingApiKey || undefined,
     });
     return cohere.embedding(modelName);
   }
 
   if (config.embeddingProvider === "mistral") {
     const mistral = createMistral({
-      apiKey: config.embeddingApiKey || "empty",
+      apiKey: config.embeddingApiKey || undefined,
     });
     return mistral.embedding(modelName);
   }
 
   if (config.embeddingProvider === "vercel_ai_gateway") {
     const gateway = createGateway({
-      apiKey: config.embeddingApiKey || "empty",
+      apiKey: config.embeddingApiKey || undefined,
     });
     // For Vercel AI Gateway, we don't slice the provider from the string, so we use config.embeddingModelId directly
     // Wait, the gateway model requires the original string, e.g., "openai/text-embedding-3-small"
@@ -70,7 +70,7 @@ export function getAIModel(config: RagConfig): any {
 
   // Default fallback (e.g. "openai")
   const openai = createOpenAI({
-    apiKey: config.embeddingApiKey || "empty",
+    apiKey: config.embeddingApiKey || undefined,
   });
   return openai.embedding(modelName);
 }

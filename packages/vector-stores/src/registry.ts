@@ -22,7 +22,7 @@ export const VECTOR_STORES: Record<VectorStoreId, VectorStoreDescriptor> = {
     installStatus: "installed",
     docsUrl: "https://lancedb.github.io/lancedb/",
     serverDependencies: {
-      "@lancedb/lancedb": "^0.21.0",
+      "@lancedb/lancedb": "^0.30.0",
     },
     fields: [
       {

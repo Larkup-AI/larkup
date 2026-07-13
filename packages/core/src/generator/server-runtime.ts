@@ -154,7 +154,15 @@ export async function startServer(config: RagConfig, serverApiKey?: string): Pro
 
   // Install minimal deps (idempotent).
   try {
-    await execAsync("npm install --omit=dev", { cwd: dir, timeout: 240_000 })
+    await execAsync("npm install --omit=dev", {
+      cwd: dir,
+      timeout: 240_000,
+      env: {
+        ...process.env,
+        HOME: process.env.HOME || dir,
+        npm_config_cache: path.join(dir, ".npm-cache"),
+      },
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : "npm install failed"
     return writeState({ ...emptyState(port), lastError: message })
@@ -180,6 +188,10 @@ export async function startServer(config: RagConfig, serverApiKey?: string): Pro
       PORT: String(port),
       TOP_K: String(config.topK),
       SERVER_API_KEY: serverApiKey || "",
+      OPENAI_API_KEY: config.embeddingApiKey || config.chatApiKey || process.env.OPENAI_API_KEY || "",
+      ANTHROPIC_API_KEY: config.chatApiKey || config.embeddingApiKey || process.env.ANTHROPIC_API_KEY || "",
+      COHERE_API_KEY: config.embeddingApiKey || config.chatApiKey || process.env.COHERE_API_KEY || "",
+      GOOGLE_GENERATIVE_AI_API_KEY: config.embeddingApiKey || config.chatApiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY || "",
       PINECONE_API_KEY: config.storeConfig.apiKey || "",
       PINECONE_INDEX: config.storeConfig.indexName || "",
       PINECONE_NAMESPACE: config.storeConfig.namespace || "",

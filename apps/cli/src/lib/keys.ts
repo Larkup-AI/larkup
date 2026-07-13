@@ -6,8 +6,13 @@ export async function ensureApiKey(
   config: Awaited<ReturnType<typeof readConfig>>,
   keyType: "embedding" | "chat" = "embedding"
 ) {
+  const envKey = keyType === "embedding" ? process.env.OPENAI_API_KEY : (process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
   const currentKey = keyType === "embedding" ? config.embeddingApiKey : (config.chatApiKey || config.embeddingApiKey);
   
+  if (envKey && !currentKey) {
+    return; // Proceed if provided via environment
+  }
+
   if (!currentKey) {
     log.warn(`Your ${keyType} API key is not configured.`);
     const key = await p.text({

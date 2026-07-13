@@ -77,8 +77,9 @@ export async function query(vector, topK) {
 
 export async function list({ page = 1, limit = 20 } = {}) {
   const t = await table()
-  // Fetch all rows to get total count, then slice for the page
-  const allRows = await t.query().toArray()
+  // Fetch all rows to get total count, then slice for the page.
+  // We explicitly exclude the "vector" column to avoid memory bloat and Rust panics on full scans.
+  const allRows = await t.query().select(["id", "text", "title", "url", "documentId"]).toArray()
   const total = allRows.length
   const start = (page - 1) * limit
   const pageRows = allRows.slice(start, start + limit)
