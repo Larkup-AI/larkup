@@ -3,7 +3,7 @@
 
   <br />
 
-**Open-source RAG infrastructure — ingest, index, and deploy production-ready vector search APIs in minutes.**
+**Open-source Custom AI infrastructure — ingest, index, and deploy production-ready vector search APIs in minutes.**
 
 [Documentation](https://larkup.larkup.de/docs) · [GitHub Issues](https://github.com/Larkup-AI/larkup/issues)
 
@@ -11,17 +11,93 @@
 
 ---
 
-## ⚡ Getting Started
+## ⚡ Installation
 
-### Option 1: CLI (quickest)
+### Quick Install (macOS / Linux / WSL)
+
+Pick the method that fits your setup:
+
+#### Global Install — uses your system Node.js
+
+Best when you already have Node.js 18+ installed and want `larkup` available system-wide via npm.
 
 ```bash
-npx @larkup/cli init my-rag-server
-cd my-rag-server
-npx @larkup/cli dev
+curl -fsSL https://larkup.de/install.sh | bash
 ```
 
-### Option 2: Docker
+This will:
+
+1. Detect your OS and architecture
+2. Check for Node.js ≥ 18 (offers to install v20 via your package manager if missing)
+3. Install `@larkup/cli` globally with `npm install -g`
+4. Ensure the `larkup` binary is on your `PATH`
+
+#### Self-Contained Install — no root, no system Node
+
+Best for machines where you don't have root access, don't want to touch system packages, or want a clean isolated setup.
+
+```bash
+curl -fsSL https://larkup.de/install-local.sh | bash
+```
+
+This will:
+
+1. Create a self-contained directory at `~/.larkup/`
+2. Download a portable Node.js v20 binary (no system Node required)
+3. Install the CLI into the local prefix
+4. Create a wrapper script at `~/.larkup/bin/larkup`
+5. Add `~/.larkup/bin` to your `PATH`
+
+To uninstall, just remove the directory:
+
+```bash
+rm -rf ~/.larkup
+```
+
+Custom install prefix:
+
+```bash
+curl -fsSL https://larkup.de/install-local.sh | bash -s -- --prefix ~/tools/larkup
+```
+
+#### Comparing the two installers
+
+|                      | `install.sh` (Global)                                   | `install-local.sh` (Self-Contained)                          |
+| -------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
+| **Node.js**          | Uses your existing system Node (installs it if missing) | Downloads its own portable Node — nothing touches the system |
+| **Install location** | npm global directory (e.g. `/usr/local/lib/…`)          | `~/.larkup/` (or custom `--prefix`)                          |
+| **Root / sudo**      | May need sudo to install Node or npm globals            | Never needs root                                             |
+| **Uninstall**        | `npm uninstall -g @larkup/cli`                          | `rm -rf ~/.larkup`                                           |
+| **Best for**         | Dev machines with Node already set up                   | CI, Docker containers, shared servers, sandboxed setups      |
+
+Both installers support these flags:
+
+| Flag              | Description                                        |
+| ----------------- | -------------------------------------------------- |
+| `--version <ver>` | Install a specific CLI version (default: `latest`) |
+| `--no-prompt`     | Skip interactive confirmations (CI-friendly)       |
+| `--dry-run`       | Preview what would happen without making changes   |
+| `--verbose`       | Show debug output for troubleshooting              |
+
+Example — CI-friendly install with a pinned version:
+
+```bash
+curl -fsSL https://larkup.de/install.sh | bash -s -- --version 1.2.0 --no-prompt
+```
+
+### Windows (PowerShell)
+
+```powershell
+iwr -useb https://larkup.de/install.ps1 | iex
+```
+
+Or with options:
+
+```powershell
+powershell -c "& ([scriptblock]::Create((irm https://larkup.de/install.ps1))) -Version 1.2.0 -DryRun"
+```
+
+### Docker
 
 ```bash
 docker run -d -p 4567:4567 \
@@ -37,13 +113,21 @@ cd larkup
 docker-compose up -d
 ```
 
-### Option 3: From source
+### From Source
 
 ```bash
 git clone https://github.com/Larkup-AI/larkup.git
 cd larkup
 pnpm install
 pnpm dev
+```
+
+### Once installed
+
+```bash
+larkup init my-custom-ai-server
+cd my-custom-ai-server
+larkup dev
 ```
 
 ---
@@ -70,17 +154,17 @@ Kick off indexing to automatically chunk, embed, and store your documents into t
 
 <img src="./.github/assets/03-index.png" alt="Index page — run ETL jobs to process documents" width="800" />
 
-### 4. Launch your RAG server
+### 4. Launch your custom AI server
 
 Your server is ready — get a live API endpoint with built-in Scalar API docs.
 
-<img src="./.github/assets/04-server.png" alt="Server page — live RAG API endpoint" width="800" />
+<img src="./.github/assets/04-server.png" alt="Server page — live AI server API endpoint" width="800" />
 
 ### 5. Test with the built-in Chat Demo
 
 Verify retrieval quality before connecting external agents.
 
-<img src="./.github/assets/06-demo.png" alt="Demo page — chat with your RAG pipeline" width="800" />
+<img src="./.github/assets/06-demo.png" alt="Demo page — chat with your custom AI pipeline" width="800" />
 
 ### 6. Deploy to production
 
@@ -106,16 +190,16 @@ import { tool } from "ai";
 import { z } from "zod";
 import { LarkupClient } from "@larkup/sdk";
 
-const rag = new LarkupClient({
+const larkupClient = new LarkupClient({
   baseUrl: "https://your-server-url.com", // or http://localhost:8080 for local
   apiKey: "your-api-key",
 });
 
-export const ragTool = tool({
+export const larkupTool = tool({
   description: "Search the knowledge base for relevant context.",
   parameters: z.object({ query: z.string() }),
   execute: async ({ query }) => {
-    const results = await rag.query(query, 5);
+    const results = await larkupClient.query(query, 5);
     return results.hits.map((hit) => hit.text).join("\n\n");
   },
 });
@@ -160,7 +244,7 @@ const larkup = createOpenAI({
 });
 
 const { text } = await generateText({
-  model: larkup("rag-model"),
+  model: larkup("my-model"),
   prompt: "What is Larkup?",
 });
 ```
