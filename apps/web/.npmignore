@@ -1,4 +1,6 @@
-.next/
+.next/dev/
+.next/cache/
+.next/standalone/
 .larkup/
 .larkupdb/
 .turbo/
