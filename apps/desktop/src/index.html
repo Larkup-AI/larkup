@@ -10,19 +10,12 @@
 
   <!--
     ┌──────────────────────────────────────────────────────────────┐
-    │  LICENSE GATE (commented out)                                │
+    │  LICENSE GATE                                                │
     │                                                              │
-    │  TODO: Re-enable when enterprise license validation is       │
-    │  implemented. See packages/ee for the planned RBAC/SSO       │
-    │  features that will require a license key.                   │
-    │                                                              │
-    │  To re-enable:                                               │
-    │  1. Uncomment the #license-gate div below                    │
-    │  2. Uncomment the license logic in main.js                   │
-    │  3. Connect to the license API at api.larkup.de/license      │
+    │  Enterprise license validation. See packages/ee for the      │
+    │  planned RBAC/SSO features that will require a license key.  │
     └──────────────────────────────────────────────────────────────┘
   -->
-  <!--
   <div id="license-gate" class="screen" style="display: none;">
     <div class="card">
       <div class="logo-area">
@@ -44,7 +37,6 @@
       <p class="hint">Contact <strong>sales@larkup.de</strong> if you need a key.</p>
     </div>
   </div>
-  -->
 
   <!-- Loading Splash -->
   <div id="splash" class="screen">
@@ -54,8 +46,11 @@
         <h1>Larkup</h1>
       </div>
       <p class="subtitle">Starting Larkup Studio...</p>
-      <div class="spinner"></div>
+      <div id="spinner" class="spinner"></div>
       <p id="status-text" class="status">Waiting for the server to boot</p>
+      <div id="retry-container" style="display: none; margin-top: 20px;">
+        <button id="retry-btn" class="action-btn">Retry Connection</button>
+      </div>
     </div>
   </div>
 

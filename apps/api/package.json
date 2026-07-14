@@ -1,0 +1,12 @@
+{
+  "name": "@larkup/api",
+  "type": "module",
+  "dependencies": {
+    "hono": "^4.12.30"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.5"
+  }
+}
