@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./apps/web/public/logo-light.png" alt="Larkup Logo" width="400" />
+  <img src="./apps/web/public/logo-light2.png" alt="Larkup Logo" width="400" />
 
   <br />
 
@@ -169,13 +169,13 @@ const { text } = await generateText({
 
 ## 🏗️ Architecture
 
-| Package | Description |
-|---|---|
-| `apps/web` | Web UI & API server — configure pipelines, ingest data, deploy |
-| `apps/cli` | CLI to init, index, and query pipelines from the terminal |
-| `apps/sdk/js-sdk` | TypeScript/JS SDK (`@larkup/sdk`) |
-| `apps/sdk/py-sdk` | Python SDK (`larkup`) |
-| `apps/docs` | Documentation site (Mintlify) |
+| Package           | Description                                                    |
+| ----------------- | -------------------------------------------------------------- |
+| `apps/web`        | Web UI & API server — configure pipelines, ingest data, deploy |
+| `apps/cli`        | CLI to init, index, and query pipelines from the terminal      |
+| `apps/sdk/js-sdk` | TypeScript/JS SDK (`@larkup/sdk`)                              |
+| `apps/sdk/py-sdk` | Python SDK (`larkup`)                                          |
+| `apps/docs`       | Documentation site (Mintlify)                                  |
 
 ## 📚 Documentation
 
