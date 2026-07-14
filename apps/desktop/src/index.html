@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Larkup</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!--
+    ┌──────────────────────────────────────────────────────────────┐
+    │  LICENSE GATE (commented out)                                │
+    │                                                              │
+    │  TODO: Re-enable when enterprise license validation is       │
+    │  implemented. See packages/ee for the planned RBAC/SSO       │
+    │  features that will require a license key.                   │
+    │                                                              │
+    │  To re-enable:                                               │
+    │  1. Uncomment the #license-gate div below                    │
+    │  2. Uncomment the license logic in main.js                   │
+    │  3. Connect to the license API at api.larkup.de/license      │
+    └──────────────────────────────────────────────────────────────┘
+  -->
+  <!--
+  <div id="license-gate" class="screen" style="display: none;">
+    <div class="card">
+      <div class="logo-area">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <rect width="48" height="48" rx="12" fill="#6366f1"/>
+          <path d="M14 34V14h6v14h8V14h6v20H14z" fill="white"/>
+        </svg>
+        <h1>Larkup</h1>
+      </div>
+      <p class="subtitle">Enter your enterprise license key to get started.</p>
+      <div class="input-group">
+        <input
+          type="text"
+          id="license-input"
+          placeholder="XXXX-XXXX-XXXX-XXXX"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <button id="activate-btn">Activate</button>
+      </div>
+      <p id="license-error" class="error" style="display: none;"></p>
+      <p class="hint">Contact <strong>sales@larkup.de</strong> if you need a key.</p>
+    </div>
+  </div>
+  -->
+
+  <!-- Loading Splash -->
+  <div id="splash" class="screen">
+    <div class="card">
+      <div class="logo-area">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <rect width="48" height="48" rx="12" fill="#6366f1"/>
+          <path d="M14 34V14h6v14h8V14h6v20H14z" fill="white"/>
+        </svg>
+        <h1>Larkup</h1>
+      </div>
+      <p class="subtitle">Starting Larkup Studio...</p>
+      <div class="spinner"></div>
+      <p id="status-text" class="status">Waiting for the server to boot</p>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

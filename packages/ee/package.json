@@ -1,0 +1,6 @@
+{
+  "name": "@larkup/ee",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise features placeholder (RBAC, SSO, etc)"
+}
