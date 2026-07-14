@@ -8,8 +8,8 @@
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background: #09090b;
-  color: #fafafa;
+  background: #fafafa;
+  color: #09090b;
   height: 100vh;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -48,7 +48,7 @@ body {
 }
 
 .subtitle {
-  color: #a1a1aa;
+  color: #52525b;
   font-size: 14px;
   margin-bottom: 32px;
   line-height: 1.5;
@@ -63,11 +63,11 @@ body {
 
 .input-group input {
   flex: 1;
-  background: #18181b;
-  border: 1px solid #27272a;
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
   border-radius: 8px;
   padding: 10px 14px;
-  color: #fafafa;
+  color: #09090b;
   font-family: 'Inter', monospace;
   font-size: 14px;
   outline: none;
@@ -75,15 +75,15 @@ body {
 }
 
 .input-group input:focus {
-  border-color: #6366f1;
+  border-color: #09090b;
 }
 
 .input-group input::placeholder {
-  color: #52525b;
+  color: #a1a1aa;
 }
 
 .input-group button {
-  background: #6366f1;
+  background: #09090b;
   color: white;
   border: none;
   border-radius: 8px;
@@ -96,11 +96,11 @@ body {
 }
 
 .input-group button:hover {
-  background: #4f46e5;
+  background: #27272a;
 }
 
 .input-group button:active {
-  background: #4338ca;
+  background: #3f3f46;
 }
 
 .error {
@@ -110,21 +110,21 @@ body {
 }
 
 .hint {
-  color: #52525b;
+  color: #71717a;
   font-size: 12px;
   margin-top: 16px;
 }
 
 .hint strong {
-  color: #71717a;
+  color: #09090b;
 }
 
 /* Spinner */
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #27272a;
-  border-top-color: #6366f1;
+  border: 3px solid #e4e4e7;
+  border-top-color: #09090b;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin: 0 auto 16px;
@@ -135,7 +135,7 @@ body {
 }
 
 .status {
-  color: #71717a;
+  color: #52525b;
   font-size: 13px;
 }
 
@@ -147,9 +147,9 @@ body {
 
 /* Action Button */
 .action-btn {
-  background: #27272a;
-  color: white;
-  border: 1px solid #3f3f46;
+  background: #ffffff;
+  color: #09090b;
+  border: 1px solid #e4e4e7;
   border-radius: 8px;
   padding: 8px 16px;
   font-size: 13px;
@@ -159,9 +159,9 @@ body {
 }
 
 .action-btn:hover {
-  background: #3f3f46;
+  background: #f4f4f5;
 }
 
 .action-btn:active {
-  background: #52525b;
+  background: #e4e4e7;
 }
