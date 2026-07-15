@@ -27,7 +27,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://larkup.de"
 Documentation = "https://larkup.de/docs"
-Repository = "https://github.com/BuddyHere-AI/buddy-rag"
+Repository = "https://github.com/Larkup-AI/larkup-rag"
 
 [build-system]
 requires = ["uv_build>=0.11.14,<0.12.0"]

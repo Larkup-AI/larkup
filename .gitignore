@@ -51,3 +51,12 @@ playwright-report
 .env.e2e
 hpi-connect.txt
 apps/web/webui.log
+
+# Hidden agent guides (internal only)
+.agents/
+
+# Desktop app sidecar binaries
+apps/desktop/src-tauri/binaries/
+apps/desktop/src-tauri/target/
+apps/api
+TODO.md

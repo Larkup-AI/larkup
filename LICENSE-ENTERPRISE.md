@@ -1,19 +1,9 @@
-# Larkup Enterprise License
+# Enterprise License
 
-Larkup offers an Enterprise License for organizations that need advanced features, support, and guarantees.
+The files in the `ee/` (Enterprise Edition) directory are proprietary and commercial software.
 
-## What's included in the Enterprise Edition (`packages/ee/`)?
-- **Role-Based Access Control (RBAC)**
-- **Single Sign-On (SSO/SAML)**
-- **Audit Logging & Compliance**
-- **Advanced Analytics & Observability**
-- **Priority Support & SLAs**
+Copyright (c) 2026 Larkup UG. All rights reserved.
 
-## Contact Sales
-To purchase an enterprise license key, please contact us at:
-**sales@larkup.de**
+These features are NOT open source. Use, modification, or distribution of the code within this directory requires a valid commercial license from Larkup UG.
 
-Once purchased, the license key (`XXXX-XXXX-XXXX-XXXX`) can be used to unlock enterprise features within your Larkup deployment.
-
----
-*Note: The community edition of Larkup remains fully open-source under the MIT License.*
+For inquiries regarding commercial licensing, please contact sales@larkup.de.

@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { AsyncLocalStorage } from "node:async_hooks"
+import net from "node:net"
 import { DEFAULT_CONFIG, type RagConfig } from "./types"
 
 /**
@@ -229,9 +230,24 @@ export async function requireDataDir(): Promise<string> {
 
 /* -------------------------------- mutations ------------------------------ */
 
-function nextPort(ws: Workspace) {
+async function isPortFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer()
+    server.once("error", () => resolve(false))
+    server.once("listening", () => {
+      server.close(() => resolve(true))
+    })
+    server.listen(port, "127.0.0.1")
+  })
+}
+
+async function nextPort(ws: Workspace) {
   const ports = ws.servers.map((s) => s.port)
-  return Math.max(BASE_PORT - 1, ...ports) + 1
+  let candidate = Math.max(BASE_PORT - 1, ...ports) + 1
+  while (!(await isPortFree(candidate))) {
+    candidate++
+  }
+  return candidate
 }
 
 function defaultConfigFor(id: string, name: string): RagConfig {
@@ -258,7 +274,7 @@ export function createServer(
     const meta: ServerMeta = {
       id,
       name: name.trim() || "Untitled server",
-      port: nextPort(ws),
+      port: await nextPort(ws),
       createdAt: now,
       updatedAt: now,
     }

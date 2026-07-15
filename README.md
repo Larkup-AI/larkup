@@ -271,4 +271,9 @@ We welcome contributions! Open an [issue](https://github.com/Larkup-AI/larkup/is
 
 ## 📄 License
 
-[MIT](./LICENSE) — Copyright (c) 2024-2026 Larkup UG
+Larkup operates on an **Open Core** licensing model.
+
+- **Community Edition**: The core framework is fully open source and self-hostable, licensed under the [Apache License 2.0](./LICENSE).
+- **Enterprise Edition**: Advanced features in the `ee/` directory are proprietary, closed-source, and require a valid commercial license. See [LICENSE-ENTERPRISE.md](./LICENSE-ENTERPRISE.md) for details.
+
+Copyright (c) 2024-2026 Larkup UG

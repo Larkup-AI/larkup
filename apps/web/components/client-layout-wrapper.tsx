@@ -89,17 +89,36 @@ export function ClientLayoutWrapper({
   if (mode === "simple") {
     // TopNav layout for simple mode
     if (layout === "topnav") {
+      const isGlobalScroll = !isChatPage;
+      const topnavContainerClasses = pageStyle === "fused"
+        ? cn(isGlobalScroll ? "min-h-[calc(100vh-8rem)]" : "h-[calc(100vh-8rem)] overflow-hidden", "bg-background text-foreground")
+        : cn(isGlobalScroll ? "min-h-[calc(100vh-8rem)]" : "h-[calc(100vh-8rem)] overflow-hidden", "rounded-2xl border border-border bg-panel text-panel-foreground");
+
       return (
-        <div className="flex h-screen flex-col overflow-hidden">
+        <div className={cn("flex flex-col", isGlobalScroll ? "min-h-screen" : "h-screen overflow-hidden")}>
           <AppTopNav />
           <main
-            className={cn("flex-1 min-h-0 overflow-hidden p-4 md:p-6 lg:p-8")}
+            className={cn("flex-1", isGlobalScroll ? "p-4 md:p-6 lg:p-8" : "min-h-0 overflow-hidden p-4 md:p-6 lg:p-8")}
           >
             <div
-              className={cn(containerClasses, "container mx-auto flex flex-col")}
+              className={cn(topnavContainerClasses, "container mx-auto flex flex-col")}
               style={panelStyle}
             >
-              {children}
+              <div
+                className={cn(
+                  "flex-1",
+                  !isGlobalScroll ? "overflow-hidden flex flex-col min-h-0" : "pt-4",
+                )}
+              >
+                <div
+                  className={cn(
+                    "h-full w-full",
+                    !isGlobalScroll ? "flex-1 min-h-0 flex flex-col" : "pb-8",
+                  )}
+                >
+                  {children}
+                </div>
+              </div>
             </div>
           </main>
         </div>
@@ -136,17 +155,36 @@ export function ClientLayoutWrapper({
 
   // ── Tech mode layout (existing) ────────────────────────────────────
   if (layout === "topnav") {
+    const isGlobalScroll = !isChatPage;
+    const topnavContainerClasses = pageStyle === "fused"
+      ? cn(isGlobalScroll ? "min-h-[calc(100vh-8rem)]" : "h-[calc(100vh-8rem)] overflow-hidden", "bg-background text-foreground")
+      : cn(isGlobalScroll ? "min-h-[calc(100vh-8rem)]" : "h-[calc(100vh-8rem)] overflow-hidden", "rounded-2xl border border-border bg-panel text-panel-foreground");
+
     return (
-      <div className="flex h-screen flex-col overflow-hidden">
+      <div className={cn("flex flex-col", isGlobalScroll ? "min-h-screen" : "h-screen overflow-hidden")}>
         <AppTopNav />
         <main
-          className={cn("flex-1 min-h-0 overflow-hidden p-4 md:p-6 lg:p-8")}
+          className={cn("flex-1", isGlobalScroll ? "p-4 md:p-6 lg:p-8" : "min-h-0 overflow-hidden p-4 md:p-6 lg:p-8")}
         >
           <div
-            className={cn(containerClasses, "container mx-auto flex flex-col")}
+            className={cn(topnavContainerClasses, "container mx-auto flex flex-col")}
             style={panelStyle}
           >
-            {children}
+            <div
+              className={cn(
+                "flex-1",
+                !isGlobalScroll ? "overflow-hidden flex flex-col min-h-0" : "pt-4",
+              )}
+            >
+              <div
+                className={cn(
+                  "h-full w-full",
+                  !isGlobalScroll ? "flex-1 min-h-0 flex flex-col" : "pb-8",
+                )}
+              >
+                {children}
+              </div>
+            </div>
           </div>
         </main>
       </div>
