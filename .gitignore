@@ -61,4 +61,5 @@ apps/desktop/src-tauri/target/
 apps/api
 TODO.md
 keys.txt
+apps/e2e/keys.txt
 .vercel
