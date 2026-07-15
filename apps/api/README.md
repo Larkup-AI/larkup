@@ -26,3 +26,7 @@ To deploy:
 npm install
 vc deploy
 ```
+
+# TODO::
+
+Migrate API from apps/web here

@@ -30,6 +30,35 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
+  const defaultEmbeddingModels: Record<string, string> = {
+    openai: "openai/text-embedding-3-small",
+    google: "google/gemini-embedding-2",
+    cohere: "cohere/embed-english-v3.0",
+    mistral: "mistral/mistral-embed",
+    vercel_ai_gateway: "openai/text-embedding-3-small",
+  };
+
+  const resolvedEmbeddingProvider =
+    body.embeddingProvider === "vercel_ai_gateway"
+      ? "vercel_ai_gateway"
+      : body.embeddingProvider;
+
+  if (
+    body.embeddingModelId &&
+    resolvedEmbeddingProvider !== "vercel_ai_gateway" &&
+    resolvedEmbeddingProvider !== "custom"
+  ) {
+    const modelInfo =
+      getEmbeddingModel(body.embeddingModelId) ||
+      getEmbeddingModel(`${resolvedEmbeddingProvider}/${body.embeddingModelId}`);
+      
+    if (!modelInfo || modelInfo.provider !== resolvedEmbeddingProvider) {
+      body.embeddingModelId =
+        defaultEmbeddingModels[resolvedEmbeddingProvider] ||
+        defaultEmbeddingModels["openai"];
+    }
+  }
+
   // Validate the embedding model exists.
   const isCustom = body.embeddingModelId.startsWith("custom:")
   if (!isCustom && !getEmbeddingModel(body.embeddingModelId)) {

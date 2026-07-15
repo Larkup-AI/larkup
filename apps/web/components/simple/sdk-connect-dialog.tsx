@@ -170,9 +170,9 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
               )}
             </button>
           </div>
-          <CodeViewer 
-            value={currentSnippet} 
-            language={activeTab === "python" ? "python" : "javascript"} 
+          <CodeViewer
+            value={currentSnippet}
+            language={activeTab === "python" ? "python" : "javascript"}
             height="auto"
           />
         </div>
@@ -186,7 +186,7 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
             </code>
           </span>
           <a
-            href="https://docs.larkup.dev/sdk/overview"
+            href="https://www.larkup.de/sdk/overview"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-primary hover:underline"

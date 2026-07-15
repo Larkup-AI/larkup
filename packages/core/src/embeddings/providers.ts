@@ -42,7 +42,7 @@ export function getAIModel(config: RagConfig): any {
     const google = createGoogleGenerativeAI({
       apiKey: config.embeddingApiKey || undefined,
     });
-    return google.embedding(modelName);
+    return google.textEmbeddingModel(modelName);
   }
 
   if (config.embeddingProvider === "cohere") {

@@ -80,11 +80,11 @@ export interface VectorStoreDescriptor {
 
 export type EmbeddingProvider = "openai" | "google" | "cohere" | "voyage" | "mistral" | "jina" | "nomic" | "custom" | "vercel_ai_gateway" | "deepseek"
 
-export interface CustomEmbeddingConfig {
+export interface CustomModelConfig {
   baseUrl: string
   apiKey?: string
   modelName: string
-  dimensions: number
+  dimensions?: number
 }
 
 export interface EmbeddingModelDescriptor {
@@ -123,7 +123,7 @@ export interface RagConfig {
   embeddingProvider: string
   embeddingApiKey?: string
   embeddingModelId: string
-  customEmbeddings?: CustomEmbeddingConfig[]
+  customEmbeddings?: CustomModelConfig[]
   indexType: IndexType
   chunking: ChunkingParams
   vectorStore: VectorStoreId
@@ -135,6 +135,7 @@ export interface RagConfig {
   chatModelId?: string;
   chatProvider?: string;
   chatApiKey?: string;
+  customChatModels?: CustomModelConfig[];
   chatSuggestions?: string[];
   systemPrompt?: string;
   serperApiKey?: string;
@@ -292,7 +293,7 @@ export interface IndexRun {
 /* Pipeline stages (drive the sidebar nav + gating)                    */
 /* ------------------------------------------------------------------ */
 
-export type StageId = "configure" | "data" | "index" | "server" | "demo" | "chat"
+export type StageId = "configure" | "data" | "server" | "demo" | "chat"
 
 export interface StageMeta {
   id: StageId

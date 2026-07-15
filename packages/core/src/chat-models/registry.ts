@@ -1,173 +1,63 @@
-import type { EmbeddingProvider } from "../types";
+import type { GatewayModel } from "../models-cache"
 
-/**
- * A selectable chat/LLM model. Grouped by the same provider IDs used
- * for embeddings so we can auto-select a default based on the user's
- * chosen embedding provider.
- */
 export interface ChatModelDescriptor {
-  /** AI SDK model string, e.g. "openai/gpt-4o-mini" */
-  id: string;
-  label: string;
-  provider: EmbeddingProvider;
-  /** Whether this is the default (cheapest) model for its provider */
-  isDefault?: boolean;
-  description: string;
+  id: string
+  name: string
+  provider: string
+  context_window?: number
+  max_tokens?: number
+  tags?: string[]
+  description?: string
 }
 
-export const CHAT_MODELS: ChatModelDescriptor[] = [
-  // ── OpenAI ──────────────────────────────────────────────────────────
-  {
-    id: "openai/gpt-4o-mini",
-    label: "GPT-4o Mini",
-    provider: "openai",
-    isDefault: true,
-    description: "Fast and affordable. Great for most chat use cases.",
-  },
-  {
-    id: "openai/gpt-4o",
-    label: "GPT-4o",
-    provider: "openai",
-    description: "Most capable OpenAI model. Higher cost.",
-  },
-  {
-    id: "openai/gpt-4.1-mini",
-    label: "GPT-4.1 Mini",
-    provider: "openai",
-    description: "Latest mini model with improved instruction following.",
-  },
-  {
-    id: "openai/gpt-4.1-nano",
-    label: "GPT-4.1 Nano",
-    provider: "openai",
-    description: "Smallest and fastest GPT-4.1 variant.",
-  },
+/** Convert a GatewayModel to a ChatModelDescriptor */
+export function toChatDescriptor(m: GatewayModel): ChatModelDescriptor {
+  return {
+    id: m.id,
+    name: m.name,
+    provider: m.owned_by,
+    context_window: m.context_window,
+    max_tokens: m.max_tokens,
+    tags: m.tags,
+    description: m.description,
+  }
+}
 
-  // ── Google ──────────────────────────────────────────────────────────
-  {
-    id: "google/gemini-2.0-flash",
-    label: "Gemini 2.0 Flash",
-    provider: "google",
-    isDefault: true,
-    description: "Fast, affordable Gemini model. Great default.",
-  },
-  {
-    id: "google/gemini-2.5-flash",
-    label: "Gemini 2.5 Flash",
-    provider: "google",
-    description: "Latest Gemini flash with improved reasoning.",
-  },
-  {
-    id: "google/gemini-2.5-pro",
-    label: "Gemini 2.5 Pro",
-    provider: "google",
-    description: "Most capable Gemini model.",
-  },
-
-  // ── Cohere ──────────────────────────────────────────────────────────
-  {
-    id: "cohere/command-r",
-    label: "Command R",
-    provider: "cohere",
-    isDefault: true,
-    description: "Optimized for RAG and tool use.",
-  },
-  {
-    id: "cohere/command-r-plus",
-    label: "Command R+",
-    provider: "cohere",
-    description: "Most capable Cohere model for complex tasks.",
-  },
-
-  // ── Mistral ─────────────────────────────────────────────────────────
-  {
-    id: "mistral/mistral-small-latest",
-    label: "Mistral Small",
-    provider: "mistral",
-    isDefault: true,
-    description: "Fast and efficient. Good for most tasks.",
-  },
-  {
-    id: "mistral/mistral-large-latest",
-    label: "Mistral Large",
-    provider: "mistral",
-    description: "Mistral's most capable model.",
-  },
-
-  // ── DeepSeek ────────────────────────────────────────────────────────
-  {
-    id: "deepseek/deepseek-chat",
-    label: "DeepSeek Chat",
-    provider: "deepseek",
-    isDefault: true,
-    description: "DeepSeek's primary chat model.",
-  },
-
-  // ── Vercel AI Gateway ───────────────────────────────────────────────
-  {
-    id: "openai/gpt-4o-mini",
-    label: "GPT-4o Mini (via Gateway)",
-    provider: "vercel_ai_gateway",
-    isDefault: true,
-    description: "OpenAI GPT-4o Mini routed through Vercel AI Gateway.",
-  },
-  {
-    id: "openai/gpt-4o",
-    label: "GPT-4o (via Gateway)",
-    provider: "vercel_ai_gateway",
-    description: "OpenAI GPT-4o routed through Vercel AI Gateway.",
-  },
-  {
-    id: "google/gemini-2.0-flash",
-    label: "Gemini 2.0 Flash (via Gateway)",
-    provider: "vercel_ai_gateway",
-    description: "Google Gemini routed through Vercel AI Gateway.",
-  },
-  {
-    id: "cohere/command-r-plus",
-    label: "Command R+ (via Gateway)",
-    provider: "vercel_ai_gateway",
-    description: "Cohere Command R+ routed through Vercel AI Gateway.",
-  },
-  {
-    id: "mistral/mistral-large-latest",
-    label: "Mistral Large (via Gateway)",
-    provider: "vercel_ai_gateway",
-    description: "Mistral Large routed through Vercel AI Gateway.",
-  },
-  {
-    id: "anthropic/claude-3-5-sonnet-20240620",
-    label: "Claude 3.5 Sonnet (via Gateway)",
-    provider: "vercel_ai_gateway",
-    description: "Anthropic Claude 3.5 Sonnet via Vercel AI Gateway.",
-  },
-  {
-    id: "anthropic/claude-3-haiku-20240307",
-    label: "Claude 3 Haiku (via Gateway)",
-    provider: "vercel_ai_gateway",
-    description: "Anthropic Claude 3 Haiku via Vercel AI Gateway.",
-  },
-];
-
-
-/** Get all chat models for a given embedding provider. */
+/** Filter chat models for a provider from a dynamic list. */
 export function getChatModelsForProvider(
+  models: ChatModelDescriptor[],
   provider: string,
 ): ChatModelDescriptor[] {
-  return CHAT_MODELS.filter((m) => m.provider === provider);
+  if (provider === "vercel_ai_gateway") return models
+  return models.filter((m) => m.provider?.toLowerCase() === provider.toLowerCase())
 }
 
-/** Get the default (cheapest) chat model for a provider. */
+/** Pick a sensible default model for a provider. */
 export function getDefaultChatModel(
+  models: ChatModelDescriptor[],
   provider: string,
 ): ChatModelDescriptor | undefined {
-  return (
-    CHAT_MODELS.find((m) => m.provider === provider && m.isDefault) ??
-    CHAT_MODELS.find((m) => m.provider === provider)
-  );
+  const forProvider = getChatModelsForProvider(models, provider)
+  // Prefer known good defaults
+  const defaults: Record<string, string> = {
+    openai: "openai/gpt-4o-mini",
+    anthropic: "anthropic/claude-sonnet-4",
+    google: "google/gemini-2.0-flash",
+    mistral: "mistral/mistral-small-latest",
+    deepseek: "deepseek/deepseek-chat",
+    cohere: "cohere/command-r",
+    meta: "meta/llama-4-maverick",
+    xai: "xai/grok-3-mini",
+    vercel_ai_gateway: "openai/gpt-4o-mini",
+  }
+  const defaultId = defaults[provider]
+  return forProvider.find((m) => m.id === defaultId) ?? forProvider[0]
 }
 
-/** Find a specific chat model by id. */
-export function getChatModel(id: string): ChatModelDescriptor | undefined {
-  return CHAT_MODELS.find((m) => m.id === id);
+/** Find a specific model by id. */
+export function getChatModel(
+  models: ChatModelDescriptor[],
+  id: string,
+): ChatModelDescriptor | undefined {
+  return models.find((m) => m.id === id)
 }

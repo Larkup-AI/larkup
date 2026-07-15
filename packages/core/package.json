@@ -20,7 +20,8 @@
     "./indexing/chunker": "./src/indexing/chunker.ts",
     "./generator/generate-server": "./src/generator/generate-server.ts",
     "./generator/server-runtime": "./src/generator/server-runtime.ts",
-    "./chat-models/registry": "./src/chat-models/registry.ts"
+    "./chat-models/registry": "./src/chat-models/registry.ts",
+    "./models-cache": "./src/models-cache.ts"
   },
   "dependencies": {
     "@ai-sdk/cohere": "^3.0.39",

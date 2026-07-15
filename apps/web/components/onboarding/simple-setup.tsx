@@ -46,7 +46,7 @@ const CLOUD_PROVIDERS: { key: EmbeddingProvider; recommended?: boolean }[] = [
 const DEFAULT_EMBEDDING_MODEL: Partial<Record<EmbeddingProvider, string>> = {
   openai: "openai/text-embedding-3-large",
   vercel_ai_gateway: "openai/text-embedding-3-large",
-  google: "google/text-embedding-004",
+  google: "google/gemini-embedding-001",
   mistral: "mistral/mistral-embed",
   voyage: "voyage/voyage-3",
   jina: "jina/jina-embeddings-v3",

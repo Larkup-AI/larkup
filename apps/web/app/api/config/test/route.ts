@@ -42,16 +42,17 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
-    dimensions = found.dimensions
+    dimensions = found.dimensions ?? 1536
   } else {
-    const embeddingModel = await import("@larkup/core/embeddings/registry").then(m => m.getEmbeddingModel(body.embeddingModelId))
-    if (!embeddingModel) {
-      return NextResponse.json(
-        { error: `Unknown embedding model: ${body.embeddingModelId}` },
-        { status: 400 },
-      )
+    const { getEmbeddingModel, EMBEDDING_DIMENSIONS } = await import("@larkup/core/embeddings/registry")
+    const embeddingModel = getEmbeddingModel(body.embeddingModelId)
+    if (embeddingModel) {
+      dimensions = embeddingModel.dimensions
+    } else {
+      // For dynamic models from gateway not in hardcoded registry, use known dimensions or fallback
+      const known = EMBEDDING_DIMENSIONS[body.embeddingModelId]
+      dimensions = known?.dimensions ?? 768
     }
-    dimensions = embeddingModel.dimensions
   }
 
   try {

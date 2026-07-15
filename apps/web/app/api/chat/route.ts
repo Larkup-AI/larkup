@@ -12,17 +12,18 @@ import { refreshServerStatus } from "@larkup/core/generator/server-runtime";
 import { createAdapter } from "@larkup/vector-stores/factory";
 import { embedQuery } from "@larkup/core/indexing/embedder";
 import { runWithServer } from "@larkup/core/workspace";
-import {
-  getDefaultChatModel,
-  getChatModel,
-} from "@larkup/core/chat-models/registry";
+import { getModelsByType } from "@larkup/core/models-cache";
+import { toChatDescriptor, getDefaultChatModel } from "@larkup/core/chat-models/registry";
 
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createCohere } from "@ai-sdk/cohere";
 import { createMistral } from "@ai-sdk/mistral";
 import { createDeepSeek } from "@ai-sdk/deepseek";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGateway } from "@ai-sdk/gateway";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import type { CustomModelConfig } from "@larkup/core/types";
 
 export const maxDuration = 60;
 
@@ -44,26 +45,43 @@ Guidelines:
 /**
  * Creates an AI SDK language model instance based on the provider and model ID.
  */
-function createChatModel(provider: string, modelId: string, apiKey?: string) {
+function createChatModel(provider: string, modelId: string, apiKey?: string, customChatModels?: CustomModelConfig[]) {
+  if (modelId.startsWith("custom:")) {
+    const customName = modelId.slice("custom:".length);
+    const custom = (customChatModels ?? []).find(
+      (m) => m.modelName === customName,
+    );
+    if (custom) {
+      const customProvider = createOpenAICompatible({
+        name: "custom_chat_provider",
+        baseURL: custom.baseUrl,
+        apiKey: custom.apiKey || apiKey || undefined,
+      });
+      return customProvider(custom.modelName);
+    }
+  }
+
   const modelName = modelId.includes("/")
     ? modelId.split("/").slice(1).join("/")
     : modelId;
-  const key = apiKey;
 
   switch (provider) {
     case "google":
-      return createGoogleGenerativeAI({ apiKey: key })(modelName);
+      return createGoogleGenerativeAI({ apiKey })(modelName);
     case "cohere":
-      return createCohere({ apiKey: key })(modelName);
+      return createCohere({ apiKey })(modelName);
     case "mistral":
-      return createMistral({ apiKey: key })(modelName);
+      return createMistral({ apiKey })(modelName);
     case "deepseek":
-      return createDeepSeek({ apiKey: key })(modelName);
-    case "vercel_ai_gateway":
-      return createGateway({ apiKey: key })(modelId);
+      return createDeepSeek({ apiKey })(modelName);
+    case "anthropic":
+      return createAnthropic({ apiKey })(modelName);
     case "openai":
+      return createOpenAI({ apiKey })(modelName);
+    case "vercel_ai_gateway":
     default:
-      return createOpenAI({ apiKey: key })(modelName);
+      // For gateway or any unknown provider, route through the gateway
+      return createGateway({ apiKey })(modelId);
   }
 }
 
@@ -144,22 +162,24 @@ export async function POST(req: Request) {
   const config = await readConfig();
   const provider = config.chatProvider || config.embeddingProvider;
 
-  // Resolve chat model: explicit request > config > default for provider
+  // Fetch dynamic models to resolve defaults
+  const gatewayModels = await getModelsByType("language");
+  const allChatModels = gatewayModels.map(toChatDescriptor);
+
   const chatModelId =
     requestedModelId ||
     config.chatModelId ||
-    getDefaultChatModel(provider)?.id ||
+    getDefaultChatModel(allChatModels, provider)?.id ||
     "openai/gpt-4o-mini";
 
-  const chatModelDescriptor = getChatModel(chatModelId);
+  // For gateway mode, always route through gateway. Otherwise use the model's own provider.
+  const modelProvider = chatModelId.split("/")[0];
   const resolvedProvider =
-    provider === "vercel_ai_gateway"
-      ? "vercel_ai_gateway"
-      : chatModelDescriptor?.provider || provider;
+    provider === "vercel_ai_gateway" ? "vercel_ai_gateway" : modelProvider || provider;
 
   const apiKey = config.chatApiKey || config.embeddingApiKey || undefined;
   console.log("Using API Key for chat:", apiKey ? `${apiKey.substring(0, 10)}...` : "NONE", "Provider:", resolvedProvider);
-  const model = createChatModel(resolvedProvider, chatModelId, apiKey);
+  const model = createChatModel(resolvedProvider, chatModelId, apiKey, config.customChatModels) as any;
 
   const result = streamText({
     model,

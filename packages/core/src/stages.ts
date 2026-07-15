@@ -20,34 +20,27 @@ export const STAGES: StageMeta[] = [
     phase: 2,
   },
   {
-    id: "index",
-    label: "Index",
-    href: "/index-data",
-    description: "Chunk, embed, and store into your selected vector store.",
-    phase: 3,
-  },
-  {
     id: "server",
     label: "Server",
     href: "/server",
     description: "Generate and launch a lightweight, deployable RAG server.",
-    phase: 4,
+    phase: 3,
   },
   {
     id: "demo",
     label: "Test",
     href: "/demo",
     description: "Send a test query and inspect the top-k retrieved documents.",
-    phase: 5,
+    phase: 4,
   },
   {
     id: "chat",
     label: "Chat",
     href: "/chat",
     description: "Chat with your knowledge base using an AI assistant.",
-    phase: 6,
+    phase: 5,
   },
 ]
 
 /** The phase currently shipped. Stages above this render as "coming soon". */
-export const CURRENT_PHASE = 6
+export const CURRENT_PHASE = 5

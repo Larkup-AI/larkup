@@ -27,7 +27,7 @@ export async function readConfig(): Promise<RagConfig> {
     let migratedEmbeddingId = parsed.embeddingModelId
 
     if (parsed.customEmbedding && !migratedEmbeddings?.length) {
-      const legacy = parsed.customEmbedding as import("./types").CustomEmbeddingConfig
+      const legacy = parsed.customEmbedding as import("./types").CustomModelConfig
       migratedEmbeddings = [legacy]
       // If the saved id was the old flat "custom", point to the named variant.
       if (migratedEmbeddingId === "custom") {

@@ -67,7 +67,7 @@ import {
   type RagConfig,
   type VectorStoreId,
   type EmbeddingProvider,
-  type CustomEmbeddingConfig,
+  type CustomModelConfig,
 } from "@larkup/core/types";
 import {
   EMBEDDING_MODELS,
@@ -81,6 +81,7 @@ import {
 import { StoreFields } from "@/components/configure/store-fields";
 import { useRouter } from "next/navigation";
 import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
+import { CustomModelModal } from "./custom-model-modal";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
@@ -1194,7 +1195,8 @@ export function ConfigureForm({
         }}
       />
 
-      <CustomEmbeddingModal
+      <CustomModelModal
+        type="embedding"
         open={customModalOpen}
         onOpenChange={setCustomModalOpen}
         onSave={async (cfg) => {
@@ -1532,152 +1534,4 @@ export function ConfigureForm({
   );
 }
 
-function CustomEmbeddingModal({
-  open,
-  onOpenChange,
-  onSave,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave: (config: CustomEmbeddingConfig) => void;
-}) {
-  const [baseUrl, setBaseUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [modelName, setModelName] = useState("");
-  const [dimensions, setDimensions] = useState<number | null>(null);
-  const [testing, setTesting] = useState(false);
 
-  // Reset form every time the modal opens so users always start fresh.
-  useEffect(() => {
-    if (open) {
-      setBaseUrl("");
-      setApiKey("");
-      setModelName("");
-      setDimensions(null);
-      setShowApiKey(false);
-    }
-  }, [open]);
-
-  const handleTest = async () => {
-    if (!baseUrl || !modelName) {
-      toast.error("Base URL and Model Name are required");
-      return;
-    }
-    setTesting(true);
-    try {
-      const res = await fetch("/api/config/test-embedding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl, apiKey, modelName }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Connection failed");
-
-      setDimensions(data.dimensions);
-      toast.success(`Success! Detected ${data.dimensions} dimensions.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Test failed");
-      setDimensions(null);
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const handleSave = () => {
-    if (!baseUrl || !modelName || !dimensions) {
-      toast.error("Please test the connection to fetch dimensions first.");
-      return;
-    }
-    onSave({ baseUrl, apiKey, modelName, dimensions });
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={"max-w-xl "}>
-        <DialogHeader>
-          <DialogTitle>Custom Embedding Model</DialogTitle>
-          <DialogDescription>
-            Connect an OpenAI-compatible embedding model.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="baseUrl">Base URL</Label>
-            <Input
-              id="baseUrl"
-              placeholder="https://api.example.com/v1"
-              value={baseUrl}
-              onChange={(e) => {
-                setBaseUrl(e.target.value);
-                setDimensions(null); // Require re-test on change
-              }}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="apiKey">API Key (Optional)</Label>
-            <div className="relative">
-              <Input
-                id="apiKey"
-                type={showApiKey ? "text" : "password"}
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value);
-                  setDimensions(null);
-                }}
-                className="pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-              >
-                {showApiKey ? (
-                  <EyeOff className="size-4" />
-                ) : (
-                  <Eye className="size-4" />
-                )}
-              </button>
-            </div>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="modelName">Model Name</Label>
-            <Input
-              id="modelName"
-              placeholder="my-embedding-model"
-              value={modelName}
-              onChange={(e) => {
-                setModelName(e.target.value);
-                setDimensions(null);
-              }}
-            />
-          </div>
-          {dimensions && (
-            <div className="text-sm text-green-600 dark:text-green-400 font-medium">
-              ✓ Connection verified ({dimensions} dimensions)
-            </div>
-          )}
-        </div>
-        <DialogFooter className="flex flex-row justify-between sm:justify-between items-center gap-2">
-          <Button variant="outline" onClick={handleTest} disabled={testing}>
-            {testing ? (
-              <Loader2 className="size-4 animate-spin mr-2" />
-            ) : (
-              <Cloud className="size-4 mr-2" />
-            )}
-            Test Connection
-          </Button>
-          <Button
-            className={"px-5"}
-            onClick={handleSave}
-            disabled={!dimensions}
-          >
-            Add Model
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}

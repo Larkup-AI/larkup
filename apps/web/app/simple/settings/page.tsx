@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import {
@@ -17,16 +17,19 @@ import {
   Settings2,
   Database,
   Clock,
-  AlertCircle,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import {
   Card,
@@ -35,17 +38,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useWorkspace } from "@/components/workspace/workspace-provider";
 import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
 import { LaunchPanel } from "@/components/server/server-workspace";
+import { ServerFormDialog } from "@/components/workspace/server-form-dialog";
 import {
   VECTOR_STORE_LIST,
   getVectorStore,
+  validateStoreConfig,
 } from "@larkup/vector-stores/registry";
 import { StoreFields } from "@/components/configure/store-fields";
-import type { RagConfig, VectorStoreId } from "@larkup/core/types";
+import { CustomModelModal } from "@/components/configure/custom-model-modal";
+import type {
+  RagConfig,
+  VectorStoreId,
+  CustomModelConfig,
+  EmbeddingModelDescriptor,
+} from "@larkup/core/types";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
@@ -86,13 +96,51 @@ export default function SimpleSettingsPage() {
   const [form, setForm] = useState<Partial<RagConfig>>({});
   const [saving, setSaving] = useState(false);
   const [showEmbeddingKey, setShowEmbeddingKey] = useState(false);
+
+  const currentChatProvider = form.chatProvider || form.embeddingProvider || "openai";
+  const statusKey = serverId
+    ? `/api/chat/status?serverId=${encodeURIComponent(serverId)}&provider=${currentChatProvider}`
+    : `/api/chat/status?provider=${currentChatProvider}`;
+  const { data: chatStatus } = useSWR(statusKey, (url: string) => fetch(url).then(r => r.json()));
+
+  // Build embedding models grouped by provider from the dynamic API response
+  const embeddingModels: EmbeddingModelDescriptor[] = chatStatus?.availableEmbeddingModels ?? [];
+  const EMBEDDING_BY_PROVIDER = useMemo(() => {
+    return embeddingModels.reduce<Record<string, EmbeddingModelDescriptor[]>>((acc, m) => {
+      (acc[m.provider] ??= []).push(m);
+      return acc;
+    }, {});
+  }, [embeddingModels]);
   const [showChatKey, setShowChatKey] = useState(false);
   const [serverApiKey, setServerApiKey] = useState("");
   const [copiedKey, setCopiedKey] = useState(false);
 
+  const { data: indexData } = useSWR(
+    "/api/index",
+    (url: string) => fetch(url).then((r) => r.json()),
+    {
+      refreshInterval: 0,
+    },
+  );
+  const indexedRun =
+    indexData?.run?.status === "completed" ? indexData.run : null;
+
+  const [newServerModalOpen, setNewServerModalOpen] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [customEmbeddingModalOpen, setCustomEmbeddingModalOpen] =
+    useState(false);
+  const [customChatModalOpen, setCustomChatModalOpen] = useState(false);
+  
+  const [isOtherEmbedding, setIsOtherEmbedding] = useState(false);
+  const [isOtherChat, setIsOtherChat] = useState(false);
+
   useEffect(() => {
     if (data?.config) {
-      setForm(data.config);
+      setForm({
+        ...data.config,
+        chatProvider: data.config.chatProvider || data.config.embeddingProvider,
+        chatApiKey: data.config.chatApiKey || data.config.embeddingApiKey,
+      });
     }
   }, [data]);
 
@@ -109,8 +157,71 @@ export default function SimpleSettingsPage() {
 
   async function handleSave() {
     if (!data?.config) return;
+
+    let hasError = false;
+    const newErrors: Record<string, string> = {};
+
+    if (!form.embeddingProvider) {
+      newErrors.embeddingProvider = "Required";
+      hasError = true;
+    }
+    if (!form.embeddingApiKey) {
+      newErrors.embeddingApiKey = "Required";
+      hasError = true;
+    }
+    if (!form.chatProvider) {
+      newErrors.chatProvider = "Required";
+      hasError = true;
+    }
+    if (!form.chatApiKey) {
+      newErrors.chatApiKey = "Required";
+      hasError = true;
+    }
+
+    if (form.vectorStore) {
+      const store = getVectorStore(form.vectorStore);
+      if (store) {
+        const storeErrs = validateStoreConfig(
+          store,
+          form.storeConfig || {},
+          form.indexType || "hybrid",
+        );
+        if (Object.keys(storeErrs).length > 0) {
+          Object.assign(newErrors, storeErrs);
+          hasError = true;
+        }
+      }
+    }
+
+    setErrors(newErrors);
+
+    if (hasError) {
+      toast.error("Please fill in all required fields", { duration: Number.POSITIVE_INFINITY });
+      return;
+    }
+
     setSaving(true);
     try {
+      const verifyRes = await fetch("/api/config/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          embeddingProvider: form.embeddingProvider,
+          embeddingApiKey: form.embeddingApiKey,
+          embeddingModelId: form.embeddingModelId,
+          customEmbeddings: form.customEmbeddings,
+          chatProvider: form.chatProvider,
+          chatApiKey: form.chatApiKey,
+          chatModelId: form.chatModelId,
+          customChatModels: form.customChatModels,
+        }),
+      });
+
+      if (!verifyRes.ok) {
+        const err = await verifyRes.json();
+        throw new Error(err.error || "Verification failed");
+      }
+
       const merged = { ...data.config, ...form };
       const res = await fetch(configUrl, {
         method: "PUT",
@@ -121,9 +232,9 @@ export default function SimpleSettingsPage() {
       if (!res.ok)
         throw new Error(json.error ?? "Failed to save configuration");
       await mutate(json, { revalidate: false });
-      toast.success("Settings saved");
+      toast.success("Settings saved", { duration: Number.POSITIVE_INFINITY });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error(err instanceof Error ? err.message : "Failed to save", { duration: Number.POSITIVE_INFINITY });
     } finally {
       setSaving(false);
     }
@@ -137,13 +248,38 @@ export default function SimpleSettingsPage() {
     }));
   };
 
+  const clearError = (key: string) => {
+    if (errors[key]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  };
+
   const setStoreValue = (key: string, value: string) => {
     setForm((f) => ({ ...f, storeConfig: { ...f.storeConfig, [key]: value } }));
+    clearError(key);
   };
 
   function handleServerApiKeyChange(v: string) {
     setServerApiKey(v);
     localStorage.setItem("rag_server_api_key", v);
+  }
+
+  function handleStructuralChangeBlock() {
+    toast("Cannot modify server configuration", {
+      description:
+        "You cannot change this in the current server because it already has an index. You must initiate a new server.",
+      duration: Number.POSITIVE_INFINITY,
+      action: {
+        label: "New Server",
+        onClick: () => {
+          setNewServerModalOpen(true);
+        },
+      },
+    });
   }
 
   function generateApiKey() {
@@ -153,7 +289,7 @@ export default function SimpleSettingsPage() {
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
     handleServerApiKeyChange(key);
-    toast.success("API key generated");
+    toast.success("API key generated", { duration: Number.POSITIVE_INFINITY });
   }
 
   async function copyApiKey() {
@@ -216,25 +352,44 @@ export default function SimpleSettingsPage() {
         </div>
       </div>
 
+      <ServerFormDialog
+        mode="create"
+        open={newServerModalOpen}
+        onOpenChange={setNewServerModalOpen}
+      />
+
+      <CustomModelModal
+        type="embedding"
+        open={customEmbeddingModalOpen}
+        onOpenChange={setCustomEmbeddingModalOpen}
+        onSave={(cfg) => {
+          setForm({
+            ...form,
+            embeddingProvider: "custom",
+            embeddingModelId: `custom:${cfg.modelName}`,
+            customEmbeddings: [cfg],
+          });
+          clearError("embeddingProvider");
+        }}
+      />
+      <CustomModelModal
+        type="chat"
+        open={customChatModalOpen}
+        onOpenChange={setCustomChatModalOpen}
+        onSave={(cfg) => {
+          setForm({
+            ...form,
+            chatProvider: "custom",
+            chatModelId: `custom:${cfg.modelName}`,
+            customChatModels: [cfg],
+          });
+          clearError("chatProvider");
+        }}
+      />
+
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 pb-8 md:px-8">
         <div className="mx-auto max-w-3xl space-y-6 pt-1">
-          {needsReindex && (
-            <Alert
-              variant="destructive"
-              className="bg-destructive/5 border-destructive/20 text-destructive mt-4"
-            >
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Warning: Re-indexing required</AlertTitle>
-              <AlertDescription>
-                Changing your vector store or embedding model will invalidate
-                your existing documents. When you click Save, the RAG server
-                will shut down and you will need to re-index your documents in
-                the Docs page.
-              </AlertDescription>
-            </Alert>
-          )}
-
           {/* ── AI Provider & Keys ────────────────────────────────────── */}
           <Card>
             <CardHeader className="pb-3">
@@ -249,82 +404,276 @@ export default function SimpleSettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <Label className="text-xs">Provider</Label>
-                <Select
-                  value={form.embeddingProvider ?? "openai"}
-                  onValueChange={(v: any) =>
-                    setForm({ ...form, embeddingProvider: v })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <span className="flex items-center gap-2">
-                      {PROVIDER_META[
-                        (form.embeddingProvider ??
-                          "openai") as keyof typeof PROVIDER_META
-                      ] ? (
-                        <>
-                          <ProviderIcon
-                            src={
-                              PROVIDER_META[
-                                form.embeddingProvider as keyof typeof PROVIDER_META
-                              ]?.iconSrc ?? ""
-                            }
-                            alt={
-                              PROVIDER_META[
-                                form.embeddingProvider as keyof typeof PROVIDER_META
-                              ]?.label ?? ""
-                            }
-                            pillBg={
-                              PROVIDER_META[
-                                form.embeddingProvider as keyof typeof PROVIDER_META
-                              ]?.pillBg ?? undefined
-                            }
-                            size={16}
-                          />
-                          {PROVIDER_META[
-                            form.embeddingProvider as keyof typeof PROVIDER_META
-                          ]?.label ?? form.embeddingProvider}
-                        </>
-                      ) : (
-                        form.embeddingProvider || "Select provider"
+                <div className="flex gap-2">
+                  <Select
+                    value={form.embeddingProvider ?? "openai"}
+                    onValueChange={(v: any) => {
+                      if (
+                        indexedRun &&
+                        data?.config &&
+                        v !== data.config.embeddingProvider
+                      ) {
+                        handleStructuralChangeBlock();
+                        return;
+                      }
+                      setForm({
+                        ...form,
+                        embeddingProvider: v,
+                        embeddingModelId: "", // clear so backend uses new provider's default
+                        chatProvider:
+                          !form.chatProvider ||
+                          form.chatProvider === form.embeddingProvider
+                            ? v
+                            : form.chatProvider,
+                        chatModelId:
+                          !form.chatProvider ||
+                          form.chatProvider === form.embeddingProvider
+                            ? "" // clear chat model id too if we are updating chatProvider
+                            : form.chatModelId,
+                      });
+                      clearError("embeddingProvider");
+                      clearError("chatProvider");
+                    }}
+                  >
+                    <SelectTrigger
+                      className={cn(
+                        "w-full",
+                        errors.embeddingProvider && "border-destructive",
                       )}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROVIDER_LIST.map((key) => {
-                      const meta =
-                        PROVIDER_META[key as keyof typeof PROVIDER_META];
-                      if (!meta) return null;
-                      return (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex items-center gap-2">
+                    >
+                      <span className="flex items-center gap-2">
+                        {PROVIDER_META[
+                          (form.embeddingProvider ??
+                            "openai") as keyof typeof PROVIDER_META
+                        ] ? (
+                          <>
                             <ProviderIcon
-                              src={meta.iconSrc}
-                              alt={meta.label}
-                              pillBg={meta.pillBg ?? undefined}
+                              src={
+                                PROVIDER_META[
+                                  form.embeddingProvider as keyof typeof PROVIDER_META
+                                ]?.iconSrc ?? ""
+                              }
+                              alt={
+                                PROVIDER_META[
+                                  form.embeddingProvider as keyof typeof PROVIDER_META
+                                ]?.label ?? ""
+                              }
+                              pillBg={
+                                PROVIDER_META[
+                                  form.embeddingProvider as keyof typeof PROVIDER_META
+                                ]?.pillBg ?? undefined
+                              }
                               size={16}
                             />
-                            <span>
-                              {meta.label}
-                              {key === "vercel_ai_gateway" && " (Recommended)"}
-                            </span>
+                            {PROVIDER_META[
+                              form.embeddingProvider as keyof typeof PROVIDER_META
+                            ]?.label ?? form.embeddingProvider}
+                          </>
+                        ) : (
+                          form.embeddingProvider || "Select provider"
+                        )}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROVIDER_LIST.filter(
+                        (key) => (EMBEDDING_BY_PROVIDER[key] && EMBEDDING_BY_PROVIDER[key].length > 0) || key === "vercel_ai_gateway"
+                      ).map((key) => {
+                        const meta =
+                          PROVIDER_META[key as keyof typeof PROVIDER_META];
+                        if (!meta) return null;
+                        return (
+                          <SelectItem key={key} value={key}>
+                            <div className="flex items-center gap-2">
+                              <ProviderIcon
+                                src={meta.iconSrc}
+                                alt={meta.label}
+                                pillBg={meta.pillBg ?? undefined}
+                                size={16}
+                              />
+                              <span>
+                                {meta.label}
+                                {key === "vercel_ai_gateway" &&
+                                  " (Recommended)"}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                      {form.customEmbeddings?.map((cfg) => (
+                        <SelectItem
+                          key={`custom:${cfg.modelName}`}
+                          value="custom"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ProviderIcon
+                              src={PROVIDER_META.custom.iconSrc}
+                              alt="Custom"
+                              pillBg={PROVIDER_META.custom.pillBg}
+                              size={16}
+                            />
+                            <span>{cfg.modelName} (Custom)</span>
                           </div>
                         </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    type="button"
+                    onClick={() => setCustomEmbeddingModalOpen(true)}
+                    className="shrink-0 h-9 w-9"
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                </div>
               </div>
+
+              <div className="space-y-1.5 mt-4">
+                <Label className="text-xs">Model</Label>
+                <div className="flex flex-col gap-2">
+                  <Select
+                    value={isOtherEmbedding ? "other" : (form.embeddingModelId || "")}
+                    onValueChange={(v: string | null) => {
+                      if (!v) return;
+                      if (v === "other") {
+                        setIsOtherEmbedding(true);
+                        return;
+                      }
+                      setIsOtherEmbedding(false);
+                      if (
+                        indexedRun &&
+                        data?.config &&
+                        v !== data.config.embeddingModelId
+                      ) {
+                        handleStructuralChangeBlock();
+                        return;
+                      }
+                      setForm({ ...form, embeddingModelId: v });
+                      clearError("embeddingModelId");
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <span>{form.embeddingModelId || "Default"}</span>
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[320px]">
+                      {Object.entries(EMBEDDING_BY_PROVIDER)
+                        .filter(
+                          ([provider]) =>
+                            form.embeddingProvider === "vercel_ai_gateway" ||
+                            provider === form.embeddingProvider ||
+                            provider === "deepseek",
+                        )
+                        .map(([provider, models]) => {
+                          const meta =
+                            PROVIDER_META[
+                              provider as keyof typeof PROVIDER_META
+                            ];
+                          return (
+                            <SelectGroup key={provider}>
+                              <SelectLabel className="flex items-center gap-2 py-1.5">
+                                {meta && (
+                                  <ProviderIcon
+                                    src={meta.iconSrc}
+                                    alt={meta.label}
+                                    pillBg={meta.pillBg}
+                                    size={18}
+                                  />
+                                )}
+                                <span className="font-medium">
+                                  {meta?.label ?? provider}
+                                </span>
+                              </SelectLabel>
+                              {models.map((m) => (
+                                <SelectItem
+                                  key={m.id}
+                                  value={m.id}
+                                  className="pl-8"
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <span>{m.label}</span>
+                                    <span className="text-[10px] text-muted-foreground font-mono">
+                                      {m.dimensions}d
+                                    </span>
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          );
+                        })}
+                      {/* Custom models */}
+                      {(form.customEmbeddings ?? []).length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel className="flex items-center gap-2 py-1.5">
+                            <ProviderIcon
+                              src={PROVIDER_META.custom.iconSrc}
+                              alt="Custom"
+                              pillBg={PROVIDER_META.custom.pillBg}
+                              size={18}
+                            />
+                            <span className="font-medium">Custom</span>
+                          </SelectLabel>
+                          {(form.customEmbeddings ?? []).map((m) => (
+                            <SelectItem
+                              key={`custom:${m.modelName}`}
+                              value={`custom:${m.modelName}`}
+                              className="pl-8"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span>{m.modelName}</span>
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  {m.dimensions}d
+                                </span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      <SelectGroup>
+                        <SelectItem value="other" className="pl-8">
+                          <span className="flex items-center gap-2">
+                            <span>Other...</span>
+                          </span>
+                        </SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {isOtherEmbedding && (
+                    <div className="w-full mt-2">
+                      <Input
+                        placeholder="Enter custom model ID"
+                        value={form.embeddingModelId || ""}
+                        onChange={(e) => setForm({ ...form, embeddingModelId: e.target.value })}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <Label className="text-xs">API Key</Label>
                 <div className="relative">
                   <Input
                     type={showEmbeddingKey ? "text" : "password"}
                     value={form.embeddingApiKey || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, embeddingApiKey: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setForm({
+                        ...form,
+                        embeddingApiKey: e.target.value,
+                        chatApiKey:
+                          !form.chatApiKey ||
+                          form.chatApiKey === form.embeddingApiKey
+                            ? e.target.value
+                            : form.chatApiKey,
+                      });
+                      clearError("embeddingApiKey");
+                      clearError("chatApiKey");
+                    }}
                     placeholder="sk-..."
-                    className="pr-10"
+                    className={cn(
+                      "pr-10",
+                      errors.embeddingApiKey && "border-destructive",
+                    )}
                   />
                   <button
                     type="button"
@@ -339,129 +688,6 @@ export default function SimpleSettingsPage() {
                   </button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* ── Chat (LLM) Provider ───────────────────────────────────── */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MessageCircle className="size-4 text-primary" />
-                Chat (LLM) Provider
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Used to answer questions based on retrieved documents. Leave
-                blank to use the same provider and key as embedding.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Provider</Label>
-                <Select
-                  value={
-                    form.chatProvider || form.embeddingProvider || "openai"
-                  }
-                  onValueChange={(v: any) =>
-                    setForm({ ...form, chatProvider: v })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <span className="flex items-center gap-2">
-                      {(() => {
-                        const pKey =
-                          form.chatProvider ||
-                          form.embeddingProvider ||
-                          "openai";
-                        const meta =
-                          PROVIDER_META[pKey as keyof typeof PROVIDER_META];
-                        return meta ? (
-                          <>
-                            <ProviderIcon
-                              src={meta.iconSrc}
-                              alt={meta.label}
-                              pillBg={meta.pillBg ?? undefined}
-                              size={16}
-                            />
-                            {meta.label}
-                          </>
-                        ) : (
-                          pKey
-                        );
-                      })()}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROVIDER_LIST.map((key) => {
-                      const meta =
-                        PROVIDER_META[key as keyof typeof PROVIDER_META];
-                      if (!meta) return null;
-                      return (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex items-center gap-2">
-                            <ProviderIcon
-                              src={meta.iconSrc}
-                              alt={meta.label}
-                              pillBg={meta.pillBg}
-                              size={16}
-                            />
-                            <span>{meta.label}</span>
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">API Key</Label>
-                <div className="relative">
-                  <Input
-                    type={showChatKey ? "text" : "password"}
-                    value={form.chatApiKey || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, chatApiKey: e.target.value })
-                    }
-                    placeholder="Leave blank to use embedding key"
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowChatKey(!showChatKey)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                  >
-                    {showChatKey ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ── System Prompt ─────────────────────────────────────────── */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Settings2 className="size-4 text-primary" />
-                System Prompt
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Override the default instructions given to the chat agent. Leave
-                blank for the default RAG prompt.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <textarea
-                value={form.systemPrompt || ""}
-                onChange={(e) =>
-                  setForm({ ...form, systemPrompt: e.target.value })
-                }
-                placeholder="You are a helpful research assistant..."
-                rows={5}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary resize-y min-h-[100px]"
-              />
             </CardContent>
           </Card>
 
@@ -481,7 +707,17 @@ export default function SimpleSettingsPage() {
                 <Label className="text-xs">Vector Store</Label>
                 <Select
                   value={form.vectorStore || ""}
-                  onValueChange={(v) => selectStore(v as VectorStoreId)}
+                  onValueChange={(v) => {
+                    if (
+                      indexedRun &&
+                      data?.config &&
+                      v !== data.config.vectorStore
+                    ) {
+                      handleStructuralChangeBlock();
+                      return;
+                    }
+                    selectStore(v as VectorStoreId);
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     {form.vectorStore ? (
@@ -554,12 +790,253 @@ export default function SimpleSettingsPage() {
                   <StoreFields
                     store={getVectorStore(form.vectorStore)}
                     values={form.storeConfig || {}}
-                    errors={{}}
+                    errors={errors}
                     onChange={setStoreValue}
                     indexType={form.indexType || "hybrid"}
                   />
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* ── Chat (LLM) Provider ───────────────────────────────────── */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MessageCircle className="size-4 text-primary" />
+                Chat (LLM) Provider
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Used to answer questions based on retrieved documents. Leave
+                blank to use the same provider and key as embedding.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Provider</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={
+                      form.chatProvider || form.embeddingProvider || "openai"
+                    }
+                    onValueChange={(v: any) => {
+                      setForm({ ...form, chatProvider: v, chatModelId: "" });
+                      clearError("chatProvider");
+                    }}
+                  >
+                    <SelectTrigger
+                      className={cn(
+                        "w-full",
+                        errors.chatProvider && "border-destructive",
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        {(() => {
+                          const pKey =
+                            form.chatProvider ||
+                            form.embeddingProvider ||
+                            "openai";
+                          const meta =
+                            PROVIDER_META[pKey as keyof typeof PROVIDER_META];
+                          return meta ? (
+                            <>
+                              <ProviderIcon
+                                src={meta.iconSrc}
+                                alt={meta.label}
+                                pillBg={meta.pillBg ?? undefined}
+                                size={16}
+                              />
+                              {meta.label}
+                            </>
+                          ) : (
+                            pKey
+                          );
+                        })()}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROVIDER_LIST.map((key) => {
+                        const meta =
+                          PROVIDER_META[key as keyof typeof PROVIDER_META];
+                        if (!meta) return null;
+                        return (
+                          <SelectItem key={key} value={key}>
+                            <div className="flex items-center gap-2">
+                              <ProviderIcon
+                                src={meta.iconSrc}
+                                alt={meta.label}
+                                pillBg={meta.pillBg}
+                                size={16}
+                              />
+                              <span>{meta.label}</span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                      {form.customChatModels?.map((cfg) => (
+                        <SelectItem
+                          key={`custom:${cfg.modelName}`}
+                          value="custom"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ProviderIcon
+                              src={PROVIDER_META.custom.iconSrc}
+                              alt="Custom"
+                              pillBg={PROVIDER_META.custom.pillBg}
+                              size={16}
+                            />
+                            <span>{cfg.modelName} (Custom)</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    type="button"
+                    onClick={() => setCustomChatModalOpen(true)}
+                    className="shrink-0 h-9 w-9"
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 mt-4">
+                <Label className="text-xs">Model</Label>
+                <div className="flex flex-col gap-2">
+                  <Select
+                    value={isOtherChat ? "other" : (form.chatModelId || "")}
+                    onValueChange={(v: string | null) => {
+                      if (!v) return;
+                      if (v === "other") {
+                        setIsOtherChat(true);
+                        return;
+                      }
+                      setIsOtherChat(false);
+                      setForm({ ...form, chatModelId: v });
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <span className="truncate">{form.chatModelId || "Default"}</span>
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[320px]">
+                      {chatStatus?.availableModels ? (
+                        <SelectGroup>
+                          {chatStatus.availableModels.map((m: any) => (
+                            <SelectItem
+                              key={m.id}
+                              value={m.id}
+                            >
+                              <span className="flex items-center gap-2">
+                                <span>{m.label}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ) : (
+                        <div className="p-2 text-sm text-muted-foreground">Loading models...</div>
+                      )}
+                      {/* Custom models */}
+                      {(form.customChatModels ?? []).length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel className="flex items-center gap-2 py-1.5">
+                            <ProviderIcon
+                              src={PROVIDER_META.custom.iconSrc}
+                              alt="Custom"
+                              pillBg={PROVIDER_META.custom.pillBg}
+                              size={18}
+                            />
+                            <span className="font-medium">Custom</span>
+                          </SelectLabel>
+                          {(form.customChatModels ?? []).map((m) => (
+                            <SelectItem
+                              key={`custom:${m.modelName}`}
+                              value={`custom:${m.modelName}`}
+                              className="pl-8"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span>{m.modelName}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      <SelectGroup>
+                        <SelectItem value="other" className="pl-8">
+                          <span className="flex items-center gap-2">
+                            <span>Other...</span>
+                          </span>
+                        </SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {isOtherChat && (
+                    <div className="w-full mt-2">
+                      <Input
+                        placeholder="Enter custom model ID"
+                        value={form.chatModelId || ""}
+                        onChange={(e) => setForm({ ...form, chatModelId: e.target.value })}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">API Key</Label>
+                <div className="relative">
+                  <Input
+                    type={showChatKey ? "text" : "password"}
+                    value={form.chatApiKey || ""}
+                    onChange={(e) => {
+                      setForm({ ...form, chatApiKey: e.target.value });
+                      clearError("chatApiKey");
+                    }}
+                    placeholder="sk-..."
+                    className={cn(
+                      "pr-10",
+                      errors.chatApiKey && "border-destructive",
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowChatKey(!showChatKey)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                  >
+                    {showChatKey ? (
+                      <EyeOff className="size-4" />
+                    ) : (
+                      <Eye className="size-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── System Prompt ─────────────────────────────────────────── */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Settings2 className="size-4 text-primary" />
+                System Prompt
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Override the default instructions given to the chat agent. Leave
+                blank for the default RAG prompt.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <textarea
+                value={form.systemPrompt || ""}
+                onChange={(e) =>
+                  setForm({ ...form, systemPrompt: e.target.value })
+                }
+                placeholder="You are a helpful research assistant..."
+                rows={5}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary resize-y min-h-[100px]"
+              />
             </CardContent>
           </Card>
 

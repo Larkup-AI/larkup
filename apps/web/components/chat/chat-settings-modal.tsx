@@ -117,22 +117,55 @@ export function ChatSettingsModal() {
               onValueChange={(v) => setProvider(v ?? "")}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select an AI Provider" />
+                <span className="flex items-center gap-2">
+                  {provider && PROVIDER_META[provider as keyof typeof PROVIDER_META] ? (
+                    <>
+                      <ProviderIcon
+                        src={PROVIDER_META[provider as keyof typeof PROVIDER_META].iconSrc}
+                        alt={PROVIDER_META[provider as keyof typeof PROVIDER_META].label}
+                        pillBg={PROVIDER_META[provider as keyof typeof PROVIDER_META].pillBg}
+                        size={16}
+                      />
+                      <span>{PROVIDER_META[provider as keyof typeof PROVIDER_META].label}</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Select an AI Provider</span>
+                  )}
+                </span>
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(PROVIDER_META).map(([key, meta]) => (
-                  <SelectItem key={key} value={key}>
-                    <div className="flex items-center gap-2">
-                      <ProviderIcon
-                        src={meta.iconSrc}
-                        alt={meta.label}
-                        pillBg={meta.pillBg}
-                        size={18}
-                      />
-                      <span>{meta.label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
+                {[
+                  "vercel_ai_gateway",
+                  "openai",
+                  "anthropic",
+                  "google",
+                  "mistral",
+                  "deepseek",
+                  "cohere",
+                  "meta",
+                  "xai",
+                  "perplexity",
+                  "groq",
+                  "together-ai",
+                  "fireworks",
+                  "cerebras",
+                ].map((key) => {
+                  const meta = PROVIDER_META[key as keyof typeof PROVIDER_META];
+                  if (!meta) return null;
+                  return (
+                    <SelectItem key={key} value={key}>
+                      <div className="flex items-center gap-2">
+                        <ProviderIcon
+                          src={meta.iconSrc}
+                          alt={meta.label}
+                          pillBg={meta.pillBg}
+                          size={18}
+                        />
+                        <span>{meta.label}</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

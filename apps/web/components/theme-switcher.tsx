@@ -94,7 +94,15 @@ const PAGE_STYLES: { id: PageStyleVariant; name: string }[] = [
 
 export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
   return (
-    <Suspense fallback={<div className={floating ? "fixed bottom-6 right-6 z-50 h-12 w-12" : "size-9"} />}>
+    <Suspense
+      fallback={
+        <div
+          className={
+            floating ? "fixed bottom-6 right-6 z-50 h-12 w-12" : "size-9"
+          }
+        />
+      }
+    >
       <ThemeSwitcherContent floating={floating} />
     </Suspense>
   );
@@ -151,8 +159,8 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
     ? "fixed bottom-6 right-6 z-50"
     : "flex items-center";
   const buttonClass = floating
-    ? "h-12 w-12 rounded-full shadow-xl"
-    : "size-9 rounded-lg border border-border bg-card text-primary shadow-sm hover:bg-accent hover:text-accent-foreground";
+    ? "h-12 w-12 rounded-full "
+    : "size-9 rounded-lg border border-border bg-card text-primary  hover:bg-accent hover:text-accent-foreground";
 
   return (
     <div className={wrapperClass}>
@@ -170,7 +178,7 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
         />
         <PopoverContent
           align="end"
-          className="w-80 p-0 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+          className="w-80 p-0  flex flex-col max-h-[85vh] overflow-hidden"
         >
           {view === "settings" ? (
             <div className="flex flex-col min-h-0 flex-1 h-full animate-in slide-in-from-right-4 duration-300">
@@ -182,7 +190,12 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                 <div className="flex items-center gap-2">
                   <Palette className="h-4 w-4" /> Preferences
                 </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setView("settings")}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setView("settings")}
+                >
                   <Settings className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </div>
@@ -196,7 +209,9 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                     <Input
                       value={localName}
                       onChange={(e) => setLocalName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSaveUsername()}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && handleSaveUsername()
+                      }
                       placeholder="Enter your name"
                       className="flex-1 rounded-md border border-input bg-background px-3 h-7 text-sm outline-none "
                     />
@@ -230,7 +245,7 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                         }`}
                       >
                         <div
-                          className="h-6 w-6 rounded-full border shadow-sm"
+                          className="h-6 w-6 rounded-full border "
                           style={{ background: t.color }}
                         />
                         <span className="truncate w-full text-center">
@@ -267,12 +282,14 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                             }
                           >
                             <div
-                              className={`h-6 w-6 rounded-full border shrink-0 ${bg.id === "bg-default" ? "border-dashed" : "shadow-sm"}`}
+                              className={`h-6 w-6 rounded-full border shrink-0 ${bg.id === "bg-default" ? "border-dashed" : ""}`}
                               style={{ background: bg.color }}
                             />
                           </TooltipTrigger>
                           <TooltipContent side="top" sideOffset={6}>
-                            <span className="text-xs font-medium">{bg.name}</span>
+                            <span className="text-xs font-medium">
+                              {bg.name}
+                            </span>
                             <span className="text-[10px] text-muted-foreground ml-1.5">
                               {bg.color}
                             </span>
@@ -287,8 +304,8 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                 <TooltipProvider delay={200}>
                   <div className="space-y-3">
                     <label className="text-sm font-medium flex items-center gap-2">
-                      <PanelTop className="h-4 w-4 text-muted-foreground" /> Content
-                      Panel Background
+                      <PanelTop className="h-4 w-4 text-muted-foreground" />{" "}
+                      Content Panel Background
                     </label>
                     <p className="text-[11px] text-muted-foreground -mt-1">
                       Inner content area (card / main panel)
@@ -309,12 +326,14 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                             }
                           >
                             <div
-                              className={`h-6 w-6 rounded-full border shrink-0 ${pb.id === "panel-default" ? "border-dashed" : "shadow-sm"}`}
+                              className={`h-6 w-6 rounded-full border shrink-0 ${pb.id === "panel-default" ? "border-dashed" : ""}`}
                               style={{ background: pb.color }}
                             />
                           </TooltipTrigger>
                           <TooltipContent side="top" sideOffset={6}>
-                            <span className="text-xs font-medium">{pb.name}</span>
+                            <span className="text-xs font-medium">
+                              {pb.name}
+                            </span>
                             <span className="text-[10px] text-muted-foreground ml-1.5">
                               {pb.color}
                             </span>
@@ -329,7 +348,8 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                 <TooltipProvider delay={200}>
                   <div className="space-y-3">
                     <label className="text-sm font-medium flex items-center gap-2">
-                      <LayoutTemplate className="h-4 w-4 text-muted-foreground" /> Sidebar / Topnav Background
+                      <LayoutTemplate className="h-4 w-4 text-muted-foreground" />{" "}
+                      Sidebar / Topnav Background
                     </label>
                     <p className="text-[11px] text-muted-foreground -mt-1">
                       Background color for the side or top navigation
@@ -350,12 +370,14 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                             }
                           >
                             <div
-                              className={`h-6 w-6 rounded-full border shrink-0 ${pb.id === "panel-default" ? "border-dashed" : "shadow-sm"}`}
+                              className={`h-6 w-6 rounded-full border shrink-0 ${pb.id === "panel-default" ? "border-dashed" : ""}`}
                               style={{ background: pb.color }}
                             />
                           </TooltipTrigger>
                           <TooltipContent side="top" sideOffset={6}>
-                            <span className="text-xs font-medium">{pb.name}</span>
+                            <span className="text-xs font-medium">
+                              {pb.name}
+                            </span>
                             <span className="text-[10px] text-muted-foreground ml-1.5">
                               {pb.color}
                             </span>
@@ -392,8 +414,8 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                 {/* Page Style */}
                 <div className="space-y-3">
                   <label className="text-sm font-medium flex items-center gap-2">
-                    <SquareDashed className="h-4 w-4 text-muted-foreground" /> Page
-                    Style
+                    <SquareDashed className="h-4 w-4 text-muted-foreground" />{" "}
+                    Page Style
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     {PAGE_STYLES.map((ps) => (

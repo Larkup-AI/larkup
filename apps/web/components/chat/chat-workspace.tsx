@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import {
@@ -11,15 +11,25 @@ import {
   Loader2,
   ChevronDown,
   MessageCircle,
+  Search,
+  X,
 } from "lucide-react";
 import useSWR from "swr";
 import { MessageItem } from "@/components/chat/message-item";
 import { ChatSettingsModal } from "@/components/chat/chat-settings-modal";
 import { useWorkspace } from "@/components/workspace/workspace-provider";
 import { cn } from "@/lib/utils";
-import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
+import { getProviderMeta, ProviderIcon } from "@/components/ui/provider-icon";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+interface AvailableModel {
+  id: string;
+  label: string;
+  provider: string;
+  context_window?: number;
+  tags?: string[];
+}
 
 interface ChatStatus {
   ready: boolean;
@@ -27,7 +37,7 @@ interface ChatStatus {
   blockers: string[];
   provider: string;
   chatModelId: string;
-  availableModels: { id: string; label: string; provider: string }[];
+  availableModels: AvailableModel[];
   suggestions: string[];
 }
 
@@ -46,7 +56,9 @@ export function ChatWorkspace() {
 
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [showModelSelect, setShowModelSelect] = useState(false);
+  const [modelSearch, setModelSearch] = useState("");
   const [input, setInput] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Update selected model when status loads
   useEffect(() => {
@@ -54,6 +66,16 @@ export function ChatWorkspace() {
       setSelectedModel(status.chatModelId);
     }
   }, [status?.chatModelId, selectedModel]);
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (showModelSelect) {
+      // Small delay to let the DOM render
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    } else {
+      setModelSearch("");
+    }
+  }, [showModelSelect]);
 
   // Fetch suggestions if missing
   useEffect(() => {
@@ -96,6 +118,28 @@ export function ChatWorkspace() {
     });
   }, [messages, chatStatus]);
 
+  // Group and filter models
+  const groupedModels = useMemo(() => {
+    const models = status?.availableModels ?? [];
+    const query = modelSearch.toLowerCase().trim();
+    const filtered = query
+      ? models.filter(
+          (m) =>
+            m.label.toLowerCase().includes(query) ||
+            m.id.toLowerCase().includes(query) ||
+            m.provider.toLowerCase().includes(query),
+        )
+      : models;
+
+    const groups = new Map<string, AvailableModel[]>();
+    for (const m of filtered) {
+      const existing = groups.get(m.provider) ?? [];
+      existing.push(m);
+      groups.set(m.provider, existing);
+    }
+    return groups;
+  }, [status?.availableModels, modelSearch]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const text = input.trim();
@@ -111,6 +155,9 @@ export function ChatWorkspace() {
 
   const isEmpty = messages.length === 0;
   const ready = status?.ready ?? false;
+  const selectedModelData = status?.availableModels?.find(
+    (m) => m.id === selectedModel,
+  );
 
   if (statusLoading) {
     return (
@@ -128,19 +175,37 @@ export function ChatWorkspace() {
           {/* We moved model selector to the right */}
         </div>
         <div className="flex items-center gap-2">
-          {/* Model selector */}
+          {/* Model selector with search */}
           {status?.availableModels && status.availableModels.length > 0 && (
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowModelSelect((o) => !o)}
-                className="flex w-[250px] justify-between items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-foreground transition hover:bg-muted"
+                className="flex w-[300px] justify-between items-center gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-3 py-1.5 text-xs text-foreground transition hover:bg-muted"
               >
-                {status.availableModels.find((m) => m.id === selectedModel)
-                  ?.label ||
-                  selectedModel ||
-                  "Select model"}
-                <ChevronDown className="size-3 text-muted-foreground" />
+                <span className="flex items-center gap-2 truncate">
+                  {selectedModelData && (
+                    <ProviderIcon
+                      src={getProviderMeta(selectedModelData.provider).iconSrc}
+                      alt={selectedModelData.provider}
+                      pillBg={
+                        getProviderMeta(selectedModelData.provider).pillBg
+                      }
+                      size={16}
+                    />
+                  )}
+                  <span className="truncate">
+                    {selectedModelData?.label ||
+                      selectedModel ||
+                      "Select model"}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "size-3 shrink-0 text-muted-foreground transition-transform",
+                    showModelSelect && "rotate-180",
+                  )}
+                />
               </button>
               {showModelSelect && (
                 <>
@@ -148,47 +213,96 @@ export function ChatWorkspace() {
                     className="fixed inset-0 z-40"
                     onClick={() => setShowModelSelect(false)}
                   />
-                  <div className="absolute right-0 top-full z-50 mt-1 max-h-64 min-w-[250px] overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg [&::-webkit-scrollbar]:hidden">
-                    {status.availableModels.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedModel(m.id);
-                          setShowModelSelect(false);
-                        }}
-                        className={cn(
-                          "flex w-full gap-3 items-center justify-between rounded-md px-3 py-2 text-left text-xs transition",
-                          m.id === selectedModel
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "text-foreground hover:bg-muted",
-                        )}
-                      >
-                        <span>{m.label}</span>
-                        {PROVIDER_META[
-                          m.provider as keyof typeof PROVIDER_META
-                        ] ? (
-                          <ProviderIcon
-                            src={
-                              PROVIDER_META[
-                                m.provider as keyof typeof PROVIDER_META
-                              ].iconSrc
-                            }
-                            alt={m.provider}
-                            pillBg={
-                              PROVIDER_META[
-                                m.provider as keyof typeof PROVIDER_META
-                              ].pillBg
-                            }
-                            size={16}
-                          />
-                        ) : (
-                          <span className="text-[10px] uppercase text-muted-foreground/60">
-                            {m.provider}
-                          </span>
-                        )}
-                      </button>
-                    ))}
+                  <div className="absolute right-0 top-full z-50 mt-1 w-[300px] rounded-lg border border-border bg-card shadow-lg">
+                    {/* Search input */}
+                    <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+                      <Search className="size-3.5 shrink-0 text-muted-foreground" />
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={modelSearch}
+                        onChange={(e) => setModelSearch(e.target.value)}
+                        placeholder="Search models..."
+                        className="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                      />
+                      {modelSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setModelSearch("")}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Grouped model list */}
+                    <div className="max-h-72 overflow-y-auto p-1 [&::-webkit-scrollbar]:hidden">
+                      {groupedModels.size === 0 ? (
+                        <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                          No models found
+                        </div>
+                      ) : (
+                        Array.from(groupedModels.entries()).map(
+                          ([provider, models]) => {
+                            const meta = getProviderMeta(provider);
+                            return (
+                              <div key={provider} className="mb-1">
+                                {/* Provider group header */}
+                                <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-foreground/70">
+                                  {meta.label}
+                                  <span className="text-[10px] text-muted-foreground/50">
+                                    ({models.length})
+                                  </span>
+                                </div>
+
+                                {/* Models */}
+                                {models.map((m) => (
+                                  <button
+                                    key={m.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedModel(m.id);
+                                      setShowModelSelect(false);
+                                    }}
+                                    className={cn(
+                                      "flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left text-xs transition",
+                                      m.id === selectedModel
+                                        ? "bg-primary/10 text-primary font-medium"
+                                        : "text-foreground hover:bg-muted",
+                                    )}
+                                  >
+                                    <span className="flex items-center gap-2 truncate">
+                                      <ProviderIcon
+                                        src={meta.iconSrc}
+                                        alt={meta.label}
+                                        pillBg={meta.pillBg}
+                                        size={14}
+                                      />
+                                      <span className="truncate">{m.label}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5 shrink-0 ml-2">
+                                      {m.context_window && (
+                                        <span className="text-[9px] font-mono text-muted-foreground/60">
+                                          {m.context_window >= 1_000_000
+                                            ? `${(m.context_window / 1_000_000).toFixed(0)}M`
+                                            : `${(m.context_window / 1000).toFixed(0)}K`}
+                                        </span>
+                                      )}
+                                      {/* {m.tags?.includes("reasoning") && (
+                                        <span className="rounded bg-violet-100 dark:bg-violet-900/30 px-1 py-0.5 text-[8px] font-medium text-violet-700 dark:text-violet-300">
+                                          reasoning
+                                        </span>
+                                      )} */}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          },
+                        )
+                      )}
+                    </div>
                   </div>
                 </>
               )}

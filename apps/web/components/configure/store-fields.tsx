@@ -82,7 +82,10 @@ export function StoreFields({
                 value={value}
                 onValueChange={(v) => onChange(field.key, (v as string) ?? "")}
               >
-                <SelectTrigger id={fieldId} className="w-full">
+                <SelectTrigger
+                  id={fieldId}
+                  className={cn("w-full", error && "border-destructive")}
+                >
                   <SelectValue placeholder={`Select ${field.label}`} />
                 </SelectTrigger>
                 <SelectContent>

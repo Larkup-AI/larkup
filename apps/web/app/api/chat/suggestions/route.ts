@@ -6,13 +6,16 @@ import { createAdapter } from "@larkup/vector-stores/factory";
 import { embedQuery } from "@larkup/core/indexing/embedder";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { getChatModel } from "@larkup/core/chat-models/registry";
+import { getChatModel, toChatDescriptor } from "@larkup/core/chat-models/registry";
+import { getModelsByType } from "@larkup/core/models-cache";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createCohere } from "@ai-sdk/cohere";
 import { createMistral } from "@ai-sdk/mistral";
 import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGateway } from "@ai-sdk/gateway";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import type { CustomModelConfig } from "@larkup/core/types";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +23,22 @@ function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
   return serverId ? runWithServer(serverId, fn) : fn();
 }
 
-function createChatModel(provider: string, modelId: string, apiKey?: string) {
+function createChatModel(provider: string, modelId: string, apiKey?: string, customChatModels?: CustomModelConfig[]) {
+  if (modelId.startsWith("custom:")) {
+    const customName = modelId.slice("custom:".length);
+    const custom = (customChatModels ?? []).find(
+      (m) => m.modelName === customName,
+    );
+    if (custom) {
+      const customProvider = createOpenAICompatible({
+        name: "custom_chat_provider",
+        baseURL: custom.baseUrl,
+        apiKey: custom.apiKey || apiKey || undefined,
+      });
+      return customProvider(custom.modelName);
+    }
+  }
+
   const modelName = modelId.includes("/")
     ? modelId.split("/").slice(1).join("/")
     : modelId;
@@ -76,7 +94,9 @@ export async function POST(req: Request) {
 
       const provider = config.chatProvider || config.embeddingProvider;
       const chatModelId = config.chatModelId || "openai/gpt-4o-mini";
-      const descriptor = getChatModel(chatModelId);
+      const gatewayModels = await getModelsByType("language");
+      const allChatModels = gatewayModels.map(toChatDescriptor);
+      const descriptor = getChatModel(allChatModels, chatModelId);
       const resolvedProvider =
         provider === "vercel_ai_gateway"
           ? "vercel_ai_gateway"
@@ -86,7 +106,8 @@ export async function POST(req: Request) {
         resolvedProvider,
         chatModelId,
         config.chatApiKey || config.embeddingApiKey,
-      );
+        config.customChatModels
+      ) as any;
 
       const { object } = await generateObject({
         model: aiModel,

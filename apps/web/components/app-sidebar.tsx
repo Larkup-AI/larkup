@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   FileStack,
   FlaskConical,
-  Layers,
   Lock,
   type LucideIcon,
   MessageCircle,
@@ -21,7 +20,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useThemeCustomizer, type PanelBgVariant } from "./theme-customizer-provider";
+import {
+  useThemeCustomizer,
+  type PanelBgVariant,
+} from "./theme-customizer-provider";
 import { ThemeSwitcher } from "./theme-switcher";
 
 const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
@@ -38,7 +40,6 @@ const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
 const STAGE_ICONS: Record<StageId, LucideIcon> = {
   configure: SlidersHorizontal,
   data: FileStack,
-  index: Layers,
   server: Server,
   demo: FlaskConical,
   chat: MessageCircle,
@@ -81,7 +82,7 @@ export function AppSidebar() {
         </Tooltip>
 
         {/* Pipeline rail */}
-        <nav className="flex flex-1 flex-col items-center gap-1.5">
+        <nav className="flex flex-1 flex-col items-center gap-4.5">
           {STAGES.map((stage) => {
             const Icon = STAGE_ICONS[stage.id];
             const active =
@@ -94,13 +95,13 @@ export function AppSidebar() {
                 {/* active accent bar (Teams-style) */}
                 <span
                   className={cn(
-                    "absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-primary transition-opacity",
+                    "absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary transition-opacity",
                     active ? "opacity-100" : "opacity-0",
                   )}
                 />
                 <span
                   className={cn(
-                    "relative flex size-10 items-center justify-center rounded-xl transition-colors",
+                    "relative flex size-9 items-center justify-center rounded-xl transition-colors",
                     active
                       ? "bg-white border text-primary"
                       : locked
@@ -120,7 +121,7 @@ export function AppSidebar() {
                 </span>
                 <span
                   className={cn(
-                    "text-[10.5px] leading-none tracking-tight",
+                    "text-[10px] leading-none tracking-tight",
                     active
                       ? "font-semibold text-primary"
                       : locked
@@ -140,13 +141,13 @@ export function AppSidebar() {
                     locked ? (
                       <div
                         aria-disabled
-                        className="group relative flex w-16 cursor-not-allowed flex-col items-center gap-1.5 rounded-2xl py-2"
+                        className="group relative flex w-16 cursor-not-allowed flex-col items-center gap-0.5 rounded-2xl py-1"
                       />
                     ) : (
                       <Link
                         href={stage.href}
                         aria-current={active ? "page" : undefined}
-                        className="group relative flex w-16 flex-col items-center gap-1.5 rounded-2xl py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="group relative flex w-16 flex-col items-center gap-0.5 rounded-2xl py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     )
                   }

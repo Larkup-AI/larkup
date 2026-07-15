@@ -12,8 +12,8 @@ export default function ServerPage() {
     <div className="flex min-h-full flex-col">
       <PageHeader
         eyebrow="Step 4 · Server"
-        title="Generate &amp; launch your RAG server"
-        description="Emit a standalone, deployable RAG server tailored to your selected vector store"
+        title="Generate &amp; launch your Custom AI Model server"
+        description="Emit a standalone, deployable AI server tailored to your selected vector store"
         actions={<DeployButton serverId={serverId} />}
       />
       <ServerWorkspace onServerId={setServerId} />

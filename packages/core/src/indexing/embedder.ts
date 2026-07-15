@@ -45,7 +45,7 @@ export function expectedDimensions(config: RagConfig): number {
     const custom = (config.customEmbeddings ?? []).find(
       (m) => m.modelName === customName,
     );
-    if (custom) return custom.dimensions;
+    if (custom) return custom.dimensions ?? 0;
   }
   return getEmbeddingModel(config.embeddingModelId)?.dimensions ?? 0;
 }

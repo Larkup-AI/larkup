@@ -2,10 +2,17 @@ import { NextResponse } from "next/server";
 import { readConfig } from "@larkup/core/config-store";
 import { readRun } from "@larkup/core/index-store";
 import { runWithServer } from "@larkup/core/workspace";
+import { getModelsByType } from "@larkup/core/models-cache";
 import {
+  toChatDescriptor,
   getChatModelsForProvider,
   getDefaultChatModel,
 } from "@larkup/core/chat-models/registry";
+import {
+  toEmbeddingDescriptor,
+  getEmbeddingModelsForProvider,
+  EMBEDDING_MODELS,
+} from "@larkup/core/embeddings/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -13,12 +20,6 @@ function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
   return serverId ? runWithServer(serverId, fn) : fn();
 }
 
-/**
- * GET /api/chat/status — readiness snapshot for the Chat stage.
- *
- * Reports whether there's an index ready to chat against, plus
- * the available chat models for the user's selected provider.
- */
 export async function GET(req: Request) {
   const serverId = new URL(req.url).searchParams.get("serverId");
   return withServer(serverId, async () => {
@@ -30,16 +31,42 @@ export async function GET(req: Request) {
 
     const blockers: string[] = [];
     if (!hasApiKey) {
-      blockers.push(
-        "Set an API Key in Settings.",
-      );
+      blockers.push("Set an API Key in Settings.");
     }
 
-    const provider = config.chatProvider || config.embeddingProvider;
-    const models = getChatModelsForProvider(provider);
-    const defaultModel = getDefaultChatModel(provider);
+    const requestedProvider = new URL(req.url).searchParams.get("provider");
+    const provider = requestedProvider || config.chatProvider || config.embeddingProvider;
+
+    // Fetch dynamic models from gateway cache
+    const [languageModels, embeddingGatewayModels] = await Promise.all([
+      getModelsByType("language"),
+      getModelsByType("embedding"),
+    ]);
+
+    // ── Chat models ───────────────────────────────────────────────────
+    const allChatModels = languageModels.map(toChatDescriptor);
+    const chatModels = getChatModelsForProvider(allChatModels, provider);
+    const defaultModel = getDefaultChatModel(allChatModels, provider);
     const chatModelId =
       config.chatModelId || defaultModel?.id || "openai/gpt-4o-mini";
+
+    // ── Embedding models ──────────────────────────────────────────────
+    // Convert gateway embedding models to descriptors (enriched with dimensions)
+    const dynamicEmbeddingModels = embeddingGatewayModels.map(toEmbeddingDescriptor);
+
+    // Merge: use gateway models + fill in any hardcoded models not in gateway
+    const embeddingIds = new Set(dynamicEmbeddingModels.map((m) => m.id));
+    const mergedEmbeddings = [
+      ...dynamicEmbeddingModels,
+      ...EMBEDDING_MODELS.filter((m) => !embeddingIds.has(m.id)),
+    ];
+
+    // Filter for the requested embedding provider
+    const embeddingProvider = config.embeddingProvider || provider;
+    const embeddingModels = getEmbeddingModelsForProvider(
+      mergedEmbeddings,
+      embeddingProvider,
+    );
 
     return NextResponse.json({
       ready: hasApiKey,
@@ -47,9 +74,22 @@ export async function GET(req: Request) {
       blockers,
       provider,
       chatModelId,
-      availableModels: models.map((m) => ({ id: m.id, label: m.label, provider: m.provider })),
+      availableModels: chatModels.map((m) => ({
+        id: m.id,
+        label: m.name,
+        provider: m.provider,
+        context_window: m.context_window,
+        tags: m.tags,
+      })),
+      availableEmbeddingModels: mergedEmbeddings.map((m) => ({
+        id: m.id,
+        label: m.label,
+        provider: m.provider,
+        dimensions: m.dimensions,
+        maxInputTokens: m.maxInputTokens,
+        description: m.description,
+      })),
       suggestions: config.chatSuggestions || [],
     });
   });
 }
-
