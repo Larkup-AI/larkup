@@ -38,7 +38,7 @@ export function GlobalIndexProgress() {
           <button className="flex items-center gap-3 rounded-full border bg-background px-4 py-2 text-sm font-medium shadow-md transition-all hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
             <Loader2 className="size-4 animate-spin text-primary" />
             <div className="flex flex-col items-start gap-0.5">
-              <span className="text-xs leading-none text-muted-foreground">Indexing...</span>
+              <span className="text-xs leading-none text-muted-foreground">Storing...</span>
               <span className="leading-none">{pct}%</span>
             </div>
           </button>
