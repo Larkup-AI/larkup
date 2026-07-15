@@ -8,6 +8,7 @@ import { WorkspaceProvider } from "@/components/workspace/workspace-provider";
 import { WorkspaceTopBar } from "@/components/workspace/workspace-top-bar";
 import { ThemeCustomizerProvider } from "@/components/theme-customizer-provider";
 import { ClientLayoutWrapper } from "@/components/client-layout-wrapper";
+import { GlobalIndexProgress } from "@/components/index/global-index-progress";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({
@@ -42,6 +43,7 @@ export default function RootLayout({
           <WorkspaceProvider>
             <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
             <Toaster position="bottom-right" />
+            <GlobalIndexProgress />
           </WorkspaceProvider>
         </ThemeCustomizerProvider>
         {process.env.NODE_ENV === "production" && <Analytics />}
