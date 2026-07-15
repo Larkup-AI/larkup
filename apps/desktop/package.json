@@ -6,7 +6,7 @@
   "scripts": {
     "tauri": "tauri",
     "start": "tauri dev",
-    "build": "tauri build",
+    "build": "find ../web/.next/standalone -type l ! -exec test -e {} \\; -delete || true && tauri build",
     "build:sidecar": "bash scripts/build_sidecar.sh",
     "test:e2e": "playwright test"
   },
