@@ -9,7 +9,7 @@ test.describe("Server Page", () => {
   test("page loads with correct heading", async ({ page }) => {
     await expect(page.getByText("Step 4 · Server")).toBeVisible();
     await expect(
-      page.getByText("Generate & launch your RAG server")
+      page.getByText("Generate & launch your Custom AI Model server")
     ).toBeVisible();
   });
 
