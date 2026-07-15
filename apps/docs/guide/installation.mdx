@@ -1,0 +1,144 @@
+---
+title: "Installation"
+description: "Get up and running with Larkup in seconds."
+---
+
+## Get Started
+
+The fastest way to install Larkup on your PC:
+
+<Tabs>
+  <Tab title="macOS / Linux" icon="terminal">
+    ```bash
+    curl -fsSL https://larkup.de/install.sh | bash
+    ```
+
+    Then start Larkup:
+
+    ```bash
+    larkup dev
+    ```
+  </Tab>
+  <Tab title="Windows" icon="windows">
+    ```powershell
+    iwr -useb https://larkup.de/install.ps1 | iex
+    ```
+
+    Then start Larkup in your terminal:
+
+    ```powershell
+    larkup dev
+    ```
+  </Tab>
+</Tabs>
+
+The script handles dependencies like Node.js, configures your PATH, and sets the correct permissions. Just paste and go.
+
+<Note>
+  You may need to restart your terminal after installation for the `larkup` command to be available.
+</Note>
+
+## Verify It Worked
+
+```bash
+larkup --version
+```
+
+If you see a version number, you're good. Head to the [Quickstart](/guide/quickstart) to build your first pipeline.
+
+---
+
+## Other Ways to Install
+
+<Tabs>
+  <Tab title="Docker" icon="docker">
+    To allow the app to dynamically launch multiple RAG servers, we map a range of ports (e.g., 8080-8090) in addition to the main port:
+
+    ```bash
+    docker run --platform linux/amd64 -d -p 4567:4567 -p 8080-8090:8080-8090 aboneda/larkup:latest
+    ```
+
+    Then open `http://localhost:4567`.
+  </Tab>
+  <Tab title="npm" icon="npm">
+    If you already have Node.js installed:
+
+    ```bash
+    npm install -g @larkup/cli
+    ```
+
+    Then start Larkup:
+
+    ```bash
+    larkup dev
+    ```
+  </Tab>
+  <Tab title="From source" icon="github">
+    ```bash
+    git clone https://github.com/Larkup-AI/larkup
+    cd larkup
+    ./start.sh
+    ```
+
+    Builds and starts the app at `http://localhost:4567`.
+  </Tab>
+</Tabs>
+
+## Self-contained Install
+
+If you prefer an installation that requires no root access and doesn't modify system files, use the self-contained script. This will install its own Node.js and keep everything isolated under `~/.larkup`.
+
+```bash
+curl -fsSL https://larkup.de/install-local.sh | bash
+```
+
+To uninstall, simply delete the folder:
+
+```bash
+rm -rf ~/.larkup
+```
+
+## Custom Install 
+
+You can customize the main installation scripts using the following flags:
+
+<Tabs>
+  <Tab title="macOS / Linux" icon="terminal">
+    Pass flags after `bash -s --`:
+
+    ```bash
+    # Install a specific version
+    curl -fsSL https://larkup.de/install.sh | bash -s -- --version 1.2.0
+
+    # Skip prompts (CI-friendly)
+    curl -fsSL https://larkup.de/install.sh | bash -s -- --no-prompt
+
+    # Preview without making changes
+    curl -fsSL https://larkup.de/install.sh | bash -s -- --dry-run
+    ```
+  </Tab>
+  <Tab title="Windows" icon="windows">
+    Run the script file directly with flags:
+
+    ```powershell
+    # Install a specific version
+    .\install.ps1 -Version 1.2.0
+
+    # Skip prompts (CI-friendly)
+    .\install.ps1 -NoPrompt
+
+    # Preview without making changes
+    .\install.ps1 -DryRun
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## System Requirements
+
+| Requirement | Details |
+| --- | --- |
+| **Node.js** | v20+ (auto-installed if missing) |
+| **OS** | macOS, Linux, WSL, or Windows |
+| **Architecture** | x64 or ARM64 |

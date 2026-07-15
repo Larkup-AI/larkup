@@ -1,0 +1,157 @@
+---
+title: "Quickstart"
+description: "Build your first pipeline in 5 steps."
+---
+
+Get your first workspace and RAG server running. Choose your preferred workflow:
+
+<Tabs>
+  <Tab title="Web UI" icon="browser">
+    <Steps>
+      <Step title="Create a Workspace">
+        Launch the Web UI and create a workspace to encapsulate your configuration, data, and server.
+      </Step>
+
+      <Step title="Configure">
+        Navigate to the **Configuration** tab. Select a **Vector Store** (e.g., LanceDB) and an **Embedding Model** (e.g., OpenAI).
+        
+        <Frame>
+          <img src="/images/configuration-page.png" alt="Configuration Page" />
+        </Frame>
+      </Step>
+
+      <Step title="Ingest Data">
+        In the **Data** tab, add documents via file upload, direct text input, or web scraping. These queue up for the ETL process.
+
+        <Frame>
+          <img src="/images/scrape-etl-jobs.png" alt="Data Ingestion" />
+        </Frame>
+      </Step>
+
+      <Step title="Index">
+        Head to the **Index** tab and click **Run Indexing Job** to chunk your documents and store the vectors.
+
+        <Frame>
+          <img src="/images/index-page.png" alt="Indexing Data" />
+        </Frame>
+      </Step>
+
+      <Step title="Launch the Server">
+        Go to the **Server** tab and click **Launch Server** to generate an optimized Node.js backend. Test queries instantly in the **Demo** tab!
+
+        <Frame>
+          <img src="/images/server-page.png" alt="Launch Server" />
+        </Frame>
+
+        View the API schema using the integrated Scalar UI:
+        <Frame>
+          <img src="/images/server-scalar-api.png" alt="Server API Reference" />
+        </Frame>
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="CLI" icon="terminal">
+    <Steps>
+      <Step title="Launch Larkup Studio">
+        If the Larkup Studio is not already running on port 4567, start it:
+        ```bash
+        larkup dev
+        ```
+      </Step>
+
+      <Step title="Initialize Workspace">
+        Create a new workspace project:
+        ```bash
+        larkup init my-first-server
+        ```
+      </Step>
+
+      <Step title="Ingest Data">
+        Add your documents to the project:
+        ```bash
+        larkup add-doc --file ./data/knowledge-base.txt
+        ```
+      </Step>
+
+      <Step title="Index">
+        Process, chunk, and index your documents into the vector store:
+        ```bash
+        larkup index
+        ```
+      </Step>
+
+      <Step title="Launch the Server">
+        Start the RAG server locally:
+        ```bash
+        larkup serve
+        ```
+      </Step>
+
+      <Step title="Test Queries">
+        In another terminal window, query your data directly:
+        ```bash
+        larkup query "What is in my knowledge base?"
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Connect Your App
+
+Once your server is running, connect your AI agents to it using our official SDKs:
+
+<CodeGroup>
+  ```typescript TypeScript (AI-SDK)
+  import { tool } from "ai";
+  import { z } from "zod";
+  import { LarkupClient } from "@larkup/sdk";
+
+  const ragClient = new LarkupClient({
+    baseUrl: "http://localhost:8080",
+    apiKey: "your-api-key",
+  });
+
+  export const ragTool = tool({
+    description: "Search the knowledge base.",
+    parameters: z.object({ query: z.string() }),
+    execute: async ({ query }) => {
+      const results = await ragClient.query(query, 5);
+      return results.hits.map((hit) => hit.text).join("\n\n");
+    },
+  });
+  ```
+
+  ```python Python (LangChain)
+  from typing import List
+  from langchain_core.retrievers import BaseRetriever
+  from langchain_core.documents import Document
+  from pydantic import Field
+  from larkup import LarkupClient, LarkupClientOptions
+
+  class LarkupRetriever(BaseRetriever):
+      client: LarkupClient = Field(
+          default_factory=lambda: LarkupClient(
+              LarkupClientOptions(base_url="http://localhost:8080", api_key="key")
+          )
+      )
+      
+      def _get_relevant_documents(self, query: str, *, run_manager=None) -> List[Document]:
+          results = self.client.query(query, top_k=5)
+          return [
+              Document(page_content=hit.text, metadata={"score": hit.score}) 
+              for hit in results.hits
+          ]
+
+  # Usage:
+  # retriever = LarkupRetriever()
+  # docs = retriever.invoke("Query here")
+  ```
+</CodeGroup>
+
+<br />
+
+**Now explore what you can build:**
+- [Build Your First RAG Server](/guide/build-rag-server)
+- [Launch an Instant Chatbot](/guide/instant-chatbot)

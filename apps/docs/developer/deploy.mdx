@@ -1,0 +1,261 @@
+---
+title: "Deploy Your Server"
+description: "Ship your RAG pipeline to production — choose your preferred cloud provider."
+---
+
+Larkup generates a fully self-contained Node.js server with zero bloat. Because it's standard Node.js under the hood, **you can deploy it anywhere** — serverless platforms, bare-metal VPS, or managed cloud services.
+
+<Info>
+  Every generated server ships with a `vercel.json` for Vercel and a `Dockerfile` for VPS / container deployments out of the box. No extra configuration needed.
+</Info>
+
+---
+
+## Choose Your Deployment Target
+
+<Tabs>
+  <Tab title="Vercel" icon="triangle">
+    <Badge color="green">Recommended · Serverless</Badge>
+
+    The fastest path to production. The generated server includes a `vercel.json` pre-configured for serverless deployment — one command and you're live.
+
+    ### Demo
+
+    <video
+      controls
+      autoPlay
+      muted
+      loop
+      playsInline
+      src="https://uj1bbyme8q.ufs.sh/f/33KlxstS2hq8P7Wdzz9qQrkh6F0NE48c1aldfxmpu3BL7GRO"
+      style={{ width: "100%", borderRadius: "12px", marginBottom: "16px" }}
+    />
+
+    > **Note:** Full demo video coming soon. Screenshots below show the in-app deployment flow.
+
+    <img
+      src="/images/deploy/vercel.png"
+      alt="Deploy to Vercel — in-app modal showing Access Token and Project ID fields"
+      style={{ borderRadius: "12px", marginBottom: "8px" }}
+    />
+
+    <img
+      src="/images/deploy/deploy-environment-variable.png"
+      alt="Environment Variables configuration panel with pre-filled API keys"
+      style={{ borderRadius: "12px", marginBottom: "24px" }}
+    />
+
+    ### Steps
+
+    <Steps>
+      <Step title="Open the Deploy Panel">
+        From the **Server** page in the Larkup app, click the **Deploy** button in the top-right corner and select **Vercel** from the dropdown.
+      </Step>
+
+      <Step title="Enter Your Vercel Access Token">
+        Paste your Vercel Access Token into the field. You can generate one at [vercel.com/account/tokens](https://vercel.com/account/tokens).
+      </Step>
+
+      <Step title="Set the Project Name">
+        Enter a unique **Project ID or Name** (e.g. `my-rag-server`). This is saved per server for future re-deployments.
+      </Step>
+
+      <Step title="Configure Environment Variables">
+        Click **Configure** next to the Environment Variables section. Your workspace `.env` values are pre-filled automatically. Ensure at minimum your LLM provider API key is set (e.g. `OPENAI_API_KEY`).
+      </Step>
+
+      <Step title="Deploy">
+        Click **Deploy** — Larkup will push your server to Vercel. Once complete, a live URL will appear in the Server panel.
+      </Step>
+    </Steps>
+
+    <Tip>
+      After your first deployment, subsequent deploys are instant — just click Deploy again. Your project name and token are remembered.
+    </Tip>
+  </Tab>
+
+  <Tab title="Hetzner / VPS" icon="server">
+    <Badge color="blue">Docker · SSH Deploy</Badge>
+
+    Deploy to any Linux VPS (Hetzner, DigitalOcean Droplets, AWS EC2, etc.) via SSH. Larkup automatically connects, installs Docker, and launches your server — no manual setup needed.
+
+    ### Demo
+
+    <video
+      controls
+      autoPlay
+      muted
+      loop
+      playsInline
+      src="https://uj1bbyme8q.ufs.sh/f/33KlxstS2hq8hQVIucpviqVtG3a6p480HIWDQKSulf2LAFeo"
+      style={{ width: "100%", borderRadius: "12px", marginBottom: "16px" }}
+    />
+
+    > **Note:** Full demo video coming soon. Screenshots below show the live SSH deployment in action.
+
+    <img
+      src="/images/deploy/launch-server.png"
+      alt="Server launched — Remote server URL shown with live curl command for testing"
+      style={{ borderRadius: "12px", marginBottom: "24px" }}
+    />
+
+    <img
+      src="/images/deploy/deploy-hertzner.png"
+      alt="Deploy via SSH modal — Server IP, SSH Username, and Authentication Type fields"
+      style={{ borderRadius: "12px", marginBottom: "8px" }}
+    />
+
+    {/* <img
+      src="/images/deploy/deploy-hertzner2.png"
+      alt="SSH deployment in progress — Docker installation log streaming in terminal output"
+      style={{ borderRadius: "12px", marginBottom: "8px" }}
+    />
+
+    <img
+      src="/images/deploy/deploy-hertzner3.png"
+      alt="SSH deployment completing — password changed, Docker verified, container launching"
+      style={{ borderRadius: "12px", marginBottom: "8px" }}
+    /> */}
+
+   
+
+    ### Steps
+
+    <Steps>
+      <Step title="Provision a VPS">
+        Create a fresh Ubuntu 22.04+ server on [Hetzner Cloud](https://www.hetzner.com/cloud), DigitalOcean, or any VPS provider. Note the public IP address.
+      </Step>
+
+      <Step title="Open the Deploy Panel">
+        In the Larkup app, click **Deploy → Deploy via SSH (Hetzner, EC2, Droplets)**.
+      </Step>
+
+      <Step title="Enter Server Credentials">
+        Fill in:
+        - **Server IP / Hostname** — e.g. `167.233.113.67`
+        - **SSH Username** — typically `root` for a fresh VPS
+        - **Authentication Type** — choose **Password** or **Private Key**
+      </Step>
+
+      <Step title="Configure Environment Variables">
+        Click **Configure** to set your API keys. Values from your local `.env` are pre-filled and synced automatically.
+      </Step>
+
+      <Step title="Deploy via SSH">
+        Click **Deploy via SSH**. Larkup will:
+        1. Connect to your server over SSH
+        2. Install Docker (if not present)
+        3. Pull and build your RAG server image
+        4. Launch the container on port `8080`
+
+        You can watch the live terminal output stream directly in the app.
+      </Step>
+
+      <Step title="Access Your Live Server">
+        Once deployment completes, the live server URL (`http://<ip>:8080`) appears in the panel with a ready-to-use `curl` test command.
+      </Step>
+    </Steps>
+
+    <Warning>
+      For production use, configure a reverse proxy (Nginx or Caddy) in front of port `8080` to handle SSL termination and custom domain routing.
+    </Warning>
+
+  </Tab>
+
+  <Tab title="Azure" icon="microsoft">
+    <Badge color="purple">Azure App Service · Container Apps</Badge>
+
+    Larkup works seamlessly on Microsoft Azure using either **Azure App Service** (for Node.js apps) or **Azure Container Apps** (for Dockerized workloads).
+
+    <img
+      src="/images/deploy/azure.png"
+      alt="Azure deployment — Larkup server page ready for Azure Container Apps or App Service"
+      style={{ borderRadius: "12px", marginBottom: "24px" }}
+    />
+
+    <Note>
+      A detailed step-by-step Azure walkthrough with screenshots is coming soon. In the meantime, reach out via [GitHub Issues](https://github.com/Larkup-AI/larkup/issues) if you need help.
+    </Note>
+  </Tab>
+
+  <Tab title="Other Clouds" icon="cloud">
+    <Badge color="gray">AWS · GCP · Railway · Fly.io · and more</Badge>
+
+    Larkup's generated server is a plain Node.js app with an included `Dockerfile` — it runs on **any cloud or platform** that supports containers or Node.js.
+
+    ### Supported Platforms
+
+    | Platform | Method | Notes |
+    |---|---|---|
+    | **AWS EC2** | SSH / Docker | Use the Hetzner SSH deploy flow with your EC2 IP |
+    | **AWS ECS / Fargate** | Docker | Push to ECR, deploy as ECS task |
+    | **AWS App Runner** | Docker / Git | Connect your repo or push an image directly |
+    | **Google Cloud Run** | Docker | Push to Artifact Registry, deploy as a Cloud Run service |
+    | **Railway** | Git / Docker | `railway up` from the generated server directory |
+    | **Fly.io** | Docker | `fly launch` from the generated server directory |
+    | **Render** | Docker / Git | Connect your repo or use the `Dockerfile` |
+    | **Self-hosted** | Docker | Run anywhere with `docker run` |
+
+    ### Generic Docker Deploy
+
+    All platforms that support containers can use the included `Dockerfile`:
+
+    ```bash
+    # Build
+    docker build -t my-rag-server .
+
+    # Run (replace env vars as needed)
+    docker run -d \
+      -p 8080:8080 \
+      -e OPENAI_API_KEY=your_key \
+      -e SERVER_API_KEY=your_secret \
+      my-rag-server
+    ```
+
+    ### AWS-Specific Quick Start
+
+    <Steps>
+      <Step title="Push to Amazon ECR">
+        ```bash
+        aws ecr create-repository --repository-name my-rag-server
+        aws ecr get-login-password | docker login --username AWS \
+          --password-stdin <account-id>.dkr.ecr.<region>.amazonaws.com
+
+        docker tag my-rag-server:latest \
+          <account-id>.dkr.ecr.<region>.amazonaws.com/my-rag-server:latest
+        docker push \
+          <account-id>.dkr.ecr.<region>.amazonaws.com/my-rag-server:latest
+        ```
+      </Step>
+
+      <Step title="Deploy to ECS Fargate or App Runner">
+        Create a task definition or App Runner service pointing to your ECR image. Set environment variables in the service configuration.
+      </Step>
+    </Steps>
+
+    <Tip>
+      Need first-class support for a specific cloud? [Open an issue](https://github.com/Larkup-AI/larkup/issues) or submit a PR — one-click deploy integrations for AWS, GCP, and Railway are on the roadmap.
+    </Tip>
+  </Tab>
+</Tabs>
+
+---
+
+## Environment Variables Reference
+
+Regardless of your deployment target, ensure the following variables are configured in your cloud provider's settings panel:
+
+| Variable | Required | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | ✅ Yes (if using OpenAI) | Your OpenAI API key for embeddings / completions |
+| `SERVER_API_KEY` | Recommended | Secures your deployed RAG endpoints with Bearer auth |
+| `EMBEDDING_API_KEY` | ✅ Yes | API key used to embed incoming queries |
+| `LANCEDB_TABLE` | Optional | Vector table name (default: `documents`) |
+| `LANCEDB_URI` | Optional | LanceDB Cloud URI (for cloud vector storage mode) |
+| `LANCEDB_API_KEY` | Optional | LanceDB Cloud API key |
+
+<img
+  src="/images/deploy/deploy-environment-variable.png"
+  alt="Environment Variables configuration panel"
+  style={{ borderRadius: "12px", marginTop: "16px" }}
+/>

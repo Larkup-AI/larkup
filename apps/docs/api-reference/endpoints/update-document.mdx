@@ -1,0 +1,48 @@
+---
+title: "Update Document"
+api: "PUT /documents/{id}"
+description: "Update an existing document in the corpus."
+---
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The ID of the document to update.
+</ParamField>
+
+### Body
+
+<ParamField body="text" type="string" required>
+  The updated raw text content of the document.
+</ParamField>
+
+<ParamField body="title" type="string">
+  An updated title for the document.
+</ParamField>
+
+<ParamField body="url" type="string">
+  An updated URL specifying where the document originated.
+</ParamField>
+
+<ParamField body="documentId" type="string">
+  The underlying document ID, usually kept the same.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates whether the update was successful.
+</ResponseField>
+
+```json Example Request
+{
+  "title": "Welcome Updated",
+  "text": "Hello world. This is an updated test document."
+}
+```
+
+```json Example Response
+{
+  "success": true
+}
+```

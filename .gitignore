@@ -33,7 +33,7 @@ venv/
 dist/
 
 # App-specific ignores
-apps/docs
+
 apps/web/demo
 apps/local-chat-connection-larkup
 

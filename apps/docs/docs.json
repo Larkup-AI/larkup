@@ -1,0 +1,119 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Larkup",
+  "colors": {
+    "primary": "#000000",
+    "light": "#000000",
+    "dark": "#222222"
+  },
+  "background": {
+    "color": {
+      "light": "#FCFCFB",
+      "dark": "#0a0a0a"
+    }
+  },
+  "favicon": "/images/favicon.ico",
+  "logo": {
+    "light": "/logo/logo-light2.png",
+    "dark": "/logo/logo-dark2.png"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:abdelrahmanaboneda@gmail.com"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "GitHub",
+      "href": "https://github.com/Larkup-AI/larkup"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["index", "guide/installation", "guide/quickstart"]
+          },
+          {
+            "group": "Use Cases",
+            "pages": [
+              "guide/build-rag-server",
+              "guide/data-loading",
+              "guide/instant-chatbot"
+            ]
+          },
+          {
+            "group": "Developer Guide",
+            "pages": [
+              "developer/cli",
+              "developer/deploy",
+              "developer/configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDK",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["sdk/overview"]
+          },
+          {
+            "group": "Official",
+            "pages": ["sdk/typescript", "sdk/python"]
+          },
+          {
+            "group": "Integrations",
+            "pages": ["sdk/integrations/ai-sdk", "sdk/integrations/langchain"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["api-reference/overview"]
+          },
+          {
+            "group": "Server Status",
+            "pages": ["api-reference/endpoints/health"]
+          },
+          {
+            "group": "Querying",
+            "pages": ["api-reference/endpoints/query"]
+          },
+          {
+            "group": "Documents",
+            "pages": [
+              "api-reference/endpoints/get-documents",
+              "api-reference/endpoints/get-document",
+              "api-reference/endpoints/create-document",
+              "api-reference/endpoints/update-document",
+              "api-reference/endpoints/delete-document"
+            ]
+          },
+          {
+            "group": "ETL & Scraping",
+            "pages": ["api-reference/endpoints/scrape"]
+          }
+        ]
+      }
+    ]
+  },
+  "contextual": {
+    "options": ["copy"]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Larkup-AI/larkup"
+    }
+  }
+}

@@ -1,0 +1,66 @@
+---
+title: "TypeScript"
+description: "How to install and use the Larkup TypeScript SDK."
+icon: "js"
+---
+
+## Installation
+
+The SDK is available on npm. You can install it using your preferred package manager:
+
+<CodeGroup>
+
+```bash npm
+npm install @larkup/sdk
+```
+
+```bash yarn
+yarn add @larkup/sdk
+```
+
+```bash pnpm
+pnpm add @larkup/sdk
+```
+
+</CodeGroup>
+
+## Initialization
+
+Import and initialize the client. It automatically picks up the `LARKUP_API_URL` and `LARKUP_API_KEY` from your environment.
+
+```typescript
+import { LarkupClient } from "@larkup/sdk";
+
+const client = new LarkupClient({
+  baseUrl: "http://localhost:8080",
+  apiKey: "your-api-key",
+});
+```
+
+## Basic Usage
+
+### Adding a Document
+
+```typescript
+const response = await client.addDocument({
+  id: "doc-1",
+  text: "Larkup is a flexible, high-performance RAG pipeline.",
+  title: "Introduction",
+});
+
+console.log("Document added:", response.success);
+```
+
+### Querying
+
+```typescript
+const results = await client.query("What is Larkup?", 5);
+
+for (const hit of results.hits) {
+  console.log(`Score: ${hit.score} | Text: ${hit.text}`);
+}
+```
+
+## Integrations
+
+For connecting to the Vercel AI SDK or LangChain.js, see the dedicated [Vercel AI SDK Integration](/sdk/integrations/ai-sdk) and [LangChain Integration](/sdk/integrations/langchain) guides.

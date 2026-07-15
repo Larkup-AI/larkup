@@ -1,0 +1,17 @@
+---
+title: "Check Health"
+api: "GET /health"
+description: "Checks if the generated RAG server is running and responsive."
+---
+
+### Response
+
+<ResponseField name="ok" type="boolean">
+  Returns `true` if the server is healthy.
+</ResponseField>
+
+```json Example Response
+{
+  "ok": true
+}
+```

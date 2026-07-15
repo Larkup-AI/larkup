@@ -1,0 +1,84 @@
+---
+title: "CLI Reference"
+description: "Control your pipeline from the terminal."
+---
+
+Everything you can do in the Web UI, you can do directly from your terminal. Whether you prefer clicking through a visual interface or automating workflows with bash scripts, Larkup has you covered.
+
+<Tip>
+  Prefer a visual interface? Most users should start with the [Web UI Quickstart](/guide/quickstart) instead.
+</Tip>
+
+## Installation
+
+Install the CLI globally using your preferred package manager:
+
+<CodeGroup>
+
+```bash npm
+npm install -g @larkup/cli
+```
+
+```bash yarn
+yarn global add @larkup/cli
+```
+
+```bash pnpm
+pnpm add -g @larkup/cli
+```
+
+</CodeGroup>
+
+Alternatively, you can use it without installation via `npx`:
+
+```bash
+npx @larkup/cli <command>
+```
+
+## Running a Full RAG Server from Local Files
+
+If you have a local directory of markdown files or PDFs, you can ingest them, index them, and run a complete standalone RAG server using *only* the CLI.
+
+Here is the complete end-to-end workflow:
+
+```bash
+# 1. Initialize a new workspace
+larkup init "my-local-knowledgebase"
+
+# 2. Ingest local files (repeat as needed, or script a loop)
+larkup add-doc --file ./docs/manual.md --title "User Manual"
+larkup add-doc --file ./docs/api.md --title "API Reference"
+
+# 3. Execute the chunking and embedding pipeline (streams progress)
+larkup index
+
+# 4. Generate the deployable RAG server to disk
+larkup generate --out ./my-rag-server
+
+# 5. Serve the generated backend in the foreground
+larkup serve
+```
+
+In another terminal window, you can instantly test queries against your new server:
+```bash
+larkup query "How do I authenticate with the API?" --topK 3
+```
+
+## Core Commands Reference
+
+Once installed, you can use the `larkup` (or `rag`) command.
+
+| Command | Description |
+| --- | --- |
+| `larkup init [name]` | Create a new RAG server workspace and make it active. |
+| `larkup servers` | List all servers (`●` marks the active one). |
+| `larkup use <id\|name>` | Switch the active server workspace. |
+| `larkup config` | Show the active server's configuration and status. |
+| `larkup add-doc --file <path>` | Add a document from a local file. |
+| `larkup add-doc --text "<text>"`| Add a document from inline text (optional `--title`, `--url`). |
+| `larkup index` | Execute the chunking and embedding pipeline. |
+| `larkup generate [--out <dir>]`| Emit the deployable RAG server to disk. |
+| `larkup serve` | Run the generated server locally in the foreground. |
+| `larkup query "<question>"` | Retrieve the top-k chunks (`--topK <n>` optional). |
+| `larkup chat` | Chat with your knowledge base in the terminal (`--model <id>` optional). |
+| `larkup settings` | Configure CLI settings (e.g., chat models). |

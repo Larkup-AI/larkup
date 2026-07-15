@@ -1,0 +1,132 @@
+---
+title: "Chat with Your Data"
+description: "Turn your documents into an AI-powered chatbot in minutes, via CLI or the Web UI."
+---
+
+Larkup gives you two ways to chat with your knowledge base: a **CLI** for developers who prefer the terminal, and a full **Web UI** with a built-in chat interface. Both paths support multiple LLM providers out of the box.
+
+## Supported Providers
+
+Larkup isn't locked to OpenAI. You can choose from any of the following embedding and LLM providers, all configurable from the UI or CLI:
+
+- **Vercel AI Gateway** (Recommended): unified gateway with automatic routing
+- **OpenAI**: GPT-4o, GPT-4o Mini, and embedding models
+- **DeepSeek**: cost-effective alternative models
+- **Google**: Gemini models
+- **Anthropic / Cohere / Mistral / Voyage AI / Jina AI / Nomic**
+- **Custom**: bring your own OpenAI-compatible endpoint
+
+<Frame caption="Choose from 10+ embedding providers directly in the configuration UI">
+  <img src="/images/configuration/llm-embedding-providers.png" alt="Supported LLM and embedding providers" />
+</Frame>
+
+---
+
+## Getting Started
+
+<Tabs>
+  <Tab title="CLI">
+    The CLI is the fastest way to go from documents to a working chatbot, no browser required.
+
+    ### 1. Initialize your project
+
+    Open your terminal and create a new chatbot workspace:
+
+    ```bash
+    npx @larkup/cli init my-first-chatbot
+    ```
+
+    ### 2. Configure your provider
+
+    Set your embedding provider and API key:
+
+    ```bash
+    npx @larkup/cli config
+    ```
+
+    You'll be prompted to select a provider (OpenAI, Vercel AI Gateway, DeepSeek, etc.) and paste your API key.
+
+    ### 3. Add your documents
+
+    Feed documents into the pipeline: PDF, text, markdown, or URLs:
+
+    ```bash
+    npx @larkup/cli add-doc --file /path/to/your/document.pdf
+    ```
+
+    Run this command multiple times to add as many files as you need.
+
+    ### 4. Index your data
+
+    Process and embed your documents into the vector store:
+
+    ```bash
+    npx @larkup/cli index
+    ```
+
+    ### 5. Start chatting
+
+    Launch the interactive chat directly in your terminal:
+
+    ```bash
+    npx @larkup/cli chat
+    ```
+
+    The AI pulls facts directly from your indexed documents to answer questions. Type `exit` to quit.
+  </Tab>
+
+  <Tab title="Web UI">
+    The Web UI provides a visual, no-code experience for the entire RAG workflow, from configuration to chat.
+
+    ### 1. Configure your pipeline
+
+    Open the **Configure** tab to set your project name, embedding model, and vector store. Click the provider dropdown to choose from Vercel AI Gateway, OpenAI, DeepSeek, Google, and more.
+
+    <Frame caption="Pipeline configuration: set your project, embedding model, and vector store">
+      <img src="/images/configuration-page.png" alt="Configuration page" />
+    </Frame>
+
+    ### 2. Load your data
+
+    Switch to the **Data** tab. You can web-scrape entire domains, paste raw text, or upload files (PDF, Word, JSON, CSV, and more). All ingestion jobs are tracked in the **ETL Jobs** tab.
+
+    <Frame caption="Scrape websites, upload files, or paste text into your knowledge base">
+      <img src="/images/data/launch-firecrwal-server.png" alt="Add data interface" />
+    </Frame>
+
+    <Frame caption="Your corpus, all ingested documents in one view">
+      <img src="/images/data/corpus-table.png" alt="Corpus table" />
+    </Frame>
+
+    ### 3. Test your pipeline
+
+    Use the **Demo** tab to send test queries against your indexed data. See matching documents, similarity scores, and response latency in real time.
+
+    <Frame caption="Query your pipeline and inspect top-k results with similarity scores">
+      <img src="/images/demo-page.png" alt="Demo query page" />
+    </Frame>
+
+    ### 4. Chat with your knowledge base
+
+    Open the **Chat** tab for a full conversational interface. Select your LLM model from the dropdown (e.g., GPT-4o Mini via Gateway) and start asking questions grounded in your documents.
+
+    <Frame caption="Built-in chat: ask questions and get answers grounded in your indexed documents">
+      <img src="/images/chat.png" alt="Chat interface" />
+    </Frame>
+  </Tab>
+</Tabs>
+
+---
+
+## Vector Store Options
+
+Larkup supports multiple vector store backends. Choose the one that fits your deployment:
+
+- **LanceDB**: embedded, file-based (great for local/offline use)
+- **Pinecone**: fully-managed cloud vector database
+- **Chroma**: open-source, developer-friendly
+- **Weaviate / Qdrant / pgvector / Supabase**: coming soon
+
+<Frame caption="Vector store selection, from embedded local DBs to managed cloud services">
+  <img src="/images/configuration/vectorstores-providers.png" alt="Vector store providers" />
+</Frame>

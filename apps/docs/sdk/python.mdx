@@ -1,0 +1,68 @@
+---
+title: "Python"
+description: "How to install and use the Larkup Python SDK."
+icon: "python"
+---
+
+## Installation
+
+The SDK is published to PyPI. Install it using `pip` or `uv`.
+
+<CodeGroup>
+
+```bash uv
+uv add larkup
+```
+
+```bash pip
+pip install larkup
+```
+
+</CodeGroup>
+
+## Initialization
+
+Import the client and initialize it. The client will automatically fall back to `LARKUP_API_URL` and `LARKUP_API_KEY` environment variables if no arguments are passed.
+
+Both synchronous and asynchronous clients are available.
+
+```python
+from larkup import LarkupClient, LarkupClientOptions
+
+options = LarkupClientOptions(
+    base_url="http://localhost:8080",
+    api_key="your-api-key"
+)
+
+client = LarkupClient(options)
+```
+
+## Basic Usage
+
+### Adding a Document
+
+```python
+from larkup import Document
+
+doc = Document(
+    id="doc-1",
+    text="Larkup is a flexible, high-performance RAG pipeline.",
+    title="Introduction"
+)
+
+response = client.add_document(doc)
+print("Document added:", response["success"])
+```
+
+### Querying
+
+```python
+results = client.query("What is Larkup?", top_k=5)
+
+for hit in results.hits:
+    print(f"Score: {hit.score} | Text: {hit.text}")
+```
+
+## Integrations
+
+For connecting to LangChain Python, see the dedicated [LangChain Integration](/sdk/integrations/langchain) guide.
