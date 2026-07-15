@@ -1,0 +1,4 @@
+# Desktop app build artifacts
+src-tauri/binaries/
+src-tauri/target/
+archive/

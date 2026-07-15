@@ -24,9 +24,24 @@ pub fn run() {
             // Spawn the Next.js sidecar server
             tauri::async_runtime::spawn(async move {
                 let shell = handle.shell();
-                let sidecar = shell.sidecar("binaries/larkup-server").unwrap();
+                // Try "larkup-server" directly (Tauri strips directory paths for the sidecar key)
+                let sidecar = shell.sidecar("larkup-server")
+                    .or_else(|_| shell.sidecar("binaries/larkup-server"))
+                    .expect("Failed to create sidecar command object");
+
+                // Build the path to the bundled Next.js standalone server
+                let server_dir = handle
+                    .path()
+                    .resource_dir()
+                    .unwrap()
+                    .join("server/apps/web");
+                let resource_path = server_dir.join("server.js");
 
                 let (mut rx, child) = sidecar
+                    .current_dir(server_dir)
+                    .arg(resource_path.to_string_lossy().to_string())
+                    .env("PORT", "4567")
+                    .env("HOSTNAME", "127.0.0.1")
                     .spawn()
                     .expect("Failed to start Larkup server sidecar");
 
@@ -46,9 +61,7 @@ pub fn run() {
                             let text_lower = text.to_lowercase();
                             if text_lower.contains("ready") || text_lower.contains("started server") || text_lower.contains("listening on") || text_lower.contains("localhost:4567") {
                                 if let Some(window) = handle.get_webview_window("main") {
-                                    let _ = window.eval(
-                                        "window.__LARKUP_SERVER_READY = true; if (window.__onServerReady) window.__onServerReady();"
-                                    );
+                                    let _ = window.navigate("http://localhost:4567".parse().unwrap());
                                 }
                             }
                         }

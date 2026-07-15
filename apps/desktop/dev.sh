@@ -92,4 +92,4 @@ echo "▸ Starting Tauri dev mode..."
 echo "  The desktop app window will open shortly."
 echo ""
 cd "$DESKTOP_DIR"
-pnpm dev
+pnpm start

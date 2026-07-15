@@ -76,23 +76,27 @@ echo "✓ Static assets copied"
 echo ""
 echo "▸ Packaging with @yao-pkg/pkg..."
 
-# Map Tauri target triple → pkg target
-PKG_TARGET=""
+# Map Tauri target triple → Node target
+NODE_VERSION="v20.14.0"
+NODE_TARGET=""
+EXT="tar.gz"
+
 case "$TARGET_TRIPLE" in
   aarch64-apple-darwin)
-    PKG_TARGET="node20-macos-arm64"
+    NODE_TARGET="darwin-arm64"
     ;;
   x86_64-apple-darwin)
-    PKG_TARGET="node20-macos-x64"
+    NODE_TARGET="darwin-x64"
     ;;
   x86_64-pc-windows-msvc)
-    PKG_TARGET="node20-win-x64"
+    NODE_TARGET="win-x64"
+    EXT="zip"
     ;;
   x86_64-unknown-linux-gnu)
-    PKG_TARGET="node20-linux-x64"
+    NODE_TARGET="linux-x64"
     ;;
   aarch64-unknown-linux-gnu)
-    PKG_TARGET="node20-linux-arm64"
+    NODE_TARGET="linux-arm64"
     ;;
   *)
     echo "✗ Unsupported target triple: $TARGET_TRIPLE"
@@ -102,20 +106,26 @@ esac
 
 mkdir -p "$BINARIES_DIR"
 
-# The standalone server entry point
-SERVER_ENTRY="$STANDALONE_DIR/apps/web/server.js"
-
 # Binary name follows Tauri's sidecar naming convention
 BINARY_NAME="larkup-server-$TARGET_TRIPLE"
+
 if [[ "$TARGET_TRIPLE" == *"windows"* ]]; then
   BINARY_NAME="$BINARY_NAME.exe"
+  URL="https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-$NODE_TARGET.zip"
+  echo "  Downloading $URL..."
+  curl -fsSL -o "$BINARIES_DIR/node.zip" "$URL"
+  unzip -p "$BINARIES_DIR/node.zip" "node-$NODE_VERSION-$NODE_TARGET/node.exe" > "$BINARIES_DIR/$BINARY_NAME"
+  rm "$BINARIES_DIR/node.zip"
+else
+  URL="https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-$NODE_TARGET.tar.gz"
+  echo "  Downloading $URL..."
+  curl -fsSL -o "$BINARIES_DIR/node.tar.gz" "$URL"
+  tar -xzf "$BINARIES_DIR/node.tar.gz" -C "$BINARIES_DIR" "node-$NODE_VERSION-$NODE_TARGET/bin/node"
+  mv "$BINARIES_DIR/node-$NODE_VERSION-$NODE_TARGET/bin/node" "$BINARIES_DIR/$BINARY_NAME"
+  rm -rf "$BINARIES_DIR/node-$NODE_VERSION-$NODE_TARGET" "$BINARIES_DIR/node.tar.gz"
 fi
 
-# Use @yao-pkg/pkg (community fork of vercel/pkg with Node 20 support)
-npx -y @yao-pkg/pkg "$SERVER_ENTRY" \
-  --target "$PKG_TARGET" \
-  --output "$BINARIES_DIR/$BINARY_NAME" \
-  --compress GZip
+chmod +x "$BINARIES_DIR/$BINARY_NAME"
 
 echo ""
 echo "╔══════════════════════════════════════════════╗"

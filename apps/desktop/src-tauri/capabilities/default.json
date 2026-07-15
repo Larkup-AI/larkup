@@ -1,0 +1,22 @@
+{
+  "identifier": "larkup-default",
+  "description": "Default capabilities for Larkup Desktop",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/larkup-server",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    "shell:allow-open"
+  ],
+  "remote": {
+    "urls": ["http://localhost:4567", "http://127.0.0.1:4567"]
+  }
+}
