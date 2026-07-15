@@ -83,12 +83,13 @@ export function IndexActionDialog({
   trigger,
 }: IndexActionDialogProps) {
   const [starting, setStarting] = useState(false);
-  
+
   // We maintain internal open state if it's not controlled
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const dialogOpen = isControlled ? open : internalOpen;
-  const setDialogOpen = isControlled && onOpenChange ? onOpenChange : setInternalOpen;
+  const setDialogOpen =
+    isControlled && onOpenChange ? onOpenChange : setInternalOpen;
 
   const { data, isLoading, mutate } = useSWR<IndexStatus>(
     "/api/index",
@@ -112,6 +113,20 @@ export function IndexActionDialog({
     }
     lastWarning.current = warning;
   }, [data?.run?.warning]);
+
+  const lastStatus = useRef<IndexRun["status"] | undefined>(undefined);
+  useEffect(() => {
+    const status = data?.run?.status;
+    if (
+      status === "completed" &&
+      lastStatus.current &&
+      ACTIVE.includes(lastStatus.current as any)
+    ) {
+      setDialogOpen(false);
+      toast.success("Indexing completed successfully!");
+    }
+    lastStatus.current = status;
+  }, [data?.run?.status, setDialogOpen]);
 
   async function build(incremental = false) {
     setStarting(true);
@@ -155,20 +170,69 @@ export function IndexActionDialog({
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       {trigger ? (
-        <DialogTrigger asChild>{trigger}</DialogTrigger>
+        <DialogTrigger 
+          render={<div>{trigger}</div>}
+        />
       ) : (
-        <DialogTrigger asChild>
-          <Button disabled={!data?.ready}>
-            <Layers className="size-4 mr-2" />
-            Index Data
-          </Button>
-        </DialogTrigger>
+        <div className="flex items-center gap-2">
+          {data?.run?.status === "completed" && (
+            <AlertDialog>
+              <AlertDialogTrigger 
+                render={
+                  <Button
+                    disabled={
+                      !data.ready ||
+                      Boolean(data.run && ACTIVE.includes(data.run.status)) ||
+                      starting
+                    }
+                    variant="outline"
+                  >
+                    <RotateCcw className="size-4 mr-2" />
+                    Re-Index Data
+                  </Button>
+                }
+              />
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Are you sure you want to re-index data?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will rebuild the entire index from scratch. All
+                    documents will be re-processed.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      setDialogOpen(true);
+                      build(false);
+                    }}
+                  >
+                    Continue
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          <DialogTrigger
+            render={
+              <Button disabled={!data?.ready || data?.unindexedCount === 0}>
+                <Layers className="size-4 mr-2" />
+                Index Data
+              </Button>
+            }
+          />
+        </div>
       )}
+
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Index Data</DialogTitle>
           <DialogDescription>
-            Chunk, embed, and store into your selected vector store.
+            Chunk, embed, and index into your selected vector database.
           </DialogDescription>
         </DialogHeader>
 
@@ -200,7 +264,10 @@ export function IndexActionDialog({
               </Alert>
             )}
 
-            <RunCard run={data.run} running={Boolean(data.run && ACTIVE.includes(data.run.status))} />
+            <RunCard
+              run={data.run}
+              running={Boolean(data.run && ACTIVE.includes(data.run.status))}
+            />
 
             {data.ready && !data.run && (
               <Alert>
@@ -211,8 +278,8 @@ export function IndexActionDialog({
                 <AlertDescription className="text-muted-foreground space-y-1">
                   <p>
                     Once indexing begins, two settings become{" "}
-                    <span className="font-medium text-foreground">locked</span> to the
-                    existing index:
+                    <span className="font-medium text-foreground">locked</span>{" "}
+                    to the existing index:
                   </p>
                   <ul className="list-disc pl-4 space-y-0.5">
                     <li>
@@ -230,7 +297,8 @@ export function IndexActionDialog({
                       <span className="font-medium text-foreground">
                         Vector store
                       </span>{" "}
-                      — changing the store after indexing requires starting fresh.
+                      — changing the store after indexing requires starting
+                      fresh.
                     </li>
                   </ul>
                 </AlertDescription>
@@ -244,11 +312,13 @@ export function IndexActionDialog({
                   !data.ready ||
                   Boolean(data.run && ACTIVE.includes(data.run.status)) ||
                   starting ||
-                  (data.run?.status === "completed" && data.unindexedCount === 0)
+                  (data.run?.status === "completed" &&
+                    data.unindexedCount === 0)
                 }
                 size="lg"
               >
-                {Boolean(data.run && ACTIVE.includes(data.run.status)) || starting ? (
+                {Boolean(data.run && ACTIVE.includes(data.run.status)) ||
+                starting ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <Play className="size-4" />
@@ -259,7 +329,7 @@ export function IndexActionDialog({
                     ? `Index new documents (${data.unindexedCount})`
                     : `Start indexing (${data.unindexedCount})`}
               </Button>
-              
+
               {Boolean(data.run && ACTIVE.includes(data.run.status)) && (
                 <Button
                   onClick={cancel}
@@ -269,40 +339,6 @@ export function IndexActionDialog({
                 >
                   Cancel
                 </Button>
-              )}
-              
-              {data.run?.status === "completed" && (
-                <AlertDialog>
-                  <AlertDialogTrigger
-                    render={
-                      <Button
-                        disabled={!data.ready || Boolean(data.run && ACTIVE.includes(data.run.status)) || starting}
-                        size="lg"
-                        variant="outline"
-                      >
-                        <RotateCcw className="size-4 mr-2" />
-                        Re-Index
-                      </Button>
-                    }
-                  />
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Are you sure you want to re-index?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will rebuild the entire index from scratch. All documents
-                        will be re-processed.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => build(false)}>
-                        Continue
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
               )}
             </div>
           </div>
@@ -431,7 +467,7 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
         </div>
         <StatusBadge status={run.status} />
       </div>
-      
+
       {run.status === "failed" ? (
         <Alert variant="destructive">
           <AlertTriangle className="size-4" />
