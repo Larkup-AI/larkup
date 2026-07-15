@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs";
+import { promises as fs, existsSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { exec } from "node:child_process";
@@ -19,6 +19,14 @@ import { readConfig } from "@larkup/core/config-store";
  */
 
 const execAsync = promisify(exec);
+
+async function runCmd(cmd: string, timeout?: number) {
+  const env = {
+    ...process.env,
+    PATH: `${process.env.PATH || ""}:/usr/local/bin:/opt/homebrew/bin:/bin:/usr/bin`,
+  };
+  return execAsync(cmd, { timeout, env });
+}
 
 const DATA_DIR = path.join(process.cwd(), ".larkup");
 const STATE_PATH = path.join(DATA_DIR, "firecrawl-local.json");
@@ -110,18 +118,18 @@ async function resolveDocker(): Promise<{
   compose: string | null;
 }> {
   try {
-    await execAsync("docker --version");
+    await runCmd("docker --version");
   } catch {
     return { docker: false, compose: null };
   }
   try {
-    await execAsync("docker compose version");
+    await runCmd("docker compose version");
     return { docker: true, compose: "docker compose" };
   } catch {
     // fall through
   }
   try {
-    await execAsync("docker-compose version");
+    await runCmd("docker-compose version");
     return { docker: true, compose: "docker-compose" };
   } catch {
     return { docker: true, compose: null };
@@ -258,9 +266,9 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
   await fs.writeFile(COMPOSE_PATH, composeFile(apiKey, port, proxy), "utf8");
 
   try {
-    await execAsync(
+    await runCmd(
       `${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" up -d`,
-      { timeout: 180_000 },
+      180_000
     );
   } catch (err) {
     const message =
@@ -274,7 +282,9 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
     });
   }
 
-  const endpoint = `http://localhost:${port}`;
+  const isDockerContainer = existsSync("/.dockerenv");
+  const host = isDockerContainer ? "host.docker.internal" : "localhost";
+  const endpoint = `http://${host}:${port}`;
   const healthy = await waitForHealth(endpoint, 60_000);
 
   return writeState({
@@ -296,9 +306,9 @@ export async function stopLocal(): Promise<LocalFirecrawlState> {
   const prev = await readLocalState();
   if (compose) {
     try {
-      await execAsync(
+      await runCmd(
         `${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" down`,
-        { timeout: 60_000 },
+        60_000
       );
     } catch {
       // best-effort

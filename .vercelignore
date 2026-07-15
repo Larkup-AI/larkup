@@ -1,0 +1,64 @@
+.snowflake/
+.vercel/
+
+# Environment variables
+.env*.local
+.env
+.env.dev
+# Common ignores
+node_modules/
+.next/
+.DS_Store
+
+# RAG Toolkit local state
+.larkup/
+proxies.txt
+
+# LanceDB data
+dummy/
+lancedb/
+
+# Turbo
+.turbo/
+
+# Python
+__pycache__/
+*.egg-info/
+build/
+venv/
+.venv/
+.pytest_cache/
+
+# Build artifacts
+dist/
+
+# App-specific ignores
+apps/docs
+apps/web/demo
+apps/local-chat-connection-larkup
+
+# Sensitive scripts
+npm-login.sh
+
+# Archive
+archive/
+
+# e2e
+apps/e2e/demo-data
+apps/e2e/playwright-report
+apps/e2e/test-results
+playwright-report
+.env.e2e
+hpi-connect.txt
+apps/web/webui.log
+
+# Hidden agent guides (internal only)
+.agents/
+
+# Desktop app sidecar binaries
+apps/desktop/src-tauri/binaries/
+apps/desktop/src-tauri/target/
+apps/api
+TODO.md
+keys.txt
+.vercel

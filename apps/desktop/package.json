@@ -13,7 +13,8 @@
   "devDependencies": {
     "@playwright/test": "^1.40.0",
     "@tauri-apps/cli": "^2.5.0",
-    "@types/node": "^26.1.1"
+    "@types/node": "^26.1.1",
+    "larkup": "workspace:*"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.5.0",

@@ -120,6 +120,9 @@ importers:
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.1
+      larkup:
+        specifier: workspace:*
+        version: link:../web
 
   apps/e2e:
     devDependencies:

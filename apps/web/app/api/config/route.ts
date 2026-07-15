@@ -52,7 +52,7 @@ export async function PUT(request: Request) {
       getEmbeddingModel(body.embeddingModelId) ||
       getEmbeddingModel(`${resolvedEmbeddingProvider}/${body.embeddingModelId}`);
       
-    if (!modelInfo || modelInfo.provider !== resolvedEmbeddingProvider) {
+    if (modelInfo && modelInfo.provider !== resolvedEmbeddingProvider) {
       body.embeddingModelId =
         defaultEmbeddingModels[resolvedEmbeddingProvider] ||
         defaultEmbeddingModels["openai"];
