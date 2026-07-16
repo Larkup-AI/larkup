@@ -24,6 +24,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { UTApi } from "uploadthing/server";
 
 // ── Config ──────────────────────────────────────────────────────
@@ -31,17 +32,26 @@ import { UTApi } from "uploadthing/server";
 const PLATFORM_MAP = {
   "aarch64.dmg": "macos-arm64",
   "x64.dmg": "macos-x64",
+  "aarch64.app.tar.gz": "macos-arm64-updater",
+  "x64.app.tar.gz": "macos-x64-updater",
   "x64-setup.exe": "windows-x64",
   "x64_en-US.msi": "windows-x64",
+  "x64-setup.nsis.zip": "windows-x64-updater",
   "amd64.AppImage": "linux-x64",
   "x86_64.AppImage": "linux-x64",
+  "amd64.AppImage.tar.gz": "linux-x64-updater",
+  "x86_64.AppImage.tar.gz": "linux-x64-updater",
 };
 
 const CUSTOM_IDS = {
   "macos-arm64": "larkup-desktop-macos-arm64",
   "macos-x64": "larkup-desktop-macos-x64",
+  "macos-arm64-updater": "larkup-desktop-macos-arm64-updater",
+  "macos-x64-updater": "larkup-desktop-macos-x64-updater",
   "windows-x64": "larkup-desktop-windows-x64",
+  "windows-x64-updater": "larkup-desktop-windows-x64-updater",
   "linux-x64": "larkup-desktop-linux-x64",
+  "linux-x64-updater": "larkup-desktop-linux-x64-updater",
 };
 
 const MANIFEST_CUSTOM_ID = "larkup-download-manifest";
@@ -247,8 +257,28 @@ async function main() {
   for (const [platform, info] of Object.entries(installers)) {
     console.log(`  Uploading ${platform}: ${info.filename}...`);
 
-    const fileBuffer = fs.readFileSync(info.path);
-    const file = new File([fileBuffer], info.filename);
+    let uploadPath = info.path;
+    let uploadFilename = info.filename;
+    let uploadSize = info.size;
+
+    // Workaround for UploadThing rejecting executables/disk images (ELF, MZ, DMG)
+    if (!uploadFilename.endsWith(".zip") && !uploadFilename.endsWith(".tar.gz")) {
+      console.log(`    Zipping ${uploadFilename} to bypass UploadThing restrictions...`);
+      const zippedFilename = `${uploadFilename}.zip`;
+      const zippedPath = `${uploadPath}.zip`;
+      try {
+        execSync(`zip -j -q "${zippedPath}" "${uploadPath}"`);
+        uploadPath = zippedPath;
+        uploadFilename = zippedFilename;
+        uploadSize = fs.statSync(zippedPath).size;
+      } catch (err) {
+        console.error(`  ✗ Failed to zip ${uploadFilename}:`, err.message);
+        process.exit(1);
+      }
+    }
+
+    const fileBuffer = fs.readFileSync(uploadPath);
+    const file = new File([fileBuffer], uploadFilename);
 
     const response = await utapi.uploadFiles(file, {
       metadata: { platform, version: opts.version },
@@ -262,8 +292,8 @@ async function main() {
 
     manifest.downloads[platform] = {
       url: response.data.ufsUrl || response.data.url,
-      filename: info.filename,
-      size: info.size,
+      filename: uploadFilename,
+      size: uploadSize,
       key: response.data.key,
     };
 
@@ -310,11 +340,14 @@ async function main() {
     "linux-x64": "linux-x86_64",
   };
 
-  for (const [platform, target] of Object.entries(tauriTargets)) {
-    if (manifest.downloads[platform]) {
+  for (const [basePlatform, target] of Object.entries(tauriTargets)) {
+    const updaterPlatform = `${basePlatform}-updater`;
+    const platformToUse = manifest.downloads[updaterPlatform] ? updaterPlatform : basePlatform;
+    
+    if (manifest.downloads[platformToUse]) {
       tauriUpdate.platforms[target] = {
-        url: manifest.downloads[platform].url,
-        signature: signatures[platform]?.content || "",
+        url: manifest.downloads[platformToUse].url,
+        signature: signatures[platformToUse]?.content || signatures[basePlatform]?.content || "",
       };
     }
   }
