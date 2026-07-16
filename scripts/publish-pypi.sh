@@ -38,9 +38,18 @@ find . -name '*.egg-info' -type d -exec rm -rf {} + 2>/dev/null || true
 echo "[2/3] Building package..."
 uv build
 
-# Publish to PyPI
-echo "[3/3] Publishing to PyPI..."
-uv publish --token "$PYPI_TOKEN"
+# Extract name and version from pyproject.toml
+PKG_NAME=$(grep -E '^name\s*=\s*' pyproject.toml | cut -d '"' -f 2 | head -n 1)
+PKG_VERSION=$(grep -E '^version\s*=\s*' pyproject.toml | cut -d '"' -f 2 | head -n 1)
+
+# Check if version exists on PyPI
+if pip index versions "$PKG_NAME" 2>/dev/null | grep -q "$PKG_VERSION"; then
+  echo "⚠️  $PKG_NAME@$PKG_VERSION is already published to PyPI. Skipping."
+else
+  # Publish to PyPI
+  echo "[3/3] Publishing to PyPI..."
+  uv publish --token "$PYPI_TOKEN"
+fi
 
 echo ""
 echo "✅ Successfully published larkup to PyPI!"

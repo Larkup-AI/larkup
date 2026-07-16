@@ -24,47 +24,52 @@ echo "  Building Web..."
 cd "$ROOT_DIR/apps/web"
 pnpm build
 
+publish_package() {
+  local dir="$1"
+  cd "$ROOT_DIR/$dir"
+  
+  local pkg_name=$(node -p "require('./package.json').name")
+  local pkg_version=$(node -p "require('./package.json').version")
+  
+  # Try to get the published version from the registry
+  if npm view "$pkg_name@$pkg_version" version &>/dev/null; then
+    echo "⚠️  $pkg_name@$pkg_version is already published. Skipping."
+  else
+    echo "🚀 Publishing $pkg_name@$pkg_version..."
+    pnpm publish --access public --no-git-checks
+    echo "✅ $pkg_name published."
+  fi
+}
+
 # --- 1. vector-stores ---
 echo ""
-echo "[1/6] Publishing @larkup/vector-stores..."
-cd "$ROOT_DIR/packages/vector-stores"
-pnpm publish --access public --no-git-checks
-echo "✅ @larkup/vector-stores published."
+echo "[1/6] Checking @larkup/vector-stores..."
+publish_package "packages/vector-stores"
 
 # --- 2. scraper ---
 echo ""
-echo "[2/6] Publishing @larkup/scraper..."
-cd "$ROOT_DIR/packages/scraper"
-pnpm publish --access public --no-git-checks
-echo "✅ @larkup/scraper published."
+echo "[2/6] Checking @larkup/scraper..."
+publish_package "packages/scraper"
 
 # --- 3. core ---
 echo ""
-echo "[3/6] Publishing @larkup/core..."
-cd "$ROOT_DIR/packages/core"
-pnpm publish --access public --no-git-checks
-echo "✅ @larkup/core published."
+echo "[3/6] Checking @larkup/core..."
+publish_package "packages/core"
 
 # --- 4. JS SDK ---
 echo ""
-echo "[4/6] Publishing @larkup/sdk..."
-cd "$ROOT_DIR/apps/sdk/js-sdk"
-pnpm publish --access public --no-git-checks
-echo "✅ @larkup/sdk published."
+echo "[4/6] Checking @larkup/sdk..."
+publish_package "apps/sdk/js-sdk"
 
 # --- 5. CLI ---
 echo ""
-echo "[5/6] Publishing @larkup/cli..."
-cd "$ROOT_DIR/apps/cli"
-pnpm publish --access public --no-git-checks
-echo "✅ @larkup/cli published."
+echo "[5/6] Checking @larkup/cli..."
+publish_package "apps/cli"
 
 # --- 6. Web (larkup) ---
 echo ""
-echo "[6/6] Publishing larkup (web)..."
-cd "$ROOT_DIR/apps/web"
-pnpm publish --access public --no-git-checks
-echo "✅ larkup (web) published."
+echo "[6/6] Checking larkup (web)..."
+publish_package "apps/web"
 
 echo ""
 echo "========================================="
