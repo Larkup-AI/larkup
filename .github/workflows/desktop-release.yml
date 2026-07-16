@@ -129,6 +129,9 @@ jobs:
           fi
           # Clean broken symlinks that break the Tauri bundler
           find "$STANDALONE" -type l ! -exec test -e {} \; -delete || true
+          # Remove node_modules because it's already compiled into the pkg sidecar executable!
+          # This prevents the long pnpm symlink paths from breaking Windows NSIS and Linux AppImage.
+          rm -rf "$STANDALONE/node_modules" "$STANDALONE/apps/web/node_modules"
 
       # Linux: install system dependencies for Tauri
       - name: Install Linux dependencies
