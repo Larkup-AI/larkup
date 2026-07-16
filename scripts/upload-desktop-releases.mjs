@@ -248,9 +248,7 @@ async function main() {
     console.log(`  Uploading ${platform}: ${info.filename}...`);
 
     const fileBuffer = fs.readFileSync(info.path);
-    const file = new File([fileBuffer], info.filename, {
-      type: "application/octet-stream",
-    });
+    const file = new File([fileBuffer], info.filename);
 
     const response = await utapi.uploadFiles(file, {
       metadata: { platform, version: opts.version },
