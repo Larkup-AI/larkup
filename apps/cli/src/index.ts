@@ -3,6 +3,7 @@
 import { Command } from "commander";
 import { prompts } from "./ui/prompts";
 import { log } from "./ui/logger";
+import { checkUpdate } from "./updater";
 
 // Commands
 import { initCommand } from "./commands/init";
@@ -118,6 +119,8 @@ program
     await settingsCommand(options);
   });
 
-program.parseAsync(process.argv).catch((err) => {
-  log.error(err instanceof Error ? err.message : String(err));
+checkUpdate().then(() => {
+  program.parseAsync(process.argv).catch((err) => {
+    log.error(err instanceof Error ? err.message : String(err));
+  });
 });
