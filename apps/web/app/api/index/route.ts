@@ -17,7 +17,7 @@ function assessReadiness(config: RagConfig, docCount: number) {
   const blockers: string[] = []
 
   const model = getEmbeddingModel(config.embeddingModelId)
-  if (!model) blockers.push("No embedding model is selected.")
+  if (!model && !config.embeddingModelId?.startsWith("custom:")) blockers.push("No embedding model is selected.")
 
   if (docCount === 0)
     blockers.push("The corpus is empty — load documents in the Data stage.")

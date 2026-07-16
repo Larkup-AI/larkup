@@ -46,9 +46,25 @@ export async function GET(req: Request) {
     // ── Chat models ───────────────────────────────────────────────────
     const allChatModels = languageModels.map(toChatDescriptor);
     const chatModels = getChatModelsForProvider(allChatModels, provider);
+    
+    if (provider === "custom" && config.customChatModels) {
+      chatModels.push(
+        ...config.customChatModels.map((m) => ({
+          id: `custom:${m.modelName}`,
+          name: m.modelName,
+          provider: "custom",
+          tags: ["custom"],
+        }))
+      );
+    }
+
     const defaultModel = getDefaultChatModel(allChatModels, provider);
     const chatModelId =
-      config.chatModelId || defaultModel?.id || "openai/gpt-4o-mini";
+      config.chatModelId ||
+      (provider === "custom" && config.customChatModels?.[0]
+        ? `custom:${config.customChatModels[0].modelName}`
+        : defaultModel?.id) ||
+      "openai/gpt-4o-mini";
 
     // ── Embedding models ──────────────────────────────────────────────
     // Convert gateway embedding models to descriptors (enriched with dimensions)

@@ -143,7 +143,7 @@ async function runQuery(
     );
   }
 
-  if (!getEmbeddingModel(config.embeddingModelId)) {
+  if (!getEmbeddingModel(config.embeddingModelId) && !config.embeddingModelId?.startsWith("custom:")) {
     return NextResponse.json(
       { error: `Unknown embedding model "${config.embeddingModelId}".` },
       { status: 400 },
