@@ -1,15 +1,1 @@
-/* #sidebar-group li a {
-  background-color: #fff !important;
-  color: #bd5339 !important;
-} */
-
-/* Active  */
-/* #sidebar-group li a.text-primary {
-  background-color: #e3f4ec !important;
-  color: #1f7a53 !important;
-} */
-
-/* Fix active nav link text color in dark mode */
-.dark .text-primary {
-  color: #ffffff !important;
-}
+/* Custom CSS removed */
