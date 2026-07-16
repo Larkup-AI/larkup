@@ -252,19 +252,19 @@ function embedSource(config: RagConfig): string {
   baseURL: process.env.EMBEDDING_BASE_URL || ${JSON.stringify(custom?.baseUrl || "")},
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(custom?.modelName || "")})`;
+const MODEL = provider.embeddingModel(process.env.EMBEDDING_MODEL || ${JSON.stringify(custom?.modelName || "")})`;
   } else if (config.embeddingProvider === "deepseek") {
     imports += `import { createDeepSeek } from "@ai-sdk/deepseek"\n`;
     init = `const provider = createDeepSeek({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
+const MODEL = provider.embeddingModel(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
   } else if (config.embeddingProvider === "google") {
     imports += `import { createGoogleGenerativeAI } from "@ai-sdk/google"\n`;
     init = `const provider = createGoogleGenerativeAI({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
+const MODEL = provider.textEmbeddingModel(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
   } else if (config.embeddingProvider === "cohere") {
     imports += `import { createCohere } from "@ai-sdk/cohere"\n`;
     init = `const provider = createCohere({
