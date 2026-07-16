@@ -13,3 +13,17 @@
 .dark .text-primary {
   color: #ffffff !important;
 }
+
+/* Download card hover animations */
+[class*="CardGroup"] a[class*="Card"] {
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+[class*="CardGroup"] a[class*="Card"]:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.dark [class*="CardGroup"] a[class*="Card"]:hover {
+  box-shadow: 0 8px 25px -5px rgba(255, 255, 255, 0.05), 0 4px 10px -6px rgba(255, 255, 255, 0.05) !important;
+}
