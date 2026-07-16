@@ -143,6 +143,9 @@ jobs:
 
       - name: Build Tauri app
         working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm build -- --target ${{ matrix.rust-target }} --bundles ${{ matrix.bundle-targets }}
 
       - name: Upload installer artifacts
@@ -153,14 +156,21 @@ jobs:
             apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.dmg
             apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.exe
             apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.AppImage
+            apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.sig
           retention-days: 7
 
-  create-release:
+  upload-to-uploadthing:
     needs: build-tauri
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install uploadthing
+        run: npm install --no-save uploadthing
 
       - name: Download all installer artifacts
         uses: actions/download-artifact@v4
@@ -170,37 +180,26 @@ jobs:
           path: ./release-assets/
 
       - name: List release assets
-        run: find ./release-assets -type f | head -20
+        run: find ./release-assets -type f | head -30
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Larkup Desktop ${{ github.ref_name }}
-          body: |
-            ## Larkup Desktop ${{ github.ref_name }}
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/desktop-v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#desktop-v}"
+          elif [[ -n "${{ github.event.inputs.version }}" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=$(node -e "console.log(require('./apps/desktop/package.json').version)")
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
 
-            ### Downloads
-
-            | Platform | Architecture | File |
-            |----------|-------------|------|
-            | macOS | Apple Silicon (M1/M2/M3) | `Larkup_*_aarch64.dmg` |
-            | macOS | Intel | `Larkup_*_x64.dmg` |
-            | Windows | x64 | `Larkup_*_x64-setup.exe` |
-            | Linux | x64 | `Larkup_*_amd64.AppImage` |
-
-            ### Installation
-
-            **macOS/Linux (curl):**
-            ```bash
-            curl -fsSL https://larkup.de/install.sh | bash
-            ```
-
-            **Windows (PowerShell):**
-            ```powershell
-            irm https://larkup.de/install.ps1 | iex
-            ```
-          files: ./release-assets/**/*
-          draft: false
-          prerelease: false
+      - name: Upload to UploadThing
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPLOADTHING_TOKEN: ${{ secrets.UPLOADTHING_TOKEN }}
+        run: |
+          node scripts/upload-desktop-releases.mjs \
+            --dir ./release-assets \
+            --version ${{ steps.version.outputs.version }}

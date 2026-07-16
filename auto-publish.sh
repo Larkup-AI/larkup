@@ -9,7 +9,9 @@ set -e
 #   ./auto-publish.sh --npm-only       # Only publish npm packages
 #   ./auto-publish.sh --pypi-only      # Only publish Python SDK to PyPI
 #   ./auto-publish.sh --docker-only    # Only build/push Docker image
+#   ./auto-publish.sh --desktop-only   # Only trigger Desktop release CI
 #   ./auto-publish.sh --with-docker    # Publish npm + pypi + docker
+#   ./auto-publish.sh --with-desktop   # Publish npm + pypi + desktop
 #   ./auto-publish.sh --bump patch     # Bump version before publishing (patch|minor|major)
 #   ./auto-publish.sh --version 0.2.0  # Set explicit version before publishing
 
@@ -20,6 +22,7 @@ SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 PUBLISH_NPM=true
 PUBLISH_PYPI=true
 PUBLISH_DOCKER=false
+PUBLISH_DESKTOP=false
 BUMP_TYPE=""
 CUSTOM_VERSION=""
 
@@ -41,10 +44,22 @@ while [[ $# -gt 0 ]]; do
             PUBLISH_NPM=false
             PUBLISH_PYPI=false
             PUBLISH_DOCKER=true
+            PUBLISH_DESKTOP=false
+            shift
+            ;;
+        --desktop-only)
+            PUBLISH_NPM=false
+            PUBLISH_PYPI=false
+            PUBLISH_DOCKER=false
+            PUBLISH_DESKTOP=true
             shift
             ;;
         --with-docker)
             PUBLISH_DOCKER=true
+            shift
+            ;;
+        --desktop | --with-desktop)
+            PUBLISH_DESKTOP=true
             shift
             ;;
         --bump)
@@ -149,6 +164,7 @@ echo "========================================="
 echo "  NPM:    $([ "$PUBLISH_NPM" = true ] && echo "✅" || echo "⏭️  skip")"
 echo "  PyPI:   $([ "$PUBLISH_PYPI" = true ] && echo "✅" || echo "⏭️  skip")"
 echo "  Docker: $([ "$PUBLISH_DOCKER" = true ] && echo "✅" || echo "⏭️  skip")"
+echo "  Desktop:$([ "$PUBLISH_DESKTOP" = true ] && echo "✅" || echo "⏭️  skip")"
 echo "========================================="
 echo ""
 
@@ -157,6 +173,7 @@ TOTAL=0
 [ "$PUBLISH_NPM" = true ] && TOTAL=$((TOTAL + 1))
 [ "$PUBLISH_PYPI" = true ] && TOTAL=$((TOTAL + 1))
 [ "$PUBLISH_DOCKER" = true ] && TOTAL=$((TOTAL + 1))
+[ "$PUBLISH_DESKTOP" = true ] && TOTAL=$((TOTAL + 1))
 
 # ---- NPM Packages ----
 if [ "$PUBLISH_NPM" = true ]; then
@@ -182,9 +199,27 @@ if [ "$PUBLISH_DOCKER" = true ]; then
     echo ""
 fi
 
+# ---- Desktop ----
+if [ "$PUBLISH_DESKTOP" = true ]; then
+    STEP=$((STEP + 1))
+    echo "[$STEP/$TOTAL] Triggering Desktop Release CI..."
+    
+    VERSION_TO_PUBLISH=$(node -e "console.log(require('./package.json').version)")
+    
+    if command -v gh &> /dev/null; then
+        echo "  Running: gh workflow run desktop-release.yml -f version=${VERSION_TO_PUBLISH}"
+        gh workflow run desktop-release.yml -f version="${VERSION_TO_PUBLISH}"
+        echo "  ✅ Desktop workflow triggered successfully."
+    else
+        echo "  ⚠️ GitHub CLI (gh) not found. Please trigger the 'Desktop Release' workflow manually on GitHub Actions for version ${VERSION_TO_PUBLISH}."
+    fi
+    echo ""
+fi
+
 echo "========================================="
 echo "🎉 All done! Published packages:"
 [ "$PUBLISH_NPM" = true ] && echo "  📦 npm: @larkup/sdk, @larkup/cli, larkup"
 [ "$PUBLISH_PYPI" = true ] && echo "  🐍 PyPI: larkup"
 [ "$PUBLISH_DOCKER" = true ] && echo "  🐳 Docker: aboneda/larkup"
+[ "$PUBLISH_DESKTOP" = true ] && echo "  💻 Desktop: GitHub Actions workflow triggered"
 echo "========================================="
