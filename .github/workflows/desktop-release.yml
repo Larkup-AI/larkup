@@ -116,6 +116,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build Next.js standalone
+        run: pnpm --filter larkup build
+
+      - name: Copy static assets
+        shell: bash
+        run: |
+          STANDALONE="apps/web/.next/standalone"
+          cp -r apps/web/.next/static "$STANDALONE/apps/web/.next/static"
+          if [ -d "apps/web/public" ]; then
+            cp -r apps/web/public "$STANDALONE/apps/web/public"
+          fi
+          # Clean broken symlinks that break the Tauri bundler
+          find "$STANDALONE" -type l ! -exec test -e {} \; -delete || true
+
       # Linux: install system dependencies for Tauri
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -142,7 +156,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm build -- --target ${{ matrix.rust-target }} --bundles ${{ matrix.bundle-targets }}
+        run: pnpm tauri build --target ${{ matrix.rust-target }} --bundles ${{ matrix.bundle-targets }}
 
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4
