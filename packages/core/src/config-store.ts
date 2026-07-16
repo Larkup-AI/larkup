@@ -42,7 +42,7 @@ export async function readConfig(): Promise<RagConfig> {
       embeddingModelId: migratedEmbeddingId ?? DEFAULT_CONFIG.embeddingModelId,
       customEmbeddings: migratedEmbeddings,
       chunking: { ...DEFAULT_CONFIG.chunking, ...parsed.chunking },
-      storeConfig: { ...parsed.storeConfig },
+      storeConfig: { ...DEFAULT_CONFIG.storeConfig, ...parsed.storeConfig },
     }
 
     // Drop the stale legacy key so it doesn't leak into the returned object.

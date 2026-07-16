@@ -25,11 +25,15 @@ test.describe("Config API (/api/config)", () => {
     test.skip(!hasEnv(ENV_KEYS.OPENAI_API_KEY), "OPENAI_API_KEY not set");
 
     const getRes = await request.get(`${BASE}/api/config`);
-    const { config: current } = await getRes.json();
+    const { config: current } = await getRes.json(); console.log("current.storeConfig", current.storeConfig);
 
     const res = await request.put(`${BASE}/api/config`, {
       data: {
         ...current,
+        storeConfig: {
+          ...current.storeConfig,
+          tableName: current.storeConfig?.tableName || "documents",
+        },
         embeddingProvider: "openai",
         chatProvider: "openai",
         embeddingApiKey: env(ENV_KEYS.OPENAI_API_KEY),
@@ -48,7 +52,7 @@ test.describe("Config API (/api/config)", () => {
 
     // First GET current config to preserve all existing fields
     const getRes = await request.get(`${BASE}/api/config`);
-    const { config: current } = await getRes.json();
+    const { config: current } = await getRes.json(); console.log("current.storeConfig", current.storeConfig);
 
     // PUT back the same config with LanceDB (preserve all existing storeConfig)
     const res = await request.put(`${BASE}/api/config`, {
@@ -74,7 +78,7 @@ test.describe("Config API (/api/config)", () => {
     test.skip(!hasEnv(ENV_KEYS.PINECONE_APIKEY), "PINECONE_APIKEY not set");
 
     const getRes = await request.get(`${BASE}/api/config`);
-    const { config: current } = await getRes.json();
+    const { config: current } = await getRes.json(); console.log("current.storeConfig", current.storeConfig);
 
     const res = await request.put(`${BASE}/api/config`, {
       data: {
@@ -101,7 +105,7 @@ test.describe("Config API (/api/config)", () => {
     request,
   }) => {
     const getRes = await request.get(`${BASE}/api/config`);
-    const { config: current } = await getRes.json();
+    const { config: current } = await getRes.json(); console.log("current.storeConfig", current.storeConfig);
 
     const res = await request.put(`${BASE}/api/config`, {
       data: {
@@ -120,7 +124,7 @@ test.describe("Config API (/api/config)", () => {
     request,
   }) => {
     const getRes = await request.get(`${BASE}/api/config`);
-    const { config: current } = await getRes.json();
+    const { config: current } = await getRes.json(); console.log("current.storeConfig", current.storeConfig);
 
     const res = await request.put(`${BASE}/api/config`, {
       data: {
@@ -139,7 +143,7 @@ test.describe("Config API (/api/config)", () => {
     request,
   }) => {
     const getRes = await request.get(`${BASE}/api/config`);
-    const { config: current } = await getRes.json();
+    const { config: current } = await getRes.json(); console.log("current.storeConfig", current.storeConfig);
 
     const res = await request.put(`${BASE}/api/config`, {
       data: {

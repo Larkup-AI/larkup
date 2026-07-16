@@ -2,6 +2,22 @@ import { test, expect } from "@playwright/test";
 import { env, hasEnv, ENV_KEYS } from "../../utils/env-loader";
 
 test.describe("Configure Page", () => {
+  test.beforeAll(async () => {
+    // Create a server to initialize the workspace
+    await fetch("http://localhost:4567/api/servers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "E2E Server" }),
+    }).catch(() => {});
+
+    // Set mode to tech to skip onboarding
+    await fetch("http://localhost:4567/api/servers", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "setMode", mode: "tech" }),
+    }).catch(() => {});
+  });
+
   test.beforeEach(async ({ page }) => {
     await page.goto("/configure");
     // Wait for the form to hydrate
@@ -51,9 +67,17 @@ test.describe("Configure Page", () => {
         await apiKeyInput.fill(env(ENV_KEYS.OPENAI_API_KEY));
 
         // Close the dialog
-        const closeBtn = page.getByRole("dialog").getByRole("button", { name: /Save changes|Close|Done/i }).first();
+        const closeBtn = page
+          .getByRole("dialog")
+          .getByRole("button", { name: /Save changes/i })
+          .first();
         if (await closeBtn.isVisible()) {
           await closeBtn.click();
+          await page.waitForTimeout(1000);
+          await page.keyboard.press("Escape");
+          await expect(page.getByRole("dialog")).not.toBeVisible({
+            timeout: 10_000,
+          });
         }
       }
     }
@@ -71,16 +95,42 @@ test.describe("Configure Page", () => {
     if (await settingsBtn.isVisible()) {
       await settingsBtn.click();
       await page.waitForTimeout(500);
+
+      // Ensure provider is OpenAI
+      const providerSelect = page
+        .getByRole("dialog")
+        .getByRole("combobox")
+        .first();
+      if (await providerSelect.isVisible()) {
+        await providerSelect.click();
+        await page.waitForTimeout(300);
+        const providerOption = page
+          .getByRole("option", { name: /^OpenAI$/i })
+          .first();
+        if (await providerOption.isVisible()) {
+          await providerOption.click({ force: true });
+          await page.waitForTimeout(300);
+        }
+      }
+
       const apiKeyInput = page
+        .getByRole("dialog")
         .locator('input[type="password"], input[placeholder*="key" i]')
         .first();
       if (await apiKeyInput.isVisible()) {
         await apiKeyInput.clear();
         await apiKeyInput.fill(env(ENV_KEYS.OPENAI_API_KEY));
-        const closeBtn = page.getByRole("dialog").getByRole("button", { name: /Save changes|Close|Done/i }).first();
+        const closeBtn = page
+          .getByRole("dialog")
+          .getByRole("button", { name: /Save changes/i })
+          .first();
         if (await closeBtn.isVisible()) {
-          await closeBtn.click();
-          await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 60_000 });
+          await closeBtn.click({ force: true });
+          await page.waitForTimeout(1000);
+          await page.keyboard.press("Escape");
+          await expect(page.getByRole("dialog")).not.toBeVisible({
+            timeout: 10_000,
+          });
         }
         await page.waitForTimeout(300);
       }
@@ -98,9 +148,13 @@ test.describe("Configure Page", () => {
       await page.waitForTimeout(500);
 
       // Handle "Incompatible embedding dimensions" dialog if it appears
-      const reindexBtn = page.getByRole("button", { name: /Re-index from scratch/i }).first();
+      const reindexBtn = page
+        .getByRole("button", { name: /Re-index from scratch/i })
+        .first();
       if (await reindexBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        const keepModelBtn = page.getByRole("button", { name: /Keep current model/i }).first();
+        const keepModelBtn = page
+          .getByRole("button", { name: /Keep current model/i })
+          .first();
         if (await keepModelBtn.isVisible()) {
           await keepModelBtn.click();
           await page.waitForTimeout(500);
@@ -110,7 +164,9 @@ test.describe("Configure Page", () => {
       }
 
       // Verify badges appear (only if we didn't revert)
-      await expect(page.getByText("1536 dims").first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("1536 dims").first()).toBeVisible({
+        timeout: 10_000,
+      });
     }
   });
 
@@ -193,10 +249,15 @@ test.describe("Configure Page", () => {
       if (await apiKeyInput.isVisible()) {
         await apiKeyInput.clear();
         await apiKeyInput.fill(env(ENV_KEYS.OPENAI_API_KEY));
-        const closeBtn = page.getByRole("dialog").getByRole("button", { name: /Save changes|Close|Done/i }).first();
+        const closeBtn = page
+          .getByRole("dialog")
+          .getByRole("button", { name: /Save changes|Close|Done/i })
+          .first();
         if (await closeBtn.isVisible()) {
-          await closeBtn.click();
-          await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 60_000 });
+          await closeBtn.click({ force: true });
+          await expect(page.getByRole("dialog")).not.toBeVisible({
+            timeout: 60_000,
+          });
         }
         await page.waitForTimeout(300);
       }
@@ -218,7 +279,7 @@ test.describe("Configure Page", () => {
 
       // Wait for save completion — look for success toast
       await expect(
-        page.getByText("Configuration saved").or(page.getByText("saved")),
+        page.getByText("Settings saved")
       ).toBeVisible({ timeout: 30_000 });
     }
   });

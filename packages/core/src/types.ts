@@ -161,6 +161,7 @@ export const DEFAULT_CONFIG: RagConfig = {
   storeConfig: {
     mode: "local",
     dbPath: "./.larkup/lancedb",
+    tableName: "documents",
   },
   topK: 5,
   serperApiKey: "",
