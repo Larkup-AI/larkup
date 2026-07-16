@@ -7,6 +7,7 @@ import { WorkspaceProvider } from "@/components/workspace/workspace-provider";
 import { ThemeCustomizerProvider } from "@/components/theme-customizer-provider";
 import { ClientLayoutWrapper } from "@/components/client-layout-wrapper";
 import { GlobalIndexProgress } from "@/components/index/global-index-progress";
+import { UpdateBanner } from "@/components/update-banner";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({
@@ -37,6 +38,7 @@ export default function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('app-theme');var b=localStorage.getItem('app-background');var r=localStorage.getItem('app-radius');var d=document.body;if(t&&t!=='default')d.classList.add(t);if(b)d.classList.add(b);if(r&&r!=='radius-default')d.classList.add(r);}catch(e){}})();`,
           }}
         />
+        <UpdateBanner />
         <ThemeCustomizerProvider>
           <WorkspaceProvider>
             <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
