@@ -25,6 +25,15 @@ test.describe("SDK Integration Patterns", () => {
       if (state.endpoint) {
         RAG_SERVER = state.endpoint;
       }
+      // Wait for server to be responsive
+      for (let i = 0; i < 15; i++) {
+        try {
+          const check = await fetch(`${RAG_SERVER}/health`);
+          if (check.ok) break;
+        } catch {
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
     } catch (e) {
       // fallback
     }

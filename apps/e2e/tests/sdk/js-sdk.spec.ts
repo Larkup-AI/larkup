@@ -88,8 +88,11 @@ test.describe("JS SDK — @larkup/sdk", () => {
       signal: AbortSignal.timeout(10_000),
     });
 
-    expect(res.ok).toBe(true);
     const body = await res.json();
+    if (!res.ok) {
+      console.log("GET /documents failed:", res.status, body.error);
+    }
+    expect(res.ok).toBe(true);
     expect(body).toHaveProperty("documents");
     expect(Array.isArray(body.documents)).toBe(true);
     console.log(`  ✓ Listed ${body.documents.length} documents`);
@@ -106,6 +109,10 @@ test.describe("JS SDK — @larkup/sdk", () => {
       signal: AbortSignal.timeout(10_000),
     });
 
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.log("POST /documents failed:", res.status, body.error);
+    }
     expect(res.ok).toBe(true);
     const body = await res.json();
     expect(body).toHaveProperty("success");

@@ -279,7 +279,7 @@ test.describe("Configure Page", () => {
 
       // Wait for save completion — look for success toast
       await expect(
-        page.getByText("Settings saved")
+        page.getByText("Configuration saved")
       ).toBeVisible({ timeout: 30_000 });
     }
   });
