@@ -29,7 +29,7 @@
     },
     "active": true,
     "targets": "all",
-    "createUpdaterArtifacts": "v2Compatible",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -54,7 +54,7 @@
       "open": true
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ2MjY1NkM0ODhGM0JBMDkKUldRSnV2T0l4RlltMW04bmFGWGxzR1JOcXA3RGlHM2VlSFg0SUN0Mk1maGh2VTY2VDlVNnlSTlAK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIwM0M5QkQ5QjA5NjkwODUKUldTRmtKYXcyWnM4SUtvZlpyVjl2M00rcUVEeTRDb0xYaE5HYjQvM1BHWTkvdEFJU0I0TjJDZisK",
       "endpoints": [
         "https://larkup.de/api/tauri-update/{{target}}/{{current_version}}"
       ]
