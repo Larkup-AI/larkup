@@ -45,8 +45,6 @@ jobs:
           node-version: 20
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -109,8 +107,6 @@ jobs:
           node-version: 20
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
