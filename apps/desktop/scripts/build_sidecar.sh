@@ -64,6 +64,11 @@ if [ ! -d "$STANDALONE_DIR" ]; then
 fi
 echo "✓ Standalone build complete"
 
+# Fix broken symlinks in standalone output (prevents Tauri builder crash)
+echo "  Cleaning up broken symlinks..."
+find "$STANDALONE_DIR" -type l ! -exec test -e {} \; -delete
+echo "✓ Cleaned up broken symlinks"
+
 # Copy static assets into standalone (Next.js standalone needs these)
 cp -r "$WEB_DIR/.next/static" "$STANDALONE_DIR/apps/web/.next/static"
 if [ -d "$WEB_DIR/public" ]; then
