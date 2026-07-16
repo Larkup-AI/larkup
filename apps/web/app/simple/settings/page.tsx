@@ -269,12 +269,12 @@ export default function SimpleSettingsPage() {
   }
 
   function handleStructuralChangeBlock() {
-    toast("Cannot modify server configuration", {
+    toast("Cannot modify configuration", {
       description:
-        "You cannot change this in the current server because it already has an index. You must initiate a new server.",
+        "You cannot change this in the current project because it already has an index. You must initiate a new project.",
       duration: Number.POSITIVE_INFINITY,
       action: {
-        label: "New Server",
+        label: "New Project",
         onClick: () => {
           setNewServerModalOpen(true);
         },

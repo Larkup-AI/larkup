@@ -82,6 +82,7 @@ import { StoreFields } from "@/components/configure/store-fields";
 import { useRouter } from "next/navigation";
 import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
 import { CustomModelModal } from "./custom-model-modal";
+import { ServerFormDialog } from "@/components/workspace/server-form-dialog";
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
@@ -178,6 +179,7 @@ export function ConfigureForm({
   const [hydrated, setHydrated] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [newServerModalOpen, setNewServerModalOpen] = useState(false);
   // Confirmation summary dialog before saving
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   // Unsaved-changes navigation blocker
@@ -331,7 +333,27 @@ export function ConfigureForm({
     return model.dimensions !== indexedDimensions;
   }
 
+  function handleStructuralChangeBlock() {
+    setApiKeyModalOpen(false);
+    setCustomModalOpen(false);
+    toast("Cannot modify configuration", {
+      description:
+        "You cannot change this in the current project because it already has an index. You must initiate a new project.",
+      duration: Number.POSITIVE_INFINITY,
+      action: {
+        label: "New Project",
+        onClick: () => {
+          setNewServerModalOpen(true);
+        },
+      },
+    });
+  }
+
   const handleEmbeddingModelChange = (v: string) => {
+    if (indexedRun && data?.config && v !== data.config.embeddingModelId) {
+      handleStructuralChangeBlock();
+      return;
+    }
     if (wouldBreakDimensions(v)) {
       setModelBlockAlertOpen(true);
       return;
@@ -512,16 +534,17 @@ export function ConfigureForm({
     },
     { label: "Index type", value: indexTypeMeta?.label ?? form.indexType },
     { label: "Vector store", value: store.label },
-    {
-      label: "Chunk size / overlap",
-      value: `${form.chunking.chunkSize} / ${form.chunking.chunkOverlap} tokens`,
-      mono: true,
-    },
+    { label: "Chunk size / overlap", value: `${form.chunking.chunkSize} / ${form.chunking.chunkOverlap} tokens`, mono: true },
     { label: "Top-K", value: String(form.topK), mono: true },
   ];
 
   return (
     <div className="px-6 py-6 md:px-8">
+      <ServerFormDialog
+        mode="create"
+        open={newServerModalOpen}
+        onOpenChange={setNewServerModalOpen}
+      />
       {/* ── Cards: first two side-by-side, last card full-width below ── */}
       <div className="mx-auto  space-y-5">
         {/* Row 1: Project + Embedding side-by-side */}
@@ -647,8 +670,7 @@ export function ConfigureForm({
                         .filter(
                           ([provider]) =>
                             form.embeddingProvider === "vercel_ai_gateway" ||
-                            provider === form.embeddingProvider ||
-                            provider === "deepseek",
+                            provider === form.embeddingProvider,
                         )
                         .map(([provider, models]) => {
                           const meta =
@@ -724,7 +746,13 @@ export function ConfigureForm({
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => setCustomModalOpen(true)}
+                            onClick={() => {
+                              if (indexedRun) {
+                                handleStructuralChangeBlock();
+                              } else {
+                                setCustomModalOpen(true);
+                              }
+                            }}
                             type="button"
                           >
                             <Plus className="size-4" />
@@ -1200,6 +1228,7 @@ export function ConfigureForm({
         open={customModalOpen}
         onOpenChange={setCustomModalOpen}
         onSave={async (cfg) => {
+          const nextId = `custom:${cfg.modelName}`;
           // Upsert: replace existing model with same name, or append a new one.
           const existing = form.customEmbeddings ?? [];
           const updatedList = existing.some(
@@ -1208,9 +1237,16 @@ export function ConfigureForm({
             ? existing.map((m) => (m.modelName === cfg.modelName ? cfg : m))
             : [...existing, cfg];
 
+          if (indexedRun && data?.config && nextId !== data.config.embeddingModelId) {
+            handleStructuralChangeBlock();
+            // Just save the custom model to the list so it's not lost, but don't select it
+            setForm({ ...form, customEmbeddings: updatedList });
+            return;
+          }
+
           const nextForm = {
             ...form,
-            embeddingModelId: `custom:${cfg.modelName}`,
+            embeddingModelId: nextId,
             customEmbeddings: updatedList,
           };
           setForm(nextForm);
@@ -1401,6 +1437,10 @@ export function ConfigureForm({
               <Select
                 value={form.embeddingProvider || "openai"}
                 onValueChange={(v) => {
+                  if (indexedRun && data?.config && v !== data.config.embeddingProvider) {
+                    handleStructuralChangeBlock();
+                    return;
+                  }
                   set("embeddingProvider", v as string);
                   // Reset model when provider changes (except for vercel_ai_gateway which shows all)
                   if (v !== "vercel_ai_gateway" && v !== "custom") {
@@ -1424,7 +1464,6 @@ export function ConfigureForm({
                   {[
                     "vercel_ai_gateway",
                     "openai",
-                    "deepseek",
                     "google",
                     // "cohere",
                     "voyage",
@@ -1432,7 +1471,9 @@ export function ConfigureForm({
                     "jina",
                     "nomic",
                     "custom",
-                  ].map((providerKey) => {
+                  ].filter(
+                    (key) => (EMBEDDING_BY_PROVIDER[key] && EMBEDDING_BY_PROVIDER[key].length > 0) || key === "vercel_ai_gateway" || key === "custom"
+                  ).map((providerKey) => {
                     const meta =
                       PROVIDER_META[providerKey as keyof typeof PROVIDER_META];
                     if (!meta) return null;

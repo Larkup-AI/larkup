@@ -109,9 +109,9 @@ export function GlobalSettings({ onBack }: { onBack: () => void }) {
             <div className="space-y-1.5">
               <Label className="text-xs">Provider</Label>
               <Select
-                value={form.embeddingProvider ?? undefined}
+                value={form.embeddingProvider || ""}
                 onValueChange={(v) =>
-                  setForm({ ...form, embeddingProvider: v! })
+                  setForm({ ...form, embeddingProvider: v === null ? undefined : v })
                 }
               >
                 <SelectTrigger className="h-8! text-sm w-full">
@@ -150,8 +150,10 @@ export function GlobalSettings({ onBack }: { onBack: () => void }) {
             <div className="space-y-1.5">
               <Label className="text-xs">Provider</Label>
               <Select
-                value={form.chatProvider ?? form.embeddingProvider ?? undefined}
-                onValueChange={(v) => setForm({ ...form, chatProvider: v! })}
+                value={form.chatProvider || form.embeddingProvider || ""}
+                onValueChange={(v) =>
+                  setForm({ ...form, chatProvider: v === null ? undefined : v })
+                }
               >
                 <SelectTrigger className="h-8! w-full text-sm">
                   <span>

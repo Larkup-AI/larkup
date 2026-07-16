@@ -36,7 +36,7 @@ export function ServerFormDialog({ mode, target, open, onOpenChange }: Props) {
   async function submit() {
     const trimmed = name.trim()
     if (!trimmed) {
-      toast.error("Enter a server name.")
+      toast.error("Enter a project name.")
       return
     }
     setBusy(true)
@@ -46,7 +46,7 @@ export function ServerFormDialog({ mode, target, open, onOpenChange }: Props) {
         if (created) toast.success(`Created "${created.name}" and switched to it.`)
       } else if (target) {
         await renameServer(target.id, trimmed)
-        toast.success("Server renamed.")
+        toast.success("Project renamed.")
       }
       onOpenChange(false)
     } catch {
@@ -61,17 +61,17 @@ export function ServerFormDialog({ mode, target, open, onOpenChange }: Props) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === "create" ? "New RAG server" : "Rename server"}
+            {mode === "create" ? "New project" : "Rename project"}
           </DialogTitle>
           <DialogDescription>
             {mode === "create"
-              ? "Each server is an isolated RAG project with its own documents, index, and deployable artifact."
-              : "Give this server a clearer name."}
+              ? "Each project is an isolated environment with its own documents, index, and settings."
+              : "Give this project a clearer name."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-2">
-          <Label htmlFor="server-name">Server name</Label>
+          <Label htmlFor="server-name">Project name</Label>
           <Input
             id="server-name"
             value={name}
@@ -94,7 +94,7 @@ export function ServerFormDialog({ mode, target, open, onOpenChange }: Props) {
           </Button>
           <Button onClick={() => void submit()} disabled={busy}>
             {busy && <Loader2 className="size-4 animate-spin" />}
-            {mode === "create" ? "Create server" : "Save"}
+            {mode === "create" ? "Create project" : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>

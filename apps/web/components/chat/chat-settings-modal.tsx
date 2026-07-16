@@ -11,8 +11,20 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { CustomModelForm } from "@/components/configure/custom-model-modal";
+import { cn } from "@/lib/utils";
+import type { CustomModelConfig } from "@larkup/core/types";
 import {
   Dialog,
   DialogTrigger,
@@ -35,7 +47,7 @@ export function ChatSettingsModal() {
     serverId ? `/api/config?serverId=${encodeURIComponent(serverId)}` : null,
     fetcher,
   );
-  
+
   const config = configData?.config;
 
   const [provider, setProvider] = useState("");
@@ -43,12 +55,20 @@ export function ChatSettingsModal() {
   const [systemPrompt, setSystemPrompt] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [view, setView] = useState<"main" | "custom">("main");
+  const [customChatModels, setCustomChatModels] = useState<CustomModelConfig[]>(
+    [],
+  );
 
   useEffect(() => {
     if (config && open) {
       setProvider(config.chatProvider || config.embeddingProvider || "openai");
       setApiKey(config.chatApiKey || "");
       setSystemPrompt(config.systemPrompt || "");
+      setCustomChatModels(config.customChatModels || []);
+    }
+    if (!open) {
+      setView("main");
     }
   }, [config, open]);
 
@@ -68,6 +88,7 @@ export function ChatSettingsModal() {
             chatProvider: provider,
             chatApiKey: apiKey,
             systemPrompt: systemPrompt,
+            customChatModels: customChatModels,
           }),
         },
       );
@@ -98,76 +119,148 @@ export function ChatSettingsModal() {
         }
       />
 
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Chat Provider Settings</DialogTitle>
-          <DialogDescription>
-            Configure the AI provider and API key used for the Chat interface.
-            This can be different from your embedding provider.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-md overflow-hidden transition-all duration-300">
+        {view === "main" ? (
+          <div className="flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <DialogHeader>
+              <DialogTitle>Chat Provider Settings</DialogTitle>
+              <DialogDescription>
+                Configure the AI provider and API key used for the Chat interface.
+                This can be different from your embedding provider.
+              </DialogDescription>
+            </DialogHeader>
 
-        <form onSubmit={handleSave} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
+            <form onSubmit={handleSave} className="flex flex-col gap-4 mt-4">
+              <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">
               AI Provider
             </label>
-            <Select
-              value={provider}
-              onValueChange={(v) => setProvider(v ?? "")}
-            >
-              <SelectTrigger className="w-full">
-                <span className="flex items-center gap-2">
-                  {provider && PROVIDER_META[provider as keyof typeof PROVIDER_META] ? (
-                    <>
-                      <ProviderIcon
-                        src={PROVIDER_META[provider as keyof typeof PROVIDER_META].iconSrc}
-                        alt={PROVIDER_META[provider as keyof typeof PROVIDER_META].label}
-                        pillBg={PROVIDER_META[provider as keyof typeof PROVIDER_META].pillBg}
-                        size={16}
-                      />
-                      <span>{PROVIDER_META[provider as keyof typeof PROVIDER_META].label}</span>
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">Select an AI Provider</span>
-                  )}
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                {[
-                  "vercel_ai_gateway",
-                  "openai",
-                  "anthropic",
-                  "google",
-                  "mistral",
-                  "deepseek",
-                  "cohere",
-                  "meta",
-                  "xai",
-                  "perplexity",
-                  "groq",
-                  "together-ai",
-                  "fireworks",
-                  "cerebras",
-                ].map((key) => {
-                  const meta = PROVIDER_META[key as keyof typeof PROVIDER_META];
-                  if (!meta) return null;
-                  return (
-                    <SelectItem key={key} value={key}>
+            <div className="flex items-center gap-2">
+              <Select
+                value={provider}
+                onValueChange={(v) => setProvider(v ?? "")}
+              >
+                <SelectTrigger className="w-full">
+                  <span className="flex items-center gap-2">
+                    {provider &&
+                    PROVIDER_META[provider as keyof typeof PROVIDER_META] ? (
+                      <>
+                        <ProviderIcon
+                          src={
+                            PROVIDER_META[
+                              provider as keyof typeof PROVIDER_META
+                            ].iconSrc
+                          }
+                          alt={
+                            PROVIDER_META[
+                              provider as keyof typeof PROVIDER_META
+                            ].label
+                          }
+                          pillBg={
+                            PROVIDER_META[
+                              provider as keyof typeof PROVIDER_META
+                            ].pillBg
+                          }
+                          size={16}
+                        />
+                        <span>
+                          {
+                            PROVIDER_META[
+                              provider as keyof typeof PROVIDER_META
+                            ].label
+                          }
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Select an AI Provider
+                      </span>
+                    )}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    "vercel_ai_gateway",
+                    "openai",
+                    "anthropic",
+                    "google",
+                    "mistral",
+                    "deepseek",
+                    "cohere",
+                    "meta",
+                    "xai",
+                    "perplexity",
+                    "groq",
+                    "together-ai",
+                    "fireworks",
+                    "cerebras",
+                  ].map((key) => {
+                    const meta =
+                      PROVIDER_META[key as keyof typeof PROVIDER_META];
+                    if (!meta) return null;
+                    return (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          <ProviderIcon
+                            src={meta.iconSrc}
+                            alt={meta.label}
+                            pillBg={meta.pillBg}
+                            size={18}
+                          />
+                          <span>{meta.label}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                  {customChatModels?.map((cfg) => (
+                    <SelectItem key={`custom:${cfg.modelName}`} value="custom">
                       <div className="flex items-center gap-2">
                         <ProviderIcon
-                          src={meta.iconSrc}
-                          alt={meta.label}
-                          pillBg={meta.pillBg}
-                          size={18}
+                          src={PROVIDER_META.custom?.iconSrc ?? ""}
+                          alt="Custom"
+                          pillBg={PROVIDER_META.custom?.pillBg}
+                          size={16}
                         />
-                        <span>{meta.label}</span>
+                        <span>{cfg.modelName} (Custom)</span>
                       </div>
                     </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+                  ))}
+                </SelectContent>
+              </Select>
+              <TooltipProvider delay={0}>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        type="button"
+                        onClick={() => setView("custom")}
+                        className="shrink-0 h-9 w-9"
+                      >
+                        <Settings className="size-4 hidden" />
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="lucide lucide-plus size-4"
+                        >
+                          <path d="M5 12h14" />
+                          <path d="M12 5v14" />
+                        </svg>
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>Add custom chat model</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -234,8 +327,32 @@ export function ChatSettingsModal() {
             >
               {isSaving ? "Saving..." : "Save Settings"}
             </button>
-          </DialogFooter>
-        </form>
+              </DialogFooter>
+            </form>
+          </div>
+        ) : (
+          <div className="flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
+            <DialogHeader>
+              <DialogTitle>Custom Chat Model</DialogTitle>
+              <DialogDescription>
+                Connect an OpenAI-compatible chat model.
+              </DialogDescription>
+            </DialogHeader>
+            <CustomModelForm
+              type="chat"
+              onSave={(cfg) => {
+                const next = [...customChatModels];
+                const idx = next.findIndex((m) => m.modelName === cfg.modelName);
+                if (idx >= 0) next[idx] = cfg;
+                else next.push(cfg);
+                setCustomChatModels(next);
+                setProvider("custom");
+                setView("main");
+              }}
+              onCancel={() => setView("main")}
+            />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

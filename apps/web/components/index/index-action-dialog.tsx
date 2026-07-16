@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, isValidElement } from "react";
 import useSWR from "swr";
 import {
   AlertTriangle,
@@ -171,7 +171,7 @@ export function IndexActionDialog({
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       {trigger ? (
         <DialogTrigger 
-          render={<div>{trigger}</div>}
+          render={isValidElement(trigger) ? trigger : <button>{trigger}</button>}
         />
       ) : (
         <div className="flex items-center gap-2">
