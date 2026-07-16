@@ -66,10 +66,107 @@ services:
     networks:
       - app_network
 
+  # ── Web Crawler (optional) ──────────────────────────────────────
+  # Activate with: docker compose --profile crawler up
+  # These services run Firecrawl for web scraping & search.
+
+  crawler-redis:
+    image: redis:7-alpine
+    profiles: ["crawler"]
+    command: redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  crawler-db:
+    image: ghcr.io/firecrawl/nuq-postgres:latest
+    profiles: ["crawler"]
+    environment:
+      POSTGRES_USER: crawler
+      POSTGRES_PASSWORD: crawler
+      POSTGRES_DB: firecrawl
+    volumes:
+      - crawler_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  crawler-rabbitmq:
+    image: rabbitmq:3-management-alpine
+    profiles: ["crawler"]
+    environment:
+      RABBITMQ_DEFAULT_USER: crawler
+      RABBITMQ_DEFAULT_PASS: crawler
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  crawler-playwright:
+    image: ghcr.io/firecrawl/playwright-service:latest
+    profiles: ["crawler"]
+    environment:
+      PORT: "3000"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  firecrawl-api:
+    image: ghcr.io/firecrawl/firecrawl:latest
+    profiles: ["crawler"]
+    depends_on:
+      - crawler-db
+      - crawler-rabbitmq
+      - crawler-redis
+      - crawler-playwright
+    environment:
+      PORT: "3002"
+      HOST: "0.0.0.0"
+      REDIS_URL: "redis://crawler-redis:6379"
+      REDIS_RATE_LIMIT_URL: "redis://crawler-redis:6379"
+      PLAYWRIGHT_MICROSERVICE_URL: "http://crawler-playwright:3000/scrape"
+      USE_DB_AUTHENTICATION: "false"
+      # Any bearer token is accepted with DB auth disabled
+      TEST_API_KEY: "fc-docker-local"
+      BULL_AUTH_KEY: "fc-docker-local"
+      DATABASE_URL: "postgresql://crawler:crawler@crawler-db:5432/firecrawl"
+      NUQ_DATABASE_URL: "postgresql://crawler:crawler@crawler-db:5432/firecrawl"
+      NUQ_RABBITMQ_URL: "amqp://crawler:crawler@crawler-rabbitmq:5672"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3002', (r) => process.exit(r.statusCode > 0 ? 0 : 1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - app_network
+
 volumes:
   app_data:
     driver: local
   app_web_data:
+    driver: local
+  crawler_db_data:
     driver: local
 
 networks:

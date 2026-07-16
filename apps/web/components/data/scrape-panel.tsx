@@ -231,7 +231,9 @@ export function ScrapePanel({
         };
       });
 
-      const newSelected = Object.fromEntries(newItems.map((r) => [r.url, true]));
+      const newSelected = Object.fromEntries(
+        newItems.map((r) => [r.url, true]),
+      );
       setSelected((prev) => ({ ...prev, ...newSelected }));
 
       if (newItems.length === 0 && !isMulti)
@@ -293,7 +295,9 @@ export function ScrapePanel({
         };
       });
 
-      const newSelected = Object.fromEntries(newItems.map((r) => [r.url, true]));
+      const newSelected = Object.fromEntries(
+        newItems.map((r) => [r.url, true]),
+      );
       setSelected((prev) => ({ ...prev, ...newSelected }));
 
       if (!isMulti) {
@@ -437,7 +441,9 @@ export function ScrapePanel({
           };
         });
 
-        const newSelected = Object.fromEntries(newItems.map((r) => [r.url, true]));
+        const newSelected = Object.fromEntries(
+          newItems.map((r) => [r.url, true]),
+        );
         setSelected((prev) => ({ ...prev, ...newSelected }));
 
         if (!data.hasMore) break;
@@ -544,10 +550,10 @@ export function ScrapePanel({
         specificUrls ? 1 : pageLimit,
       );
 
-      toast.success("ETL job started — running in background", {
+      toast.success("ETL job started, running in background", {
         description: specificUrls
-          ? `Scraping ${selectedUrls.length} specific URL(s) only — no deep crawl. You can navigate away — progress is tracked automatically.`
-          : `${selectedUrls.length} ${effectiveScope === "domain" ? "domain(s)" : "page(s)"} · ~${totalPages} pages · ETA ${formatDuration(estimatedSeconds)}. You can navigate away — progress is tracked automatically.`,
+          ? `Scraping ${selectedUrls.length} specific URL(s) only, no deep crawl. You can navigate away. Progress is tracked automatically.`
+          : `${selectedUrls.length} ${effectiveScope === "domain" ? "domain(s)" : "page(s)"} · ~${totalPages} pages · ETA ${formatDuration(estimatedSeconds)}. You can navigate away. Progress is tracked automatically.`,
         duration: 8000,
       });
 
@@ -953,7 +959,7 @@ export function ScrapePanel({
         title="Start ETL Job?"
         description={
           specificUrls
-            ? `This will scrape ${selectedUrls.length} specific URL${selectedUrls.length !== 1 ? "s" : ""} exactly as provided — no deep crawl or pagination.\n\nThe job will run in the background. You can navigate away and check progress anytime.`
+            ? `This will scrape ${selectedUrls.length} specific URL${selectedUrls.length !== 1 ? "s" : ""} exactly as provided, no deep crawl or pagination.\n\nThe job will run in the background. You can navigate away and check progress anytime.`
             : `This will scrape ${selectedUrls.length} ${scope === "domain" ? "domain(s)" : "page(s)"}${scope === "domain" ? ` with up to ${pageLimit} pages each` : ""}.\n\n• Total pages: ~${estimate.totalPages.toLocaleString()}\n• Estimated time: ${formatDuration(estimate.estimatedSeconds)}\n\nThe job will run in the background. You can navigate away and check progress anytime.`
         }
         actionText="Start ETL Job"

@@ -193,12 +193,10 @@ export function DataWorkspace() {
                         onErrorChange={setScrapeHasError}
                       />
                     </div>
-                    {!scrapeHasError && (
-                      <ScrapePanel
-                        disabled={!configured}
-                        onStarted={handleDataAdded}
-                      />
-                    )}
+                    <ScrapePanel
+                      disabled={false}
+                      onStarted={handleDataAdded}
+                    />
                   </TabsContent>
                   <TabsContent
                     value="paste"

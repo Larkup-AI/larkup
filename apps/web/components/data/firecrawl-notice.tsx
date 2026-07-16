@@ -33,17 +33,20 @@ interface DockerState {
 interface LocalResponse {
   state: LocalState;
   docker: DockerState;
+  runtimeEnv?: "web" | "desktop" | "docker";
 }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 /**
- * Local Firecrawl launcher.
+ * Web-crawler launcher notice.
  *
- * Lets the user spin up a self-hosted Firecrawl via Docker straight from the
- * UI — no manual API key needed. We generate a bearer token automatically and
- * wire the local endpoint into the scraper, so web search + crawling work
- * against localhost. If the cloud key is already set, this stays collapsed.
+ * Adapts to the runtime environment:
+ * - **Web / Desktop**: lets the user spin up a self-hosted crawler via Docker.
+ * - **Docker**: detects a sibling crawler service on the Docker network.
+ *
+ * The API key (cloud) option is managed in Settings — this component only
+ * handles the local/Docker launcher.
  */
 export function FirecrawlNotice({
   cloudConfigured = false,
@@ -66,6 +69,7 @@ export function FirecrawlNotice({
 
   const state = data?.state;
   const docker = data?.docker;
+  const runtimeEnv = data?.runtimeEnv ?? "web";
   const running = state?.running ?? false;
   const dockerReady = docker?.compose ?? false;
   const hasError = !cloudConfigured && (!dockerReady || !!state?.lastError);
@@ -79,10 +83,17 @@ export function FirecrawlNotice({
   async function control(action: "start" | "stop") {
     setBusy(action);
     if (action === "start") {
-      toast.info("Launching local Firecrawl…", {
-        description:
-          "Pulling images and starting containers. This can take a minute on first run.",
-      });
+      toast.info(
+        runtimeEnv === "docker"
+          ? "Connecting to crawler service…"
+          : "Launching web crawler…",
+        {
+          description:
+            runtimeEnv === "docker"
+              ? "Checking if the crawler service is available on the network."
+              : "Pulling images and starting containers. This can take a minute on first run.",
+        },
+      );
     }
     try {
       const res = await fetch("/api/firecrawl/local", {
@@ -95,22 +106,22 @@ export function FirecrawlNotice({
 
       if (action === "start") {
         if (json.state?.running) {
-          toast.success("Local Firecrawl is running", {
-            description: "Web scraping is now wired to your local instance.",
+          toast.success("Web crawler is running", {
+            description: "Web scraping is now active.",
           });
         } else {
-          toast.warning("Containers started", {
+          toast.warning("Crawler started", {
             description:
-              json.state?.lastError ?? "Waiting for the API to become healthy.",
+              json.state?.lastError ?? "Waiting for the service to become healthy.",
           });
         }
       } else {
-        toast.success("Local Firecrawl stopped");
+        toast.success("Web crawler stopped");
       }
       await mutate();
       onChange?.();
     } catch (err) {
-      toast.error("Could not control local Firecrawl", {
+      toast.error("Could not control web crawler", {
         description: formatErrorMessage(err),
       });
     } finally {
@@ -118,8 +129,20 @@ export function FirecrawlNotice({
     }
   }
 
-  // Cloud key present and no local instance running → nothing to show.
-  if (cloudConfigured && !running && !state?.startedAt) return null;
+  // Both cloud and local options are kept available.
+
+  // Description text based on environment
+  const idleDescription = (() => {
+    if (runtimeEnv === "docker") {
+      return dockerReady
+        ? "A crawler service was found on the network. Click to connect."
+        : "Start your deployment with the crawler profile to enable web scraping: docker compose --profile crawler up";
+    }
+    if (cloudConfigured) {
+      return "You have a cloud key set. You can also run the crawler locally via Docker.";
+    }
+    return "Launch a self-hosted web crawler via Docker. A key is generated automatically — no signup required. Pasting and uploading work without it.";
+  })();
 
   return (
     <Alert>
@@ -129,7 +152,25 @@ export function FirecrawlNotice({
         <KeyRound className="size-4" />
       )}
       <AlertTitle className="flex items-center gap-2">
-        {running ? "Web Crawler is running" : "Launch Web Crawler"}
+        {running ? (
+          <>
+            <img
+              src="/icons/firecrawl2.png"
+              alt=""
+              className="size-4 object-contain"
+            />
+            Web Crawler is running
+          </>
+        ) : (
+          <>
+            <img
+              src="/icons/firecrawl2.png"
+              alt=""
+              className="size-4 object-contain"
+            />
+            Launch Web Crawler
+          </>
+        )}
         {running && (
           <Badge
             variant="secondary"
@@ -150,15 +191,10 @@ export function FirecrawlNotice({
             <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
               {state?.endpoint}
             </code>
-            . A bearer token was generated automatically — web search and
-            crawling use it without any setup.
+            . Web search and crawling are active.
           </p>
         ) : (
-          <p className="text-sm">
-            {cloudConfigured
-              ? "You have a cloud key set. You can also run Firecrawl locally in Docker."
-              : "Launch a self-hosted Firecrawl in Docker. A key is generated for you automatically, no signup required. Pasting and uploading work without it."}
-          </p>
+          <p className="text-sm">{idleDescription}</p>
         )}
 
         {/* Docker readiness hint */}
@@ -196,7 +232,7 @@ export function FirecrawlNotice({
             <Button
               size="sm"
               onClick={() => control("start")}
-              disabled={busy !== null || isLoading || !dockerReady}
+              disabled={busy !== null || isLoading || (!dockerReady && runtimeEnv !== "docker")}
               className="
     inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium
     bg-[#F97316] hover:bg-[#EA6C0A]
@@ -210,25 +246,13 @@ export function FirecrawlNotice({
               ) : (
                 <img
                   src="/icons/firecrawl2.png"
-                  alt="Firecrawl"
+                  alt=""
                   className="size-4 object-contain"
                 />
               )}
-              Launch Web Crawler
+              {runtimeEnv === "docker" ? "Connect" : "Launch"}
             </Button>
           )}
-
-          {/* {dockerReady && !running && (
-            <span className="flex items-center gap-1 text-xs text-cyan-700  bg-white px-3 p-1 rounded-md">
-              <img
-                src={"/docker.png"}
-                alt="docker"
-                width={20}
-                height={20}
-              />
-              Docker ready
-            </span>
-          )} */}
         </div>
       </AlertDescription>
     </Alert>

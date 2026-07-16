@@ -119,13 +119,15 @@ async function resolveDocker(): Promise<{
 }> {
   try {
     await runCmd("docker --version");
-  } catch {
+  } catch (err) {
+    console.error("DOCKER ERR:", err);
     return { docker: false, compose: null };
   }
   try {
     await runCmd("docker compose version");
     return { docker: true, compose: "docker compose" };
-  } catch {
+  } catch (err) {
+    console.error("DOCKER COMPOSE ERR:", err);
     // fall through
   }
   try {
@@ -350,4 +352,60 @@ async function waitForHealth(endpoint: string, timeoutMs: number) {
     await new Promise((r) => setTimeout(r, 3000));
   }
   return false;
+}
+
+/* ---------------------- Docker-sibling detection -------------------- */
+
+/** Whether Larkup is itself running inside a Docker container. */
+export function isInsideDocker(): boolean {
+  return (
+    process.env.DOCKER_ENV === "true" ||
+    process.env.DOCKER_BUILD === "1" ||
+    existsSync("/.dockerenv")
+  );
+}
+
+/**
+ * When Larkup runs in Docker, Firecrawl may be a sibling service on the same
+ * Docker network (started via `--profile crawler`). This checks whether the
+ * sibling API is reachable and wires it up automatically.
+ *
+ * Docker Compose DNS resolves "firecrawl-api" to the sibling container.
+ */
+const DOCKER_SIBLING_ENDPOINT = "http://firecrawl-api:3002";
+
+export async function checkDockerSibling(): Promise<{
+  available: boolean;
+  endpoint: string;
+}> {
+  if (!isInsideDocker()) {
+    return { available: false, endpoint: "" };
+  }
+  const up = await isHealthy(DOCKER_SIBLING_ENDPOINT);
+  return { available: up, endpoint: DOCKER_SIBLING_ENDPOINT };
+}
+
+/**
+ * Wire a discovered Docker-sibling Firecrawl into the local state so the
+ * scraper client talks to it automatically.
+ */
+export async function connectDockerSibling(): Promise<LocalFirecrawlState> {
+  const { available } = await checkDockerSibling();
+  if (!available) {
+    return writeState({
+      ...EMPTY,
+      running: false,
+      lastError:
+        "Firecrawl sibling service is not running. Restart with: docker compose --profile crawler up",
+    });
+  }
+  const apiKey = `fc-docker-${randomUUID()}`;
+  return writeState({
+    running: true,
+    endpoint: DOCKER_SIBLING_ENDPOINT,
+    apiKey,
+    port: DEFAULT_PORT,
+    project: "docker-sibling",
+    startedAt: new Date().toISOString(),
+  });
 }
