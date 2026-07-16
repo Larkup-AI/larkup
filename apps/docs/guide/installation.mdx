@@ -11,7 +11,7 @@ The easiest way to use Larkup — download the desktop app and get started with 
   <Card
     title="macOS (Apple Silicon)"
     icon="apple"
-    href="https://github.com/Larkup-AI/larkup/releases/latest"
+    href="https://larkup.de/api/download/macos-arm64"
   >
     **M1, M2, M3 Macs**
 
@@ -21,7 +21,7 @@ The easiest way to use Larkup — download the desktop app and get started with 
   <Card
     title="macOS (Intel)"
     icon="apple"
-    href="https://github.com/Larkup-AI/larkup/releases/latest"
+    href="https://larkup.de/api/download/macos-x64"
   >
     **Intel Macs**
 
@@ -31,7 +31,7 @@ The easiest way to use Larkup — download the desktop app and get started with 
   <Card
     title="Windows"
     icon="windows"
-    href="https://github.com/Larkup-AI/larkup/releases/latest"
+    href="https://larkup.de/api/download/windows-x64"
   >
     **64-bit (x64)**
 
@@ -41,7 +41,7 @@ The easiest way to use Larkup — download the desktop app and get started with 
   <Card
     title="Linux"
     icon="linux"
-    href="https://github.com/Larkup-AI/larkup/releases/latest"
+    href="https://larkup.de/api/download/linux-x64"
   >
     **AppImage / .deb**
 
@@ -50,7 +50,7 @@ The easiest way to use Larkup — download the desktop app and get started with 
 </CardGroup>
 
 <Tip>
-  All desktop downloads are available on the [Download Page](https://larkup.de/download) with architecture-specific options, or directly from [GitHub Releases](https://github.com/Larkup-AI/larkup/releases/latest).
+  All desktop downloads are available on the [Download Page](https://larkup.de/download) with architecture-specific options.
 </Tip>
 
 ---
@@ -181,6 +181,57 @@ You can customize the main installation scripts using the following flags:
 
     # Preview without making changes
     .\install.ps1 -DryRun
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Keeping Up to Date
+
+Larkup will notify you in the web UI when a new version is available — look for the update banner at the top of the page.
+
+<Tabs>
+  <Tab title="Desktop" icon="desktop">
+    The desktop app checks for updates automatically on startup. When a new version is available, you'll see an **"Update Now"** button that downloads and installs the update seamlessly — no manual re-download needed.
+  </Tab>
+  <Tab title="Docker" icon="docker">
+    Update to the latest version with a single command:
+
+    ```bash
+    docker pull aboneda/larkup:latest && docker compose up -d
+    ```
+
+    For **automatic updates**, add [Watchtower](https://containrrr.dev/watchtower/) to your `docker-compose.yml`:
+
+    ```yaml
+    services:
+      larkup:
+        image: aboneda/larkup:latest
+        ports:
+          - "4567:4567"
+          - "8080-8090:8080-8090"
+
+      watchtower:
+        image: containrrr/watchtower
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+        command: --interval 86400 larkup
+    ```
+
+    Watchtower checks for new images daily and updates automatically.
+  </Tab>
+  <Tab title="npm / CLI" icon="npm">
+    Update the CLI to the latest version:
+
+    ```bash
+    npm install -g @larkup/cli
+    ```
+
+    Or if you used the install script:
+
+    ```bash
+    curl -fsSL https://larkup.de/install.sh | bash
     ```
   </Tab>
 </Tabs>
