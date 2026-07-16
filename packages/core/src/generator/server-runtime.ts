@@ -188,6 +188,8 @@ export async function startServer(config: RagConfig, serverApiKey?: string): Pro
       PORT: String(port),
       TOP_K: String(config.topK),
       SERVER_API_KEY: serverApiKey || "",
+      EMBEDDING_API_KEY: config.embeddingApiKey || process.env.EMBEDDING_API_KEY || process.env.OPENAI_API_KEY || "",
+      CHAT_API_KEY: config.chatApiKey || process.env.CHAT_API_KEY || process.env.OPENAI_API_KEY || "",
       OPENAI_API_KEY: config.embeddingApiKey || config.chatApiKey || process.env.OPENAI_API_KEY || "",
       ANTHROPIC_API_KEY: config.chatApiKey || config.embeddingApiKey || process.env.ANTHROPIC_API_KEY || "",
       COHERE_API_KEY: config.embeddingApiKey || config.chatApiKey || process.env.COHERE_API_KEY || "",
@@ -204,6 +206,7 @@ export async function startServer(config: RagConfig, serverApiKey?: string): Pro
       LANCEDB_TABLE: config.storeConfig.tableName || "documents",
     },
   })
+  console.log("Starting child process with OPENAI_API_KEY:", !!(config.embeddingApiKey || config.chatApiKey || process.env.OPENAI_API_KEY));
   child.unref()
   await logFd.close()
 

@@ -43,27 +43,37 @@ if (IS_SERVERLESS && MODE !== "cloud") {
   console.warn("[LanceDB] Running on serverless — using /tmp/lancedb. Data will NOT persist between invocations. Use LanceDB Cloud for production.")
 }
 
+let _conn = null
 let _table = null
 
-async function table() {
-  if (_table) return _table
-  let conn
+async function getConn() {
+  if (_conn) return _conn
   if (MODE === "cloud") {
     if (!URI || !API_KEY) {
       throw new Error("LanceDB Cloud needs LANCEDB_URI and LANCEDB_API_KEY.")
     }
-    conn = await lancedb.connect(URI, { apiKey: API_KEY })
+    _conn = await lancedb.connect(URI, { apiKey: API_KEY })
   } else {
     const abs = path.isAbsolute(DB_PATH) ? DB_PATH : path.join(process.cwd(), DB_PATH)
-    conn = await lancedb.connect(abs)
+    _conn = await lancedb.connect(abs)
   }
+  return _conn
+}
 
-  _table = await conn.openTable(TABLE)
-  return _table
+async function getTable() {
+  if (_table) return _table
+  const conn = await getConn()
+  const names = await conn.tableNames()
+  if (names.includes(TABLE)) {
+    _table = await conn.openTable(TABLE)
+    return _table
+  }
+  return null
 }
 
 export async function query(vector, topK) {
-  const t = await table()
+  const t = await getTable()
+  if (!t) return []
   const rows = await t.search(vector).limit(topK).toArray()
   return rows.map((row) => ({
     id: row.id,
@@ -76,7 +86,8 @@ export async function query(vector, topK) {
 }
 
 export async function list({ page = 1, limit = 20 } = {}) {
-  const t = await table()
+  const t = await getTable()
+  if (!t) return { documents: [], total: 0, page, limit, totalPages: 0 }
   // Fetch all rows to get total count, then slice for the page.
   // We explicitly exclude the "vector" column to avoid memory bloat and Rust panics on full scans.
   const allRows = await t.query().select(["id", "text", "title", "url", "documentId"]).toArray()
@@ -99,7 +110,8 @@ export async function list({ page = 1, limit = 20 } = {}) {
 }
 
 export async function get(id) {
-  const t = await table()
+  const t = await getTable()
+  if (!t) return null
   const rows = await t.query().filter(\`id = '\${id}'\`).limit(1).toArray()
   if (!rows.length) return null;
   const row = rows[0];
@@ -107,24 +119,44 @@ export async function get(id) {
 }
 
 export async function add(docs) {
-  const t = await table()
-  await t.add(docs)
+  if (docs.length === 0) return { success: true }
+  let t = await getTable()
+  if (t) {
+    await t.add(docs)
+  } else {
+    const conn = await getConn()
+    const names = await conn.tableNames()
+    if (names.includes(TABLE)) {
+      t = await conn.openTable(TABLE)
+      _table = t
+      await t.add(docs)
+    } else {
+      t = await conn.createTable(TABLE, docs)
+      _table = t
+    }
+  }
   return { success: true }
 }
 
 export async function remove(id) {
-  const t = await table()
+  const t = await getTable()
+  if (!t) return { success: true }
   await t.delete(\`id = '\${id}'\`)
   return { success: true }
 }
 
 export async function update(id, doc) {
-  const t = await table()
+  let t = await getTable()
+  if (!t) {
+    const conn = await getConn()
+    t = await conn.createTable(TABLE, [doc])
+    _table = t
+    return { success: true }
+  }
   await t.delete(\`id = '\${id}'\`)
   await t.add([doc])
   return { success: true }
-}
-`;
+}`;
 }
 
 function pineconeStore(): string {
@@ -483,9 +515,10 @@ const server = createServer(async (req, res) => {
       if (!doc.text) return send(res, 400, { error: "Missing text" })
       const vector = await embedQuery(doc.text)
       const id = doc.id || Math.random().toString(36).slice(2)
-      await store.add([{ id, vector, text: doc.text, title: doc.title || "Untitled", url: doc.url, documentId: doc.documentId || id }])
+      await store.add([{ id, vector, text: doc.text, title: doc.title || "Untitled", url: doc.url || "", documentId: doc.documentId || id }])
       return send(res, 200, { success: true, id })
     } catch (err) {
+      console.error("[POST /documents] Error:", err)
       return send(res, 500, { error: String(err?.message || err) })
     }
   }
@@ -538,7 +571,7 @@ const server = createServer(async (req, res) => {
       for (const [idx, chunk] of chunks.entries()) {
         const id = \`\${documentId}-\${idx}\`
         const vector = await embedQuery(chunk)
-        await store.add([{ id, vector, text: chunk, title: \`\${title} (part \${idx + 1})\`, url: targetUrl, documentId }])
+        await store.add([{ id, vector, text: chunk, title: \`\${title} (part \${idx + 1})\`, url: targetUrl || "", documentId }])
       }
 
       return send(res, 200, { success: true, documentId, chunks: chunks.length })
