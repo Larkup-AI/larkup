@@ -170,6 +170,8 @@ jobs:
             apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.dmg
             apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.exe
             apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.AppImage
+            apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.tar.gz
+            apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.zip
             apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/**/*.sig
           retention-days: 7
 
