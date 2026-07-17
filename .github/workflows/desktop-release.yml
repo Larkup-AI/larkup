@@ -215,10 +215,10 @@ jobs:
           URL_BASE="https://github.com/Larkup-AI/larkup/releases/download/v${VERSION}"
           
           # Find signatures
-          SIG_MAC_ARM=$(cat ./release-assets/*aarch64*.sig 2>/dev/null || echo "")
-          SIG_MAC_INTEL=$(cat ./release-assets/*x64*.dmg.sig 2>/dev/null || echo "")
-          SIG_WIN=$(cat ./release-assets/*setup*.sig 2>/dev/null || echo "")
-          SIG_LINUX=$(cat ./release-assets/*.AppImage*.sig 2>/dev/null || echo "")
+          SIG_MAC_ARM=$(cat $(find ./release-assets -name "*aarch64*.sig" | head -1) 2>/dev/null || echo "")
+          SIG_MAC_INTEL=$(cat $(find ./release-assets -name "*x64*.dmg.sig" | head -1) 2>/dev/null || echo "")
+          SIG_WIN=$(cat $(find ./release-assets -name "*setup*.sig" | head -1) 2>/dev/null || echo "")
+          SIG_LINUX=$(cat $(find ./release-assets -name "*.AppImage*.sig" | head -1) 2>/dev/null || echo "")
 
           cat <<EOF > ./release-assets/latest.json
           {
@@ -253,12 +253,12 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           name: Larkup Desktop v${{ steps.version.outputs.version }}
           files: |
-            ./release-assets/*.dmg
-            ./release-assets/*.exe
-            ./release-assets/*.AppImage
-            ./release-assets/*.tar.gz
-            ./release-assets/*.zip
-            ./release-assets/*.sig
+            ./release-assets/**/*.dmg
+            ./release-assets/**/*.exe
+            ./release-assets/**/*.AppImage
+            ./release-assets/**/*.tar.gz
+            ./release-assets/**/*.zip
+            ./release-assets/**/*.sig
             ./release-assets/latest.json
           draft: false
           prerelease: false
