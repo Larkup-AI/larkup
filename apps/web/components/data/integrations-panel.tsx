@@ -79,6 +79,38 @@ const INTEGRATIONS: Integration[] = [
     icon: "/icons/Confluence.png",
     available: false,
   },
+  {
+    id: "sharepoint",
+    name: "SharePoint",
+    category: "Documentation",
+    description: "Sites, lists, and document libraries.",
+    icon: "/icons/sharepoint.png",
+    available: false,
+  },
+  {
+    id: "sap",
+    name: "SAP",
+    category: "ERP",
+    description: "Business processes, data, and analytics.",
+    icon: "/icons/sap.png",
+    available: false,
+  },
+  {
+    id: "outlook",
+    name: "Outlook",
+    category: "Communication",
+    description: "Emails, contacts, and calendars.",
+    icon: "/icons/outlook.png",
+    available: false,
+  },
+  {
+    id: "onedrive",
+    name: "OneDrive",
+    category: "Documentation",
+    description: "Files, folders, and shared drives.",
+    icon: "/icons/onedrive.png",
+    available: false,
+  },
 ];
 
 export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
@@ -108,7 +140,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
         <h3 className="text-sm font-semibold text-foreground mb-4">
           Available Integrations
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {INTEGRATIONS.map((integration) => (
             <button
               key={integration.id}
