@@ -64,7 +64,7 @@ interface IndexStatus {
 
 const ACTIVE: IndexRun["status"][] = ["chunking", "embedding", "upserting"];
 
-export function IndexWorkspace() {
+export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
   const [starting, setStarting] = useState(false);
   const { data, isLoading, mutate } = useSWR<IndexStatus>(
     "/api/index",
@@ -92,7 +92,7 @@ export function IndexWorkspace() {
 
   if (isLoading || !data) {
     return (
-      <div className="px-6 py-6 md:px-8">
+      <div className="py-4">
         <Skeleton className="h-40 w-full" />
       </div>
     );
@@ -117,6 +117,7 @@ export function IndexWorkspace() {
       }
       toast.success("Indexing started.");
       mutate();
+      onDone?.();
     } catch {
       toast.error("Could not start indexing.");
     } finally {
@@ -134,6 +135,7 @@ export function IndexWorkspace() {
       }
       toast.success("Indexing cancelled.");
       mutate();
+      onDone?.();
     } catch {
       toast.error("Could not cancel indexing.");
     } finally {
@@ -142,7 +144,7 @@ export function IndexWorkspace() {
   }
 
   return (
-    <div className="space-y-6 px-6 py-6 md:px-8">
+    <div className="space-y-6">
       <ConfigSummary
         config={config}
         docCount={docCount}
@@ -168,7 +170,7 @@ export function IndexWorkspace() {
       <RunCard run={run} running={running} />
 
       {/* Pre-indexing warning — only shown before the very first run */}
-      {ready && !run && (
+      {/* {ready && !run && (
         <Alert>
           <Info className="size-4 text-blue-500!" />
           <AlertTitle className="text-blue-600 dark:text-blue-400">
@@ -201,7 +203,7 @@ export function IndexWorkspace() {
             </ul>
           </AlertDescription>
         </Alert>
-      )}
+      )} */}
 
       <div className="flex items-center gap-3">
         <Button
@@ -361,19 +363,8 @@ const STATUS_COPY: Record<
 };
 
 function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
-  if (!run) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center gap-1 py-12 text-center">
-          <Hash className="mb-1 size-6 text-muted-foreground/60" />
-          <p className="text-sm font-medium">No index built yet</p>
-          <p className="text-sm text-muted-foreground">
-            Build a Larkup index to embed your corpus and make it
-            searchable.
-          </p>
-        </CardContent>
-      </Card>
-    );
+  if (!run || run.status === "failed") {
+    return <></>;
   }
 
   const copy = STATUS_COPY[run.status];
@@ -390,8 +381,6 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
         <CardTitle className="flex items-center gap-2 text-base">
           {run.status === "completed" ? (
             <CheckCircle2 className="size-4 text-primary" />
-          ) : run.status === "failed" ? (
-            <AlertTriangle className="size-4 text-destructive" />
           ) : (
             <Loader2 className="size-4 animate-spin text-primary" />
           )}
@@ -400,15 +389,7 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
         <StatusBadge status={run.status} />
       </CardHeader>
       <CardContent className="space-y-4">
-        {run.status === "failed" ? (
-          <Alert variant="destructive">
-            <AlertTriangle className="size-4" />
-            <AlertTitle>Indexing failed</AlertTitle>
-            <AlertDescription>{run.error}</AlertDescription>
-          </Alert>
-        ) : (
-          <>
-            <div className="space-y-2">
+          <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
                   {copy.phase ?? "Done"}
@@ -444,8 +425,6 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
                 }
               />
             </dl>
-          </>
-        )}
       </CardContent>
     </Card>
   );

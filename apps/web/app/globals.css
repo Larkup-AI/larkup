@@ -194,3 +194,125 @@
     transition: all 0.2s ease;
   }
 }
+
+/* ── Premium Chat Message Styles ── */
+
+.assistant-text-content {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--foreground);
+  opacity: 0.92;
+}
+
+.assistant-text-content p,
+.assistant-text-content .msg-p {
+  margin: 0.5em 0;
+}
+
+/* Headings */
+.assistant-text-content .msg-h1 {
+  font-size: 1.15rem;
+  font-weight: 650;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  padding-bottom: 0.35em;
+  border-bottom: 1px solid var(--border);
+}
+
+.assistant-text-content .msg-h2 {
+  font-size: 1.0rem;
+  font-weight: 650;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+  margin-top: 1.4em;
+  margin-bottom: 0.4em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+}
+
+.assistant-text-content .msg-h3 {
+  font-size: 0.925rem;
+  font-weight: 600;
+  color: var(--foreground);
+  letter-spacing: -0.005em;
+  margin-top: 1.2em;
+  margin-bottom: 0.35em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid color-mix(in oklch, var(--border) 40%, transparent);
+}
+
+/* Bold */
+.assistant-text-content .msg-bold {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* Lists */
+.assistant-text-content .msg-ul,
+.assistant-text-content .msg-ol {
+  margin: 0.6em 0;
+  padding-left: 1.25em;
+}
+
+.assistant-text-content .msg-ul {
+  list-style-type: disc;
+}
+
+.assistant-text-content .msg-ol {
+  list-style-type: decimal;
+}
+
+.assistant-text-content .msg-li,
+.assistant-text-content .msg-li-ordered {
+  margin: 0.3em 0;
+  padding-left: 0.25em;
+  line-height: 1.6;
+}
+
+.assistant-text-content .msg-li::marker,
+.assistant-text-content .msg-li-ordered::marker {
+  color: var(--muted-foreground);
+}
+
+/* Inline code */
+.assistant-text-content .msg-inline-code {
+  border-radius: 0.375rem;
+  background: var(--muted);
+  padding: 0.15em 0.4em;
+  font-size: 0.85em;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  color: var(--foreground);
+}
+
+/* Code blocks */
+.assistant-text-content .msg-code-block {
+  border-radius: 0.625rem;
+  border: 1px solid color-mix(in oklch, var(--border) 50%, transparent);
+  background: color-mix(in oklch, var(--muted) 30%, transparent);
+  padding: 1rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.assistant-text-content .msg-code-block code {
+  font-family: var(--font-mono);
+}
+
+/* Links */
+.assistant-text-content .msg-link {
+  font-weight: 500;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: opacity 0.15s ease;
+}
+
+.assistant-text-content .msg-link:hover {
+  opacity: 0.75;
+}
+

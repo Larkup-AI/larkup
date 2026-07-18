@@ -24,6 +24,12 @@ import { cn } from "@/lib/utils";
 import { getProviderMeta, ProviderIcon } from "@/components/ui/provider-icon";
 import { get, set, del } from "idb-keyval";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -196,9 +202,7 @@ export function ChatWorkspace() {
         (firstMsg as any)?.content ||
         (firstMsg as any)?.text;
 
-      const title = firstMsgText
-        ? firstMsgText.substring(0, 40)
-        : "New Chat";
+      const title = firstMsgText ? firstMsgText.substring(0, 40) : "New Chat";
 
       let next;
       if (existing) {
@@ -432,90 +436,109 @@ export function ChatWorkspace() {
 
           <div className="h-4 w-px bg-border mx-1" />
 
-          <Sheet>
-            <SheetTrigger
-              render={
-                <button
-                  type="button"
-                  title="Chat History"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-                >
-                  <History className="h-[16px] w-[16px]" />
-                </button>
-              }
-            />
-            <SheetContent
-              side="left"
-              className="w-[300px] sm:w-[350px] p-0 flex flex-col"
-            >
-              <SheetHeader className="p-4 border-b">
-                <SheetTitle className="text-sm font-semibold">
-                  Chat History
-                </SheetTitle>
-              </SheetHeader>
-              <div className="flex-1 overflow-y-auto p-2">
-                {history.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-muted-foreground">
-                    No chat history
-                  </div>
-                ) : (
-                  history
-                    .sort((a, b) => b.updatedAt - a.updatedAt)
-                    .map((chat) => (
-                      <div
-                        key={chat.id}
-                        onClick={() => loadChat(chat.id)}
-                        className={cn(
-                          "group flex items-center justify-between rounded-md px-3 py-2 text-sm cursor-pointer transition hover:bg-muted mb-1",
-                          currentChatId === chat.id && "bg-muted font-medium",
-                        )}
-                      >
-                        <div className="truncate pr-4 flex-1 text-xs">
-                          {chat.title}
-                        </div>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <button
+          <TooltipProvider delay={150}>
+            <Sheet>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <SheetTrigger
+                      render={
+                        <button
+                          type="button"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                        >
+                          <History className="h-[16px] w-[16px]" />
+                        </button>
+                      }
+                    />
+                  }
+                />
+                <TooltipContent>Chat History</TooltipContent>
+              </Tooltip>
+              <SheetContent
+                side="left"
+                className="w-[300px] sm:w-[350px] p-0 flex flex-col"
+              >
+                <SheetHeader className="p-4 border-b">
+                  <SheetTitle className="text-sm font-semibold">
+                    Chat History
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="flex-1 overflow-y-auto p-2">
+                  {history.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-muted-foreground">
+                      No chat history
+                    </div>
+                  ) : (
+                    history
+                      .sort((a, b) => b.updatedAt - a.updatedAt)
+                      .map((chat) => (
+                        <div
+                          key={chat.id}
+                          onClick={() => loadChat(chat.id)}
+                          className={cn(
+                            "group flex items-center justify-between rounded-md px-3 py-2 text-sm cursor-pointer transition hover:bg-muted mb-1",
+                            currentChatId === chat.id && "bg-muted font-medium",
+                          )}
+                        >
+                          <div className="truncate pr-4 flex-1 text-xs">
+                            {chat.title}
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger
+                              render={
+                                <button
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              }
+                            />
+                            <AlertDialogContent
                               onClick={(e) => e.stopPropagation()}
-                              className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive"
                             >
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Chat</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this chat? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => deleteChat(chat.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    ))
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this chat?
+                                  This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteChat(chat.id)}
+                                  className="bg-destructive text-white hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
 
-          <button
-            type="button"
-            onClick={newChat}
-            title="New chat"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          >
-            <SquarePen className="h-[16px] w-[16px]" />
-          </button>
-          <ChatSettingsModal />
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    onClick={newChat}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                  >
+                    <SquarePen className="h-[16px] w-[16px]" />
+                  </button>
+                }
+              />
+              <TooltipContent>New Chat</TooltipContent>
+            </Tooltip>
+            <ChatSettingsModal />
+          </TooltipProvider>
         </div>
       </div>
 

@@ -8,6 +8,9 @@ import {
   readDocuments,
   updateDocument,
 } from "@larkup/core/documents-store"
+import { readConfig } from "@larkup/core/config-store"
+import { readRun, patchRun } from "@larkup/core/index-store"
+import { createAdapter } from "@larkup/vector-stores/factory"
 import type { DocumentSource } from "@larkup/core/types"
 
 export const runtime = "nodejs"
@@ -85,6 +88,34 @@ export async function DELETE(req: Request) {
   const ids = url.searchParams.get("ids")
   if (id) await deleteDocument(id)
   else if (ids) await deleteDocuments(ids.split(","))
-  else await clearDocuments()
+  else {
+    // Clear all: wipe documents, reset vector store, and clear index run state
+    await clearDocuments()
+
+    // Reset the vector store so stale embeddings are removed
+    try {
+      const config = await readConfig()
+      const adapter = await createAdapter(config)
+      await adapter.init(0)
+      await adapter.reset()
+    } catch {
+      // Vector store reset is best-effort — if the store isn't configured
+      // or unreachable we still clear the documents DB successfully.
+    }
+
+    // Clear the index run state so the UI shows no active index
+    try {
+      const run = await readRun()
+      if (run) {
+        await patchRun({
+          status: "failed",
+          error: "Corpus cleared — index invalidated.",
+          finishedAt: new Date().toISOString(),
+        })
+      }
+    } catch {
+      // best-effort
+    }
+  }
   return NextResponse.json({ ok: true })
 }

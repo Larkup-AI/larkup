@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const { text } = await generateText({
       model,
       prompt: "Reply with the word 'OK'",
-      maxOutputTokens: 5,
+      maxOutputTokens: 16,
     });
 
     return NextResponse.json({ success: true, text });

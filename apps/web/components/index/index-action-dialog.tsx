@@ -114,19 +114,20 @@ export function IndexActionDialog({
     lastWarning.current = warning;
   }, [data?.run?.warning]);
 
-  const lastStatus = useRef<IndexRun["status"] | undefined>(undefined);
+  const [isIndexing, setIsIndexing] = useState(false);
+
   useEffect(() => {
     const status = data?.run?.status;
-    if (
-      status === "completed" &&
-      lastStatus.current &&
-      ACTIVE.includes(lastStatus.current as any)
-    ) {
+    const isNowActive = Boolean(status && ACTIVE.includes(status as any));
+
+    if (isNowActive) {
+      setIsIndexing(true);
+    } else if (isIndexing && status === "completed") {
+      setIsIndexing(false);
       setDialogOpen(false);
       toast.success("Indexing completed successfully!");
     }
-    lastStatus.current = status;
-  }, [data?.run?.status, setDialogOpen]);
+  }, [data?.run?.status, isIndexing, setDialogOpen]);
 
   async function build(incremental = false) {
     setStarting(true);
@@ -142,6 +143,7 @@ export function IndexActionDialog({
         return;
       }
       toast.success("Indexing started.");
+      setIsIndexing(true);
       mutate();
     } catch {
       toast.error("Could not start indexing.");
@@ -170,14 +172,16 @@ export function IndexActionDialog({
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       {trigger ? (
-        <DialogTrigger 
-          render={isValidElement(trigger) ? trigger : <button>{trigger}</button>}
+        <DialogTrigger
+          render={
+            isValidElement(trigger) ? trigger : <button>{trigger}</button>
+          }
         />
       ) : (
         <div className="flex items-center gap-2">
           {data?.run?.status === "completed" && (
             <AlertDialog>
-              <AlertDialogTrigger 
+              <AlertDialogTrigger
                 render={
                   <Button
                     disabled={
@@ -305,41 +309,91 @@ export function IndexActionDialog({
               </Alert>
             )}
 
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => build(data.run?.status === "completed")}
-                disabled={
-                  !data.ready ||
-                  Boolean(data.run && ACTIVE.includes(data.run.status)) ||
-                  starting ||
-                  (data.run?.status === "completed" &&
-                    data.unindexedCount === 0)
-                }
-                size="lg"
-              >
-                {Boolean(data.run && ACTIVE.includes(data.run.status)) ||
-                starting ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Play className="size-4" />
-                )}
-                {Boolean(data.run && ACTIVE.includes(data.run.status))
-                  ? "Indexing…"
-                  : data.run?.status === "completed"
-                    ? `Index new documents (${data.unindexedCount})`
-                    : `Start indexing (${data.unindexedCount})`}
-              </Button>
-
-              {Boolean(data.run && ACTIVE.includes(data.run.status)) && (
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center gap-3">
                 <Button
-                  onClick={cancel}
-                  disabled={starting}
+                  onClick={() => build(data.run?.status === "completed")}
+                  disabled={
+                    !data.ready ||
+                    Boolean(data.run && ACTIVE.includes(data.run.status)) ||
+                    starting ||
+                    (data.run?.status === "completed" &&
+                      data.unindexedCount === 0)
+                  }
                   size="lg"
-                  variant="destructive"
                 >
-                  Cancel
+                  {Boolean(data.run && ACTIVE.includes(data.run.status)) ||
+                  starting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Play className="size-4" />
+                  )}
+                  {Boolean(data.run && ACTIVE.includes(data.run.status))
+                    ? "Indexing…"
+                    : data.run?.status === "completed"
+                      ? `Index new documents (${data.unindexedCount})`
+                      : `Start indexing (${data.unindexedCount})`}
                 </Button>
-              )}
+
+                {data.run?.status === "completed" &&
+                  !Boolean(data.run && ACTIVE.includes(data.run.status)) && (
+                    <AlertDialog>
+                      <AlertDialogTrigger
+                        render={
+                          <Button
+                            variant="outline"
+                            size="lg"
+                            disabled={starting}
+                          >
+                            <RotateCcw className="size-4 mr-2" />
+                            Re-Index All
+                          </Button>
+                        }
+                      />
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Are you sure you want to re-index data?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will rebuild the entire index from scratch. All
+                            documents will be re-processed.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => {
+                              setDialogOpen(true);
+                              build(false);
+                            }}
+                          >
+                            Continue
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+
+                {Boolean(data.run && ACTIVE.includes(data.run.status)) && (
+                  <Button
+                    onClick={cancel}
+                    disabled={starting}
+                    size="lg"
+                    variant="destructive"
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+
+              <Button
+                variant="ghost"
+                size="lg"
+                onClick={() => setDialogOpen(false)}
+              >
+                Close
+              </Button>
             </div>
           </div>
         )}
@@ -469,12 +523,13 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
       </div>
 
       {run.status === "failed" ? (
-        <Alert variant="destructive">
-          <AlertTriangle className="size-4" />
-          <AlertTitle>Indexing failed</AlertTitle>
-          <AlertDescription>{run.error}</AlertDescription>
-        </Alert>
+        <></>
       ) : (
+        // <Alert variant="destructive">
+        //   <AlertTriangle className="size-4" />
+        //   <AlertTitle>Indexing failed</AlertTitle>
+        //   <AlertDescription>{run.error}</AlertDescription>
+        // </Alert>
         <>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import useSWR from "swr";
-import { Loader2, Save, Database, Clock } from "lucide-react";
+import { Loader2, Save, Database, Clock, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,25 @@ import {
   validateStoreConfig,
 } from "@larkup/vector-stores/registry";
 import { StoreFields } from "@/components/configure/store-fields";
-import type { RagConfig, VectorStoreId } from "@larkup/core/types";
+import type { RagConfig, VectorStoreId, IndexType } from "@larkup/core/types";
+
+const INDEX_TYPES: { value: IndexType; label: string; description: string }[] = [
+  {
+    value: "hybrid",
+    label: "Hybrid",
+    description: "Combines semantic understanding with keyword matching for best results.",
+  },
+  {
+    value: "semantic",
+    label: "Semantic",
+    description: "Uses embeddings to find conceptually similar content.",
+  },
+  {
+    value: "lexical",
+    label: "Lexical",
+    description: "Traditional keyword-based search using BM25 scoring.",
+  },
+];
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
@@ -171,6 +189,55 @@ export function StorageSection() {
           Where your processed data is stored and indexed.
         </p>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Layers className="size-3.5 text-primary" />
+            Indexing Strategy
+          </CardTitle>
+          <CardDescription className="text-xs">
+            How your documents are indexed for retrieval.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-xs">Strategy</Label>
+            <Select
+              value={form.indexType || "hybrid"}
+              onValueChange={(v) => {
+                if (
+                  indexedRun &&
+                  data?.config &&
+                  v !== data.config.indexType
+                ) {
+                  handleStructuralChangeBlock();
+                  return;
+                }
+                setForm((f) => ({ ...f, indexType: v as IndexType }));
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <span className="font-medium text-sm">
+                  {INDEX_TYPES.find((t) => t.value === (form.indexType || "hybrid"))?.label ?? "Select strategy…"}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {INDEX_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-medium text-sm">{t.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {t.description}
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">

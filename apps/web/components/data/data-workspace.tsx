@@ -5,18 +5,47 @@ import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import type { CrawlJob, SourceDocument } from "@larkup/core/types";
-import { Globe, FileUp, Type, Image, Plug, Briefcase, ChevronDown } from "lucide-react";
-
+import type { CrawlJob, SourceDocument, IndexRun } from "@larkup/core/types";
+import {
+  Globe,
+  FileUp,
+  Type,
+  Image,
+  Plug,
+  Briefcase,
+  ChevronDown,
+  Zap,
+  RotateCcw,
+} from "lucide-react";
 import { ScrapePanel } from "@/components/data/scrape-panel";
 import { PastePanel } from "@/components/data/paste-panel";
 import { UploadPanel } from "@/components/data/upload-panel";
 import { MediaPanel } from "@/components/data/media-panel";
-import { NotionPanel } from "@/components/data/notion-panel";
 import { IntegrationsPanel } from "@/components/data/integrations-panel";
 import { JobsPanel } from "@/components/data/jobs-panel";
 import { CorpusPanel } from "@/components/data/corpus-panel";
 import { FirecrawlNotice } from "@/components/data/firecrawl-notice";
+import { IndexWorkspace } from "@/components/index/index-workspace";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -76,6 +105,7 @@ export function DataWorkspace() {
   const [activeTab, setActiveTab] = useState<TopTabId>("add");
   const [activeSubTab, setActiveSubTab] = useState<SubTabId>("website");
   const [showJobsDrawer, setShowJobsDrawer] = useState(false);
+  const [indexDialogOpen, setIndexDialogOpen] = useState(false);
   const prevJobsRef = useRef<CrawlJob[]>([]);
 
   const jobsQuery = useSWR("/api/jobs", fetchJobsWithSync, {
@@ -115,22 +145,36 @@ export function DataWorkspace() {
   });
   const documents = docsQuery.data?.documents ?? [];
   const stats = docsQuery.data?.stats;
+  const docCount = stats?.docCount ?? 0;
+
+  const indexQuery = useSWR<{
+    unindexedCount: number;
+    running: boolean;
+    run: IndexRun | null;
+  }>("/api/index", fetcher, {
+    refreshInterval: (d) => (d?.running ? 2000 : 15000),
+  });
+  const unindexedCount = indexQuery.data?.unindexedCount ?? 0;
+  const indexRunning = indexQuery.data?.running ?? false;
+  const hasCompletedIndex = indexQuery.data?.run?.status === "completed";
 
   const { mutate: mutateGlobal } = useSWRConfig();
 
   const refreshAll = () => {
     jobsQuery.mutate();
     docsQuery.mutate();
+    indexQuery.mutate();
     mutateGlobal("/api/index");
   };
 
   const handleDataAdded = () => {
     refreshAll();
+    setActiveTab("corpus");
   };
 
   return (
     <div className="px-6 md:px-8">
-      {/* ─── Top-level tabs (Mintlify-style pill tabs) ─── */}
+      {/* ─── Top-level tabs + action buttons ─── */}
       <div className="flex w-full items-center justify-between mb-6">
         <div className="flex items-center rounded-sm bg-white/90 p-0.5 border h-11">
           {TOP_TABS.map((tab) => {
@@ -175,22 +219,19 @@ export function DataWorkspace() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Firecrawl notice always visible next to jobs */}
-          <FirecrawlNotice cloudConfigured={configured} />
-
-          {/* Floating jobs indicator — always accessible */}
+          {/* Floating jobs indicator */}
           {jobs.length > 0 && (
             <button
               type="button"
               onClick={() => setShowJobsDrawer(!showJobsDrawer)}
               className={cn(
-                "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                "flex items-center gap-2 rounded-lg border h-10 px-4 text-sm font-medium transition-colors",
                 hasActive
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                   : "border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground",
               )}
             >
-              <Briefcase className="size-3.5" />
+              <Briefcase className="size-4" />
               {hasActive ? (
                 <>
                   <span className="relative flex size-2">
@@ -211,12 +252,101 @@ export function DataWorkspace() {
               )}
               <ChevronDown
                 className={cn(
-                  "ml-1 size-3.5 transition-transform duration-200",
-                  showJobsDrawer && "rotate-180"
+                  "ml-1 size-4 transition-transform duration-200",
+                  showJobsDrawer && "rotate-180",
                 )}
               />
             </button>
           )}
+
+          {hasCompletedIndex && !indexRunning && (
+            <AlertDialog>
+              <AlertDialogTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    className="h-10 px-4 text-sm gap-1.5 bg-transparent hover:bg-white"
+                  >
+                    <RotateCcw className="size-3.5" />
+                    Re-Index
+                  </Button>
+                }
+              />
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Are you sure you want to re-index data?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will rebuild the entire index from scratch. All
+                    documents will be re-processed.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      fetch("/api/index", {
+                        method: "POST",
+                        body: JSON.stringify({ incremental: false }),
+                        headers: { "Content-Type": "application/json" },
+                      }).then(() => {
+                        toast.success("Indexing started.");
+                        setIndexDialogOpen(true);
+                        indexQuery.mutate();
+                      });
+                    }}
+                  >
+                    Continue
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          <Dialog open={indexDialogOpen} onOpenChange={setIndexDialogOpen}>
+            <DialogTrigger
+              render={
+                <Button
+                  variant={indexRunning ? "success" : "default"}
+                  disabled={
+                    (docCount === 0 || unindexedCount === 0) && !indexRunning
+                  }
+                  className="h-10 rounded-md px-4 gap-1.5 text-sm"
+                >
+                  {indexRunning ? (
+                    <>
+                      <span className="relative flex size-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                        <span className="relative inline-flex size-2 rounded-full bg-white" />
+                      </span>
+                      Indexing…
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="size-3.5" />
+                      {unindexedCount > 0
+                        ? `Start Indexing (${unindexedCount})`
+                        : "Start Indexing"}
+                    </>
+                  )}
+                </Button>
+              }
+            />
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Build Index</DialogTitle>
+                <DialogDescription>
+                  Embed your documents into a vector index for semantic search.
+                </DialogDescription>
+              </DialogHeader>
+              <IndexWorkspace
+                onDone={() => {
+                  indexQuery.mutate();
+                }}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -286,10 +416,15 @@ export function DataWorkspace() {
               {activeSubTab === "website" && (
                 <div className="w-full flex flex-col gap-8 animate-in fade-in duration-200">
                   <div>
-                    <ScrapePanel onStarted={() => {
-                      handleDataAdded();
-                      setShowJobsDrawer(true);
-                    }} />
+                    <ScrapePanel
+                      onStarted={() => {
+                        handleDataAdded();
+                        setShowJobsDrawer(true);
+                      }}
+                      crawlerControl={
+                        <FirecrawlNotice cloudConfigured={configured} />
+                      }
+                    />
                   </div>
                   {/* {jobs.length > 0 && !showJobsDrawer && (
                     <div className="pt-8 border-t border-border">

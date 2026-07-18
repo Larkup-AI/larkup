@@ -14,6 +14,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Database,
 } from "lucide-react";
 import type { DocumentSource, SourceDocument } from "@larkup/core/types";
 import { GenericAlert } from "@/components/alerts/generic-alert";
@@ -49,6 +50,7 @@ const SOURCE_META: Record<
   scrape: { label: "Scraped", icon: Globe },
   paste: { label: "Pasted", icon: ClipboardPaste },
   upload: { label: "Uploaded", icon: FileUp },
+  tabular: { label: "Tabular", icon: Database },
 };
 
 export function CorpusPanel({
@@ -101,7 +103,7 @@ export function CorpusPanel({
   }
   async function clearAll() {
     await fetch("/api/documents", { method: "DELETE" });
-    toast.message("Corpus cleared");
+    toast.message("Corpus and vector index cleared");
     setSelectedIds(new Set());
     onChanged();
   }

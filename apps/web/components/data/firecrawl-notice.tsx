@@ -149,9 +149,8 @@ export function FirecrawlNotice({
     <div className="flex items-center gap-2">
       {running ? (
         <Button
-          size="sm"
           variant="outline"
-          className="h-7 gap-1.5  bg-red-500 hover:bg-red-600 text-white hover:text-white hover:border-red-200 text-xs px-2.5 shadow-none"
+          className="h-10 gap-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white hover:text-white hover:border-red-200 text-sm px-4 shadow-none"
           onClick={() => control("stop")}
           disabled={busy !== null}
         >
@@ -164,7 +163,6 @@ export function FirecrawlNotice({
         </Button>
       ) : (
         <Button
-          size="sm"
           variant="outline"
           onClick={() => control("start")}
           disabled={
@@ -172,7 +170,7 @@ export function FirecrawlNotice({
             isLoading ||
             (!dockerReady && runtimeEnv !== "docker")
           }
-          className="h-7 gap-1.5 text-xs px-2.5 shadow-none bg-orange-500 text-white hover:bg-orange-600 hover:text-white"
+          className="h-10 gap-1.5 rounded-md text-sm px-4 shadow-none bg-orange-500 text-white hover:bg-orange-600 hover:text-white"
         >
           {busy === "start" ? (
             <Loader2 className="size-3 animate-spin text-muted-foreground" />

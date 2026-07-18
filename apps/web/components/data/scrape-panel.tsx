@@ -6,7 +6,6 @@ import { formatErrorMessage } from "@/lib/error-formatter";
 import {
   Globe,
   Loader2,
-  Plus,
   Rocket,
   Search,
   ChevronDown,
@@ -93,9 +92,11 @@ interface SearchState {
 export function ScrapePanel({
   disabled,
   onStarted,
+  crawlerControl,
 }: {
   disabled?: boolean;
   onStarted: () => void;
+  crawlerControl?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -594,6 +595,7 @@ export function ScrapePanel({
       <div className="space-y-3">
         {/* Mode toggle + input */}
         <div className="flex items-center gap-2">
+          {crawlerControl}
           <Tabs
             value={inputMode}
             onValueChange={(v) => setInputMode(v as "search" | "url")}

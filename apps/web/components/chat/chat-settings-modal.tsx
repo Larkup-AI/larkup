@@ -103,17 +103,25 @@ export function ChatSettingsModal() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <button
-            type="button"
-            title="Chat Settings"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-        }
-      />
+      <TooltipProvider delay={150}>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DialogTrigger
+                render={
+                  <button
+                    type="button"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </button>
+                }
+              />
+            }
+          />
+          <TooltipContent>Chat Settings</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       <DialogContent className="max-w-md overflow-hidden transition-all duration-300">
         {view === "main" ? (

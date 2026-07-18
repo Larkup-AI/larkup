@@ -3,10 +3,19 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { formatErrorMessage } from "@/lib/error-formatter";
-import { FileUp, Loader2, X, Settings2, Columns, Plus } from "lucide-react";
+import {
+  FileUp,
+  Loader2,
+  X,
+  Settings2,
+  Columns,
+  Plus,
+  Database,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { TabularPreview } from "@/components/data/tabular-preview";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import {
@@ -28,7 +37,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 
-const ACCEPT = ".txt,.md,.markdown,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx";
+const ACCEPT =
+  ".txt,.md,.markdown,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx";
 
 type FileFormat = "plain" | "lines" | "structured";
 
@@ -46,6 +56,10 @@ interface StagedFile {
   contentSeparator?: string;
   metadataKeys?: string[];
   globalMetadata?: { key: string; value: string }[];
+  /** When true, structured data is also saved as a TabularDataset for analytics */
+  indexAsTabular?: boolean;
+  /** Expanded preview state */
+  showPreview?: boolean;
 }
 
 export function UploadPanel({ onAdded }: { onAdded: () => void }) {
@@ -86,15 +100,27 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
               titleKey: keys[0],
               contentKeys: keys,
               contentSeparator: ", ",
-              metadataKeys: [],
+              metadataKeys: keys.slice(1),
               globalMetadata: [],
+              indexAsTabular: true,
             });
           }
         } else if (ext === "xlsx" || ext === "xls") {
           const data = await file.arrayBuffer();
-          const workbook = XLSX.read(data, { type: "array" });
+          const workbook = XLSX.read(data, { type: "array", cellDates: true });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(sheet);
+          const rawRows = XLSX.utils.sheet_to_json(sheet) as Record<
+            string,
+            any
+          >[];
+          // Convert any Date objects to ISO date strings so they display correctly
+          const rows = rawRows.map((row) => {
+            const out: Record<string, any> = {};
+            for (const [k, v] of Object.entries(row)) {
+              out[k] = v instanceof Date ? v.toISOString().split("T")[0] : v;
+            }
+            return out;
+          });
           if (rows.length > 0) {
             const keys = Object.keys(rows[0] as object);
             next.push({
@@ -107,8 +133,9 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
               titleKey: keys[0],
               contentKeys: keys,
               contentSeparator: ", ",
-              metadataKeys: [],
+              metadataKeys: keys.slice(1),
               globalMetadata: [],
+              indexAsTabular: true,
             });
           }
         } else if (ext === "json") {
@@ -131,8 +158,9 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                 titleKey: keys[0],
                 contentKeys: keys,
                 contentSeparator: ", ",
-                metadataKeys: [],
+                metadataKeys: keys.slice(1),
                 globalMetadata: [],
+                indexAsTabular: true,
               });
             } else {
               // fallback to plain
@@ -156,16 +184,16 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
         } else if (ext === "pdf" || ext === "doc" || ext === "docx") {
           const formData = new FormData();
           formData.append("file", file);
-          
+
           const res = await fetch("/api/parse-file", {
             method: "POST",
             body: formData,
           });
-          
+
           if (!res.ok) {
             throw new Error(`Failed to parse ${file.name}`);
           }
-          
+
           const { text } = await res.json();
           next.push({
             id,
@@ -198,6 +226,28 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
 
     const payloads: any[] = [];
 
+    // First: save tabular datasets for files with indexAsTabular enabled
+    for (const f of staged) {
+      if (f.format === "structured" && f.rows && f.indexAsTabular) {
+        try {
+          const res = await fetch("/api/tabular", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileName: f.name, rows: f.rows }),
+          });
+          if (res.ok) {
+            const result = await res.json();
+            toast.success(
+              `Saved "${f.name}" as tabular dataset (${result.rowCount} rows, ${result.columns.length} columns)`,
+            );
+          }
+        } catch {
+          /* continue — still add as documents */
+        }
+      }
+    }
+
+    // Then: create document payloads
     for (const f of staged) {
       if (f.format === "plain" && f.rawContent) {
         payloads.push({
@@ -227,11 +277,13 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
           let content = "";
           if (f.contentKeys && f.contentKeys.length > 0) {
             content = f.contentKeys
-              .map((k) => String(row[k] || ""))
+              .map((k) => `${k}: ${String(row[k] || "")}`)
               .filter(Boolean)
-              .join(f.contentSeparator || " ");
+              .join(f.contentSeparator || " | ");
           } else {
-            content = JSON.stringify(row);
+            content = Object.entries(row)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(" | ");
           }
 
           const metadata: Record<string, any> = {};
@@ -249,7 +301,12 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
           }
 
           if (content.trim()) {
-            payloads.push({ title, content, metadata, source: "upload" });
+            payloads.push({
+              title,
+              content,
+              metadata,
+              source: f.indexAsTabular ? "tabular" : "upload",
+            });
           }
         }
       }
@@ -346,6 +403,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                       ? "SPLIT BY LINE"
                       : "PLAIN TEXT"}
                   {f.format === "structured" && ` • ${f.rows?.length} ROWS`}
+                  {f.indexAsTabular && " • TABULAR"}
                 </span>
               </div>
               <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
@@ -353,6 +411,35 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
               </span>
 
               <div className="flex items-center gap-1 shrink-0">
+                {/* Tabular indexing toggle for structured files */}
+                {f.format === "structured" && (
+                  <button
+                    type="button"
+                    aria-label="Toggle tabular indexing"
+                    title={
+                      f.indexAsTabular
+                        ? "Tabular indexing ON"
+                        : "Enable tabular indexing for data analysis"
+                    }
+                    onClick={() =>
+                      setStaged((p) =>
+                        p.map((item) =>
+                          item.id === f.id
+                            ? { ...item, indexAsTabular: !item.indexAsTabular }
+                            : item,
+                        ),
+                      )
+                    }
+                    className={cn(
+                      "p-1.5 border rounded-md transition-colors cursor-pointer",
+                      f.indexAsTabular
+                        ? "bg-primary/10 border-primary/30 text-primary"
+                        : "bg-secondary text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                    )}
+                  >
+                    <Database className="size-3.5" />
+                  </button>
+                )}
                 <button
                   type="button"
                   aria-label={`Configure ${f.name}`}
@@ -372,6 +459,13 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                   <X className="size-3.5 text-red-500" />
                 </button>
               </div>
+
+              {/* Tabular preview for structured files with tabular indexing */}
+              {f.format === "structured" && f.indexAsTabular && f.rows && (
+                <div className="col-span-full mt-2 w-full">
+                  <TabularPreview rows={f.rows} maxPreviewRows={5} />
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -414,7 +508,10 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
           </DialogHeader>
 
           {editingFile && (
-            <div className="py-4 space-y-6 overflow-y-auto pr-2" style={{ maxHeight: "calc(80vh - 120px)" }}>
+            <div
+              className="py-4 space-y-6 overflow-y-auto pr-2"
+              style={{ maxHeight: "calc(80vh - 120px)" }}
+            >
               {editingFile.format === "structured" ? (
                 <>
                   <div className="space-y-4">
@@ -450,14 +547,16 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                             type="button"
                             className="text-[10px] uppercase font-medium text-primary hover:underline cursor-pointer"
                             onClick={() => {
-                              updateEditingFile({ 
-                                contentKeys: editingFile.keys || []
+                              updateEditingFile({
+                                contentKeys: editingFile.keys || [],
                               });
                             }}
                           >
                             Select All
                           </button>
-                          <span className="text-muted-foreground text-[10px]">|</span>
+                          <span className="text-muted-foreground text-[10px]">
+                            |
+                          </span>
                           <button
                             type="button"
                             className="text-[10px] uppercase font-medium text-muted-foreground hover:underline cursor-pointer"
@@ -545,15 +644,20 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                             type="button"
                             className="text-[10px] uppercase font-medium text-primary hover:underline cursor-pointer"
                             onClick={() => {
-                              const availableKeys = editingFile.keys?.filter(k => k !== editingFile.titleKey) || [];
-                              updateEditingFile({ 
-                                metadataKeys: availableKeys
+                              const availableKeys =
+                                editingFile.keys?.filter(
+                                  (k) => k !== editingFile.titleKey,
+                                ) || [];
+                              updateEditingFile({
+                                metadataKeys: availableKeys,
                               });
                             }}
                           >
                             Select All
                           </button>
-                          <span className="text-muted-foreground text-[10px]">|</span>
+                          <span className="text-muted-foreground text-[10px]">
+                            |
+                          </span>
                           <button
                             type="button"
                             className="text-[10px] uppercase font-medium text-muted-foreground hover:underline cursor-pointer"
@@ -704,7 +808,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="pb-2! bg-muted ">
             <Button onClick={() => setEditingFileId(null)}>Done</Button>
           </DialogFooter>
         </DialogContent>

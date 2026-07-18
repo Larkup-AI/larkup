@@ -238,7 +238,7 @@ export async function POST(request: Request) {
       ) as any;
 
       try {
-        await generateText({ model, prompt: "hi", maxOutputTokens: 1 });
+        await generateText({ model, prompt: "hi", maxOutputTokens: 16 });
       } catch (err: any) {
         const msg = err.message || "";
 

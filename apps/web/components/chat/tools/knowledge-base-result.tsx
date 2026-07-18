@@ -24,12 +24,29 @@ export function KnowledgeBaseResult({
   isShimmering?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const isRunning = parts.some(
-    (part) =>
-      part.state === "input-streaming" || part.state === "input-available",
-  );
-  const hits: KBHit[] = parts.flatMap((part) => part.output?.hits ?? []);
-  const queries = parts.map((part) => part.input?.query).filter(Boolean);
+  const isRunning = parts.some((part: any) => {
+    // New format
+    if (part.type === "tool-invocation") {
+      const state = part.toolInvocation?.state;
+      return state === "partial-call" || state === "call";
+    }
+    // Legacy format
+    return part.state === "input-streaming" || part.state === "input-available";
+  });
+  const hits: KBHit[] = parts.flatMap((part: any) => {
+    // New format
+    if (part.type === "tool-invocation") {
+      return part.toolInvocation?.result?.hits ?? [];
+    }
+    // Legacy format
+    return part.output?.hits ?? [];
+  });
+  const queries = parts.map((part: any) => {
+    if (part.type === "tool-invocation") {
+      return part.toolInvocation?.args?.query;
+    }
+    return part.input?.query;
+  }).filter(Boolean);
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card">
