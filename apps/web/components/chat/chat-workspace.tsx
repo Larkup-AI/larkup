@@ -69,6 +69,14 @@ export function ChatWorkspace() {
   const [modelSearch, setModelSearch] = useState("");
   const [input, setInput] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
 
   const [currentChatId, setCurrentChatId] = useState<string>("");
   const [history, setHistory] = useState<
@@ -598,6 +606,7 @@ export function ChatWorkspace() {
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
             <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-1 focus-within:ring-ring">
               <textarea
+                ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -606,10 +615,10 @@ export function ChatWorkspace() {
                     handleSubmit(e);
                   }
                 }}
-                rows={2}
+                rows={1}
                 disabled={!ready}
                 placeholder="Ask about your knowledge base…"
-                className="max-h-40 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className="max-h-48 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40"
               />
               <button
                 type="submit"
