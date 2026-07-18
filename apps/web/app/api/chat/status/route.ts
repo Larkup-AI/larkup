@@ -31,7 +31,9 @@ export async function GET(req: Request) {
 
     const blockers: string[] = [];
     if (!hasApiKey) {
-      blockers.push("Set AI Models API Key in Settings.");
+      blockers.push(
+        "You Can't start chatting.You have to set AI Models API Key in Settings.",
+      );
     }
 
     const requestedProvider = new URL(req.url).searchParams.get("provider");

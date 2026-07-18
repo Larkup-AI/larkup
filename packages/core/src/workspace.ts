@@ -250,7 +250,7 @@ async function nextPort(ws: Workspace) {
   return candidate
 }
 
-function defaultConfigFor(id: string, name: string): RagConfig {
+function defaultConfigFor(id: string, name: string, prevConfig: Partial<RagConfig> = {}): RagConfig {
   return {
     ...DEFAULT_CONFIG,
     projectName:
@@ -260,6 +260,12 @@ function defaultConfigFor(id: string, name: string): RagConfig {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "") || "my-rag",
     storeConfig: { mode: "local", dbPath: relServerPath(id, "lancedb") },
+    embeddingApiKey: prevConfig.embeddingApiKey ?? DEFAULT_CONFIG.embeddingApiKey,
+    customEmbeddings: prevConfig.customEmbeddings ?? DEFAULT_CONFIG.customEmbeddings,
+    chatApiKey: prevConfig.chatApiKey ?? DEFAULT_CONFIG.chatApiKey,
+    customChatModels: prevConfig.customChatModels ?? DEFAULT_CONFIG.customChatModels,
+    serperApiKey: prevConfig.serperApiKey ?? DEFAULT_CONFIG.serperApiKey,
+    firecrawlApiKey: prevConfig.firecrawlApiKey ?? DEFAULT_CONFIG.firecrawlApiKey,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -280,9 +286,20 @@ export function createServer(
     }
     const dir = serverDir(id)
     await fs.mkdir(dir, { recursive: true })
+
+    let prevConfig: Partial<RagConfig> = {}
+    if (ws.activeServerId) {
+      try {
+        const raw = await fs.readFile(path.join(serverDir(ws.activeServerId), "config.json"), "utf8")
+        prevConfig = JSON.parse(raw) as Partial<RagConfig>
+      } catch {
+        // ignore if not readable
+      }
+    }
+
     await fs.writeFile(
       path.join(dir, "config.json"),
-      JSON.stringify(defaultConfigFor(id, meta.name), null, 2),
+      JSON.stringify(defaultConfigFor(id, meta.name, prevConfig), null, 2),
       "utf8",
     )
     const next: Workspace = {

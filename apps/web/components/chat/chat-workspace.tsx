@@ -279,7 +279,9 @@ export function ChatWorkspace() {
                                         pillBg={meta.pillBg}
                                         size={14}
                                       />
-                                      <span className="truncate">{m.label}</span>
+                                      <span className="truncate">
+                                        {m.label}
+                                      </span>
                                     </span>
                                     <span className="flex items-center gap-1.5 shrink-0 ml-2">
                                       {m.context_window && (
@@ -331,7 +333,7 @@ export function ChatWorkspace() {
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
           {!ready ? (
             <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white border text-muted-foreground">
                 <MessageCircle className="size-7" />
               </div>
               <h1 className="text-xl font-semibold tracking-tight text-foreground">
@@ -342,7 +344,13 @@ export function ChatWorkspace() {
                   "Set an API key in Settings to start chatting."}
               </p>
               <a
-                href={status?.blockers?.some(b => b.includes("API Key") || b.includes("Settings")) ? "/settings?ai-models" : "/settings"}
+                href={
+                  status?.blockers?.some(
+                    (b) => b.includes("API Key") || b.includes("Settings"),
+                  )
+                    ? "/settings?ai-models"
+                    : "/settings"
+                }
                 className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
               >
                 Go to Settings
