@@ -19,3 +19,6 @@ docker-compose.yml
 hpi-connect.txt
 apps/web/webui.log
 npm-login.sh
+**/node_modules
+apps/desktop/src-tauri/target
+**/target
