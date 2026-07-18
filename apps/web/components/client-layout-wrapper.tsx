@@ -1,20 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import {
   useThemeCustomizer,
   PanelBgVariant,
 } from "./theme-customizer-provider";
-import { AppSidebar } from "./app-sidebar";
+import { UnifiedSidebar } from "./unified-sidebar";
 import { AppTopNav } from "./app-topnav";
 import { usePathname } from "next/navigation";
-import { WorkspaceTopBar } from "@/components/workspace/workspace-top-bar";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/components/workspace/workspace-provider";
 import { WelcomeScreen } from "@/components/onboarding/welcome-screen";
-import { TechSetup } from "@/components/onboarding/tech-setup";
-import { SimpleSetup } from "@/components/onboarding/simple-setup";
-import { SimpleSidebar } from "@/components/simple/simple-sidebar";
 
 const PANEL_BG_COLORS: Record<PanelBgVariant, string | null> = {
   "panel-default": "#FAFAFA",
@@ -26,160 +21,54 @@ const PANEL_BG_COLORS: Record<PanelBgVariant, string | null> = {
   "panel-stone": "#F5F5F2",
 };
 
-type OnboardingStep = "welcome" | "tech-setup" | "simple-setup"
-
 export function ClientLayoutWrapper({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { layout, pageStyle, panelBg } = useThemeCustomizer();
+  const { pageStyle, panelBg, layout } = useThemeCustomizer();
   const pathname = usePathname();
   const isChatPage = pathname?.includes("/chat");
-  const { isFirstRun, isLoading, mode } = useWorkspace();
-
-  // Local onboarding step state — only used during the onboarding flow
-  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>("welcome")
+  const { isFirstRun, isLoading } = useWorkspace();
 
   const panelColor = PANEL_BG_COLORS[panelBg];
   const panelStyle = panelColor ? { backgroundColor: panelColor } : undefined;
 
-  // ── Onboarding: full-page screens ──────────────────────────────────
-  // Show onboarding when it's first run (no servers) OR no mode has been chosen yet
-  const needsOnboarding = !isLoading && (isFirstRun || (!mode && !isLoading))
-
-  if (needsOnboarding) {
-    if (onboardingStep === "welcome") {
-      return (
-        <WelcomeScreen
-          onSelectTech={() => setOnboardingStep("tech-setup")}
-          onSelectSimple={() => setOnboardingStep("simple-setup")}
-        />
-      )
-    }
-    if (onboardingStep === "tech-setup") {
-      return <TechSetup onBack={() => setOnboardingStep("welcome")} />
-    }
-    if (onboardingStep === "simple-setup") {
-      return <SimpleSetup onBack={() => setOnboardingStep("welcome")} />
-    }
+  if (!isLoading && isFirstRun) {
+    return <WelcomeScreen />;
   }
 
-  // ── Loading state ──────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
-    )
+    );
   }
-
-  // ── Shared layout classes ──────────────────────────────────────────
-  const containerClasses =
-    pageStyle === "fused"
-      ? "h-[calc(100vh-8rem)] bg-background text-foreground overflow-hidden"
-      : "h-[calc(100vh-8rem)] rounded-2xl border border-border bg-panel text-panel-foreground overflow-hidden";
 
   const sidebarContainerClasses =
     pageStyle === "fused"
       ? "h-[calc(100vh-1.5rem)] flex flex-col bg-background text-foreground overflow-hidden"
       : "h-[calc(100vh-1.5rem)] flex flex-col rounded-2xl border border-border bg-panel text-panel-foreground overflow-hidden";
 
-  // ── Simple mode layout ─────────────────────────────────────────────
-  if (mode === "simple") {
-    // TopNav layout for simple mode
-    if (layout === "topnav") {
-      const isGlobalScroll = !isChatPage;
-      const topnavContainerClasses = pageStyle === "fused"
-        ? cn(isGlobalScroll ? "min-h-[calc(100vh-8rem)]" : "h-[calc(100vh-8rem)] overflow-hidden", "bg-background text-foreground")
-        : cn(isGlobalScroll ? "min-h-[calc(100vh-8rem)]" : "h-[calc(100vh-8rem)] overflow-hidden", "rounded-2xl border border-border bg-panel text-panel-foreground");
+  const isTopNav = layout === "topnav";
 
-      return (
-        <div className={cn("flex flex-col", isGlobalScroll ? "min-h-screen" : "h-screen overflow-hidden")}>
-          <AppTopNav />
-          <main
-            className={cn("flex-1", isGlobalScroll ? "p-4 md:p-6 lg:p-8" : "min-h-0 overflow-hidden p-4 md:p-6 lg:p-8")}
-          >
-            <div
-              className={cn(topnavContainerClasses, "container mx-auto flex flex-col")}
-              style={panelStyle}
-            >
-              <div
-                className={cn(
-                  "flex-1",
-                  !isGlobalScroll ? "overflow-hidden flex flex-col min-h-0" : "pt-4",
-                )}
-              >
-                <div
-                  className={cn(
-                    "h-full w-full",
-                    !isGlobalScroll ? "flex-1 min-h-0 flex flex-col" : "pb-8",
-                  )}
-                >
-                  {children}
-                </div>
-              </div>
-            </div>
-          </main>
-        </div>
-      );
-    }
-
-    // Default sidebar layout for simple mode
+  if (isTopNav) {
     return (
-      <div className="flex h-screen overflow-hidden">
-        <SimpleSidebar />
-        <main className="min-w-0 flex-1 p-3 pl-3 md:pl-0 overflow-hidden">
-          <div className={sidebarContainerClasses} style={panelStyle}>
-            <WorkspaceTopBar />
+      <div className="flex flex-col h-screen overflow-hidden">
+        <AppTopNav />
+        <main className="min-w-0 flex-1 overflow-hidden">
+          <div className="h-full flex flex-col bg-background text-foreground" style={panelStyle}>
             <div
               className={cn(
                 "flex-1 min-h-0",
-                isChatPage ? "overflow-hidden flex flex-col" : "overflow-auto",
-              )}
-            >
-              <div
-                className={cn(
-                  "container mx-auto",
-                  isChatPage ? "flex-1 min-h-0 flex flex-col" : "pb-8",
-                )}
-              >
-                {children}
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // ── Tech mode layout (existing) ────────────────────────────────────
-  if (layout === "topnav") {
-    const isGlobalScroll = !isChatPage;
-    const topnavContainerClasses = pageStyle === "fused"
-      ? cn(isGlobalScroll ? "min-h-[calc(100vh-8rem)]" : "h-[calc(100vh-8rem)] overflow-hidden", "bg-background text-foreground")
-      : cn(isGlobalScroll ? "min-h-[calc(100vh-8rem)]" : "h-[calc(100vh-8rem)] overflow-hidden", "rounded-2xl border border-border bg-panel text-panel-foreground");
-
-    return (
-      <div className={cn("flex flex-col", isGlobalScroll ? "min-h-screen" : "h-screen overflow-hidden")}>
-        <AppTopNav />
-        <main
-          className={cn("flex-1", isGlobalScroll ? "p-4 md:p-6 lg:p-8" : "min-h-0 overflow-hidden p-4 md:p-6 lg:p-8")}
-        >
-          <div
-            className={cn(topnavContainerClasses, "container mx-auto flex flex-col")}
-            style={panelStyle}
-          >
-            <div
-              className={cn(
-                "flex-1",
-                !isGlobalScroll ? "overflow-hidden flex flex-col min-h-0" : "pt-4",
+                (isChatPage || pathname?.includes("/settings")) ? "overflow-hidden flex flex-col" : "overflow-auto",
               )}
             >
               <div
                 className={cn(
                   "h-full w-full",
-                  !isGlobalScroll ? "flex-1 min-h-0 flex flex-col" : "pb-8",
+                  (isChatPage || pathname?.includes("/settings")) ? "flex-1 min-h-0 flex flex-col" : "container mx-auto pb-8",
                 )}
               >
                 {children}
@@ -191,23 +80,21 @@ export function ClientLayoutWrapper({
     );
   }
 
-  // Default Sidebar Layout
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppSidebar />
+      <UnifiedSidebar />
       <main className="min-w-0 flex-1 p-3 pl-3 md:pl-0 overflow-hidden">
         <div className={sidebarContainerClasses} style={panelStyle}>
-          <WorkspaceTopBar />
           <div
             className={cn(
               "flex-1 min-h-0",
-              isChatPage ? "overflow-hidden flex flex-col" : "overflow-auto",
+              (isChatPage || pathname?.includes("/settings")) ? "overflow-hidden flex flex-col" : "overflow-auto",
             )}
           >
             <div
               className={cn(
-                "container mx-auto",
-                isChatPage ? "flex-1 min-h-0 flex flex-col" : "pb-8",
+                "h-full w-full",
+                (isChatPage || pathname?.includes("/settings")) ? "flex-1 min-h-0 flex flex-col" : "container mx-auto pb-8",
               )}
             >
               {children}

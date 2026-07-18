@@ -61,9 +61,9 @@ pub fn run() {
 
                             // Once the server logs its ready message, navigate the webview
                             let text_lower = text.to_lowercase();
-                            if text_lower.contains("ready") || text_lower.contains("started server") || text_lower.contains("listening on") || text_lower.contains("localhost:4567") {
+                            if text_lower.contains("ready") || text_lower.contains("started server") || text_lower.contains("listening on") || text_lower.contains("127.0.0.1:4567") || text_lower.contains("localhost:4567") {
                                 if let Some(window) = handle.get_webview_window("main") {
-                                    let _ = window.navigate("http://localhost:4567".parse().unwrap());
+                                    let _ = window.navigate("http://127.0.0.1:4567".parse().unwrap());
                                 }
                             }
                         }

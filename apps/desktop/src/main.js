@@ -1,4 +1,4 @@
-const SERVER_URL = "http://localhost:4567";
+const SERVER_URL = "http://127.0.0.1:4567";
 const POLL_INTERVAL = 800;
 const MAX_WAIT = 120_000;
 

@@ -93,7 +93,7 @@ export function ScrapePanel({
   disabled,
   onStarted,
 }: {
-  disabled: boolean;
+  disabled?: boolean;
   onStarted: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -125,6 +125,7 @@ export function ScrapePanel({
   const [cachedQueries, setCachedQueries] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchLimit, setSearchLimit] = useState(15);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -550,7 +551,7 @@ export function ScrapePanel({
         specificUrls ? 1 : pageLimit,
       );
 
-      toast.success("ETL job started, running in background", {
+      toast.success("Scraping started, running in background", {
         description: specificUrls
           ? `Scraping ${selectedUrls.length} specific URL(s) only, no deep crawl. You can navigate away. Progress is tracked automatically.`
           : `${selectedUrls.length} ${effectiveScope === "domain" ? "domain(s)" : "page(s)"} · ~${totalPages} pages · ETA ${formatDuration(estimatedSeconds)}. You can navigate away. Progress is tracked automatically.`,
@@ -597,17 +598,17 @@ export function ScrapePanel({
             onValueChange={(v) => setInputMode(v as "search" | "url")}
             className="shrink-0"
           >
-            <TabsList className="inline-flex h-9 items-center justify-center rounded-lg bg-muted/40 border border-border p-0.5 text-muted-foreground">
+            <TabsList className="inline-flex bg-white/70 h-9 items-center justify-center rounded-lg  border border-border p-0.5 text-muted-foreground">
               <TabsTrigger
                 value="search"
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm hover:text-foreground h-full"
+                className="inline-flex items-center h-9 justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm hover:text-foreground"
               >
                 <Search className="size-3.5 mr-1.5" />
                 Search
               </TabsTrigger>
               <TabsTrigger
                 value="url"
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm hover:text-foreground h-full"
+                className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm hover:text-foreground"
               >
                 <Globe className="size-3.5 mr-1.5" />
                 Direct URL
@@ -619,12 +620,15 @@ export function ScrapePanel({
           <div className="relative flex-1">
             {inputMode === "search" ? (
               <>
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground z-10 pointer-events-none" />
                 <Input
                   ref={inputRef}
                   id="kw"
+                  autoComplete="off"
                   placeholder='Search keywords, e.g. "RAG pipelines"'
                   value={query}
                   disabled={disabled}
+                  className="pl-9 pr-[88px]"
                   onChange={(e) => {
                     setQuery(e.target.value);
                     setShowDropdown(true);
@@ -637,6 +641,23 @@ export function ScrapePanel({
                     }
                   }}
                 />
+                {query.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8"
+                    onClick={() => {
+                      setShowDropdown(false);
+                      runSearch();
+                    }}
+                    disabled={disabled || searching}
+                  >
+                    {searching ? (
+                      <Loader2 className="size-3.5 animate-spin mr-1" />
+                    ) : null}
+                    Search
+                  </Button>
+                )}
                 {showDropdown && cachedQueries.length > 0 && (
                   <div
                     ref={dropdownRef}
@@ -669,13 +690,28 @@ export function ScrapePanel({
                 )}
               </>
             ) : (
-              <Input
-                placeholder="Paste URLs (comma or space separated)"
-                value={manualUrl}
-                disabled={disabled}
-                onChange={(e) => setManualUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addManual()}
-              />
+              <>
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground z-10 pointer-events-none" />
+                <Input
+                  placeholder="Paste URLs (comma or space separated)"
+                  value={manualUrl}
+                  disabled={disabled}
+                  className="pl-9 pr-[64px]"
+                  onChange={(e) => setManualUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addManual()}
+                />
+                {manualUrl.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8"
+                    onClick={addManual}
+                    disabled={disabled}
+                  >
+                    Add
+                  </Button>
+                )}
+              </>
             )}
           </div>
 
@@ -693,34 +729,24 @@ export function ScrapePanel({
             />
           )}
 
-          {/* Action button */}
-          {inputMode === "search" ? (
-            <Button
-              onClick={() => {
-                setShowDropdown(false);
-                runSearch();
-              }}
-              disabled={disabled || searching}
-              className="shrink-0"
-            >
-              {searching ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Search className="size-4" />
-              )}
-              Search
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              onClick={addManual}
-              disabled={disabled}
-              className="shrink-0"
-            >
-              <Plus className="size-4" />
-              Add
-            </Button>
-          )}
+          {/* Start Scraping Button (always visible) */}
+          <Button
+            onClick={handleStartClick}
+            disabled={disabled || starting || selectedUrls.length === 0}
+            className="shrink-0"
+          >
+            {starting ? (
+              <Loader2 className="size-4 animate-spin mr-1" />
+            ) : (
+              <Rocket className="size-4 mr-2" />
+            )}
+            Start Scraping
+            {selectedUrls.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {selectedUrls.length}
+              </Badge>
+            )}
+          </Button>
         </div>
       </div>
 
@@ -743,106 +769,104 @@ export function ScrapePanel({
         </div>
       )}
 
-      {/* Scope + launch — compact single row */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Select
-          defaultValue={scope}
-          value={scope}
-          onValueChange={(v) => setScope(v as CrawlScope)}
-          disabled={specificUrls || disabled}
+      {/* Minimal Action Row */}
+      <div className="flex items-center justify-between mt-2">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          <SelectTrigger className="w-auto min-w-[180px] flex-1 bg-white h-9 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="page">Scrape pages only</SelectItem>
-            <SelectItem value="domain">Crawl whole domain</SelectItem>
-          </SelectContent>
-        </Select>
+          {showAdvanced ? (
+            <ChevronDown className="size-3.5" />
+          ) : (
+            <ChevronsDown className="size-3.5" />
+          )}
+          {showAdvanced ? "Hide advanced settings" : "Advanced settings"}
+        </button>
 
-        {scope === "domain" && !specificUrls && (
-          <div className="flex items-center gap-1.5">
-            <Label
-              htmlFor="limit"
-              className="text-xs text-muted-foreground whitespace-nowrap"
-            >
-              Max pages
-            </Label>
-            <Input
-              id="limit"
-              type="number"
-              min={1}
-              max={500}
-              value={pageLimit}
-              disabled={specificUrls || disabled}
-              onChange={(e) => setPageLimit(Number(e.target.value) || 1)}
-              className="w-20 h-9 tabular-nums"
-            />
-          </div>
+        {/* Estimation inline */}
+        {selectedUrls.length > 0 && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1.5 ml-auto">
+            <Clock className="size-3" />
+            {specificUrls
+              ? `${selectedUrls.length} URL${selectedUrls.length !== 1 ? "s" : ""}`
+              : `~${estimate.totalPages.toLocaleString()} pages · ${formatDuration(estimate.estimatedSeconds)}`}
+          </span>
         )}
+      </div>
 
-        <div className="flex items-center gap-1.5">
-          <Switch
-            id="specific-urls-inline"
-            checked={specificUrls}
-            onCheckedChange={setSpecificUrls}
-            disabled={disabled}
-            size="sm"
-          />
-          <Label
-            htmlFor="specific-urls-inline"
-            className="text-xs font-medium cursor-pointer flex items-center gap-1"
-          >
-            Exact URLs
-            <TooltipProvider delay={0}>
-              <Tooltip>
-                <TooltipTrigger
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  <Info className="size-3.5" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-[200px] text-center">
-                    Scrape exact URLs only — no deep crawl or pagination.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </Label>
-        </div>
+      {/* Advanced Settings Collapsible */}
+      {showAdvanced && (
+        <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-muted/30 p-3 mt-2 animate-in slide-in-from-top-2 fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Scope</Label>
+            <Select
+              defaultValue={scope}
+              value={scope}
+              onValueChange={(v) => setScope(v as CrawlScope)}
+              disabled={specificUrls || disabled}
+            >
+              <SelectTrigger className="w-[160px] bg-white h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="page">Scrape pages only</SelectItem>
+                <SelectItem value="domain">Crawl whole domain</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="flex items-center gap-2 ml-auto">
-          {/* ETL estimation inline */}
-          {selectedUrls.length > 0 && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Clock className="size-3" />
-              {specificUrls
-                ? `${selectedUrls.length} URL${selectedUrls.length !== 1 ? "s" : ""}`
-                : `~${estimate.totalPages.toLocaleString()} pages · ${formatDuration(estimate.estimatedSeconds)}`}
-            </span>
+          {scope === "domain" && !specificUrls && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="limit" className="text-xs text-muted-foreground">
+                Max pages
+              </Label>
+              <Input
+                id="limit"
+                type="number"
+                min={1}
+                max={500}
+                value={pageLimit}
+                disabled={specificUrls || disabled}
+                onChange={(e) => setPageLimit(Number(e.target.value) || 1)}
+                className="w-20 h-8 tabular-nums text-xs"
+              />
+            </div>
           )}
 
-          <Button
-            onClick={handleStartClick}
-            disabled={disabled || starting || selectedUrls.length === 0}
-            className="shrink-0"
-          >
-            {starting ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Rocket className="size-4" />
-            )}
-            Start ETL
-            {selectedUrls.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {selectedUrls.length}
-              </Badge>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="specific-urls-inline"
+              checked={specificUrls}
+              onCheckedChange={setSpecificUrls}
+              disabled={disabled}
+              size="sm"
+            />
+            <Label
+              htmlFor="specific-urls-inline"
+              className="text-xs font-medium cursor-pointer flex items-center gap-1"
+            >
+              Exact URLs only
+              <TooltipProvider delay={0}>
+                <Tooltip>
+                  <TooltipTrigger
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    <Info className="size-3" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-[200px] text-center">
+                      Scrape exact URLs only — no deep crawl or pagination.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </Label>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Results list */}
       {results.length > 0 && (
@@ -956,13 +980,13 @@ export function ScrapePanel({
       <GenericAlert
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Start ETL Job?"
+        title="Start Scraping?"
         description={
           specificUrls
             ? `This will scrape ${selectedUrls.length} specific URL${selectedUrls.length !== 1 ? "s" : ""} exactly as provided, no deep crawl or pagination.\n\nThe job will run in the background. You can navigate away and check progress anytime.`
             : `This will scrape ${selectedUrls.length} ${scope === "domain" ? "domain(s)" : "page(s)"}${scope === "domain" ? ` with up to ${pageLimit} pages each` : ""}.\n\n• Total pages: ~${estimate.totalPages.toLocaleString()}\n• Estimated time: ${formatDuration(estimate.estimatedSeconds)}\n\nThe job will run in the background. You can navigate away and check progress anytime.`
         }
-        actionText="Start ETL Job"
+        actionText="Start Scraping"
         onAction={startJob}
       />
     </div>

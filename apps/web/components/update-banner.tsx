@@ -5,14 +5,7 @@ import { X, ArrowUpCircle } from "lucide-react";
 
 /**
  * UpdateBanner — Universal update notification for all channels.
- *
  * Checks https://larkup.de/api/version on mount.
- * Compares with the build-time version (NEXT_PUBLIC_APP_VERSION).
- * Detects installation channel:
- *   - Tauri (window.__TAURI__) → Desktop → offers in-app update
- *   - NEXT_PUBLIC_RUNNING_IN_DOCKER → Docker → shows docker pull command
- *   - Otherwise → npm/CLI → shows npm install command
- *
  * Dismissable: stores dismissal in localStorage for 24h.
  */
 
@@ -60,7 +53,7 @@ function dismiss() {
   try {
     localStorage.setItem(
       DISMISS_KEY,
-      JSON.stringify({ timestamp: Date.now() })
+      JSON.stringify({ timestamp: Date.now() }),
     );
   } catch {
     // ignore
@@ -72,8 +65,7 @@ export function UpdateBanner() {
   const [visible, setVisible] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  const currentVersion =
-    process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
+  const currentVersion = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
   const channel = detectChannel();
 
   useEffect(() => {
@@ -134,7 +126,7 @@ export function UpdateBanner() {
   if (!visible || !latestVersion) return null;
 
   return (
-    <div className="relative z-50 flex items-center justify-center gap-3 bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm text-white shadow-sm">
+    <div className="relative z-50 flex items-center justify-center gap-3 bg-linear-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm text-white shadow-sm">
       <ArrowUpCircle className="h-4 w-4 shrink-0" />
       <span>
         <span className="font-medium">Larkup v{latestVersion}</span> is
@@ -147,7 +139,11 @@ export function UpdateBanner() {
         disabled={updating}
         className="ml-2 rounded-full bg-white/20 px-3 py-0.5 text-xs font-medium transition-colors hover:bg-white/30 disabled:opacity-50"
       >
-        {updating ? "Updating..." : channel === "desktop" ? "Update Now" : "View Details"}
+        {updating
+          ? "Updating..."
+          : channel === "desktop"
+            ? "Update Now"
+            : "View Details"}
       </button>
 
       {channel !== "desktop" && (

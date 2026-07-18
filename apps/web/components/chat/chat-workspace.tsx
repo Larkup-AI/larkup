@@ -168,9 +168,9 @@ export function ChatWorkspace() {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
       {/* Header bar */}
-      <div className="flex items-center justify-between border-b border-border px-6 pb-3">
+      <div className="flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-3">
           {/* We moved model selector to the right */}
         </div>
@@ -335,16 +335,22 @@ export function ChatWorkspace() {
                 <MessageCircle className="size-7" />
               </div>
               <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                Chat not ready yet
+                Setup Required
               </h1>
-              <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+              <p className="max-w-md text-sm leading-relaxed text-muted-foreground mb-2">
                 {status?.blockers?.join(" ") ||
                   "Set an API key in Settings to start chatting."}
               </p>
+              <a
+                href="/settings"
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+              >
+                Go to Settings
+              </a>
             </div>
           ) : isEmpty ? (
             <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white border border-border/60 text-primary shadow-sm">
                 <MessageCircle className="size-7" />
               </div>
               <h1 className="text-xl font-semibold tracking-tight text-foreground text-balance">
@@ -425,7 +431,7 @@ export function ChatWorkspace() {
 
       {/* Input area */}
       {ready && (
-        <div className="relative z-10000 px-4 pb-5 pt-3 sm:px-6">
+        <div className="relative z-10000 mt-auto px-4 pb-5 pt-3 sm:px-6">
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
             <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-1 focus-within:ring-ring">
               <textarea

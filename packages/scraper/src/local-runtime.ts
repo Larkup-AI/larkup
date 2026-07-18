@@ -1,5 +1,6 @@
 import { promises as fs, existsSync } from "node:fs";
 import path from "node:path";
+import net from "node:net";
 import { randomUUID } from "node:crypto";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
@@ -35,6 +36,23 @@ const COMPOSE_PATH = path.join(DATA_DIR, "firecrawl", "docker-compose.yml");
 const CONTAINER_PREFIX = "ragtoolkit-firecrawl";
 const DEFAULT_PORT = 3002;
 const IMAGE = "ghcr.io/firecrawl/firecrawl:latest";
+
+async function getFreePort(startingPort: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.listen(startingPort, () => {
+      const port = (server.address() as net.AddressInfo).port;
+      server.close(() => resolve(port));
+    });
+    server.on("error", (err: any) => {
+      if (err.code === "EADDRINUSE") {
+        getFreePort(startingPort === 0 ? 0 : startingPort + 1).then(resolve, reject);
+      } else {
+        reject(err);
+      }
+    });
+  });
+}
 
 async function getProxy(): Promise<{ server: string; username?: string; password?: string } | null> {
   // Option 1 (Most Efficient): Try reading from proxies.txt for direct connections
@@ -260,7 +278,7 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
   const prev = await readLocalState();
   // Reuse an existing token if we have one, otherwise generate a fresh key.
   const apiKey = prev.apiKey || `fc-local-${randomUUID()}`;
-  const port = prev.port || DEFAULT_PORT;
+  let port = prev.port || DEFAULT_PORT;
 
   const proxy = await getProxy();
 
@@ -275,13 +293,33 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "docker compose failed";
-    return writeState({
-      ...prev,
-      apiKey,
-      port,
-      running: false,
-      lastError: message,
-    });
+      
+    if (message.includes("address already in use") || message.includes("Ports are not available")) {
+      try {
+        port = await getFreePort(port + 1);
+        await fs.writeFile(COMPOSE_PATH, composeFile(apiKey, port, proxy), "utf8");
+        await runCmd(
+          `${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" up -d`,
+          180_000
+        );
+      } catch (retryErr) {
+        return writeState({
+          ...prev,
+          apiKey,
+          port,
+          running: false,
+          lastError: retryErr instanceof Error ? retryErr.message : "docker compose retry failed",
+        });
+      }
+    } else {
+      return writeState({
+        ...prev,
+        apiKey,
+        port,
+        running: false,
+        lastError: message,
+      });
+    }
   }
 
   const isDockerContainer = existsSync("/.dockerenv");

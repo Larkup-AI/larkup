@@ -1,17 +1,19 @@
-import { PageHeader } from "@/components/page-header";
 import { DataWorkspace } from "@/components/data/data-workspace";
-import { IndexActionDialog } from "@/components/index/index-action-dialog";
 
 export default function DataPage() {
   return (
-    <div className="flex min-h-full flex-col">
-      <PageHeader
-        eyebrow="Step 2 · Data"
-        title="Load &amp; scrape data"
-        description="Manage your corpus and ETL jobs. Load new data via web scraping, pasting, or uploading files."
-        actions={<IndexActionDialog />}
-      />
-      <DataWorkspace />
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="px-6 pt-6 pb-2 md:px-8">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          Data
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Upload files, scrape the web, or manage your knowledge base.
+        </p>
+      </div>
+      <div className="flex-1 min-h-0">
+        <DataWorkspace />
+      </div>
     </div>
   );
 }

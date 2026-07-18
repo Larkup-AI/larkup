@@ -20,6 +20,7 @@ export type BackgroundVariant =
   | "bg-pure"
   | "bg-silver"
   | "bg-sage"
+  | "bg-fafafa"
   | "bg-stone";
 
 export type PanelBgVariant =

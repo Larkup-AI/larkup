@@ -731,3 +731,39 @@
 .radius-full {
   --radius: 9999px !important;
 }
+
+.bg-fafafa {
+  --background: #f4f4f4 !important;
+  --sidebar: #eeeeee !important;
+  --card: #ffffff !important;
+  --popover: #ffffff !important;
+  --border: #e0e0e0 !important;
+  --input: #e0e0e0 !important;
+  --foreground: #171717 !important;
+  --card-foreground: #171717 !important;
+  --popover-foreground: #171717 !important;
+  --sidebar-foreground: #525252 !important;
+  --sidebar-border: #e0e0e0 !important;
+  --muted: #eeeeee !important;
+  --muted-foreground: #737373 !important;
+  --secondary: #eeeeee !important;
+  --accent: #eeeeee !important;
+}
+.dark.bg-fafafa,
+.bg-fafafa .dark {
+  --background: #0d0d0d !important;
+  --sidebar: #171717 !important;
+  --card: #202020 !important;
+  --popover: #202020 !important;
+  --border: #333333 !important;
+  --input: #333333 !important;
+  --foreground: #f4f4f4 !important;
+  --card-foreground: #f4f4f4 !important;
+  --popover-foreground: #f4f4f4 !important;
+  --sidebar-foreground: #a6a6a6 !important;
+  --sidebar-border: #333333 !important;
+  --muted: #1f1f1f !important;
+  --muted-foreground: #a6a6a6 !important;
+  --secondary: #1f1f1f !important;
+  --accent: #1f1f1f !important;
+}

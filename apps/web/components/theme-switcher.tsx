@@ -54,6 +54,7 @@ const THEMES: { id: ThemeVariant; name: string; color: string }[] = [
 const BACKGROUNDS: { id: BackgroundVariant; name: string; color: string }[] = [
   { id: "bg-default", name: "White", color: "#FFFFFF" },
   { id: "bg-pure", name: "Pure White", color: "#FFFFFF" },
+  { id: "bg-fafafa", name: "Near White", color: "#F4F4F4" },
   { id: "bg-silver", name: "Silver", color: "#F8F8F8" },
   { id: "bg-soft", name: "Soft", color: "#FBFAF8" },
   { id: "bg-stone", name: "Stone", color: "#F5F5F2" },

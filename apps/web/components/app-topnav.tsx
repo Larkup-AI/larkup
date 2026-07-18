@@ -3,27 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  FileStack,
-  FlaskConical,
-  Layers,
-  Lock,
-  type LucideIcon,
   MessageCircle,
-  Server,
-  SlidersHorizontal,
+  Database,
+  Settings,
+  BarChart3,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { STAGES, CURRENT_PHASE } from "@larkup/core/stages";
-import type { StageId } from "@larkup/core/types";
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ServerSwitcher } from "@/components/workspace/server-switcher";
 import { useWorkspace } from "@/components/workspace/workspace-provider";
-import { ThemeSwitcher } from "./theme-switcher";
 import { useThemeCustomizer, type PanelBgVariant } from "./theme-customizer-provider";
 
 const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
@@ -36,14 +27,19 @@ const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
   "panel-stone": "#F5F5F2",
 };
 
-const STAGE_ICONS: Record<StageId, LucideIcon> = {
-  configure: SlidersHorizontal,
-  data: FileStack,
-  index: Layers,
-  server: Server,
-  demo: FlaskConical,
-  chat: MessageCircle,
-};
+interface NavItem {
+  id: string;
+  label: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { id: "chat", label: "Chat", href: "/chat", icon: MessageCircle },
+  { id: "data", label: "Data", href: "/data", icon: Database },
+  { id: "analytics", label: "Analytics", href: "/analytics", icon: BarChart3 },
+  { id: "settings", label: "Settings", href: "/settings", icon: Settings },
+];
 
 export function AppTopNav() {
   const pathname = usePathname();
@@ -57,128 +53,66 @@ export function AppTopNav() {
     <TooltipProvider delay={150}>
       <header
         className={cn(
-          "sticky top-0 z-50 flex h-16 shrink-0 items-center gap-4 border-b border-border px-4 md:px-6",
-          !navColor ? "bg-white" : "",
+          "sticky top-0 z-50 flex h-14 shrink-0 items-center gap-6 border-b border-border px-4 md:px-6",
+          !navColor ? "bg-[#F5F5F4]" : "",
         )}
         style={navStyle}
       >
         {/* Brand */}
         <Link
-          href="/configure"
+          href="/chat"
           aria-label="larkup home"
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
+          className="flex items-center gap-2.5 shrink-0"
         >
-          <img src={"/logo9.png"} className="size-5" alt="logo" />
+          <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105">
+            <img src="/logo9.png" className="size-5" alt="logo" />
+          </span>
+          <span className="font-semibold tracking-tight text-foreground hidden sm:inline-block">
+            Larkup
+          </span>
         </Link>
-        <span className="font-semibold tracking-tight hidden sm:inline-block">
-          Larkup
-        </span>
 
-        {/* Pipeline rail */}
-        <nav className="flex flex-1 h-full items-end pb-0 gap-2 md:gap-4 ml-4">
-          {STAGES.map((stage, index) => {
-            const Icon = STAGE_ICONS[stage.id];
+        {/* Navigation items */}
+        <nav className="flex h-full items-center gap-1">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
             const active =
-              pathname === stage.href ||
-              (stage.href === "/configure" && pathname === "/");
-            const locked = stage.phase > CURRENT_PHASE;
-
-            const body = (
-              <div className="flex items-center ">
-                <span
-                  className={cn(
-                    "flex size-9 items-center justify-center rounded-lg transition-colors",
-                    active
-                      ? "text-primary"
-                      : locked
-                        ? "text-muted-foreground/50"
-                        : "text-muted-foreground group-hover:text-foreground",
-                  )}
-                >
-                  <Icon
-                    className="size-[18px]"
-                    strokeWidth={active ? 2.25 : 2}
-                  />
-                  {locked && (
-                    <span className="absolute -right-0.5 -top-0.5 flex size-3 items-center justify-center rounded-full bg-background">
-                      <Lock className="size-2 text-muted-foreground" />
-                    </span>
-                  )}
-                </span>
-                <span
-                  className={cn(
-                    "hidden md:block text-[13px] tracking-tight",
-                    active
-                      ? "font-semibold text-primary"
-                      : locked
-                        ? "text-muted-foreground/50"
-                        : "text-muted-foreground group-hover:text-foreground",
-                  )}
-                >
-                  {index + 1}. {stage.label}
-                </span>
-                {/* active accent bar (bottom) */}
-                <span
-                  className={cn(
-                    "absolute bottom-0 left-0 h-0.5 w-full bg-primary transition-opacity",
-                    active
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100",
-                  )}
-                />
-              </div>
-            );
+              pathname === item.href ||
+              (item.href !== "/" && pathname?.startsWith(item.href));
 
             return (
-              <Tooltip key={stage.id}>
-                <TooltipTrigger
-                  render={
-                    locked ? (
-                      <div
-                        aria-disabled
-                        className="group relative flex cursor-not-allowed items-center gap-2 h-10 px-3 rounded-md transition-colors"
-                      />
-                    ) : (
-                      <Link
-                        href={stage.href}
-                        aria-current={active ? "page" : undefined}
-                        className={cn(
-                          "group relative flex items-center gap-2 h-10 px-3 rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          active ? "bg-muted/0" : "hover:bg-muted/30",
-                        )}
-                      />
-                    )
-                  }
-                >
-                  {body}
-                </TooltipTrigger>
-                <TooltipContent
-                  side="bottom"
-                  sideOffset={10}
-                  className="max-w-56"
-                >
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-medium">
-                      {index + 1}. {stage.label}
-                      {locked && (
-                        <span className="ml-1.5 font-mono text-[10px] opacity-70">
-                          Phase {stage.phase}
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-[11px] leading-snug opacity-80">
-                      {locked
-                        ? `Unlocks in Phase ${stage.phase}.`
-                        : stage.description}
-                    </span>
-                  </div>
-                </TooltipContent>
-              </Tooltip>
+              <Link
+                key={item.id}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "group relative flex items-center gap-2 h-full px-3 text-[13px] font-medium transition-colors outline-none",
+                  active
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon
+                  className="size-[16px]"
+                  strokeWidth={active ? 2.25 : 1.75}
+                />
+                <span className="hidden md:inline">{item.label}</span>
+                {/* Active underline indicator */}
+                <span
+                  className={cn(
+                    "absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary transition-opacity",
+                    active ? "opacity-100" : "opacity-0",
+                  )}
+                />
+              </Link>
             );
           })}
         </nav>
 
-        {/* Right side: Workspace & Theme Customizer */}
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Right side */}
         <div className="flex items-center gap-3">
           <ServerSwitcher />
           {username && (
@@ -187,7 +121,6 @@ export function AppTopNav() {
               <span className="font-medium text-foreground">{username}</span>
             </span>
           )}
-          <ThemeSwitcher floating={false} />{" "}
         </div>
       </header>
     </TooltipProvider>

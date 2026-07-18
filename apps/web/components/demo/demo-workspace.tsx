@@ -120,8 +120,8 @@ export function DemoWorkspace() {
   }
 
   return (
-    <div className="space-y-6 px-6 py-6 md:px-8">
-      <SourceSummary server={server} config={config} />
+    <div className="space-y-6  w-full">
+      {/* <SourceSummary server={server} config={config} /> */}
 
       {!ready && (
         <Alert variant="default" className="text-orange-500">
@@ -243,7 +243,7 @@ function SourceSummary({
   const store = getVectorStore(config.vectorStore);
 
   return (
-    <Card>
+    <Card className="">
       <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-4 py-4">
         <div className="flex items-center gap-2">
           {server.running ? (

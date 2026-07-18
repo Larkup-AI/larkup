@@ -82,7 +82,7 @@ export function AppSidebar() {
         </Tooltip>
 
         {/* Pipeline rail */}
-        <nav className="flex flex-1 flex-col items-center gap-4.5">
+        <nav className="flex flex-1 flex-col items-center gap-4.5 ">
           {STAGES.map((stage) => {
             const Icon = STAGE_ICONS[stage.id];
             const active =

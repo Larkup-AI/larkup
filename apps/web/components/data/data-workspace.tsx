@@ -2,17 +2,18 @@
 
 import { useState, useEffect, useRef } from "react";
 import useSWR, { useSWRConfig } from "swr";
-import { ClipboardPaste, FileUp, Globe, Layers, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 import type { CrawlJob, SourceDocument } from "@larkup/core/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
+import { Globe, FileUp, Type, Image, Plug, Briefcase } from "lucide-react";
 
 import { ScrapePanel } from "@/components/data/scrape-panel";
 import { PastePanel } from "@/components/data/paste-panel";
 import { UploadPanel } from "@/components/data/upload-panel";
+import { MediaPanel } from "@/components/data/media-panel";
+import { NotionPanel } from "@/components/data/notion-panel";
+import { IntegrationsPanel } from "@/components/data/integrations-panel";
 import { JobsPanel } from "@/components/data/jobs-panel";
 import { CorpusPanel } from "@/components/data/corpus-panel";
 import { FirecrawlNotice } from "@/components/data/firecrawl-notice";
@@ -53,9 +54,28 @@ async function fetchJobsWithSync(url: string): Promise<{
   return { jobs: jobs.map((j) => map.get(j.id) ?? j), configured };
 }
 
+// ---------- Tab definitions ----------
+
+const TOP_TABS = [
+  { id: "add", label: "Add Data" },
+  { id: "corpus", label: "Knowledge Base" },
+] as const;
+
+const SUB_TABS = [
+  { id: "website", label: "Website", icon: Globe },
+  { id: "files", label: "Files", icon: FileUp },
+  { id: "text", label: "Text", icon: Type },
+  { id: "media", label: "Media", icon: Image },
+  { id: "notion", label: "Integrations", icon: Plug },
+] as const;
+
+type TopTabId = (typeof TOP_TABS)[number]["id"];
+type SubTabId = (typeof SUB_TABS)[number]["id"];
+
 export function DataWorkspace() {
-  const [activeTab, setActiveTab] = useState<"add" | "corpus" | "etl">("add");
-  const [scrapeHasError, setScrapeHasError] = useState(false);
+  const [activeTab, setActiveTab] = useState<TopTabId>("add");
+  const [activeSubTab, setActiveSubTab] = useState<SubTabId>("website");
+  const [showJobsDrawer, setShowJobsDrawer] = useState(false);
   const prevJobsRef = useRef<CrawlJob[]>([]);
 
   const jobsQuery = useSWR("/api/jobs", fetchJobsWithSync, {
@@ -84,9 +104,7 @@ export function DataWorkspace() {
       );
 
       if (justCompleted.length > 0) {
-        toast.success(
-          "Indexing these corpus just added successfully completed.",
-        );
+        toast.success("Indexing completed.");
       }
     }
     prevJobsRef.current = jobs;
@@ -108,163 +126,202 @@ export function DataWorkspace() {
 
   const handleDataAdded = () => {
     refreshAll();
-    setActiveTab("etl");
   };
 
   return (
-    <div className="px-6  md:px-8">
-      <Tabs
-        value={activeTab}
-        onValueChange={(v) => setActiveTab(v as "add" | "corpus" | "etl")}
-        className="w-full"
-      >
-        <TabsList className="mb-3 flex w-full h-10 justify-start rounded-none border-b border-border bg-transparent p-0! ">
-          <TabsTrigger
-            value="add"
-            className="h-full flex-none rounded-none border-b-2 border-transparent bg-transparent! px-4 font-medium text-muted-foreground shadow-none! transition-none data-active:border-transparent data-[state=active]:border-transparent data-active:border-b-foreground data-[state=active]:border-b-foreground data-active:text-foreground data-[state=active]:text-foreground hover:text-foreground"
-          >
-            {/* <Plus className="size-4 mr-2" /> */}
-            Add Data
-          </TabsTrigger>
-          <TabsTrigger
-            value="corpus"
-            className="h-full flex-none rounded-none border-b-2 border-transparent bg-transparent! px-4 font-medium text-muted-foreground shadow-none! transition-none data-active:border-transparent data-[state=active]:border-transparent data-active:border-b-foreground data-[state=active]:border-b-foreground data-active:text-foreground data-[state=active]:text-foreground hover:text-foreground"
-          >
-            Corpus
-          </TabsTrigger>
-          <TabsTrigger
-            value="etl"
-            className="h-full flex-none rounded-none border-b-2 border-transparent bg-transparent! px-4 font-medium text-muted-foreground shadow-none! transition-none data-active:border-transparent data-[state=active]:border-transparent data-active:border-b-foreground data-[state=active]:border-b-foreground data-active:text-foreground data-[state=active]:text-foreground hover:text-foreground"
-          >
-            ETL Jobs
-            {hasActive && (
-              <span className="ml-2 flex items-center gap-1.5 text-xs text-green-600">
-                <span className="relative flex size-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-600 opacity-75" />
-                  <span className="relative inline-flex size-2 rounded-full bg-green-600" />
+    <div className="px-6 md:px-8">
+      {/* ─── Top-level tabs (Mintlify-style pill tabs) ─── */}
+      <div className="flex w-full items-center justify-between mb-6">
+        <div className="flex items-center rounded-sm bg-white/90 p-0.5 border h-11">
+          {TOP_TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "relative flex cursor-pointer items-center justify-center px-4 h-9 text-sm font-medium transition-colors outline-none ",
+                  isActive
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="data-tabs-indicator"
+                    className="absolute inset-0 rounded-sm bg-background  border border-border/50"
+                    initial={false}
+                    transition={{
+                      type: "spring",
+                      stiffness: 500,
+                      damping: 35,
+                    }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center">
+                  {tab.label}
+                  {tab.id === "add" && hasActive && (
+                    <span className="ml-2 flex items-center gap-1.5 text-xs text-emerald-600">
+                      <span className="relative flex size-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                        <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                      </span>
+                    </span>
+                  )}
                 </span>
-              </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Floating jobs indicator — always accessible */}
+        {jobs.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowJobsDrawer(!showJobsDrawer)}
+            className={cn(
+              "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+              hasActive
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                : "border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground",
             )}
-          </TabsTrigger>
-        </TabsList>
+          >
+            <Briefcase className="size-3.5" />
+            {hasActive ? (
+              <>
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                </span>
+                {
+                  jobs.filter(
+                    (j) => j.status === "running" || j.status === "queued",
+                  ).length
+                }{" "}
+                active
+              </>
+            ) : (
+              <>
+                {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+              </>
+            )}
+          </button>
+        )}
+      </div>
 
-        <TabsContent
-          value="add"
-          className="m-0 focus-visible:outline-none focus-visible:ring-0 p-0"
-        >
-          <Card className="bg-transparent border-none! ring-0 p-0 m-0! pl-0! shadow-none">
-            <CardContent className="border-none shadow-none  m-0! p-0.5">
-              <Tabs defaultValue="scrape" className="flex flex-col w-full">
-                <div className="shrink-0 mb-6">
-                  <TabsList className="inline-flex h-10! items-center justify-center rounded-lg bg-muted/30! border p-1 text-muted-foreground">
-                    <TabsTrigger
-                      value="scrape"
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm hover:text-foreground"
-                    >
-                      <Globe className="size-4 mr-2" />
-                      Web scrape
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="paste"
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm hover:text-foreground"
-                    >
-                      <ClipboardPaste className="size-4 mr-2" />
-                      Paste text
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="upload"
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm hover:text-foreground"
-                    >
-                      <FileUp className="size-4 mr-2" />
-                      Upload files
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
+      {/* ─── Jobs drawer (minimal, collapsible) ─── */}
+      {showJobsDrawer && jobs.length > 0 && (
+        <div className="mb-6 animate-in slide-in-from-top-2 fade-in duration-200">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-foreground">
+                Scraping Jobs
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowJobsDrawer(false)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Hide
+              </button>
+            </div>
+            <JobsPanel jobs={jobs} onChanged={refreshAll} />
+          </div>
+        </div>
+      )}
 
-                <div className="flex-1 w-full">
-                  <TabsContent
-                    value="scrape"
-                    className="m-0 h-full focus-visible:outline-none focus-visible:ring-0"
-                  >
-                    <div className="mb-4">
-                      <FirecrawlNotice
-                        cloudConfigured={configured}
-                        onChange={refreshAll}
-                        onErrorChange={setScrapeHasError}
-                      />
+      <div className="mt-2">
+        {activeTab === "add" && (
+          <div className="w-full">
+            {/* ─── Line-style sub-tabs ─── */}
+            <div className="border-b border-border mb-6">
+              <div className="flex items-center gap-1 -mb-px">
+                {SUB_TABS.map((tab) => {
+                  const isActive = activeSubTab === tab.id;
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveSubTab(tab.id)}
+                      className={cn(
+                        "relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors outline-none",
+                        isActive
+                          ? "text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      {tab.label}
+                      {isActive && (
+                        <motion.div
+                          layoutId="add-data-sub-tab-indicator"
+                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
+                          initial={false}
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 35,
+                          }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ─── Tab content ─── */}
+            <div className="relative">
+              {activeSubTab === "website" && (
+                <div className="w-full flex flex-col gap-8 animate-in fade-in duration-200">
+                  <div>
+                    {!configured && <FirecrawlNotice />}
+                    <ScrapePanel onStarted={handleDataAdded} />
+                  </div>
+                  {jobs.length > 0 && !showJobsDrawer && (
+                    <div className="pt-8 border-t border-border">
+                      <h3 className="text-lg font-semibold tracking-tight mb-4">
+                        Recent Scrape Jobs
+                      </h3>
+                      <JobsPanel jobs={jobs} onChanged={refreshAll} />
                     </div>
-                    <ScrapePanel
-                      disabled={false}
-                      onStarted={handleDataAdded}
-                    />
-                  </TabsContent>
-                  <TabsContent
-                    value="paste"
-                    className="m-0 h-full focus-visible:outline-none focus-visible:ring-0"
-                  >
-                    <PastePanel onAdded={handleDataAdded} />
-                  </TabsContent>
-                  <TabsContent
-                    value="upload"
-                    className="m-0 h-full focus-visible:outline-none focus-visible:ring-0"
-                  >
-                    <UploadPanel onAdded={handleDataAdded} />
-                  </TabsContent>
+                  )}
                 </div>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              )}
 
-        <TabsContent
-          value="corpus"
-          className="m-0 focus-visible:outline-none focus-visible:ring-0"
-        >
-          <Card>
-            <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Layers className="size-4 text-primary" />
-                Corpus
-              </CardTitle>
-              {stats && (
-                <div className="flex items-center gap-4 text-xs text-muted-foreground tabular-nums">
-                  <span>{stats.docCount.toLocaleString()} docs</span>
-                  <span>{stats.charCount.toLocaleString()} chars</span>
+              {activeSubTab === "files" && (
+                <div className="animate-in fade-in duration-200">
+                  <UploadPanel onAdded={handleDataAdded} />
                 </div>
               )}
-            </CardHeader>
-            <CardContent>
-              {docsQuery.isLoading ? (
-                <Skeleton className="h-40 w-full" />
-              ) : (
-                <CorpusPanel documents={documents} onChanged={refreshAll} />
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        <TabsContent
-          value="etl"
-          className="m-0 focus-visible:outline-none focus-visible:ring-0"
-        >
-          <Card>
-            <CardHeader className="flex-row items-center justify-between shrink-0">
-              <CardTitle className="text-base">ETL jobs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {jobsQuery.isLoading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
+              {activeSubTab === "text" && (
+                <div className="max-w-3xl animate-in fade-in duration-200">
+                  <PastePanel onAdded={handleDataAdded} />
                 </div>
-              ) : (
-                <JobsPanel jobs={jobs} onChanged={refreshAll} />
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+
+              {activeSubTab === "media" && (
+                <div className="animate-in fade-in duration-200">
+                  <MediaPanel onAdded={handleDataAdded} />
+                </div>
+              )}
+
+              {activeSubTab === "notion" && (
+                <div className="animate-in fade-in duration-200">
+                  <IntegrationsPanel onAdded={handleDataAdded} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "corpus" && (
+          <div className="animate-in fade-in duration-300">
+            <CorpusPanel documents={documents} onChanged={refreshAll} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,22 +1,25 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   MessageCircle,
   FileStack,
   SlidersHorizontal,
   type LucideIcon,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { useThemeCustomizer, type PanelBgVariant } from "@/components/theme-customizer-provider"
-import { ThemeSwitcher } from "@/components/theme-switcher"
+} from "@/components/ui/tooltip";
+import {
+  useThemeCustomizer,
+  type PanelBgVariant,
+} from "@/components/theme-customizer-provider";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 
 const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
   "panel-default": undefined,
@@ -26,14 +29,14 @@ const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
   "panel-soft": "#FBFAF8",
   "panel-silver": "#F8F8F8",
   "panel-stone": "#F5F5F2",
-}
+};
 
 interface NavItem {
-  id: string
-  label: string
-  href: string
-  icon: LucideIcon
-  description: string
+  id: string;
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  description: string;
 }
 
 const SIMPLE_NAV: NavItem[] = [
@@ -58,14 +61,14 @@ const SIMPLE_NAV: NavItem[] = [
     icon: SlidersHorizontal,
     description: "Configure provider, API keys, and advanced settings.",
   },
-]
+];
 
 export function SimpleSidebar() {
-  const pathname = usePathname()
-  const { pageStyle, navBg } = useThemeCustomizer()
+  const pathname = usePathname();
+  const { pageStyle, navBg } = useThemeCustomizer();
 
-  const navColor = navBg ? NAV_BG_COLORS[navBg] : undefined
-  const navStyle = navColor ? { backgroundColor: navColor } : undefined
+  const navColor = navBg ? NAV_BG_COLORS[navBg] : undefined;
+  const navStyle = navColor ? { backgroundColor: navColor } : undefined;
 
   return (
     <TooltipProvider delay={150}>
@@ -96,10 +99,10 @@ export function SimpleSidebar() {
         </Tooltip>
 
         {/* Navigation */}
-        <nav className="flex flex-1 flex-col items-center gap-0.5">
+        <nav className="flex flex-1 flex-col items-center gap-2.5">
           {SIMPLE_NAV.map((item) => {
-            const Icon = item.icon
-            const active = pathname?.startsWith(item.href)
+            const Icon = item.icon;
+            const active = pathname?.startsWith(item.href);
 
             return (
               <Tooltip key={item.id}>
@@ -127,7 +130,10 @@ export function SimpleSidebar() {
                         : "text-foreground/70 group-hover:bg-white/90 group-hover:text-foreground",
                     )}
                   >
-                    <Icon className="size-[19px]" strokeWidth={active ? 2.25 : 2} />
+                    <Icon
+                      className="size-[19px]"
+                      strokeWidth={active ? 2.25 : 2}
+                    />
                   </span>
                   <span
                     className={cn(
@@ -140,7 +146,11 @@ export function SimpleSidebar() {
                     {item.label}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={10} className="max-w-56">
+                <TooltipContent
+                  side="right"
+                  sideOffset={10}
+                  className="max-w-56"
+                >
                   <div className="flex flex-col gap-0.5">
                     <span className="font-medium">{item.label}</span>
                     <span className="text-[11px] leading-snug opacity-80">
@@ -149,7 +159,7 @@ export function SimpleSidebar() {
                   </div>
                 </TooltipContent>
               </Tooltip>
-            )
+            );
           })}
         </nav>
 
@@ -157,5 +167,5 @@ export function SimpleSidebar() {
         <ThemeSwitcher floating={false} />
       </aside>
     </TooltipProvider>
-  )
+  );
 }

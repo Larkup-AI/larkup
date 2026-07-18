@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "larkup",
   description:
-    "larkup — a dual-mode (Web + CLI) toolkit to build, index, and serve a lightweight, deployable RAG pipeline.",
+    "larkup — a toolkit to build, index, and serve your own AI model and knowledge base.",
 };
 
 export default function RootLayout({

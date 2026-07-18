@@ -42,7 +42,7 @@ function SelectTrigger({
       data-size={size}
       className={cn(
         // layout
-        "flex w-fit items-center justify-between gap-2 rounded-lg border border-input bg-transparent",
+        "flex w-fit items-center justify-between gap-2 rounded-md border border-input bg-transparent",
         "pr-3 pl-3 text-sm whitespace-nowrap select-none outline-none",
         // transitions & hover
         "transition-all duration-150",
@@ -52,7 +52,7 @@ function SelectTrigger({
         // data-open ring
         "data-[state=open]:border-primary/60 data-[state=open]:ring-2 data-[state=open]:ring-primary/15",
         // sizes
-        "data-[size=default]:h-9 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)]",
+        "data-[size=default]:h-9 data-[size=sm]:h-7 data-[size=sm]:rounded-lg",
         // value placeholder
         "*:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5",
         // disabled / invalid
