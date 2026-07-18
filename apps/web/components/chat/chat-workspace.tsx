@@ -249,6 +249,11 @@ export function ChatWorkspace() {
 
   async function deleteChat(id: string, e: React.MouseEvent) {
     e.stopPropagation();
+    
+    if (!window.confirm("Are you sure you want to delete this chat? This action cannot be undone.")) {
+      return;
+    }
+    
     await del(`chat_messages_${id}`);
     setHistory((prev) => {
       const next = prev.filter((p) => p.id !== id);
