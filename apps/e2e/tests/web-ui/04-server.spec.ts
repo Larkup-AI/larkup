@@ -2,21 +2,20 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Server Page", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/server");
-    await page.waitForSelector("text=Generate & launch", { timeout: 15_000 });
+    await page.goto("/settings?section=server");
+    await page.waitForSelector("text=Launch, manage, and connect", { timeout: 15_000 });
   });
 
   test("page loads with correct heading", async ({ page }) => {
-    await expect(page.getByText("Step 4 · Server")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Server", exact: true })).toBeVisible();
     await expect(
-      page.getByText("Generate & launch your Custom AI Model server")
+      page.getByText("Launch, manage, and connect to your AI server.")
     ).toBeVisible();
   });
 
   test("server generation panel loads", async ({ page }) => {
-    // The LaunchPanel should render with the "Launch locally" card
     await expect(
-      page.getByText("Launch locally").or(page.getByText("Launch local server")).first()
+      page.getByText("Local Server").first()
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -25,7 +24,7 @@ test.describe("Server Page", () => {
 
     // Find and click the launch button
     const launchBtn = page
-      .getByRole("button", { name: /Launch|Start|Play/i })
+      .getByRole("button", { name: /Launch server|Start/i })
       .first();
 
     try {
@@ -66,9 +65,8 @@ test.describe("Server Page", () => {
   test("stop RAG server", async ({ page }) => {
     test.setTimeout(30_000);
 
-    // Check if server is running
     const stopBtn = page
-      .getByRole("button", { name: /Stop/i })
+      .getByRole("button", { name: /Stop server|Stop/i })
       .first();
 
     if (await stopBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
@@ -77,7 +75,7 @@ test.describe("Server Page", () => {
 
       // Verify it stopped
       const launchBtn = page
-        .getByRole("button", { name: /Launch|Start/i })
+        .getByRole("button", { name: /Launch server|Start/i })
         .first();
       await expect(launchBtn).toBeVisible({ timeout: 15_000 });
       console.log("  ✓ RAG server stopped");
@@ -90,7 +88,7 @@ test.describe("Server Page", () => {
     test.setTimeout(60_000);
 
     // Re-launch if not running
-    const launchBtn = page.getByRole("button", { name: /Launch|Start/i }).first();
+    const launchBtn = page.getByRole("button", { name: /Launch server|Start/i }).first();
     if (await launchBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await launchBtn.click();
       await page.waitForTimeout(10_000);
