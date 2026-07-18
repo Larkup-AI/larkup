@@ -30,6 +30,17 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -247,13 +258,7 @@ export function ChatWorkspace() {
     }
   }
 
-  async function deleteChat(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    
-    if (!window.confirm("Are you sure you want to delete this chat? This action cannot be undone.")) {
-      return;
-    }
-    
+  async function deleteChat(id: string) {
     await del(`chat_messages_${id}`);
     setHistory((prev) => {
       const next = prev.filter((p) => p.id !== id);
@@ -468,12 +473,33 @@ export function ChatWorkspace() {
                         <div className="truncate pr-4 flex-1 text-xs">
                           {chat.title}
                         </div>
-                        <button
-                          onClick={(e) => deleteChat(chat.id, e)}
-                          className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this chat? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => deleteChat(chat.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     ))
                 )}
