@@ -108,10 +108,12 @@ export function CorpusPanel({
 
   if (documents.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border px-6 py-14 text-center">
-        <FileText className="size-7 text-muted-foreground/60" />
-        <p className="mt-3 text-sm font-medium">Your corpus is empty</p>
-        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+      <div className="flex flex-col  items-center justify-center rounded-lg   px-6 py-14 text-center">
+        <div className="size-10 p-1.5 bg-white/60 border border-border  rounded-md flex items-center justify-center">
+          <FileText className="size-7 text-muted-foreground/60" />
+        </div>
+        <p className="mt-3 text-lg font-medium">Your corpus is empty</p>
+        <p className="mt-1 max-w-xl text-sm text-muted-foreground">
           Scrape the web, paste text, or upload files. Everything you collect is
           stored locally and ready to index in the next step.
         </p>
@@ -380,7 +382,11 @@ function DocumentDialog({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        toast.error(body.error ? formatErrorMessage(new Error(body.error)) : "Failed to save document.");
+        toast.error(
+          body.error
+            ? formatErrorMessage(new Error(body.error))
+            : "Failed to save document.",
+        );
         return;
       }
       toast.success("Document saved");
@@ -413,7 +419,10 @@ function DocumentDialog({
         </DialogHeader>
 
         {editing ? (
-          <div className="grid gap-4 overflow-y-auto pr-2 pb-2" style={{ maxHeight: "calc(80vh - 150px)" }}>
+          <div
+            className="grid gap-4 overflow-y-auto pr-2 pb-2"
+            style={{ maxHeight: "calc(80vh - 150px)" }}
+          >
             <div className="grid gap-2">
               <Label htmlFor="doc-title">Title</Label>
               <Input

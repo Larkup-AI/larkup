@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { SettingsLayout, type SettingsSection } from "@/components/settings/settings-layout";
 import { GeneralSection } from "@/components/settings/general-section";
 import { ModelsSection } from "@/components/settings/models-section";
@@ -10,13 +11,49 @@ import { PlaygroundSection } from "@/components/settings/playground-section";
 import { AppearanceSection } from "@/components/settings/appearance-section";
 import { StorageSection } from "@/components/settings/storage-section";
 
-export default function SettingsPage() {
-  const [activeSection, setActiveSection] = useState<SettingsSection>("general");
+function SettingsContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const getInitialSection = (): SettingsSection => {
+    if (searchParams.has("ai-models")) return "models";
+    const section = searchParams.get("section") as SettingsSection;
+    if (section) return section;
+    return "general";
+  };
+
+  const [activeSection, setActiveSection] = useState<SettingsSection>(getInitialSection());
+
+  useEffect(() => {
+    const currentSection = searchParams.get("section");
+    const hasAiModels = searchParams.has("ai-models");
+
+    if (hasAiModels) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("ai-models");
+      params.set("section", "models");
+      router.replace(`${pathname}?${params.toString()}`);
+      if (activeSection !== "models") {
+        setActiveSection("models");
+      }
+    } else if (currentSection && currentSection !== activeSection) {
+      setActiveSection(currentSection as SettingsSection);
+    }
+  }, [searchParams, activeSection, pathname, router]);
+
+  const handleSectionChange = (newSection: SettingsSection) => {
+    setActiveSection(newSection);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("ai-models");
+    params.set("section", newSection);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   return (
     <SettingsLayout
       activeSection={activeSection}
-      onSectionChange={setActiveSection}
+      onSectionChange={handleSectionChange}
     >
       {activeSection === "general" && <GeneralSection />}
       {activeSection === "models" && <ModelsSection />}
@@ -26,5 +63,13 @@ export default function SettingsPage() {
       {activeSection === "playground" && <PlaygroundSection />}
       {activeSection === "appearance" && <AppearanceSection />}
     </SettingsLayout>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsContent />
+    </Suspense>
   );
 }

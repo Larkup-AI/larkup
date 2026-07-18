@@ -112,7 +112,8 @@ export function FirecrawlNotice({
         } else {
           toast.warning("Crawler started", {
             description:
-              json.state?.lastError ?? "Waiting for the service to become healthy.",
+              json.state?.lastError ??
+              "Waiting for the service to become healthy.",
           });
         }
       } else {
@@ -145,116 +146,65 @@ export function FirecrawlNotice({
   })();
 
   return (
-    <Alert>
+    <div className="flex items-center gap-2">
       {running ? (
-        <Server className="size-4 text-primary" />
-      ) : (
-        <KeyRound className="size-4" />
-      )}
-      <AlertTitle className="flex items-center gap-2">
-        {running ? (
-          <>
-            <img
-              src="/icons/firecrawl2.png"
-              alt=""
-              className="size-4 object-contain"
-            />
-            Web Crawler is running
-          </>
-        ) : (
-          <>
-            <img
-              src="/icons/firecrawl2.png"
-              alt=""
-              className="size-4 object-contain"
-            />
-            Launch Web Crawler
-          </>
-        )}
-        {running && (
-          <Badge
-            variant="secondary"
-            className="gap-1 font-normal text-green-600"
-          >
-            <span className="relative flex size-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
-              <span className="relative inline-flex size-1.5 rounded-full bg-green-500" />
-            </span>
-            live
-          </Badge>
-        )}
-      </AlertTitle>
-      <AlertDescription className="flex flex-col gap-0">
-        {running ? (
-          <p className="text-sm">
-            Connected to{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-              {state?.endpoint}
-            </code>
-            . Web search and crawling are active.
-          </p>
-        ) : (
-          <p className="text-sm">{idleDescription}</p>
-        )}
-
-        {/* Docker readiness hint */}
-        {!isLoading && !dockerReady && !running && docker?.message && (
-          <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-destructive" />
-            <span>{formatErrorMessage(docker.message)}</span>
-          </div>
-        )}
-
-        {state?.lastError && !running && (
-          <div className="flex items-start mb-3 gap-2 max-h-[200px]! overflow-auto rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-            <span>{formatErrorMessage(state.lastError)}</span>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 pb-2">
-          {running ? (
-            <Button
-              size="sm"
-              variant="destructive"
-              className={"bg-red-500 hover:bg-red-500/80 text-white "}
-              onClick={() => control("stop")}
-              disabled={busy !== null}
-            >
-              {busy === "stop" ? (
-                <Loader2 className="size-4 animate-spin text-white" />
-              ) : (
-                <Square className="size-4 text-white!" />
-              )}
-              Stop
-            </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 gap-1.5  bg-red-500 hover:bg-red-600 text-white hover:text-white hover:border-red-200 text-xs px-2.5 shadow-none"
+          onClick={() => control("stop")}
+          disabled={busy !== null}
+        >
+          {busy === "stop" ? (
+            <Loader2 className="size-3 animate-spin" />
           ) : (
-            <Button
-              size="sm"
-              onClick={() => control("start")}
-              disabled={busy !== null || isLoading || (!dockerReady && runtimeEnv !== "docker")}
-              className="
-    inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium
-    bg-[#F97316] hover:bg-[#EA6C0A]
-    text-white border-none
-    rounded-md transition-all duration-200
-    disabled:opacity-70 disabled:cursor-not-allowed
-  "
-            >
-              {busy === "start" ? (
-                <Loader2 className="size-4 animate-spin text-white" />
-              ) : (
-                <img
-                  src="/icons/firecrawl2.png"
-                  alt=""
-                  className="size-4 object-contain"
-                />
-              )}
-              {runtimeEnv === "docker" ? "Connect" : "Launch"}
-            </Button>
+            <Square className="size-3" />
           )}
-        </div>
-      </AlertDescription>
-    </Alert>
+          Stop Crawler
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => control("start")}
+          disabled={
+            busy !== null ||
+            isLoading ||
+            (!dockerReady && runtimeEnv !== "docker")
+          }
+          className="h-7 gap-1.5 text-xs px-2.5 shadow-none bg-orange-500 text-white hover:bg-orange-600 hover:text-white"
+        >
+          {busy === "start" ? (
+            <Loader2 className="size-3 animate-spin text-muted-foreground" />
+          ) : (
+            <img
+              src="/icons/firecrawl2.png"
+              alt=""
+              className="size-3 object-contain"
+            />
+          )}
+          {runtimeEnv === "docker" ? "Connect Crawler" : "Launch Crawler"}
+        </Button>
+      )}
+
+      {state?.lastError && !running && (
+        <span
+          className="text-[10px] text-destructive flex items-center gap-1 max-w-[200px] truncate"
+          title={state.lastError}
+        >
+          <TriangleAlert className="size-3 shrink-0" />
+          <span className="truncate">Error starting crawler</span>
+        </span>
+      )}
+      {!isLoading && !dockerReady && !running && docker?.message && (
+        <span
+          className="text-[10px] text-destructive flex items-center gap-1 max-w-[200px] truncate"
+          title={docker.message}
+        >
+          <TriangleAlert className="size-3 shrink-0" />
+          <span className="truncate">Docker issue</span>
+        </span>
+      )}
+    </div>
   );
 }

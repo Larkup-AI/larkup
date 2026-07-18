@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { CrawlJob, SourceDocument } from "@larkup/core/types";
-import { Globe, FileUp, Type, Image, Plug, Briefcase } from "lucide-react";
+import { Globe, FileUp, Type, Image, Plug, Briefcase, ChevronDown } from "lucide-react";
 
 import { ScrapePanel } from "@/components/data/scrape-panel";
 import { PastePanel } from "@/components/data/paste-panel";
@@ -174,39 +174,50 @@ export function DataWorkspace() {
           })}
         </div>
 
-        {/* Floating jobs indicator — always accessible */}
-        {jobs.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowJobsDrawer(!showJobsDrawer)}
-            className={cn(
-              "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
-              hasActive
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                : "border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-            )}
-          >
-            <Briefcase className="size-3.5" />
-            {hasActive ? (
-              <>
-                <span className="relative flex size-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-                </span>
-                {
-                  jobs.filter(
-                    (j) => j.status === "running" || j.status === "queued",
-                  ).length
-                }{" "}
-                active
-              </>
-            ) : (
-              <>
-                {jobs.length} job{jobs.length !== 1 ? "s" : ""}
-              </>
-            )}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Firecrawl notice always visible next to jobs */}
+          <FirecrawlNotice cloudConfigured={configured} />
+
+          {/* Floating jobs indicator — always accessible */}
+          {jobs.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowJobsDrawer(!showJobsDrawer)}
+              className={cn(
+                "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                hasActive
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+              )}
+            >
+              <Briefcase className="size-3.5" />
+              {hasActive ? (
+                <>
+                  <span className="relative flex size-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                  </span>
+                  {
+                    jobs.filter(
+                      (j) => j.status === "running" || j.status === "queued",
+                    ).length
+                  }{" "}
+                  active
+                </>
+              ) : (
+                <>
+                  {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+                </>
+              )}
+              <ChevronDown
+                className={cn(
+                  "ml-1 size-3.5 transition-transform duration-200",
+                  showJobsDrawer && "rotate-180"
+                )}
+              />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ─── Jobs drawer (minimal, collapsible) ─── */}
@@ -275,17 +286,19 @@ export function DataWorkspace() {
               {activeSubTab === "website" && (
                 <div className="w-full flex flex-col gap-8 animate-in fade-in duration-200">
                   <div>
-                    {!configured && <FirecrawlNotice />}
-                    <ScrapePanel onStarted={handleDataAdded} />
+                    <ScrapePanel onStarted={() => {
+                      handleDataAdded();
+                      setShowJobsDrawer(true);
+                    }} />
                   </div>
-                  {jobs.length > 0 && !showJobsDrawer && (
+                  {/* {jobs.length > 0 && !showJobsDrawer && (
                     <div className="pt-8 border-t border-border">
                       <h3 className="text-lg font-semibold tracking-tight mb-4">
                         Recent Scrape Jobs
                       </h3>
                       <JobsPanel jobs={jobs} onChanged={refreshAll} />
                     </div>
-                  )}
+                  )} */}
                 </div>
               )}
 

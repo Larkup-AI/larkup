@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/tooltip";
 import { GenericAlert } from "@/components/alerts/generic-alert";
 import { cn } from "@/lib/utils";
+import { FirecrawlNotice } from "@/components/data/firecrawl-notice";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 

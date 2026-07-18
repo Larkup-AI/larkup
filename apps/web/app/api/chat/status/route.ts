@@ -31,11 +31,12 @@ export async function GET(req: Request) {
 
     const blockers: string[] = [];
     if (!hasApiKey) {
-      blockers.push("Set an API Key in Settings.");
+      blockers.push("Set AI Models API Key in Settings.");
     }
 
     const requestedProvider = new URL(req.url).searchParams.get("provider");
-    const provider = requestedProvider || config.chatProvider || config.embeddingProvider;
+    const provider =
+      requestedProvider || config.chatProvider || config.embeddingProvider;
 
     // Fetch dynamic models from gateway cache
     const [languageModels, embeddingGatewayModels] = await Promise.all([
@@ -46,7 +47,7 @@ export async function GET(req: Request) {
     // ── Chat models ───────────────────────────────────────────────────
     const allChatModels = languageModels.map(toChatDescriptor);
     const chatModels = getChatModelsForProvider(allChatModels, provider);
-    
+
     if (provider === "custom" && config.customChatModels) {
       chatModels.push(
         ...config.customChatModels.map((m) => ({
@@ -54,7 +55,7 @@ export async function GET(req: Request) {
           name: m.modelName,
           provider: "custom",
           tags: ["custom"],
-        }))
+        })),
       );
     }
 
@@ -68,7 +69,9 @@ export async function GET(req: Request) {
 
     // ── Embedding models ──────────────────────────────────────────────
     // Convert gateway embedding models to descriptors (enriched with dimensions)
-    const dynamicEmbeddingModels = embeddingGatewayModels.map(toEmbeddingDescriptor);
+    const dynamicEmbeddingModels = embeddingGatewayModels.map(
+      toEmbeddingDescriptor,
+    );
 
     // Merge: use gateway models + fill in any hardcoded models not in gateway
     const embeddingIds = new Set(dynamicEmbeddingModels.map((m) => m.id));

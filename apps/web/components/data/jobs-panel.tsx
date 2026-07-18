@@ -50,7 +50,7 @@ const STATUS: Record<
   running: {
     label: "Running",
     icon: Loader2,
-    className: "text-primary border-primary/30 bg-primary/10",
+    className: "text-orange-500 border-orange-500/30 bg-orange-500/10",
     badgeVariant: "outline",
   },
   completed: {
@@ -328,7 +328,7 @@ export function JobsPanel({
                               .map((t) => t.url)
                               .join("\n");
                             navigator.clipboard.writeText(failedUrls);
-                            toast.success("Failed URLs copied to clipboard");
+                            toast.success("Copied failed URLs to clipboard");
                           }}
                           className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
                           title="Copy failed URLs"
