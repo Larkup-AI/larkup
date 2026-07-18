@@ -1,7 +1,290 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import type { UIMessage } from "ai";
-import { KnowledgeBaseResult } from "@/components/chat/knowledge-base-result";
+import { KnowledgeBaseResult } from "@/components/chat/tools/knowledge-base-result";
+import { ChatChart, type ChartConfig } from "@/components/chat/tools/chat-chart";
+import {
+  ChatDataTable,
+  type DataTableConfig,
+} from "@/components/chat/tools/chat-data-table";
+import {
+  ChatSandboxResult,
+  type SandboxResultConfig,
+} from "@/components/chat/tools/chat-sandbox-result";
+import { VisualizationTabs } from "@/components/chat/tools/visualization-tabs";
+import { Sparkles, BarChart3, Table2, FlaskConical } from "lucide-react";
+
+/* ------------------------------------------------------------------ */
+/* Follow-up suggestion buttons                                        */
+/* ------------------------------------------------------------------ */
+
+function FollowUpButtons({
+  suggestions,
+  onSelect,
+}: {
+  suggestions: string[];
+  onSelect?: (text: string) => void;
+}) {
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2 pt-1">
+      {suggestions.map((s, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onSelect?.(s)}
+          className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
+            i === 0
+              ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+              : "border-border bg-card text-foreground hover:bg-secondary"
+          }`}
+        >
+          {s}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Markdown table parser                                                */
+/* ------------------------------------------------------------------ */
+
+interface ParsedTable {
+  columns: string[];
+  rows: Record<string, any>[];
+}
+
+function splitTextAndTables(
+  text: string,
+): Array<
+  { type: "text"; content: string } | { type: "table"; table: ParsedTable }
+> {
+  if (!text) return [];
+
+  const lines = text.split("\n");
+  const segments: Array<
+    { type: "text"; content: string } | { type: "table"; table: ParsedTable }
+  > = [];
+  let currentText: string[] = [];
+  let tableLines: string[] = [];
+  let inTable = false;
+
+  const isTableRow = (line: string) => {
+    const trimmed = line.trim();
+    return (
+      trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 2
+    );
+  };
+
+  const isSeparatorRow = (line: string) => /^\|[\s\-:|]+\|$/.test(line.trim());
+
+  const flushText = () => {
+    if (currentText.length > 0) {
+      const content = currentText.join("\n").trim();
+      if (content) {
+        segments.push({ type: "text", content });
+      }
+      currentText = [];
+    }
+  };
+
+  const flushTable = () => {
+    if (tableLines.length < 2) {
+      currentText.push(...tableLines);
+      tableLines = [];
+      return;
+    }
+
+    const headerLine = tableLines[0];
+    const columns = headerLine
+      .split("|")
+      .map((c) => c.trim())
+      .filter(Boolean);
+
+    let dataStart = 1;
+    if (tableLines.length > 1 && isSeparatorRow(tableLines[1])) {
+      dataStart = 2;
+    }
+
+    const rows: Record<string, any>[] = [];
+    for (let i = dataStart; i < tableLines.length; i++) {
+      const rawCells = tableLines[i]
+        .split("|")
+        .slice(1, -1)
+        .map((c) => c.trim());
+
+      const row: Record<string, any> = {};
+      columns.forEach((col, j) => {
+        const val = rawCells[j] ?? "";
+        const num = Number(val);
+        row[col] = !isNaN(num) && val !== "" ? num : val;
+      });
+      rows.push(row);
+    }
+
+    if (columns.length > 0 && rows.length > 0) {
+      segments.push({
+        type: "table",
+        table: { columns, rows },
+      });
+    }
+    tableLines = [];
+  };
+
+  for (const line of lines) {
+    if (isTableRow(line)) {
+      if (!inTable) {
+        flushText();
+        inTable = true;
+      }
+      if (!isSeparatorRow(line) || tableLines.length === 1) {
+        tableLines.push(line);
+      } else if (isSeparatorRow(line)) {
+        tableLines.push(line);
+      }
+    } else {
+      if (inTable) {
+        flushTable();
+        inTable = false;
+      }
+      currentText.push(line);
+    }
+  }
+
+  if (inTable) {
+    flushTable();
+  }
+  flushText();
+
+  return segments;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tool part helpers — unified state detection                         */
+/* ------------------------------------------------------------------ */
+
+/** Extract normalized tool info from a part, handling ALL AI SDK format variants. */
+function getToolInfo(part: any): {
+  toolName: string;
+  isExecuting: boolean;
+  isCompleted: boolean;
+  output: any;
+  input: any;
+} {
+  // Format 1: New AI SDK v4+ → { type: "tool-invocation", toolInvocation: { toolName, state, result, args } }
+  if (part.type === "tool-invocation") {
+    const ti = part.toolInvocation;
+    const state = ti.state;
+    return {
+      toolName: ti.toolName,
+      isExecuting: state === "partial-call" || state === "call",
+      isCompleted:
+        (state === "result" ||
+          state === "output" ||
+          state === "output-available") &&
+        ti.result !== undefined,
+      output: ti.result,
+      input: ti.args,
+    };
+  }
+
+  // Format 2: Legacy → { type: "tool-<toolName>", state: "output-available" | "output" | "input-streaming" | ..., output: {...}, input: {...} }
+  if (part.type?.startsWith("tool-") && part.type !== "tool-invocation") {
+    const toolName = part.type.replace("tool-", "");
+    const state = part.state;
+    return {
+      toolName,
+      isExecuting: state === "input-streaming" || state === "input-available",
+      isCompleted:
+        (state === "output" || state === "output-available") &&
+        part.output !== undefined,
+      output: part.output,
+      input: part.input,
+    };
+  }
+
+  return {
+    toolName: "",
+    isExecuting: false,
+    isCompleted: false,
+    output: undefined,
+    input: undefined,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Tool part renderers                                                 */
+/* ------------------------------------------------------------------ */
+
+function renderToolPart(part: any, index: number): React.ReactNode | null {
+  const { toolName, isExecuting, isCompleted, output, input } =
+    getToolInfo(part);
+
+  // Still executing
+  if (isExecuting) {
+    if (toolName === "searchKnowledgeBase") return null;
+    return (
+      <div
+        key={index}
+        className="flex items-center gap-2.5 py-3 text-[13px] text-muted-foreground animate-pulse"
+      >
+        <Sparkles className="size-4 text-foreground/60" />
+        <span className="font-medium text-foreground/80">
+          {toolName === "queryTabularData" && "Querying data..."}
+          {toolName === "generateVisualization" && "Generating chart..."}
+          {toolName === "executeAnalysis" && "Running analysis..."}
+          {![
+            "queryTabularData",
+            "generateVisualization",
+            "executeAnalysis",
+          ].includes(toolName) && "Processing..."}
+        </span>
+      </div>
+    );
+  }
+
+  // Completed
+  if (isCompleted) {
+    switch (toolName) {
+      case "queryTabularData": {
+        if (output.error) return null;
+        const tableConfig: DataTableConfig = {
+          columns: output.columns ?? [],
+          rows: output.rows ?? [],
+          totalRows: output.totalRows ?? 0,
+          aggregationResults: output.aggregationResults,
+        };
+        if (tableConfig.rows.length === 0 && !tableConfig.aggregationResults)
+          return null;
+        return <ChatDataTable key={index} config={tableConfig} />;
+      }
+
+      case "generateVisualization": {
+        const chartConfig = output as ChartConfig;
+        if (!chartConfig?.data || chartConfig.data.length === 0) return null;
+        return <ChatChart key={index} config={chartConfig} />;
+      }
+
+      case "executeAnalysis": {
+        const result = output as SandboxResultConfig;
+        const code = input?.code;
+        return <ChatSandboxResult key={index} config={result} code={code} />;
+      }
+
+      default:
+        return null;
+    }
+  }
+
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Main message component                                              */
+/* ------------------------------------------------------------------ */
 
 export function MessageItem({
   message,
@@ -14,90 +297,210 @@ export function MessageItem({
 }) {
   const isUser = message.role === "user";
 
+  // Normalise parts and handle missing tools in parts array at runtime
+  const anyMessage = message as any;
+  const parts: any[] = message.parts ? [...message.parts] : [];
+
+  if (anyMessage.toolInvocations && Array.isArray(anyMessage.toolInvocations)) {
+    anyMessage.toolInvocations.forEach((t: any) => {
+      if (
+        !parts.some(
+          (p: any) =>
+            p.type === "tool-invocation" &&
+            p.toolInvocation?.toolCallId === t.toolCallId,
+        )
+      ) {
+        parts.push({ type: "tool-invocation", toolInvocation: t });
+      }
+    });
+  }
+
   if (isUser) {
-    const text = message.parts
-      .filter((p) => p.type === "text")
+    const text = parts
+      .filter((p: any) => p.type === "text")
       .map((p: any) => p.text)
       .join("");
     return (
       <div className="message user-message flex justify-end" data-role="user">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary/10 px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
+        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-foreground/6 px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
           {text}
         </div>
       </div>
     );
   }
 
-  // UIMessage parts: "text", "tool-searchKnowledgeBase", etc.
-  const kbParts = message.parts.filter(
-    (p: any) => p.type === "tool-searchKnowledgeBase",
-  );
-  const textParts = message.parts.filter((p: any) => p.type === "text");
+  // --- Assistant message ---
+
+  // Categorize parts using unified detection
+  const kbParts = parts.filter((p: any) => {
+    const { toolName } = getToolInfo(p);
+    return toolName === "searchKnowledgeBase";
+  });
+
+  const toolParts = parts.filter((p: any) => {
+    const { toolName } = getToolInfo(p);
+    return toolName && toolName !== "searchKnowledgeBase";
+  });
+
+  const textParts = parts.filter((p: any) => p.type === "text");
 
   const isShimmering =
     textParts.every((p: any) => !p.text || p.text.trim().length === 0) &&
     isLast &&
     isStreaming;
 
-  return (
-    <div className="message assistant-message flex flex-col gap-3" data-role="assistant">
-      {kbParts.length > 0 ? (
-        <KnowledgeBaseResult parts={kbParts} isShimmering={isShimmering} />
-      ) : null}
+  // Check if we have multiple visualization outputs for tabs
+  const isVizPart = (p: any) => {
+    const { toolName, isCompleted } = getToolInfo(p);
+    return toolName === "generateVisualization" && isCompleted;
+  };
 
-      {textParts.map((part: any, i: number) => (
-        <div
-          key={i}
-          className="prose prose-sm max-w-none text-[15px] text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-a:text-foreground prose-a:underline prose-a:underline-offset-2 prose-code:rounded prose-code:bg-secondary prose-code:px-1 prose-code:py-0.5 prose-code:text-xs prose-code:before:content-none prose-code:after:content-none"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(part.text || "") }}
-        />
-      ))}
+  const vizParts = toolParts.filter(isVizPart);
+  const nonVizToolParts = toolParts.filter((p: any) => !isVizPart(p));
+
+  // Build tabs if we have multiple visualizations
+  const vizTabs =
+    vizParts.length > 1
+      ? vizParts.map((p: any, i: number) => {
+          const { output } = getToolInfo(p);
+          return {
+            label: (output as ChartConfig)?.title || `Chart ${i + 1}`,
+            content: renderToolPart(p, i),
+          };
+        })
+      : null;
+
+  // Separate in-progress tool parts for loading indicators
+  const executingParts = toolParts.filter((p: any) => {
+    const { isExecuting, toolName } = getToolInfo(p);
+    return isExecuting && toolName !== "searchKnowledgeBase";
+  });
+
+  return (
+    <div
+      className="message assistant-message flex flex-col gap-4"
+      data-role="assistant"
+    >
+      {/* Knowledge base results */}
+      {kbParts.length > 0 && (
+        <KnowledgeBaseResult parts={kbParts} isShimmering={isShimmering} />
+      )}
+
+      {/* Non-visualization tool outputs (data tables, sandbox results) */}
+      {nonVizToolParts
+        .filter((p: any) => getToolInfo(p).isCompleted)
+        .map((part: any, i: number) => renderToolPart(part, i))}
+
+      {/* Visualization outputs */}
+      {vizTabs ? (
+        <VisualizationTabs tabs={vizTabs} />
+      ) : (
+        vizParts.map((part: any, i: number) => renderToolPart(part, i))
+      )}
+
+      {/* Loading states for in-progress tools */}
+      {executingParts.map((part: any, i: number) => renderToolPart(part, i))}
+
+      {/* Text parts — with markdown table detection */}
+      {textParts.map((part: any, i: number) => {
+        const rawText = part.text || "";
+        if (!rawText.trim()) return null;
+        const segments = splitTextAndTables(rawText);
+
+        return (
+          <div key={i} className="flex flex-col gap-4">
+            {segments.map((seg, j) => {
+              if (seg.type === "table") {
+                const tableConfig: DataTableConfig = {
+                  columns: seg.table.columns,
+                  rows: seg.table.rows,
+                  totalRows: seg.table.rows.length,
+                };
+                return (
+                  <ChatDataTable key={`table-${j}`} config={tableConfig} />
+                );
+              }
+              return (
+                <div
+                  key={`text-${j}`}
+                  className="assistant-text-content"
+                  dangerouslySetInnerHTML={{
+                    __html: renderMarkdown(seg.content),
+                  }}
+                />
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-/**
- * Lightweight markdown → HTML for chat messages.
- */
+/* ------------------------------------------------------------------ */
+/* Premium markdown → HTML renderer for chat messages.                 */
+/* ------------------------------------------------------------------ */
+
 function renderMarkdown(text: string): string {
   if (!text) return "";
-  return text
+
+  let html = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    // Code blocks
-    .replace(
-      /```(\w*)\n([\s\S]*?)```/g,
-      '<pre class="rounded-lg bg-secondary p-3 text-xs overflow-x-auto my-2"><code>$2</code></pre>',
-    )
-    // Inline code
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    // Italic
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    // Links
-    .replace(
-      /\[([^\]]+)\]\(([^)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noreferrer">$1</a>',
-    )
-    // Headings
-    .replace(
-      /^### (.+)$/gm,
-      '<h3 class="text-base font-semibold mt-3 mb-1">$1</h3>',
-    )
-    .replace(
-      /^## (.+)$/gm,
-      '<h2 class="text-lg font-semibold mt-4 mb-1">$1</h2>',
-    )
-    .replace(
-      /^# (.+)$/gm,
-      '<h1 class="text-xl font-semibold mt-4 mb-2">$1</h1>',
-    )
-    // Lists
-    .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
-    .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal">$1</li>')
-    // Paragraphs
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\n/g, "<br/>");
+    .replace(/>/g, "&gt;");
+
+  // Remove markdown images entirely (charts are handled via tools)
+  html = html.replace(/!\[.*?\]\(.*?\)/g, "");
+
+  // Code blocks — styled premium
+  html = html.replace(
+    /```(\w*)\n([\s\S]*?)```/g,
+    '<pre class="msg-code-block"><code>$2</code></pre>',
+  );
+
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code class="msg-inline-code">$1</code>');
+
+  // Bold
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="msg-bold">$1</strong>');
+
+  // Italic
+  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+
+  // Links
+  html = html.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noreferrer" class="msg-link">$1</a>',
+  );
+
+  // Headings — styled as section headers with subtle dividers
+  html = html.replace(/^### (.+)$/gm, '<h3 class="msg-h3">$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2 class="msg-h2">$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1 class="msg-h1">$1</h1>');
+
+  // Unordered lists — collect consecutive lines into <ul>
+  html = html.replace(/^- (.+)$/gm, '<li class="msg-li">$1</li>');
+  // Wrap consecutive <li> in <ul>
+  html = html.replace(
+    /(<li class="msg-li">.*?<\/li>\n?)+/g,
+    (match) => `<ul class="msg-ul">${match}</ul>`,
+  );
+
+  // Ordered lists
+  html = html.replace(/^\d+\. (.+)$/gm, '<li class="msg-li-ordered">$1</li>');
+  html = html.replace(
+    /(<li class="msg-li-ordered">.*?<\/li>\n?)+/g,
+    (match) => `<ol class="msg-ol">${match}</ol>`,
+  );
+
+  // Paragraphs
+  html = html.replace(/\n\n/g, '</p><p class="msg-p">');
+  
+  // Clean up newlines around block elements to prevent huge spaces
+  html = html.replace(/(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)\n+/g, '$1');
+  html = html.replace(/\n+(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)/g, '$1');
+
+  html = html.replace(/\n/g, "<br/>");
+
+  return html;
 }
