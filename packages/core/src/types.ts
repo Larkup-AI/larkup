@@ -177,7 +177,7 @@ export const DEFAULT_CONFIG: RagConfig = {
 /* ------------------------------------------------------------------ */
 
 /** How a document entered the corpus. */
-export type DocumentSource = "paste" | "upload" | "scrape"
+export type DocumentSource = "paste" | "upload" | "scrape" | "tabular"
 
 /**
  * A single cleaned document in the corpus. This is the unit that Phase 3
@@ -198,6 +198,20 @@ export interface SourceDocument {
   /** custom metadata fields mapped during ingestion */
   metadata?: Record<string, any>
   createdAt: string
+}
+
+/* ------------------------------------------------------------------ */
+/* Tabular data references                                             */
+/* ------------------------------------------------------------------ */
+
+/** Links a document back to the tabular dataset it originated from. */
+export interface TabularRef {
+  /** ID of the TabularDataset */
+  datasetId: string
+  /** Row index within the dataset */
+  rowIndex: number
+  /** Mapping of column names used in the document content */
+  columnMap: string[]
 }
 
 export type CrawlJobStatus =

@@ -170,3 +170,80 @@ export async function corpusStats() {
     }, {}),
   }
 }
+
+/**
+ * Batch-create SourceDocuments from tabular data rows.
+ *
+ * Each row becomes a document with structured text like:
+ *   "Column1: value1 | Column2: value2 | ..."
+ *
+ * Metadata includes a _tabular ref linking back to the dataset + row index.
+ * The title is auto-generated from the first text column.
+ */
+export function addTabularDocuments(
+  datasetId: string,
+  fileName: string,
+  rows: Record<string, any>[],
+  columnNames: string[],
+  options?: {
+    /** Column to use for document titles (default: first text column) */
+    titleColumn?: string
+    /** Columns to include in document content (default: all) */
+    contentColumns?: string[]
+    /** Separator between column values (default: " | ") */
+    separator?: string
+  },
+): Promise<number> {
+  return serialize(async () => {
+    const docs = await readDocuments()
+    const sep = options?.separator ?? " | "
+    const contentCols = options?.contentColumns ?? columnNames
+    const titleCol = options?.titleColumn ?? columnNames[0]
+    let added = 0
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+
+      // Build structured text content
+      const content = contentCols
+        .map((col) => {
+          const val = row[col]
+          if (val === null || val === undefined || val === "") return null
+          return `${col}: ${val}`
+        })
+        .filter(Boolean)
+        .join(sep)
+
+      if (!content.trim()) continue
+
+      const title =
+        titleCol && row[titleCol]
+          ? String(row[titleCol])
+          : `${fileName} — Row ${i + 1}`
+
+      const doc: SourceDocument = {
+        id: randomUUID(),
+        title,
+        source: "tabular",
+        content,
+        charCount: content.length,
+        metadata: {
+          _tabular: {
+            datasetId,
+            rowIndex: i,
+            columnMap: contentCols,
+          },
+          _fileName: fileName,
+        },
+        createdAt: new Date().toISOString(),
+      }
+
+      docs.push(doc)
+      added++
+    }
+
+    if (added > 0) await writeAll(docs)
+    return added
+  })
+}
+
