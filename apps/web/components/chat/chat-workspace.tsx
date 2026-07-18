@@ -13,6 +13,8 @@ import {
   MessageCircle,
   Search,
   X,
+  History,
+  Trash2,
 } from "lucide-react";
 import useSWR from "swr";
 import { MessageItem } from "@/components/chat/message-item";
@@ -20,6 +22,14 @@ import { ChatSettingsModal } from "@/components/chat/chat-settings-modal";
 import { useWorkspace } from "@/components/workspace/workspace-provider";
 import { cn } from "@/lib/utils";
 import { getProviderMeta, ProviderIcon } from "@/components/ui/provider-icon";
+import { get, set, del } from "idb-keyval";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -60,6 +70,18 @@ export function ChatWorkspace() {
   const [input, setInput] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const [currentChatId, setCurrentChatId] = useState<string>("");
+  const [history, setHistory] = useState<
+    { id: string; title: string; updatedAt: number }[]
+  >([]);
+
+  // Load history on mount
+  useEffect(() => {
+    get("chat_sessions").then((val) => {
+      if (val) setHistory(val);
+    });
+  }, []);
+
   // Update selected model when status loads
   useEffect(() => {
     if (status?.chatModelId && !selectedModel) {
@@ -99,11 +121,22 @@ export function ChatWorkspace() {
     error,
     regenerate,
   } = useChat({
+    // api: "/api/chat",
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      body: {
-        serverId,
-        chatModelId: selectedModel || undefined,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      prepareSendMessagesRequest({ messages, id, body }) {
+        return {
+          body: {
+            messages,
+            id,
+            serverId,
+            chatModelId: selectedModel || undefined,
+            ...body,
+          },
+        };
       },
     }),
   });
@@ -112,11 +145,55 @@ export function ChatWorkspace() {
   const isBusy = chatStatus === "submitted" || chatStatus === "streaming";
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
+    const el = scrollRef.current;
+    if (!el) return;
+    // Use rAF to batch the scroll with the paint, avoiding cascading state updates
+    const id = requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     });
+    return () => cancelAnimationFrame(id);
   }, [messages, chatStatus]);
+
+  // Save messages to history
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    let activeId = currentChatId;
+    if (!activeId) {
+      activeId = crypto.randomUUID();
+      setCurrentChatId(activeId);
+    }
+
+    set(`chat_messages_${activeId}`, messages);
+
+    setHistory((prev) => {
+      const existing = prev.find((p) => p.id === activeId);
+      const firstMsg = messages[0];
+      const firstMsgText =
+        (firstMsg as any)?.parts
+          ?.filter((p: any) => p.type === "text")
+          ?.map((p: any) => p.text)
+          ?.join("") ||
+        (firstMsg as any)?.content ||
+        (firstMsg as any)?.text;
+
+      const title = firstMsgText
+        ? firstMsgText.substring(0, 40)
+        : "New Chat";
+
+      let next;
+      if (existing) {
+        next = prev.map((p) =>
+          p.id === activeId ? { ...p, title, updatedAt: Date.now() } : p,
+        );
+      } else {
+        next = [{ id: activeId, title, updatedAt: Date.now() }, ...prev];
+      }
+
+      set("chat_sessions", next);
+      return next;
+    });
+  }, [messages, currentChatId]);
 
   // Group and filter models
   const groupedModels = useMemo(() => {
@@ -151,6 +228,30 @@ export function ChatWorkspace() {
   function newChat() {
     setMessages([]);
     setInput("");
+    setCurrentChatId(crypto.randomUUID());
+  }
+
+  async function loadChat(id: string) {
+    const msgs = await get(`chat_messages_${id}`);
+    if (msgs) {
+      setMessages(msgs);
+      setCurrentChatId(id);
+    }
+  }
+
+  async function deleteChat(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    await del(`chat_messages_${id}`);
+    setHistory((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      set("chat_sessions", next);
+      return next;
+    });
+    if (currentChatId === id) {
+      setMessages([]);
+      setInput("");
+      setCurrentChatId("");
+    }
   }
 
   const isEmpty = messages.length === 0;
@@ -312,6 +413,60 @@ export function ChatWorkspace() {
           )}
 
           <div className="h-4 w-px bg-border mx-1" />
+
+          <Sheet>
+            <SheetTrigger
+              render={
+                <button
+                  type="button"
+                  title="Chat History"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                >
+                  <History className="h-[16px] w-[16px]" />
+                </button>
+              }
+            />
+            <SheetContent
+              side="left"
+              className="w-[300px] sm:w-[350px] p-0 flex flex-col"
+            >
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle className="text-sm font-semibold">
+                  Chat History
+                </SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto p-2">
+                {history.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted-foreground">
+                    No chat history
+                  </div>
+                ) : (
+                  history
+                    .sort((a, b) => b.updatedAt - a.updatedAt)
+                    .map((chat) => (
+                      <div
+                        key={chat.id}
+                        onClick={() => loadChat(chat.id)}
+                        className={cn(
+                          "group flex items-center justify-between rounded-md px-3 py-2 text-sm cursor-pointer transition hover:bg-muted mb-1",
+                          currentChatId === chat.id && "bg-muted font-medium",
+                        )}
+                      >
+                        <div className="truncate pr-4 flex-1 text-xs">
+                          {chat.title}
+                        </div>
+                        <button
+                          onClick={(e) => deleteChat(chat.id, e)}
+                          className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
 
           <button
             type="button"
