@@ -13,8 +13,9 @@ import {
   CorpusDataResult,
   type CorpusDataConfig,
 } from '@/components/chat/tools/corpus-data-result';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, FileEdit, CheckCircle2 } from 'lucide-react';
 import { ChatMediaPreview, parseMediaRefs } from '@/components/chat/tools/chat-media-preview';
+import { useDocEditor } from '@/components/chat/canvas/doc-editor-provider';
 
 function FollowUpButtons({
   suggestions,
@@ -220,12 +221,16 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
           {toolName === 'executeAnalysis' && 'Running analysis...'}
           {toolName === 'getIndexedData' && 'Fetching corpus data...'}
           {toolName === 'analyzeCorpusWithCode' && 'Analyzing corpus...'}
+          {toolName === 'fillDocumentForm' && 'Filling form fields...'}
+          {toolName === 'editDocument' && 'Editing document...'}
           {![
             'queryTabularData',
             'generateVisualization',
             'executeAnalysis',
             'getIndexedData',
             'analyzeCorpusWithCode',
+            'fillDocumentForm',
+            'editDocument',
           ].includes(toolName) && 'Processing...'}
         </span>
       </div>
@@ -271,6 +276,29 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
         return <ChatSandboxResult key={index} config={corpusResult} code={corpusCode} />;
       }
 
+      case 'fillDocumentForm':
+      case 'editDocument': {
+        if (!output.success) return null;
+        return (
+          <div
+            key={index}
+            className="flex items-center gap-2 rounded-xl border border-border/60 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
+          >
+            <CheckCircle2 className="size-4" />
+            <div className="flex flex-col">
+              <span className="font-medium">
+                {toolName === 'fillDocumentForm' ? 'Form fields updated' : 'Document edited'}
+              </span>
+              <span className="text-xs opacity-80">
+                {output.updatedFields?.length || 0}{' '}
+                {output.updatedFields?.length === 1 ? 'change' : 'changes'} applied. Preview updated
+                in Canvas.
+              </span>
+            </div>
+          </div>
+        );
+      }
+
       default:
         return null;
     }
@@ -293,9 +321,41 @@ export function MessageItem({
   isStreaming?: boolean;
 }) {
   const isUser = message.role === 'user';
+  let updateFromToolResult: ((result: any) => void) | undefined;
+
+  try {
+    const editor = useDocEditor();
+    updateFromToolResult = editor.updateFromToolResult;
+  } catch {
+    // Not wrapped in DocEditorProvider in some contexts
+  }
 
   const anyMessage = message as any;
   const parts: any[] = message.parts ? [...message.parts] : [];
+
+  // Effect to apply document edits to the Canvas context
+  import('react').then(({ useEffect }) => {
+    useEffect(() => {
+      if (!updateFromToolResult || !isLast) return;
+
+      const completedDocTools = parts.filter((p: any) => {
+        const info = getToolInfo(p);
+        return (
+          info.isCompleted &&
+          info.output?.success &&
+          (info.toolName === 'fillDocumentForm' || info.toolName === 'editDocument')
+        );
+      });
+
+      if (completedDocTools.length > 0) {
+        // Find the latest output
+        const latest = getToolInfo(completedDocTools[completedDocTools.length - 1]).output;
+        if (latest && latest.fileBase64) {
+          updateFromToolResult(latest);
+        }
+      }
+    }, [parts, isLast, updateFromToolResult]);
+  });
 
   if (anyMessage.toolInvocations && Array.isArray(anyMessage.toolInvocations)) {
     anyMessage.toolInvocations.forEach((t: any) => {

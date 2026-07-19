@@ -33,6 +33,7 @@
     "@larkup/marketplace": "workspace:*",
     "@larkup/sandbox": "workspace:*",
     "@larkup/scraper": "workspace:*",
+    "@larkup/tool-doc-editor": "workspace:*",
     "@larkup/vector-stores": "workspace:*",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",

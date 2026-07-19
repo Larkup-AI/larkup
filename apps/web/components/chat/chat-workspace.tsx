@@ -36,6 +36,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { DocEditorProvider } from '@/components/chat/canvas/doc-editor-provider';
+import { DocumentCanvas } from '@/components/chat/canvas/document-canvas';
+import { FileAttachmentButton } from '@/components/chat/canvas/file-attachment-button';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -58,7 +61,19 @@ interface ChatStatus {
 }
 
 export function ChatWorkspace() {
+  return (
+    <DocEditorProvider>
+      <DocumentCanvas>
+        <ChatWorkspaceInner />
+      </DocumentCanvas>
+    </DocEditorProvider>
+  );
+}
+
+function ChatWorkspaceInner() {
   const { activeServer } = useWorkspace();
+  const { sessionId, parsedDocument } = useDocEditor();
+  const docEditorState = { sessionId, fields: parsedDocument?.fields || [] };
   const serverId = activeServer?.id ?? null;
 
   const statusKey = serverId
@@ -140,6 +155,8 @@ export function ChatWorkspace() {
             id,
             serverId,
             chatModelId: selectedModel || undefined,
+            docSessionId: docEditorState.sessionId,
+            docFields: docEditorState.fields,
             ...body,
           },
         };
@@ -604,6 +621,7 @@ export function ChatWorkspace() {
         <div className="relative z-10000 mt-auto px-4 pb-5 pt-3 sm:px-6">
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
             <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-1 focus-within:ring-ring">
+              <FileAttachmentButton />
               <textarea
                 ref={textareaRef}
                 value={input}
