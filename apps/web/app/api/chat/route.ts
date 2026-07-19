@@ -726,6 +726,38 @@ ${docFields?.map((f) => `- [${f.id}] ${f.name} (${f.type})`).join('\n') || 'None
           }
         },
       }),
+
+      requestDocumentSignature: tool({
+        description:
+          'Use this when the user asks to sign the currently active document. You should analyze the document to find the best place for a signature (e.g. searching for "Signature:" or "Sign Here"). Yield the UI for the user to confirm the placement and provide their signature.',
+        inputSchema: z.object({
+          detectedLocations: z
+            .array(
+              z.object({
+                pageIndex: z
+                  .number()
+                  .describe('The page index (0-based) where the signature belongs'),
+                context: z
+                  .string()
+                  .describe(
+                    'The text context around the signature line, e.g. "Employee Signature: ____"',
+                  ),
+              }),
+            )
+            .describe('The detected signature locations in the document.'),
+        }),
+        execute: async ({ detectedLocations }) => {
+          if (!docSessionId) return { success: false, error: 'No active document session' };
+
+          // We return the detected locations so the UI can render the configuration form.
+          return {
+            success: true,
+            action: 'request_signature',
+            sessionId: docSessionId,
+            detectedLocations,
+          };
+        },
+      }),
     },
   });
 
