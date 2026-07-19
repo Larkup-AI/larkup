@@ -22,3 +22,12 @@ npm-login.sh
 **/node_modules
 apps/desktop/src-tauri/target
 **/target
+
+# Excluded apps
+apps/larkup-proxy
+apps/desktop
+apps/e2e
+apps/cli
+apps/docs
+apps/sdk
+apps/local-chat-connection-larkup

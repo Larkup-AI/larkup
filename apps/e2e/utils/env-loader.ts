@@ -4,8 +4,8 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load .env.e2e from apps/e2e/
-config({ path: path.resolve(__dirname, "../.env.e2e") });
+// Load .env from workspace root
+config({ path: path.resolve(__dirname, "../../../.env") });
 
 /**
  * Get an environment variable with optional fallback.
