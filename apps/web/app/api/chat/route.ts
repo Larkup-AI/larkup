@@ -16,6 +16,7 @@ import {
   type CorpusFilter,
 } from '@larkup/core/corpus-retriever';
 import { SandboxManager } from '@larkup/sandbox';
+import { applyFieldEdits, applyContentEdits } from '@larkup/tool-doc-editor';
 
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -205,10 +206,14 @@ export async function POST(req: Request) {
     messages,
     serverId,
     chatModelId: requestedModelId,
+    docSessionId,
+    docFields,
   }: {
     messages: UIMessage[];
     serverId?: string;
     chatModelId?: string;
+    docSessionId?: string;
+    docFields?: { id: string; name: string; type: string }[];
   } = await req.json();
 
   const config = await readConfig();
@@ -273,7 +278,16 @@ export async function POST(req: Request) {
     /* no tabular data */
   }
 
-  const systemPrompt = (config.systemPrompt || DEFAULT_SYSTEM_PROMPT) + tabularContext;
+  let docContext = '';
+  if (docSessionId) {
+    docContext = `\n\n[Active Document Session: ${docSessionId}]\nYou are currently editing a document in the Canvas.
+The user may ask you to fill out form fields or edit content.
+Use the "fillDocumentForm" or "editDocument" tools to apply changes.
+Available Form Fields:
+${docFields?.map((f) => `- [${f.id}] ${f.name} (${f.type})`).join('\n') || 'None detected.'}`;
+  }
+
+  const systemPrompt = (config.systemPrompt || DEFAULT_SYSTEM_PROMPT) + tabularContext + docContext;
 
   const result = streamText({
     model,
@@ -612,6 +626,103 @@ export async function POST(req: Request) {
               artifacts: [],
               executionTimeMs: 0,
             };
+          }
+        },
+      }),
+
+      fillDocumentForm: tool({
+        description:
+          'Fill form fields in the currently active document. You should use the searchKnowledgeBase tool to find answers to form questions if you do not know them. The available fields are provided in your system prompt.',
+        inputSchema: z.object({
+          edits: z
+            .array(
+              z.object({
+                fieldId: z
+                  .string()
+                  .describe('The ID of the field to fill (from the active document context)'),
+                value: z.string().describe('The value to set for the field'),
+              }),
+            )
+            .describe('List of fields to fill and their new values'),
+        }),
+        execute: async ({ edits }) => {
+          if (!docSessionId) return { success: false, error: 'No active document session' };
+
+          try {
+            const fieldEdits = edits.map((edit) => ({
+              ...edit,
+              type: 'fill' as const,
+            }));
+            const result = await applyFieldEdits(docSessionId, fieldEdits);
+            if (!result.success) {
+              return { success: false, error: result.error };
+            }
+
+            return {
+              success: true,
+              action: 'fill_document',
+              sessionId: docSessionId,
+              edits,
+              updatedFields: result.updatedFields,
+              fields: result.parsed.fields,
+              pages: result.parsed.pages.map((p) => ({
+                index: p.index,
+                text: p.text.slice(0, 2000),
+                html: p.html,
+                fields: p.fields,
+                dimensions: p.dimensions,
+              })),
+              totalPages: result.parsed.totalPages,
+              fileBase64: result.fileBase64,
+            };
+          } catch (err: any) {
+            return { success: false, error: err.message };
+          }
+        },
+      }),
+
+      editDocument: tool({
+        description:
+          'Edit the content (text) of the currently active document. Use this when the user asks to modify paragraphs or slides (not form fields).',
+        inputSchema: z.object({
+          edits: z
+            .array(
+              z.object({
+                pageIndex: z.number().default(0).describe('Page or slide index (0-based)'),
+                type: z.enum(['replace_text', 'insert_text']).describe('Type of edit'),
+                search: z.string().optional().describe('Text to search for (if replacing)'),
+                text: z.string().describe('Replacement text or text to insert'),
+              }),
+            )
+            .describe('List of content edits to apply'),
+        }),
+        execute: async ({ edits }) => {
+          if (!docSessionId) return { success: false, error: 'No active document session' };
+
+          try {
+            const result = await applyContentEdits(docSessionId, edits);
+            if (!result.success) {
+              return { success: false, error: result.error };
+            }
+
+            return {
+              success: true,
+              action: 'edit_document',
+              sessionId: docSessionId,
+              edits,
+              updatedFields: result.updatedFields,
+              pages: result.parsed.pages.map((p) => ({
+                index: p.index,
+                text: p.text.slice(0, 2000),
+                html: p.html,
+                fields: p.fields,
+                dimensions: p.dimensions,
+              })),
+              totalPages: result.parsed.totalPages,
+              fileBase64: result.fileBase64,
+            };
+          } catch (err: any) {
+            return { success: false, error: err.message };
           }
         },
       }),
