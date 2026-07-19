@@ -52,4 +52,6 @@ jobs:
           chmod +x apps/desktop/src-tauri/binaries/larkup-server-x86_64-unknown-linux-gnu
 
       - name: Build
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
         run: pnpm build
