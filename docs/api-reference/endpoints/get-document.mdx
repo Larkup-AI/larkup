@@ -1,0 +1,26 @@
+---
+title: "Get Document"
+api: "GET /documents/:id"
+description: "Retrieve a specific document by its ID."
+---
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique ID of the document.
+</ParamField>
+
+### Response
+
+<ResponseField name="document" type="object">
+  The document metadata and content.
+</ResponseField>
+
+```json Example Response
+{
+  "id": "doc-123",
+  "title": "Welcome",
+  "text": "This is the content of the document...",
+  "status": "indexed"
+}
+```

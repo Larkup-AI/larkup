@@ -1,0 +1,53 @@
+---
+title: "Query Data"
+api: "POST /query"
+description: "Retrieve relevant document chunks based on a query."
+---
+
+### Body
+
+<ParamField body="query" type="string" required>
+  The question or text you want to find matches for in the vector store.
+</ParamField>
+
+<ParamField body="topK" type="number">
+  The maximum number of chunks to return. Defaults to `5`.
+</ParamField>
+
+### Response
+
+<ResponseField name="query" type="string">
+  The original query.
+</ResponseField>
+
+<ResponseField name="hits" type="array">
+  An array of retrieved chunk objects.
+  
+  <Expandable title="Hit Object">
+    <ResponseField name="id" type="string">The vector ID.</ResponseField>
+    <ResponseField name="score" type="number">Similarity score.</ResponseField>
+    <ResponseField name="text" type="string">The chunk content.</ResponseField>
+    <ResponseField name="title" type="string">The origin document title.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+```json Example Request
+{
+  "query": "How do I configure the RAG server?",
+  "topK": 3
+}
+```
+
+```json Example Response
+{
+  "query": "How do I configure the RAG server?",
+  "hits": [
+    {
+      "id": "chunk-123",
+      "score": 0.89,
+      "text": "The RAG server is configured via the .ragtoolkit workspace...",
+      "title": "Server Manual"
+    }
+  ]
+}
+```

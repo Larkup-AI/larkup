@@ -1,0 +1,39 @@
+---
+title: "Create Document"
+api: "POST /documents"
+description: "Ingest a new document into the corpus."
+---
+
+### Body
+
+<ParamField body="text" type="string" required>
+  The raw text content of the document.
+</ParamField>
+
+<ParamField body="title" type="string">
+  An optional title for the document.
+</ParamField>
+
+<ParamField body="url" type="string">
+  An optional URL specifying where the document originated.
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="string">
+  The ID of the newly created document.
+</ResponseField>
+
+```json Example Request
+{
+  "title": "Welcome",
+  "text": "Hello world. This is a test document."
+}
+```
+
+```json Example Response
+{
+  "id": "doc-456",
+  "status": "pending"
+}
+```

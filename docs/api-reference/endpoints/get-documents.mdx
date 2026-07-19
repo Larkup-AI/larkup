@@ -1,0 +1,38 @@
+---
+title: "List Documents"
+api: "GET /documents"
+description: "Retrieve a list of ingested documents in the corpus."
+---
+
+### Query Parameters
+
+<ParamField query="page" type="number">
+  The page number to retrieve. Defaults to 1.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  The number of items per page. Defaults to 20, Max 100.
+</ParamField>
+
+### Response
+
+<ResponseField name="documents" type="array">
+  Array of document metadata objects.
+</ResponseField>
+
+<ResponseField name="total" type="number">
+  Total number of documents.
+</ResponseField>
+
+```json Example Response
+{
+  "documents": [
+    {
+      "id": "doc-123",
+      "title": "Welcome",
+      "status": "indexed"
+    }
+  ],
+  "total": 1
+}
+```

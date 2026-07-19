@@ -1,0 +1,34 @@
+---
+title: "Scrape URL"
+api: "POST /scrape"
+description: "Trigger a web scraping job to ingest content from a URL."
+---
+
+### Body
+
+<ParamField body="url" type="string" required>
+  The URL to scrape.
+</ParamField>
+
+<ParamField body="provider" type="string">
+  The scraping provider. Currently supports `firecrawl`. Defaults to `firecrawl`.
+</ParamField>
+
+### Response
+
+<ResponseField name="jobId" type="string">
+  The ID of the ETL job created to process this URL.
+</ResponseField>
+
+```json Example Request
+{
+  "url": "https://example.com/docs"
+}
+```
+
+```json Example Response
+{
+  "jobId": "job-789",
+  "status": "queued"
+}
+```

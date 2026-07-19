@@ -1,0 +1,27 @@
+---
+title: "Delete Document"
+api: "DELETE /documents/{id}"
+description: "Delete an existing document from the corpus."
+---
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The ID of the document to delete.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates whether the deletion was successful.
+</ResponseField>
+
+```json Example Request
+DELETE /documents/doc-456
+```
+
+```json Example Response
+{
+  "success": true
+}
+```

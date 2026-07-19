@@ -1,0 +1,133 @@
+---
+title: "Build Your First RAG Server"
+description: "Generate, launch, and deploy a complete RAG backend."
+---
+
+The core power of Larkup is turning your raw data into a deployable, high-performance RAG API in minutes. You can build your server using either our visual Web UI or the developer-focused CLI.
+
+<Tabs>
+  <Tab title="Web UI" icon="browser">
+    <Steps>
+      <Step title="Configure Vector Store & Embedding Model">
+        Start by configuring your preferred **Vector Store** (e.g., LanceDB, Pinecone) and **Embedding Model** (e.g., OpenAI, Cohere) in the Configuration tab.
+        
+        <Frame>
+          <img src="/images/configuration-page.png" alt="Configuration Page" />
+        </Frame>
+      </Step>
+
+      <Step title="Ingest Your Documents">
+        Navigate to the **Data** tab to upload files, paste raw text, or scrape websites. These sources will queue up as ingestion jobs.
+      </Step>
+
+      <Step title="Run Indexing">
+        In the **Index** tab, click **Run Indexing Job**. This process will automatically chunk your text and generate vector embeddings to store in your chosen database.
+      </Step>
+
+      <Step title="Launch the Server">
+        Finally, go to the **Server** tab and click **Launch Server**. Larkup takes your entire configuration and generates a minimal, deployable Node.js server. 
+        
+        <Frame>
+          <img src="/images/server-scalar-api.png" alt="Server Launch Interface" />
+        </Frame>
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="CLI" icon="terminal">
+    <Steps>
+      <Step title="Initialize the Workspace">
+        Create a new workspace project:
+        ```bash
+        larkup init my-rag-server
+        ```
+      </Step>
+
+      <Step title="Configure Providers (Optional)">
+        By default, the CLI uses a local LanceDB instance. If you want to configure external stores or OpenAI embeddings, run:
+        ```bash
+        larkup config
+        ```
+      </Step>
+
+      <Step title="Add Documents">
+        Add multiple files or URLs to your workspace:
+        ```bash
+        larkup add-doc --file ./docs/manual.pdf
+        larkup add-doc --url https://example.com/docs
+        ```
+      </Step>
+
+      <Step title="Index Data">
+        Run the indexing job to chunk and embed your data:
+        ```bash
+        larkup index
+        ```
+      </Step>
+
+      <Step title="Launch the Server">
+        Spin up the backend in the foreground:
+        ```bash
+        larkup serve
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## The Generated Server
+
+When you launch your server, Larkup creates an optimized backend output directory . It contains everything you need and absolutely nothing you don't:
+
+- **Zero Bloat**: Only dependencies for your specific Vector Store are bundled.
+- **No Build Step**: Runs directly as a Node ESM backend (`node server.mjs`).
+
+## SDK Usage
+
+Because Larkup exposes an OpenAI-compatible API, you can easily connect to it using your favorite AI tools and SDKs.
+
+<Tabs>
+  <Tab title="Vercel AI SDK">
+    Use the `ai` and `@ai-sdk/openai` packages to connect to your local RAG server.
+
+    ```typescript
+    import { createOpenAI } from '@ai-sdk/openai';
+    import { generateText } from 'ai';
+
+    const larkup = createOpenAI({
+      baseURL: 'http://localhost:8080/v1',
+      apiKey: 'not-needed-for-local',
+    });
+
+    const { text } = await generateText({
+      model: larkup('rag-model'), // The model name doesn't matter for local RAG
+      prompt: 'What is Larkup?',
+    });
+
+    console.log(text);
+    ```
+  </Tab>
+  <Tab title="LangChain (Python)">
+    Use `langchain-openai` to connect via Python.
+
+    ```python
+    from langchain_openai import ChatOpenAI
+
+    llm = ChatOpenAI(
+        openai_api_base="http://localhost:8080/v1",
+        openai_api_key="not-needed-for-local",
+        model_name="rag-model"
+    )
+
+    response = llm.invoke("What is Larkup?")
+    print(response.content)
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+Your server is now live at `http://localhost:8080`. 
+
+- [**Deploy your server**](/developer/deploy) to Vercel, Docker, or a VPS.
+- [**Build a frontend chatbot**](/guide/instant-chatbot) using your new API.

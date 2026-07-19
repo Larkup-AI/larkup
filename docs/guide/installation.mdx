@@ -1,0 +1,247 @@
+---
+title: "Installation"
+description: "Get up and running with Larkup in seconds."
+---
+
+{/*
+## Desktop App <Icon icon="desktop" />
+
+The easiest way to use Larkup — download the desktop app and get started with a full graphical interface. No terminal required.
+
+<CardGroup cols={2}>
+  <Card
+    title="macOS (Apple Silicon)"
+    icon="apple"
+    href="https://larkup.de/api/download/macos-arm64"
+  >
+    **M1, M2, M3 Macs**
+
+    Download the Apple Silicon `.dmg` installer for macOS 12+.
+  </Card>
+
+  <Card
+    title="macOS (Intel)"
+    icon="apple"
+    href="https://larkup.de/api/download/macos-x64"
+  >
+    **Intel Macs**
+
+    Download the Intel `.dmg` installer for macOS 12+.
+  </Card>
+
+  <Card
+    title="Windows"
+    icon="windows"
+    href="https://larkup.de/api/download/windows-x64"
+  >
+    **64-bit (x64)**
+
+    Download the `.exe` installer for Windows 10+.
+  </Card>
+
+  <Card
+    title="Linux"
+    icon="linux"
+    href="https://larkup.de/api/download/linux-x64"
+  >
+    **AppImage / .deb**
+
+    Download for Ubuntu, Debian, Fedora & more.
+  </Card>
+</CardGroup>
+
+<Tip>
+  All desktop downloads are available on the [Download Page](https://larkup.de/download) with architecture-specific options.
+</Tip>
+*/}
+
+## CLI Install <Icon icon="terminal" />
+
+Prefer the command line? Install the Larkup CLI in one command:
+
+<Tabs>
+  <Tab title="macOS / Linux" icon="terminal">
+    ```bash
+    curl -fsSL https://larkup.de/install.sh | bash
+    ```
+
+    Then start Larkup:
+
+    ```bash
+    larkup dev
+    ```
+  </Tab>
+  <Tab title="Windows" icon="windows">
+    ```powershell
+    iwr -useb https://larkup.de/install.ps1 | iex
+    ```
+
+    Then start Larkup in your terminal:
+
+    ```powershell
+    larkup dev
+    ```
+  </Tab>
+</Tabs>
+
+The script handles dependencies like Node.js, configures your PATH, and sets the correct permissions. Just paste and go.
+
+<Note>
+  You may need to restart your terminal after installation for the `larkup` command to be available.
+</Note>
+
+## Verify It Worked
+
+```bash
+larkup --version
+```
+
+If you see a version number, you're good. Head to the [Quickstart](/guide/quickstart) to build your first pipeline.
+
+---
+
+## Other Ways to Install
+
+<Tabs>
+  <Tab title="Docker" icon="docker">
+    To allow the app to dynamically launch multiple RAG servers, we map a range of ports (e.g., 8080-8090) in addition to the main port:
+
+    ```bash
+    docker run --platform linux/amd64 -d -p 4567:4567 -p 8080-8090:8080-8090 aboneda/larkup:latest
+    ```
+
+    Then open `http://localhost:4567`.
+  </Tab>
+  <Tab title="npm" icon="npm">
+    If you already have Node.js installed:
+
+    ```bash
+    npm install -g @larkup/cli
+    ```
+
+    Then start Larkup:
+
+    ```bash
+    larkup dev
+    ```
+  </Tab>
+  <Tab title="From source" icon="github">
+    ```bash
+    git clone https://github.com/Larkup-AI/larkup
+    cd larkup
+    ./start.sh
+    ```
+
+    Builds and starts the app at `http://localhost:4567`.
+  </Tab>
+</Tabs>
+
+## Self-contained Install
+
+If you prefer an installation that requires no root access and doesn't modify system files, use the self-contained script. This will install its own Node.js and keep everything isolated under `~/.larkup`.
+
+```bash
+curl -fsSL https://larkup.de/install-local.sh | bash
+```
+
+To uninstall, simply delete the folder:
+
+```bash
+rm -rf ~/.larkup
+```
+
+## Custom Install 
+
+You can customize the main installation scripts using the following flags:
+
+<Tabs>
+  <Tab title="macOS / Linux" icon="terminal">
+    Pass flags after `bash -s --`:
+
+    ```bash
+    # Install a specific version
+    curl -fsSL https://larkup.de/install.sh | bash -s -- --version 1.2.0
+
+    # Skip prompts (CI-friendly)
+    curl -fsSL https://larkup.de/install.sh | bash -s -- --no-prompt
+
+    # Preview without making changes
+    curl -fsSL https://larkup.de/install.sh | bash -s -- --dry-run
+    ```
+  </Tab>
+  <Tab title="Windows" icon="windows">
+    Run the script file directly with flags:
+
+    ```powershell
+    # Install a specific version
+    .\install.ps1 -Version 1.2.0
+
+    # Skip prompts (CI-friendly)
+    .\install.ps1 -NoPrompt
+
+    # Preview without making changes
+    .\install.ps1 -DryRun
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Keeping Up to Date
+
+Larkup will notify you in the web UI when a new version is available — look for the update banner at the top of the page.
+
+<Tabs>
+  <Tab title="Desktop" icon="desktop">
+    The desktop app checks for updates automatically on startup. When a new version is available, you'll see an **"Update Now"** button that downloads and installs the update seamlessly — no manual re-download needed.
+  </Tab>
+  <Tab title="Docker" icon="docker">
+    Update to the latest version with a single command:
+
+    ```bash
+    docker pull aboneda/larkup:latest && docker compose up -d
+    ```
+
+    For **automatic updates**, add [Watchtower](https://containrrr.dev/watchtower/) to your `docker-compose.yml`:
+
+    ```yaml
+    services:
+      larkup:
+        image: aboneda/larkup:latest
+        ports:
+          - "4567:4567"
+          - "8080-8090:8080-8090"
+
+      watchtower:
+        image: containrrr/watchtower
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+        command: --interval 86400 larkup
+    ```
+
+    Watchtower checks for new images daily and updates automatically.
+  </Tab>
+  <Tab title="npm / CLI" icon="npm">
+    Update the CLI to the latest version:
+
+    ```bash
+    npm install -g @larkup/cli
+    ```
+
+    Or if you used the install script:
+
+    ```bash
+    curl -fsSL https://larkup.de/install.sh | bash
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## System Requirements
+
+| Requirement | Details |
+| --- | --- |
+| **Node.js** | v20+ (auto-installed if missing) |
+| **OS** | macOS, Linux, WSL, or Windows |
+| **Architecture** | x64 or ARM64 |

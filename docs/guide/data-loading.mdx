@@ -1,0 +1,71 @@
+---
+title: "Web Crawling & Data Loading"
+description: "Scrape websites, upload files, and build your knowledge corpus"
+---
+
+Larkup gives you a complete data pipeline out of the box. Crawl entire domains, upload local documents, or paste raw text then track every ingestion job in real time. Everything runs through a single **Data** tab with three views: **Add Data**, **Corpus**, and **ETL Jobs**.
+
+## Adding Data
+
+The **Add Data** tab is your starting point for loading content into the pipeline. You can choose from three ingestion modes:
+
+- **Web Scrape**: Crawl websites by keyword search or direct URL. Powered by Firecrawl, with support for self-hosted and cloud modes.
+- **Paste Text**: Drop in raw text or a single URL for quick ingestion.
+- **Upload Files**: Drag-and-drop files directly. Supported formats include PDF, Word (`.docx`), Markdown, CSV, JSON, Excel, and plain text.
+
+<Frame caption="Launch a self-hosted Firecrawl crawler in Docker">
+  <img src="/images/data/launch-firecrwal-server.png" alt="Launch web crawler" />
+</Frame>
+
+<Frame caption="Upload files by dragging them into the UI, PDF, Word, JSON, and more">
+  <img src="/images/data/upload-files.png" alt="File upload interface" />
+</Frame>
+
+## Your Corpus
+
+Once data is ingested, every document lands in the **Corpus**,  your central knowledge base. The corpus view shows all loaded documents with their source type (scraped, pasted, uploaded), character count, and actions to edit or delete.
+
+<Frame caption="The Corpus table, browse, edit, or remove any document in your knowledge base">
+  <img src="/images/data/corpus-table.png" alt="Corpus table view" />
+</Frame>
+
+## Tracking ETL Jobs
+
+Large scraping and upload operations run as background **ETL Jobs**. The ETL Jobs tab gives you real-time visibility into every job, including target count, pages processed, and completion status.
+
+<Frame caption="Monitor all ingestion jobs, see page counts, status, and completion in real time">
+  <img src="/images/data/etl-jobs.png" alt="ETL Jobs table" />
+</Frame>
+
+## Scraping Configuration
+
+Larkup supports both **self-hosted** and **cloud-hosted** scraping. You can configure everything from the **Global Settings** panel, no `.env` editing required.
+
+### Self-Hosted Firecrawl
+
+Click **Launch Web Crawler** in the Add Data tab to spin up a local Firecrawl instance inside Docker. A bearer token is auto-generated, you can start scraping immediately with zero signup.
+
+### Cloud API Keys
+
+If you prefer the hosted Firecrawl or Serper.dev services, enter your API keys in Global Settings:
+
+- **Firecrawl API Key (Cloud)**: for cloud-based web crawling
+- **Serper.dev API Key**: for programmatic Google search ingestion
+
+<Frame caption="Global Settings, configure Firecrawl cloud API key and Serper.dev key">
+  <img src="/images/data/set-firecrawl-serper-cloud-apikey.png" alt="API key settings" />
+</Frame>
+
+### Proxy Settings
+
+For organizations that route traffic through a proxy (e.g., for rate-limit bypass or secure scraping), the settings panel exposes proxy configuration fields:
+
+- **Proxy Server**: e.g. `http://proxy.example.com:8080`
+- **Proxy Username**
+- **Proxy Password**
+
+<Frame caption="Proxy settings for secure or rate-limited scraping environments">
+  <img src="/images/data/set-firecrawl-cloud.png" alt="Proxy settings in Global Settings" />
+</Frame>
+
+Larkup automatically routes all outgoing scraping requests through your configured proxy.

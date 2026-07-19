@@ -1,0 +1,113 @@
+---
+title: "LangChain"
+description: "Integrate Larkup with LangChain in Python and TypeScript."
+---
+
+Larkup provides seamless integrations with LangChain for both Python and TypeScript/JavaScript.
+
+<Tabs>
+  <Tab title="Python">
+    ### Custom Retriever
+    
+    You can wrap the Larkup Python SDK into a custom retriever, allowing you to use it directly in your LangChain chains and agents.
+
+    ```python
+    from typing import List
+    from langchain_core.retrievers import BaseRetriever
+    from langchain_core.documents import Document
+    from pydantic import Field
+    from larkup import LarkupClient, LarkupClientOptions
+
+    class LarkupRetriever(BaseRetriever):
+        client: LarkupClient = Field(
+            default_factory=lambda: LarkupClient(
+                LarkupClientOptions(base_url="http://localhost:8080", api_key="key")
+            )
+        )
+        
+        def _get_relevant_documents(self, query: str, *, run_manager=None) -> List[Document]:
+            results = self.client.query(query, top_k=5)
+            
+            # Convert hits to LangChain Documents
+            return [
+                Document(page_content=hit.text, metadata={"score": hit.score}) 
+                for hit in results.hits
+            ]
+
+    # Usage:
+    # retriever = LarkupRetriever()
+    # docs = retriever.invoke("What is Larkup?")
+    ```
+
+    ### OpenAI Compatible API
+
+    If you are running the generated RAG server, you can connect directly using LangChain's OpenAI integration:
+
+    ```python
+    from langchain_openai import ChatOpenAI
+
+    llm = ChatOpenAI(
+        openai_api_base="http://localhost:8080/v1",
+        openai_api_key="not-needed-for-local",
+        model_name="rag-model"
+    )
+
+    response = llm.invoke("What is Larkup?")
+    print(response.content)
+    ```
+  </Tab>
+
+  <Tab title="TypeScript">
+    ### Custom Retriever
+    
+    You can wrap the Larkup TypeScript SDK into a custom retriever for LangChain.js to use within your chains or agents.
+
+    ```typescript
+    import { BaseRetriever } from "@langchain/core/retrievers";
+    import { Document } from "@langchain/core/documents";
+    import { LarkupClient } from "@larkup/sdk";
+
+    export class LarkupRetriever extends BaseRetriever {
+      lc_namespace = ["langchain", "retrievers"];
+      client: LarkupClient;
+
+      constructor() {
+        super();
+        this.client = new LarkupClient();
+      }
+
+      async _getRelevantDocuments(query: string): Promise<Document[]> {
+        const results = await this.client.query(query, 5);
+        
+        // Convert hits to LangChain Documents
+        return results.hits.map(
+          (hit) => new Document({ pageContent: hit.text, metadata: { score: hit.score } })
+        );
+      }
+    }
+
+    // Usage:
+    // const retriever = new LarkupRetriever();
+    // const docs = await retriever.invoke("What is Larkup?");
+    ```
+
+    ### OpenAI Compatible API
+
+    If you are running the generated RAG server, you can connect directly using LangChain.js's OpenAI integration:
+
+    ```typescript
+    import { ChatOpenAI } from "@langchain/openai";
+
+    const llm = new ChatOpenAI({
+      configuration: {
+        baseURL: "http://localhost:8080/v1",
+      },
+      openAIApiKey: "not-needed-for-local",
+      modelName: "rag-model"
+    });
+
+    const response = await llm.invoke("What is Larkup?");
+    console.log(response.content);
+    ```
+  </Tab>
+</Tabs>

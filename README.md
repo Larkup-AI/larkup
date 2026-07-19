@@ -13,6 +13,7 @@
 
 ## ⚡ Installation
 
+<!--
 ### Quick Install (macOS / Linux / WSL)
 
 Pick the method that fits your setup:
@@ -96,6 +97,7 @@ Or with options:
 ```powershell
 powershell -c "& ([scriptblock]::Create((irm https://larkup.de/install.ps1))) -Version 1.2.0 -DryRun"
 ```
+-->
 
 ### Docker
 
@@ -140,37 +142,37 @@ Once running, open **http://localhost:4567** and follow these steps:
 
 Pick your vector store (LanceDB, Pinecone, Chroma…) and embedding provider (OpenAI, Cohere…) — all from the UI.
 
-<img src="./.github/assets/01-configure.png" alt="Configuration page — select vector store and embedding provider" width="800" />
+<img src="./assets/01-configure.png" alt="Configuration page — select vector store and embedding provider" width="800" />
 
 ### 2. Ingest your data
 
 Upload files (PDF, TXT, DOCX), paste raw text, or scrape URLs directly from the Data tab.
 
-<img src="./.github/assets/02-ingest.png" alt="Data page — upload files or scrape URLs" width="800" />
+<img src="./assets/02-ingest.png" alt="Data page — upload files or scrape URLs" width="800" />
 
 ### 3. Run the ETL pipeline
 
 Kick off indexing to automatically chunk, embed, and store your documents into the vector database.
 
-<img src="./.github/assets/03-index.png" alt="Index page — run ETL jobs to process documents" width="800" />
+<img src="./assets/03-index.png" alt="Index page — run ETL jobs to process documents" width="800" />
 
 ### 4. Launch your custom AI server
 
 Your server is ready — get a live API endpoint with built-in Scalar API docs.
 
-<img src="./.github/assets/04-server.png" alt="Server page — live AI server API endpoint" width="800" />
+<img src="./assets/04-server.png" alt="Server page — live AI server API endpoint" width="800" />
 
 ### 5. Test with the built-in Chat Demo
 
 Verify retrieval quality before connecting external agents.
 
-<img src="./.github/assets/06-demo.png" alt="Demo page — chat with your custom AI pipeline" width="800" />
+<img src="./assets/06-demo.png" alt="Demo page — chat with your custom AI pipeline" width="800" />
 
 ### 6. Deploy to production
 
 Ship to Vercel, Hetzner/VPS via SSH, or any Docker-compatible cloud — one click from the UI.
 
-<img src="./.github/assets/05-deploy.png" alt="Deploy to Vercel modal" width="800" />
+<img src="./assets/05-deploy.png" alt="Deploy to Vercel modal" width="800" />
 
 ---
 
