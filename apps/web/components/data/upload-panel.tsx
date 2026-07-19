@@ -392,77 +392,79 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
           {staged.map((f) => (
             <li
               key={f.id}
-              className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm"
+              className="flex flex-col gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm"
             >
-              <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                <span className="truncate font-mono text-xs">{f.name}</span>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  {f.format === "structured"
-                    ? "STRUCTURED"
-                    : f.format === "lines"
-                      ? "SPLIT BY LINE"
-                      : "PLAIN TEXT"}
-                  {f.format === "structured" && ` • ${f.rows?.length} ROWS`}
-                  {f.indexAsTabular && " • TABULAR"}
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                  <span className="truncate font-mono text-xs">{f.name}</span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    {f.format === "structured"
+                      ? "STRUCTURED"
+                      : f.format === "lines"
+                        ? "SPLIT BY LINE"
+                        : "PLAIN TEXT"}
+                    {f.format === "structured" && ` • ${f.rows?.length} ROWS`}
+                    {f.indexAsTabular && " • TABULAR"}
+                  </span>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {(f.size / 1024).toFixed(1)} KB
                 </span>
-              </div>
-              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {(f.size / 1024).toFixed(1)} KB
-              </span>
 
-              <div className="flex items-center gap-1 shrink-0">
-                {/* Tabular indexing toggle for structured files */}
-                {f.format === "structured" && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Tabular indexing toggle for structured files */}
+                  {f.format === "structured" && (
+                    <button
+                      type="button"
+                      aria-label="Toggle tabular indexing"
+                      title={
+                        f.indexAsTabular
+                          ? "Tabular indexing ON"
+                          : "Enable tabular indexing for data analysis"
+                      }
+                      onClick={() =>
+                        setStaged((p) =>
+                          p.map((item) =>
+                            item.id === f.id
+                              ? { ...item, indexAsTabular: !item.indexAsTabular }
+                              : item,
+                          ),
+                        )
+                      }
+                      className={cn(
+                        "p-1.5 border rounded-md transition-colors cursor-pointer",
+                        f.indexAsTabular
+                          ? "bg-primary/10 border-primary/30 text-primary"
+                          : "bg-secondary text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                      )}
+                    >
+                      <Database className="size-3.5" />
+                    </button>
+                  )}
                   <button
                     type="button"
-                    aria-label="Toggle tabular indexing"
-                    title={
-                      f.indexAsTabular
-                        ? "Tabular indexing ON"
-                        : "Enable tabular indexing for data analysis"
-                    }
-                    onClick={() =>
-                      setStaged((p) =>
-                        p.map((item) =>
-                          item.id === f.id
-                            ? { ...item, indexAsTabular: !item.indexAsTabular }
-                            : item,
-                        ),
-                      )
-                    }
-                    className={cn(
-                      "p-1.5 border rounded-md transition-colors cursor-pointer",
-                      f.indexAsTabular
-                        ? "bg-primary/10 border-primary/30 text-primary"
-                        : "bg-secondary text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                    )}
+                    aria-label={`Configure ${f.name}`}
+                    onClick={() => setEditingFileId(f.id)}
+                    className="p-1.5 bg-secondary cursor-pointer border text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-md transition-colors"
                   >
-                    <Database className="size-3.5" />
+                    <Settings2 className="size-3.5" />
                   </button>
-                )}
-                <button
-                  type="button"
-                  aria-label={`Configure ${f.name}`}
-                  onClick={() => setEditingFileId(f.id)}
-                  className="p-1.5 bg-secondary cursor-pointer border text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-md transition-colors"
-                >
-                  <Settings2 className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Remove ${f.name}`}
-                  onClick={() =>
-                    setStaged((p) => p.filter((item) => item.id !== f.id))
-                  }
-                  className="p-1.5 border bg-muted hover:bg-muted/50 cursor-pointer text-muted-foreground hover:text-foreground rounded-md transition-colors"
-                >
-                  <X className="size-3.5 text-red-500" />
-                </button>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${f.name}`}
+                    onClick={() =>
+                      setStaged((p) => p.filter((item) => item.id !== f.id))
+                    }
+                    className="p-1.5 border bg-muted hover:bg-muted/50 cursor-pointer text-muted-foreground hover:text-foreground rounded-md transition-colors"
+                  >
+                    <X className="size-3.5 text-red-500" />
+                  </button>
+                </div>
               </div>
 
               {/* Tabular preview for structured files with tabular indexing */}
               {f.format === "structured" && f.indexAsTabular && f.rows && (
-                <div className="col-span-full mt-2 w-full">
+                <div className="min-w-0 w-full mt-1">
                   <TabularPreview rows={f.rows} maxPreviewRows={5} />
                 </div>
               )}

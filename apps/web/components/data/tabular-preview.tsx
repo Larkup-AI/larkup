@@ -76,12 +76,14 @@ interface TabularPreviewProps {
   rows: Record<string, any>[];
   columns?: ColumnMeta[];
   maxPreviewRows?: number;
+  maxPreviewColumns?: number;
 }
 
 export function TabularPreview({
   rows,
   columns: providedColumns,
   maxPreviewRows = 8,
+  maxPreviewColumns = 10,
 }: TabularPreviewProps) {
   // Auto-detect columns if not provided
   const columnNames = useMemo(() => {
@@ -113,6 +115,9 @@ export function TabularPreview({
   }, [columnMeta]);
 
   const previewRows = rows.slice(0, maxPreviewRows);
+  const previewColumnNames = columnNames.slice(0, maxPreviewColumns);
+  const previewColumnMeta = columnMeta.slice(0, maxPreviewColumns);
+  const hasMoreColumns = columnNames.length > maxPreviewColumns;
 
   if (rows.length === 0 || columnNames.length === 0) {
     return (
@@ -126,7 +131,7 @@ export function TabularPreview({
     <div className="space-y-3">
       {/* Column type badges */}
       <div className="flex flex-wrap gap-1.5">
-        {columnMeta.map((col) => (
+        {previewColumnMeta.map((col) => (
           <div
             key={col.name}
             className="flex items-center gap-1 rounded-md border border-border/40 bg-card px-2 py-1 text-xs"
@@ -135,6 +140,13 @@ export function TabularPreview({
             <TypeBadge type={col.type} />
           </div>
         ))}
+        {hasMoreColumns && (
+          <div className="flex items-center gap-1 rounded-md border border-border/40 bg-card px-2 py-1 text-xs">
+            <span className="font-medium text-muted-foreground">
+              ... (+ {columnNames.length - maxPreviewColumns} more)
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Summary stats for numeric columns */}
@@ -166,7 +178,7 @@ export function TabularPreview({
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-border/40 bg-secondary/30">
-                {columnNames.map((col) => (
+                {previewColumnNames.map((col) => (
                   <th
                     key={col}
                     className="whitespace-nowrap px-2.5 py-2 font-medium text-muted-foreground"
@@ -174,12 +186,17 @@ export function TabularPreview({
                     {col}
                   </th>
                 ))}
+                {hasMoreColumns && (
+                  <th className="whitespace-nowrap px-2.5 py-2 font-medium text-muted-foreground">
+                    ...
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {previewRows.map((row, i) => (
                 <tr key={i} className="border-b border-border/20 last:border-0">
-                  {columnNames.map((col) => (
+                  {previewColumnNames.map((col) => (
                     <td
                       key={col}
                       className="max-w-[150px] truncate whitespace-nowrap px-2.5 py-1.5 tabular-nums text-foreground"
@@ -190,6 +207,11 @@ export function TabularPreview({
                         : String(row[col])}
                     </td>
                   ))}
+                  {hasMoreColumns && (
+                    <td className="px-2.5 py-1.5 text-muted-foreground">
+                      ...
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
