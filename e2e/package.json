@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "playwright test",
+    "test": "echo 'Skipping E2E in turbo test. Run test:e2e explicitly.'",
+    "test:e2e": "playwright test",
     "test:web": "playwright test tests/web-ui/",
     "test:api": "playwright test tests/api/",
     "test:sdk": "playwright test tests/sdk/",

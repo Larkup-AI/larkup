@@ -40,7 +40,7 @@ jobs:
         pnpm --filter "./apps/web" start &
         pnpm dlx wait-on http://localhost:4567 -t 60000
         cd e2e
-        pnpm test
+        pnpm test:e2e
       env:
         CI: true
 
