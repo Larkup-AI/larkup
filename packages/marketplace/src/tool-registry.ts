@@ -87,6 +87,32 @@ export const TOOL_REGISTRY: Record<string, ToolDescriptor> = {
     updatedAt: '2026-07-19',
     comingSoon: true,
   },
+
+  'doc-editor': {
+    id: 'doc-editor',
+    name: 'Document Editor',
+    description: 'AI-powered form filling and document editing with Canvas-style live preview.',
+    longDescription:
+      'Open PDF, Word, PowerPoint, and text files in a split-view Canvas. ' +
+      'AI fills forms using your knowledge base, edits content on request, and previews changes live. ' +
+      'Supports PDF form fields (AcroForm), DOCX paragraphs/tables, PPTX slide text, and plain text editing. ' +
+      'Uses pdf-lib (native) for PDF and the Docker sandbox for DOCX/PPTX via python-docx/python-pptx.',
+    category: 'utility',
+    version: '0.1.0',
+    pricing: 'free',
+    emoji: '📝',
+    icon: 'FileEdit',
+    packageName: '@larkup/tool-doc-editor',
+    installSize: '~5 MB',
+    systemDeps: ['docker'],
+    author: 'Larkup',
+    capabilities: ['document-editing', 'form-filling', 'document-preview'],
+    tags: ['pdf', 'docx', 'pptx', 'form', 'canvas', 'editor', 'fill'],
+    downloads: 0,
+    repositoryUrl: 'https://github.com/Larkup-AI/larkup-rag',
+    license: 'Apache-2.0',
+    updatedAt: '2026-07-19',
+  },
 };
 
 /** All tools as a flat list, sorted by name. */
