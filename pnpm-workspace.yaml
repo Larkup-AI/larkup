@@ -1,4 +1,8 @@
 packages:
-  - "apps/*"
-  - "apps/sdk/*"
-  - "packages/*"
+  - apps/*
+  - apps/sdk/*
+  - packages/*
+  - packages/tools/*
+  - e2e
+ignoredBuiltDependencies:
+  - '@ffmpeg-installer/darwin-arm64'

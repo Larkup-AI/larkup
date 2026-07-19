@@ -1,35 +1,60 @@
-node_modules
-**/.next
+# Git & Docker
 .git
-.turbo
-*.md
+.gitignore
 .dockerignore
 Dockerfile
-docker-compose.yml
+docker-compose*.yml
+docker/
+
+# Environment & IDE
 .env*
 !.env.example
+**/.DS_Store
+**/.viminfo
+.vscode
+.cursor
+.claude
+.opencode
+.agents
+
+# Dependencies & Build output
+**/node_modules
+**/.next
+**/target
+.turbo
+.venv
+.vercel
 **/.larkup
 **/gen
 **/lancedb
+
+# Misc
+*.md
+**/*.md
 **/proxies.txt
-**/.viminfo
-.viminfo
-**/.DS_Store
-.DS_Store
 hpi-connect.txt
 apps/web/webui.log
 npm-login.sh
-**/node_modules
-apps/desktop/src-tauri/target
-**/target
+playwright-report
 
-# Excluded apps
+# Root directories not needed in Docker
+archive
+assets
+demo-repos
+docs
+dummy
+e2e/*
+!e2e/package.json
+scripts
+.github
+.husky
+.changeset
+
+# Excluded apps (keep package.json for workspace resolution)
 apps/larkup-proxy/*
 !apps/larkup-proxy/package.json
 apps/desktop/*
 !apps/desktop/package.json
-apps/e2e/*
-!apps/e2e/package.json
 apps/cli/*
 !apps/cli/package.json
 apps/docs/*

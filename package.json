@@ -9,15 +9,26 @@
     "lint": "turbo lint",
     "test": "turbo test",
     "rag": "pnpm --filter @larkup/cli rag",
-    "test:publish": "pnpm build && pnpm publish -r --dry-run --no-git-checks"
+    "test:publish": "pnpm build && pnpm publish -r --dry-run --no-git-checks",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.1",
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
     "@turbo/gen": "^2.9.16",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.1.0",
     "turbo": "^2.5.0"
   },
   "packageManager": "pnpm@10.11.0",
   "dependencies": {
     "@vercel/sdk": "^1.21.9",
     "uploadthing": "^7.7.4"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --write --ignore-unknown"
+    ]
   }
 }
