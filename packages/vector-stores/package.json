@@ -14,14 +14,14 @@
     "./chroma": "./src/adapters/chroma.ts"
   },
   "dependencies": {
-    "@lancedb/lancedb": "^0.30.0",
-    "@pinecone-database/pinecone": "^7.2.0"
+    "@lancedb/lancedb": "^0.31.0",
+    "@pinecone-database/pinecone": "^8.0.0"
   },
   "peerDependencies": {
     "@larkup/core": "workspace:*"
   },
   "devDependencies": {
-    "chromadb": "^1.10.5",
-    "typescript": "5.7.3"
+    "chromadb": "^3.5.0",
+    "typescript": "7.0.2"
   }
 }

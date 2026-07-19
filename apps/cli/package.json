@@ -17,28 +17,28 @@
     "larkup": "tsx src/index.ts"
   },
   "dependencies": {
-    "@ai-sdk/cohere": "^3.0.39",
-    "@ai-sdk/deepseek": "^2.0.39",
-    "@ai-sdk/gateway": "^3.0.133",
-    "@ai-sdk/google": "^3.0.83",
-    "@ai-sdk/mistral": "^3.0.40",
-    "@ai-sdk/openai": "^3.0.68",
-    "@ai-sdk/openai-compatible": "^2.0.51",
-    "@clack/prompts": "^0.10.1",
-    "@lancedb/lancedb": "^0.30.0",
+    "@ai-sdk/cohere": "^4.0.11",
+    "@ai-sdk/deepseek": "^3.0.12",
+    "@ai-sdk/gateway": "^4.0.23",
+    "@ai-sdk/google": "^4.0.18",
+    "@ai-sdk/mistral": "^4.0.13",
+    "@ai-sdk/openai": "^4.0.16",
+    "@ai-sdk/openai-compatible": "^3.0.12",
+    "@clack/prompts": "^1.7.0",
+    "@lancedb/lancedb": "^0.31.0",
     "@larkup/core": "workspace:*",
     "@larkup/vector-stores": "workspace:*",
-    "@pinecone-database/pinecone": "^7.2.0",
-    "ai": "^6.0.197",
+    "@pinecone-database/pinecone": "^8.0.0",
+    "ai": "^7.0.31",
     "chalk": "^5.6.2",
-    "chromadb": "^1.10.5",
+    "chromadb": "^3.5.0",
     "cli-table3": "^0.6.5",
-    "commander": "^13.1.0",
+    "commander": "^15.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
     "tsx": "^4.22.4",
-    "typescript": "5.7.3"
+    "typescript": "7.0.2"
   }
 }

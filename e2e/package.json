@@ -16,7 +16,7 @@
   "devDependencies": {
     "@larkup/sdk": "workspace:*",
     "@playwright/test": "^1.61.1",
-    "dotenv": "^16.6.0",
-    "typescript": "5.7.3"
+    "dotenv": "^17.4.2",
+    "typescript": "7.0.2"
   }
 }
