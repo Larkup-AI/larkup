@@ -13,7 +13,6 @@ COPY apps/cli/package.json ./apps/cli/
 COPY apps/desktop/package.json ./apps/desktop/
 COPY apps/e2e/package.json ./apps/e2e/
 COPY apps/larkup-proxy/package.json ./apps/larkup-proxy/
-COPY apps/local-chat-connection-larkup/package.json ./apps/local-chat-connection-larkup/
 COPY apps/web/package.json ./apps/web/
 COPY packages/core/package.json ./packages/core/
 COPY packages/ee/package.json ./packages/ee/
