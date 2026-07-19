@@ -45,7 +45,7 @@
     "framer-motion": "^12.40.0",
     "idb-keyval": "^6.3.0",
     "jszip": "^3.10.1",
-    "lucide-react": "^1.16.0",
+    "lucide-react": "^1.25.0",
     "mammoth": "^1.12.0",
     "next": "16.2.6",
     "next-themes": "^0.4.6",
