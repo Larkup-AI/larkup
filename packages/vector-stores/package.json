@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.30.0",
-    "@pinecone-database/pinecone": "^7.2.0"
+    "@pinecone-database/pinecone": "^8.0.0"
   },
   "peerDependencies": {
     "@larkup/core": "workspace:*"

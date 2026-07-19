@@ -28,7 +28,7 @@
     "@lancedb/lancedb": "^0.30.0",
     "@larkup/core": "workspace:*",
     "@larkup/vector-stores": "workspace:*",
-    "@pinecone-database/pinecone": "^7.2.0",
+    "@pinecone-database/pinecone": "^8.0.0",
     "ai": "^6.0.197",
     "chalk": "^5.6.2",
     "chromadb": "^1.10.5",
