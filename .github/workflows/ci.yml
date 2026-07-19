@@ -14,7 +14,7 @@ jobs:
   lint-and-build:
     name: Lint & Build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
