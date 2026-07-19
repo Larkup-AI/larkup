@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Settings Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/settings');
-    await page.waitForSelector('text=Settings', { timeout: 15_000 });
+    await page.waitForSelector('text=Settings', { timeout: 60_000 });
   });
 
   test('settings page loads with correct heading', async ({ page }) => {

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Marketplace', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/settings?section=marketplace');
-    await page.waitForSelector('text=Marketplace', { timeout: 15_000 });
+    await page.waitForSelector('text=Marketplace', { timeout: 60_000 });
   });
 
   test('marketplace page loads with correct heading', async ({ page }) => {

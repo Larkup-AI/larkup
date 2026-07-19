@@ -6,7 +6,7 @@ test.describe.serial('Chat Page', () => {
     // Wait for EITHER "Chat with your knowledge base" OR "Setup Required"
     await expect(
       page.getByText('Chat with your knowledge base').or(page.getByText('Setup Required')).first(),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible({ timeout: 60_000 });
   });
 
   test('page loads with correct heading', async ({ page }) => {

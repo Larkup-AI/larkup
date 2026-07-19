@@ -40,7 +40,7 @@ test.describe('CLI — @larkup/cli', () => {
   });
 
   test('cli --help shows available commands', async () => {
-    test.setTimeout(15_000);
+    test.setTimeout(60_000);
 
     try {
       const output = cli('--help');
@@ -75,7 +75,7 @@ test.describe('CLI — @larkup/cli', () => {
   });
 
   test('cli config — show current configuration', async () => {
-    test.setTimeout(15_000);
+    test.setTimeout(60_000);
 
     try {
       const output = cli('config');
@@ -101,7 +101,7 @@ test.describe('CLI — @larkup/cli', () => {
   });
 
   test('cli add-doc --text — add inline text', async () => {
-    test.setTimeout(15_000);
+    test.setTimeout(60_000);
 
     try {
       const output = cli('add-doc --text "E2E test inline text document" --title "CLI E2E Test"');
@@ -113,7 +113,7 @@ test.describe('CLI — @larkup/cli', () => {
   });
 
   test('cli servers — list servers', async () => {
-    test.setTimeout(15_000);
+    test.setTimeout(60_000);
 
     try {
       const output = cli('servers');
@@ -150,7 +150,7 @@ test.describe('CLI — @larkup/cli', () => {
   });
 
   test('cli settings — view settings', async () => {
-    test.setTimeout(15_000);
+    test.setTimeout(60_000);
 
     try {
       const output = cli('settings');

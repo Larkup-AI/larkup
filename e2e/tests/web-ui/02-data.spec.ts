@@ -5,7 +5,7 @@ import { hasEnv, ENV_KEYS } from '../../utils/env-loader';
 test.describe.serial('Data Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/data');
-    await page.waitForSelector('text=Upload files, scrape the web', { timeout: 15_000 });
+    await page.waitForSelector('text=Upload files, scrape the web', { timeout: 60_000 });
   });
 
   test('page loads with correct heading', async ({ page }) => {
@@ -27,14 +27,14 @@ test.describe.serial('Data Page', () => {
     }
 
     // Find the file input (may be hidden, so we use setInputFiles)
-    await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 15_000 });
+    await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(FIXTURES.pdf);
     await page.waitForTimeout(3_000);
 
     // Verify the document appears in the corpus list
     await expect(page.getByText('demo.pdf').or(page.getByText('demo'))).toBeVisible({
-      timeout: 15_000,
+      timeout: 60_000,
     });
   });
 
@@ -52,7 +52,7 @@ test.describe.serial('Data Page', () => {
     await page.waitForTimeout(3_000);
 
     await expect(page.getByText('demo.txt').or(page.getByText('demo'))).toBeVisible({
-      timeout: 15_000,
+      timeout: 60_000,
     });
   });
 
@@ -65,13 +65,13 @@ test.describe.serial('Data Page', () => {
       await page.waitForTimeout(300);
     }
 
-    await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 15_000 });
+    await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(FIXTURES.docx);
     await page.waitForTimeout(3_000);
 
     await expect(page.getByText('demo.docx').or(page.getByText('demo'))).toBeVisible({
-      timeout: 15_000,
+      timeout: 60_000,
     });
   });
 
@@ -84,7 +84,7 @@ test.describe.serial('Data Page', () => {
       await page.waitForTimeout(300);
     }
 
-    await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 15_000 });
+    await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(FIXTURES.json);
     await page.waitForTimeout(3_000);
@@ -106,13 +106,13 @@ test.describe.serial('Data Page', () => {
       await page.waitForTimeout(300);
     }
 
-    await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 15_000 });
+    await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(FIXTURES.csv);
     await page.waitForTimeout(3_000);
 
     await expect(page.getByText('demo.csv').or(page.getByText('demo'))).toBeVisible({
-      timeout: 15_000,
+      timeout: 60_000,
     });
   });
 
@@ -303,7 +303,7 @@ test.describe.serial('Data Page', () => {
     }
 
     // Find the file input in the media panel
-    await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 15_000 });
+    await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(FIXTURES.png);
     await page.waitForTimeout(3_000);

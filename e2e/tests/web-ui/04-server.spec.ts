@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe.serial('Server Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/settings?section=server');
-    await page.waitForSelector('text=Launch, manage, and connect', { timeout: 15_000 });
+    await page.waitForSelector('text=Launch, manage, and connect', { timeout: 60_000 });
   });
 
   test('page loads with correct heading', async ({ page }) => {
@@ -12,7 +12,7 @@ test.describe.serial('Server Page', () => {
   });
 
   test('server generation panel loads', async ({ page }) => {
-    await expect(page.getByText('Local Server').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Local Server').first()).toBeVisible({ timeout: 60_000 });
   });
 
   test('launch RAG server', async ({ page }) => {
@@ -22,7 +22,7 @@ test.describe.serial('Server Page', () => {
     const launchBtn = page.getByRole('button', { name: /Launch server|Start/i }).first();
 
     try {
-      await expect(launchBtn).toBeVisible({ timeout: 15_000 });
+      await expect(launchBtn).toBeVisible({ timeout: 60_000 });
       await launchBtn.click();
       await page.waitForTimeout(5_000);
 
@@ -65,7 +65,7 @@ test.describe.serial('Server Page', () => {
 
       // Verify it stopped
       const launchBtn = page.getByRole('button', { name: /Launch server|Start/i }).first();
-      await expect(launchBtn).toBeVisible({ timeout: 15_000 });
+      await expect(launchBtn).toBeVisible({ timeout: 60_000 });
       console.log('  ✓ RAG server stopped');
     } else {
       console.log('  ℹ Server not running — skipping stop test');

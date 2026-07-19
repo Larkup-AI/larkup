@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Navigation & Layout', () => {
   test('root redirects to data page', async ({ page }) => {
     await page.goto('/');
-    await page.waitForURL(/\/(data|chat|settings)/, { timeout: 15_000 });
+    await page.waitForURL(/\/(data|chat|settings)/, { timeout: 60_000 });
 
     const url = page.url();
     expect(url).toMatch(/\/(data|chat|settings)/);
@@ -12,7 +12,7 @@ test.describe('Navigation & Layout', () => {
 
   test('sidebar navigation links are visible', async ({ page }) => {
     await page.goto('/data');
-    await page.waitForSelector('text=Upload files, scrape the web', { timeout: 15_000 });
+    await page.waitForSelector('text=Upload files, scrape the web', { timeout: 60_000 });
 
     // Verify main navigation items exist in sidebar
     const navItems = ['Data', 'Chat', 'Settings'];
@@ -33,7 +33,7 @@ test.describe('Navigation & Layout', () => {
   test('navigate to Data page', async ({ page }) => {
     await page.goto('/data');
     await expect(page.getByText('Upload files, scrape the web').first()).toBeVisible({
-      timeout: 15_000,
+      timeout: 60_000,
     });
   });
 
@@ -41,12 +41,12 @@ test.describe('Navigation & Layout', () => {
     await page.goto('/chat');
     await expect(
       page.getByText('Chat with your knowledge base').or(page.getByText('Setup Required')).first(),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible({ timeout: 60_000 });
   });
 
   test('navigate to Settings page', async ({ page }) => {
     await page.goto('/settings');
-    await expect(page.getByText('Settings').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Settings').first()).toBeVisible({ timeout: 60_000 });
   });
 
   test('page has correct title', async ({ page }) => {

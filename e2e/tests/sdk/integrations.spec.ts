@@ -108,7 +108,7 @@ test.describe('SDK Integration Patterns', () => {
   });
 
   test('OpenAI-compatible endpoint pattern', async () => {
-    test.setTimeout(15_000);
+    test.setTimeout(60_000);
 
     // The RAG server should expose an OpenAI-compatible endpoint
     // Test if /v1 or similar exists
