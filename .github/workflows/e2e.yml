@@ -32,7 +32,7 @@ jobs:
       run: pnpm --filter @larkup/e2e exec playwright install --with-deps
 
     - name: Build Web App
-      run: pnpm --filter @larkup/web build
+      run: pnpm turbo build --filter "./apps/web"
 
     - name: Run E2E tests
       run: |
