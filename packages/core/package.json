@@ -29,7 +29,7 @@
     "@ai-sdk/deepseek": "^2.0.39",
     "@ai-sdk/gateway": "^3.0.133",
     "@ai-sdk/google": "^3.0.83",
-    "@ai-sdk/mistral": "^3.0.40",
+    "@ai-sdk/mistral": "^4.0.13",
     "@ai-sdk/openai": "^3.0.68",
     "@ai-sdk/openai-compatible": "^2.0.51",
     "@larkup/vector-stores": "workspace:*",
