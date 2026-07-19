@@ -175,10 +175,10 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
   }
 
   return (
-    <div className="overflow-hidden bg-transparent border-0 shadow-none my-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="overflow-hidden rounded-xl border border-border/90 bg-white my-4 animate-in fade-in slide-in-from-bottom-2 duration-500 [&_*:focus]:outline-none [&_*:focus-visible]:ring-0">
       {/* Aggregation results (KPI cards) */}
       {aggregationResults && Object.keys(aggregationResults).length > 0 && (
-        <div className="flex flex-wrap gap-3 border-b border-border/40 px-4 py-3">
+        <div className="flex flex-wrap gap-3 border-b border-border/30 px-4 py-3">
           {Object.entries(aggregationResults).map(([key, value]) => {
             const [op, ...colParts] = key.split("_");
             const col = colParts.join("_");
@@ -204,7 +204,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
       )}
 
       {/* Toolbar: search + actions */}
-      <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3 py-2">
+      <div className="flex items-center justify-between gap-2 border-b border-border/30 px-3 py-2">
         <div className="relative flex-1 max-w-[240px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
           <Input
@@ -214,7 +214,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
               setPage(0);
             }}
             placeholder="Search rows…"
-            className="h-8 pl-8 pr-8 text-xs"
+            className="h-7 pl-8 pr-8 text-xs border-border/40 focus-visible:ring-0 focus-visible:border-border/60"
           />
           {searchQuery && (
             <button
@@ -231,7 +231,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
             variant="ghost"
             size="sm"
             onClick={handleCopy}
-            className="h-7 gap-1.5 text-[11px] text-muted-foreground"
+            className="h-7 gap-1.5 text-[11px] text-muted-foreground focus:ring-0 focus-visible:ring-0"
           >
             {copied ? (
               <Check className="size-3 text-emerald-500" />
@@ -244,7 +244,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
             variant="ghost"
             size="sm"
             onClick={handleDownload}
-            className="h-7 gap-1.5 text-[11px] text-muted-foreground"
+            className="h-7 gap-1.5 text-[11px] text-muted-foreground focus:ring-0 focus-visible:ring-0"
           >
             <Download className="size-3" />
             CSV
@@ -256,7 +256,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
       <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/30 hover:bg-muted/30">
+            <TableRow className="bg-muted/20 hover:bg-muted/20 border-b border-border/30">
               {columns.map((col) => {
                 const { icon } = columnTypeIndicator(col, rows);
                 return (
@@ -266,7 +266,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
                     onClick={() => handleSort(col)}
                   >
                     <span className="flex items-center gap-1.5">
-                      <span className="text-[10px] opacity-50 font-mono">
+                      <span className="text-[10px] opacity-40 font-mono">
                         {icon}
                       </span>
                       <span>{col}</span>
@@ -289,7 +289,10 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
             {displayRows.map((row, i) => (
               <TableRow
                 key={i}
-                className={cn("transition", i % 2 === 1 && "bg-muted/10")}
+                className={cn(
+                  "transition border-border/25",
+                  i % 2 === 1 && "bg-muted/8",
+                )}
               >
                 {columns.map((col) => (
                   <TableCell
@@ -307,7 +310,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
       </div>
 
       {/* Pagination footer */}
-      <div className="flex items-center justify-between border-t border-border/40 px-3 py-2">
+      <div className="flex items-center justify-between border-t border-border/30 px-3 py-2">
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground">
             {filteredRows.length !== rows.length
@@ -315,7 +318,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
               : ""}
             {totalRows.toLocaleString()} rows
           </span>
-          <div className="h-3 w-px bg-border" />
+          <div className="h-3 w-px bg-border/40" />
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-muted-foreground">Show</span>
             <Select
@@ -325,7 +328,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
                 setPage(0);
               }}
             >
-              <SelectTrigger className="h-6 w-[52px] text-[11px] px-2">
+              <SelectTrigger className="h-6 w-[52px] text-[11px] px-2 focus:ring-0 focus-visible:ring-0">
                 {pageSize}
               </SelectTrigger>
               <SelectContent>
@@ -345,7 +348,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 focus:ring-0 focus-visible:ring-0"
             disabled={page === 0}
             onClick={() => setPage((p) => p - 1)}
           >
@@ -354,7 +357,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 focus:ring-0 focus-visible:ring-0"
             disabled={page >= totalPages - 1}
             onClick={() => setPage((p) => p + 1)}
           >

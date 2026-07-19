@@ -3,7 +3,10 @@
 import { useState, useMemo } from "react";
 import type { UIMessage } from "ai";
 import { KnowledgeBaseResult } from "@/components/chat/tools/knowledge-base-result";
-import { ChatChart, type ChartConfig } from "@/components/chat/tools/chat-chart";
+import {
+  ChatChart,
+  type ChartConfig,
+} from "@/components/chat/tools/chat-chart";
 import {
   ChatDataTable,
   type DataTableConfig,
@@ -12,12 +15,13 @@ import {
   ChatSandboxResult,
   type SandboxResultConfig,
 } from "@/components/chat/tools/chat-sandbox-result";
-import { VisualizationTabs } from "@/components/chat/tools/visualization-tabs";
+import { ChatTabs } from "@/components/chat/tools/chat-tabs";
+import { ChatCardSimple } from "@/components/chat/tools/chat-card";
+import {
+  ChatGrid,
+  type ChatGridConfig,
+} from "@/components/chat/tools/chat-grid";
 import { Sparkles, BarChart3, Table2, FlaskConical } from "lucide-react";
-
-/* ------------------------------------------------------------------ */
-/* Follow-up suggestion buttons                                        */
-/* ------------------------------------------------------------------ */
 
 function FollowUpButtons({
   suggestions,
@@ -47,10 +51,6 @@ function FollowUpButtons({
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* Markdown table parser                                                */
-/* ------------------------------------------------------------------ */
 
 interface ParsedTable {
   columns: string[];
@@ -322,7 +322,7 @@ export function MessageItem({
       .join("");
     return (
       <div className="message user-message flex justify-end" data-role="user">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-foreground/6 px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
+        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[#edecec] px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
           {text}
         </div>
       </div>
@@ -393,7 +393,7 @@ export function MessageItem({
 
       {/* Visualization outputs */}
       {vizTabs ? (
-        <VisualizationTabs tabs={vizTabs} />
+        <ChatTabs config={{ tabs: vizTabs }} />
       ) : (
         vizParts.map((part: any, i: number) => renderToolPart(part, i))
       )}
@@ -495,10 +495,10 @@ function renderMarkdown(text: string): string {
 
   // Paragraphs
   html = html.replace(/\n\n/g, '</p><p class="msg-p">');
-  
+
   // Clean up newlines around block elements to prevent huge spaces
-  html = html.replace(/(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)\n+/g, '$1');
-  html = html.replace(/\n+(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)/g, '$1');
+  html = html.replace(/(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)\n+/g, "$1");
+  html = html.replace(/\n+(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)/g, "$1");
 
   html = html.replace(/\n/g, "<br/>");
 
