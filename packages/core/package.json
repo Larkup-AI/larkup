@@ -36,6 +36,6 @@
     "ai": "^6.0.197"
   },
   "devDependencies": {
-    "typescript": "5.7.3"
+    "typescript": "7.0.2"
   }
 }
