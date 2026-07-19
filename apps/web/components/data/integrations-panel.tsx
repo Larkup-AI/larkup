@@ -145,12 +145,13 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
 
     setIsRequesting(true);
     try {
-      const res = await fetch("https://larkup.de/api/connect", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer sk_larkup_618502dbca35d040d1afbb0ac0a37c8545da230ad2c724a7`,
-        },
+      const res = await fetch(
+        process.env.NEXT_PUBLIC_CONNECT_API_URL || "https://www.larkup.de/api/connect",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
         body: JSON.stringify({
           email: requestEmail,
           message: requestMessage,
@@ -345,7 +346,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader className="sr-only">
             <DialogTitle>Integration Panel</DialogTitle>
           </DialogHeader>
@@ -354,7 +355,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
       </Dialog>
 
       <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Ask for Integration</DialogTitle>
           </DialogHeader>
@@ -389,8 +390,8 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
                 <Textarea
                   id="message"
                   placeholder="Tell us which tool you want to connect and how you plan to use it..."
-                  className="resize-none min-h-[150px]"
-                  rows={11}
+                  className="resize-none min-h-[120px] max-h-[270px]!"
+                  rows={5}
                   value={requestMessage}
                   onChange={(e) => setRequestMessage(e.target.value)}
                 />
