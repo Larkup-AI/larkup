@@ -1,0 +1,19 @@
+{
+  "name": "@larkup/tool-video-audio",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@larkup/core": "workspace:*",
+    "@larkup/marketplace": "workspace:*",
+    "fluent-ffmpeg": "^2.1.3",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/fluent-ffmpeg": "^2.1.27",
+    "typescript": "5.7.3"
+  }
+}

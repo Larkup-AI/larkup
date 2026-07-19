@@ -1,0 +1,20 @@
+{
+  "name": "@larkup/marketplace",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./registry": "./src/tool-registry.ts",
+    "./installer": "./src/tool-installer.ts",
+    "./loader": "./src/tool-loader.ts",
+    "./storage": "./src/storage-provider.ts",
+    "./manifest": "./src/tool-manifest.schema.ts"
+  },
+  "dependencies": {
+    "@larkup/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "typescript": "5.7.3"
+  }
+}
