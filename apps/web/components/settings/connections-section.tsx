@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Code2 } from "lucide-react";
+import { Code2, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 
 type ConnectionId =
   | "webhook"
@@ -133,6 +135,59 @@ export function ConnectionsSection() {
     null,
   );
 
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [requestName, setRequestName] = useState("");
+  const [requestCompany, setRequestCompany] = useState("");
+  const [requestEmail, setRequestEmail] = useState("");
+  const [requestMessage, setRequestMessage] = useState("");
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState(false);
+
+  const handleRequestConnection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestEmail) return;
+
+    setIsRequesting(true);
+    try {
+      const res = await fetch(
+        process.env.NEXT_PUBLIC_CONNECT_API_URL ||
+          "https://www.larkup.de/api/connect",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: requestName,
+            company: requestCompany,
+            email: requestEmail,
+            message: requestMessage,
+          }),
+        },
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to send request");
+      }
+
+      setRequestSuccess(true);
+      toast.success("Request sent successfully!");
+
+      setTimeout(() => {
+        setIsRequestModalOpen(false);
+        setRequestSuccess(false);
+        setRequestName("");
+        setRequestCompany("");
+        setRequestEmail("");
+        setRequestMessage("");
+      }, 2000);
+    } catch (error) {
+      toast.error("Failed to send request. Please try again later.");
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
   const handleConnectClick = (id: ConnectionId) => {
     setActiveDialog(id);
     setDialogType("connect");
@@ -161,11 +216,22 @@ export function ConnectionsSection() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight">Connections</h2>
-        <p className="text-sm text-muted-foreground">
-          Connect different channels to your AI server to chat from anywhere.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Connections</h2>
+          <p className="text-sm text-muted-foreground">
+            Connect different channels to your AI server to chat from anywhere.
+          </p>
+        </div>
+        <Button
+          variant="default"
+          size="sm"
+          className="h-8 gap-2 "
+          onClick={() => setIsRequestModalOpen(true)}
+        >
+          <Sparkles className="size-3.5" />
+          Ask for connection
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-1 gap-5">
@@ -312,6 +378,89 @@ export function ConnectionsSection() {
               </div>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Ask for Connection</DialogTitle>
+          </DialogHeader>
+          {requestSuccess ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Thank you! We've received your request and will get back to you
+                soon.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleRequestConnection} className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="John Doe"
+                    value={requestName}
+                    onChange={(e) => setRequestName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company">Company</Label>
+                  <Input
+                    id="company"
+                    type="text"
+                    placeholder="Acme Inc."
+                    value={requestCompany}
+                    onChange={(e) => setRequestCompany(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">
+                  Your Email <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  placeholder="name@company.com"
+                  value={requestEmail}
+                  onChange={(e) => setRequestEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="message">Which connection do you need?</Label>
+                <Textarea
+                  id="message"
+                  placeholder="Tell us which platform you want to connect to your AI server..."
+                  className="resize-none min-h-[120px] max-h-[270px]!"
+                  rows={5}
+                  value={requestMessage}
+                  onChange={(e) => setRequestMessage(e.target.value)}
+                />
+              </div>
+              <DialogFooter className="bg-muted/50 border-border/70 mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsRequestModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isRequesting}>
+                  {isRequesting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Submit Request
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
