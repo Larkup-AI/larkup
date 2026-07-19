@@ -24,10 +24,17 @@ apps/desktop/src-tauri/target
 **/target
 
 # Excluded apps
-apps/larkup-proxy
-apps/desktop
-apps/e2e
-apps/cli
-apps/docs
-apps/sdk
-apps/local-chat-connection-larkup
+apps/larkup-proxy/*
+!apps/larkup-proxy/package.json
+apps/desktop/*
+!apps/desktop/package.json
+apps/e2e/*
+!apps/e2e/package.json
+apps/cli/*
+!apps/cli/package.json
+apps/docs/*
+!apps/docs/package.json
+apps/sdk/*
+!apps/sdk/package.json
+apps/local-chat-connection-larkup/*
+!apps/local-chat-connection-larkup/package.json

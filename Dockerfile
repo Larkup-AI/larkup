@@ -8,9 +8,15 @@ WORKDIR /app
 RUN corepack enable pnpm
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
-COPY apps/web/package.json ./apps/web/
+COPY apps/api/package.json ./apps/api/
 COPY apps/cli/package.json ./apps/cli/
+COPY apps/desktop/package.json ./apps/desktop/
+COPY apps/e2e/package.json ./apps/e2e/
+COPY apps/larkup-proxy/package.json ./apps/larkup-proxy/
+COPY apps/local-chat-connection-larkup/package.json ./apps/local-chat-connection-larkup/
+COPY apps/web/package.json ./apps/web/
 COPY packages/core/package.json ./packages/core/
+COPY packages/ee/package.json ./packages/ee/
 COPY packages/sandbox/package.json ./packages/sandbox/
 COPY packages/scraper/package.json ./packages/scraper/
 COPY packages/vector-stores/package.json ./packages/vector-stores/
