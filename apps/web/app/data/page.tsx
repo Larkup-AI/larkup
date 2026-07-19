@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { DataWorkspace } from "@/components/data/data-workspace";
 
 export default function DataPage() {
@@ -12,7 +13,9 @@ export default function DataPage() {
         </p>
       </div>
       <div className="flex-1 min-h-0 pb-8">
-        <DataWorkspace />
+        <Suspense>
+          <DataWorkspace />
+        </Suspense>
       </div>
     </div>
   );

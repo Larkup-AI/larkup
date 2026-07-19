@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -102,8 +103,49 @@ type TopTabId = (typeof TOP_TABS)[number]["id"];
 type SubTabId = (typeof SUB_TABS)[number]["id"];
 
 export function DataWorkspace() {
-  const [activeTab, setActiveTab] = useState<TopTabId>("add");
-  const [activeSubTab, setActiveSubTab] = useState<SubTabId>("website");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const getInitialTab = (): TopTabId => {
+    const tab = searchParams.get("tab") as TopTabId;
+    if (tab && TOP_TABS.some((t) => t.id === tab)) return tab;
+    return "add";
+  };
+
+  const getInitialSubTab = (): SubTabId => {
+    const subtab = searchParams.get("subtab") as SubTabId;
+    if (subtab && SUB_TABS.some((t) => t.id === subtab)) return subtab;
+    return "website";
+  };
+
+  const [activeTab, setActiveTabState] = useState<TopTabId>(getInitialTab());
+  const [activeSubTab, setActiveSubTabState] = useState<SubTabId>(getInitialSubTab());
+
+  useEffect(() => {
+    const tab = searchParams.get("tab") as TopTabId;
+    if (tab && tab !== activeTab && TOP_TABS.some((t) => t.id === tab)) {
+      setActiveTabState(tab);
+    }
+    const subtab = searchParams.get("subtab") as SubTabId;
+    if (subtab && subtab !== activeSubTab && SUB_TABS.some((t) => t.id === subtab)) {
+      setActiveSubTabState(subtab);
+    }
+  }, [searchParams, activeTab, activeSubTab]);
+
+  const setActiveTab = (tab: TopTabId) => {
+    setActiveTabState(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+  };
+
+  const setActiveSubTab = (subtab: SubTabId) => {
+    setActiveSubTabState(subtab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("subtab", subtab);
+    window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+  };
   const [showJobsDrawer, setShowJobsDrawer] = useState(false);
   const [indexDialogOpen, setIndexDialogOpen] = useState(false);
   const prevJobsRef = useRef<CrawlJob[]>([]);
