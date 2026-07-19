@@ -8,6 +8,11 @@ export type ProviderMeta = {
 
 /** Maps provider IDs → display metadata. Uses models.dev for providers we don't have local icons for. */
 export const PROVIDER_META: Record<string, ProviderMeta> = {
+  vercel_ai_gateway: {
+    label: "Vercel AI Gateway",
+    iconSrc: "/icons/vercel.svg",
+    pillBg: "bg-white dark:bg-white text-white dark:text-black",
+  },
   openai: {
     label: "OpenAI",
     iconSrc: "/icons/openai.svg",
@@ -112,11 +117,6 @@ export const PROVIDER_META: Record<string, ProviderMeta> = {
     label: "Custom",
     iconSrc: "/logo.png",
     pillBg: "bg-slate-100 dark:bg-slate-800",
-  },
-  vercel_ai_gateway: {
-    label: "Vercel AI Gateway",
-    iconSrc: "/icons/vercel.svg",
-    pillBg: "bg-white dark:bg-white text-white dark:text-black",
   },
 };
 
