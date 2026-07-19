@@ -24,15 +24,16 @@ test.describe('JS SDK — @larkup/sdk', () => {
       console.log('  Starting RAG server for SDK tests...');
       const startRes = await request.post(`${WEB_API}/api/server/local`, {
         data: { action: 'start' },
+        timeout: 180_000,
       });
       const startBody = await startRes.json();
       if (startBody.state?.endpoint) {
         RAG_SERVER = startBody.state.endpoint;
       }
 
-      // Wait for server to become ready
+      // Wait for server to become ready (up to 180 seconds for npm install in CI)
       let ready = false;
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < 90; i++) {
         await new Promise((r) => setTimeout(r, 2_000));
         try {
           const res = await fetch(`${RAG_SERVER}/health`, {
