@@ -73,7 +73,7 @@ jobs:
             --compress GZip
 
       - name: Upload sidecar artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sidecar-${{ matrix.rust-target }}
           path: apps/desktop/src-tauri/binaries/
@@ -163,7 +163,7 @@ jobs:
         run: pnpm tauri build --target ${{ matrix.rust-target }} --bundles ${{ matrix.bundle-targets }}
 
       - name: Upload installer artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: installer-${{ matrix.rust-target }}
           path: |
