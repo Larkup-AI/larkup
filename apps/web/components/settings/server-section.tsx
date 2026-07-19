@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
 import {
   Loader2,
   Play,
@@ -14,6 +14,12 @@ import {
   RefreshCw,
   Key,
   Trash2,
+  Webhook,
+  Hash,
+  MessageSquare,
+  Send,
+  Phone,
+  Plug,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +54,7 @@ import { toast } from "sonner";
 import { useWorkspace } from "@/components/workspace/workspace-provider";
 import { SdkConnectDialog } from "@/components/simple/sdk-connect-dialog";
 import { DeployButton } from "@/components/server/deploy-button";
+import { cn } from "@/lib/utils";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -61,7 +68,7 @@ interface LocalServerState {
 }
 
 export function ServerSection() {
-  const { activeServer } = useWorkspace();
+  const { activeServer, refresh } = useWorkspace();
   const serverId = activeServer?.id || "default";
 
   const [busy, setBusy] = useState<"start" | "stop" | null>(null);
@@ -90,6 +97,26 @@ export function ServerSection() {
 
   async function control(action: "start" | "stop") {
     setBusy(action);
+    const isStarting = action === "start";
+
+    // Optimistically update local state
+    mutate({ state: { ...(state as LocalServerState), running: isStarting } }, false);
+    
+    // Optimistically update global workspace state for the sidebar icon
+    globalMutate(
+      "/api/servers",
+      (currentData: any) => {
+        if (!currentData) return currentData;
+        return {
+          ...currentData,
+          servers: currentData.servers.map((s: any) =>
+            s.id === serverId ? { ...s, running: isStarting } : s
+          ),
+        };
+      },
+      false
+    );
+
     try {
       const currentApiKey = localStorage.getItem("rag_server_api_key") || "";
       const res = await fetch("/api/server/local", {
@@ -99,14 +126,21 @@ export function ServerSection() {
       });
       const body = await res.json();
       if (action === "start") {
-        if (body.state?.running) toast.success("Server is running.");
-        else toast.error(body.state?.lastError ?? "Server did not start.");
+        if (body.state?.running) {
+          toast.success("Server is running.");
+        } else {
+          toast.error(body.state?.lastError ?? "Server did not start.");
+          globalMutate("/api/servers"); // Revert
+        }
       } else {
         toast.success("Server stopped.");
       }
       mutate();
+      refresh();
     } catch {
       toast.error("Could not reach the server controller.");
+      globalMutate("/api/servers"); // Revert
+      mutate();
     } finally {
       setBusy(null);
     }
@@ -210,6 +244,7 @@ export function ServerSection() {
                   variant="destructive"
                   onClick={() => control("stop")}
                   disabled={busy !== null}
+                  className={"rounded-md"}
                 >
                   {busy === "stop" ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -222,7 +257,10 @@ export function ServerSection() {
                   href={state.endpoint}
                   target="_blank"
                   rel="noreferrer"
-                  className={buttonVariants({ variant: "secondary" })}
+                  className={cn(
+                    buttonVariants({ variant: "secondary" }),
+                    "rounded-md",
+                  )}
                 >
                   <ExternalLink className="size-4" />
                   {state.endpoint}

@@ -8,6 +8,7 @@ import {
   Search,
   Palette,
   Database,
+  Plug,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ export type SettingsSection =
   | "models"
   | "storage"
   | "server"
+  | "connections"
   | "prompts"
   | "playground"
   | "appearance";
@@ -40,6 +42,7 @@ const SECTION_GROUPS: SectionGroup[] = [
       { id: "models", label: "AI Models", icon: Sparkles },
       { id: "storage", label: "Storage", icon: Database },
       { id: "server", label: "Larkup Server", icon: Server },
+      { id: "connections", label: "Connections", icon: Plug },
     ],
   },
   {

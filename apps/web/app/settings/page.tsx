@@ -10,6 +10,7 @@ import { PromptsSection } from "@/components/settings/prompts-section";
 import { PlaygroundSection } from "@/components/settings/playground-section";
 import { AppearanceSection } from "@/components/settings/appearance-section";
 import { StorageSection } from "@/components/settings/storage-section";
+import { ConnectionsSection } from "@/components/settings/connections-section";
 
 function SettingsContent() {
   const searchParams = useSearchParams();
@@ -59,6 +60,7 @@ function SettingsContent() {
       {activeSection === "models" && <ModelsSection />}
       {activeSection === "storage" && <StorageSection />}
       {activeSection === "server" && <ServerSection />}
+      {activeSection === "connections" && <ConnectionsSection />}
       {activeSection === "prompts" && <PromptsSection />}
       {activeSection === "playground" && <PlaygroundSection />}
       {activeSection === "appearance" && <AppearanceSection />}
