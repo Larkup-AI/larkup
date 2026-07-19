@@ -29,7 +29,7 @@ import { useWorkspace } from "@/components/workspace/workspace-provider";
 const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
   "panel-default": undefined,
   "panel-white": "#FFFFFF",
-  "panel-fafafa": "#F4F4F4",
+  "panel-fafafa": "#FAFAFA",
   "panel-warm": "#F7F1EA",
   "panel-soft": "#FBFAF8",
   "panel-silver": "#F8F8F8",
@@ -76,7 +76,7 @@ export function UnifiedSidebar() {
         className={cn(
           "sticky top-0 hidden h-screen shrink-0 flex-col self-start py-4 md:flex transition-all duration-300 ease-in-out",
           collapsed ? "w-[72px]" : "w-[240px]",
-          !navColor ? "bg-[#F4F4F5]" : "",
+          !navColor ? "bg-background" : "",
           pageStyle === "fused" ? "border-r border-border" : "",
         )}
         style={navStyle}

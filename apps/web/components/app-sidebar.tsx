@@ -29,7 +29,7 @@ import { ThemeSwitcher } from "./theme-switcher";
 const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
   "panel-default": undefined,
   "panel-white": "#FFFFFF",
-  "panel-fafafa": "#F4F4F4",
+  "panel-fafafa": "#FAFAFA",
   "panel-warm": "#F7F1EA",
   "panel-soft": "#FBFAF8",
   "panel-silver": "#F8F8F8",
