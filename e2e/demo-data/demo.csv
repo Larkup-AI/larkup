@@ -1,0 +1,6 @@
+title,content,source
+"What is Larkup?","Larkup is an open-source toolkit for launching production-ready RAG servers. It handles ingestion, indexing, and retrieval so you can focus on building AI applications.","csv-upload"
+"Vector Store Options","Larkup supports multiple vector stores including LanceDB (local, zero-config), Pinecone (cloud-hosted), and Chroma (self-hosted or cloud). Each store can be configured through the Web UI or CLI.","csv-upload"
+"Embedding Models","The platform supports embedding models from OpenAI, Cohere, Google, Anthropic, and custom OpenAI-compatible endpoints. Models can be selected and configured through the Configuration page.","csv-upload"
+"CLI Usage","The CLI (@larkup/cli) provides commands: init, config, add-doc, index, serve, query, chat, generate, and settings. Install globally with npm install -g @larkup/cli.","csv-upload"
+"Deployment Options","Larkup supports local development with pnpm dev, Docker deployment with docker compose, and cloud deployment to Vercel or custom VPS servers.","csv-upload"

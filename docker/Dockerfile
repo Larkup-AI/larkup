@@ -1,56 +1,63 @@
-# Stage 1: Build
-FROM node:20-slim AS builder
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+FROM node:20-slim AS base
 
-# Install build tools
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
-
+FROM base AS deps
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY . . 
 
-# Install dependencies
+# Install pnpm
+RUN corepack enable pnpm
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/cli/package.json ./apps/cli/
+COPY apps/desktop/package.json ./apps/desktop/
+COPY e2e/package.json ./e2e/
+COPY apps/larkup-proxy/package.json ./apps/larkup-proxy/
+COPY apps/web/package.json ./apps/web/
+COPY packages/core/package.json ./packages/core/
+COPY packages/ee/package.json ./packages/ee/
+COPY packages/marketplace/package.json ./packages/marketplace/
+COPY packages/sandbox/package.json ./packages/sandbox/
+COPY packages/scraper/package.json ./packages/scraper/
+COPY packages/vector-stores/package.json ./packages/vector-stores/
+COPY packages/tools/clip-embeddings/package.json ./packages/tools/clip-embeddings/
+COPY packages/tools/video-audio/package.json ./packages/tools/video-audio/
+
 RUN pnpm install --frozen-lockfile
 
-# Build environment - keep memory within Docker limits
-ENV DOCKER_BUILD=1
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+FROM base AS builder
+WORKDIR /app
+RUN corepack enable pnpm
+COPY --from=deps /app /app
+COPY . .
+
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build the web app
-RUN pnpm --filter=larkup build
+RUN pnpm --filter larkup build
 
-RUN mkdir -p /lancedb-native && \
-    LANCEDB_DIR=$(find /app/node_modules/.pnpm -maxdepth 1 -name '@lancedb+lancedb@*' -type d | head -1) && \
-    if [ -d "$LANCEDB_DIR/node_modules/@lancedb" ]; then \
-        cp -r "$LANCEDB_DIR/node_modules/@lancedb" /lancedb-native/; \
-    fi
-    
-# Stage 2: Runner
-FROM node:20-slim AS runner
+FROM base AS runner
 WORKDIR /app
+
 ENV NODE_ENV=production
-ENV DOCKER_BUILD=1
+ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN groupadd --system --gid 1001 nodejs
-RUN useradd --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-RUN mkdir -p /app/data \
-    /app/apps/web/data && \
-    chown -R nextjs:nodejs /app/data /app/apps && \
-    chmod -R 755 /app/data /app/apps
+COPY --from=builder /app/apps/web/public ./apps/web/public
+RUN mkdir -p /app/apps/web/.next && chown nextjs:nodejs /app/apps/web/.next
 
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 
-# Copy @lancedb native bindings (NAPI-RS) that standalone trace missed
-COPY --from=builder --chown=nextjs:nodejs /lancedb-native/@lancedb ./node_modules/@lancedb
+# Install LanceDB native binding directly for the target platform.
+RUN npm install --no-save @lancedb/lancedb@0.30.0 && \
+    chown -R nextjs:nodejs node_modules/@lancedb node_modules/apache-arrow node_modules/reflect-metadata
 
 USER nextjs
+
 EXPOSE 4567
+
 ENV PORT=4567
-ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "apps/web/server.js"]

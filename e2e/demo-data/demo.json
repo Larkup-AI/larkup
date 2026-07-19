@@ -1,0 +1,27 @@
+[
+  {
+    "title": "What is Larkup?",
+    "content": "Larkup is an open-source toolkit designed to take you from zero to a running Retrieval-Augmented Generation (RAG) server effortlessly. It eliminates the complexities of manual infrastructure setup, allowing you to seamlessly configure vector stores, chunking strategies, and embedding models through a unified interface.",
+    "source": "manual"
+  },
+  {
+    "title": "Larkup Features",
+    "content": "Key features include: Zero-Config Web UI for configuring vector databases (LanceDB, Pinecone, Chroma) and embedding models (OpenAI, Cohere). Robust Ingestion for loading data via file upload, raw text, or web scraping. Automated Indexing with built-in ETL jobs. Local and Cloud Deployments. Built-in Demo UI for testing retrieval quality. Native JavaScript/TypeScript and Python SDKs.",
+    "source": "manual"
+  },
+  {
+    "title": "Architecture Overview",
+    "content": "The Larkup repository is structured as a monorepo containing: apps/web (Web Interface and API Server), apps/cli (Command-Line Interface), apps/sdk/js-sdk (JavaScript/TypeScript SDK), apps/sdk/py-sdk (Python SDK), and apps/docs (Mintlify-powered documentation).",
+    "source": "manual"
+  },
+  {
+    "title": "Getting Started",
+    "content": "To get started with Larkup: 1. Start the development server with pnpm install && pnpm dev. 2. Launch the Web UI at http://localhost:4567. 3. Configure your Vector Store and Embedding Provider. 4. Add documents or scrape URLs in the Data tab. 5. Run the ETL pipeline to process documents. 6. Test your pipeline using the built-in Chat Demo.",
+    "source": "manual"
+  },
+  {
+    "title": "SDK Integration",
+    "content": "Larkup provides official SDKs for both JavaScript/TypeScript and Python. The JS SDK (@larkup/sdk) supports querying, data ingestion, and indexing with full TypeScript support. The Python SDK (larkup) offers both synchronous and asynchronous clients built with httpx and pydantic.",
+    "source": "manual"
+  }
+]
