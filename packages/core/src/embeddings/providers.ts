@@ -15,6 +15,8 @@ export function getAIModel(config: RagConfig): any {
     modelName = modelName.split("/")[1];
   }
 
+  const explicitApiKey = config.embeddingApiKey?.trim() || "NO_API_KEY_PROVIDED_FROM_UI";
+
   // Handle custom customEmbeddings
   if (config.embeddingModelId.startsWith("custom:")) {
     const customName = config.embeddingModelId.slice("custom:".length);
@@ -33,44 +35,42 @@ export function getAIModel(config: RagConfig): any {
 
   if (config.embeddingProvider === "deepseek") {
     const deepseek = createDeepSeek({
-      apiKey: config.embeddingApiKey || undefined,
+      apiKey: explicitApiKey,
     });
     return deepseek.embeddingModel(modelName);
   }
 
   if (config.embeddingProvider === "google") {
     const google = createGoogleGenerativeAI({
-      apiKey: config.embeddingApiKey || undefined,
+      apiKey: explicitApiKey,
     });
     return google.textEmbeddingModel(modelName);
   }
 
   if (config.embeddingProvider === "cohere") {
     const cohere = createCohere({
-      apiKey: config.embeddingApiKey || undefined,
+      apiKey: explicitApiKey,
     });
     return cohere.embedding(modelName);
   }
 
   if (config.embeddingProvider === "mistral") {
     const mistral = createMistral({
-      apiKey: config.embeddingApiKey || undefined,
+      apiKey: explicitApiKey,
     });
     return mistral.embedding(modelName);
   }
 
   if (config.embeddingProvider === "vercel_ai_gateway") {
     const gateway = createGateway({
-      apiKey: config.embeddingApiKey || undefined,
+      apiKey: explicitApiKey,
     });
-    // For Vercel AI Gateway, we don't slice the provider from the string, so we use config.embeddingModelId directly
-    // Wait, the gateway model requires the original string, e.g., "openai/text-embedding-3-small"
     return gateway.embedding(config.embeddingModelId);
   }
 
   // Default fallback (e.g. "openai")
   const openai = createOpenAI({
-    apiKey: config.embeddingApiKey || undefined,
+    apiKey: explicitApiKey,
   });
   return openai.embedding(modelName);
 }

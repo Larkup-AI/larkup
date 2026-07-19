@@ -63,6 +63,7 @@ function normalize(input: NewDocumentInput): SourceDocument {
     charCount: content.length,
     jobId: input.jobId,
     metadata: input.metadata,
+    status: "unindexed",
     createdAt: new Date().toISOString(),
   }
 }
@@ -129,6 +130,7 @@ export function updateDocument(
       charCount: content.length,
       url: patch.url !== undefined ? patch.url || undefined : current.url,
       metadata: patch.metadata !== undefined ? patch.metadata : current.metadata,
+      status: "unindexed",
     }
     docs[idx] = next
     await writeAll(docs)
@@ -154,6 +156,21 @@ export function deleteDocuments(ids: string[]) {
 export function clearDocuments() {
   return serialize(async () => {
     await writeAll([])
+  })
+}
+
+export function updateDocumentsStatus(ids: string[], status: "indexed" | "unindexed") {
+  return serialize(async () => {
+    const docs = await readDocuments()
+    const idSet = new Set(ids)
+    let changed = false
+    for (const d of docs) {
+      if (idSet.has(d.id)) {
+        d.status = status
+        changed = true
+      }
+    }
+    if (changed) await writeAll(docs)
   })
 }
 
@@ -227,6 +244,7 @@ export function addTabularDocuments(
         source: "tabular",
         content,
         charCount: content.length,
+        status: "unindexed",
         metadata: {
           _tabular: {
             datasetId,

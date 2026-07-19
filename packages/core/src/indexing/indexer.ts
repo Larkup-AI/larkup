@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import type { IndexRun, RagConfig } from "../types"
-import { readDocuments } from "../documents-store"
+import { readDocuments, updateDocumentsStatus } from "../documents-store"
 import { patchRun, writeRun } from "../index-store"
 import { chunkCorpus } from "./chunker"
 import { embedTexts, expectedDimensions } from "./embedder"
@@ -202,6 +202,9 @@ export async function runIndexer(
       finishedAt: new Date().toISOString(),
       durationMs: Date.now() - started,
     })
+
+    // Mark processed documents as indexed
+    await updateDocumentsStatus(docs.map(d => d.id), "indexed")
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Indexing failed unexpectedly."

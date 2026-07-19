@@ -197,6 +197,8 @@ export interface SourceDocument {
   jobId?: string
   /** custom metadata fields mapped during ingestion */
   metadata?: Record<string, any>
+  /** indexing status */
+  status?: "indexed" | "unindexed"
   createdAt: string
 }
 
