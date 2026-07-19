@@ -12,7 +12,15 @@ export interface DocumentField {
   /** Human-readable field name / label */
   name: string;
   /** Field type */
-  type: 'text' | 'textarea' | 'checkbox' | 'radio' | 'date' | 'number' | 'select';
+  type:
+    | 'text'
+    | 'textarea'
+    | 'checkbox'
+    | 'radio'
+    | 'date'
+    | 'number'
+    | 'select'
+    | 'signature_placeholder';
   /** Current value (empty if unfilled) */
   value: string;
   /** Page/slide index (0-based) */
@@ -25,6 +33,8 @@ export interface DocumentField {
   options?: string[];
   /** Bounding box for overlay positioning (PDF) — percentages of page */
   bbox?: { x: number; y: number; width: number; height: number };
+  /** Context around the field (for smart detection) */
+  context?: string;
 }
 
 /** A single page or slide of a parsed document */
@@ -87,6 +97,30 @@ export interface ContentEdit {
   text: string;
   /** Position for insert (paragraph index) */
   position?: number;
+}
+
+/** Signature details for applying to a document */
+export interface SignatureData {
+  /** The mode of the signature */
+  mode: 'type' | 'draw' | 'upload';
+  /** Base64 image of the signature (for draw/upload) */
+  imagePayload?: string;
+  /** Typed text for the signature */
+  text?: string;
+  /** Font family for typed text */
+  font?: string;
+  /** Color (hex) */
+  color?: string;
+  /** Optional date to include */
+  date?: string;
+  /** Optional extra text */
+  extraText?: string;
+  /** Page index (0-based) where the signature should be placed */
+  pageIndex: number;
+  /** Approximate X coordinate (if known) */
+  x?: number;
+  /** Approximate Y coordinate (if known) */
+  y?: number;
 }
 
 /** Active editing session */

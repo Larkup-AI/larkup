@@ -7,10 +7,24 @@
  * - In-memory session management
  */
 
-import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup } from 'pdf-lib';
+import {
+  PDFDocument,
+  PDFTextField,
+  PDFCheckBox,
+  PDFDropdown,
+  PDFRadioGroup,
+  rgb,
+  StandardFonts,
+} from 'pdf-lib';
 import { SandboxManager } from '@larkup/sandbox';
-import { randomUUID } from 'node:crypto';
-import type { EditorSession, FieldEdit, ContentEdit, EditResult, ParsedDocument } from './types';
+import type {
+  EditorSession,
+  FieldEdit,
+  ContentEdit,
+  EditResult,
+  ParsedDocument,
+  SignatureData,
+} from './types';
 import { parseDocument, enrichPDFWithText } from './parsers';
 import {
   generateFillPDFScript,
@@ -446,6 +460,109 @@ async function fillPDFNatively(buffer: Buffer, edits: FieldEdit[]): Promise<Buff
 
   const modifiedBytes = await pdfDoc.save();
   return Buffer.from(modifiedBytes);
+}
+
+/* ------------------------------------------------------------------ */
+/* Apply signature using pdf-lib (no sandbox needed)                   */
+/* ------------------------------------------------------------------ */
+
+export async function applySignature(sessionId: string, data: SignatureData): Promise<EditResult> {
+  const session = sessions.get(sessionId);
+  if (!session) {
+    return { success: false, error: 'Session not found' } as any;
+  }
+
+  try {
+    const buffer = Buffer.from(session.currentFileBase64, 'base64');
+
+    if (session.mimeType === 'application/pdf') {
+      const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+      const pages = pdfDoc.getPages();
+      const pageIndex = Math.min(Math.max(0, data.pageIndex), pages.length - 1);
+      const page = pages[pageIndex];
+
+      const x = data.x ?? 50;
+      const y = data.y ?? 50;
+
+      if (data.mode === 'type' && data.text) {
+        const font = await pdfDoc.embedFont(StandardFonts.HelveticaOblique); // Using Helvetica Oblique as cursive placeholder
+
+        let color = rgb(0, 0, 0);
+        if (data.color === 'blue') color = rgb(0, 0, 1);
+        if (data.color === 'red') color = rgb(1, 0, 0);
+
+        page.drawText(data.text, {
+          x,
+          y,
+          size: 24,
+          font,
+          color,
+        });
+      } else if ((data.mode === 'draw' || data.mode === 'upload') && data.imagePayload) {
+        const isPng = data.imagePayload.startsWith('data:image/png');
+        const isJpeg = data.imagePayload.startsWith('data:image/jpeg');
+
+        // Strip data URL prefix
+        const base64Data = data.imagePayload.replace(/^data:image\/\w+;base64,/, '');
+        const imageBytes = Buffer.from(base64Data, 'base64');
+
+        let embeddedImage;
+        if (isJpeg) {
+          embeddedImage = await pdfDoc.embedJpg(imageBytes);
+        } else {
+          embeddedImage = await pdfDoc.embedPng(imageBytes); // default PNG
+        }
+
+        const dims = embeddedImage.scale(0.5); // scale down
+        page.drawImage(embeddedImage, {
+          x,
+          y,
+          width: dims.width,
+          height: dims.height,
+        });
+      }
+
+      if (data.date) {
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        page.drawText(`Date: ${data.date}`, {
+          x,
+          y: y - 20,
+          size: 12,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      }
+
+      if (data.extraText) {
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        page.drawText(data.extraText, {
+          x,
+          y: y - 40,
+          size: 12,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      }
+
+      const modifiedBytes = await pdfDoc.save();
+      const newBase64 = Buffer.from(modifiedBytes).toString('base64');
+
+      session.currentFileBase64 = newBase64;
+      session.updatedAt = new Date().toISOString();
+      sessions.set(sessionId, session);
+
+      return {
+        success: true,
+        parsed: session.parsed!,
+        fileBase64: newBase64,
+        updatedFields: [],
+      };
+    } else {
+      return { success: false, error: 'Signatures only supported for PDF natively' } as any;
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to apply signature' } as any;
+  }
 }
 
 /* ------------------------------------------------------------------ */

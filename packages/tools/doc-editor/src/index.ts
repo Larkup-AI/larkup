@@ -26,6 +26,7 @@ export {
   deleteSession,
   applyFieldEdits,
   applyContentEdits,
+  applySignature,
   exportDocument,
 } from './editor';
 

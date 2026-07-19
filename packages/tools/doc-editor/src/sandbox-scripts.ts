@@ -77,6 +77,7 @@ from pypdf import PdfReader
 
 reader = PdfReader("/sandbox/input/document.pdf")
 pages = []
+fields = []
 
 for i, page in enumerate(reader.pages):
     text = page.extract_text() or ""
@@ -84,9 +85,22 @@ for i, page in enumerate(reader.pages):
         "index": i,
         "text": text,
     })
+    
+    # Smart signature detection
+    lines = text.split('\\n')
+    for line in lines:
+        lower_line = line.lower()
+        if "signature:" in lower_line or "sign here" in lower_line or "date:" in lower_line or "_______" in lower_line:
+            if "signature" in lower_line or "sign" in lower_line:
+                fields.append({
+                    "name": "detected_signature_" + str(i),
+                    "type": "signature_placeholder",
+                    "value": "",
+                    "pageIndex": i,
+                    "context": line.strip()
+                })
 
 # Extract form fields
-fields = []
 if reader.is_form:
     form_fields = reader.get_fields() or {}
     for name, field in form_fields.items():
@@ -96,6 +110,7 @@ if reader.is_form:
             "name": name,
             "type": field_type,
             "value": value,
+            "pageIndex": 0 # We might not know the exact page from get_fields easily, default to 0
         })
 
 result = {
