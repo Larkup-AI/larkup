@@ -40,7 +40,6 @@ playwright-report
 # Root directories not needed in Docker
 archive
 assets
-demo-repos
 docs
 dummy
 e2e/*
