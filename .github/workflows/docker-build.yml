@@ -1,8 +1,9 @@
 name: Build and Push Docker Image
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -25,6 +26,8 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/larkup:latest
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/larkup:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/larkup:${{ github.event.release.tag_name || 'latest' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
