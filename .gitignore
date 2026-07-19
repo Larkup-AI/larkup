@@ -58,4 +58,5 @@ TODO.md
 # ── Archived / Generated ────────────────────────
 archive/
 dummy/
-apps/api
+apps/api*.log
+*.pid

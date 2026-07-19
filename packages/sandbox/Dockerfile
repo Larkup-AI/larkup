@@ -12,7 +12,11 @@ RUN pip install --no-cache-dir \
     scipy==1.15.3 \
     scikit-learn==1.7.0 \
     seaborn==0.13.2 \
-    xlrd==2.0.1
+    xlrd==2.0.1 \
+    pypdf==5.1.0 \
+    python-docx==1.1.2 \
+    python-pptx==1.0.2 \
+    Pillow==11.1.0
 
 # Matplotlib non-interactive backend (no display needed)
 ENV MPLBACKEND=Agg
