@@ -153,10 +153,10 @@ test.describe.serial('Data Page', () => {
   // ── Web Scraping ──────────────────────────────────────────────────────────
 
   test('web scraping panel is visible', async ({ page }) => {
-    // test.skip(
-    //   !hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY) && !hasEnv(ENV_KEYS.SERPER_API_KEY),
-    //   'No search providers configured',
-    // );
+    test.skip(
+      !hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY) && !hasEnv(ENV_KEYS.SERPER_API_KEY),
+      'No search providers configured',
+    );
 
     // Look for the scrape panel/tab
     const scrapeTab = page.getByText('Website', { exact: true }).first();
@@ -171,7 +171,7 @@ test.describe.serial('Data Page', () => {
   });
 
   test('web scrape with Firecrawl', async ({ page }) => {
-    // test.skip(!hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY), 'FIRECRAWL_CLOUD_API_KEY not set');
+    test.skip(!hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY), 'FIRECRAWL_CLOUD_API_KEY not set');
     test.setTimeout(120_000);
 
     const scrapeTab = page.getByText('Website', { exact: true }).first();
@@ -209,10 +209,10 @@ test.describe.serial('Data Page', () => {
   });
 
   test('web search with Serper', async ({ page }) => {
-    // test.skip(
-    //   !hasEnv(ENV_KEYS.SERPER_API_KEY) || !hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY),
-    //   'Search requires Serper and Crawling requires Firecrawl',
-    // );
+    test.skip(
+      !hasEnv(ENV_KEYS.SERPER_API_KEY) || !hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY),
+      'Search requires Serper and Crawling requires Firecrawl',
+    );
     test.setTimeout(60_000);
 
     // Navigate to the scrape section

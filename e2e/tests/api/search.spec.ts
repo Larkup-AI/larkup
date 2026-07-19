@@ -23,10 +23,10 @@ test.describe('Search API (/api/search)', () => {
   });
 
   test('POST /api/search — valid query returns results', async ({ request }) => {
-    // test.skip(
-    //   !hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY) && !hasEnv(ENV_KEYS.SERPER_API_KEY),
-    //   "No search API key configured"
-    // );
+    test.skip(
+      !hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY) && !hasEnv(ENV_KEYS.SERPER_API_KEY),
+      'No search API key configured',
+    );
     test.setTimeout(30_000);
 
     const res = await request.post('/api/search', {

@@ -588,6 +588,92 @@ const server = createServer(async (req, res) => {
     }
   }
 
+  if (req.method === "GET" && url.pathname === "/corpus/summary") {
+    try {
+      const all = await store.list({ page: 1, limit: 100000 })
+      const docs = all.documents || []
+      const bySource = {}
+      const byStatus = {}
+      let totalChars = 0
+      for (const d of docs) {
+        const src = d.source || "unknown"
+        bySource[src] = (bySource[src] || 0) + 1
+        const st = d.status || "indexed"
+        byStatus[st] = (byStatus[st] || 0) + 1
+        totalChars += (d.text || "").length
+      }
+      return send(res, 200, {
+        totalDocuments: all.total,
+        bySource,
+        byStatus,
+        totalCharacters: totalChars
+      })
+    } catch (err) {
+      return send(res, 500, { error: String(err?.message || err) })
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/corpus") {
+    try {
+      const { filter, limit: reqLimit, offset: reqOffset, includeContent } = await readBody(req)
+      const pageSize = Math.min(Math.max(reqLimit || 200, 1), 1000)
+      const page = Math.max(1, Math.floor((reqOffset || 0) / pageSize) + 1)
+      const result = await store.list({ page, limit: pageSize })
+      let docs = result.documents || []
+
+      // Apply optional filters
+      if (filter) {
+        if (filter.source) docs = docs.filter(d => d.source === filter.source)
+        if (filter.titleContains) {
+          const needle = filter.titleContains.toLowerCase()
+          docs = docs.filter(d => (d.title || "").toLowerCase().includes(needle))
+        }
+      }
+
+      const mapped = docs.map(d => {
+        const entry = { id: d.id, title: d.title, url: d.url, documentId: d.documentId, charCount: (d.text || "").length }
+        if (includeContent) entry.content = (d.text || "").slice(0, 2000)
+        return entry
+      })
+      return send(res, 200, { documents: mapped, total: result.total, page, limit: pageSize })
+    } catch (err) {
+      return send(res, 500, { error: String(err?.message || err) })
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/corpus/export") {
+    try {
+      const { format } = await readBody(req)
+      const all = await store.list({ page: 1, limit: 100000 })
+      const docs = all.documents || []
+
+      if (format === "jsonl") {
+        const lines = docs.map(d => JSON.stringify({
+          id: d.id, title: d.title, url: d.url || "",
+          documentId: d.documentId, text: (d.text || "").slice(0, 1000)
+        }))
+        res.writeHead(200, { "Content-Type": "application/x-ndjson", "Access-Control-Allow-Origin": "*" })
+        return res.end(lines.join("\n"))
+      }
+
+      // Default: CSV
+      const header = "id,title,url,documentId,charCount,content"
+      const csvEscape = (v) => {
+        const s = String(v || "")
+        return s.includes(",") || s.includes('"') || s.includes("\n") ? '"' + s.replace(/"/g, '""') + '"' : s
+      }
+      const rows = docs.map(d => [
+        d.id, d.title, d.url || "", d.documentId,
+        (d.text || "").length,
+        (d.text || "").slice(0, 1000).replace(/\n/g, " ")
+      ].map(csvEscape).join(","))
+      res.writeHead(200, { "Content-Type": "text/csv", "Access-Control-Allow-Origin": "*" })
+      return res.end([header, ...rows].join("\n"))
+    } catch (err) {
+      return send(res, 500, { error: String(err?.message || err) })
+    }
+  }
+
   if (req.method === "GET" && url.pathname === "/openapi.json") {
     return send(res, 200, {
       openapi: "3.1.0",
@@ -684,6 +770,55 @@ const server = createServer(async (req, res) => {
           get: {
             summary: "Health check",
             responses: { "200": { description: "OK" } }
+          }
+        },
+        "/corpus/summary": {
+          get: {
+            summary: "Get corpus summary statistics",
+            security: [{ bearerAuth: [] }],
+            responses: {
+              "200": {
+                description: "Corpus summary with counts by source and status",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        totalDocuments: { type: "integer" },
+                        bySource: { type: "object" },
+                        byStatus: { type: "object" },
+                        totalCharacters: { type: "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/corpus": {
+          post: {
+            summary: "Get corpus documents with optional filtering",
+            security: [{ bearerAuth: [] }],
+            requestBody: {
+              content: { "application/json": { schema: { type: "object", properties: {
+                filter: { type: "object", properties: { source: { type: "string" }, titleContains: { type: "string" } } },
+                limit: { type: "integer", default: 200 },
+                offset: { type: "integer", default: 0 },
+                includeContent: { type: "boolean", default: false }
+              } } } }
+            },
+            responses: { "200": { description: "Paginated list of corpus documents" } }
+          }
+        },
+        "/corpus/export": {
+          post: {
+            summary: "Export full corpus as CSV or JSONL",
+            security: [{ bearerAuth: [] }],
+            requestBody: {
+              content: { "application/json": { schema: { type: "object", properties: { format: { type: "string", enum: ["csv", "jsonl"], default: "csv" } } } } }
+            },
+            responses: { "200": { description: "Corpus data in requested format" } }
           }
         }
       },
@@ -918,6 +1053,9 @@ vercel deploy
 - \`PUT  /documents/:id\`    → update a document
 - \`DELETE /documents/:id\`  → delete a document
 - \`POST /scrape\`           → scrape a URL and ingest into the corpus
+- \`GET  /corpus/summary\`   → get corpus statistics (counts by source/status)
+- \`POST /corpus\`           → get corpus documents with optional filtering
+- \`POST /corpus/export\`    → export full corpus as CSV or JSONL
 `;
 }
 

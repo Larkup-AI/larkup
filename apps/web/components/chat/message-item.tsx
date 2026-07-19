@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useMemo } from 'react';
 import type { UIMessage } from 'ai';
 import { KnowledgeBaseResult } from '@/components/chat/tools/knowledge-base-result';
 import { ChatChart, type ChartConfig } from '@/components/chat/tools/chat-chart';
@@ -10,9 +9,11 @@ import {
   type SandboxResultConfig,
 } from '@/components/chat/tools/chat-sandbox-result';
 import { ChatTabs } from '@/components/chat/tools/chat-tabs';
-import { ChatCardSimple } from '@/components/chat/tools/chat-card';
-import { ChatGrid, type ChatGridConfig } from '@/components/chat/tools/chat-grid';
-import { Sparkles, BarChart3, Table2, FlaskConical } from 'lucide-react';
+import {
+  CorpusDataResult,
+  type CorpusDataConfig,
+} from '@/components/chat/tools/corpus-data-result';
+import { Sparkles } from 'lucide-react';
 import { ChatMediaPreview, parseMediaRefs } from '@/components/chat/tools/chat-media-preview';
 
 function FollowUpButtons({
@@ -217,8 +218,15 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
           {toolName === 'queryTabularData' && 'Querying data...'}
           {toolName === 'generateVisualization' && 'Generating chart...'}
           {toolName === 'executeAnalysis' && 'Running analysis...'}
-          {!['queryTabularData', 'generateVisualization', 'executeAnalysis'].includes(toolName) &&
-            'Processing...'}
+          {toolName === 'getIndexedData' && 'Fetching corpus data...'}
+          {toolName === 'analyzeCorpusWithCode' && 'Analyzing corpus...'}
+          {![
+            'queryTabularData',
+            'generateVisualization',
+            'executeAnalysis',
+            'getIndexedData',
+            'analyzeCorpusWithCode',
+          ].includes(toolName) && 'Processing...'}
         </span>
       </div>
     );
@@ -249,6 +257,18 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
         const result = output as SandboxResultConfig;
         const code = input?.code;
         return <ChatSandboxResult key={index} config={result} code={code} />;
+      }
+
+      case 'getIndexedData': {
+        const corpusConfig = output as CorpusDataConfig;
+        if (!corpusConfig) return null;
+        return <CorpusDataResult key={index} config={corpusConfig} />;
+      }
+
+      case 'analyzeCorpusWithCode': {
+        const corpusResult = output as SandboxResultConfig;
+        const corpusCode = input?.code;
+        return <ChatSandboxResult key={index} config={corpusResult} code={corpusCode} />;
       }
 
       default:

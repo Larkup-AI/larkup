@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import useSWR, { useSWRConfig } from "swr";
-import { toast } from "sonner";
-import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
-import type { CrawlJob, SourceDocument, IndexRun } from "@larkup/core/types";
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import useSWR, { useSWRConfig } from 'swr';
+import { toast } from 'sonner';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import type { CrawlJob, SourceDocument, IndexRun } from '@larkup/core/types';
 import {
   Globe,
   FileUp,
@@ -17,16 +17,16 @@ import {
   ChevronDown,
   Zap,
   RotateCcw,
-} from "lucide-react";
-import { ScrapePanel } from "@/components/data/scrape-panel";
-import { PastePanel } from "@/components/data/paste-panel";
-import { UploadPanel } from "@/components/data/upload-panel";
-import { MediaPanel } from "@/components/data/media-panel";
-import { IntegrationsPanel } from "@/components/data/integrations-panel";
-import { JobsPanel } from "@/components/data/jobs-panel";
-import { CorpusPanel } from "@/components/data/corpus-panel";
-import { FirecrawlNotice } from "@/components/data/firecrawl-notice";
-import { IndexWorkspace } from "@/components/index/index-workspace";
+} from 'lucide-react';
+import { ScrapePanel } from '@/components/data/scrape-panel';
+import { PastePanel } from '@/components/data/paste-panel';
+import { UploadPanel } from '@/components/data/upload-panel';
+import { MediaPanel } from '@/components/data/media-panel';
+import { IntegrationsPanel } from '@/components/data/integrations-panel';
+import { JobsPanel } from '@/components/data/jobs-panel';
+import { CorpusPanel } from '@/components/data/corpus-panel';
+import { FirecrawlNotice } from '@/components/data/firecrawl-notice';
+import { IndexWorkspace } from '@/components/index/index-workspace';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,8 +45,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -67,9 +67,7 @@ async function fetchJobsWithSync(url: string): Promise<{
     jobs: CrawlJob[];
     configured: boolean;
   };
-  const active = jobs.filter(
-    (j) => j.status === "running" || j.status === "queued",
-  );
+  const active = jobs.filter((j) => j.status === 'running' || j.status === 'queued');
   if (active.length === 0) return { jobs, configured };
 
   const advanced = await Promise.all(
@@ -87,20 +85,20 @@ async function fetchJobsWithSync(url: string): Promise<{
 // ---------- Tab definitions ----------
 
 const TOP_TABS = [
-  { id: "add", label: "Add Data" },
-  { id: "corpus", label: "Knowledge Base" },
+  { id: 'add', label: 'Add Data' },
+  { id: 'corpus', label: 'Knowledge Base' },
 ] as const;
 
 const SUB_TABS = [
-  { id: "website", label: "Website", icon: Globe },
-  { id: "files", label: "Files", icon: FileUp },
-  { id: "text", label: "Text", icon: Type },
-  { id: "media", label: "Media", icon: Image },
-  { id: "notion", label: "Integrations", icon: Plug },
+  { id: 'website', label: 'Website', icon: Globe },
+  { id: 'files', label: 'Files', icon: FileUp },
+  { id: 'text', label: 'Text', icon: Type },
+  { id: 'media', label: 'Media', icon: Image },
+  { id: 'notion', label: 'Integrations', icon: Plug },
 ] as const;
 
-type TopTabId = (typeof TOP_TABS)[number]["id"];
-type SubTabId = (typeof SUB_TABS)[number]["id"];
+type TopTabId = (typeof TOP_TABS)[number]['id'];
+type SubTabId = (typeof SUB_TABS)[number]['id'];
 
 export function DataWorkspace() {
   const searchParams = useSearchParams();
@@ -108,26 +106,26 @@ export function DataWorkspace() {
   const pathname = usePathname();
 
   const getInitialTab = (): TopTabId => {
-    const tab = searchParams.get("tab") as TopTabId;
+    const tab = searchParams.get('tab') as TopTabId;
     if (tab && TOP_TABS.some((t) => t.id === tab)) return tab;
-    return "add";
+    return 'add';
   };
 
   const getInitialSubTab = (): SubTabId => {
-    const subtab = searchParams.get("subtab") as SubTabId;
+    const subtab = searchParams.get('subtab') as SubTabId;
     if (subtab && SUB_TABS.some((t) => t.id === subtab)) return subtab;
-    return "website";
+    return 'website';
   };
 
   const [activeTab, setActiveTabState] = useState<TopTabId>(getInitialTab());
   const [activeSubTab, setActiveSubTabState] = useState<SubTabId>(getInitialSubTab());
 
   useEffect(() => {
-    const tab = searchParams.get("tab") as TopTabId;
+    const tab = searchParams.get('tab') as TopTabId;
     if (tab && tab !== activeTab && TOP_TABS.some((t) => t.id === tab)) {
       setActiveTabState(tab);
     }
-    const subtab = searchParams.get("subtab") as SubTabId;
+    const subtab = searchParams.get('subtab') as SubTabId;
     if (subtab && subtab !== activeSubTab && SUB_TABS.some((t) => t.id === subtab)) {
       setActiveSubTabState(subtab);
     }
@@ -136,53 +134,48 @@ export function DataWorkspace() {
   const setActiveTab = (tab: TopTabId) => {
     setActiveTabState(tab);
     const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", tab);
-    window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+    params.set('tab', tab);
+    window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
   };
 
   const setActiveSubTab = (subtab: SubTabId) => {
     setActiveSubTabState(subtab);
     const params = new URLSearchParams(searchParams.toString());
-    params.set("subtab", subtab);
-    window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+    params.set('subtab', subtab);
+    window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
   };
   const [showJobsDrawer, setShowJobsDrawer] = useState(false);
   const [indexDialogOpen, setIndexDialogOpen] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
   const prevJobsRef = useRef<CrawlJob[]>([]);
 
-  const jobsQuery = useSWR("/api/jobs", fetchJobsWithSync, {
+  const jobsQuery = useSWR('/api/jobs', fetchJobsWithSync, {
     refreshInterval: (data) =>
-      data?.jobs.some((j) => j.status === "running" || j.status === "queued")
-        ? 4000
-        : 0,
+      data?.jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 4000 : 0,
   });
   const jobs = jobsQuery.data?.jobs ?? [];
   const configured = jobsQuery.data?.configured ?? true;
-  const hasActive = jobs.some(
-    (j) => j.status === "running" || j.status === "queued",
-  );
+  const hasActive = jobs.some((j) => j.status === 'running' || j.status === 'queued');
 
   useEffect(() => {
     const prevJobs = prevJobsRef.current;
     if (prevJobs.length > 0 && jobs.length > 0) {
       const justCompleted = jobs.filter(
         (j) =>
-          j.status === "completed" &&
+          j.status === 'completed' &&
           prevJobs.some(
-            (pj) =>
-              pj.id === j.id &&
-              (pj.status === "running" || pj.status === "queued"),
+            (pj) => pj.id === j.id && (pj.status === 'running' || pj.status === 'queued'),
           ),
       );
 
       if (justCompleted.length > 0) {
-        toast.success("Indexing completed.");
+        toast.success('Indexing completed.');
       }
     }
     prevJobsRef.current = jobs;
   }, [jobs]);
 
-  const docsQuery = useSWR<DocsResponse>("/api/documents", fetcher, {
+  const docsQuery = useSWR<DocsResponse>('/api/documents', fetcher, {
     refreshInterval: hasActive ? 5000 : 0,
   });
   const documents = docsQuery.data?.documents ?? [];
@@ -193,12 +186,12 @@ export function DataWorkspace() {
     unindexedCount: number;
     running: boolean;
     run: IndexRun | null;
-  }>("/api/index", fetcher, {
+  }>('/api/index', fetcher, {
     refreshInterval: (d) => (d?.running ? 2000 : 0),
   });
   const unindexedCount = indexQuery.data?.unindexedCount ?? 0;
   const indexRunning = indexQuery.data?.running ?? false;
-  const hasCompletedIndex = indexQuery.data?.run?.status === "completed";
+  const hasCompletedIndex = indexQuery.data?.run?.status === 'completed';
 
   const { mutate: mutateGlobal } = useSWRConfig();
 
@@ -206,12 +199,12 @@ export function DataWorkspace() {
     jobsQuery.mutate();
     docsQuery.mutate();
     indexQuery.mutate();
-    mutateGlobal("/api/index");
+    mutateGlobal('/api/index');
   };
 
   const handleDataAdded = () => {
     refreshAll();
-    setActiveTab("corpus");
+    setActiveTab('corpus');
   };
 
   return (
@@ -226,10 +219,8 @@ export function DataWorkspace() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "relative flex cursor-pointer items-center justify-center px-4 h-9 text-sm font-medium transition-colors outline-none ",
-                  isActive
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
+                  'relative flex cursor-pointer items-center justify-center px-4 h-9 text-sm font-medium transition-colors outline-none ',
+                  isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {isActive && (
@@ -238,7 +229,7 @@ export function DataWorkspace() {
                     className="absolute inset-0 rounded-sm bg-background  border border-border/50"
                     initial={false}
                     transition={{
-                      type: "spring",
+                      type: 'spring',
                       stiffness: 500,
                       damping: 35,
                     }}
@@ -246,7 +237,7 @@ export function DataWorkspace() {
                 )}
                 <span className="relative z-10 flex items-center">
                   {tab.label}
-                  {tab.id === "add" && hasActive && (
+                  {tab.id === 'add' && hasActive && (
                     <span className="ml-2 flex items-center gap-1.5 text-xs text-emerald-600">
                       <span className="relative flex size-2">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
@@ -267,10 +258,10 @@ export function DataWorkspace() {
               type="button"
               onClick={() => setShowJobsDrawer(!showJobsDrawer)}
               className={cn(
-                "flex items-center gap-2 rounded-lg border h-10 px-4 text-sm font-medium transition-colors",
+                'flex items-center gap-2 rounded-lg border h-10 px-4 text-sm font-medium transition-colors',
                 hasActive
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                  : "border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  : 'border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground',
               )}
             >
               <Briefcase className="size-4" />
@@ -280,22 +271,18 @@ export function DataWorkspace() {
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
                     <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
                   </span>
-                  {
-                    jobs.filter(
-                      (j) => j.status === "running" || j.status === "queued",
-                    ).length
-                  }{" "}
+                  {jobs.filter((j) => j.status === 'running' || j.status === 'queued').length}{' '}
                   active
                 </>
               ) : (
                 <>
-                  {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+                  {jobs.length} job{jobs.length !== 1 ? 's' : ''}
                 </>
               )}
               <ChevronDown
                 className={cn(
-                  "ml-1 size-4 transition-transform duration-200",
-                  showJobsDrawer && "rotate-180",
+                  'ml-1 size-4 transition-transform duration-200',
+                  showJobsDrawer && 'rotate-180',
                 )}
               />
             </button>
@@ -316,24 +303,22 @@ export function DataWorkspace() {
               />
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    Are you sure you want to re-index data?
-                  </AlertDialogTitle>
+                  <AlertDialogTitle>Are you sure you want to re-index data?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will rebuild the entire index from scratch. All
-                    documents will be re-processed.
+                    This will rebuild the entire index from scratch. All documents will be
+                    re-processed.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={() => {
-                      fetch("/api/index", {
-                        method: "POST",
+                      fetch('/api/index', {
+                        method: 'POST',
                         body: JSON.stringify({ incremental: false }),
-                        headers: { "Content-Type": "application/json" },
+                        headers: { 'Content-Type': 'application/json' },
                       }).then(() => {
-                        toast.success("Indexing started.");
+                        toast.success('Indexing started.');
                         setIndexDialogOpen(true);
                         indexQuery.mutate();
                       });
@@ -350,10 +335,8 @@ export function DataWorkspace() {
             <DialogTrigger
               render={
                 <Button
-                  variant={indexRunning ? "success" : "default"}
-                  disabled={
-                    (docCount === 0 || unindexedCount === 0) && !indexRunning
-                  }
+                  variant={indexRunning ? 'success' : 'default'}
+                  disabled={(docCount === 0 || unindexedCount === 0) && !indexRunning}
                   className="h-10 rounded-md px-4 gap-1.5 text-sm"
                 >
                   {indexRunning ? (
@@ -367,9 +350,7 @@ export function DataWorkspace() {
                   ) : (
                     <>
                       <Zap className="size-3.5" />
-                      {unindexedCount > 0
-                        ? `Start Indexing (${unindexedCount})`
-                        : "Start Indexing"}
+                      {unindexedCount > 0 ? `Start Indexing (${unindexedCount})` : 'Start Indexing'}
                     </>
                   )}
                 </Button>
@@ -385,6 +366,7 @@ export function DataWorkspace() {
               <IndexWorkspace
                 onDone={() => {
                   indexQuery.mutate();
+                  setResetKey((k) => k + 1);
                 }}
               />
             </DialogContent>
@@ -397,9 +379,7 @@ export function DataWorkspace() {
         <div className="mb-6 animate-in slide-in-from-top-2 fade-in duration-200">
           <div className="rounded-lg border border-border bg-card p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-foreground">
-                Scraping Jobs
-              </h3>
+              <h3 className="text-sm font-semibold text-foreground">Scraping Jobs</h3>
               <button
                 type="button"
                 onClick={() => setShowJobsDrawer(false)}
@@ -414,7 +394,7 @@ export function DataWorkspace() {
       )}
 
       <div className="mt-2">
-        {activeTab === "add" && (
+        {activeTab === 'add' && (
           <div className="w-full">
             {/* ─── Line-style sub-tabs ─── */}
             <div className="border-b border-border mb-6">
@@ -427,10 +407,10 @@ export function DataWorkspace() {
                       key={tab.id}
                       onClick={() => setActiveSubTab(tab.id)}
                       className={cn(
-                        "relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors outline-none",
+                        'relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors outline-none',
                         isActive
-                          ? "text-foreground"
-                          : "text-muted-foreground hover:text-foreground",
+                          ? 'text-foreground'
+                          : 'text-muted-foreground hover:text-foreground',
                       )}
                     >
                       <Icon className="size-4" />
@@ -441,7 +421,7 @@ export function DataWorkspace() {
                           className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
                           initial={false}
                           transition={{
-                            type: "spring",
+                            type: 'spring',
                             stiffness: 500,
                             damping: 35,
                           }}
@@ -454,8 +434,8 @@ export function DataWorkspace() {
             </div>
 
             {/* ─── Tab content ─── */}
-            <div className="relative">
-              {activeSubTab === "website" && (
+            <div className="relative" key={resetKey}>
+              {activeSubTab === 'website' && (
                 <div className="w-full flex flex-col gap-8 animate-in fade-in duration-200">
                   <div>
                     <ScrapePanel
@@ -463,9 +443,7 @@ export function DataWorkspace() {
                         handleDataAdded();
                         setShowJobsDrawer(true);
                       }}
-                      crawlerControl={
-                        <FirecrawlNotice cloudConfigured={configured} />
-                      }
+                      crawlerControl={<FirecrawlNotice cloudConfigured={configured} />}
                     />
                   </div>
                   {/* {jobs.length > 0 && !showJobsDrawer && (
@@ -479,25 +457,25 @@ export function DataWorkspace() {
                 </div>
               )}
 
-              {activeSubTab === "files" && (
+              {activeSubTab === 'files' && (
                 <div className="animate-in fade-in duration-200">
                   <UploadPanel onAdded={handleDataAdded} />
                 </div>
               )}
 
-              {activeSubTab === "text" && (
+              {activeSubTab === 'text' && (
                 <div className=" animate-in fade-in duration-200">
                   <PastePanel onAdded={handleDataAdded} />
                 </div>
               )}
 
-              {activeSubTab === "media" && (
+              {activeSubTab === 'media' && (
                 <div className="animate-in fade-in duration-200">
                   <MediaPanel onAdded={handleDataAdded} />
                 </div>
               )}
 
-              {activeSubTab === "notion" && (
+              {activeSubTab === 'notion' && (
                 <div className="animate-in fade-in duration-200">
                   <IntegrationsPanel onAdded={handleDataAdded} />
                 </div>
@@ -506,7 +484,7 @@ export function DataWorkspace() {
           </div>
         )}
 
-        {activeTab === "corpus" && (
+        {activeTab === 'corpus' && (
           <div className="animate-in fade-in duration-300">
             <CorpusPanel documents={documents} onChanged={refreshAll} />
           </div>

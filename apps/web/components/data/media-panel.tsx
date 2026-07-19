@@ -188,7 +188,8 @@ export function MediaPanel({ onAdded }: { onAdded: () => void }) {
           assets={assets}
           isLoading={isLoading}
           storageUsedBytes={data?.storage?.usedBytes ?? 0}
-          onMutate={() => {
+          onMutate={() => mutate()}
+          onUploadComplete={() => {
             mutate();
             onAdded();
           }}
@@ -258,6 +259,7 @@ function MediaContent({
   isLoading,
   storageUsedBytes,
   onMutate,
+  onUploadComplete,
 }: {
   mediaType: 'image' | 'video' | 'audio';
   tab: MediaSubTab;
@@ -265,6 +267,7 @@ function MediaContent({
   isLoading: boolean;
   storageUsedBytes: number;
   onMutate: () => void;
+  onUploadComplete: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [staged, setStaged] = useState<StagedMedia[]>([]);
@@ -348,7 +351,7 @@ function MediaContent({
         }).catch(() => {}); // fire and forget
       }
 
-      onMutate();
+      onUploadComplete();
     } catch (err) {
       toast.error(formatErrorMessage(err));
     } finally {
@@ -440,17 +443,17 @@ function MediaContent({
 
           {/* Grid preview for staged images */}
           {mediaType === 'image' ? (
-            <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {staged.map((item) => (
                 <div
                   key={item.id}
-                  className="group relative aspect-square rounded-lg overflow-hidden bg-muted"
+                  className="group relative aspect-[2/1] sm:aspect-[21/9] rounded-xl overflow-hidden bg-muted/30 border border-border/50"
                 >
                   {item.preview && (
                     <img
                       src={item.preview}
                       alt={item.file.name}
-                      className="size-full object-cover"
+                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   )}
                   <button
@@ -459,9 +462,9 @@ function MediaContent({
                       e.stopPropagation();
                       removeFile(item.id);
                     }}
-                    className="absolute right-1 top-1 rounded-full bg-black/50 p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <X className="size-3" />
+                    <X className="size-3.5" />
                   </button>
                 </div>
               ))}
@@ -576,56 +579,106 @@ function ImageGallery({
   assets: MediaAsset[];
   onDelete: (id: string) => void;
 }) {
+  const [visibleCount, setVisibleCount] = useState(12);
+  const [expandedAsset, setExpandedAsset] = useState<MediaAsset | null>(null);
+
+  const visibleAssets = assets.slice(0, visibleCount);
+  const hasMore = visibleCount < assets.length;
+
   return (
-    <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">
-      {assets.map((asset) => (
-        <div
-          key={asset.id}
-          className="group relative aspect-square rounded-lg overflow-hidden bg-muted cursor-pointer"
-        >
-          <img
-            src={`/api/media/${asset.id}?thumb=true`}
-            alt={asset.fileName}
-            className="size-full object-cover"
-            loading="lazy"
-            onError={(e) => {
-              // Fallback to original if no thumbnail
-              (e.target as HTMLImageElement).src = `/api/media/${asset.id}`;
-            }}
-          />
-
-          {/* Processing status overlay */}
-          {asset.processingStatus === 'processing' && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Loader2 className="size-4 animate-spin text-white" />
-            </div>
-          )}
-          {asset.processingStatus === 'failed' && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <AlertCircle className="size-4 text-red-400" />
-            </div>
-          )}
-          {asset.processingStatus === 'pending' && (
-            <div className="absolute bottom-1 right-1">
-              <Clock className="size-3 text-white/60" />
-            </div>
-          )}
-
-          {/* Hover actions */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(asset.id);
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {visibleAssets.map((asset) => (
+          <div
+            key={asset.id}
+            onClick={() => setExpandedAsset(asset)}
+            className="group relative aspect-[2/1] sm:aspect-[21/9] rounded-xl overflow-hidden bg-muted/30 border border-border/50 cursor-pointer"
+          >
+            <img
+              src={`/api/media/${asset.id}?thumb=true`}
+              alt={asset.fileName}
+              className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+              onError={(e) => {
+                // Fallback to original if no thumbnail
+                (e.target as HTMLImageElement).src = `/api/media/${asset.id}`;
               }}
-              className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            />
+
+            {/* Processing status overlay */}
+            {asset.processingStatus === 'processing' && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                <Loader2 className="size-4 animate-spin text-white" />
+              </div>
+            )}
+            {asset.processingStatus === 'failed' && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                <AlertCircle className="size-4 text-red-400" />
+              </div>
+            )}
+            {asset.processingStatus === 'pending' && (
+              <div className="absolute bottom-2 right-2">
+                <Clock className="size-3.5 text-white/80 drop-shadow-md" />
+              </div>
+            )}
+
+            {/* Hover actions */}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(asset.id);
+                }}
+                className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto hover:bg-black/70"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {hasMore && (
+        <div className="flex justify-center pt-2 pb-6">
+          <Button
+            variant="outline"
+            onClick={() => setVisibleCount((prev) => prev + 12)}
+            className="text-muted-foreground"
+          >
+            Load More
+          </Button>
+        </div>
+      )}
+
+      {/* Lightbox Overlay */}
+      {expandedAsset && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-8 animate-in fade-in duration-200"
+          onClick={() => setExpandedAsset(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            <img
+              src={`/api/media/${expandedAsset.id}`}
+              alt={expandedAsset.fileName}
+              className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain"
+              onClick={(e) => e.stopPropagation()} // Prevent click from closing immediately
+            />
+            <button
+              onClick={() => setExpandedAsset(null)}
+              className="absolute -top-3 -right-3 md:-top-5 md:-right-5 rounded-full bg-black/50 border border-white/20 p-2 text-white hover:bg-black/80 transition-colors"
             >
-              <Trash2 className="size-3" />
+              <X className="size-5" />
             </button>
+            <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black/80 to-transparent text-white rounded-b-lg opacity-0 hover:opacity-100 transition-opacity flex justify-between items-end">
+              <div>
+                <p className="text-sm font-medium">{expandedAsset.fileName}</p>
+                <p className="text-xs text-white/70 mt-1">{formatSize(expandedAsset.fileSize)}</p>
+              </div>
+            </div>
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }

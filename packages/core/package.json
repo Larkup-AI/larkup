@@ -24,7 +24,8 @@
     "./models-cache": "./src/models-cache.ts",
     "./tabular-store": "./src/tabular-store.ts",
     "./analytics-store": "./src/analytics-store.ts",
-    "./media-store": "./src/media-store.ts"
+    "./media-store": "./src/media-store.ts",
+    "./corpus-retriever": "./src/corpus-retriever.ts"
   },
   "dependencies": {
     "@ai-sdk/cohere": "^3.0.39",

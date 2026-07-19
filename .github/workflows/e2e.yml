@@ -34,6 +34,7 @@ jobs:
     - name: Run E2E tests
       run: |
         pnpm dev &
+        pnpm dlx wait-on http://localhost:4567 -t 60000
         cd e2e
         pnpm test
       env:

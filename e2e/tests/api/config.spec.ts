@@ -22,7 +22,7 @@ test.describe('Config API (/api/config)', () => {
   });
 
   test('PUT /api/config sets API key', async ({ request }) => {
-    // test.skip(!hasEnv(ENV_KEYS.OPENAI_API_KEY), "OPENAI_API_KEY not set");
+    test.skip(!hasEnv(ENV_KEYS.OPENAI_API_KEY), 'OPENAI_API_KEY not set');
 
     const getRes = await request.get('/api/config');
     const { config: current } = await getRes.json();
@@ -50,7 +50,7 @@ test.describe('Config API (/api/config)', () => {
   });
 
   test('PUT /api/config with valid LanceDB config', async ({ request }) => {
-    // test.skip(!hasEnv(ENV_KEYS.AI_GATEWAY_APIKEY), "API key not set");
+    test.skip(!hasEnv(ENV_KEYS.AI_GATEWAY_APIKEY), 'API key not set');
 
     const getRes = await request.get('/api/config');
     const { config: current } = await getRes.json();
@@ -79,7 +79,7 @@ test.describe('Config API (/api/config)', () => {
   });
 
   test('PUT /api/config with valid Pinecone config', async ({ request }) => {
-    // test.skip(!hasEnv(ENV_KEYS.PINECONE_APIKEY), "PINECONE_APIKEY not set");
+    test.skip(!hasEnv(ENV_KEYS.PINECONE_APIKEY), 'PINECONE_APIKEY not set');
 
     const getRes = await request.get('/api/config');
     const { config: current } = await getRes.json();

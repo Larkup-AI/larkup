@@ -9,6 +9,12 @@ import { runWithServer } from '@larkup/core/workspace';
 import { getModelsByType } from '@larkup/core/models-cache';
 import { toChatDescriptor, getDefaultChatModel } from '@larkup/core/chat-models/registry';
 import { listTabularDatasets, getTabularDataset, queryTabular } from '@larkup/core/tabular-store';
+import {
+  getCorpusDocuments,
+  exportCorpusAsCSV,
+  exportCorpusAsJSONL,
+  type CorpusFilter,
+} from '@larkup/core/corpus-retriever';
 import { SandboxManager } from '@larkup/sandbox';
 
 import { createOpenAI } from '@ai-sdk/openai';
@@ -23,58 +29,59 @@ import type { CustomModelConfig } from '@larkup/core/types';
 
 export const maxDuration = 60;
 
-const DEFAULT_SYSTEM_PROMPT = `You are a powerful data analysis assistant with access to a knowledge base and tabular data tools.
+const DEFAULT_SYSTEM_PROMPT = `You are a powerful data analysis assistant with access to a knowledge base, corpus introspection tools, tabular data tools, and a code sandbox.
 
 You have these tools:
-1. "searchKnowledgeBase" — searches the private RAG knowledge base for relevant documents.
-2. "queryTabularData" — queries stored tabular datasets (CSV/Excel/JSON) for exact values, aggregations, filtering, and grouping.
-3. "generateVisualization" — generates interactive charts to visualize data trends.
-4. "executeAnalysis" — runs Python code in a sandbox for deep statistical analysis (correlations, regressions, custom calculations).
+1. "searchKnowledgeBase" — semantic search over the RAG knowledge base. Returns top-K most relevant document chunks.
+2. "getIndexedData" — structured access to ALL indexed source documents. Returns document metadata (title, source, status, metadata fields, dates). Use for counting, listing, filtering, and overview questions.
+3. "analyzeCorpusWithCode" — runs Python code in a sandbox with the FULL corpus available as a CSV/JSONL file. Use for complex analysis of hundreds/thousands of documents.
+4. "queryTabularData" — queries stored tabular datasets (CSV/Excel/JSON) for exact values, aggregations, filtering, and grouping.
+5. "generateVisualization" — generates interactive charts to visualize data trends.
+6. "executeAnalysis" — runs Python code in a sandbox for deep statistical analysis on tabular datasets.
+
+TOOL SELECTION STRATEGY (follow this decision tree):
+1. Greeting or general question → respond directly, no tools needed.
+2. "Find me info about X", "What does Y say about Z?" → searchKnowledgeBase (semantic search, top-K).
+3. "How many documents?", "List all X", "Show progress", "What's the status?", "Show me documents by source" → getIndexedData (structured data access with filters).
+4. Complex analysis over hundreds of documents, pivot tables, grouping, pattern detection, progress tracking across many items → analyzeCorpusWithCode (Python sandbox with full corpus).
+5. Questions about uploaded CSV/Excel/JSON data → queryTabularData.
+6. Chart or visual representation needed → generateVisualization.
+7. Complex statistical analysis on tabular data → executeAnalysis.
+
+IMPORTANT — getIndexedData vs analyzeCorpusWithCode:
+- Use getIndexedData for simple questions: counts, lists, filtering by source/status/metadata.
+- Use analyzeCorpusWithCode when you need to PROCESS the actual content: parse fields from text, group by patterns, compute progress percentages, detect duplicates, or analyze metadata programmatically.
+- analyzeCorpusWithCode gives you the corpus as 'corpus.csv' with columns: id, title, source, url, charCount, status, createdAt, content, plus any metadata_* columns.
+- Example: "Show todo progress" → analyzeCorpusWithCode to parse status from content/metadata, compute percentages.
+- Example: "How many docs are scraped?" → getIndexedData with source filter (simpler).
 
 CRITICAL RULES FOR CHARTS AND VISUALIZATIONS:
 - You MUST ALWAYS use the "generateVisualization" tool to display ANY visual data, trends, or charts.
 - The UI strictly requires the "generateVisualization" tool to render interactive charts. Text-based approximations will not work.
 - DO NOT be lazy. You MUST populate the 'data' array in the 'generateVisualization' tool call with the exact rows of data you want to plot.
-- ALWAYS call queryTabularData FIRST to get the data, THEN in your next turn, call generateVisualization with that exact data to render the chart.
+- ALWAYS get the data FIRST (via getIndexedData, queryTabularData, or analyzeCorpusWithCode), THEN call generateVisualization with that data.
 - The UI renders generateVisualization output as an interactive Recharts chart.
+
 RESPONSE FORMATTING (Analytics Style):
 - Structure your responses for an analytics dashboard — be concise and insight-driven.
 - Lead with the key insight or answer in bold (e.g., "**October had the highest revenue at $487,384**").
 - Use "### Key Findings" or "### Summary" headers to organize sections.
 - For observations, use bullet points with bold labels: "- **Peak:** October at $487K"
-- When presenting multiple numbers, prefer a table or call generateVisualization — do NOT list raw numbers with dollar signs line by line.
+- When presenting multiple numbers, prefer a table or call generateVisualization — do NOT list raw numbers line by line.
 - End with 1-2 brief, actionable follow-up suggestions.
 - Keep text SHORT. Let the charts and tables do the heavy lifting.
 - NEVER output long lists of numbers as plain text. Use tables or charts instead.
 
-Guidelines:
-- For basic greetings, respond conversationally without tools.
-- For questions about facts or specific topics, call searchKnowledgeBase first.
-- For questions about data, numbers, comparisons, or "what is the highest/lowest/average...": ALWAYS call queryTabularData to get exact answers. Never guess numerical values.
-- When showing trends, distributions, or comparisons, use generateVisualization to create charts. Choose the best chart type:
-  • Bar charts: comparing categories
-  • Line charts: trends over time
-  • Area charts: cumulative trends
-  • Pie charts: proportion/share breakdowns
-  • Scatter charts: correlation between two variables
-  • Radar charts: multi-dimensional comparison
-- For complex statistical analysis (correlations, regressions, hypothesis testing, or when data exceeds simple aggregation), use executeAnalysis with Python code.
-- After showing data or charts, suggest 2-3 brief follow-up actions as short phrases (e.g., "Compare by region", "Break down Q4", "Show top products").
-- Always cite your data sources. Be concise and accurate.
-- IMPORTANT: When you create charts, use descriptive titles and subtitles. Include the data directly in the visualization config.
-- IMPORTANT: If queryTabularData returns results, synthesize a clear answer with the exact numbers. Don't just dump raw data.
-
 DATE HANDLING:
-- Date columns store values as strings. When filtering dates, use the EXACT format shown in the column metadata (e.g. "2024-01-15" for YYYY-MM-DD format).
-- For date comparisons (before/after/between), use "gt", "gte", "lt", "lte" operators with date strings in the same format as stored.
-- Example: to find records after January 2024, use filter { column: "date", op: "gte", value: "2024-01-01" }.
-- Example: to find records in 2024, use TWO filters: { op: "gte", value: "2024-01-01" } AND { op: "lt", value: "2025-01-01" }.
+- Date columns store values as strings. When filtering dates, use the EXACT format shown in the column metadata.
+- For date comparisons, use "gt", "gte", "lt", "lte" operators with date strings in the same format as stored.
 - NEVER convert dates to numbers. Always pass date filter values as strings matching the stored format.
 
 LARGE DATASET HANDLING:
-- For datasets with MORE than 10,000 rows, prefer "executeAnalysis" with pandas for complex queries (multi-step aggregations, pivots, correlations, time-series analysis).
-- For simple lookups, counts, or single aggregations on any size dataset, queryTabularData is fine.
-- When using executeAnalysis, the dataset is available as 'data.csv'. Use: df = pd.read_csv('data.csv')
+- For datasets with MORE than 10,000 rows, prefer "executeAnalysis" or "analyzeCorpusWithCode" with pandas.
+- For simple lookups, counts, or single aggregations, queryTabularData or getIndexedData is fine.
+- When using executeAnalysis, the tabular dataset is available as 'data.csv'. Use: df = pd.read_csv('data.csv')
+- When using analyzeCorpusWithCode, the corpus is available as 'corpus.csv'. Use: df = pd.read_csv('corpus.csv')
 - Always print the final results clearly. Use plt.show() for charts.
 `;
 
@@ -461,6 +468,146 @@ export async function POST(req: Request) {
             return {
               stdout: '',
               stderr: err.message ?? 'Sandbox execution failed',
+              exitCode: 1,
+              artifacts: [],
+              executionTimeMs: 0,
+            };
+          }
+        },
+      }),
+
+      getIndexedData: tool({
+        description:
+          'Get structured access to ALL indexed source documents. Use this for counting, listing, filtering, and overview questions about the knowledge base. Returns document metadata (title, source type, status, custom metadata fields, dates). Use this when the user asks "how many documents?", "list all X", "show progress", "what sources?", or any structural question about the corpus.',
+        inputSchema: z.object({
+          filter: z
+            .object({
+              source: z
+                .enum(['paste', 'upload', 'scrape', 'tabular', 'media'])
+                .optional()
+                .describe('Filter by document source type.'),
+              status: z
+                .enum(['indexed', 'unindexed'])
+                .optional()
+                .describe('Filter by indexing status.'),
+              metadataKey: z.string().optional().describe('Filter by metadata key existence.'),
+              metadataValue: z
+                .string()
+                .optional()
+                .describe('Filter by metadata key=value (requires metadataKey).'),
+              titleContains: z
+                .string()
+                .optional()
+                .describe('Case-insensitive text search in title.'),
+              createdAfter: z
+                .string()
+                .optional()
+                .describe('Only docs created on or after this ISO date.'),
+              createdBefore: z
+                .string()
+                .optional()
+                .describe('Only docs created on or before this ISO date.'),
+            })
+            .optional()
+            .describe('Optional filters to narrow down documents.'),
+          limit: z
+            .number()
+            .optional()
+            .default(200)
+            .describe('Max number of document summaries to return (default 200).'),
+          offset: z.number().optional().default(0).describe('Pagination offset.'),
+          includeContent: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe(
+              'Whether to include truncated document content. Default false for performance. Set true only when you need the actual text.',
+            ),
+        }),
+        execute: async ({ filter, limit, offset, includeContent }) => {
+          try {
+            return await getCorpusDocuments(
+              filter as CorpusFilter | undefined,
+              limit ?? 200,
+              offset ?? 0,
+              includeContent ?? false,
+            );
+          } catch (err: any) {
+            return {
+              documents: [],
+              total: 0,
+              summary: {
+                totalDocuments: 0,
+                bySource: {},
+                byStatus: {},
+                topMetadataKeys: [],
+                totalCharacters: 0,
+                dateRange: null,
+              },
+              error: err.message ?? 'Failed to retrieve corpus data',
+            };
+          }
+        },
+      }),
+
+      analyzeCorpusWithCode: tool({
+        description:
+          'Run Python code in a sandbox with the FULL indexed corpus available as a file. Use this for complex analysis of documents: parsing fields from content, computing progress percentages, grouping by patterns, detecting duplicates, generating charts from corpus data, or any question that requires programmatic processing of hundreds/thousands of documents. The corpus is available as "corpus.csv" (or "corpus.jsonl" if format is jsonl). CSV columns: id, title, source, url, charCount, status, createdAt, content, plus any metadata_* columns.',
+        inputSchema: z.object({
+          code: z
+            .string()
+            .describe(
+              'Python code to execute. The corpus file is in the working directory. Use pandas to load it: df = pd.read_csv("corpus.csv") or for JSONL: df = pd.read_json("corpus.jsonl", lines=True). Has pandas, numpy, matplotlib, scipy, sklearn, seaborn available. Print results and use plt.show() for charts.',
+            ),
+          format: z
+            .enum(['csv', 'jsonl'])
+            .optional()
+            .default('csv')
+            .describe('Format of the corpus file. Default is CSV.'),
+        }),
+        execute: async ({ code, format }) => {
+          try {
+            const sandboxManager = new SandboxManager({ backend: 'docker' });
+
+            // Export corpus in the requested format
+            const corpusData =
+              format === 'jsonl' ? await exportCorpusAsJSONL() : await exportCorpusAsCSV();
+
+            if (!corpusData) {
+              return {
+                stdout: 'No documents found in the corpus.',
+                stderr: '',
+                exitCode: 0,
+                artifacts: [],
+                executionTimeMs: 0,
+              };
+            }
+
+            const fileName = format === 'jsonl' ? 'corpus.jsonl' : 'corpus.csv';
+            const files = [{ name: fileName, content: corpusData }];
+
+            const result = await sandboxManager.execute({
+              code,
+              language: 'python',
+              files,
+              timeout: 30_000,
+            });
+
+            return {
+              stdout: result.stdout.slice(0, 5000),
+              stderr: result.stderr.slice(0, 2000),
+              exitCode: result.exitCode,
+              artifacts: result.artifacts.map((a) => ({
+                name: a.name,
+                mimeType: a.mimeType,
+                data: a.data.slice(0, 500_000),
+              })),
+              executionTimeMs: result.executionTimeMs,
+            };
+          } catch (err: any) {
+            return {
+              stdout: '',
+              stderr: err.message ?? 'Corpus analysis failed',
               exitCode: 1,
               artifacts: [],
               executionTimeMs: 0,
