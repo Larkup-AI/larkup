@@ -12,20 +12,27 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "reasoning",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000012",
+      "output": "0.00000024"
+    }
   },
   {
     "id": "alibaba/qwen-3-235b",
     "name": "Qwen3 235B A22B",
     "owned_by": "alibaba",
     "type": "language",
-    "description": "",
     "context_window": 262144,
     "max_tokens": 16384,
     "tags": [
       "tool-use",
       "reasoning"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000022",
+      "output": "0.00000088"
+    }
   },
   {
     "id": "alibaba/qwen-3-30b",
@@ -38,7 +45,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "reasoning",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000012",
+      "output": "0.0000005"
+    }
   },
   {
     "id": "alibaba/qwen-3-32b",
@@ -52,7 +63,11 @@ export const ALL_MODELS: GatewayModel[] = [
       "reasoning",
       "tool-use",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000016",
+      "output": "0.00000064"
+    }
   },
   {
     "id": "alibaba/qwen-3.6-max-preview",
@@ -65,7 +80,57 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "reasoning",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000013",
+      "input_tiers": [
+        {
+          "cost": "0.0000013",
+          "min": 0,
+          "max": 128000
+        },
+        {
+          "cost": "0.000002",
+          "min": 128000
+        }
+      ],
+      "output": "0.0000078",
+      "output_tiers": [
+        {
+          "cost": "0.0000078",
+          "min": 0,
+          "max": 128000
+        },
+        {
+          "cost": "0.000012",
+          "min": 128000
+        }
+      ],
+      "input_cache_read": "0.00000026",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.00000026",
+          "min": 0,
+          "max": 128000
+        },
+        {
+          "cost": "0.0000002",
+          "min": 128000
+        }
+      ],
+      "input_cache_write": "0.000001625",
+      "input_cache_write_tiers": [
+        {
+          "cost": "0.000001625",
+          "min": 0,
+          "max": 128000
+        },
+        {
+          "cost": "0.0000025",
+          "min": 128000
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/qwen3-235b-a22b-thinking",
@@ -80,7 +145,11 @@ export const ALL_MODELS: GatewayModel[] = [
       "reasoning",
       "tool-use",
       "file-input"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000004",
+      "output": "0.000004"
+    }
   },
   {
     "id": "alibaba/qwen3-coder",
@@ -93,7 +162,60 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "tool-use",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000015",
+      "input_tiers": [
+        {
+          "cost": "0.0000015",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.0000027",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.0000045",
+          "min": 128001
+        }
+      ],
+      "output": "0.0000075",
+      "output_tiers": [
+        {
+          "cost": "0.0000075",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.0000135",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.0000225",
+          "min": 128001
+        }
+      ],
+      "input_cache_read": "0.0000003",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000003",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.00000054",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.0000009",
+          "min": 128001
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/qwen3-coder-30b-a3b",
@@ -105,7 +227,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "max_tokens": 8192,
     "tags": [
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.0000006"
+    }
   },
   {
     "id": "alibaba/qwen3-coder-next",
@@ -117,7 +243,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "max_tokens": 256000,
     "tags": [
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000005",
+      "output": "0.0000012"
+    }
   },
   {
     "id": "alibaba/qwen3-coder-plus",
@@ -130,7 +260,75 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "implicit-caching",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000001",
+      "input_tiers": [
+        {
+          "cost": "0.000001",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.0000018",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.000003",
+          "min": 128001,
+          "max": 256001
+        },
+        {
+          "cost": "0.000006",
+          "min": 256001
+        }
+      ],
+      "output": "0.000005",
+      "output_tiers": [
+        {
+          "cost": "0.000005",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.000009",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.000015",
+          "min": 128001,
+          "max": 256001
+        },
+        {
+          "cost": "0.00006",
+          "min": 256001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000002",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.00000036",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.0000006",
+          "min": 128001,
+          "max": 256001
+        },
+        {
+          "cost": "0.0000012",
+          "min": 256001
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/qwen3-embedding-0.6b",
@@ -140,7 +338,9 @@ export const ALL_MODELS: GatewayModel[] = [
     "description": "The Qwen3 Embedding model series is the latest proprietary model of the Qwen family, specifically designed for text embedding and ranking tasks. Building upon the dense foundational models of the Qwen3 series, it provides a comprehensive range of text embeddings and reranking models in various sizes (0.6B, 4B, and 8B).",
     "context_window": 32768,
     "max_tokens": 32768,
-    "tags": []
+    "pricing": {
+      "input": "0.00000001"
+    }
   },
   {
     "id": "alibaba/qwen3-embedding-4b",
@@ -150,7 +350,9 @@ export const ALL_MODELS: GatewayModel[] = [
     "description": "The Qwen3 Embedding model series is the latest proprietary model of the Qwen family, specifically designed for text embedding and ranking tasks. Building upon the dense foundational models of the Qwen3 series, it provides a comprehensive range of text embeddings and reranking models in various sizes (0.6B, 4B, and 8B).",
     "context_window": 32768,
     "max_tokens": 32768,
-    "tags": []
+    "pricing": {
+      "input": "0.00000002"
+    }
   },
   {
     "id": "alibaba/qwen3-embedding-8b",
@@ -160,7 +362,9 @@ export const ALL_MODELS: GatewayModel[] = [
     "description": "The Qwen3 Embedding model series is the latest proprietary model of the Qwen family, specifically designed for text embedding and ranking tasks. Building upon the dense foundational models of the Qwen3 series, it provides a comprehensive range of text embeddings and reranking models in various sizes (0.6B, 4B, and 8B).",
     "context_window": 32768,
     "max_tokens": 32768,
-    "tags": []
+    "pricing": {
+      "input": "0.00000005"
+    }
   },
   {
     "id": "alibaba/qwen3-max",
@@ -173,7 +377,60 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "tool-use",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000012",
+      "input_tiers": [
+        {
+          "cost": "0.0000012",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.0000024",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.000003",
+          "min": 128001
+        }
+      ],
+      "output": "0.000006",
+      "output_tiers": [
+        {
+          "cost": "0.000006",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.000012",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.000015",
+          "min": 128001
+        }
+      ],
+      "input_cache_read": "0.00000024",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.00000024",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.00000048",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.0000006",
+          "min": 128001
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/qwen3-max-preview",
@@ -186,7 +443,60 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "tool-use",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000012",
+      "input_tiers": [
+        {
+          "cost": "0.0000012",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.0000024",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.000003",
+          "min": 128001
+        }
+      ],
+      "output": "0.000006",
+      "output_tiers": [
+        {
+          "cost": "0.000006",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.000012",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.000015",
+          "min": 128001
+        }
+      ],
+      "input_cache_read": "0.00000024",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.00000024",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.00000048",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.0000006",
+          "min": 128001
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/qwen3-max-thinking",
@@ -199,7 +509,60 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "reasoning",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000012",
+      "input_tiers": [
+        {
+          "cost": "0.0000012",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.0000024",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.000003",
+          "min": 128001
+        }
+      ],
+      "output": "0.000006",
+      "output_tiers": [
+        {
+          "cost": "0.000006",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.000012",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.000015",
+          "min": 128001
+        }
+      ],
+      "input_cache_read": "0.00000024",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.00000024",
+          "min": 0,
+          "max": 32001
+        },
+        {
+          "cost": "0.00000048",
+          "min": 32001,
+          "max": 128001
+        },
+        {
+          "cost": "0.0000006",
+          "min": 128001
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/qwen3-next-80b-a3b-instruct",
@@ -211,7 +574,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "max_tokens": 32768,
     "tags": [
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.0000012"
+    }
   },
   {
     "id": "alibaba/qwen3-next-80b-a3b-thinking",
@@ -224,7 +591,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "reasoning",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.0000012"
+    }
   },
   {
     "id": "alibaba/qwen3-vl-235b-a22b-instruct",
@@ -238,7 +609,11 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000004",
+      "output": "0.0000016"
+    }
   },
   {
     "id": "alibaba/qwen3-vl-instruct",
@@ -252,7 +627,11 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000004",
+      "output": "0.0000016"
+    }
   },
   {
     "id": "alibaba/qwen3-vl-thinking",
@@ -267,7 +646,11 @@ export const ALL_MODELS: GatewayModel[] = [
       "reasoning",
       "tool-use",
       "file-input"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000004",
+      "output": "0.000004"
+    }
   },
   {
     "id": "alibaba/qwen3.5-flash",
@@ -282,7 +665,13 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "reasoning",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000001",
+      "output": "0.0000004",
+      "input_cache_read": "0.000000001",
+      "input_cache_write": "0.000000125"
+    }
   },
   {
     "id": "alibaba/qwen3.5-plus",
@@ -297,7 +686,57 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "reasoning",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000004",
+      "input_tiers": [
+        {
+          "cost": "0.0000004",
+          "min": 0,
+          "max": 256001
+        },
+        {
+          "cost": "0.0000012",
+          "min": 256001
+        }
+      ],
+      "output": "0.0000024",
+      "output_tiers": [
+        {
+          "cost": "0.0000024",
+          "min": 0,
+          "max": 256001
+        },
+        {
+          "cost": "0.0000072",
+          "min": 256001
+        }
+      ],
+      "input_cache_read": "0.00000004",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.00000004",
+          "min": 0,
+          "max": 256001
+        },
+        {
+          "cost": "0.00000012",
+          "min": 256001
+        }
+      ],
+      "input_cache_write": "0.0000005",
+      "input_cache_write_tiers": [
+        {
+          "cost": "0.0000005",
+          "min": 0,
+          "max": 256001
+        },
+        {
+          "cost": "0.0000015",
+          "min": 256001
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/qwen3.6-27b",
@@ -312,7 +751,11 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "file-input",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000006",
+      "output": "0.0000036"
+    }
   },
   {
     "id": "alibaba/qwen3.6-plus",
@@ -327,7 +770,57 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "file-input"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000005",
+      "input_tiers": [
+        {
+          "cost": "0.0000005",
+          "min": 0,
+          "max": 256000
+        },
+        {
+          "cost": "0.000002",
+          "min": 256000
+        }
+      ],
+      "output": "0.000003",
+      "output_tiers": [
+        {
+          "cost": "0.000003",
+          "min": 0,
+          "max": 256000
+        },
+        {
+          "cost": "0.000006",
+          "min": 256000
+        }
+      ],
+      "input_cache_read": "0.0000001",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000001",
+          "min": 0,
+          "max": 256000
+        },
+        {
+          "cost": "0.0000002",
+          "min": 256000
+        }
+      ],
+      "input_cache_write": "0.000000625",
+      "input_cache_write_tiers": [
+        {
+          "cost": "0.000000625",
+          "min": 0,
+          "max": 256000
+        },
+        {
+          "cost": "0.0000025",
+          "min": 256000
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/qwen3.7-max",
@@ -341,7 +834,13 @@ export const ALL_MODELS: GatewayModel[] = [
       "implicit-caching",
       "reasoning",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "output": "0.00000375",
+      "input_cache_read": "0.00000025",
+      "input_cache_write": "0.0000015625"
+    }
   },
   {
     "id": "alibaba/qwen3.7-plus",
@@ -357,71 +856,305 @@ export const ALL_MODELS: GatewayModel[] = [
       "implicit-caching",
       "file-input",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000004",
+      "input_tiers": [
+        {
+          "cost": "0.0000004",
+          "min": 0,
+          "max": 256000
+        },
+        {
+          "cost": "0.0000012",
+          "min": 256000
+        }
+      ],
+      "output": "0.0000016",
+      "output_tiers": [
+        {
+          "cost": "0.0000016",
+          "min": 0,
+          "max": 256000
+        },
+        {
+          "cost": "0.0000048",
+          "min": 256000
+        }
+      ],
+      "input_cache_read": "0.00000008",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.00000008",
+          "min": 0,
+          "max": 256000
+        },
+        {
+          "cost": "0.00000024",
+          "min": 256000
+        }
+      ],
+      "input_cache_write": "0.0000005",
+      "input_cache_write_tiers": [
+        {
+          "cost": "0.0000005",
+          "min": 0,
+          "max": 256000
+        },
+        {
+          "cost": "0.0000015",
+          "min": 256000
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/wan-v2.5-t2v-preview",
     "name": "Wan v2.5 Text-to-Video Preview",
     "owned_by": "alibaba",
     "type": "video",
-    "description": "",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "480p",
+          "cost_per_second": "0.05"
+        },
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.1"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.15"
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/wan-v2.6-i2v",
     "name": "Wan v2.6 Image-to-Video",
     "owned_by": "alibaba",
     "type": "video",
-    "description": "",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.1"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.15"
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/wan-v2.6-i2v-flash",
     "name": "Wan v2.6 Image-to-Video Flash",
     "owned_by": "alibaba",
     "type": "video",
-    "description": "",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.05"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.075"
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/wan-v2.6-r2v",
     "name": "Wan v2.6 Reference-to-Video",
     "owned_by": "alibaba",
     "type": "video",
-    "description": "",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.1"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.15"
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/wan-v2.6-r2v-flash",
     "name": "Wan v2.6 Reference-to-Video Flash",
     "owned_by": "alibaba",
     "type": "video",
-    "description": "",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.05"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.075"
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/wan-v2.6-t2v",
     "name": "Wan v2.6 Text-to-Video",
     "owned_by": "alibaba",
     "type": "video",
-    "description": "",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.1"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.15"
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/wan-v2.7-r2v",
     "name": "Wan v2.7 Reference-to-Video",
     "owned_by": "alibaba",
     "type": "video",
-    "description": "",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.1"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.15"
+        }
+      ]
+    }
   },
   {
     "id": "alibaba/wan-v2.7-t2v",
     "name": "Wan v2.7 Text-to-Video",
     "owned_by": "alibaba",
     "type": "video",
-    "description": "",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.1"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.15"
+        }
+      ]
+    }
+  },
+  {
+    "id": "amazon/nova-2-lite",
+    "name": "Nova 2 Lite",
+    "owned_by": "amazon",
+    "type": "language",
+    "description": "Nova 2 Lite is a fast, cost-effective reasoning model for everyday workloads that can process text, images, and videos to generate text.",
+    "context_window": 1000000,
+    "max_tokens": 1000000,
+    "tags": [
+      "file-input",
+      "reasoning",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000025",
+      "input_cache_read": "0.000000075"
+    }
+  },
+  {
+    "id": "amazon/nova-lite",
+    "name": "Nova Lite",
+    "owned_by": "amazon",
+    "type": "language",
+    "description": "A very low cost multimodal model that is lightning fast for processing image, video, and text inputs.",
+    "context_window": 300000,
+    "max_tokens": 8192,
+    "tags": [
+      "file-input",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.00000006",
+      "output": "0.00000024"
+    }
+  },
+  {
+    "id": "amazon/nova-micro",
+    "name": "Nova Micro",
+    "owned_by": "amazon",
+    "type": "language",
+    "description": "A text-only model that delivers the lowest latency responses at very low cost.",
+    "context_window": 128000,
+    "max_tokens": 8192,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.000000035",
+      "output": "0.00000014"
+    }
+  },
+  {
+    "id": "amazon/nova-pro",
+    "name": "Nova Pro",
+    "owned_by": "amazon",
+    "type": "language",
+    "description": "A highly capable multimodal model with the best combination of accuracy, speed, and cost for a wide range of tasks.",
+    "context_window": 300000,
+    "max_tokens": 8192,
+    "tags": [
+      "file-input",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.0000008",
+      "output": "0.0000032"
+    }
+  },
+  {
+    "id": "amazon/titan-embed-text-v2",
+    "name": "Titan Text Embeddings V2",
+    "owned_by": "amazon",
+    "type": "embedding",
+    "description": "Amazon Titan Text Embeddings V2 is a light weight, efficient multilingual embedding model supporting 1024, 512, and 256 dimensions.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000002"
+    }
   },
   {
     "id": "anthropic/claude-3-haiku",
@@ -435,7 +1168,13 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "explicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "output": "0.00000125",
+      "input_cache_read": "0.00000003",
+      "input_cache_write": "0.0000003"
+    }
   },
   {
     "id": "anthropic/claude-fable-5",
@@ -451,7 +1190,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "explicit-caching",
       "file-input",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00001",
+      "output": "0.00005",
+      "input_cache_read": "0.000001",
+      "input_cache_write": "0.0000125",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-haiku-4.5",
@@ -468,7 +1214,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000001",
+      "output": "0.000005",
+      "input_cache_read": "0.0000001",
+      "input_cache_write": "0.00000125",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-opus-4",
@@ -484,7 +1237,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "explicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000015",
+      "output": "0.000075",
+      "input_cache_read": "0.0000015",
+      "input_cache_write": "0.00001875",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-opus-4.1",
@@ -500,7 +1260,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "explicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000015",
+      "output": "0.000075",
+      "input_cache_read": "0.0000015",
+      "input_cache_write": "0.00001875",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-opus-4.5",
@@ -517,7 +1284,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000005",
+      "output": "0.000025",
+      "input_cache_read": "0.0000005",
+      "input_cache_write": "0.00000625",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-opus-4.6",
@@ -534,7 +1308,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "explicit-caching",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000005",
+      "output": "0.000025",
+      "input_cache_read": "0.0000005",
+      "input_cache_write": "0.00000625",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-opus-4.7",
@@ -552,7 +1333,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "explicit-caching",
       "web-search",
       "fast"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000005",
+      "output": "0.000025",
+      "input_cache_read": "0.0000005",
+      "input_cache_write": "0.00000625",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-opus-4.7-fast",
@@ -570,7 +1358,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "explicit-caching",
       "web-search",
       "fast"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00003",
+      "output": "0.00015",
+      "input_cache_read": "0.000003",
+      "input_cache_write": "0.0000375",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-opus-4.8",
@@ -588,7 +1383,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "explicit-caching",
       "web-search",
       "fast"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000005",
+      "output": "0.000025",
+      "input_cache_read": "0.0000005",
+      "input_cache_write": "0.00000625",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-opus-4.8-fast",
@@ -606,7 +1408,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "explicit-caching",
       "web-search",
       "fast"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00001",
+      "output": "0.00005",
+      "input_cache_read": "0.000001",
+      "input_cache_write": "0.0000125",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-sonnet-4",
@@ -622,7 +1431,57 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "explicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000003",
+      "input_tiers": [
+        {
+          "cost": "0.000003",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000006",
+          "min": 200001
+        }
+      ],
+      "output": "0.000015",
+      "output_tiers": [
+        {
+          "cost": "0.000015",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000225",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000003",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000003",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000006",
+          "min": 200001
+        }
+      ],
+      "input_cache_write": "0.00000375",
+      "input_cache_write_tiers": [
+        {
+          "cost": "0.00000375",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000075",
+          "min": 200001
+        }
+      ]
+    }
   },
   {
     "id": "anthropic/claude-sonnet-4.5",
@@ -639,7 +1498,58 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000003",
+      "input_tiers": [
+        {
+          "cost": "0.000003",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000006",
+          "min": 200001
+        }
+      ],
+      "output": "0.000015",
+      "output_tiers": [
+        {
+          "cost": "0.000015",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000225",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000003",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000003",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000006",
+          "min": 200001
+        }
+      ],
+      "input_cache_write": "0.00000375",
+      "input_cache_write_tiers": [
+        {
+          "cost": "0.00000375",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000075",
+          "min": 200001
+        }
+      ],
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-sonnet-4.6",
@@ -656,7 +1566,14 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "explicit-caching",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000003",
+      "output": "0.000015",
+      "input_cache_read": "0.0000003",
+      "input_cache_write": "0.00000375",
+      "web_search": "10"
+    }
   },
   {
     "id": "anthropic/claude-sonnet-5",
@@ -673,7 +1590,496 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000002",
+      "output": "0.00001",
+      "input_cache_read": "0.0000002",
+      "input_cache_write": "0.0000025",
+      "web_search": "10"
+    }
+  },
+  {
+    "id": "arcee-ai/trinity-large-thinking",
+    "name": "Trinity Large Thinking",
+    "owned_by": "arcee-ai",
+    "type": "language",
+    "description": "Trinity-Large-Thinking is a reasoning-optimized variant of Arcee AI's Trinity-Large family — a 398B-parameter sparse Mixture-of-Experts (MoE) model with approximately 13B active parameters per token. Built on Trinity-Large-Base and post-trained with extended chain-of-thought reasoning and agentic RL, Trinity-Large-Thinking delivers state-of-the-art performance on agentic benchmarks while maintaining strong general capabilities.",
+    "context_window": 262100,
+    "max_tokens": 80000,
+    "tags": [
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "output": "0.0000009"
+    }
+  },
+  {
+    "id": "arcee-ai/trinity-mini",
+    "name": "Trinity Mini",
+    "owned_by": "arcee-ai",
+    "type": "language",
+    "description": "Trinity Mini is a 26B-parameter (3B active) sparse mixture-of-experts language model, engineered for efficient inference over long contexts with robust function calling and multi-step agent workflows.",
+    "context_window": 131072,
+    "max_tokens": 131072,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.000000045",
+      "output": "0.00000015"
+    }
+  },
+  {
+    "id": "bfl/flux-2-flex",
+    "name": "FLUX.2 [flex]",
+    "owned_by": "bfl",
+    "type": "image",
+    "description": "FLUX.2 is a completely new base model trained for visual intelligence, not just pixel generation, setting a new standard for both image generation and image editing. With FLUX.2 models you can expect the highest quality, higher resolutions (up to 4MP), and new capabilities like multi-ref images. FLUX.2 [flex] supports customizable image generation and editing with adjustable steps and guidance. It's better at typography and text rendering. It supports up to 10 reference images (up to 14 MP total input).\nThis provider gives the option to change the moderation level for inputs and outputs. The control is under safety tolerance and is by default 2 on a range from 0 (more strict) through 6 (more permissive).",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {}
+  },
+  {
+    "id": "bfl/flux-2-klein-4b",
+    "name": "FLUX.2 [klein] 4B",
+    "owned_by": "bfl",
+    "type": "image",
+    "description": "FLUX.2 [klein] is Black Forest Labs' fastest image model yet - it unifies image generation and editing in a single, compact model. Delivering state-of-the-art quality with end-to-end inference in less than a second. Enabling interactive workflows, real-time previews, and latency-critical applications.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {}
+  },
+  {
+    "id": "bfl/flux-2-klein-9b",
+    "name": "FLUX.2 [klein] 9B",
+    "owned_by": "bfl",
+    "type": "image",
+    "description": "FLUX.2 [klein] is Black Forest Labs' fastest image model yet - it unifies image generation and editing in a single, compact model. Delivering state-of-the-art quality with end-to-end inference in less than a second. Enabling interactive workflows, real-time previews, and latency-critical applications.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {}
+  },
+  {
+    "id": "bfl/flux-2-max",
+    "name": "FLUX.2 [max]",
+    "owned_by": "bfl",
+    "type": "image",
+    "description": "FLUX.2 [max] offers image generation and image editing with the highest quality available. It delivers state-of-the-art image generation and advanced image editing with exceptional realism, precision, and consistency. Built for professional use, FLUX.2 [max] produces production-ready outputs for marketing teams, creatives, filmmakers, and creators around the world.",
+    "context_window": 67300,
+    "max_tokens": 67300,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {}
+  },
+  {
+    "id": "bfl/flux-2-pro",
+    "name": "FLUX.2 [pro]",
+    "owned_by": "bfl",
+    "type": "image",
+    "description": "FLUX.2 is a completely new base model trained for visual intelligence, not just pixel generation, setting a new standard for both image generation and image editing. With FLUX.2 models you can expect the highest quality, higher resolutions (up to 4MP), and new capabilities like multi-ref images. FLUX.2 [pro] supports generation, editing, and multiple reference images (up to 9 MP total input).\nThis provider gives the option to change the moderation level for inputs and outputs. The control is under safety tolerance and is by default 2 on a range from 0 (more strict) through 6 (more permissive).",
+    "context_window": 67300,
+    "max_tokens": 67300,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {}
+  },
+  {
+    "id": "bfl/flux-kontext-max",
+    "name": "FLUX.1 Kontext Max",
+    "owned_by": "bfl",
+    "type": "image",
+    "description": "FLUX.1 Kontext creates images from text prompts with unique capabilities for character consistency and advanced editing. It also edits images using simple text prompts. No complex workflows or fine-tuning needed.\nThis provider gives the option to change the moderation level for inputs and outputs. The control is under safety tolerance and is by default 2 on a range from 0 (more strict) through 6 (more permissive).",
+    "context_window": 512,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.08"
+    }
+  },
+  {
+    "id": "bfl/flux-kontext-pro",
+    "name": "FLUX.1 Kontext Pro",
+    "owned_by": "bfl",
+    "type": "image",
+    "description": "FLUX.1 Kontext creates images from text prompts with unique capabilities for character consistency and advanced editing. It also edits images using simple text prompts. No complex workflows or fine-tuning needed.\nThis provider gives the option to change the moderation level for inputs and outputs. The control is under safety tolerance and is by default 2 on a range from 0 (more strict) through 6 (more permissive).",
+    "context_window": 512,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.04"
+    }
+  },
+  {
+    "id": "bfl/flux-pro-1.0-fill",
+    "name": "FLUX.1 Fill [pro]",
+    "owned_by": "bfl",
+    "type": "image",
+    "description": "A state-of-the-art inpainting model, enabling editing and expansion of real and generated images given a text description and a binary mask.\nThis provider gives the option to change the moderation level for inputs and outputs. The control is under safety tolerance and is by default 2 on a range from 0 (more strict) through 6 (more permissive).",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.05"
+    }
+  },
+  {
+    "id": "bfl/flux-pro-1.1",
+    "name": "FLUX1.1 [pro]",
+    "owned_by": "bfl",
+    "type": "image",
+    "description": "FLUX1.1 [pro] is the standard for text-to-image generation with fast, reliable and consistently stunning results.\nThis provider gives the option to change the moderation level for inputs and outputs. The control is under safety tolerance and is by default 2 on a range from 0 (more strict) through 6 (more permissive).",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.04"
+    }
+  },
+  {
+    "id": "bfl/flux-pro-1.1-ultra",
+    "name": "FLUX1.1 [pro] Ultra",
+    "owned_by": "bfl",
+    "type": "image",
+    "description": "FLUX1.1 [pro] Ultra delivers ultra-fast, ultra high-resolution image creation - with more pixels in every picture. Generate varying aspect ratios from text, at 4MP resolution fast.\nThis provider gives the option to change the moderation level for inputs and outputs. The control is under safety tolerance and is by default 2 on a range from 0 (more strict) through 6 (more permissive).",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.06"
+    }
+  },
+  {
+    "id": "bytedance/seed-1.6",
+    "name": "Seed 1.6",
+    "owned_by": "bytedance",
+    "type": "language",
+    "description": "ByteDance's new multimodal deep-thinking model, supporting both text and visual inputs with enhanced reasoning capabilities.",
+    "context_window": 256000,
+    "max_tokens": 32000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "input_tiers": [
+        {
+          "cost": "0.00000025",
+          "min": 0,
+          "max": 128001
+        },
+        {
+          "cost": "0.0000005",
+          "min": 128001
+        }
+      ],
+      "output": "0.000002",
+      "output_tiers": [
+        {
+          "cost": "0.000002",
+          "min": 0,
+          "max": 128001
+        },
+        {
+          "cost": "0.000004",
+          "min": 128001
+        }
+      ],
+      "input_cache_read": "0.00000005"
+    }
+  },
+  {
+    "id": "bytedance/seed-1.8",
+    "name": "Bytedance Seed 1.8",
+    "owned_by": "bytedance",
+    "type": "language",
+    "description": "Bytedance Seed 1.8 features stronger multimodal understanding and agent capabilities. The model delivers superior performance across a wide range of complex real-world tasks, helping enterprises create greater value.",
+    "context_window": 256000,
+    "max_tokens": 64000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "input_tiers": [
+        {
+          "cost": "0.00000025",
+          "min": 0,
+          "max": 128001
+        },
+        {
+          "cost": "0.0000005",
+          "min": 128001
+        }
+      ],
+      "output": "0.000002",
+      "output_tiers": [
+        {
+          "cost": "0.000002",
+          "min": 0,
+          "max": 128001
+        },
+        {
+          "cost": "0.000004",
+          "min": 128001
+        }
+      ],
+      "input_cache_read": "0.00000005"
+    }
+  },
+  {
+    "id": "bytedance/seedance-2.0",
+    "name": "Seedance 2.0",
+    "owned_by": "bytedance",
+    "type": "video",
+    "description": "Built with a unified multimodal audio-video joint generation architecture, Seedance 2.0 supports four input modalities: text, image, audio, and video. Compared with Version 1.5, Seedance 2.0 delivers a substantial leap in generation quality. It achieves a higher usability rate for complex interaction and motion scenes, with significant improvements in physical accuracy, visual realism, and controllability, making it well-suited for high-quality creation scenarios.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "video-generation",
+      "vision"
+    ],
+    "pricing": {
+      "video_token_pricing": {
+        "no_video_input": {
+          "cost_per_million_tokens": "7"
+        },
+        "with_video_input": {
+          "cost_per_million_tokens": "4.3"
+        },
+        "notes": "Pricing varies based on whether the input contains video. When video is included in the input, all tokens are billed at the reduced rate. Token count includes both input and output video and is subject to minimum token floors based on output duration."
+      }
+    }
+  },
+  {
+    "id": "bytedance/seedance-2.0-fast",
+    "name": "Seedance 2.0 Fast",
+    "owned_by": "bytedance",
+    "type": "video",
+    "description": "Seedance 2.0 Fast is a new-generation multimodal video creation model, inheriting the core functions and advantages of Seedance 2.0, with faster speed.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "vision",
+      "video-generation"
+    ],
+    "pricing": {
+      "video_token_pricing": {
+        "no_video_input": {
+          "cost_per_million_tokens": "5.6"
+        },
+        "with_video_input": {
+          "cost_per_million_tokens": "3.3"
+        },
+        "notes": "Pricing varies based on whether the input contains video. When video is included in the input, all tokens are billed at the reduced rate. Token count includes both input and output video and is subject to minimum token floors based on output duration."
+      }
+    }
+  },
+  {
+    "id": "bytedance/seedance-v1.0-pro",
+    "name": "Seedance v1.0 Pro",
+    "owned_by": "bytedance",
+    "type": "video",
+    "description": "A video generation model that supports multi-shot storytelling. It excels in semantic understanding and instruction following, producing smooth, detailed, and cinematic 1080P HD videos.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "video-generation"
+    ],
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "480p",
+          "cost_per_second": "0.0243"
+        },
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.0515"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.1224"
+        }
+      ]
+    }
+  },
+  {
+    "id": "bytedance/seedance-v1.0-pro-fast",
+    "name": "Seedance v1.0 Pro Fast",
+    "owned_by": "bytedance",
+    "type": "video",
+    "description": "Seedance 1.0 Pro Fast delivers top performance at an unbeatable price, balancing quality, speed, and cost. Built on Seedance 1.0 Pro’s core strengths, it’s faster and more cost-efficient for creators.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "video-generation"
+    ],
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "480p",
+          "cost_per_second": "0.0097"
+        },
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.0206"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.049"
+        }
+      ]
+    }
+  },
+  {
+    "id": "bytedance/seedance-v1.5-pro",
+    "name": "Seedance v1.5 Pro",
+    "owned_by": "bytedance",
+    "type": "video",
+    "description": "ByteDance's Seedance 1.5 Pro is a professional video model using V2A native generation for integrated, synced audio-visual output, enhancing efficiency of professional video creation.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "video-generation"
+    ],
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "480p",
+          "audio": false,
+          "cost_per_second": "0.0121"
+        },
+        {
+          "resolution": "480p",
+          "audio": true,
+          "cost_per_second": "0.0241"
+        },
+        {
+          "resolution": "720p",
+          "audio": false,
+          "cost_per_second": "0.0259"
+        },
+        {
+          "resolution": "720p",
+          "audio": true,
+          "cost_per_second": "0.0518"
+        },
+        {
+          "resolution": "1080p",
+          "audio": false,
+          "cost_per_second": "0.0583"
+        },
+        {
+          "resolution": "1080p",
+          "audio": true,
+          "cost_per_second": "0.1166"
+        }
+      ]
+    }
+  },
+  {
+    "id": "bytedance/seedream-4.0",
+    "name": "Seedream 4.0",
+    "owned_by": "bytedance",
+    "type": "image",
+    "description": "Seedream 4.0 is a SOTA multimodal image creation model built on leading architecture. It breaks through the boundaries of traditional text-to-image models by natively supporting text, single-image, and multi-image inputs. Users can freely combine text and images to achieve diverse creative modes within a single model—such as multi-image blending, image editing, and sequentially batch image generation, featuring subject consistency, making image creation more free and controllable.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.03"
+    }
+  },
+  {
+    "id": "bytedance/seedream-4.5",
+    "name": "Seedream 4.5",
+    "owned_by": "bytedance",
+    "type": "image",
+    "description": "Seedream 4.5 is the latest in-house image generation model developed by ByteDance. Compared with Seedream 4.0, it delivers comprehensive improvements—especially in editing consistency, including better preservation of subject details, lighting, and color tone. It also enhances portrait refinement and small-text rendering. The model’s multi-image composition capabilities have been significantly strengthened, and both reasoning performance and visual aesthetics continue to advance, enabling more accurate and artistically expressive image generation.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.04"
+    }
+  },
+  {
+    "id": "bytedance/seedream-5.0-lite",
+    "name": "Seedream 5.0 Lite",
+    "owned_by": "bytedance",
+    "type": "image",
+    "description": "ByteDance-Seedream-5.0-lite is the latest image generation model released by BytePlus. For the first time, it introduces web-connected retrieval, enabling the model to fuse real-time online information to significantly improve the timeliness and relevance of generated images. The model’s reasoning and comprehension capabilities are further upgraded, allowing it to accurately interpret complex prompts and visual inputs. In addition, ByteDance-Seedream-5.0-lite delivers notable improvements in global knowledge coverage, reference consistency, and professional-grade scene generation, making it well suited for enterprise-level visual creation workflows.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.035"
+    }
+  },
+  {
+    "id": "bytedance/seedream-5.0-pro",
+    "name": "Seedream 5.0 Pro",
+    "owned_by": "bytedance",
+    "type": "image",
+    "description": "Seedream-5.0-Pro, ByteDance's newest image generation model, delivers comprehensive upgrades for complex, lifelike image creation and editing, ushering in a new phase of controllable visual production. It stands out with precise editing control, robust commercial applicability and natural rendering results.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "input": "0.000000003",
+      "image": "0.035"
+    }
+  },
+  {
+    "id": "cohere/command-a",
+    "name": "Command A",
+    "owned_by": "cohere",
+    "type": "language",
+    "description": "Command A is Cohere's most performant model to date, excelling at tool use, agents, retrieval augmented generation (RAG), and multilingual use cases. Command A has a context length of 256K, only requires two GPUs to run, and has 150% higher throughput compared to Command R+ 08-2024.",
+    "context_window": 256000,
+    "max_tokens": 8000,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.0000025",
+      "output": "0.00001"
+    }
   },
   {
     "id": "cohere/embed-v4.0",
@@ -682,7 +2088,10 @@ export const ALL_MODELS: GatewayModel[] = [
     "type": "embedding",
     "description": "A model that allows for text, images, or mixed content to be classified or turned into embeddings.",
     "context_window": 128000,
-    "tags": []
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000012"
+    }
   },
   {
     "id": "cohere/rerank-v3.5",
@@ -692,7 +2101,7 @@ export const ALL_MODELS: GatewayModel[] = [
     "description": "A model that allows for re-ranking English Language documents and semi-structured data (JSON).",
     "context_window": 4096,
     "max_tokens": 4096,
-    "tags": []
+    "pricing": {}
   },
   {
     "id": "cohere/rerank-v4-fast",
@@ -702,7 +2111,7 @@ export const ALL_MODELS: GatewayModel[] = [
     "description": "A light version of Rerank 4 Pro, this is a multilingual model that allows for re-ranking English and non-english documents and semi-structured data (JSON). This model is better suited for low latency and high throughput use-cases than its pro variant.",
     "context_window": 32000,
     "max_tokens": 32000,
-    "tags": []
+    "pricing": {}
   },
   {
     "id": "cohere/rerank-v4-pro",
@@ -712,7 +2121,116 @@ export const ALL_MODELS: GatewayModel[] = [
     "description": "A multilingual model that allows for re-ranking English and non-english documents and semi-structured data (JSON). This model is better suited for state-of-the-art quality and complex use-cases than its fast variant.",
     "context_window": 32000,
     "max_tokens": 32000,
-    "tags": []
+    "pricing": {}
+  },
+  {
+    "id": "deepseek/deepseek-r1",
+    "name": "DeepSeek-R1",
+    "owned_by": "deepseek",
+    "type": "language",
+    "description": "DeepSeek-R1 provides customers a state-of-the-art reasoning model, optimized for general reasoning tasks, math, science, and code generation.",
+    "context_window": 128000,
+    "max_tokens": 8192,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.00000135",
+      "output": "0.0000054"
+    }
+  },
+  {
+    "id": "deepseek/deepseek-v3",
+    "name": "DeepSeek V3 0324",
+    "owned_by": "deepseek",
+    "type": "language",
+    "description": "DeepSeek V3, a 685B-parameter, mixture-of-experts model, is the latest iteration of the flagship chat model family from the DeepSeek team.",
+    "context_window": 163840,
+    "max_tokens": 163840,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000027",
+      "output": "0.00000112",
+      "input_cache_read": "0.000000135"
+    }
+  },
+  {
+    "id": "deepseek/deepseek-v3.1",
+    "name": "DeepSeek V3.1",
+    "owned_by": "deepseek",
+    "type": "language",
+    "description": "DeepSeek-V3.1 is post-trained on the top of DeepSeek-V3.1-Base, which is built upon the original V3 base checkpoint through a two-phase long context extension approach, following the methodology outlined in the original DeepSeek-V3 report. We have expanded our dataset by collecting additional long documents and substantially extending both training phases. The 32K extension phase has been increased 10-fold to 630B tokens, while the 128K extension phase has been extended by 3.3x to 209B tokens. Additionally, DeepSeek-V3.1 is trained using the UE8M0 FP8 scale data format to ensure compatibility with microscaling data formats.",
+    "context_window": 163840,
+    "max_tokens": 128000,
+    "tags": [
+      "implicit-caching",
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "output": "0.00000095",
+      "input_cache_read": "0.00000013"
+    }
+  },
+  {
+    "id": "deepseek/deepseek-v3.1-terminus",
+    "name": "DeepSeek V3.1 Terminus",
+    "owned_by": "deepseek",
+    "type": "language",
+    "description": "DeepSeek-V3.1-Terminus delivers more stable & reliable outputs across benchmarks compared to the previous version and addresses user feedback (i.e. language consistency and agent upgrades).",
+    "context_window": 131072,
+    "max_tokens": 65536,
+    "tags": [
+      "implicit-caching",
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000027",
+      "output": "0.000001",
+      "input_cache_read": "0.000000135"
+    }
+  },
+  {
+    "id": "deepseek/deepseek-v3.2",
+    "name": "DeepSeek V3.2",
+    "owned_by": "deepseek",
+    "type": "language",
+    "description": "DeepSeek-V3.2: Official successor to V3.2-Exp.",
+    "context_window": 128000,
+    "max_tokens": 8000,
+    "tags": [
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.00000028",
+      "output": "0.00000042",
+      "input_cache_read": "0.000000028"
+    }
+  },
+  {
+    "id": "deepseek/deepseek-v3.2-thinking",
+    "name": "DeepSeek V3.2 Thinking",
+    "owned_by": "deepseek",
+    "type": "language",
+    "description": "DeepSeek‑V3.2 from DeepSeek harmonizes high computational efficiency with superior reasoning and agent performance. It builds on three main techniques: DeepSeek Sparse Attention for long‑context efficiency, a scalable reinforcement learning framework, and a large‑scale agentic task synthesis pipeline. This model excels at long-context reasoning and agentic tasks, efficiently handling extended inputs while maintaining strong accuracy. Its sparse attention design enables it to process complex, multi-step workflows without excessive compute costs. Overall, DeepSeek‑V3.2 targets long‑context reasoning, tool‑using agents, and efficient deployment in production environments.",
+    "context_window": 128000,
+    "max_tokens": 8000,
+    "tags": [
+      "tool-use",
+      "implicit-caching",
+      "reasoning"
+    ],
+    "pricing": {
+      "input": "0.00000062",
+      "output": "0.00000185"
+    }
   },
   {
     "id": "deepseek/deepseek-v4-flash",
@@ -726,7 +2244,12 @@ export const ALL_MODELS: GatewayModel[] = [
       "reasoning",
       "tool-use",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000014",
+      "output": "0.00000028",
+      "input_cache_read": "0.000000028"
+    }
   },
   {
     "id": "deepseek/deepseek-v4-pro",
@@ -740,7 +2263,480 @@ export const ALL_MODELS: GatewayModel[] = [
       "reasoning",
       "tool-use",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000000435",
+      "output": "0.00000087",
+      "input_cache_read": "0.0000000036"
+    }
+  },
+  {
+    "id": "google/gemini-2.5-flash",
+    "name": "Gemini 2.5 Flash",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Gemini 2.5 Flash is a thinking model that offers great, well-rounded capabilities. It is designed to offer a balance between price and performance with multimodal support and a 1M token context window.",
+    "context_window": 1000000,
+    "max_tokens": 65536,
+    "tags": [
+      "file-input",
+      "reasoning",
+      "tool-use",
+      "vision",
+      "web-search",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000025",
+      "input_cache_read": "0.00000003",
+      "web_search": "35",
+      "maps_search": "25",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00000054",
+          "output": "0.0000045",
+          "input_cache_read": "0.000000054"
+        },
+        "flex": {
+          "input": "0.00000015",
+          "output": "0.00000125"
+        }
+      }
+    }
+  },
+  {
+    "id": "google/gemini-2.5-flash-image",
+    "name": "Nano Banana (Gemini 2.5 Flash Image)",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Nano Banana (Gemini 2.5 Flash Image) is Google's first fully hybrid reasoning model, letting developers turn thinking on or off and set thinking budgets to balance quality, cost, and latency. Upgraded for rapid creative workflows, it can generate interleaved text and images and supports conversational, multi‑turn image editing in natural language. It’s also locale‑aware, enabling culturally and linguistically appropriate image generation for audiences worldwide.",
+    "context_window": 32768,
+    "max_tokens": 65536,
+    "tags": [
+      "image-generation",
+      "web-search"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000025",
+      "input_cache_read": "0.00000003",
+      "image_dimension_quality_pricing": [
+        {
+          "size": "default",
+          "cost": "0.039"
+        }
+      ],
+      "maps_search": "25",
+      "service_tiers": {
+        "flex": {
+          "input": "0.00000015",
+          "output": "0.00000125"
+        }
+      }
+    }
+  },
+  {
+    "id": "google/gemini-2.5-flash-lite",
+    "name": "Gemini 2.5 Flash Lite",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Gemini 2.5 Flash-Lite is a balanced, low-latency model with configurable thinking budgets and tool connectivity (e.g., Google Search grounding and code execution). It supports multimodal input and offers a 1M-token context window.",
+    "context_window": 1048576,
+    "max_tokens": 65536,
+    "tags": [
+      "file-input",
+      "reasoning",
+      "tool-use",
+      "vision",
+      "web-search",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000001",
+      "output": "0.0000004",
+      "input_cache_read": "0.00000001",
+      "web_search": "35",
+      "maps_search": "25",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00000018",
+          "output": "0.00000072",
+          "input_cache_read": "0.000000018"
+        },
+        "flex": {
+          "input": "0.00000005",
+          "output": "0.0000002"
+        }
+      }
+    }
+  },
+  {
+    "id": "google/gemini-2.5-pro",
+    "name": "Gemini 2.5 Pro",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Gemini 2.5 Pro is our most advanced reasoning Gemini model, capable of solving complex problems. Gemini 2.5 Pro can comprehend vast datasets and challenging problems from different information sources, including text, audio, images, video, and even entire code repositories.",
+    "context_window": 1048576,
+    "max_tokens": 65536,
+    "tags": [
+      "file-input",
+      "reasoning",
+      "tool-use",
+      "vision",
+      "web-search",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "input_tiers": [
+        {
+          "cost": "0.00000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000025",
+          "min": 200001
+        }
+      ],
+      "output": "0.00001",
+      "output_tiers": [
+        {
+          "cost": "0.00001",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000015",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.000000125",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.000000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.00000025",
+          "min": 200001
+        }
+      ],
+      "web_search": "35",
+      "maps_search": "25",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00000225",
+          "output": "0.000018",
+          "input_cache_read": "0.000000225",
+          "long_context": {
+            "threshold": 200000,
+            "input": "0.0000045",
+            "output": "0.000027",
+            "input_cache_read": "0.00000045"
+          }
+        },
+        "flex": {
+          "input": "0.000000625",
+          "output": "0.000005",
+          "long_context": {
+            "threshold": 200000,
+            "input": "0.00000125",
+            "output": "0.0000075"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "google/gemini-3-flash",
+    "name": "Gemini 3 Flash",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Google's most intelligent model built for speed, combining frontier intelligence with superior search and grounding.",
+    "context_window": 1000000,
+    "max_tokens": 65000,
+    "tags": [
+      "reasoning",
+      "file-input",
+      "vision",
+      "tool-use",
+      "web-search",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000005",
+      "input_tiers": [
+        {
+          "cost": "0.0000005",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000005",
+          "min": 200001
+        }
+      ],
+      "output": "0.000003",
+      "output_tiers": [
+        {
+          "cost": "0.000003",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000003",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.00000005",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.00000005",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.00000005",
+          "min": 200001
+        }
+      ],
+      "web_search": "14",
+      "maps_search": "14",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000009",
+          "output": "0.0000054",
+          "input_cache_read": "0.00000009"
+        },
+        "flex": {
+          "input": "0.00000025",
+          "output": "0.0000015"
+        }
+      }
+    }
+  },
+  {
+    "id": "google/gemini-3-pro-image",
+    "name": "Nano Banana Pro (Gemini 3 Pro Image)",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Nano Banana Pro (Gemini 3 Pro Image) builds on Nano Banana's generation capabilities into a new era of studio-quality, functional design to help you create and edit high-fidelity, production-ready visuals with unparalleled precision and control. Improvements include enhanced world knowledge and reasoning, dynamic text and translation, and studio level controls.",
+    "context_window": 65536,
+    "max_tokens": 32768,
+    "tags": [
+      "image-generation",
+      "web-search",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.000002",
+      "output": "0.000012",
+      "input_cache_read": "0.0000002",
+      "image_dimension_quality_pricing": [
+        {
+          "size": "1K",
+          "cost": "0.1344"
+        },
+        {
+          "size": "2K",
+          "cost": "0.1344"
+        },
+        {
+          "size": "4K",
+          "cost": "0.24"
+        },
+        {
+          "size": "default",
+          "cost": "0.1344"
+        }
+      ],
+      "web_search": "14",
+      "maps_search": "14",
+      "service_tiers": {
+        "flex": {
+          "input": "0.000001",
+          "output": "0.000006"
+        }
+      }
+    }
+  },
+  {
+    "id": "google/gemini-3-pro-preview",
+    "name": "Gemini 3 Pro Preview",
+    "owned_by": "google",
+    "type": "language",
+    "description": "This model improves upon Gemini 2.5 Pro and is catered towards challenging tasks, especially those involving complex reasoning or agentic workflows. Improvements highlighted include use cases for coding, multi-step function calling, planning, reasoning, deep knowledge tasks, and instruction following.",
+    "context_window": 1000000,
+    "max_tokens": 64000,
+    "tags": [
+      "file-input",
+      "tool-use",
+      "reasoning",
+      "vision",
+      "web-search",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.000002",
+      "input_tiers": [
+        {
+          "cost": "0.000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000004",
+          "min": 200001
+        }
+      ],
+      "output": "0.000012",
+      "output_tiers": [
+        {
+          "cost": "0.000012",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000018",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000004",
+          "min": 200001
+        }
+      ],
+      "web_search": "14",
+      "maps_search": "14",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000036",
+          "output": "0.0000216",
+          "input_cache_read": "0.00000036",
+          "long_context": {
+            "threshold": 200000,
+            "input": "0.0000072",
+            "output": "0.0000324",
+            "input_cache_read": "0.00000072"
+          }
+        },
+        "flex": {
+          "input": "0.000001",
+          "output": "0.000006",
+          "long_context": {
+            "threshold": 200000,
+            "input": "0.000002",
+            "output": "0.000009"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "google/gemini-3.1-flash-image",
+    "name": "Gemini 3.1 Flash Image (Nano Banana 2)",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Gemini 3.1 Flash Image is optimized for image understanding and generation and offers a balance of price and performance.",
+    "context_window": 131072,
+    "max_tokens": 32768,
+    "tags": [
+      "image-generation",
+      "implicit-caching",
+      "reasoning",
+      "vision",
+      "web-search"
+    ],
+    "pricing": {
+      "input": "0.0000005",
+      "output": "0.000003",
+      "input_cache_read": "0.00000005",
+      "image_dimension_quality_pricing": [
+        {
+          "size": "512",
+          "cost": "0.045"
+        },
+        {
+          "size": "1K",
+          "cost": "0.067"
+        },
+        {
+          "size": "2K",
+          "cost": "0.101"
+        },
+        {
+          "size": "4K",
+          "cost": "0.151"
+        },
+        {
+          "size": "default",
+          "cost": "0.067"
+        }
+      ],
+      "web_search": "14",
+      "maps_search": "14"
+    }
+  },
+  {
+    "id": "google/gemini-3.1-flash-image-preview",
+    "name": "Gemini 3.1 Flash Image Preview (Nano Banana 2)",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Gemini 3.1 Flash Image is optimized for image understanding and generation and offers a balance of price and performance.",
+    "context_window": 131072,
+    "max_tokens": 32768,
+    "tags": [
+      "image-generation",
+      "implicit-caching",
+      "reasoning",
+      "vision",
+      "web-search"
+    ],
+    "pricing": {
+      "input": "0.0000005",
+      "output": "0.000003",
+      "input_cache_read": "0.00000005",
+      "image_dimension_quality_pricing": [
+        {
+          "size": "512",
+          "cost": "0.045"
+        },
+        {
+          "size": "1K",
+          "cost": "0.067"
+        },
+        {
+          "size": "2K",
+          "cost": "0.101"
+        },
+        {
+          "size": "4K",
+          "cost": "0.151"
+        },
+        {
+          "size": "default",
+          "cost": "0.067"
+        }
+      ],
+      "web_search": "14",
+      "maps_search": "14",
+      "service_tiers": {
+        "flex": {
+          "input": "0.00000025",
+          "output": "0.0000015"
+        }
+      }
+    }
   },
   {
     "id": "google/gemini-3.1-flash-lite",
@@ -757,7 +2753,59 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "output": "0.0000015",
+      "input_cache_read": "0.00000003",
+      "web_search": "14",
+      "maps_search": "14",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00000045",
+          "output": "0.0000027",
+          "input_cache_read": "0.000000045"
+        },
+        "flex": {
+          "input": "0.000000125",
+          "output": "0.00000075",
+          "input_cache_read": "0.0000000125"
+        }
+      }
+    }
+  },
+  {
+    "id": "google/gemini-3.1-flash-lite-image",
+    "name": "Gemini 3.1 Flash Lite Image (Nano Banana 2 Lite)",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Gemini 3.1 Flash-Lite Image (Nano Banana 2 Lite) is Google's fastest image generation model enabling rapid creation and iteration.",
+    "context_window": 65536,
+    "max_tokens": 4096,
+    "tags": [
+      "image-generation",
+      "implicit-caching",
+      "reasoning",
+      "vision",
+      "web-search"
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "output": "0.0000015",
+      "input_cache_read": "0.00000003",
+      "image_dimension_quality_pricing": [
+        {
+          "size": "default",
+          "cost": "0.034"
+        },
+        {
+          "size": "1K",
+          "cost": "0.034"
+        }
+      ],
+      "web_search": "14",
+      "maps_search": "14"
+    }
   },
   {
     "id": "google/gemini-3.1-flash-lite-preview",
@@ -774,7 +2822,141 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "output": "0.0000015",
+      "input_cache_read": "0.00000003",
+      "web_search": "14",
+      "maps_search": "14",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00000045",
+          "output": "0.0000027",
+          "input_cache_read": "0.000000045"
+        },
+        "flex": {
+          "input": "0.000000125",
+          "output": "0.00000075",
+          "input_cache_read": "0.0000000125"
+        }
+      }
+    }
+  },
+  {
+    "id": "google/gemini-3.1-pro-preview",
+    "name": "Gemini 3.1 Pro Preview",
+    "owned_by": "google",
+    "type": "language",
+    "description": "This model improves upon Gemini 2.5 Pro and is catered towards challenging tasks, especially those involving complex reasoning or agentic workflows. Improvements highlighted include use cases for coding, multi-step function calling, planning, reasoning, deep knowledge tasks, and instruction following.",
+    "context_window": 1000000,
+    "max_tokens": 64000,
+    "tags": [
+      "file-input",
+      "tool-use",
+      "reasoning",
+      "vision",
+      "web-search",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.000002",
+      "input_tiers": [
+        {
+          "cost": "0.000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000004",
+          "min": 200001
+        }
+      ],
+      "output": "0.000012",
+      "output_tiers": [
+        {
+          "cost": "0.000012",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000018",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000004",
+          "min": 200001
+        }
+      ],
+      "web_search": "14",
+      "maps_search": "14",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000036",
+          "output": "0.0000216",
+          "input_cache_read": "0.00000036",
+          "long_context": {
+            "threshold": 200000,
+            "input": "0.0000072",
+            "output": "0.0000324",
+            "input_cache_read": "0.00000072"
+          }
+        },
+        "flex": {
+          "input": "0.000001",
+          "output": "0.000006",
+          "long_context": {
+            "threshold": 200000,
+            "input": "0.000002",
+            "output": "0.000009"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "google/gemini-3.5-flash",
+    "name": "Gemini 3.5 Flash",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Google's latest model, highly optimized for coding proficiency and parallel agentic execution loops. Defaults to medium thinking effort for faster and more cost-efficient responses.",
+    "context_window": 1000000,
+    "max_tokens": 64000,
+    "tags": [
+      "reasoning",
+      "file-input",
+      "vision",
+      "tool-use",
+      "web-search",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000015",
+      "output": "0.000009",
+      "input_cache_read": "0.00000015",
+      "web_search": "14",
+      "maps_search": "14",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000027",
+          "output": "0.0000162",
+          "input_cache_read": "0.00000027"
+        },
+        "flex": {
+          "input": "0.00000075",
+          "output": "0.0000045",
+          "input_cache_read": "0.00000008"
+        }
+      }
+    }
   },
   {
     "id": "google/gemini-embedding-001",
@@ -782,7 +2964,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "google",
     "type": "embedding",
     "description": "State-of-the-art embedding model with excellent performance across English, multilingual and code tasks.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000015"
+    }
   },
   {
     "id": "google/gemini-embedding-2",
@@ -790,7 +2976,30 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "google",
     "type": "embedding",
     "description": "Google’s first fully multimodal Embedding model that is capable of mapping text, image, video, audio, and PDFs and their interleaved combinations thereof into a single, unified vector space. Built on the Gemini architecture, it supports 100+ languages.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.0000002"
+    }
+  },
+  {
+    "id": "google/gemini-omni-flash-preview",
+    "name": "Gemini Omni Flash Preview",
+    "owned_by": "google",
+    "type": "language",
+    "description": "Gemini Omni Flash (Preview) is a multimodal model designed for video, image, and text tasks. It is optimized for video generation, offering video output alongside text responses in a single model.",
+    "context_window": 1000000,
+    "max_tokens": 57920,
+    "tags": [
+      "file-input",
+      "reasoning",
+      "vision",
+      "video-generation"
+    ],
+    "pricing": {
+      "input": "0.0000015",
+      "output": "0.000009"
+    }
   },
   {
     "id": "google/gemma-4-26b-a4b-it",
@@ -806,7 +3015,12 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.0000006",
+      "input_cache_read": "0.000000015"
+    }
   },
   {
     "id": "google/gemma-4-31b-it",
@@ -821,7 +3035,11 @@ export const ALL_MODELS: GatewayModel[] = [
       "reasoning",
       "tool-use",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000014",
+      "output": "0.0000004"
+    }
   },
   {
     "id": "google/imagen-4.0-fast-generate-001",
@@ -830,9 +3048,13 @@ export const ALL_MODELS: GatewayModel[] = [
     "type": "image",
     "description": "Imagen 4 Fast is Google’s speed-optimized variant of the Imagen 4 text-to-image model, designed for rapid, high-volume image generation. It’s ideal for workflows like quick drafts, mockups, and iterative creative exploration. Despite emphasizing speed, it still benefits from the broader Imagen 4 family’s improvements in clarity, text rendering, and stylistic flexibility, and supports high-resolution outputs up to 2K.",
     "context_window": 480,
+    "max_tokens": 0,
     "tags": [
       "image-generation"
-    ]
+    ],
+    "pricing": {
+      "image": "0.02"
+    }
   },
   {
     "id": "google/imagen-4.0-generate-001",
@@ -841,9 +3063,13 @@ export const ALL_MODELS: GatewayModel[] = [
     "type": "image",
     "description": "Imagen 4: Google's flagship text-to-image model that serves as the go-to choice for a wide variety of high-quality image generation tasks, featuring significant improvements in text rendering over previous models. It now supports up to 2K resolution generation for creating detailed and crisp visuals, making it suitable for everything from marketing assets to artistic compositions.",
     "context_window": 480,
+    "max_tokens": 0,
     "tags": [
       "image-generation"
-    ]
+    ],
+    "pricing": {
+      "image": "0.04"
+    }
   },
   {
     "id": "google/imagen-4.0-ultra-generate-001",
@@ -852,9 +3078,37 @@ export const ALL_MODELS: GatewayModel[] = [
     "type": "image",
     "description": "Imagen 4 Ultra: Highest quality image generation model for detailed and photorealistic outputs.",
     "context_window": 480,
+    "max_tokens": 0,
     "tags": [
       "image-generation"
-    ]
+    ],
+    "pricing": {
+      "image": "0.06"
+    }
+  },
+  {
+    "id": "google/text-embedding-005",
+    "name": "Text Embedding 005",
+    "owned_by": "google",
+    "type": "embedding",
+    "description": "English-focused text embedding model optimized for code and English language tasks.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.000000025"
+    }
+  },
+  {
+    "id": "google/text-multilingual-embedding-002",
+    "name": "Text Multilingual Embedding 002",
+    "owned_by": "google",
+    "type": "embedding",
+    "description": "Multilingual text embedding model optimized for cross-lingual tasks across many languages.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.000000025"
+    }
   },
   {
     "id": "google/veo-3.0-fast-generate-001",
@@ -862,7 +3116,32 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "google",
     "type": "video",
     "description": "Veo 3 Fast is a quicker and more cost effective version of Veo 3, allowing developers to create videos with sound while maintaining high quality and optimizing for speed and business use cases. Veo 3 Fast offers both text-to-video and image-to-video modalities.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "audio": false,
+          "cost_per_second": "0.1"
+        },
+        {
+          "resolution": "720p",
+          "audio": true,
+          "cost_per_second": "0.15"
+        },
+        {
+          "resolution": "1080p",
+          "audio": false,
+          "cost_per_second": "0.1"
+        },
+        {
+          "resolution": "1080p",
+          "audio": true,
+          "cost_per_second": "0.15"
+        }
+      ]
+    }
   },
   {
     "id": "google/veo-3.0-generate-001",
@@ -870,7 +3149,32 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "google",
     "type": "video",
     "description": "Veo 3 is designed to handle a range of video generation tasks, from cinematic narratives to dynamic character animations. With Veo 3, you can create more immersive experiences by not only generating stunning visuals, but also audio like dialogue and sound effects.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "audio": false,
+          "cost_per_second": "0.2"
+        },
+        {
+          "resolution": "720p",
+          "audio": true,
+          "cost_per_second": "0.4"
+        },
+        {
+          "resolution": "1080p",
+          "audio": false,
+          "cost_per_second": "0.2"
+        },
+        {
+          "resolution": "1080p",
+          "audio": true,
+          "cost_per_second": "0.4"
+        }
+      ]
+    }
   },
   {
     "id": "google/veo-3.1-fast-generate-001",
@@ -878,7 +3182,42 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "google",
     "type": "video",
     "description": "Veo 3.1 Fast is a specialized, high-speed variant of Google DeepMind’s Veo 3.1 text-to-video model, optimized for rapid generation of 8-second, high-fidelity videos. It is designed to create cinematic, 1080p, or 720p content with improved prompt adherence and native audio, making it ideal for creating quick, high-quality video clips, social media content, and ad creatives.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "audio": false,
+          "cost_per_second": "0.1"
+        },
+        {
+          "resolution": "720p",
+          "audio": true,
+          "cost_per_second": "0.15"
+        },
+        {
+          "resolution": "1080p",
+          "audio": false,
+          "cost_per_second": "0.1"
+        },
+        {
+          "resolution": "1080p",
+          "audio": true,
+          "cost_per_second": "0.15"
+        },
+        {
+          "resolution": "4k",
+          "audio": false,
+          "cost_per_second": "0.3"
+        },
+        {
+          "resolution": "4k",
+          "audio": true,
+          "cost_per_second": "0.35"
+        }
+      ]
+    }
   },
   {
     "id": "google/veo-3.1-generate-001",
@@ -886,7 +3225,400 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "google",
     "type": "video",
     "description": "Veo 3.1 is Google's state-of-the-art model for generating high-fidelity, 8-second 720p, 1080p or 4k videos featuring stunning realism and natively generated audio.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "720p",
+          "audio": false,
+          "cost_per_second": "0.2"
+        },
+        {
+          "resolution": "720p",
+          "audio": true,
+          "cost_per_second": "0.4"
+        },
+        {
+          "resolution": "1080p",
+          "audio": false,
+          "cost_per_second": "0.2"
+        },
+        {
+          "resolution": "1080p",
+          "audio": true,
+          "cost_per_second": "0.4"
+        },
+        {
+          "resolution": "4k",
+          "audio": false,
+          "cost_per_second": "0.4"
+        },
+        {
+          "resolution": "4k",
+          "audio": true,
+          "cost_per_second": "0.6"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inception/mercury-2",
+    "name": "Mercury 2",
+    "owned_by": "inception",
+    "type": "language",
+    "description": "A diffusion-based reasoning LLM that generates text via parallel refinement (not token-by-token), delivering real-time latency with ~1k tokens/sec plus 128K context and built-in tool/JSON support.",
+    "context_window": 128000,
+    "max_tokens": 128000,
+    "tags": [
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "output": "0.00000075",
+      "input_cache_read": "0.000000025"
+    }
+  },
+  {
+    "id": "inception/mercury-coder-small",
+    "name": "Mercury Coder Small Beta",
+    "owned_by": "inception",
+    "type": "language",
+    "description": "Mercury Coder Small is ideal for code generation, debugging, and refactoring tasks with minimal latency.",
+    "context_window": 32000,
+    "max_tokens": 16384,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "output": "0.000001"
+    }
+  },
+  {
+    "id": "interfaze/interfaze-beta",
+    "name": "Interfaze Beta",
+    "owned_by": "interfaze",
+    "type": "language",
+    "description": "Interfaze is an AI model built on a new architecture that merges specialized DNN/CNN models with LLMs for developer tasks that require deterministic output and high consistency like OCR, scraping, classification, STT and more.",
+    "context_window": 1000000,
+    "max_tokens": 32000,
+    "tags": [
+      "file-input",
+      "reasoning",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.0000015",
+      "output": "0.0000035"
+    }
+  },
+  {
+    "id": "klingai/kling-v2.5-turbo-i2v",
+    "name": "Kling v2.5 Turbo Image-to-Video",
+    "owned_by": "klingai",
+    "type": "video",
+    "description": "Kling 2.5 Turbo is a major update to the AI video generation model focused on significantly improving speed, video quality, temporal stability, and creative control for creators, making professional-grade AI-generated video faster, more coherent, and easier to direct from text prompts.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "mode": "std",
+          "cost_per_second": "0.042"
+        },
+        {
+          "mode": "pro",
+          "cost_per_second": "0.07"
+        }
+      ]
+    }
+  },
+  {
+    "id": "klingai/kling-v2.5-turbo-t2v",
+    "name": "Kling v2.5 Turbo Text-to-Video",
+    "owned_by": "klingai",
+    "type": "video",
+    "description": "Kling 2.5 Turbo is a major update to the AI video generation model focused on significantly improving speed, video quality, temporal stability, and creative control for creators, making professional-grade AI-generated video faster, more coherent, and easier to direct from text prompts.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "mode": "std",
+          "cost_per_second": "0.042"
+        },
+        {
+          "mode": "pro",
+          "cost_per_second": "0.07"
+        }
+      ]
+    }
+  },
+  {
+    "id": "klingai/kling-v2.6-i2v",
+    "name": "Kling v2.6 Image-to-Video",
+    "owned_by": "klingai",
+    "type": "video",
+    "description": "Kling 2.6 introduces a groundbreaking \"Native Audio\" capability, enabling the generation of complete videos in a single go, including natural voice, action sound effects, and environmental ambient sounds, providing an immersive \"what you see if what you hear\" experience. ",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "mode": "std",
+          "cost_per_second": "0.042"
+        },
+        {
+          "audio": false,
+          "mode": "pro",
+          "cost_per_second": "0.07"
+        },
+        {
+          "audio": true,
+          "mode": "pro",
+          "cost_per_second": "0.14"
+        }
+      ]
+    }
+  },
+  {
+    "id": "klingai/kling-v2.6-motion-control",
+    "name": "Kling v2.6 Motion Control",
+    "owned_by": "klingai",
+    "type": "video",
+    "description": "Kling 2.6 introduces a groundbreaking \"Native Audio\" capability, enabling the generation of complete videos in a single go, including natural voice, action sound effects, and environmental ambient sounds, providing an immersive \"what you see if what you hear\" experience. ",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "mode": "std",
+          "cost_per_second": "0.07"
+        },
+        {
+          "mode": "pro",
+          "cost_per_second": "0.112"
+        }
+      ]
+    }
+  },
+  {
+    "id": "klingai/kling-v2.6-t2v",
+    "name": "Kling v2.6 Text-to-Video",
+    "owned_by": "klingai",
+    "type": "video",
+    "description": "Kling 2.6 introduces a groundbreaking \"Native Audio\" capability, enabling the generation of complete videos in a single go, including natural voice, action sound effects, and environmental ambient sounds, providing an immersive \"what you see if what you hear\" experience. ",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "mode": "std",
+          "cost_per_second": "0.042"
+        },
+        {
+          "audio": false,
+          "mode": "pro",
+          "cost_per_second": "0.07"
+        },
+        {
+          "audio": true,
+          "mode": "pro",
+          "cost_per_second": "0.14"
+        }
+      ]
+    }
+  },
+  {
+    "id": "klingai/kling-v3.0-i2v",
+    "name": "Kling v3.0 Image-to-Video",
+    "owned_by": "klingai",
+    "type": "video",
+    "description": "Build upon an All-in-One product framework, the Kling 3.0 model series supports full multimodal input and output spanning text, images, audio, and video, bringing the understanding, generation, and editing of video together in one streamlined AI workflow. The models integrate multiple tasks, including text-to-video, image-to-video, reference-to-video, and in-video editing, into a single, native multimodal architecture, enabling the models to follow complex narrative logic, deliver precise shot control, and maintain strong prompt adherence.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "audio": false,
+          "mode": "std",
+          "cost_per_second": "0.168"
+        },
+        {
+          "audio": true,
+          "mode": "std",
+          "cost_per_second": "0.252"
+        },
+        {
+          "audio": true,
+          "mode": "std",
+          "voice_control": true,
+          "cost_per_second": "0.308"
+        },
+        {
+          "audio": false,
+          "mode": "pro",
+          "cost_per_second": "0.224"
+        },
+        {
+          "audio": true,
+          "mode": "pro",
+          "cost_per_second": "0.336"
+        },
+        {
+          "audio": true,
+          "mode": "pro",
+          "voice_control": true,
+          "cost_per_second": "0.392"
+        }
+      ]
+    }
+  },
+  {
+    "id": "klingai/kling-v3.0-motion-control",
+    "name": "Kling v3.0 Motion Control",
+    "owned_by": "klingai",
+    "type": "video",
+    "description": "Kling 3.0 delivers a major leap in character fidelity for motion-driven generation, with stable facial features across multi-angle and long-duration motion, accurate complex emotions from multi-image face references, identity preservation through partial occlusions (hats, hands, fans), and steady clarity as the camera zooms, pans, or tracks.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "video-generation"
+    ],
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "mode": "std",
+          "cost_per_second": "0.126"
+        },
+        {
+          "mode": "pro",
+          "cost_per_second": "0.168"
+        }
+      ]
+    }
+  },
+  {
+    "id": "klingai/kling-v3.0-t2v",
+    "name": "Kling v3.0 Text-to-Video",
+    "owned_by": "klingai",
+    "type": "video",
+    "description": "Build upon an All-in-One product framework, the Kling 3.0 model series supports full multimodal input and output spanning text, images, audio, and video, bringing the understanding, generation, and editing of video together in one streamlined AI workflow. The models integrate multiple tasks, including text-to-video, image-to-video, reference-to-video, and in-video editing, into a single, native multimodal architecture, enabling the models to follow complex narrative logic, deliver precise shot control, and maintain strong prompt adherence.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "audio": false,
+          "mode": "std",
+          "cost_per_second": "0.168"
+        },
+        {
+          "audio": true,
+          "mode": "std",
+          "cost_per_second": "0.252"
+        },
+        {
+          "audio": true,
+          "mode": "std",
+          "voice_control": true,
+          "cost_per_second": "0.308"
+        },
+        {
+          "audio": false,
+          "mode": "pro",
+          "cost_per_second": "0.224"
+        },
+        {
+          "audio": true,
+          "mode": "pro",
+          "cost_per_second": "0.336"
+        },
+        {
+          "audio": true,
+          "mode": "pro",
+          "voice_control": true,
+          "cost_per_second": "0.392"
+        }
+      ]
+    }
+  },
+  {
+    "id": "kwaipilot/kat-coder-air-v2.5",
+    "name": "Kat Coder Air V2.5",
+    "owned_by": "kwaipilot",
+    "type": "language",
+    "description": "Fast response version of Kat Coder V2.5 optimized for Agent and Claw use cases.",
+    "context_window": 256000,
+    "max_tokens": 80000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.0000006",
+      "input_cache_read": "0.00000003"
+    }
+  },
+  {
+    "id": "kwaipilot/kat-coder-pro-v1",
+    "name": "KAT-Coder-Pro V1",
+    "owned_by": "kwaipilot",
+    "type": "language",
+    "description": "KAT-Coder-Pro V1 is KwaiKAT's most advanced agentic coding model in the KwaiKAT series. Designed specifically for agentic coding tasks, it excels in real-world software engineering scenarios, achieving a remarkable 73.4% solve rate on the SWE-Bench Verified benchmark. KAT-Coder-Pro V1 delivers top-tier coding performance and has been rigorously tested by thousands of in-house engineers. The model has been optimized for tool-use capability, multi-turn interaction, instruction following, generalization and comprehensive capabilities through a multi-stage training process, including mid-training, supervised fine-tuning (SFT), reinforcement fine-tuning (RFT), and scalable agentic RL.",
+    "context_window": 256000,
+    "max_tokens": 32000,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000012",
+      "input_cache_read": "0.00000006"
+    }
+  },
+  {
+    "id": "kwaipilot/kat-coder-pro-v2",
+    "name": "Kat Coder Pro V2",
+    "owned_by": "kwaipilot",
+    "type": "language",
+    "description": "A high-performance edition designed for complex enterprise projects and SaaS integration.",
+    "context_window": 256000,
+    "max_tokens": 256000,
+    "tags": [
+      "tool-use",
+      "reasoning",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000012",
+      "input_cache_read": "0.00000006"
+    }
+  },
+  {
+    "id": "kwaipilot/kat-coder-pro-v2.5",
+    "name": "Kat Coder Pro V2.5",
+    "owned_by": "kwaipilot",
+    "type": "language",
+    "description": "KAT-Coder-V2.5 is a coding-focused agentic model trained to act autonomously inside real, executable repositories rather than as a single-turn code generator.",
+    "context_window": 256000,
+    "max_tokens": 80000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.00000074",
+      "output": "0.00000296",
+      "input_cache_read": "0.00000015"
+    }
   },
   {
     "id": "meta/llama-3.1-70b",
@@ -898,7 +3630,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "max_tokens": 8192,
     "tags": [
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000072",
+      "output": "0.00000072"
+    }
   },
   {
     "id": "meta/llama-3.1-8b",
@@ -911,53 +3647,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "tool-use",
       "implicit-caching"
-    ]
-  },
-  {
-    "id": "meta/llama-3.2-11b",
-    "name": "Llama 3.2 11B Vision Instruct",
-    "owned_by": "meta",
-    "type": "language",
-    "description": "Instruction-tuned image reasoning generative model (text + images in / text out) optimized for visual recognition, image reasoning, captioning and answering general questions about the image.",
-    "context_window": 128000,
-    "max_tokens": 8192,
-    "tags": [
-      "tool-use",
-      "vision"
-    ]
-  },
-  {
-    "id": "meta/llama-3.2-1b",
-    "name": "Llama 3.2 1B Instruct",
-    "owned_by": "meta",
-    "type": "language",
-    "description": "Text-only model, supporting on-device use cases such as multilingual local knowledge retrieval, summarization, and rewriting.",
-    "context_window": 128000,
-    "max_tokens": 8192,
-    "tags": []
-  },
-  {
-    "id": "meta/llama-3.2-3b",
-    "name": "Llama 3.2 3B Instruct",
-    "owned_by": "meta",
-    "type": "language",
-    "description": "Text-only model, fine-tuned for supporting on-device use cases such as multilingual local knowledge retrieval, summarization, and rewriting.",
-    "context_window": 128000,
-    "max_tokens": 8192,
-    "tags": []
-  },
-  {
-    "id": "meta/llama-3.2-90b",
-    "name": "Llama 3.2 90B Vision Instruct",
-    "owned_by": "meta",
-    "type": "language",
-    "description": "Instruction-tuned image reasoning generative model (text + images in / text out) optimized for visual recognition, image reasoning, captioning and answering general questions about the image.",
-    "context_window": 128000,
-    "max_tokens": 8192,
-    "tags": [
-      "tool-use",
-      "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000022",
+      "output": "0.00000022"
+    }
   },
   {
     "id": "meta/llama-3.3-70b",
@@ -969,7 +3663,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "max_tokens": 8192,
     "tags": [
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000072",
+      "output": "0.00000072"
+    }
   },
   {
     "id": "meta/llama-4-maverick",
@@ -982,7 +3680,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "tool-use",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000024",
+      "output": "0.00000097"
+    }
   },
   {
     "id": "meta/llama-4-scout",
@@ -995,7 +3697,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "tool-use",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000017",
+      "output": "0.00000066"
+    }
   },
   {
     "id": "meta/muse-spark-1.1",
@@ -1011,7 +3717,221 @@ export const ALL_MODELS: GatewayModel[] = [
       "implicit-caching",
       "file-input",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "output": "0.00000425",
+      "input_cache_read": "0.00000015"
+    }
+  },
+  {
+    "id": "minimax/minimax-m2",
+    "name": "MiniMax M2",
+    "owned_by": "minimax",
+    "type": "language",
+    "description": "MiniMax-M2 redefines efficiency for agents. It is a compact, fast, and cost-effective MoE model (230 billion total parameters with 10 billion active parameters) built for elite performance in coding and agentic tasks, all while maintaining powerful general intelligence.",
+    "context_window": 205000,
+    "max_tokens": 205000,
+    "tags": [
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000012",
+      "input_cache_read": "0.00000003",
+      "input_cache_write": "0.000000375"
+    }
+  },
+  {
+    "id": "minimax/minimax-m2.1",
+    "name": "MiniMax M2.1",
+    "owned_by": "minimax",
+    "type": "language",
+    "description": "MiniMax 2.1 is MiniMax's latest model, optimized specifically for robustness in coding, tool use, instruction following, and long-horizon planning.",
+    "context_window": 204800,
+    "max_tokens": 131072,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000012",
+      "input_cache_read": "0.00000003",
+      "input_cache_write": "0.000000375"
+    }
+  },
+  {
+    "id": "minimax/minimax-m2.1-lightning",
+    "name": "MiniMax M2.1 Lightning",
+    "owned_by": "minimax",
+    "type": "language",
+    "description": "MiniMax-M2.1-lightning is a faster version of MiniMax-M2.1, offering the same performance but with significantly higher throughput (output speed ~100 TPS, MiniMax-M2 output speed ~60 TPS).",
+    "context_window": 204800,
+    "max_tokens": 131072,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000024",
+      "input_cache_read": "0.00000003",
+      "input_cache_write": "0.000000375"
+    }
+  },
+  {
+    "id": "minimax/minimax-m2.5",
+    "name": "MiniMax M2.5",
+    "owned_by": "minimax",
+    "type": "language",
+    "description": "MiniMax-M2.5 is a SOTA large language model designed for real-world productivity. It is capable of handling the entire development process of various complex systems. It covers full-stack projects across multiple platforms including Web, Android, iOS, Windows, and Mac, encompassing server-side APIs, functional logic, and databases.",
+    "context_window": 204800,
+    "max_tokens": 131000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000012",
+      "input_cache_read": "0.00000003",
+      "input_cache_write": "0.000000375"
+    }
+  },
+  {
+    "id": "minimax/minimax-m2.5-highspeed",
+    "name": "MiniMax M2.5 High Speed",
+    "owned_by": "minimax",
+    "type": "language",
+    "description": "M2.5 highspeed: Same performance, faster and more agile (output speed approximately 100 tps)",
+    "context_window": 204800,
+    "max_tokens": 131000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000006",
+      "output": "0.0000024",
+      "input_cache_read": "0.00000003",
+      "input_cache_write": "0.000000375"
+    }
+  },
+  {
+    "id": "minimax/minimax-m2.7",
+    "name": "MiniMax M2.7",
+    "owned_by": "minimax",
+    "type": "language",
+    "description": "M2.7 delivers outstanding performance in real-world software engineering, including end-to-end full project delivery, log analysis and bug troubleshooting, code security, machine learning, and more.",
+    "context_window": 204800,
+    "max_tokens": 131000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000012",
+      "input_cache_read": "0.00000006",
+      "input_cache_write": "0.000000375"
+    }
+  },
+  {
+    "id": "minimax/minimax-m2.7-highspeed",
+    "name": "MiniMax M2.7 High Speed",
+    "owned_by": "minimax",
+    "type": "language",
+    "description": "M2.7 Highspeed: Same performance, faster and more agile (output speed approximately 100 tps)",
+    "context_window": 204800,
+    "max_tokens": 131100,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000006",
+      "output": "0.0000024",
+      "input_cache_read": "0.00000006",
+      "input_cache_write": "0.000000375"
+    }
+  },
+  {
+    "id": "minimax/minimax-m3",
+    "name": "MiniMax M3",
+    "owned_by": "minimax",
+    "type": "language",
+    "description": "MiniMax-M3 is a frontier-class foundation model that unites the three capabilities defining today's frontier: a 1M-token context window, frontier coding and agentic performance, and native multimodality — the first open-weight model to deliver all three in a single system.",
+    "context_window": 1000000,
+    "max_tokens": 1000000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "vision",
+      "file-input",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "input_tiers": [
+        {
+          "cost": "0.0000003",
+          "min": 0,
+          "max": 512000
+        },
+        {
+          "cost": "0.0000012",
+          "min": 512000
+        }
+      ],
+      "output": "0.0000012",
+      "output_tiers": [
+        {
+          "cost": "0.0000012",
+          "min": 0,
+          "max": 512000
+        },
+        {
+          "cost": "0.0000048",
+          "min": 512000
+        }
+      ],
+      "input_cache_read": "0.00000006",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.00000006",
+          "min": 0,
+          "max": 512000
+        },
+        {
+          "cost": "0.00000024",
+          "min": 512000
+        }
+      ]
+    }
+  },
+  {
+    "id": "mistral/codestral",
+    "name": "Mistral Codestral",
+    "owned_by": "mistral",
+    "type": "language",
+    "description": "Mistral's cutting-edge language model for coding released end of July 2025, Codestral specializes in low-latency, high-frequency tasks such as fill-in-the-middle (FIM), code correction and test generation.",
+    "context_window": 128000,
+    "max_tokens": 4000,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000009"
+    }
   },
   {
     "id": "mistral/codestral-embed",
@@ -1019,7 +3939,130 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "mistral",
     "type": "embedding",
     "description": "Code embedding model that can embed code databases and repositories to power coding assistants.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000015"
+    }
+  },
+  {
+    "id": "mistral/devstral-2",
+    "name": "Devstral 2",
+    "owned_by": "mistral",
+    "type": "language",
+    "description": "An enterprise-grade text model that excels at using tools to explore codebases, editing multiple files, and powering software engineering agents.",
+    "context_window": 256000,
+    "max_tokens": 256000,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.0000004",
+      "output": "0.000002"
+    }
+  },
+  {
+    "id": "mistral/devstral-small-2",
+    "name": "Devstral Small 2",
+    "owned_by": "mistral",
+    "type": "language",
+    "description": "Our open source model that excels at using tools to explore codebases, editing multiple files, and powering software engineering agents.",
+    "context_window": 256000,
+    "max_tokens": 256000,
+    "tags": [
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.0000001",
+      "output": "0.0000003"
+    }
+  },
+  {
+    "id": "mistral/magistral-medium",
+    "name": "Magistral Medium 2509",
+    "owned_by": "mistral",
+    "type": "language",
+    "description": "Complex thinking, backed by deep understanding, with transparent reasoning you can follow and verify. The model excels in maintaining high-fidelity reasoning across numerous languages, even when switching between languages mid-task.",
+    "context_window": 128000,
+    "max_tokens": 64000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.000002",
+      "output": "0.000005"
+    }
+  },
+  {
+    "id": "mistral/magistral-small",
+    "name": "Magistral Small 2509",
+    "owned_by": "mistral",
+    "type": "language",
+    "description": "Complex thinking, backed by deep understanding, with transparent reasoning you can follow and verify. The model excels in maintaining high-fidelity reasoning across numerous languages, even when switching between languages mid-task.",
+    "context_window": 128000,
+    "max_tokens": 64000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.0000005",
+      "output": "0.0000015"
+    }
+  },
+  {
+    "id": "mistral/ministral-14b",
+    "name": "Ministral 14B",
+    "owned_by": "mistral",
+    "type": "language",
+    "description": "Ministral 3 14B is the largest model in the Ministral 3 family, offering state-of-the-art capabilities and performance comparable to its larger Mistral Small 3.2 24B counterpart. Optimized for local deployment, it delivers high performance across diverse hardware, including local setups.",
+    "context_window": 256000,
+    "max_tokens": 256000,
+    "tags": [
+      "file-input",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.0000002",
+      "output": "0.0000002"
+    }
+  },
+  {
+    "id": "mistral/ministral-3b",
+    "name": "Ministral 3B",
+    "owned_by": "mistral",
+    "type": "language",
+    "description": "A compact, efficient model for on-device tasks like smart assistants and local analytics, offering low-latency performance.",
+    "context_window": 128000,
+    "max_tokens": 4000,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.0000001",
+      "output": "0.0000001"
+    }
+  },
+  {
+    "id": "mistral/ministral-8b",
+    "name": "Ministral 8B",
+    "owned_by": "mistral",
+    "type": "language",
+    "description": "A more powerful model with faster, memory-efficient inference, ideal for complex workflows and demanding edge applications.",
+    "context_window": 128000,
+    "max_tokens": 4000,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.00000015"
+    }
   },
   {
     "id": "mistral/mistral-embed",
@@ -1027,7 +4070,28 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "mistral",
     "type": "embedding",
     "description": "General-purpose text embedding model for semantic search, similarity, clustering, and RAG workflows.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.0000001"
+    }
+  },
+  {
+    "id": "mistral/mistral-large-3",
+    "name": "Mistral Large 3",
+    "owned_by": "mistral",
+    "type": "language",
+    "description": "Mistral Large 3 2512 is Mistral’s most capable model to date. It has a sparse mixture-of-experts architecture with 41B active parameters (675B total).",
+    "context_window": 256000,
+    "max_tokens": 256000,
+    "tags": [
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.0000005",
+      "output": "0.0000015"
+    }
   },
   {
     "id": "mistral/mistral-medium",
@@ -1040,7 +4104,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "tool-use",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000004",
+      "output": "0.000002"
+    }
   },
   {
     "id": "mistral/mistral-medium-3.5",
@@ -1054,7 +4122,27 @@ export const ALL_MODELS: GatewayModel[] = [
       "reasoning",
       "tool-use",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000015",
+      "output": "0.0000075"
+    }
+  },
+  {
+    "id": "mistral/mistral-nemo",
+    "name": "Mistral Nemo 12B",
+    "owned_by": "mistral",
+    "type": "language",
+    "description": "A 12B parameter model with a 128k token context length built by Mistral in collaboration with NVIDIA. The model is multilingual, supporting English, French, German, Spanish, Italian, Portuguese, Chinese, Japanese, Korean, Arabic, and Hindi. It supports function calling and is released under the Apache 2.0 license.",
+    "context_window": 128000,
+    "max_tokens": 128000,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.00000015"
+    }
   },
   {
     "id": "mistral/mistral-small",
@@ -1067,7 +4155,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "tool-use",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000001",
+      "output": "0.0000003"
+    }
   },
   {
     "id": "mistral/pixtral-12b",
@@ -1080,7 +4172,263 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "tool-use",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.00000015"
+    }
+  },
+  {
+    "id": "moonshotai/kimi-k2",
+    "name": "Kimi K2 Instruct",
+    "owned_by": "moonshotai",
+    "type": "language",
+    "description": "Kimi K2 is a state-of-the-art mixture-of-experts (MoE) language model with 32 billion activated parameters and 1 trillion total parameters. Trained with the Muon optimizer, Kimi K2 achieves exceptional performance across frontier knowledge, reasoning, and coding tasks while being meticulously optimized for agentic capabilities.",
+    "context_window": 131072,
+    "max_tokens": 131072,
+    "tags": [
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000057",
+      "output": "0.0000023"
+    }
+  },
+  {
+    "id": "moonshotai/kimi-k2-thinking",
+    "name": "Kimi K2 Thinking",
+    "owned_by": "moonshotai",
+    "type": "language",
+    "description": "Kimi K2 Thinking is an advanced open-source thinking model by Moonshot AI. It can execute up to 200 – 300 sequential tool calls without human interference, reasoning coherently across hundreds of steps to solve complex problems. Built as a thinking agent, it reasons step by step while using tools, achieving state-of-the-art performance on Humanity's Last Exam (HLE), BrowseComp, and other benchmarks, with major gains in reasoning, agentic search, coding, writing, and general capabilities.",
+    "context_window": 216144,
+    "max_tokens": 216144,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.00000047",
+      "output": "0.000002",
+      "input_cache_read": "0.000000141"
+    }
+  },
+  {
+    "id": "moonshotai/kimi-k2.5",
+    "name": "Kimi K2.5",
+    "owned_by": "moonshotai",
+    "type": "language",
+    "description": "kimi-k2.5 is Kimi's most versatile model to date, featuring a native multimodal architecture that supports both visual and text input, thinking and non-thinking modes, and dialogue and agent tasks.",
+    "context_window": 262114,
+    "max_tokens": 262114,
+    "tags": [
+      "reasoning",
+      "vision",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000006",
+      "output": "0.000003",
+      "input_cache_read": "0.0000001"
+    }
+  },
+  {
+    "id": "moonshotai/kimi-k2.6",
+    "name": "Kimi K2.6",
+    "owned_by": "moonshotai",
+    "type": "language",
+    "description": "Kimi K2.6 demonstrates particularly strong performance in long-horizon coding tasks and produces professional-grade design with code and vision.",
+    "context_window": 262000,
+    "max_tokens": 262000,
+    "tags": [
+      "implicit-caching",
+      "reasoning",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.00000095",
+      "output": "0.000004",
+      "input_cache_read": "0.00000016"
+    }
+  },
+  {
+    "id": "moonshotai/kimi-k2.7-code",
+    "name": "Kimi K2.7 Code",
+    "owned_by": "moonshotai",
+    "type": "language",
+    "description": "Kimi-K2.7-Code is a coding model from Moonshot AI. It has  improved coding & agent performance over K2.6, more reasoning efficiency with less overthinking, and improved instruction following for long-horizon coding.",
+    "context_window": 256000,
+    "max_tokens": 32768,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching",
+      "file-input",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.00000095",
+      "output": "0.000004",
+      "input_cache_read": "0.00000019"
+    }
+  },
+  {
+    "id": "moonshotai/kimi-k2.7-code-highspeed",
+    "name": "Kimi K2.7 Code High Speed",
+    "owned_by": "moonshotai",
+    "type": "language",
+    "description": "Kimi K2.7 Code HighSpeed is the high-speed version of Kimi K2.7 Code, the same model as Kimi K2.7 Code, but with an output speed of approximately 180 Tokens/s and up to 260 Tokens/s in short context scenarios, delivering a more extreme coding experience.",
+    "context_window": 262144,
+    "max_tokens": 32768,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching",
+      "file-input",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.0000019",
+      "output": "0.000008",
+      "input_cache_read": "0.00000038"
+    }
+  },
+  {
+    "id": "moonshotai/kimi-k3",
+    "name": "Kimi K3",
+    "owned_by": "moonshotai",
+    "type": "language",
+    "description": "Kimi’s flagship model for long-horizon coding and end-to-end knowledge work, with a 1M-token context window.",
+    "context_window": 1000000,
+    "max_tokens": 131072,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching",
+      "file-input",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.000003",
+      "output": "0.000015",
+      "input_cache_read": "0.0000003"
+    }
+  },
+  {
+    "id": "morph/morph-v3-fast",
+    "name": "Morph V3 Fast",
+    "owned_by": "morph",
+    "type": "language",
+    "description": "Morph offers a specialized AI model that applies code changes suggested by frontier models (like Claude or GPT-4o) to your existing code files FAST - 4500+ tokens/second. It acts as the final step in the AI coding workflow. Supports 16k input tokens and 16k output tokens.",
+    "context_window": 81920,
+    "max_tokens": 16384,
+    "pricing": {
+      "input": "0.0000008",
+      "output": "0.0000012"
+    }
+  },
+  {
+    "id": "morph/morph-v3-large",
+    "name": "Morph V3 Large",
+    "owned_by": "morph",
+    "type": "language",
+    "description": "Morph offers a specialized AI model that applies code changes suggested by frontier models (like Claude or GPT-4o) to your existing code files FAST - 2500+ tokens/second. It acts as the final step in the AI coding workflow. Supports 16k input tokens and 16k output tokens.",
+    "context_window": 81920,
+    "max_tokens": 16384,
+    "pricing": {
+      "input": "0.0000009",
+      "output": "0.0000019"
+    }
+  },
+  {
+    "id": "nvidia/nemotron-3-nano-30b-a3b",
+    "name": "Nemotron 3 Nano 30B A3B",
+    "owned_by": "nvidia",
+    "type": "language",
+    "description": "NVIDIA Nemotron 3 Nano is an open reasoning model optimized for fast, cost-efficient inference. Built with a hybrid MoE and Mamba architecture and trained on NVIDIA-curated synthetic reasoning data, it delivers strong multi-step reasoning with stable latency and predictable performance for agentic and production workloads.",
+    "context_window": 262144,
+    "max_tokens": 262144,
+    "tags": [
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000005",
+      "output": "0.00000024"
+    }
+  },
+  {
+    "id": "nvidia/nemotron-3-super-120b-a12b",
+    "name": "NVIDIA Nemotron 3 Super 120B A12B",
+    "owned_by": "nvidia",
+    "type": "language",
+    "description": "NVIDIA Nemotron 3 Super is a 120B-parameter open hybrid MoE model, activating just 12B parameters for maximum compute efficiency and accuracy in complex multi-agent applications. It delivers up to 7x higher throughput, providing fast, cost-efficient inference for agentic tasks. Additionally, a long context window gives the model long-term memory, preventing AI agents from losing focus on long, multi-step tasks and ensuring high-accuracy results. Fully open with weights, datasets, and recipes, Super allows easy customization and secure deployment anywhere.",
+    "context_window": 256000,
+    "max_tokens": 32000,
+    "tags": [
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.00000065"
+    }
+  },
+  {
+    "id": "nvidia/nemotron-3-ultra-550b-a55b",
+    "name": "Nemotron 3 Ultra",
+    "owned_by": "nvidia",
+    "type": "language",
+    "description": "A 550B parameter (55B active) open reasoning model from NVIDIA, built for long-running agent workflows. It uses a hybrid Mamba-Transformer MoE architecture and supports a 1M token context window.",
+    "context_window": 1000000,
+    "max_tokens": 65000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000006",
+      "output": "0.0000024",
+      "input_cache_read": "0.00000012"
+    }
+  },
+  {
+    "id": "nvidia/nemotron-nano-12b-v2-vl",
+    "name": "Nvidia Nemotron Nano 12B V2 VL",
+    "owned_by": "nvidia",
+    "type": "language",
+    "description": "The model is an auto-regressive vision language model that uses an optimized transformer architecture. The model enables multi-image reasoning and video understanding, along with strong document intelligence, visual Q&A and summarization capabilities.",
+    "context_window": 131072,
+    "max_tokens": 131072,
+    "tags": [
+      "vision",
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.0000002",
+      "output": "0.0000006"
+    }
+  },
+  {
+    "id": "nvidia/nemotron-nano-9b-v2",
+    "name": "Nvidia Nemotron Nano 9B V2",
+    "owned_by": "nvidia",
+    "type": "language",
+    "description": "NVIDIA-Nemotron-Nano-9B-v2 is a large language model (LLM) trained from scratch by NVIDIA, and designed as a unified model for both reasoning and non-reasoning tasks. It responds to user queries and tasks by first generating a reasoning trace and then concluding with a final response. The model's reasoning capabilities can be controlled via a system prompt. If the user prefers the model to provide its final answer without intermediate reasoning traces, it can be configured to do so.\\",
+    "context_window": 131072,
+    "max_tokens": 131072,
+    "tags": [
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.00000006",
+      "output": "0.00000023"
+    }
   },
   {
     "id": "openai/gpt-3.5-turbo",
@@ -1092,7 +4440,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "max_tokens": 4096,
     "tags": [
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000005",
+      "output": "0.0000015"
+    }
   },
   {
     "id": "openai/gpt-4-turbo",
@@ -1105,7 +4457,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "tool-use",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00001",
+      "output": "0.00003"
+    }
   },
   {
     "id": "openai/gpt-4.1",
@@ -1121,7 +4477,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000002",
+      "output": "0.000008",
+      "input_cache_read": "0.0000005",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000035",
+          "output": "0.000014",
+          "input_cache_read": "0.000000875"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-4.1-mini",
@@ -1137,7 +4506,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000004",
+      "output": "0.0000016",
+      "input_cache_read": "0.0000001",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000007",
+          "output": "0.0000028",
+          "input_cache_read": "0.000000175"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-4.1-nano",
@@ -1153,7 +4535,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000001",
+      "output": "0.0000004",
+      "input_cache_read": "0.000000025",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000002",
+          "output": "0.0000008",
+          "input_cache_read": "0.00000005"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-4o",
@@ -1169,7 +4564,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000025",
+      "output": "0.00001",
+      "input_cache_read": "0.00000125",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00000425",
+          "output": "0.000017",
+          "input_cache_read": "0.000002125"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-4o-mini",
@@ -1185,7 +4593,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.0000006",
+      "input_cache_read": "0.000000075",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00000025",
+          "output": "0.000001",
+          "input_cache_read": "0.000000125"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-4o-mini-search-preview",
@@ -1197,7 +4618,12 @@ export const ALL_MODELS: GatewayModel[] = [
     "max_tokens": 16384,
     "tags": [
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000015",
+      "output": "0.0000006",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-4o-mini-transcribe",
@@ -1205,7 +4631,10 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "transcription",
     "description": "GPT-4o mini Transcribe is a speech-to-text model that uses GPT-4o mini to transcribe audio. It offers improvements to word error rate and better language recognition and accuracy compared to original Whisper models. Use it for more accurate transcripts.",
-    "tags": []
+    "pricing": {
+      "input": "0.00000125",
+      "output": "0.000005"
+    }
   },
   {
     "id": "openai/gpt-4o-transcribe",
@@ -1213,7 +4642,10 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "transcription",
     "description": "GPT-4o Transcribe is a speech-to-text model that uses GPT-4o to transcribe audio. It offers improvements to word error rate and better language recognition and accuracy compared to original Whisper models. Use it for more accurate transcripts.",
-    "tags": []
+    "pricing": {
+      "input": "0.0000025",
+      "output": "0.00001"
+    }
   },
   {
     "id": "openai/gpt-5",
@@ -1230,7 +4662,25 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "output": "0.00001",
+      "input_cache_read": "0.000000125",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000025",
+          "output": "0.00002",
+          "input_cache_read": "0.00000025"
+        },
+        "flex": {
+          "input": "0.000000625",
+          "output": "0.000005",
+          "input_cache_read": "0.0000000625"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5-chat",
@@ -1246,7 +4696,13 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "output": "0.00001",
+      "input_cache_read": "0.000000125",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-5-codex",
@@ -1263,7 +4719,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "output": "0.00001",
+      "input_cache_read": "0.000000125",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000025",
+          "output": "0.00002",
+          "input_cache_read": "0.00000025"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5-mini",
@@ -1280,7 +4749,25 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "output": "0.000002",
+      "input_cache_read": "0.000000025",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00000045",
+          "output": "0.0000036",
+          "input_cache_read": "0.000000045"
+        },
+        "flex": {
+          "input": "0.000000125",
+          "output": "0.000001",
+          "input_cache_read": "0.0000000125"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5-nano",
@@ -1297,7 +4784,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000005",
+      "output": "0.0000004",
+      "input_cache_read": "0.000000005",
+      "web_search": "10",
+      "service_tiers": {
+        "flex": {
+          "input": "0.000000025",
+          "output": "0.0000002",
+          "input_cache_read": "0.0000000025"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5-pro",
@@ -1313,7 +4813,12 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000015",
+      "output": "0.00012",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-5.1-codex",
@@ -1330,7 +4835,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "output": "0.00001",
+      "input_cache_read": "0.000000125",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000025",
+          "output": "0.00002",
+          "input_cache_read": "0.00000025"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.1-codex-max",
@@ -1347,7 +4865,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "output": "0.00001",
+      "input_cache_read": "0.000000125",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000025",
+          "output": "0.00002",
+          "input_cache_read": "0.00000025"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.1-codex-mini",
@@ -1364,7 +4895,13 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000025",
+      "output": "0.000002",
+      "input_cache_read": "0.000000025",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-5.1-instant",
@@ -1380,7 +4917,13 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "output": "0.00001",
+      "input_cache_read": "0.000000125",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-5.1-thinking",
@@ -1397,7 +4940,25 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "output": "0.00001",
+      "input_cache_read": "0.000000125",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000025",
+          "output": "0.00002",
+          "input_cache_read": "0.00000025"
+        },
+        "flex": {
+          "input": "0.000000625",
+          "output": "0.000005",
+          "input_cache_read": "0.0000000625"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.2",
@@ -1414,7 +4975,25 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000175",
+      "output": "0.000014",
+      "input_cache_read": "0.000000175",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000035",
+          "output": "0.000028",
+          "input_cache_read": "0.00000035"
+        },
+        "flex": {
+          "input": "0.000000875",
+          "output": "0.000007",
+          "input_cache_read": "0.0000000875"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.2-chat",
@@ -1430,7 +5009,13 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000175",
+      "output": "0.000014",
+      "input_cache_read": "0.000000175",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-5.2-codex",
@@ -1447,7 +5032,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000175",
+      "output": "0.000014",
+      "input_cache_read": "0.000000175",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000035",
+          "output": "0.000028",
+          "input_cache_read": "0.00000035"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.2-pro",
@@ -1463,7 +5061,12 @@ export const ALL_MODELS: GatewayModel[] = [
       "reasoning",
       "file-input",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000021",
+      "output": "0.000168",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-5.3-chat",
@@ -1479,7 +5082,13 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000175",
+      "output": "0.000014",
+      "input_cache_read": "0.000000175",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-5.3-codex",
@@ -1496,7 +5105,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000175",
+      "output": "0.000014",
+      "input_cache_read": "0.000000175",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000035",
+          "output": "0.000028",
+          "input_cache_read": "0.00000035"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.4",
@@ -1514,7 +5136,64 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "web-search",
       "websocket-realtime"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000025",
+      "input_tiers": [
+        {
+          "cost": "0.0000025",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.000005",
+          "min": 272000
+        }
+      ],
+      "output": "0.000015",
+      "output_tiers": [
+        {
+          "cost": "0.000015",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.0000225",
+          "min": 272000
+        }
+      ],
+      "input_cache_read": "0.00000025",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.00000025",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.0000005",
+          "min": 272000
+        }
+      ],
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.000005",
+          "output": "0.00003",
+          "input_cache_read": "0.0000005"
+        },
+        "flex": {
+          "input": "0.00000125",
+          "output": "0.0000075",
+          "input_cache_read": "0.00000013",
+          "long_context": {
+            "threshold": 272000,
+            "input": "0.0000025",
+            "output": "0.00001125",
+            "input_cache_read": "0.00000025"
+          }
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.4-mini",
@@ -1531,7 +5210,25 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000075",
+      "output": "0.0000045",
+      "input_cache_read": "0.000000075",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000015",
+          "output": "0.000009",
+          "input_cache_read": "0.00000015"
+        },
+        "flex": {
+          "input": "0.000000375",
+          "output": "0.00000225",
+          "input_cache_read": "0.0000000375"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.4-nano",
@@ -1548,7 +5245,20 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000002",
+      "output": "0.00000125",
+      "input_cache_read": "0.00000002",
+      "web_search": "10",
+      "service_tiers": {
+        "flex": {
+          "input": "0.0000001",
+          "output": "0.000000625",
+          "input_cache_read": "0.00000001"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.4-pro",
@@ -1564,7 +5274,45 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00003",
+      "input_tiers": [
+        {
+          "cost": "0.00003",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.00006",
+          "min": 272000
+        }
+      ],
+      "output": "0.00018",
+      "output_tiers": [
+        {
+          "cost": "0.00018",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.00027",
+          "min": 272000
+        }
+      ],
+      "web_search": "10",
+      "service_tiers": {
+        "flex": {
+          "input": "0.000015",
+          "output": "0.00009",
+          "long_context": {
+            "threshold": 272000,
+            "input": "0.00003",
+            "output": "0.000135"
+          }
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.5",
@@ -1582,14 +5330,70 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "web-search",
       "websocket-realtime"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000005",
+      "input_tiers": [
+        {
+          "cost": "0.000005",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.00001",
+          "min": 272000
+        }
+      ],
+      "output": "0.00003",
+      "output_tiers": [
+        {
+          "cost": "0.00003",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.000045",
+          "min": 272000
+        }
+      ],
+      "input_cache_read": "0.0000005",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000005",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.000001",
+          "min": 272000
+        }
+      ],
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000125",
+          "output": "0.000075",
+          "input_cache_read": "0.00000125"
+        },
+        "flex": {
+          "input": "0.0000025",
+          "output": "0.000015",
+          "input_cache_read": "0.00000025",
+          "long_context": {
+            "threshold": 272000,
+            "input": "0.000005",
+            "output": "0.0000225",
+            "input_cache_read": "0.0000005"
+          }
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.5-pro",
     "name": "GPT 5.5 Pro",
     "owned_by": "openai",
     "type": "language",
-    "description": "",
     "context_window": 1000000,
     "max_tokens": 128000,
     "tags": [
@@ -1598,7 +5402,40 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "web-search",
       "vision"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00003",
+      "input_tiers": [
+        {
+          "cost": "0.00003",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.00006",
+          "min": 272000
+        }
+      ],
+      "output": "0.00018",
+      "output_tiers": [
+        {
+          "cost": "0.00018",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.00027",
+          "min": 272000
+        }
+      ],
+      "web_search": "14",
+      "service_tiers": {
+        "flex": {
+          "input": "0.000015",
+          "output": "0.00009"
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.6-luna",
@@ -1616,7 +5453,75 @@ export const ALL_MODELS: GatewayModel[] = [
       "implicit-caching",
       "web-search",
       "websocket-realtime"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000001",
+      "input_tiers": [
+        {
+          "cost": "0.000001",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.000002",
+          "min": 272000
+        }
+      ],
+      "output": "0.000006",
+      "output_tiers": [
+        {
+          "cost": "0.000006",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.000009",
+          "min": 272000
+        }
+      ],
+      "input_cache_read": "0.0000001",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000001",
+          "max": 272000
+        },
+        {
+          "cost": "0.0000002",
+          "min": 272000
+        }
+      ],
+      "input_cache_write": "0.00000125",
+      "input_cache_write_tiers": [
+        {
+          "cost": "0.00000125",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.0000025",
+          "min": 272000
+        }
+      ],
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.000002",
+          "output": "0.000012",
+          "input_cache_read": "0.0000002"
+        },
+        "flex": {
+          "input": "0.0000005",
+          "output": "0.000003",
+          "input_cache_read": "0.00000005",
+          "long_context": {
+            "threshold": 272000,
+            "input": "0.000001",
+            "output": "0.0000045",
+            "input_cache_read": "0.0000001"
+          }
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.6-sol",
@@ -1634,7 +5539,76 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "web-search",
       "websocket-realtime"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000005",
+      "input_tiers": [
+        {
+          "cost": "0.000005",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.00001",
+          "min": 272000
+        }
+      ],
+      "output": "0.00003",
+      "output_tiers": [
+        {
+          "cost": "0.00003",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.000045",
+          "min": 272000
+        }
+      ],
+      "input_cache_read": "0.0000005",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000005",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.000001",
+          "min": 272000
+        }
+      ],
+      "input_cache_write": "0.00000625",
+      "input_cache_write_tiers": [
+        {
+          "cost": "0.00000625",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.0000125",
+          "min": 272000
+        }
+      ],
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.00001",
+          "output": "0.00006",
+          "input_cache_read": "0.000001"
+        },
+        "flex": {
+          "input": "0.0000025",
+          "output": "0.000015",
+          "input_cache_read": "0.00000025",
+          "long_context": {
+            "threshold": 272000,
+            "input": "0.000005",
+            "output": "0.0000225",
+            "input_cache_read": "0.0000005"
+          }
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-5.6-terra",
@@ -1652,7 +5626,76 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "implicit-caching",
       "websocket-realtime"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000025",
+      "input_tiers": [
+        {
+          "cost": "0.0000025",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.000005",
+          "min": 272000
+        }
+      ],
+      "output": "0.000015",
+      "output_tiers": [
+        {
+          "cost": "0.000015",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.0000225",
+          "min": 272000
+        }
+      ],
+      "input_cache_read": "0.00000025",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.00000025",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.0000005",
+          "min": 272000
+        }
+      ],
+      "input_cache_write": "0.000003125",
+      "input_cache_write_tiers": [
+        {
+          "cost": "0.000003125",
+          "min": 0,
+          "max": 272000
+        },
+        {
+          "cost": "0.00000625",
+          "min": 272000
+        }
+      ],
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.000005",
+          "output": "0.00003",
+          "input_cache_read": "0.0000005"
+        },
+        "flex": {
+          "input": "0.00000125",
+          "output": "0.0000075",
+          "input_cache_read": "0.000000125",
+          "long_context": {
+            "threshold": 272000,
+            "input": "0.0000025",
+            "output": "0.00001125",
+            "input_cache_read": "0.00000025"
+          }
+        }
+      }
+    }
   },
   {
     "id": "openai/gpt-image-1",
@@ -1660,10 +5703,17 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "image",
     "description": "GPT Image 1 is OpenAI's new state-of-the-art image generation model. It is a natively multimodal language model that accepts both text and image inputs, and produces image outputs.",
+    "context_window": 0,
+    "max_tokens": 0,
     "tags": [
       "image-generation",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000005",
+      "output": "0.00004",
+      "input_cache_read": "0.00000125"
+    }
   },
   {
     "id": "openai/gpt-image-1-mini",
@@ -1671,10 +5721,17 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "image",
     "description": "A cost-efficient version of GPT Image 1. It is a natively multimodal language model that accepts both text and image inputs, and produces image outputs.",
+    "context_window": 0,
+    "max_tokens": 0,
     "tags": [
       "image-generation",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000002",
+      "output": "0.000008",
+      "input_cache_read": "0.0000002"
+    }
   },
   {
     "id": "openai/gpt-image-1.5",
@@ -1682,10 +5739,17 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "image",
     "description": "GPT Image 1.5 is OpenAI's latest image generation model, with better instruction following and adherence to prompts.",
+    "context_window": 0,
+    "max_tokens": 0,
     "tags": [
       "image-generation",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000005",
+      "output": "0.000032",
+      "input_cache_read": "0.00000125"
+    }
   },
   {
     "id": "openai/gpt-image-2",
@@ -1693,10 +5757,17 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "image",
     "description": "GPT Image 2 is OpenAI's state-of-the-art image generation model for fast, high-quality image generation and editing. It supports flexible image sizes and high-fidelity image inputs.",
+    "context_window": 0,
+    "max_tokens": 0,
     "tags": [
       "image-generation",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000005",
+      "output": "0.00003",
+      "input_cache_read": "0.00000125"
+    }
   },
   {
     "id": "openai/gpt-oss-120b",
@@ -1710,7 +5781,11 @@ export const ALL_MODELS: GatewayModel[] = [
       "reasoning",
       "tool-use",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000001",
+      "output": "0.0000005"
+    }
   },
   {
     "id": "openai/gpt-oss-20b",
@@ -1724,7 +5799,11 @@ export const ALL_MODELS: GatewayModel[] = [
       "reasoning",
       "tool-use",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000005",
+      "output": "0.0000002"
+    }
   },
   {
     "id": "openai/gpt-oss-safeguard-20b",
@@ -1738,7 +5817,12 @@ export const ALL_MODELS: GatewayModel[] = [
       "implicit-caching",
       "reasoning",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000000075",
+      "output": "0.0000003",
+      "input_cache_read": "0.000000037"
+    }
   },
   {
     "id": "openai/gpt-realtime-1.5",
@@ -1746,7 +5830,14 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "realtime",
     "description": "GPT-Realtime-1.5 is our flagship audio model for voice agents and customer support.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.000004",
+      "output": "0.000016",
+      "input_cache_read": "0.0000004",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-realtime-2",
@@ -1754,9 +5845,17 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "realtime",
     "description": "GPT Realtime 2 is our most capable realtime voice model. It supports speech-to-speech interactions with configurable reasoning effort, stronger instruction following, and more reliable tool use for complex voice-agent workflows.",
+    "context_window": 0,
+    "max_tokens": 0,
     "tags": [
       "websocket-realtime"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000004",
+      "output": "0.000024",
+      "input_cache_read": "0.0000004",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-realtime-2.1",
@@ -1766,7 +5865,12 @@ export const ALL_MODELS: GatewayModel[] = [
     "description": "GPT-Realtime-2.1 updates GPT-Realtime-2 with improved alphanumeric recognition, silence and noise handling, and interruption behavior. It supports speech-to-speech interactions with configurable reasoning effort, instruction following, and tool use for complex voice-agent workflows.",
     "context_window": 128000,
     "max_tokens": 32000,
-    "tags": []
+    "pricing": {
+      "input": "0.000004",
+      "output": "0.000024",
+      "input_cache_read": "0.0000004",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/gpt-realtime-mini",
@@ -1774,7 +5878,29 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "realtime",
     "description": "GPT-Realtime mini is capable of responding to audio and text inputs in realtime over WebRTC, WebSocket, or SIP connections.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.0000006",
+      "output": "0.0000024",
+      "input_cache_read": "0.00000006",
+      "web_search": "10"
+    }
+  },
+  {
+    "id": "openai/gpt-realtime-whisper",
+    "name": "gpt-realtime-whisper",
+    "owned_by": "openai",
+    "type": "transcription",
+    "description": "GPT Realtime Whisper is a streaming speech-to-text model for applications that need low-latency transcript deltas from live audio. It is designed for realtime use cases where developers need to tune latency and accuracy. GPT Realtime Whisper is priced by audio duration rather than text tokens.",
+    "tags": [
+      "websocket-realtime",
+      "websocket-transcription"
+    ],
+    "pricing": {
+      "input": "0.0000000002",
+      "transcription_duration_cost_per_second": "0.000284"
+    }
   },
   {
     "id": "openai/o1",
@@ -1790,7 +5916,12 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000015",
+      "output": "0.00006",
+      "input_cache_read": "0.0000075"
+    }
   },
   {
     "id": "openai/o3",
@@ -1807,7 +5938,25 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000002",
+      "output": "0.000008",
+      "input_cache_read": "0.0000005",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.0000035",
+          "output": "0.000014",
+          "input_cache_read": "0.000000875"
+        },
+        "flex": {
+          "input": "0.000001",
+          "output": "0.000004",
+          "input_cache_read": "0.00000025"
+        }
+      }
+    }
   },
   {
     "id": "openai/o3-deep-research",
@@ -1824,7 +5973,13 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00001",
+      "output": "0.00004",
+      "input_cache_read": "0.0000025",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/o3-mini",
@@ -1838,7 +5993,12 @@ export const ALL_MODELS: GatewayModel[] = [
       "implicit-caching",
       "reasoning",
       "tool-use"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000011",
+      "output": "0.0000044",
+      "input_cache_read": "0.00000055"
+    }
   },
   {
     "id": "openai/o3-pro",
@@ -1854,7 +6014,12 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "tool-use",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00002",
+      "output": "0.00008",
+      "web_search": "10"
+    }
   },
   {
     "id": "openai/o4-mini",
@@ -1871,7 +6036,25 @@ export const ALL_MODELS: GatewayModel[] = [
       "tool-use",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000011",
+      "output": "0.0000044",
+      "input_cache_read": "0.000000275",
+      "web_search": "10",
+      "service_tiers": {
+        "priority": {
+          "input": "0.000002",
+          "output": "0.000008",
+          "input_cache_read": "0.0000005"
+        },
+        "flex": {
+          "input": "0.00000055",
+          "output": "0.0000022",
+          "input_cache_read": "0.000000138"
+        }
+      }
+    }
   },
   {
     "id": "openai/text-embedding-3-large",
@@ -1879,7 +6062,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "embedding",
     "description": "OpenAI's most capable embedding model for both english and non-english tasks.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000013"
+    }
   },
   {
     "id": "openai/text-embedding-3-small",
@@ -1887,7 +6074,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "embedding",
     "description": "OpenAI's improved, more performant version of their ada embedding model.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000002"
+    }
   },
   {
     "id": "openai/text-embedding-ada-002",
@@ -1895,7 +6086,11 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "embedding",
     "description": "OpenAI's legacy text embedding model.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.0000001"
+    }
   },
   {
     "id": "openai/tts-1",
@@ -1903,7 +6098,10 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "speech",
     "description": "TTS is a model that converts text to natural sounding spoken text.",
-    "tags": []
+    "pricing": {
+      "input": "0.000015",
+      "speech_input_character_cost": "0.000015"
+    }
   },
   {
     "id": "openai/tts-1-hd",
@@ -1911,7 +6109,10 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "speech",
     "description": "TTS is a model that converts text to natural sounding spoken text. The tts-1-hd model is optimized for high quality text-to-speech use cases.",
-    "tags": []
+    "pricing": {
+      "input": "0.00003",
+      "speech_input_character_cost": "0.00003"
+    }
   },
   {
     "id": "openai/whisper-1",
@@ -1919,7 +6120,10 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "openai",
     "type": "transcription",
     "description": "Whisper is a general-purpose speech recognition model, trained on a large dataset of diverse audio. You can also use it as a multitask model to perform multilingual speech recognition as well as speech translation and language identification.",
-    "tags": []
+    "pricing": {
+      "input": "0.0000000001",
+      "transcription_duration_cost_per_second": "0.0001"
+    }
   },
   {
     "id": "perplexity/sonar",
@@ -1932,7 +6136,8 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {}
   },
   {
     "id": "perplexity/sonar-pro",
@@ -1945,7 +6150,8 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {}
   },
   {
     "id": "perplexity/sonar-reasoning-pro",
@@ -1958,14 +6164,474 @@ export const ALL_MODELS: GatewayModel[] = [
     "tags": [
       "reasoning",
       "web-search"
-    ]
+    ],
+    "pricing": {}
+  },
+  {
+    "id": "prodia/flux-fast-schnell",
+    "name": "Flux Schnell",
+    "owned_by": "prodia",
+    "type": "image",
+    "description": "Lightning-fast image generation",
+    "context_window": 512,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {}
+  },
+  {
+    "id": "quiverai/arrow-1.1",
+    "name": "Arrow 1.1",
+    "owned_by": "quiverai",
+    "type": "image",
+    "description": "Best default for speed and quality, with stronger prompt following and more precise SVG structure.",
+    "context_window": 131072,
+    "max_tokens": 131072,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image_dimension_quality_pricing": [
+        {
+          "operation": "generate",
+          "cost": "0.2"
+        },
+        {
+          "operation": "vectorize",
+          "cost": "0.15"
+        }
+      ]
+    }
+  },
+  {
+    "id": "recraft/recraft-v2",
+    "name": "Recraft V2",
+    "owned_by": "recraft",
+    "type": "image",
+    "description": "Recraft V2 is an image generation model released in March 2024 and the first model trained from scratch by Recraft. With 20 billion parameters, it was a breakthrough in human anatomical accuracy and the first to support brand consistency and brand color inputs. It also introduced vector image generation (SVG output), as well as minimalistic icon and illustration styles.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.022",
+      "image_dimension_quality_pricing": [
+        {
+          "style": "vector_illustration",
+          "cost": "0.044"
+        }
+      ]
+    }
+  },
+  {
+    "id": "recraft/recraft-v3",
+    "name": "Recraft V3",
+    "owned_by": "recraft",
+    "type": "image",
+    "description": "V3 introduced major advances in photorealism and text rendering. It was the first Recraft model to generate mid-size text accurately and, as of 2025, is the only model capable of placing text at specific positions in an image.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.04",
+      "image_dimension_quality_pricing": [
+        {
+          "style": "vector_illustration",
+          "cost": "0.08"
+        }
+      ]
+    }
+  },
+  {
+    "id": "recraft/recraft-v4",
+    "name": "Recraft V4",
+    "owned_by": "recraft",
+    "type": "image",
+    "description": "The model delivers strong photorealism, including realistic skin rendering and natural textures, while avoiding common synthetic artifacts. It produces more distinctive lighting, composition, diverse subjects, contemporary styling, and carefully considered scene elements. For illustration, it generates original characters and forms with sophisticated and unexpected color combinations.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.04",
+      "image_dimension_quality_pricing": [
+        {
+          "style": "vector_illustration",
+          "cost": "0.08"
+        }
+      ]
+    }
+  },
+  {
+    "id": "recraft/recraft-v4-pro",
+    "name": "Recraft V4 Pro",
+    "owned_by": "recraft",
+    "type": "image",
+    "description": "The model delivers strong photorealism, including realistic skin rendering and natural textures, while avoiding common synthetic artifacts. It produces more distinctive lighting, composition, diverse subjects, contemporary styling, and carefully considered scene elements. For illustration, it generates original characters and forms with sophisticated and unexpected color combinations.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.25",
+      "image_dimension_quality_pricing": [
+        {
+          "style": "vector_illustration",
+          "cost": "0.3"
+        }
+      ]
+    }
+  },
+  {
+    "id": "recraft/recraft-v4.1",
+    "name": "Recraft V4.1",
+    "owned_by": "recraft",
+    "type": "image",
+    "description": "V4.1 is built on the same visual aesthetic and the same eye for what looks right, just pushed further across every dimension. The photorealism is more natural. The gradients are dreamier. Illustration styles are now possible that simply weren't before. And this is a model that reads a short prompts easier and creates something worth stopping for.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.035",
+      "image_dimension_quality_pricing": [
+        {
+          "style": "vector_illustration",
+          "cost": "0.08"
+        }
+      ]
+    }
+  },
+  {
+    "id": "recraft/recraft-v4.1-pro",
+    "name": "Recraft V4.1 Pro",
+    "owned_by": "recraft",
+    "type": "image",
+    "description": "V4.1 is built on the same visual aesthetic and the same eye for what looks right, just pushed further across every dimension. The photorealism is more natural. The gradients are dreamier. Illustration styles are now possible that simply weren't before. And this is a model that reads a short prompts easier and creates something worth stopping for. V4.1 Pro generates higher-resolution images for when the idea deserves more room.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.21",
+      "image_dimension_quality_pricing": [
+        {
+          "style": "vector_illustration",
+          "cost": "0.3"
+        }
+      ]
+    }
+  },
+  {
+    "id": "recraft/recraft-v4.1-utility",
+    "name": "Recraft V4.1 Utility",
+    "owned_by": "recraft",
+    "type": "image",
+    "description": "V4.1 is built on the same visual aesthetic and the same eye for what looks right, just pushed further across every dimension. The photorealism is more natural. The gradients are dreamier. Illustration styles are now possible that simply weren't before. And this is a model that reads a short prompts easier and creates something worth stopping for. V4.1 Utility is designed for when restraint is the aesthetic choice, with flat lighting, front-facing composition, and simple, controlled scenes.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.035",
+      "image_dimension_quality_pricing": [
+        {
+          "style": "vector_illustration",
+          "cost": "0.08"
+        }
+      ]
+    }
+  },
+  {
+    "id": "recraft/recraft-v4.1-utility-pro",
+    "name": "Recraft V4.1 Utility Pro",
+    "owned_by": "recraft",
+    "type": "image",
+    "description": "V4.1 is built on the same visual aesthetic and the same eye for what looks right, just pushed further across every dimension. The photorealism is more natural. The gradients are dreamier. Illustration styles are now possible that simply weren't before. And this is a model that reads a short prompts easier and creates something worth stopping for. V4.1 Utility is designed for when restraint is the aesthetic choice, with flat lighting, front-facing composition, and simple, controlled scenes.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "tags": [
+      "image-generation"
+    ],
+    "pricing": {
+      "image": "0.21",
+      "image_dimension_quality_pricing": [
+        {
+          "style": "vector_illustration",
+          "cost": "0.3"
+        }
+      ]
+    }
+  },
+  {
+    "id": "sakana/fugu-ultra",
+    "name": "Fugu Ultra",
+    "owned_by": "sakana",
+    "type": "language",
+    "description": "Fugu Ultra coordinates a deeper pool of expert agents to maximize answer quality on hard, high-stakes problems. Fugu Ultra focuses on maximizing performance, for a higher cost. It routes between one to three agents, depending on the problem.",
+    "context_window": 1000000,
+    "max_tokens": 1000000,
+    "tags": [
+      "vision",
+      "tool-use",
+      "reasoning"
+    ],
+    "pricing": {
+      "input": "0.000005",
+      "input_tiers": [
+        {
+          "cost": "0.000005",
+          "min": 0,
+          "max": 272001
+        },
+        {
+          "cost": "0.00001",
+          "min": 272001
+        }
+      ],
+      "output": "0.00003",
+      "output_tiers": [
+        {
+          "cost": "0.00003",
+          "min": 0,
+          "max": 272001
+        },
+        {
+          "cost": "0.000045",
+          "min": 272001
+        }
+      ],
+      "input_cache_read": "0.0000005",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000005",
+          "min": 0,
+          "max": 272001
+        },
+        {
+          "cost": "0.000001",
+          "min": 272001
+        }
+      ]
+    }
+  },
+  {
+    "id": "stepfun/step-3.5-flash",
+    "name": "StepFun 3.5 Flash",
+    "owned_by": "stepfun",
+    "type": "language",
+    "description": "Step 3.5 Flash is an open-source reasoning model by StepFun with 196B total parameters (11B active) using Mixture of Experts. It features a 256K context window, deep reasoning, tool calling, and agentic capabilities, achieving 97.3 on AIME 2025 and 74.4% on SWE-bench Verified.",
+    "context_window": 262114,
+    "max_tokens": 262114,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.00000009",
+      "output": "0.0000003",
+      "input_cache_read": "0.00000002"
+    }
+  },
+  {
+    "id": "stepfun/step-3.7-flash",
+    "name": "Step 3.7 Flash",
+    "owned_by": "stepfun",
+    "type": "language",
+    "description": "StepFun’s flagship multimodal reasoning model. Powered by a 198B-parameter / 11B-activation sparse MoE architecture, with native support for image and video understanding.",
+    "context_window": 256000,
+    "max_tokens": 256000,
+    "tags": [
+      "implicit-caching",
+      "reasoning",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.0000002",
+      "output": "0.00000115",
+      "input_cache_read": "0.00000004"
+    }
+  },
+  {
+    "id": "thinkingmachines/inkling",
+    "name": "Inkling",
+    "owned_by": "thinkingmachines",
+    "type": "language",
+    "description": "Inkling is a multimodal MoE model (975B total, 41B active, 256k context) reasoning over text, image, and audio inputs.",
+    "context_window": 256000,
+    "max_tokens": 256000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "vision",
+      "file-input"
+    ],
+    "pricing": {
+      "input": "0.000001",
+      "output": "0.00000405",
+      "input_cache_read": "0.00000017"
+    }
+  },
+  {
+    "id": "voyage/rerank-2.5",
+    "name": "Voyage Rerank 2.5",
+    "owned_by": "voyage",
+    "type": "reranking",
+    "description": "A generalist reranker optimized for quality with instruction-following and multilingual support.",
+    "context_window": 32000,
+    "max_tokens": 32000,
+    "pricing": {
+      "input": "0.00000005"
+    }
+  },
+  {
+    "id": "voyage/rerank-2.5-lite",
+    "name": "Voyage Rerank 2.5 Lite",
+    "owned_by": "voyage",
+    "type": "reranking",
+    "description": "A generalist reranker optimized for both latency and quality with instruction-following and multilingual support.",
+    "context_window": 32000,
+    "max_tokens": 32000,
+    "pricing": {
+      "input": "0.00000002"
+    }
+  },
+  {
+    "id": "voyage/voyage-3-large",
+    "name": "voyage-3-large",
+    "owned_by": "voyage",
+    "type": "embedding",
+    "description": "Voyage AI's embedding model with the best general-purpose and multilingual retrieval quality.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000018"
+    }
+  },
+  {
+    "id": "voyage/voyage-3.5",
+    "name": "Voyage 3.5",
+    "owned_by": "voyage",
+    "type": "embedding",
+    "description": "Voyage AI's embedding model optimized for general-purpose and multilingual retrieval quality.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000006"
+    }
+  },
+  {
+    "id": "voyage/voyage-3.5-lite",
+    "name": "Voyage 3.5 Lite",
+    "owned_by": "voyage",
+    "type": "embedding",
+    "description": "Voyage AI's embedding model optimized for latency and cost.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000002"
+    }
+  },
+  {
+    "id": "voyage/voyage-4",
+    "name": "Voyage 4",
+    "owned_by": "voyage",
+    "type": "embedding",
+    "description": "Optimized for general-purpose and multilingual retrieval quality. All embeddings created with the 4 series are compatible with each other.",
+    "context_window": 32000,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000006"
+    }
+  },
+  {
+    "id": "voyage/voyage-4-large",
+    "name": "Voyage 4 Large",
+    "owned_by": "voyage",
+    "type": "embedding",
+    "description": "The best general-purpose and multilingual retrieval quality. All embeddings created with the 4 series are compatible with each other.",
+    "context_window": 32000,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000012"
+    }
+  },
+  {
+    "id": "voyage/voyage-4-lite",
+    "name": "Voyage 4 Lite",
+    "owned_by": "voyage",
+    "type": "embedding",
+    "description": "Optimized for latency and cost. All embeddings created with the 4 series are compatible with each other.",
+    "context_window": 32000,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000002"
+    }
+  },
+  {
+    "id": "voyage/voyage-code-2",
+    "name": "Voyage Code 2",
+    "owned_by": "voyage",
+    "type": "embedding",
+    "description": "Voyage AI's embedding model optimized for code retrieval (17% better than alternatives). This is the previous generation of code embeddings models.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000012"
+    }
+  },
+  {
+    "id": "voyage/voyage-code-3",
+    "name": "Voyage Code 3",
+    "owned_by": "voyage",
+    "type": "embedding",
+    "description": "Voyage AI's embedding model optimized for code retrieval.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000018"
+    }
+  },
+  {
+    "id": "voyage/voyage-finance-2",
+    "name": "Voyage Finance 2",
+    "owned_by": "voyage",
+    "type": "embedding",
+    "description": "Voyage AI's embedding model optimized for finance retrieval and RAG.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000012"
+    }
+  },
+  {
+    "id": "voyage/voyage-law-2",
+    "name": "Voyage Law 2",
+    "owned_by": "voyage",
+    "type": "embedding",
+    "description": "Voyage AI's embedding model optimized for legal retrieval and RAG.",
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "input": "0.00000012"
+    }
   },
   {
     "id": "xai/grok-4.1-fast-non-reasoning",
     "name": "Grok 4.1 Fast Non-Reasoning",
     "owned_by": "xai",
     "type": "language",
-    "description": "",
     "context_window": 1000000,
     "max_tokens": 1000000,
     "tags": [
@@ -1973,14 +6639,18 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "vision",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000002",
+      "output": "0.0000005",
+      "input_cache_read": "0.00000005"
+    }
   },
   {
     "id": "xai/grok-4.1-fast-reasoning",
     "name": "Grok 4.1 Fast Reasoning",
     "owned_by": "xai",
     "type": "language",
-    "description": "",
     "context_window": 1000000,
     "max_tokens": 1000000,
     "tags": [
@@ -1989,7 +6659,12 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "tool-use",
       "implicit-caching"
-    ]
+    ],
+    "pricing": {
+      "input": "0.0000002",
+      "output": "0.0000005",
+      "input_cache_read": "0.00000005"
+    }
   },
   {
     "id": "xai/grok-4.20-multi-agent",
@@ -2006,7 +6681,46 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "file-input",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "input_tiers": [
+        {
+          "cost": "0.00000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000025",
+          "min": 200001
+        }
+      ],
+      "output": "0.0000025",
+      "output_tiers": [
+        {
+          "cost": "0.0000025",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000005",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000004",
+          "min": 200001
+        }
+      ],
+      "web_search": "5"
+    }
   },
   {
     "id": "xai/grok-4.20-multi-agent-beta",
@@ -2023,7 +6737,46 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "file-input",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "input_tiers": [
+        {
+          "cost": "0.00000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000025",
+          "min": 200001
+        }
+      ],
+      "output": "0.0000025",
+      "output_tiers": [
+        {
+          "cost": "0.0000025",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000005",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000004",
+          "min": 200001
+        }
+      ],
+      "web_search": "5"
+    }
   },
   {
     "id": "xai/grok-4.20-non-reasoning",
@@ -2039,7 +6792,46 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "input_tiers": [
+        {
+          "cost": "0.00000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000025",
+          "min": 200001
+        }
+      ],
+      "output": "0.0000025",
+      "output_tiers": [
+        {
+          "cost": "0.0000025",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000005",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000004",
+          "min": 200001
+        }
+      ],
+      "web_search": "5"
+    }
   },
   {
     "id": "xai/grok-4.20-non-reasoning-beta",
@@ -2055,7 +6847,41 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "file-input",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "input_tiers": [
+        {
+          "cost": "0.00000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000025",
+          "min": 200001
+        }
+      ],
+      "output": "0.0000025",
+      "output_tiers": [
+        {
+          "cost": "0.0000025",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000005",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000004",
+          "min": 200001
+        }
+      ],
+      "web_search": "5"
+    }
   },
   {
     "id": "xai/grok-4.20-reasoning",
@@ -2072,7 +6898,46 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "file-input",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "input_tiers": [
+        {
+          "cost": "0.00000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000025",
+          "min": 200001
+        }
+      ],
+      "output": "0.0000025",
+      "output_tiers": [
+        {
+          "cost": "0.0000025",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000005",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000004",
+          "min": 200001
+        }
+      ],
+      "web_search": "5"
+    }
   },
   {
     "id": "xai/grok-4.20-reasoning-beta",
@@ -2089,7 +6954,46 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "implicit-caching",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "input_tiers": [
+        {
+          "cost": "0.00000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000025",
+          "min": 200001
+        }
+      ],
+      "output": "0.0000025",
+      "output_tiers": [
+        {
+          "cost": "0.0000025",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000005",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000004",
+          "min": 200001
+        }
+      ],
+      "web_search": "5"
+    }
   },
   {
     "id": "xai/grok-4.3",
@@ -2106,7 +7010,46 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.00000125",
+      "input_tiers": [
+        {
+          "cost": "0.00000125",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000025",
+          "min": 200001
+        }
+      ],
+      "output": "0.0000025",
+      "output_tiers": [
+        {
+          "cost": "0.0000025",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000005",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000004",
+          "min": 200001
+        }
+      ],
+      "web_search": "5"
+    }
   },
   {
     "id": "xai/grok-4.5",
@@ -2123,7 +7066,46 @@ export const ALL_MODELS: GatewayModel[] = [
       "file-input",
       "vision",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000002",
+      "input_tiers": [
+        {
+          "cost": "0.000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000004",
+          "min": 200001
+        }
+      ],
+      "output": "0.000006",
+      "output_tiers": [
+        {
+          "cost": "0.000006",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000012",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000005",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000005",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000001",
+          "min": 200001
+        }
+      ],
+      "web_search": "5"
+    }
   },
   {
     "id": "xai/grok-build-0.1",
@@ -2139,7 +7121,46 @@ export const ALL_MODELS: GatewayModel[] = [
       "vision",
       "tool-use",
       "web-search"
-    ]
+    ],
+    "pricing": {
+      "input": "0.000001",
+      "input_tiers": [
+        {
+          "cost": "0.000001",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000002",
+          "min": 200001
+        }
+      ],
+      "output": "0.000002",
+      "output_tiers": [
+        {
+          "cost": "0.000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.000004",
+          "min": 200001
+        }
+      ],
+      "input_cache_read": "0.0000002",
+      "input_cache_read_tiers": [
+        {
+          "cost": "0.0000002",
+          "min": 0,
+          "max": 200001
+        },
+        {
+          "cost": "0.0000004",
+          "min": 200001
+        }
+      ],
+      "web_search": "5"
+    }
   },
   {
     "id": "xai/grok-imagine-image",
@@ -2147,9 +7168,14 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "xai",
     "type": "image",
     "description": "Generate high-quality images from text prompts with xAI's imagine API.",
+    "context_window": 0,
+    "max_tokens": 0,
     "tags": [
       "image-generation"
-    ]
+    ],
+    "pricing": {
+      "image": "0.02"
+    }
   },
   {
     "id": "xai/grok-imagine-video",
@@ -2157,23 +7183,68 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "xai",
     "type": "video",
     "description": "State-of-the-art video generation across quality, cost, and latency. Grok Imagine is x.AI's most powerful video-audio generative model yet. Bring an image to life, start from a simple text prompt, or even refine a complex cinematic sequence.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "480p",
+          "cost_per_second": "0.05"
+        },
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.07"
+        }
+      ]
+    }
   },
   {
     "id": "xai/grok-imagine-video-1.5",
     "name": "Grok Imagine Video 1.5",
     "owned_by": "xai",
     "type": "video",
-    "description": "",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "480p",
+          "cost_per_second": "0.08"
+        },
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.14"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.25"
+        }
+      ]
+    }
   },
   {
     "id": "xai/grok-imagine-video-1.5-preview",
     "name": "Grok Imagine Video 1.5 Preview",
     "owned_by": "xai",
     "type": "video",
-    "description": "",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {
+      "video_duration_pricing": [
+        {
+          "resolution": "480p",
+          "cost_per_second": "0.08"
+        },
+        {
+          "resolution": "720p",
+          "cost_per_second": "0.14"
+        },
+        {
+          "resolution": "1080p",
+          "cost_per_second": "0.25"
+        }
+      ]
+    }
   },
   {
     "id": "xai/grok-stt",
@@ -2181,7 +7252,13 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "xai",
     "type": "transcription",
     "description": "Transcribe audio to text in 25 languages with batch and streaming modes.",
-    "tags": []
+    "tags": [
+      "websocket-transcription"
+    ],
+    "pricing": {
+      "input": "0",
+      "transcription_duration_cost_per_second": "0.000028"
+    }
   },
   {
     "id": "xai/grok-tts",
@@ -2189,7 +7266,10 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "xai",
     "type": "speech",
     "description": "Generate speech with 5 expressive voices, speech tags, and telephony codecs.",
-    "tags": []
+    "pricing": {
+      "input": "0.000015",
+      "speech_input_character_cost": "0.000015"
+    }
   },
   {
     "id": "xai/grok-voice-think-fast-1.0",
@@ -2197,6 +7277,334 @@ export const ALL_MODELS: GatewayModel[] = [
     "owned_by": "xai",
     "type": "realtime",
     "description": "Build real-time voice applications powered by Grok. Stream audio and text bidirectionally via WebSocket for voice assistants, phone agents, and interactive voice systems.",
-    "tags": []
+    "context_window": 0,
+    "max_tokens": 0,
+    "pricing": {}
+  },
+  {
+    "id": "xiaomi/mimo-v2.5",
+    "name": "MiMo M2.5",
+    "owned_by": "xiaomi",
+    "type": "language",
+    "description": "A native full-modal model supporting text, image, video, and audio understanding, with powerful Agent capabilities.",
+    "context_window": 1050000,
+    "max_tokens": 131100,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching",
+      "file-input",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.00000014",
+      "output": "0.00000028",
+      "input_cache_read": "0.0000000028"
+    }
+  },
+  {
+    "id": "xiaomi/mimo-v2.5-pro",
+    "name": "MiMo V2.5 Pro",
+    "owned_by": "xiaomi",
+    "type": "language",
+    "description": "MiMo V2.5 Pro delivers significant improvements over its predecessor, MiMo-V2-Pro, in general agentic capabilities, complex software engineering, and long-horizon tasks. MiMo-V2.5-Pro is a 1.02T-parameter Mixture-of-Experts model with 42B active parameters, built on a hybrid-attention architecture with a 1M-token context window.",
+    "context_window": 1050000,
+    "max_tokens": 131000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.000000435",
+      "output": "0.00000087",
+      "input_cache_read": "0.0000000036"
+    }
+  },
+  {
+    "id": "zai/glm-4.5",
+    "name": "GLM 4.5",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "GLM-4.5 and GLM-4.5-Air are our latest flagship models, purpose-built as foundational models for agent-oriented applications. Both leverage a Mixture-of-Experts (MoE) architecture. GLM-4.5 has a total parameter count of 355B with 32B active parameters per forward pass, while GLM-4.5-Air adopts a more streamlined design with 106B total parameters and 12B active parameters.",
+    "context_window": 128000,
+    "max_tokens": 96000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000006",
+      "output": "0.0000022",
+      "input_cache_read": "0.00000011"
+    }
+  },
+  {
+    "id": "zai/glm-4.5-air",
+    "name": "GLM 4.5 Air",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "GLM-4.5 and GLM-4.5-Air are our latest flagship models, purpose-built as foundational models for agent-oriented applications. Both leverage a Mixture-of-Experts (MoE) architecture. GLM-4.5 has a total parameter count of 355B with 32B active parameters per forward pass, while GLM-4.5-Air adopts a more streamlined design with 106B total parameters and 12B active parameters.",
+    "context_window": 128000,
+    "max_tokens": 96000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000002",
+      "output": "0.0000011",
+      "input_cache_read": "0.00000003"
+    }
+  },
+  {
+    "id": "zai/glm-4.5v",
+    "name": "GLM 4.5V",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "Built on the GLM-4.5-Air base model, GLM-4.5V inherits proven techniques from GLM-4.1V-Thinking while achieving effective scaling through a powerful 106B-parameter MoE architecture.",
+    "context_window": 66000,
+    "max_tokens": 16000,
+    "tags": [
+      "implicit-caching",
+      "reasoning",
+      "tool-use",
+      "vision"
+    ],
+    "pricing": {
+      "input": "0.0000006",
+      "output": "0.0000018",
+      "input_cache_read": "0.00000011"
+    }
+  },
+  {
+    "id": "zai/glm-4.6",
+    "name": "GLM 4.6",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "As the latest iteration in the GLM series, GLM-4.6 achieves comprehensive enhancements across multiple domains, including real-world coding, long-context processing, reasoning, searching, writing, and agentic applications.",
+    "context_window": 200000,
+    "max_tokens": 96000,
+    "tags": [
+      "implicit-caching",
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.0000006",
+      "output": "0.0000022",
+      "input_cache_read": "0.00000011"
+    }
+  },
+  {
+    "id": "zai/glm-4.6v",
+    "name": "GLM-4.6V",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "GLM-4.6V series are Z.ai’s iterations in a multimodal large language model. GLM-4.6V scales its context window to 128k tokens in training, and achieves SoTA performance in visual understanding among models of similar parameter scales.",
+    "context_window": 128000,
+    "max_tokens": 24000,
+    "tags": [
+      "vision",
+      "file-input",
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000003",
+      "output": "0.0000009",
+      "input_cache_read": "0.00000005"
+    }
+  },
+  {
+    "id": "zai/glm-4.6v-flash",
+    "name": "GLM-4.6V-Flash",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "For local deployment and low-latency applications. GLM-4.6V series are Z.ai’s iterations in a multimodal large language model. GLM-4.6V scales its context window to 128k tokens in training, and achieves SoTA performance in visual understanding among models of similar parameter scales.",
+    "context_window": 128000,
+    "max_tokens": 24000,
+    "tags": [
+      "vision",
+      "reasoning",
+      "file-input",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {}
+  },
+  {
+    "id": "zai/glm-4.7",
+    "name": "GLM 4.7",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "GLM-4.7 is Z.ai’s latest flagship model, with major upgrades focused on two key areas: stronger coding capabilities and more stable multi-step reasoning and execution.",
+    "context_window": 200000,
+    "max_tokens": 120000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000006",
+      "output": "0.0000022",
+      "input_cache_read": "0.00000012"
+    }
+  },
+  {
+    "id": "zai/glm-4.7-flash",
+    "name": "GLM 4.7 Flash",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "GLM-4.7-Flash balances high performance with efficiency, making it the perfect lightweight deployment option. Beyond coding, it is also recommended for creative writing, translation, long-context tasks, and roleplay.",
+    "context_window": 200000,
+    "max_tokens": 131000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.00000007",
+      "output": "0.0000004"
+    }
+  },
+  {
+    "id": "zai/glm-4.7-flashx",
+    "name": "GLM 4.7 FlashX",
+    "owned_by": "zai",
+    "type": "language",
+    "description": " GLM-4.7-Flash balances high performance with efficiency, making it the perfect lightweight deployment option. ",
+    "context_window": 200000,
+    "max_tokens": 128000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.00000006",
+      "output": "0.0000004",
+      "input_cache_read": "0.00000001"
+    }
+  },
+  {
+    "id": "zai/glm-5",
+    "name": "GLM 5",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "GLM-5 is Zai’s new-generation flagship foundation model, designed for Agentic Engineering, capable of providing reliable productivity in complex system engineering and long-range Agent tasks. In terms of Coding and Agent capabilities, GLM-5 has achieved state-of-the-art (SOTA) performance in open source, with its usability in real programming scenarios approaching that of Claude Opus 4.5.",
+    "context_window": 202800,
+    "max_tokens": 131100,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.00000095",
+      "output": "0.00000315",
+      "input_cache_read": "0.0000002"
+    }
+  },
+  {
+    "id": "zai/glm-5-turbo",
+    "name": "GLM 5 Turbo",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "GLM 5 Turbo is a foundation model deeply optimized for the OpenClaw scenario. It has been specifically optimized for the core requirements of OpenClaw tasks since the training phase, enhancing key capabilities such as tool invocation, command following, timed and persistent tasks, and long-chain execution.",
+    "context_window": 202800,
+    "max_tokens": 131100,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000012",
+      "output": "0.000004",
+      "input_cache_read": "0.00000024"
+    }
+  },
+  {
+    "id": "zai/glm-5.1",
+    "name": "GLM 5.1",
+    "owned_by": "zai",
+    "type": "language",
+    "context_window": 202000,
+    "max_tokens": 202000,
+    "tags": [
+      "implicit-caching",
+      "reasoning",
+      "tool-use"
+    ],
+    "pricing": {
+      "input": "0.0000013",
+      "output": "0.0000043",
+      "input_cache_read": "0.00000026"
+    }
+  },
+  {
+    "id": "zai/glm-5.2",
+    "name": "GLM 5.2",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "GLM-5.2 delivers powerful coding capabilities, usable 1M-context support, and continued strengths in long-horizon tasks.",
+    "context_window": 1040000,
+    "max_tokens": 128000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000014",
+      "output": "0.0000044",
+      "input_cache_read": "0.00000026"
+    }
+  },
+  {
+    "id": "zai/glm-5.2-fast",
+    "name": "GLM 5.2 Fast",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "Fast version of GLM 5.2 with 120-250 TPS.",
+    "context_window": 1000000,
+    "max_tokens": 128000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching"
+    ],
+    "pricing": {
+      "input": "0.0000021",
+      "output": "0.0000066",
+      "input_cache_read": "0.00000021"
+    }
+  },
+  {
+    "id": "zai/glm-5v-turbo",
+    "name": "GLM 5V Turbo",
+    "owned_by": "zai",
+    "type": "language",
+    "description": "GLM-5V-Turbo is Z.AI’s first multimodal coding foundation model, built for vision-based coding tasks. It can natively process multimodal inputs such as images, video, and text, while also excelling at long-horizon planning, complex coding, and action execution. Deeply optimized for agent workflows, it works seamlessly with agents such as Claude Code and OpenClaw to complete the full loop of “understand the environment → plan actions → execute tasks”.",
+    "context_window": 200000,
+    "max_tokens": 128000,
+    "tags": [
+      "reasoning",
+      "tool-use",
+      "implicit-caching",
+      "vision",
+      "file-input"
+    ],
+    "pricing": {
+      "input": "0.0000012",
+      "output": "0.000004",
+      "input_cache_read": "0.00000024"
+    }
   }
 ];

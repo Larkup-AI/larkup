@@ -9,7 +9,7 @@ export interface GatewayModel {
   context_window?: number
   max_tokens?: number
   tags?: string[]
-  pricing?: Record<string, string>
+  pricing?: Record<string, any>
 }
 
 export interface GatewayProvider {
