@@ -33,6 +33,8 @@ jobs:
 
     - name: Build Web App
       run: pnpm turbo build --filter "./apps/web"
+      env:
+        E2E_BUILD: "true"
 
     - name: Run E2E tests
       run: |
