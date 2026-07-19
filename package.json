@@ -12,7 +12,7 @@
     "test:publish": "pnpm build && pnpm publish -r --dry-run --no-git-checks"
   },
   "devDependencies": {
-    "@turbo/gen": "^2.9.16",
+    "@turbo/gen": "^2.10.5",
     "turbo": "^2.5.0"
   },
   "packageManager": "pnpm@10.11.0",
