@@ -95,10 +95,6 @@ function columnTypeIndicator(
   return { icon: "Aa", label: "text" };
 }
 
-/* ------------------------------------------------------------------ */
-/* Component                                                           */
-/* ------------------------------------------------------------------ */
-
 const PAGE_SIZES = [10, 25, 50, 100];
 
 export function ChatDataTable({ config }: { config: DataTableConfig }) {
@@ -144,10 +140,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
-  const displayRows = sortedRows.slice(
-    page * pageSize,
-    (page + 1) * pageSize,
-  );
+  const displayRows = sortedRows.slice(page * pageSize, (page + 1) * pageSize);
 
   const handleSort = useCallback(
     (col: string) => {
@@ -296,10 +289,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
             {displayRows.map((row, i) => (
               <TableRow
                 key={i}
-                className={cn(
-                  "transition",
-                  i % 2 === 1 && "bg-muted/10",
-                )}
+                className={cn("transition", i % 2 === 1 && "bg-muted/10")}
               >
                 {columns.map((col) => (
                   <TableCell

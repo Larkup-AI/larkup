@@ -11,6 +11,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/cli/package.json ./apps/cli/
 COPY packages/core/package.json ./packages/core/
+COPY packages/sandbox/package.json ./packages/sandbox/
 COPY packages/scraper/package.json ./packages/scraper/
 COPY packages/vector-stores/package.json ./packages/vector-stores/
 
