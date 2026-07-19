@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import useSWR from "swr";
-import Link from "next/link";
+import { useState, useEffect, useRef } from 'react';
+import useSWR from 'swr';
+import Link from 'next/link';
 import {
   AlertTriangle,
   Boxes,
@@ -17,22 +17,17 @@ import {
   Play,
   RotateCcw,
   Scissors,
-} from "lucide-react";
-import type {
-  ChunkingParams,
-  IndexRun,
-  IndexType,
-  VectorStoreId,
-} from "@larkup/core/types";
-import { getEmbeddingModel } from "@larkup/core/embeddings/registry";
-import { getVectorStore } from "@larkup/vector-stores/registry";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+} from 'lucide-react';
+import type { ChunkingParams, IndexRun, IndexType, VectorStoreId } from '@larkup/core/types';
+import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
+import { getVectorStore } from '@larkup/vector-stores/registry';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -63,28 +58,22 @@ interface IndexStatus {
   };
 }
 
-const ACTIVE: IndexRun["status"][] = ["chunking", "embedding", "upserting"];
+const ACTIVE: IndexRun['status'][] = ['chunking', 'embedding', 'upserting'];
 
 export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
   const [starting, setStarting] = useState(false);
-  const { data, isLoading, mutate } = useSWR<IndexStatus>(
-    "/api/index",
-    fetcher,
-    {
-      refreshInterval: (d) =>
-        d?.run && ACTIVE.includes(d.run.status) ? 1000 : 0,
-    },
-  );
+  const { data, isLoading, mutate } = useSWR<IndexStatus>('/api/index', fetcher, {
+    refreshInterval: (d) => (d?.run && ACTIVE.includes(d.run.status) ? 1000 : 0),
+  });
 
-  // Show a warning toast whenever the run's warning message changes
   const lastWarning = useRef<string | undefined>(undefined);
   useEffect(() => {
     const warning = data?.run?.warning;
     if (warning && warning !== lastWarning.current) {
-      toast.warning(warning, { id: "rate-limit-warning", duration: 70_000 });
+      toast.warning(warning, { id: 'rate-limit-warning', duration: 70_000 });
     } else if (!warning && lastWarning.current) {
-      toast.dismiss("rate-limit-warning");
-      toast.success("Rate limit resolved — resuming indexing.", {
+      toast.dismiss('rate-limit-warning');
+      toast.success('Rate limit resolved — resuming indexing.', {
         duration: 3000,
       });
     }
@@ -99,28 +88,27 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
     );
   }
 
-  const { run, ready, blockers, docCount, charCount, unindexedCount, config } =
-    data;
+  const { run, ready, blockers, docCount, charCount, unindexedCount, config } = data;
   const running = Boolean(run && ACTIVE.includes(run.status));
 
   async function build(incremental = false) {
     setStarting(true);
     try {
-      const res = await fetch("/api/index", {
-        method: "POST",
+      const res = await fetch('/api/index', {
+        method: 'POST',
         body: JSON.stringify({ incremental }),
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       });
       const body = await res.json();
       if (!res.ok) {
-        toast.error(body.error ?? "Could not start indexing.");
+        toast.error(body.error ?? 'Could not start indexing.');
         return;
       }
-      toast.success("Indexing started.");
+      toast.success('Indexing started.');
       mutate();
       onDone?.();
     } catch {
-      toast.error("Could not start indexing.");
+      toast.error('Could not start indexing.');
     } finally {
       setStarting(false);
     }
@@ -129,16 +117,16 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
   async function cancel() {
     setStarting(true);
     try {
-      const res = await fetch("/api/index", { method: "DELETE" });
+      const res = await fetch('/api/index', { method: 'DELETE' });
       if (!res.ok) {
-        toast.error("Could not cancel indexing.");
+        toast.error('Could not cancel indexing.');
         return;
       }
-      toast.success("Indexing cancelled.");
+      toast.success('Indexing cancelled.');
       mutate();
       onDone?.();
     } catch {
-      toast.error("Could not cancel indexing.");
+      toast.error('Could not cancel indexing.');
     } finally {
       setStarting(false);
     }
@@ -146,35 +134,23 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
 
   return (
     <div className="space-y-6">
-      <ConfigSummary
-        config={config}
-        docCount={docCount}
-        charCount={charCount}
-      />
+      <ConfigSummary config={config} docCount={docCount} charCount={charCount} />
 
       {!ready && (
         <Alert variant="default">
           <AlertTriangle className="size-4 text-orange-500!" />
-          <AlertTitle className="text-orange-500!">
-            Not ready to index
-          </AlertTitle>
+          <AlertTitle className="text-orange-500!">Not ready to index</AlertTitle>
           <AlertDescription>
             <ul className="list-disc pl-4 mt-2 space-y-2">
               {blockers.map((b) => {
-                if (b === "MISSING_EMBEDDING_API_KEY") {
+                if (b === 'MISSING_EMBEDDING_API_KEY') {
                   return (
                     <li key={b} className="flex flex-col items-start gap-3">
-                      <span>
-                        An API key for your chosen embedding model is required.
-                      </span>
+                      <span>An API key for your chosen embedding model is required.</span>
                       <Button
                         variant="outline"
                         size="sm"
-                        render={
-                          <Link href="/settings">
-                            Go to AI Models in Settings
-                          </Link>
-                        }
+                        render={<Link href="/settings">Go to AI Models in Settings</Link>}
                       />
                     </li>
                   );
@@ -186,12 +162,12 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
         </Alert>
       )}
 
-      {run?.status === "failed" && (
+      {run?.status === 'failed' && (
         <Alert variant="destructive">
           <AlertTriangle className="size-4" />
           <AlertTitle>Indexing failed</AlertTitle>
           <AlertDescription className="wrap-break-word">
-            {run.error ?? "An unknown error occurred during indexing."}
+            {run.error ?? 'An unknown error occurred during indexing.'}
           </AlertDescription>
         </Alert>
       )}
@@ -236,12 +212,9 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
 
       <div className="flex items-center gap-3">
         <Button
-          onClick={() => build(run?.status === "completed")}
+          onClick={() => build(run?.status === 'completed')}
           disabled={
-            !ready ||
-            running ||
-            starting ||
-            (run?.status === "completed" && unindexedCount === 0)
+            !ready || running || starting || (run?.status === 'completed' && unindexedCount === 0)
           }
           size="lg"
         >
@@ -251,30 +224,21 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
             <Play className="size-4" />
           )}
           {running
-            ? "Indexing…"
-            : run?.status === "completed"
-              ? `Index new documents (${unindexedCount})`
-              : `Start indexing (${unindexedCount})`}
+            ? 'Indexing…'
+            : run?.status === 'completed'
+            ? `Index new documents (${unindexedCount})`
+            : `Start indexing (${unindexedCount})`}
         </Button>
         {running && (
-          <Button
-            onClick={cancel}
-            disabled={starting}
-            size="lg"
-            variant="destructive"
-          >
+          <Button onClick={cancel} disabled={starting} size="lg" variant="destructive">
             Cancel
           </Button>
         )}
-        {run?.status === "completed" && (
+        {run?.status === 'completed' && (
           <AlertDialog>
             <AlertDialogTrigger
               render={
-                <Button
-                  disabled={!ready || running || starting}
-                  size="lg"
-                  variant="outline"
-                >
+                <Button disabled={!ready || running || starting} size="lg" variant="outline">
                   <RotateCcw className="size-4 mr-2" />
                   Re-Index
                 </Button>
@@ -282,19 +246,15 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
             />
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>
-                  Are you sure you want to re-index?
-                </AlertDialogTitle>
+                <AlertDialogTitle>Are you sure you want to re-index?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will rebuild the entire index from scratch. All documents
-                  will be re-processed.
+                  This will rebuild the entire index from scratch. All documents will be
+                  re-processed.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => build(false)}>
-                  Continue
-                </AlertDialogAction>
+                <AlertDialogAction onClick={() => build(false)}>Continue</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -309,7 +269,7 @@ function ConfigSummary({
   docCount,
   charCount,
 }: {
-  config: IndexStatus["config"];
+  config: IndexStatus['config'];
   docCount: number;
   charCount: number;
 }) {
@@ -319,29 +279,29 @@ function ConfigSummary({
   const items = [
     {
       icon: Cpu,
-      label: "Embedding model",
+      label: 'Embedding model',
       value: model?.label ?? config.embeddingModelId,
       hint: model ? `${model.dimensions} dims` : undefined,
     },
     {
       icon: Database,
-      label: "Vector store",
+      label: 'Vector store',
       value: store?.label ?? config.vectorStore,
     },
     {
       icon: Boxes,
-      label: "Index type",
+      label: 'Index type',
       value: config.indexType.toUpperCase(),
     },
     {
       icon: Scissors,
-      label: "Chunking",
+      label: 'Chunking',
       value: `${config.chunking.chunkSize} / ${config.chunking.chunkOverlap}`,
-      hint: "size / overlap",
+      hint: 'size / overlap',
     },
     {
       icon: FileText,
-      label: "Corpus",
+      label: 'Corpus',
       value: `${docCount.toLocaleString()} docs`,
       hint: `${charCount.toLocaleString()} chars`,
     },
@@ -379,20 +339,17 @@ function ConfigSummary({
   );
 }
 
-const STATUS_COPY: Record<
-  IndexRun["status"],
-  { label: string; phase?: string }
-> = {
-  idle: { label: "Idle" },
-  chunking: { label: "Chunking", phase: "Splitting documents into chunks" },
-  embedding: { label: "Embedding", phase: "Generating vector embeddings" },
-  upserting: { label: "Storing", phase: "Writing vectors to the store" },
-  completed: { label: "Completed" },
-  failed: { label: "Failed" },
+const STATUS_COPY: Record<IndexRun['status'], { label: string; phase?: string }> = {
+  idle: { label: 'Idle' },
+  chunking: { label: 'Chunking', phase: 'Splitting documents into chunks' },
+  embedding: { label: 'Embedding', phase: 'Generating vector embeddings' },
+  upserting: { label: 'Storing', phase: 'Writing vectors to the store' },
+  completed: { label: 'Completed' },
+  failed: { label: 'Failed' },
 };
 
 function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
-  if (!run || run.status === "failed") {
+  if (!run || run.status === 'failed') {
     return <></>;
   }
 
@@ -401,14 +358,14 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
     run.totalChunks > 0
       ? Math.round((run.processedChunks / run.totalChunks) * 100)
       : running
-        ? 5
-        : 0;
+      ? 5
+      : 0;
 
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-base">
-          {run.status === "completed" ? (
+          {run.status === 'completed' ? (
             <CheckCircle2 className="size-4 text-primary" />
           ) : (
             <Loader2 className="size-4 animate-spin text-primary" />
@@ -420,37 +377,23 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {copy.phase ?? "Done"}
-            </span>
+            <span className="text-muted-foreground">{copy.phase ?? 'Done'}</span>
             <span className="font-mono tabular-nums">
               {run.processedChunks.toLocaleString()}
-              {run.totalChunks > 0 &&
-                ` / ${run.totalChunks.toLocaleString()}`}{" "}
-              chunks
+              {run.totalChunks > 0 && ` / ${run.totalChunks.toLocaleString()}`} chunks
             </span>
           </div>
-          <Progress
-            value={pct}
-            className="**:data-[slot=progress-indicator]:bg-green-600"
-          />
+          <Progress value={pct} className="**:data-[slot=progress-indicator]:bg-green-600" />
         </div>
 
         <dl className="grid grid-cols-2 gap-4 pt-1 sm:grid-cols-4">
           <Stat label="Documents" value={run.docCount.toLocaleString()} />
           <Stat label="Chunks" value={run.totalChunks.toLocaleString()} />
-          <Stat
-            label="Dimensions"
-            value={run.dimensions ? run.dimensions.toLocaleString() : "—"}
-          />
+          <Stat label="Dimensions" value={run.dimensions ? run.dimensions.toLocaleString() : '—'} />
           <Stat
             label="Duration"
             value={
-              run.durationMs
-                ? `${(run.durationMs / 1000).toFixed(1)}s`
-                : running
-                  ? "running…"
-                  : "—"
+              run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : running ? 'running…' : '—'
             }
           />
         </dl>
@@ -468,14 +411,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatusBadge({ status }: { status: IndexRun["status"] }) {
-  if (status === "completed")
-    return (
-      <Badge className="bg-primary/12 text-primary hover:bg-primary/12">
-        Ready
-      </Badge>
-    );
-  if (status === "failed") return <Badge variant="destructive">Failed</Badge>;
+function StatusBadge({ status }: { status: IndexRun['status'] }) {
+  if (status === 'completed')
+    return <Badge className="bg-primary/12 text-primary hover:bg-primary/12">Ready</Badge>;
+  if (status === 'failed') return <Badge variant="destructive">Failed</Badge>;
   if (ACTIVE.includes(status))
     return (
       <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">

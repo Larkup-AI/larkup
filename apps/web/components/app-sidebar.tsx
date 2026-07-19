@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   FileStack,
   FlaskConical,
@@ -10,30 +10,22 @@ import {
   MessageCircle,
   Server,
   SlidersHorizontal,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { STAGES, CURRENT_PHASE } from "@larkup/core/stages";
-import type { StageId } from "@larkup/core/types";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  useThemeCustomizer,
-  type PanelBgVariant,
-} from "./theme-customizer-provider";
-import { ThemeSwitcher } from "./theme-switcher";
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { STAGES, CURRENT_PHASE } from '@larkup/core/stages';
+import type { StageId } from '@larkup/core/types';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useThemeCustomizer, type PanelBgVariant } from './theme-customizer-provider';
+import { ThemeSwitcher } from './theme-switcher';
 
 const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
-  "panel-default": undefined,
-  "panel-white": "#FFFFFF",
-  "panel-fafafa": "#FAFAFA",
-  "panel-warm": "#F7F1EA",
-  "panel-soft": "#FBFAF8",
-  "panel-silver": "#F8F8F8",
-  "panel-stone": "#F5F5F2",
+  'panel-default': undefined,
+  'panel-white': '#FFFFFF',
+  'panel-fafafa': '#FAFAFA',
+  'panel-warm': '#F7F1EA',
+  'panel-soft': '#FBFAF8',
+  'panel-silver': '#F8F8F8',
+  'panel-stone': '#F5F5F2',
 };
 
 // [#CDA1FE]
@@ -56,9 +48,9 @@ export function AppSidebar() {
     <TooltipProvider delay={150}>
       <aside
         className={cn(
-          "sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start py-3 md:flex",
-          !navColor ? "bg-background" : "",
-          pageStyle === "fused" ? "border-r border-border" : "",
+          'sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start py-3 md:flex',
+          !navColor ? 'bg-background' : '',
+          pageStyle === 'fused' ? 'border-r border-border' : '',
         )}
         style={navStyle}
       >
@@ -69,12 +61,12 @@ export function AppSidebar() {
               <Link
                 href="/configure"
                 aria-label="larkup home"
-                className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
+                className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-transform hover:scale-105"
               />
             }
           >
             {/* <Boxes className="size-5" /> */}
-            <img src={"/logo9.png"} className="size-6.5" alt="logo" />
+            <img src={'/logo9.png'} className="size-6.5" alt="logo" />
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
             Larkup
@@ -86,8 +78,7 @@ export function AppSidebar() {
           {STAGES.map((stage) => {
             const Icon = STAGE_ICONS[stage.id];
             const active =
-              pathname === stage.href ||
-              (stage.href === "/configure" && pathname === "/");
+              pathname === stage.href || (stage.href === '/configure' && pathname === '/');
             const locked = stage.phase > CURRENT_PHASE;
 
             const body = (
@@ -95,24 +86,21 @@ export function AppSidebar() {
                 {/* active accent bar (Teams-style) */}
                 <span
                   className={cn(
-                    "absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary transition-opacity",
-                    active ? "opacity-100" : "opacity-0",
+                    'absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary transition-opacity',
+                    active ? 'opacity-100' : 'opacity-0',
                   )}
                 />
                 <span
                   className={cn(
-                    "relative flex size-9 items-center justify-center rounded-xl transition-colors",
+                    'relative flex size-9 items-center justify-center rounded-xl transition-colors',
                     active
-                      ? "bg-white border text-primary"
+                      ? 'bg-white border text-primary'
                       : locked
-                        ? "text-muted-foreground/50"
-                        : "text-foreground/70 group-hover:bg-white/90 group-hover:text-foreground",
+                      ? 'text-muted-foreground/50'
+                      : 'text-foreground/70 group-hover:bg-white/90 group-hover:text-foreground',
                   )}
                 >
-                  <Icon
-                    className="size-[19px]"
-                    strokeWidth={active ? 2.25 : 2}
-                  />
+                  <Icon className="size-[19px]" strokeWidth={active ? 2.25 : 2} />
                   {locked && (
                     <span className="absolute -right-0.5 -top-0.5 flex size-3.5 items-center justify-center rounded-full bg-background">
                       <Lock className="size-2.5 text-muted-foreground" />
@@ -121,12 +109,12 @@ export function AppSidebar() {
                 </span>
                 <span
                   className={cn(
-                    "text-[10px] leading-none tracking-tight",
+                    'text-[10px] leading-none tracking-tight',
                     active
-                      ? "font-semibold text-primary"
+                      ? 'font-semibold text-primary'
                       : locked
-                        ? "text-muted-foreground/50"
-                        : "text-muted-foreground",
+                      ? 'text-muted-foreground/50'
+                      : 'text-muted-foreground',
                   )}
                 >
                   {stage.label}
@@ -146,7 +134,7 @@ export function AppSidebar() {
                     ) : (
                       <Link
                         href={stage.href}
-                        aria-current={active ? "page" : undefined}
+                        aria-current={active ? 'page' : undefined}
                         className="group relative flex w-16 flex-col items-center gap-0.5 rounded-2xl py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     )
@@ -154,11 +142,7 @@ export function AppSidebar() {
                 >
                   {body}
                 </TooltipTrigger>
-                <TooltipContent
-                  side="right"
-                  sideOffset={10}
-                  className="max-w-56"
-                >
+                <TooltipContent side="right" sideOffset={10} className="max-w-56">
                   <div className="flex flex-col gap-0.5">
                     <span className="font-medium">
                       {stage.label}
@@ -169,9 +153,7 @@ export function AppSidebar() {
                       )}
                     </span>
                     <span className="text-[11px] leading-snug opacity-80">
-                      {locked
-                        ? `Unlocks in Phase ${stage.phase}.`
-                        : stage.description}
+                      {locked ? `Unlocks in Phase ${stage.phase}.` : stage.description}
                     </span>
                   </div>
                 </TooltipContent>

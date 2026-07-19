@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import useSWR from "swr";
+import { useEffect, useState } from 'react';
+import useSWR from 'swr';
 import {
   AlertTriangle,
   CornerDownLeft,
@@ -13,20 +13,20 @@ import {
   Cpu,
   Database,
   ExternalLink,
-} from "lucide-react";
-import type { IndexType, VectorStoreId } from "@larkup/core/types";
-import type { QueryHit } from "@larkup/vector-stores/adapter";
-import { getEmbeddingModel } from "@larkup/core/embeddings/registry";
-import { getVectorStore } from "@larkup/vector-stores/registry";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
+} from 'lucide-react';
+import type { IndexType, VectorStoreId } from '@larkup/core/types';
+import type { QueryHit } from '@larkup/vector-stores/adapter';
+import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
+import { getVectorStore } from '@larkup/vector-stores/registry';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 
-import { useWorkspace } from "@/components/workspace/workspace-provider";
-import { cn } from "@/lib/utils";
+import { useWorkspace } from '@/components/workspace/workspace-provider';
+import { cn } from '@/lib/utils';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -47,7 +47,7 @@ interface DemoStatus {
 interface DemoResult {
   query: string;
   hits: QueryHit[];
-  source: "server" | "direct";
+  source: 'server' | 'direct';
   endpoint?: string;
   tookMs: number;
 }
@@ -55,29 +55,26 @@ interface DemoResult {
 const TOP_K_PRESETS = [1, 3, 5, 8, 10];
 
 const SAMPLE_QUERIES = [
-  "What is this corpus about?",
-  "Summarize the key concepts.",
-  "How does retrieval work?",
+  'What is this corpus about?',
+  'Summarize the key concepts.',
+  'How does retrieval work?',
 ];
 
 export function DemoWorkspace() {
   const { activeServer } = useWorkspace();
   const serverId = activeServer?.id ?? null;
 
-  const statusKey = serverId
-    ? `/api/demo?serverId=${encodeURIComponent(serverId)}`
-    : "/api/demo";
+  const statusKey = serverId ? `/api/demo?serverId=${encodeURIComponent(serverId)}` : '/api/demo';
   const { data, isLoading } = useSWR<DemoStatus>(statusKey, fetcher, {
     refreshInterval: 5000,
   });
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [topK, setTopK] = useState<number>(5);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DemoResult | null>(null);
 
-  // Clear any stale result when switching the target server.
   useEffect(() => {
     setResult(null);
     setError(null);
@@ -99,20 +96,20 @@ export function DemoWorkspace() {
     setRunning(true);
     setError(null);
     try {
-      const res = await fetch("/api/demo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: question, topK, serverId }),
       });
       const body = await res.json();
       if (!res.ok) {
-        setError(body.error ?? "Query failed.");
+        setError(body.error ?? 'Query failed.');
         setResult(null);
         return;
       }
       setResult(body as DemoResult);
     } catch {
-      setError("Could not reach the retrieval endpoint.");
+      setError('Could not reach the retrieval endpoint.');
       setResult(null);
     } finally {
       setRunning(false);
@@ -144,7 +141,7 @@ export function DemoWorkspace() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
                   run(query);
                 }
@@ -166,10 +163,10 @@ export function DemoWorkspace() {
                     type="button"
                     onClick={() => setTopK(k)}
                     className={cn(
-                      "min-w-8 rounded-md px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
+                      'min-w-8 rounded-md px-2.5 py-1 text-xs font-medium tabular-nums transition-colors',
                       topK === k
-                        ? "bg-white border text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
+                        ? 'bg-white border text-foreground '
+                        : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
                     {k}
@@ -178,16 +175,13 @@ export function DemoWorkspace() {
               </div>
             </div>
 
-            <Button
-              onClick={() => run(query)}
-              disabled={!ready || running || !query.trim()}
-            >
+            <Button onClick={() => run(query)} disabled={!ready || running || !query.trim()}>
               {running ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Search className="size-4" />
               )}
-              {running ? "Searching…" : "Search"}
+              {running ? 'Searching…' : 'Search'}
               {!running && (
                 <kbd className="ml-1 hidden items-center gap-0.5 rounded border border-primary-foreground/30 px-1 text-[10px] opacity-80 sm:inline-flex">
                   <CornerDownLeft className="size-2.5" />
@@ -236,8 +230,8 @@ function SourceSummary({
   server,
   config,
 }: {
-  server: DemoStatus["server"];
-  config: DemoStatus["config"];
+  server: DemoStatus['server'];
+  config: DemoStatus['config'];
 }) {
   const model = getEmbeddingModel(config.embeddingModelId);
   const store = getVectorStore(config.vectorStore);
@@ -262,24 +256,10 @@ function SourceSummary({
           )}
         </div>
 
-        <Meta
-          icon={Cpu}
-          label="Model"
-          value={model?.label ?? config.embeddingModelId}
-        />
-        <Meta
-          icon={Database}
-          label="Store"
-          value={store?.label ?? config.vectorStore}
-        />
-        <Meta
-          icon={Sparkles}
-          label="Index"
-          value={config.indexType.toUpperCase()}
-        />
-        {server.running && (
-          <Meta icon={Server} label="Endpoint" value={server.endpoint} mono />
-        )}
+        <Meta icon={Cpu} label="Model" value={model?.label ?? config.embeddingModelId} />
+        <Meta icon={Database} label="Store" value={store?.label ?? config.vectorStore} />
+        <Meta icon={Sparkles} label="Index" value={config.indexType.toUpperCase()} />
+        {server.running && <Meta icon={Server} label="Endpoint" value={server.endpoint} mono />}
       </CardContent>
     </Card>
   );
@@ -302,12 +282,7 @@ function Meta({
         <Icon className="size-3.5" />
         {label}
       </span>
-      <span
-        className={cn(
-          "text-sm font-medium leading-tight",
-          mono && "font-mono text-xs",
-        )}
-      >
+      <span className={cn('text-sm font-medium leading-tight', mono && 'font-mono text-xs')}>
         {value}
       </span>
     </div>
@@ -322,8 +297,7 @@ function Results({ result }: { result: DemoResult }) {
           <Search className="mb-1 size-6 text-muted-foreground/60" />
           <p className="text-sm font-medium">No matches found</p>
           <p className="text-sm text-muted-foreground">
-            Nothing in the index scored against that query. Try rephrasing or
-            indexing more content.
+            Nothing in the index scored against that query. Try rephrasing or indexing more content.
           </p>
         </CardContent>
       </Card>
@@ -334,10 +308,10 @@ function Results({ result }: { result: DemoResult }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium">
-          {result.hits.length} result{result.hits.length === 1 ? "" : "s"}
+          {result.hits.length} result{result.hits.length === 1 ? '' : 's'}
         </h2>
         <span className="font-mono text-xs text-muted-foreground tabular-nums">
-          {result.source === "server" ? "via server" : "via direct"} ·{" "}
+          {result.source === 'server' ? 'via server' : 'via direct'} ·{' '}
           {result.tookMs.toLocaleString()}ms
         </span>
       </div>
@@ -364,22 +338,15 @@ function HitCard({ hit, rank }: { hit: QueryHit; rank: number }) {
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <FileText className="size-4 shrink-0 text-muted-foreground" />
-              <h3 className="truncate text-sm font-medium">
-                {hit.title || "Untitled"}
-              </h3>
+              <h3 className="truncate text-sm font-medium">{hit.title || 'Untitled'}</h3>
             </div>
-            <Badge
-              variant="secondary"
-              className="shrink-0 font-mono text-[11px] tabular-nums"
-            >
+            <Badge variant="secondary" className="shrink-0 font-mono text-[11px] tabular-nums">
               {pct}%
             </Badge>
           </div>
 
           <p className="text-sm leading-relaxed text-muted-foreground">
-            {hit.text.length > 360
-              ? `${hit.text.slice(0, 360).trim()}…`
-              : hit.text}
+            {hit.text.length > 360 ? `${hit.text.slice(0, 360).trim()}…` : hit.text}
           </p>
 
           {hit.url && (

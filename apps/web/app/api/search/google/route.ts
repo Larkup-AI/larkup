@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
-import { readConfig } from "@larkup/core/config-store";
+import { NextResponse } from 'next/server';
+import { readConfig } from '@larkup/core/config-store';
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export interface SerperSearchItem {
   url: string;
@@ -38,8 +38,7 @@ export async function POST(req: Request) {
   if (!apiKey) {
     return NextResponse.json(
       {
-        error:
-          "Serper search is not configured. Set SERPER_API_KEY in your environment.",
+        error: 'Serper search is not configured. Set SERPER_API_KEY in your environment.',
         configured: false,
       },
       { status: 503 },
@@ -50,35 +49,29 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: "Invalid request body." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
 
   const { query, page = 1 } = body;
   if (!query?.trim()) {
-    return NextResponse.json(
-      { error: "A search query is required." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'A search query is required.' }, { status: 400 });
   }
 
   const clampedPage = Math.max(1, Math.min(page, 10));
 
   try {
-    const res = await fetch("https://google.serper.dev/search", {
-      method: "POST",
+    const res = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
       headers: {
-        "X-API-KEY": apiKey,
-        "Content-Type": "application/json",
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         q: query.trim(),
         num: 10,
         page: clampedPage,
       }),
-      cache: "no-store",
+      cache: 'no-store',
     });
 
     const json = (await res.json()) as {
@@ -112,31 +105,25 @@ export async function POST(req: Request) {
 
     // Serper's free plan omits searchInformation.totalResults.
     // We derive pagination heuristically:
-    //   • A full page (10 results) means there are likely more pages.
-    //   • We cap at 10 pages (100 results) — Serper's max accessible window.
-    //   • If fewer than 10 results returned, this is the last page.
     const gotFullPage = items.length >= 10;
     const hasMore = gotFullPage && clampedPage < 10;
 
-    // Derive a synthetic total: current page offset + items on this page,
-    // plus "+?" if we believe there are more pages.
     const minTotal = (clampedPage - 1) * 10 + items.length;
     // If searchInformation is present (cloud/enterprise plan), use it.
     const siTotal = json.searchInformation?.totalResults;
     const rawTotal =
       siTotal != null
-        ? typeof siTotal === "string"
+        ? typeof siTotal === 'string'
           ? parseInt(siTotal, 10) || minTotal
           : siTotal
         : minTotal;
 
-    // Total pages: if we know the real count, cap at 10; otherwise estimate.
     const totalPages =
       siTotal != null
         ? Math.min(Math.max(1, Math.ceil(Math.min(rawTotal, 100) / 10)), 10)
         : hasMore
-          ? 10 // unknown upper bound — show up to 10 pages
-          : clampedPage; // last page reached
+        ? 10 // unknown upper bound — show up to 10 pages
+        : clampedPage; // last page reached
 
     return NextResponse.json({
       items,
@@ -149,7 +136,7 @@ export async function POST(req: Request) {
       query: query.trim(),
     } satisfies SerperSearchResponse & { totalResultsIsEstimate: boolean });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Serper search failed.";
+    const msg = err instanceof Error ? err.message : 'Serper search failed.';
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

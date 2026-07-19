@@ -1,23 +1,10 @@
-"use client";
+'use client';
 
-import { useState, useMemo } from "react";
-import {
-  ChevronDown,
-  Code2,
-  Play,
-  Clock,
-  Image as ImageIcon,
-  Table2,
-} from "lucide-react";
-import {
-  ChatDataTable,
-  type DataTableConfig,
-} from "@/components/chat/tools/chat-data-table";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useState, useMemo } from 'react';
+import { ChevronDown, Code2, Play, Clock, Image as ImageIcon, Table2 } from 'lucide-react';
+import { ChatDataTable, type DataTableConfig } from '@/components/chat/tools/chat-data-table';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 interface SandboxArtifact {
   name: string;
@@ -37,41 +24,37 @@ export interface SandboxResultConfig {
 /* Try to parse CSV-like stdout into a table                           */
 /* ------------------------------------------------------------------ */
 
-function tryParseStdoutAsTable(
-  stdout: string,
-): DataTableConfig | null {
+function tryParseStdoutAsTable(stdout: string): DataTableConfig | null {
   if (!stdout || stdout.trim().length === 0) return null;
 
-  const lines = stdout.trim().split("\n");
+  const lines = stdout.trim().split('\n');
   if (lines.length < 2) return null;
 
-  // Check if it looks like CSV (comma-separated with consistent column count)
   const firstLine = lines[0];
   const commaCount = (firstLine.match(/,/g) || []).length;
   const tabCount = (firstLine.match(/\t/g) || []).length;
 
   let separator: string | null = null;
-  if (commaCount >= 1 && commaCount === ((lines[1]?.match(/,/g) || []).length)) {
-    separator = ",";
-  } else if (tabCount >= 1 && tabCount === ((lines[1]?.match(/\t/g) || []).length)) {
-    separator = "\t";
+  if (commaCount >= 1 && commaCount === (lines[1]?.match(/,/g) || []).length) {
+    separator = ',';
+  } else if (tabCount >= 1 && tabCount === (lines[1]?.match(/\t/g) || []).length) {
+    separator = '\t';
   }
 
   if (!separator) return null;
 
-  // Must have at least 2 columns and 2 data rows to be worth rendering as table
-  const columns = lines[0].split(separator).map((c) => c.trim().replace(/^"|"$/g, ""));
+  const columns = lines[0].split(separator).map((c) => c.trim().replace(/^"|"$/g, ''));
   if (columns.length < 2) return null;
 
   const rows: Record<string, any>[] = [];
   for (let i = 1; i < lines.length && i <= 200; i++) {
-    const cells = lines[i].split(separator).map((c) => c.trim().replace(/^"|"$/g, ""));
+    const cells = lines[i].split(separator).map((c) => c.trim().replace(/^"|"$/g, ''));
     if (cells.length !== columns.length) continue;
     const row: Record<string, any> = {};
     columns.forEach((col, j) => {
       const val = cells[j];
       const num = Number(val);
-      row[col] = !isNaN(num) && val !== "" ? num : val;
+      row[col] = !isNaN(num) && val !== '' ? num : val;
     });
     rows.push(row);
   }
@@ -100,7 +83,7 @@ export function ChatSandboxResult({
   const { stdout, stderr, exitCode, artifacts, executionTimeMs } = config;
 
   const images = useMemo(
-    () => artifacts.filter((a) => a.mimeType.startsWith("image/")),
+    () => artifacts.filter((a) => a.mimeType.startsWith('image/')),
     [artifacts],
   );
 
@@ -110,21 +93,21 @@ export function ChatSandboxResult({
   const isSuccess = exitCode === 0;
 
   return (
-    <Card className="overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <Card className="overflow-hidden  animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <div
             className={`flex h-6 w-6 items-center justify-center rounded-md ${
               isSuccess
-                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
-                : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
             }`}
           >
             <Play className="size-3" />
           </div>
           <span className="text-xs font-medium text-foreground">
-            {isSuccess ? "Analysis completed" : "Analysis failed"}
+            {isSuccess ? 'Analysis completed' : 'Analysis failed'}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -142,11 +125,9 @@ export function ChatSandboxResult({
               className="h-7 gap-1 text-[11px] text-muted-foreground"
             >
               <Code2 className="size-3" />
-              {showCode ? "Hide code" : "View code"}
+              {showCode ? 'Hide code' : 'View code'}
               <ChevronDown
-                className={`size-3 transition-transform ${
-                  showCode ? "rotate-180" : ""
-                }`}
+                className={`size-3 transition-transform ${showCode ? 'rotate-180' : ''}`}
               />
             </Button>
           )}
@@ -166,10 +147,7 @@ export function ChatSandboxResult({
       {images.length > 0 && (
         <div className="space-y-3 p-4">
           {images.map((img, i) => (
-            <div
-              key={i}
-              className="overflow-hidden rounded-lg border border-border/40"
-            >
+            <div key={i} className="overflow-hidden rounded-lg border border-border/40">
               <img
                 src={`data:${img.mimeType};base64,${img.data}`}
                 alt={img.name}
@@ -177,9 +155,7 @@ export function ChatSandboxResult({
               />
               <div className="flex items-center gap-2 border-t border-border/40 px-3 py-1.5">
                 <ImageIcon className="size-3 text-muted-foreground" />
-                <span className="text-[10px] text-muted-foreground">
-                  {img.name}
-                </span>
+                <span className="text-[10px] text-muted-foreground">{img.name}</span>
               </div>
             </div>
           ))}

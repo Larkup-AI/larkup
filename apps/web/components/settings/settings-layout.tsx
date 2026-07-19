@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   Settings2,
@@ -9,19 +9,21 @@ import {
   Palette,
   Database,
   Plug,
+  Store,
   type LucideIcon,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export type SettingsSection =
-  | "general"
-  | "models"
-  | "storage"
-  | "server"
-  | "connections"
-  | "prompts"
-  | "playground"
-  | "appearance";
+  | 'general'
+  | 'models'
+  | 'storage'
+  | 'server'
+  | 'connections'
+  | 'prompts'
+  | 'playground'
+  | 'appearance'
+  | 'marketplace';
 
 interface SectionItem {
   id: SettingsSection;
@@ -36,21 +38,25 @@ interface SectionGroup {
 
 const SECTION_GROUPS: SectionGroup[] = [
   {
-    label: "Larkup Settiings",
+    label: 'Larkup Settiings',
     items: [
-      { id: "general", label: "General", icon: Settings2 },
-      { id: "models", label: "AI Models", icon: Sparkles },
-      { id: "storage", label: "Storage", icon: Database },
-      { id: "server", label: "Larkup Server", icon: Server },
-      { id: "connections", label: "Connections", icon: Plug },
+      { id: 'general', label: 'General', icon: Settings2 },
+      { id: 'models', label: 'AI Models', icon: Sparkles },
+      { id: 'storage', label: 'Storage', icon: Database },
+      { id: 'server', label: 'Larkup Server', icon: Server },
+      { id: 'connections', label: 'Connections', icon: Plug },
     ],
   },
   {
-    label: "Advanced",
+    label: 'Hub',
+    items: [{ id: 'marketplace', label: 'Marketplace', icon: Store }],
+  },
+  {
+    label: 'Advanced',
     items: [
-      { id: "prompts", label: "Prompts", icon: MessageSquareText },
-      { id: "playground", label: "Playground", icon: Search },
-      { id: "appearance", label: "Appearance", icon: Palette },
+      { id: 'prompts', label: 'Prompts', icon: MessageSquareText },
+      { id: 'playground', label: 'Playground', icon: Search },
+      { id: 'appearance', label: 'Appearance', icon: Palette },
     ],
   },
 ];
@@ -61,15 +67,10 @@ interface SettingsLayoutProps {
   children: React.ReactNode;
 }
 
-export function SettingsLayout({
-  activeSection,
-  onSectionChange,
-  children,
-}: SettingsLayoutProps) {
+export function SettingsLayout({ activeSection, onSectionChange, children }: SettingsLayoutProps) {
   // Find the label for breadcrumbs
   const activeLabel =
-    SECTION_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeSection)
-      ?.label || "Settings";
+    SECTION_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeSection)?.label || 'Settings';
 
   return (
     <div className="flex h-full w-full flex-1 min-h-0 bg-transparent">
@@ -90,16 +91,13 @@ export function SettingsLayout({
                       key={section.id}
                       onClick={() => onSectionChange(section.id)}
                       className={cn(
-                        "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-all duration-200 text-left outline-none",
+                        'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-all duration-200 text-left outline-none',
                         active
-                          ? "font-medium text-foreground bg-[#F0F0F0]"
-                          : "font-normal text-muted-foreground hover:bg-[#EBEBEB] hover:text-foreground",
+                          ? 'font-medium text-foreground bg-[#F0F0F0]'
+                          : 'font-normal text-muted-foreground hover:bg-[#EBEBEB] hover:text-foreground',
                       )}
                     >
-                      <Icon
-                        className="size-4 shrink-0"
-                        strokeWidth={active ? 2.25 : 1.75}
-                      />
+                      <Icon className="size-4 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
                       <span className="truncate">{section.label}</span>
                     </button>
                   );
@@ -120,10 +118,10 @@ export function SettingsLayout({
               key={section.id}
               onClick={() => onSectionChange(section.id)}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors border",
+                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors border',
                 active
-                  ? "bg-[#F0F0F0] border-transparent text-foreground"
-                  : "bg-transparent border-transparent text-muted-foreground hover:bg-[#EBEBEB]",
+                  ? 'bg-[#F0F0F0] border-transparent text-foreground'
+                  : 'bg-transparent border-transparent text-muted-foreground hover:bg-[#EBEBEB]',
               )}
             >
               <Icon className="size-3.5" />
@@ -134,9 +132,7 @@ export function SettingsLayout({
       </div>
 
       <div className="flex-1 min-w-0 h-full overflow-y-auto bg-transparent">
-        <div className="mx-auto max-w-5xl px-8 py-8 md:px-12 md:py-10">
-          {children}
-        </div>
+        <div className="mx-auto max-w-5xl px-8 py-8 md:px-12 md:py-10">{children}</div>
       </div>
     </div>
   );

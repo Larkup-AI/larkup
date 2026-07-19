@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextResponse } from 'next/server';
 import {
   createServer,
   deleteServer,
@@ -10,54 +10,48 @@ import {
   setMode,
   type ServerMeta,
   type WorkspaceMode,
-} from "@larkup/core/workspace"
-import { corpusStats } from "@larkup/core/documents-store"
-import { readRun } from "@larkup/core/index-store"
-import { readServerState } from "@larkup/core/generator/server-runtime"
+} from '@larkup/core/workspace';
+import { corpusStats } from '@larkup/core/documents-store';
+import { readRun } from '@larkup/core/index-store';
+import { readServerState } from '@larkup/core/generator/server-runtime';
 
-export const runtime = "nodejs"
-export const dynamic = "force-dynamic"
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /** A server entry enriched with lightweight, per-server status for the UI. */
 async function decorate(server: ServerMeta) {
   return runWithServer(server.id, async () => {
-    const [stats, run, state] = await Promise.all([
-      corpusStats(),
-      readRun(),
-      readServerState(),
-    ])
+    const [stats, run, state] = await Promise.all([corpusStats(), readRun(), readServerState()]);
     return {
       ...server,
       docCount: stats.docCount,
-      indexed: run?.status === "completed" && (run.totalChunks ?? 0) > 0,
+      indexed: run?.status === 'completed' && (run.totalChunks ?? 0) > 0,
       running: state.running,
       endpoint: state.endpoint,
-    }
-  })
+    };
+  });
 }
 
 /** GET → the full workspace: username, active server, and decorated servers. */
 export async function GET() {
-  const ws = await getWorkspace()
-  const servers = await Promise.all(ws.servers.map(decorate))
+  const ws = await getWorkspace();
+  const servers = await Promise.all(ws.servers.map(decorate));
   return NextResponse.json({
     username: ws.username,
     activeServerId: ws.activeServerId,
     servers,
     mode: ws.mode,
-  })
+  });
 }
 
 /** POST { name } → create a new server (and make it active). */
 export async function POST(req: Request) {
-  let body: { name?: string } = {}
+  let body: { name?: string } = {};
   try {
-    body = await req.json()
-  } catch {
-    // empty body is fine — server gets a default name
-  }
-  const { server } = await createServer(body.name ?? "Untitled server")
-  return NextResponse.json({ server }, { status: 201 })
+    body = await req.json();
+  } catch {}
+  const { server } = await createServer(body.name ?? 'Untitled server');
+  return NextResponse.json({ server }, { status: 201 });
 }
 
 /**
@@ -66,72 +60,62 @@ export async function POST(req: Request) {
  */
 export async function PATCH(req: Request) {
   let body: {
-    action?: string
-    serverId?: string
-    name?: string
-    username?: string
-    mode?: WorkspaceMode
-  }
+    action?: string;
+    serverId?: string;
+    name?: string;
+    username?: string;
+    mode?: WorkspaceMode;
+  };
   try {
-    body = await req.json()
+    body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
   switch (body.action) {
-    case "activate": {
+    case 'activate': {
       if (!body.serverId) {
-        return NextResponse.json(
-          { error: "serverId is required." },
-          { status: 400 },
-        )
+        return NextResponse.json({ error: 'serverId is required.' }, { status: 400 });
       }
-      return NextResponse.json({ workspace: await setActiveServer(body.serverId) })
+      return NextResponse.json({ workspace: await setActiveServer(body.serverId) });
     }
-    case "rename": {
+    case 'rename': {
       if (!body.serverId || !body.name?.trim()) {
-        return NextResponse.json(
-          { error: "serverId and name are required." },
-          { status: 400 },
-        )
+        return NextResponse.json({ error: 'serverId and name are required.' }, { status: 400 });
       }
       return NextResponse.json({
         workspace: await renameServer(body.serverId, body.name),
-      })
+      });
     }
-    case "setUsername": {
+    case 'setUsername': {
       return NextResponse.json({
-        workspace: await setUsername(body.username ?? ""),
-      })
+        workspace: await setUsername(body.username ?? ''),
+      });
     }
-    case "setMode": {
-      if (!body.mode || !(["tech", "simple"] as string[]).includes(body.mode)) {
-        return NextResponse.json(
-          { error: "mode must be 'tech' or 'simple'." },
-          { status: 400 },
-        )
+    case 'setMode': {
+      if (!body.mode || !(['tech', 'simple'] as string[]).includes(body.mode)) {
+        return NextResponse.json({ error: "mode must be 'tech' or 'simple'." }, { status: 400 });
       }
       return NextResponse.json({
         workspace: await setMode(body.mode),
-      })
+      });
     }
     default:
-      return NextResponse.json({ error: "Unknown action." }, { status: 400 })
+      return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   }
 }
 
 /** DELETE ?id=<id> — stop the server's instance, then remove all its data. */
 export async function DELETE(req: Request) {
-  const id = new URL(req.url).searchParams.get("id")
+  const id = new URL(req.url).searchParams.get('id');
   if (!id) {
-    return NextResponse.json({ error: "id is required." }, { status: 400 })
+    return NextResponse.json({ error: 'id is required.' }, { status: 400 });
   }
-  // Stop any running instance in the target server's context first.
   try {
-    const { stopServer } = await import("@larkup/core/generator/server-runtime")
-    await runWithServer(id, () => stopServer())
+    const { stopServer } = await import('@larkup/core/generator/server-runtime');
+    await runWithServer(id, () => stopServer());
   } catch {
     // best effort — still remove the data
   }
-  return NextResponse.json({ workspace: await deleteServer(id) })
+  return NextResponse.json({ workspace: await deleteServer(id) });
 }

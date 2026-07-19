@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Code2, Copy, Check, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { Code2, Copy, Check, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -10,17 +10,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
-import { CodeViewer } from "@/components/server/code-viewer";
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import { CodeViewer } from '@/components/server/code-viewer';
 
 const TABS = [
-  { id: "python", label: "Python" },
-  { id: "typescript", label: "TypeScript" },
-  { id: "openai", label: "OpenAI Compatible" },
+  { id: 'python', label: 'Python' },
+  { id: 'typescript', label: 'TypeScript' },
+  { id: 'openai', label: 'OpenAI Compatible' },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+type TabId = (typeof TABS)[number]['id'];
 
 function getSnippets(serverUrl: string): Record<TabId, string> {
   return {
@@ -89,10 +89,10 @@ console.log(text);`,
 }
 
 export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
-  const [activeTab, setActiveTab] = useState<TabId>("python");
+  const [activeTab, setActiveTab] = useState<TabId>('python');
   const [copied, setCopied] = useState(false);
 
-  const snippets = getSnippets(serverUrl || "http://localhost:8080");
+  const snippets = getSnippets(serverUrl || 'http://localhost:8080');
   const currentSnippet = snippets[activeTab];
 
   async function handleCopy() {
@@ -118,8 +118,7 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
             Connect to your RAG Server
           </DialogTitle>
           <DialogDescription>
-            Use one of these SDKs to programmatically interact with your RAG
-            server.
+            Use one of these SDKs to programmatically interact with your RAG server.
           </DialogDescription>
         </DialogHeader>
 
@@ -131,10 +130,10 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+                'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
                 activeTab === tab.id
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? 'bg-background text-foreground '
+                  : 'text-muted-foreground hover:text-foreground',
               )}
             >
               {tab.label}
@@ -146,11 +145,11 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
         <div className="relative rounded-lg border bg-slate-50 overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2 bg-slate-100/50">
             <span className="text-xs text-slate-500 font-mono">
-              {activeTab === "python"
-                ? "main.py"
-                : activeTab === "typescript"
-                  ? "index.ts"
-                  : "connect.ts"}
+              {activeTab === 'python'
+                ? 'main.py'
+                : activeTab === 'typescript'
+                ? 'index.ts'
+                : 'connect.ts'}
             </span>
             <button
               type="button"
@@ -172,7 +171,7 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
           </div>
           <CodeViewer
             value={currentSnippet}
-            language={activeTab === "python" ? "python" : "javascript"}
+            language={activeTab === 'python' ? 'python' : 'javascript'}
             height="auto"
           />
         </div>
@@ -180,9 +179,9 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
         {/* Docs link */}
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Server URL:{" "}
+            Server URL:{' '}
             <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">
-              {serverUrl || "Not running"}
+              {serverUrl || 'Not running'}
             </code>
           </span>
           <a

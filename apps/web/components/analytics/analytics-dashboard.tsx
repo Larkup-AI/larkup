@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -11,225 +11,190 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from 'recharts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Activity, Database, MessageSquare, Zap } from "lucide-react";
+} from '@/components/ui/select';
+import { Activity, Database, Loader2, MessageSquare, Zap } from 'lucide-react';
+import useSWR from 'swr';
+import type { AnalyticsSummary } from '@larkup/core/analytics-store';
 
-// Mock Data
-const MOCK_SERVER_REQUESTS = [
-  { date: "Dec 18", requests: 300, latency: 45 },
-  { date: "Dec 19", requests: 420, latency: 42 },
-  { date: "Dec 20", requests: 380, latency: 48 },
-  { date: "Dec 21", requests: 510, latency: 50 },
-  { date: "Dec 22", requests: 490, latency: 40 },
-  { date: "Dec 23", requests: 800, latency: 38 },
-  { date: "Dec 24", requests: 620, latency: 35 },
-  { date: "Dec 25", requests: 450, latency: 38 },
-  { date: "Dec 26", requests: 520, latency: 41 },
-  { date: "Dec 27", requests: 390, latency: 44 },
-  { date: "Dec 28", requests: 610, latency: 40 },
-  { date: "Dec 29", requests: 720, latency: 37 },
-  { date: "Dec 30", requests: 840, latency: 36 },
-  { date: "Dec 31", requests: 680, latency: 39 },
-  { date: "Jan 01", requests: 120, latency: 45 },
-  { date: "Jan 02", requests: 340, latency: 42 },
-  { date: "Jan 03", requests: 280, latency: 48 },
-  { date: "Jan 04", requests: 560, latency: 50 },
-  { date: "Jan 05", requests: 430, latency: 40 },
-  { date: "Jan 06", requests: 780, latency: 38 },
-  { date: "Jan 07", requests: 620, latency: 35 },
-];
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-const MOCK_CHAT_USAGE = [
-  { date: "Dec 18", tokens: 210000 },
-  { date: "Dec 19", tokens: 420000 },
-  { date: "Dec 20", tokens: 380000 },
-  { date: "Dec 21", tokens: 550000 },
-  { date: "Dec 22", tokens: 480000 },
-  { date: "Dec 23", tokens: 710000 },
-  { date: "Dec 24", tokens: 620000 },
-  { date: "Dec 25", tokens: 430000 },
-  { date: "Dec 26", tokens: 520000 },
-  { date: "Dec 27", tokens: 390000 },
-  { date: "Dec 28", tokens: 610000 },
-  { date: "Dec 29", tokens: 730000 },
-  { date: "Dec 30", tokens: 850000 },
-  { date: "Dec 31", tokens: 680000 },
-  { date: "Jan 01", tokens: 120000 },
-  { date: "Jan 02", tokens: 340000 },
-  { date: "Jan 03", tokens: 280000 },
-  { date: "Jan 04", tokens: 560000 },
-  { date: "Jan 05", tokens: 430000 },
-  { date: "Jan 06", tokens: 780000 },
-  { date: "Jan 07", tokens: 620000 },
-];
+function padTimeSeries<T extends { date: string }>(
+  data: T[],
+  timeframe: string,
+  emptyItemFactory: () => Omit<T, 'date'>,
+): T[] {
+  if (timeframe === 'all' || !data) return data || [];
 
-const MOCK_INDEXING_USAGE = [
-  { date: "Dec 18", tokens: 800000 },
-  { date: "Dec 19", tokens: 0 },
-  { date: "Dec 20", tokens: 1200000 },
-  { date: "Dec 21", tokens: 400000 },
-  { date: "Dec 22", tokens: 0 },
-  { date: "Dec 23", tokens: 1500000 },
-  { date: "Dec 24", tokens: 0 },
-  { date: "Dec 25", tokens: 0 },
-  { date: "Dec 26", tokens: 900000 },
-  { date: "Dec 27", tokens: 0 },
-  { date: "Dec 28", tokens: 0 },
-  { date: "Dec 29", tokens: 1100000 },
-  { date: "Dec 30", tokens: 0 },
-  { date: "Dec 31", tokens: 300000 },
-  { date: "Jan 01", tokens: 500000 },
-  { date: "Jan 02", tokens: 0 },
-  { date: "Jan 03", tokens: 1200000 },
-  { date: "Jan 04", tokens: 0 },
-  { date: "Jan 05", tokens: 250000 },
-  { date: "Jan 06", tokens: 0 },
-  { date: "Jan 07", tokens: 800000 },
-];
+  let days = 30;
+  if (timeframe === '7d') days = 7;
+  else if (timeframe === '14d') days = 14;
+  else if (timeframe === '30d') days = 30;
+  else if (timeframe === '90d') days = 90;
 
-const MOCK_MODELS = [
-  { name: "gpt-4o", type: "chat", tokens: 1250000, cost: 6.25, custom: false },
-  {
-    name: "claude-3-haiku",
-    type: "chat",
-    tokens: 850000,
-    cost: 0.21,
-    custom: false,
-  },
-  {
-    name: "llama-3-8b-local",
-    type: "chat",
-    tokens: 340000,
-    cost: 0,
-    custom: true,
-  },
-  {
-    name: "text-embedding-3-small",
-    type: "embedding",
-    tokens: 4200000,
-    cost: 0.08,
-    custom: false,
-  },
-  {
-    name: "nomic-embed-text",
-    type: "embedding",
-    tokens: 1500000,
-    cost: 0,
-    custom: true,
-  },
-];
+  const padded: T[] = [];
+  const today = new Date();
+
+  const dataMap = new Map(data.map((item) => [item.date, item]));
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+
+    if (dataMap.has(dateStr)) {
+      padded.push(dataMap.get(dateStr)!);
+    } else {
+      padded.push({ date: dateStr, ...emptyItemFactory() } as T);
+    }
+  }
+
+  return padded;
+}
+
+function formatTokens(num: number): string {
+  return (num / 1000000).toFixed(2) + 'M';
+}
+
+function formatCost(cost: number): string {
+  if (cost === 0) return '$0.00';
+  if (cost < 0.01) return '<$0.01';
+  return `$${cost.toFixed(2)}`;
+}
 
 export function AnalyticsDashboard() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState('overview');
+  const [timeframe, setTimeframe] = useState('14d');
 
-  const totalChatTokens = MOCK_MODELS.filter((m) => m.type === "chat").reduce(
-    (sum, m) => sum + m.tokens,
-    0,
-  );
-  const totalEmbeddingTokens = MOCK_MODELS.filter(
-    (m) => m.type === "embedding",
-  ).reduce((sum, m) => sum + m.tokens, 0);
-  const totalCost = MOCK_MODELS.reduce(
-    (sum, m) => sum + (m.custom ? 0 : m.cost),
-    0,
+  const {
+    data: summary,
+    isLoading,
+    error,
+  } = useSWR<AnalyticsSummary>(`/api/analytics?timeframe=${timeframe}`, fetcher);
+
+  if (isLoading) {
+    return (
+      <div className="p-8 flex-col gap-2 text-center text-muted-foreground animate-pulse flex items-center justify-center h-full">
+        <Loader2 className="size-6 animate-spin" />
+        <span className="text-[15px]">Loading analytics data...</span>
+      </div>
+    );
+  }
+
+  if (error || !summary) {
+    return <div className="p-8 text-center text-destructive">Failed to load analytics data.</div>;
+  }
+
+  const isServerEmpty =
+    !summary.serverTimeSeries?.length || summary.serverTimeSeries.every((d) => d.requests === 0);
+  const isIndexingEmpty =
+    !summary.embeddingTimeSeries?.length ||
+    summary.embeddingTimeSeries.every((d) => d.tokens === 0);
+  const isChatEmpty =
+    !summary.chatTimeSeries?.length || summary.chatTimeSeries.every((d) => d.tokens === 0);
+
+  const DummyOverlay = ({ title, description }: { title: string; description: string }) => (
+    <div className="absolute inset-0 z-10 flex items-center justify-center  rounded-md">
+      <div className="flex flex-col items-center space-y-2  dark:bg-zinc-900/90 px-5 py-4 rounded-lg max-w-xl text-center">
+        <div className="p-2 border border-border/70 rounded-lg bg-white">
+          <Activity className="size-6 text-black/80" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[16px] font-semibold text-foreground">{title}</p>
+          <p className="text-[13px] text-muted-foreground">{description}</p>
+        </div>
+      </div>
+    </div>
   );
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <Card className="shadow-none rounded-xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
             <Activity className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalCost.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              Across all paid models
-            </p>
+            <div className="text-2xl font-bold">{formatCost(summary.totalCost)}</div>
+            <p className="text-xs text-muted-foreground">Across all paid models</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-none rounded-xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Chat Tokens</CardTitle>
             <MessageSquare className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(totalChatTokens / 1000000).toFixed(1)}M
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Processed in conversations
-            </p>
+            <div className="text-2xl font-bold">{formatTokens(summary.totalChatTokens)}</div>
+            <p className="text-xs text-muted-foreground">Processed in conversations</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-none rounded-xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Embedding Tokens
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Embedding Tokens</CardTitle>
             <Database className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(totalEmbeddingTokens / 1000000).toFixed(1)}M
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Processed during indexing
-            </p>
+            <div className="text-2xl font-bold">{formatTokens(summary.totalEmbeddingTokens)}</div>
+            <p className="text-xs text-muted-foreground">Processed during indexing</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-none rounded-xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Requests
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
             <Zap className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {MOCK_SERVER_REQUESTS.reduce(
-                (sum, day) => sum + day.requests,
-                0,
-              ).toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              To local RAG server this week
-            </p>
+            <div className="text-2xl font-bold">{summary.totalRequests.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">To local RAG server this week</p>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-4"
-      >
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <TabsList className="bg-white dark:bg-muted">
-            <TabsTrigger value="overview">Server Traffic</TabsTrigger>
-            <TabsTrigger value="indexing">Indexing Usage</TabsTrigger>
-            <TabsTrigger value="chat">Chat Usage</TabsTrigger>
+          <TabsList className="inline-flex bg-white/70 dark:bg-muted/70 h-9 items-center justify-center rounded-lg border border-border p-0.5 text-muted-foreground">
+            <TabsTrigger
+              value="overview"
+              className="inline-flex items-center h-9 justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
+            >
+              <Activity className="size-3.5 mr-1.5" />
+              Server Traffic
+            </TabsTrigger>
+            <TabsTrigger
+              value="indexing"
+              className="inline-flex items-center h-9 justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
+            >
+              <Database className="size-3.5 mr-1.5" />
+              Indexing Usage
+            </TabsTrigger>
+            <TabsTrigger
+              value="chat"
+              className="inline-flex items-center h-9 justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
+            >
+              <MessageSquare className="size-3.5 mr-1.5" />
+              Chat Usage
+            </TabsTrigger>
           </TabsList>
           <div className="flex items-center">
-            <Select defaultValue="30d">
-              <SelectTrigger className="w-[140px] h-10! text-sm bg-white dark:bg-background">
-                <SelectValue placeholder="Select timeframe" />
+            <Select value={timeframe} onValueChange={(val) => val && setTimeframe(val)}>
+              <SelectTrigger className="w-[140px] h-10! text-sm bg-white dark:bg-background focus:ring-0 focus:border-input data-[state=open]:ring-0 data-[state=open]:border-input outline-none focus:outline-none">
+                <SelectValue placeholder="Select timeframe">
+                  {timeframe === '7d' && 'Last 7 days'}
+                  {timeframe === '14d' && 'Last 14 days'}
+                  {timeframe === '30d' && 'Last 30 days'}
+                  {timeframe === '90d' && 'Last 90 days'}
+                  {timeframe === 'all' && 'All time'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="7d">Last 7 days</SelectItem>
@@ -243,19 +208,31 @@ export function AnalyticsDashboard() {
         </div>
 
         <TabsContent value="overview" className="space-y-4">
-          <Card>
+          <Card className="shadow-none! rounded-xl">
             <CardHeader>
               <CardTitle>Requests to RAG Server</CardTitle>
               <CardDescription>
-                Daily requests sent to your local or remote deployed RAG
-                endpoints.
+                Daily requests sent to your local or remote deployed RAG endpoints.
               </CardDescription>
             </CardHeader>
             <CardContent className="px-2 sm:p-6">
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[300px] w-full relative">
+                {isServerEmpty && (
+                  <DummyOverlay
+                    title="No Server Traffic Yet"
+                    description="Once you start sending requests to the RAG server, usage will appear here."
+                  />
+                )}
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                  className="[&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none"
+                >
                   <BarChart
-                    data={MOCK_SERVER_REQUESTS}
+                    data={padTimeSeries(summary.serverTimeSeries, timeframe, () => ({
+                      requests: 0,
+                      avgLatencyMs: 0,
+                    }))}
                     margin={{
                       top: 10,
                       right: 30,
@@ -277,8 +254,18 @@ export function AnalyticsDashboard() {
                       tickLine={false}
                       axisLine={false}
                       minTickGap={20}
+                      tickFormatter={(val) => {
+                        if (!val.includes('-')) return val;
+                        const [y, m, d] = val.split('-');
+                        return new Date(
+                          parseInt(y, 10),
+                          parseInt(m, 10) - 1,
+                          parseInt(d, 10),
+                        ).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                      }}
                     />
                     <YAxis
+                      allowDecimals={false}
                       stroke="currentColor"
                       strokeOpacity={0.5}
                       fontSize={12}
@@ -288,18 +275,21 @@ export function AnalyticsDashboard() {
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "var(--color-background)",
-                        borderColor: "var(--color-border)",
-                        borderRadius: "8px",
+                        backgroundColor: 'var(--color-background)',
+                        borderColor: 'var(--color-border)',
+                        borderRadius: '8px',
                       }}
-                      itemStyle={{ color: "var(--color-foreground)" }}
-                      cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
+                      itemStyle={{ color: 'var(--color-foreground)' }}
+                      cursor={{ fill: 'var(--color-muted)', opacity: 0.4 }}
                     />
                     <Bar
                       dataKey="requests"
                       fill="#3b82f6"
                       radius={[4, 4, 0, 0]}
-                      barSize={32}
+                      maxBarSize={40}
+                      activeBar={{
+                        className: 'outline-none focus:outline-none',
+                      }}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -309,18 +299,30 @@ export function AnalyticsDashboard() {
         </TabsContent>
 
         <TabsContent value="indexing" className="space-y-4">
-          <Card>
+          <Card className="shadow-none rounded-xl">
             <CardHeader>
               <CardTitle>Indexing Token Usage</CardTitle>
-              <CardDescription>
-                Daily tokens processed for document indexing.
-              </CardDescription>
+              <CardDescription>Daily tokens processed for document indexing.</CardDescription>
             </CardHeader>
             <CardContent className="px-2 sm:p-6">
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[300px] w-full relative">
+                {isIndexingEmpty && (
+                  <DummyOverlay
+                    title="No Indexing Data Yet"
+                    description="Add documents to your knowledge bases to see embedding token usage here."
+                  />
+                )}
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                  className="[&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none"
+                >
                   <AreaChart
-                    data={MOCK_INDEXING_USAGE}
+                    data={padTimeSeries(summary.embeddingTimeSeries, timeframe, () => ({
+                      tokens: 0,
+                      cost: 0,
+                      requests: 0,
+                    }))}
                     margin={{
                       top: 10,
                       right: 30,
@@ -329,23 +331,9 @@ export function AnalyticsDashboard() {
                     }}
                   >
                     <defs>
-                      <linearGradient
-                        id="colorIndexing"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#f97316"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#f97316"
-                          stopOpacity={0}
-                        />
+                      <linearGradient id="colorIndexing" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid
@@ -362,24 +350,32 @@ export function AnalyticsDashboard() {
                       tickLine={false}
                       axisLine={false}
                       minTickGap={20}
+                      tickFormatter={(val) => {
+                        if (!val.includes('-')) return val;
+                        const [y, m, d] = val.split('-');
+                        return new Date(
+                          parseInt(y, 10),
+                          parseInt(m, 10) - 1,
+                          parseInt(d, 10),
+                        ).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                      }}
                     />
                     <YAxis
+                      allowDecimals={false}
                       stroke="currentColor"
                       strokeOpacity={0.5}
                       fontSize={12}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) =>
-                        `${value >= 1000 ? value / 1000 + "k" : value}`
-                      }
+                      tickFormatter={(value) => `${value >= 1000 ? value / 1000 + 'k' : value}`}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "var(--color-background)",
-                        borderColor: "var(--color-border)",
-                        borderRadius: "8px",
+                        backgroundColor: 'var(--color-background)',
+                        borderColor: 'var(--color-border)',
+                        borderRadius: '8px',
                       }}
-                      itemStyle={{ color: "var(--color-foreground)" }}
+                      itemStyle={{ color: 'var(--color-foreground)' }}
                     />
                     <Area
                       type="monotone"
@@ -388,7 +384,11 @@ export function AnalyticsDashboard() {
                       strokeWidth={2}
                       fillOpacity={1}
                       fill="url(#colorIndexing)"
-                      activeDot={{ r: 4 }}
+                      activeDot={{
+                        r: 4,
+                        className: 'outline-none focus:outline-none',
+                        strokeWidth: 0,
+                      }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -398,18 +398,30 @@ export function AnalyticsDashboard() {
         </TabsContent>
 
         <TabsContent value="chat" className="space-y-4">
-          <Card>
+          <Card className="shadow-none rounded-xl">
             <CardHeader>
               <CardTitle>Chat Token Usage</CardTitle>
-              <CardDescription>
-                Daily tokens processed for chat completions.
-              </CardDescription>
+              <CardDescription>Daily tokens processed for chat completions.</CardDescription>
             </CardHeader>
             <CardContent className="px-2 sm:p-6">
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[300px] w-full relative">
+                {isChatEmpty && (
+                  <DummyOverlay
+                    title="No Chat Data Yet"
+                    description="Chat with the AI to see your token usage metrics here."
+                  />
+                )}
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                  className="[&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none"
+                >
                   <AreaChart
-                    data={MOCK_CHAT_USAGE}
+                    data={padTimeSeries(summary.chatTimeSeries, timeframe, () => ({
+                      tokens: 0,
+                      cost: 0,
+                      requests: 0,
+                    }))}
                     margin={{
                       top: 10,
                       right: 30,
@@ -418,23 +430,9 @@ export function AnalyticsDashboard() {
                     }}
                   >
                     <defs>
-                      <linearGradient
-                        id="colorChat"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#3b82f6"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#3b82f6"
-                          stopOpacity={0}
-                        />
+                      <linearGradient id="colorChat" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid
@@ -451,24 +449,32 @@ export function AnalyticsDashboard() {
                       tickLine={false}
                       axisLine={false}
                       minTickGap={20}
+                      tickFormatter={(val) => {
+                        if (!val.includes('-')) return val;
+                        const [y, m, d] = val.split('-');
+                        return new Date(
+                          parseInt(y, 10),
+                          parseInt(m, 10) - 1,
+                          parseInt(d, 10),
+                        ).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                      }}
                     />
                     <YAxis
+                      allowDecimals={false}
                       stroke="currentColor"
                       strokeOpacity={0.5}
                       fontSize={12}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) =>
-                        `${value >= 1000 ? value / 1000 + "k" : value}`
-                      }
+                      tickFormatter={(value) => `${value >= 1000 ? value / 1000 + 'k' : value}`}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "var(--color-background)",
-                        borderColor: "var(--color-border)",
-                        borderRadius: "8px",
+                        backgroundColor: 'var(--color-background)',
+                        borderColor: 'var(--color-border)',
+                        borderRadius: '8px',
                       }}
-                      itemStyle={{ color: "var(--color-foreground)" }}
+                      itemStyle={{ color: 'var(--color-foreground)' }}
                     />
                     <Area
                       type="monotone"
@@ -477,7 +483,11 @@ export function AnalyticsDashboard() {
                       strokeWidth={2}
                       fillOpacity={1}
                       fill="url(#colorChat)"
-                      activeDot={{ r: 4 }}
+                      activeDot={{
+                        r: 4,
+                        className: 'outline-none focus:outline-none',
+                        strokeWidth: 0,
+                      }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>

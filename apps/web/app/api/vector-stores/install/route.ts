@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
+import { NextResponse } from 'next/server';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
@@ -13,8 +13,7 @@ const execAsync = promisify(exec);
  * Body: { "storeId": "chroma" }
  */
 export async function POST(request: Request) {
-  // Block in production — pnpm add can't run on Vercel
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === 'production') {
     return NextResponse.json(
       {
         error:
@@ -29,7 +28,7 @@ export async function POST(request: Request) {
 
   // Only Chroma is installable for now
   const INSTALLABLE: Record<string, { pkg: string; version: string }> = {
-    chroma: { pkg: "chromadb", version: "^1.9.0" },
+    chroma: { pkg: 'chromadb', version: '^1.9.0' },
   };
 
   const entry = INSTALLABLE[storeId];

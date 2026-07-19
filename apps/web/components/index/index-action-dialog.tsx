@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef, isValidElement } from "react";
-import useSWR from "swr";
+import { useState, useEffect, useRef, isValidElement } from 'react';
+import useSWR from 'swr';
 import {
   AlertTriangle,
   Boxes,
@@ -16,21 +16,16 @@ import {
   Play,
   RotateCcw,
   Scissors,
-} from "lucide-react";
-import type {
-  ChunkingParams,
-  IndexRun,
-  IndexType,
-  VectorStoreId,
-} from "@larkup/core/types";
-import { getEmbeddingModel } from "@larkup/core/embeddings/registry";
-import { getVectorStore } from "@larkup/vector-stores/registry";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+} from 'lucide-react';
+import type { ChunkingParams, IndexRun, IndexType, VectorStoreId } from '@larkup/core/types';
+import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
+import { getVectorStore } from '@larkup/vector-stores/registry';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import {
   Dialog,
   DialogContent,
@@ -49,7 +44,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -69,7 +64,7 @@ interface IndexStatus {
   };
 }
 
-const ACTIVE: IndexRun["status"][] = ["chunking", "embedding", "upserting"];
+const ACTIVE: IndexRun['status'][] = ['chunking', 'embedding', 'upserting'];
 
 interface IndexActionDialogProps {
   open?: boolean;
@@ -77,37 +72,26 @@ interface IndexActionDialogProps {
   trigger?: React.ReactNode;
 }
 
-export function IndexActionDialog({
-  open,
-  onOpenChange,
-  trigger,
-}: IndexActionDialogProps) {
+export function IndexActionDialog({ open, onOpenChange, trigger }: IndexActionDialogProps) {
   const [starting, setStarting] = useState(false);
 
-  // We maintain internal open state if it's not controlled
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const dialogOpen = isControlled ? open : internalOpen;
-  const setDialogOpen =
-    isControlled && onOpenChange ? onOpenChange : setInternalOpen;
+  const setDialogOpen = isControlled && onOpenChange ? onOpenChange : setInternalOpen;
 
-  const { data, isLoading, mutate } = useSWR<IndexStatus>(
-    "/api/index",
-    fetcher,
-    {
-      refreshInterval: (d) =>
-        d?.run && ACTIVE.includes(d.run.status) ? 1000 : 0,
-    },
-  );
+  const { data, isLoading, mutate } = useSWR<IndexStatus>('/api/index', fetcher, {
+    refreshInterval: (d) => (d?.run && ACTIVE.includes(d.run.status) ? 1000 : 0),
+  });
 
   const lastWarning = useRef<string | undefined>(undefined);
   useEffect(() => {
     const warning = data?.run?.warning;
     if (warning && warning !== lastWarning.current) {
-      toast.warning(warning, { id: "rate-limit-warning", duration: 70_000 });
+      toast.warning(warning, { id: 'rate-limit-warning', duration: 70_000 });
     } else if (!warning && lastWarning.current) {
-      toast.dismiss("rate-limit-warning");
-      toast.success("Rate limit resolved — resuming indexing.", {
+      toast.dismiss('rate-limit-warning');
+      toast.success('Rate limit resolved — resuming indexing.', {
         duration: 3000,
       });
     }
@@ -122,31 +106,31 @@ export function IndexActionDialog({
 
     if (isNowActive) {
       setIsIndexing(true);
-    } else if (isIndexing && status === "completed") {
+    } else if (isIndexing && status === 'completed') {
       setIsIndexing(false);
       setDialogOpen(false);
-      toast.success("Indexing completed successfully!");
+      toast.success('Indexing completed successfully!');
     }
   }, [data?.run?.status, isIndexing, setDialogOpen]);
 
   async function build(incremental = false) {
     setStarting(true);
     try {
-      const res = await fetch("/api/index", {
-        method: "POST",
+      const res = await fetch('/api/index', {
+        method: 'POST',
         body: JSON.stringify({ incremental }),
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       });
       const body = await res.json();
       if (!res.ok) {
-        toast.error(body.error ?? "Could not start indexing.");
+        toast.error(body.error ?? 'Could not start indexing.');
         return;
       }
-      toast.success("Indexing started.");
+      toast.success('Indexing started.');
       setIsIndexing(true);
       mutate();
     } catch {
-      toast.error("Could not start indexing.");
+      toast.error('Could not start indexing.');
     } finally {
       setStarting(false);
     }
@@ -155,15 +139,15 @@ export function IndexActionDialog({
   async function cancel() {
     setStarting(true);
     try {
-      const res = await fetch("/api/index", { method: "DELETE" });
+      const res = await fetch('/api/index', { method: 'DELETE' });
       if (!res.ok) {
-        toast.error("Could not cancel indexing.");
+        toast.error('Could not cancel indexing.');
         return;
       }
-      toast.success("Indexing cancelled.");
+      toast.success('Indexing cancelled.');
       mutate();
     } catch {
-      toast.error("Could not cancel indexing.");
+      toast.error('Could not cancel indexing.');
     } finally {
       setStarting(false);
     }
@@ -172,14 +156,10 @@ export function IndexActionDialog({
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       {trigger ? (
-        <DialogTrigger
-          render={
-            isValidElement(trigger) ? trigger : <button>{trigger}</button>
-          }
-        />
+        <DialogTrigger render={isValidElement(trigger) ? trigger : <button>{trigger}</button>} />
       ) : (
         <div className="flex items-center gap-2">
-          {data?.run?.status === "completed" && (
+          {data?.run?.status === 'completed' && (
             <AlertDialog>
               <AlertDialogTrigger
                 render={
@@ -198,12 +178,10 @@ export function IndexActionDialog({
               />
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    Are you sure you want to re-index data?
-                  </AlertDialogTitle>
+                  <AlertDialogTitle>Are you sure you want to re-index data?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will rebuild the entire index from scratch. All
-                    documents will be re-processed.
+                    This will rebuild the entire index from scratch. All documents will be
+                    re-processed.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -255,9 +233,7 @@ export function IndexActionDialog({
             {!data.ready && (
               <Alert variant="default">
                 <AlertTriangle className="size-4 text-orange-500!" />
-                <AlertTitle className="text-orange-500!">
-                  Not ready to index
-                </AlertTitle>
+                <AlertTitle className="text-orange-500!">Not ready to index</AlertTitle>
                 <AlertDescription>
                   <ul className="list-disc pl-4">
                     {data.blockers.map((b) => (
@@ -281,28 +257,21 @@ export function IndexActionDialog({
                 </AlertTitle>
                 <AlertDescription className="text-muted-foreground space-y-1">
                   <p>
-                    Once indexing begins, two settings become{" "}
-                    <span className="font-medium text-foreground">locked</span>{" "}
-                    to the existing index:
+                    Once indexing begins, two settings become{' '}
+                    <span className="font-medium text-foreground">locked</span> to the existing
+                    index:
                   </p>
                   <ul className="list-disc pl-4 space-y-0.5">
                     <li>
-                      <span className="font-medium text-foreground">
-                        Embedding model
-                      </span>{" "}
-                      — you can swap to any model with the{" "}
-                      <span className="font-medium text-foreground">
-                        same vector dimensions
-                      </span>
-                      , but switching to a model with different dimensions will
-                      require a full re-index.
+                      <span className="font-medium text-foreground">Embedding model</span> — you can
+                      swap to any model with the{' '}
+                      <span className="font-medium text-foreground">same vector dimensions</span>,
+                      but switching to a model with different dimensions will require a full
+                      re-index.
                     </li>
                     <li>
-                      <span className="font-medium text-foreground">
-                        Vector store
-                      </span>{" "}
-                      — changing the store after indexing requires starting
-                      fresh.
+                      <span className="font-medium text-foreground">Vector store</span> — changing
+                      the store after indexing requires starting fresh.
                     </li>
                   </ul>
                 </AlertDescription>
@@ -312,39 +281,33 @@ export function IndexActionDialog({
             <div className="flex items-center justify-between pt-2">
               <div className="flex items-center gap-3">
                 <Button
-                  onClick={() => build(data.run?.status === "completed")}
+                  onClick={() => build(data.run?.status === 'completed')}
                   disabled={
                     !data.ready ||
                     Boolean(data.run && ACTIVE.includes(data.run.status)) ||
                     starting ||
-                    (data.run?.status === "completed" &&
-                      data.unindexedCount === 0)
+                    (data.run?.status === 'completed' && data.unindexedCount === 0)
                   }
                   size="lg"
                 >
-                  {Boolean(data.run && ACTIVE.includes(data.run.status)) ||
-                  starting ? (
+                  {Boolean(data.run && ACTIVE.includes(data.run.status)) || starting ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
                     <Play className="size-4" />
                   )}
                   {Boolean(data.run && ACTIVE.includes(data.run.status))
-                    ? "Indexing…"
-                    : data.run?.status === "completed"
-                      ? `Index new documents (${data.unindexedCount})`
-                      : `Start indexing (${data.unindexedCount})`}
+                    ? 'Indexing…'
+                    : data.run?.status === 'completed'
+                    ? `Index new documents (${data.unindexedCount})`
+                    : `Start indexing (${data.unindexedCount})`}
                 </Button>
 
-                {data.run?.status === "completed" &&
+                {data.run?.status === 'completed' &&
                   !Boolean(data.run && ACTIVE.includes(data.run.status)) && (
                     <AlertDialog>
                       <AlertDialogTrigger
                         render={
-                          <Button
-                            variant="outline"
-                            size="lg"
-                            disabled={starting}
-                          >
+                          <Button variant="outline" size="lg" disabled={starting}>
                             <RotateCcw className="size-4 mr-2" />
                             Re-Index All
                           </Button>
@@ -356,8 +319,8 @@ export function IndexActionDialog({
                             Are you sure you want to re-index data?
                           </AlertDialogTitle>
                           <AlertDialogDescription>
-                            This will rebuild the entire index from scratch. All
-                            documents will be re-processed.
+                            This will rebuild the entire index from scratch. All documents will be
+                            re-processed.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -376,22 +339,13 @@ export function IndexActionDialog({
                   )}
 
                 {Boolean(data.run && ACTIVE.includes(data.run.status)) && (
-                  <Button
-                    onClick={cancel}
-                    disabled={starting}
-                    size="lg"
-                    variant="destructive"
-                  >
+                  <Button onClick={cancel} disabled={starting} size="lg" variant="destructive">
                     Cancel
                   </Button>
                 )}
               </div>
 
-              <Button
-                variant="ghost"
-                size="lg"
-                onClick={() => setDialogOpen(false)}
-              >
+              <Button variant="ghost" size="lg" onClick={() => setDialogOpen(false)}>
                 Close
               </Button>
             </div>
@@ -407,7 +361,7 @@ function ConfigSummary({
   docCount,
   charCount,
 }: {
-  config: IndexStatus["config"];
+  config: IndexStatus['config'];
   docCount: number;
   charCount: number;
 }) {
@@ -417,36 +371,36 @@ function ConfigSummary({
   const items = [
     {
       icon: Cpu,
-      label: "Embedding model",
+      label: 'Embedding model',
       value: model?.label ?? config.embeddingModelId,
       hint: model ? `${model.dimensions} dims` : undefined,
     },
     {
       icon: Database,
-      label: "Vector store",
+      label: 'Vector store',
       value: store?.label ?? config.vectorStore,
     },
     {
       icon: Boxes,
-      label: "Index type",
+      label: 'Index type',
       value: config.indexType.toUpperCase(),
     },
     {
       icon: Scissors,
-      label: "Chunking",
+      label: 'Chunking',
       value: `${config.chunking.chunkSize} / ${config.chunking.chunkOverlap}`,
-      hint: "size / overlap",
+      hint: 'size / overlap',
     },
     {
       icon: FileText,
-      label: "Corpus",
+      label: 'Corpus',
       value: `${docCount.toLocaleString()} docs`,
       hint: `${charCount.toLocaleString()} chars`,
     },
   ];
 
   return (
-    <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-4">
+    <div className="rounded-xl border bg-card text-card-foreground  p-4">
       <div className="flex items-center gap-2 text-base font-semibold mb-4">
         <Layers className="size-4 text-primary" />
         Index configuration
@@ -473,22 +427,19 @@ function ConfigSummary({
   );
 }
 
-const STATUS_COPY: Record<
-  IndexRun["status"],
-  { label: string; phase?: string }
-> = {
-  idle: { label: "Idle" },
-  chunking: { label: "Chunking", phase: "Splitting documents into chunks" },
-  embedding: { label: "Embedding", phase: "Generating vector embeddings" },
-  upserting: { label: "Storing", phase: "Writing vectors to the store" },
-  completed: { label: "Completed" },
-  failed: { label: "Failed" },
+const STATUS_COPY: Record<IndexRun['status'], { label: string; phase?: string }> = {
+  idle: { label: 'Idle' },
+  chunking: { label: 'Chunking', phase: 'Splitting documents into chunks' },
+  embedding: { label: 'Embedding', phase: 'Generating vector embeddings' },
+  upserting: { label: 'Storing', phase: 'Writing vectors to the store' },
+  completed: { label: 'Completed' },
+  failed: { label: 'Failed' },
 };
 
 function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
   if (!run) {
     return (
-      <div className="rounded-xl border bg-card text-card-foreground shadow-sm flex flex-col items-center justify-center gap-1 py-8 text-center">
+      <div className="rounded-xl border bg-card text-card-foreground  flex flex-col items-center justify-center gap-1 py-8 text-center">
         <Hash className="mb-1 size-6 text-muted-foreground/60" />
         <p className="text-sm font-medium">No index built yet</p>
         <p className="text-sm text-muted-foreground">
@@ -503,16 +454,16 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
     run.totalChunks > 0
       ? Math.round((run.processedChunks / run.totalChunks) * 100)
       : running
-        ? 5
-        : 0;
+      ? 5
+      : 0;
 
   return (
-    <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-4 space-y-4">
+    <div className="rounded-xl border bg-card text-card-foreground  p-4 space-y-4">
       <div className="flex flex-row items-center justify-between">
         <div className="flex items-center gap-2 text-base font-semibold">
-          {run.status === "completed" ? (
+          {run.status === 'completed' ? (
             <CheckCircle2 className="size-4 text-primary" />
-          ) : run.status === "failed" ? (
+          ) : run.status === 'failed' ? (
             <AlertTriangle className="size-4 text-destructive" />
           ) : (
             <Loader2 className="size-4 animate-spin text-primary" />
@@ -522,7 +473,7 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
         <StatusBadge status={run.status} />
       </div>
 
-      {run.status === "failed" ? (
+      {run.status === 'failed' ? (
         <></>
       ) : (
         // <Alert variant="destructive">
@@ -533,20 +484,13 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
         <>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {copy.phase ?? "Done"}
-              </span>
+              <span className="text-muted-foreground">{copy.phase ?? 'Done'}</span>
               <span className="font-mono tabular-nums">
                 {run.processedChunks.toLocaleString()}
-                {run.totalChunks > 0 &&
-                  ` / ${run.totalChunks.toLocaleString()}`}{" "}
-                chunks
+                {run.totalChunks > 0 && ` / ${run.totalChunks.toLocaleString()}`} chunks
               </span>
             </div>
-            <Progress
-              value={pct}
-              className="**:data-[slot=progress-indicator]:bg-green-600"
-            />
+            <Progress value={pct} className="**:data-[slot=progress-indicator]:bg-green-600" />
           </div>
 
           <dl className="grid grid-cols-2 gap-4 pt-1 sm:grid-cols-4">
@@ -554,7 +498,7 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
             <Stat label="Chunks" value={run.totalChunks.toLocaleString()} />
             <Stat
               label="Dimensions"
-              value={run.dimensions ? run.dimensions.toLocaleString() : "—"}
+              value={run.dimensions ? run.dimensions.toLocaleString() : '—'}
             />
             <Stat
               label="Duration"
@@ -562,8 +506,8 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
                 run.durationMs
                   ? `${(run.durationMs / 1000).toFixed(1)}s`
                   : running
-                    ? "running…"
-                    : "—"
+                  ? 'running…'
+                  : '—'
               }
             />
           </dl>
@@ -582,14 +526,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatusBadge({ status }: { status: IndexRun["status"] }) {
-  if (status === "completed")
-    return (
-      <Badge className="bg-primary/12 text-primary hover:bg-primary/12">
-        Ready
-      </Badge>
-    );
-  if (status === "failed") return <Badge variant="destructive">Failed</Badge>;
+function StatusBadge({ status }: { status: IndexRun['status'] }) {
+  if (status === 'completed')
+    return <Badge className="bg-primary/12 text-primary hover:bg-primary/12">Ready</Badge>;
+  if (status === 'failed') return <Badge variant="destructive">Failed</Badge>;
   if (ACTIVE.includes(status))
     return (
       <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">

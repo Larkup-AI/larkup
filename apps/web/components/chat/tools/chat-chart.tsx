@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -24,25 +24,25 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-} from "recharts";
-import { Download, Copy, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
+} from 'recharts';
+import { Download, Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 /* ------------------------------------------------------------------ */
 /* Color palette — refined, premium tones                              */
 /* ------------------------------------------------------------------ */
 
 const CHART_COLORS = [
-  "#f97316", // orange
-  "#10b981", // emerald
-  "#3b82f6", // blue
-  "#8b5cf6", // violet
-  "#f43f5e", // rose
-  "#f59e0b", // amber
-  "#06b6d4", // cyan
-  "#64748b", // slate
-  "#ec4899", // pink
-  "#14b8a6", // teal
+  '#f97316', // orange
+  '#10b981', // emerald
+  '#3b82f6', // blue
+  '#8b5cf6', // violet
+  '#f43f5e', // rose
+  '#f59e0b', // amber
+  '#06b6d4', // cyan
+  '#64748b', // slate
+  '#ec4899', // pink
+  '#14b8a6', // teal
 ];
 
 /* Gradient definitions for area / bar fills */
@@ -52,14 +52,7 @@ function ChartGradients({ series }: { series: SeriesConfig[] }) {
       {series.map((s, i) => {
         const color = s.color || CHART_COLORS[i % CHART_COLORS.length];
         return (
-          <linearGradient
-            key={s.dataKey}
-            id={`gradient-${s.dataKey}`}
-            x1="0"
-            y1="0"
-            x2="0"
-            y2="1"
-          >
+          <linearGradient key={s.dataKey} id={`gradient-${s.dataKey}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor={color} stopOpacity={0.25} />
             <stop offset="95%" stopColor={color} stopOpacity={0.02} />
           </linearGradient>
@@ -86,11 +79,9 @@ function CustomTooltip({ active, payload, label }: any) {
               className="h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-muted-foreground">
-              {entry.name || entry.dataKey}:
-            </span>
+            <span className="text-muted-foreground">{entry.name || entry.dataKey}:</span>
             <span className="font-medium tabular-nums text-foreground">
-              {typeof entry.value === "number"
+              {typeof entry.value === 'number'
                 ? entry.value.toLocaleString(undefined, {
                     maximumFractionDigits: 2,
                   })
@@ -114,7 +105,7 @@ interface SeriesConfig {
 }
 
 export interface ChartConfig {
-  chartType: "bar" | "area" | "line" | "pie" | "scatter" | "radar";
+  chartType: 'bar' | 'area' | 'line' | 'pie' | 'scatter' | 'radar';
   title: string;
   subtitle?: string;
   data: Record<string, any>[];
@@ -130,22 +121,22 @@ function downloadCSV(data: Record<string, any>[], title: string) {
   if (data.length === 0) return;
   const keys = Object.keys(data[0]);
   const csv = [
-    keys.join(","),
+    keys.join(','),
     ...data.map((row) =>
       keys
         .map((k) => {
-          const v = String(row[k] ?? "");
-          return v.includes(",") ? `"${v}"` : v;
+          const v = String(row[k] ?? '');
+          return v.includes(',') ? `"${v}"` : v;
         })
-        .join(","),
+        .join(','),
     ),
-  ].join("\n");
+  ].join('\n');
 
-  const blob = new Blob([csv], { type: "text/csv" });
+  const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
-  a.download = `${title.replace(/\s+/g, "_").toLowerCase()}.csv`;
+  a.download = `${title.replace(/\s+/g, '_').toLowerCase()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -154,9 +145,9 @@ function copyDataToClipboard(data: Record<string, any>[]) {
   if (data.length === 0) return;
   const keys = Object.keys(data[0]);
   const text = [
-    keys.join("\t"),
-    ...data.map((row) => keys.map((k) => String(row[k] ?? "")).join("\t")),
-  ].join("\n");
+    keys.join('\t'),
+    ...data.map((row) => keys.map((k) => String(row[k] ?? '')).join('\t')),
+  ].join('\n');
   navigator.clipboard.writeText(text);
 }
 
@@ -167,24 +158,23 @@ function copyDataToClipboard(data: Record<string, any>[]) {
 
 const AXIS_TICK_STYLE = {
   fontSize: 11,
-  fill: "var(--muted-foreground)",
-  fontFamily: "inherit",
+  fill: 'var(--muted-foreground)',
+  fontFamily: 'inherit',
 };
 
 const AXIS_LINE_STYLE = {
-  stroke: "var(--border)",
+  stroke: 'var(--border)',
 };
 
 const LEGEND_WRAPPER_STYLE = { fontSize: 11, paddingTop: 8 };
 const LEGEND_WRAPPER_STYLE_PIE = { fontSize: 11 };
-const PIE_LABEL_LINE = { stroke: "var(--muted-foreground)", strokeWidth: 1 };
-const SCATTER_CURSOR = { strokeDasharray: "3 3" };
-const POLAR_ANGLE_TICK = { fontSize: 11, fill: "var(--muted-foreground)" };
-const POLAR_RADIUS_TICK = { fontSize: 10, fill: "var(--muted-foreground)" };
-const ACTIVE_DOT = { r: 4, strokeWidth: 2, stroke: "var(--card)" };
+const PIE_LABEL_LINE = { stroke: 'var(--muted-foreground)', strokeWidth: 1 };
+const SCATTER_CURSOR = { strokeDasharray: '3 3' };
+const POLAR_ANGLE_TICK = { fontSize: 11, fill: 'var(--muted-foreground)' };
+const POLAR_RADIUS_TICK = { fontSize: 10, fill: 'var(--muted-foreground)' };
+const ACTIVE_DOT = { r: 4, strokeWidth: 2, stroke: 'var(--card)' };
 
-const renderPieLabel = ({ name, percent }: any) =>
-  `${name} ${(percent * 100).toFixed(0)}%`;
+const renderPieLabel = ({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`;
 
 /* ------------------------------------------------------------------ */
 /* Deep compare hook — prevents infinite loops from object references  */
@@ -222,10 +212,8 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     yAxisLabel,
   } = config;
 
-  // Stable memoized colors — deep compare series to avoid infinite loop
   const chartColors = useDeepMemo(
-    () =>
-      series.map((s, i) => s.color || CHART_COLORS[i % CHART_COLORS.length]),
+    () => series.map((s, i) => s.color || CHART_COLORS[i % CHART_COLORS.length]),
     [series],
   );
 
@@ -239,10 +227,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     setTimeout(() => setCopied(false), 2000);
   }, [data]);
 
-  const handleDownload = useCallback(
-    () => downloadCSV(data, title),
-    [data, title],
-  );
+  const handleDownload = useCallback(() => downloadCSV(data, title), [data, title]);
 
   // Memoize axis labels stably
   const xLabelObj = useDeepMemo(
@@ -250,9 +235,9 @@ export function ChatChart({ config }: { config: ChartConfig }) {
       xAxisLabel
         ? {
             value: xAxisLabel,
-            position: "insideBottom",
+            position: 'insideBottom',
             offset: -5,
-            style: { fontSize: 11, fill: "var(--muted-foreground)" },
+            style: { fontSize: 11, fill: 'var(--muted-foreground)' },
           }
         : undefined,
     [xAxisLabel],
@@ -264,8 +249,8 @@ export function ChatChart({ config }: { config: ChartConfig }) {
         ? {
             value: yAxisLabel,
             angle: -90,
-            position: "insideLeft",
-            style: { fontSize: 11, fill: "var(--muted-foreground)" },
+            position: 'insideLeft',
+            style: { fontSize: 11, fill: 'var(--muted-foreground)' },
           }
         : undefined,
     [yAxisLabel],
@@ -276,7 +261,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
 
   const renderChart = () => {
     switch (chartType) {
-      case "bar":
+      case 'bar':
         return (
           <BarChart data={data} barGap={4} barCategoryGap="20%">
             <CartesianGrid
@@ -300,11 +285,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
             />
             <Tooltip content={CustomTooltip} cursor={false} />
             {showLegend && (
-              <Legend
-                iconType="circle"
-                iconSize={7}
-                wrapperStyle={LEGEND_WRAPPER_STYLE}
-              />
+              <Legend iconType="circle" iconSize={7} wrapperStyle={LEGEND_WRAPPER_STYLE} />
             )}
             {stableSeries.map((s, i) => (
               <Bar
@@ -312,7 +293,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
                 dataKey={s.dataKey}
                 name={s.label || s.dataKey}
                 fill={chartColors[i]}
-                stackId={stacked ? "stack" : undefined}
+                stackId={stacked ? 'stack' : undefined}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={40}
                 animationDuration={700}
@@ -322,7 +303,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
           </BarChart>
         );
 
-      case "area":
+      case 'area':
         return (
           <AreaChart data={data}>
             <ChartGradients series={stableSeries} />
@@ -342,11 +323,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
             <YAxis tick={AXIS_TICK_STYLE} axisLine={false} tickLine={false} />
             <Tooltip content={CustomTooltip} />
             {showLegend && (
-              <Legend
-                iconType="circle"
-                iconSize={7}
-                wrapperStyle={LEGEND_WRAPPER_STYLE}
-              />
+              <Legend iconType="circle" iconSize={7} wrapperStyle={LEGEND_WRAPPER_STYLE} />
             )}
             {stableSeries.map((s, i) => (
               <Area
@@ -357,7 +334,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
                 stroke={chartColors[i]}
                 strokeWidth={2}
                 fill={`url(#gradient-${s.dataKey})`}
-                stackId={stacked ? "stack" : undefined}
+                stackId={stacked ? 'stack' : undefined}
                 animationDuration={800}
                 animationEasing="ease-in-out"
               />
@@ -365,7 +342,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
           </AreaChart>
         );
 
-      case "line":
+      case 'line':
         return (
           <LineChart data={data}>
             <CartesianGrid
@@ -384,11 +361,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
             <YAxis tick={AXIS_TICK_STYLE} axisLine={false} tickLine={false} />
             <Tooltip content={CustomTooltip} />
             {showLegend && (
-              <Legend
-                iconType="circle"
-                iconSize={7}
-                wrapperStyle={LEGEND_WRAPPER_STYLE}
-              />
+              <Legend iconType="circle" iconSize={7} wrapperStyle={LEGEND_WRAPPER_STYLE} />
             )}
             {stableSeries.map((s, i) => (
               <Line
@@ -407,8 +380,8 @@ export function ChatChart({ config }: { config: ChartConfig }) {
           </LineChart>
         );
 
-      case "pie": {
-        const dataKey = stableSeries[0]?.dataKey || "value";
+      case 'pie': {
+        const dataKey = stableSeries[0]?.dataKey || 'value';
         return (
           <PieChart>
             <Tooltip content={CustomTooltip} />
@@ -436,17 +409,13 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               ))}
             </Pie>
             {showLegend && (
-              <Legend
-                iconType="circle"
-                iconSize={7}
-                wrapperStyle={LEGEND_WRAPPER_STYLE_PIE}
-              />
+              <Legend iconType="circle" iconSize={7} wrapperStyle={LEGEND_WRAPPER_STYLE_PIE} />
             )}
           </PieChart>
         );
       }
 
-      case "scatter":
+      case 'scatter':
         return (
           <ScatterChart>
             <CartesianGrid
@@ -482,7 +451,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
           </ScatterChart>
         );
 
-      case "radar":
+      case 'radar':
         return (
           <RadarChart data={data} outerRadius="75%">
             <PolarGrid stroke="var(--border)" opacity={0.5} />
@@ -503,11 +472,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               />
             ))}
             {showLegend && (
-              <Legend
-                iconType="circle"
-                iconSize={7}
-                wrapperStyle={LEGEND_WRAPPER_STYLE_PIE}
-              />
+              <Legend iconType="circle" iconSize={7} wrapperStyle={LEGEND_WRAPPER_STYLE_PIE} />
             )}
           </RadarChart>
         );
@@ -525,20 +490,14 @@ export function ChatChart({ config }: { config: ChartConfig }) {
       {/* Header */}
       <div className="flex flex-row justify-between items-center gap-4 border-b border-border/30 px-4 py-3">
         <div className="flex flex-col justify-center min-w-0">
-          <h3 className="text-sm font-semibold text-foreground truncate">
-            {title}
-          </h3>
-          {subtitle && (
-            <p className="mt-0.5 text-xs text-muted-foreground truncate">
-              {subtitle}
-            </p>
-          )}
+          <h3 className="text-sm font-semibold text-foreground truncate">{title}</h3>
+          {subtitle && <p className="mt-0.5 text-xs text-muted-foreground truncate">{subtitle}</p>}
         </div>
       </div>
 
       {/* Chart area — compact height */}
       <div className="px-2 py-4 pb-2">
-        <div style={{ width: "100%", height: 240, minHeight: 240 }}>
+        <div style={{ width: '100%', height: 240, minHeight: 240 }}>
           <ResponsiveContainer width="100%" height="100%">
             {renderChart() as any}
           </ResponsiveContainer>
@@ -553,12 +512,8 @@ export function ChatChart({ config }: { config: ChartConfig }) {
           className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus-visible:ring-0"
           onClick={handleCopy}
         >
-          {copied ? (
-            <Check className="h-3 w-3 text-emerald-500" />
-          ) : (
-            <Copy className="h-3 w-3" />
-          )}
-          {copied ? "Copied" : "Copy Data"}
+          {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+          {copied ? 'Copied' : 'Copy Data'}
         </Button>
 
         <Button

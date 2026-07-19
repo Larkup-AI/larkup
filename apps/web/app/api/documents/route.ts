@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextResponse } from 'next/server';
 import {
   addDocument,
   clearDocuments,
@@ -7,25 +7,25 @@ import {
   deleteDocuments,
   readDocuments,
   updateDocument,
-} from "@larkup/core/documents-store"
-import { readConfig } from "@larkup/core/config-store"
-import { readRun, patchRun } from "@larkup/core/index-store"
-import { createAdapter } from "@larkup/vector-stores/factory"
-import type { DocumentSource } from "@larkup/core/types"
+} from '@larkup/core/documents-store';
+import { readConfig } from '@larkup/core/config-store';
+import { readRun, patchRun } from '@larkup/core/index-store';
+import { createAdapter } from '@larkup/vector-stores/factory';
+import type { DocumentSource } from '@larkup/core/types';
 
-export const runtime = "nodejs"
-export const dynamic = "force-dynamic"
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /** GET → the full corpus plus summary stats. */
 export async function GET() {
-  const [documents, stats] = await Promise.all([readDocuments(), corpusStats()])
-  
+  const [documents, stats] = await Promise.all([readDocuments(), corpusStats()]);
+
   // Sort documents by createdAt descending (newest first)
   const sortedDocuments = documents.sort((a, b) => {
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  })
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
-  return NextResponse.json({ documents: sortedDocuments, stats })
+  return NextResponse.json({ documents: sortedDocuments, stats });
 }
 
 /**
@@ -35,26 +35,26 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as {
-      title?: string
-      content?: string
-      source?: DocumentSource
-      url?: string
-      metadata?: Record<string, any>
-    }
+      title?: string;
+      content?: string;
+      source?: DocumentSource;
+      url?: string;
+      metadata?: Record<string, any>;
+    };
     if (!body.content || !body.content.trim()) {
-      return NextResponse.json({ error: "Content is empty." }, { status: 400 })
+      return NextResponse.json({ error: 'Content is empty.' }, { status: 400 });
     }
     const doc = await addDocument({
-      title: body.title ?? "Untitled",
+      title: body.title ?? 'Untitled',
       content: body.content,
-      source: body.source === "upload" ? "upload" : "paste",
+      source: body.source === 'upload' ? 'upload' : 'paste',
       url: body.url,
       metadata: body.metadata,
-    })
-    return NextResponse.json({ document: doc }, { status: 201 })
+    });
+    return NextResponse.json({ document: doc }, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to add document."
-    return NextResponse.json({ error: message }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Failed to add document.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -63,65 +63,65 @@ export async function POST(req: Request) {
  * Body: { id, title?, content?, url? }
  */
 export async function PATCH(req: Request) {
-  let body: { id?: string; title?: string; content?: string; url?: string; metadata?: Record<string, any> }
+  let body: {
+    id?: string;
+    title?: string;
+    content?: string;
+    url?: string;
+    metadata?: Record<string, any>;
+  };
   try {
-    body = await req.json()
+    body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
   if (!body.id) {
-    return NextResponse.json({ error: "id is required." }, { status: 400 })
+    return NextResponse.json({ error: 'id is required.' }, { status: 400 });
   }
   if (body.content !== undefined && !body.content.trim()) {
-    return NextResponse.json({ error: "Content is empty." }, { status: 400 })
+    return NextResponse.json({ error: 'Content is empty.' }, { status: 400 });
   }
   const doc = await updateDocument(body.id, {
     title: body.title,
     content: body.content,
     url: body.url,
     metadata: body.metadata,
-  })
+  });
   if (!doc) {
-    return NextResponse.json({ error: "Document not found." }, { status: 404 })
+    return NextResponse.json({ error: 'Document not found.' }, { status: 404 });
   }
-  return NextResponse.json({ document: doc })
+  return NextResponse.json({ document: doc });
 }
 
 /** DELETE ?id=<id> removes one doc; DELETE ?ids=1,2 removes many; DELETE with no id clears the corpus. */
 export async function DELETE(req: Request) {
-  const url = new URL(req.url)
-  const id = url.searchParams.get("id")
-  const ids = url.searchParams.get("ids")
-  if (id) await deleteDocument(id)
-  else if (ids) await deleteDocuments(ids.split(","))
+  const url = new URL(req.url);
+  const id = url.searchParams.get('id');
+  const ids = url.searchParams.get('ids');
+  if (id) await deleteDocument(id);
+  else if (ids) await deleteDocuments(ids.split(','));
   else {
-    // Clear all: wipe documents, reset vector store, and clear index run state
-    await clearDocuments()
+    await clearDocuments();
 
-    // Reset the vector store so stale embeddings are removed
     try {
-      const config = await readConfig()
-      const adapter = await createAdapter(config)
-      await adapter.init(0)
-      await adapter.reset()
-    } catch {
-      // Vector store reset is best-effort — if the store isn't configured
-      // or unreachable we still clear the documents DB successfully.
-    }
+      const config = await readConfig();
+      const adapter = await createAdapter(config);
+      await adapter.init(0);
+      await adapter.reset();
+    } catch {}
 
-    // Clear the index run state so the UI shows no active index
     try {
-      const run = await readRun()
+      const run = await readRun();
       if (run) {
         await patchRun({
-          status: "failed",
-          error: "Corpus cleared — index invalidated.",
+          status: 'failed',
+          error: 'Corpus cleared — index invalidated.',
           finishedAt: new Date().toISOString(),
-        })
+        });
       }
     } catch {
       // best-effort
     }
   }
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true });
 }

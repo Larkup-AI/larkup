@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { toast } from "sonner";
+import { useState } from 'react';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   ArrowRight,
@@ -12,31 +12,31 @@ import {
   Monitor,
   CheckCircle2,
   ShieldCheck,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useWorkspace } from "@/components/workspace/workspace-provider";
-import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
-import type { EmbeddingProvider } from "@larkup/core/types";
-import { cn } from "@/lib/utils";
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useWorkspace } from '@/components/workspace/workspace-provider';
+import { PROVIDER_META, ProviderIcon } from '@/components/ui/provider-icon';
+import type { EmbeddingProvider } from '@larkup/core/types';
+import { cn } from '@/lib/utils';
 
 interface SimpleSetupProps {
   onBack: () => void;
 }
 
-type ConnectionMode = "cloud" | "custom";
+type ConnectionMode = 'cloud' | 'custom';
 
 /** Ordered provider list — only Vercel AI Gateway is recommended. */
 const CLOUD_PROVIDERS: { key: EmbeddingProvider; recommended?: boolean }[] = [
-  { key: "vercel_ai_gateway", recommended: true },
-  { key: "openai" },
-  { key: "google" },
-  { key: "mistral" },
-  { key: "voyage" },
-  { key: "jina" },
-  { key: "nomic" },
-  { key: "deepseek" },
+  { key: 'vercel_ai_gateway', recommended: true },
+  { key: 'openai' },
+  { key: 'google' },
+  { key: 'mistral' },
+  { key: 'voyage' },
+  { key: 'jina' },
+  { key: 'nomic' },
+  { key: 'deepseek' },
 ];
 
 /**
@@ -44,39 +44,37 @@ const CLOUD_PROVIDERS: { key: EmbeddingProvider; recommended?: boolean }[] = [
  * OpenAI and Vercel AI Gateway get the large model; others get the first in the registry.
  */
 const DEFAULT_EMBEDDING_MODEL: Partial<Record<EmbeddingProvider, string>> = {
-  openai: "openai/text-embedding-3-large",
-  vercel_ai_gateway: "openai/text-embedding-3-large",
-  google: "google/gemini-embedding-001",
-  mistral: "mistral/mistral-embed",
-  voyage: "voyage/voyage-3",
-  jina: "jina/jina-embeddings-v3",
-  nomic: "nomic/nomic-embed-text-v1.5",
-  deepseek: "openai/text-embedding-3-large",
+  openai: 'openai/text-embedding-3-large',
+  vercel_ai_gateway: 'openai/text-embedding-3-large',
+  google: 'google/gemini-embedding-001',
+  mistral: 'mistral/mistral-embed',
+  voyage: 'voyage/voyage-3',
+  jina: 'jina/jina-embeddings-v3',
+  nomic: 'nomic/nomic-embed-text-v1.5',
+  deepseek: 'openai/text-embedding-3-large',
 };
 
 export function SimpleSetup({ onBack }: SimpleSetupProps) {
   const { createServer, setMode } = useWorkspace();
 
   // Connection mode
-  const [connectionMode, setConnectionMode] = useState<ConnectionMode>("cloud");
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>('cloud');
 
   // Cloud mode state
-  const [provider, setProvider] = useState<EmbeddingProvider>("openai");
-  const [apiKey, setApiKey] = useState("");
+  const [provider, setProvider] = useState<EmbeddingProvider>('openai');
+  const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [cloudVerified, setCloudVerified] = useState(false);
   const [testingCloud, setTestingCloud] = useState(false);
 
   // Custom model state
-  const [embeddingBaseUrl, setEmbeddingBaseUrl] = useState(
-    "http://localhost:11434/v1",
-  );
-  const [embeddingModelName, setEmbeddingModelName] = useState("");
-  const [embeddingApiKey, setEmbeddingApiKey] = useState("");
+  const [embeddingBaseUrl, setEmbeddingBaseUrl] = useState('http://localhost:11434/v1');
+  const [embeddingModelName, setEmbeddingModelName] = useState('');
+  const [embeddingApiKey, setEmbeddingApiKey] = useState('');
   const [showEmbeddingApiKey, setShowEmbeddingApiKey] = useState(false);
-  const [llmBaseUrl, setLlmBaseUrl] = useState("http://localhost:11434/v1");
-  const [llmModelName, setLlmModelName] = useState("");
-  const [llmApiKey, setLlmApiKey] = useState("");
+  const [llmBaseUrl, setLlmBaseUrl] = useState('http://localhost:11434/v1');
+  const [llmModelName, setLlmModelName] = useState('');
+  const [llmApiKey, setLlmApiKey] = useState('');
   const [showLlmApiKey, setShowLlmApiKey] = useState(false);
 
   const [busy, setBusy] = useState(false);
@@ -99,16 +97,15 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
 
   async function testCloudProvider() {
     if (!apiKey.trim()) {
-      toast.error("Please enter your API key first.");
+      toast.error('Please enter your API key first.');
       return;
     }
     setTestingCloud(true);
     try {
-      const embeddingModelId =
-        DEFAULT_EMBEDDING_MODEL[provider] ?? "openai/text-embedding-3-large";
-      const res = await fetch("/api/config/test-provider", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const embeddingModelId = DEFAULT_EMBEDDING_MODEL[provider] ?? 'openai/text-embedding-3-large';
+      const res = await fetch('/api/config/test-provider', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           embeddingProvider: provider,
           embeddingApiKey: apiKey,
@@ -116,14 +113,12 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Connection failed");
+      if (!res.ok) throw new Error(data.error || 'Connection failed');
       setCloudVerified(true);
-      toast.success("API key verified successfully!");
+      toast.success('API key verified successfully!');
     } catch (err) {
       toast.error(
-        err instanceof Error
-          ? err.message
-          : "Invalid API key. Please check and try again.",
+        err instanceof Error ? err.message : 'Invalid API key. Please check and try again.',
       );
       setCloudVerified(false);
     } finally {
@@ -133,14 +128,14 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
 
   async function testCustomEmbedding() {
     if (!embeddingBaseUrl || !embeddingModelName) {
-      toast.error("Base URL and model name are required.");
+      toast.error('Base URL and model name are required.');
       return;
     }
     setTestingEmbedding(true);
     try {
-      const res = await fetch("/api/config/test-embedding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/config/test-embedding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           baseUrl: embeddingBaseUrl,
           apiKey: embeddingApiKey || undefined,
@@ -148,12 +143,12 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Connection failed");
+      if (!res.ok) throw new Error(data.error || 'Connection failed');
       setDetectedDims(data.dimensions);
       setEmbeddingVerified(true);
       toast.success(`Connected! Detected ${data.dimensions} dimensions.`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Test failed");
+      toast.error(err instanceof Error ? err.message : 'Test failed');
       setEmbeddingVerified(false);
       setDetectedDims(null);
     } finally {
@@ -163,14 +158,14 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
 
   async function testCustomLlm() {
     if (!llmBaseUrl || !llmModelName) {
-      toast.error("Base URL and model name are required.");
+      toast.error('Base URL and model name are required.');
       return;
     }
     setTestingLlm(true);
     try {
-      const res = await fetch("/api/config/test-llm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/config/test-llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           baseUrl: llmBaseUrl,
           apiKey: llmApiKey || undefined,
@@ -178,11 +173,11 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Connection failed");
+      if (!res.ok) throw new Error(data.error || 'Connection failed');
       setLlmVerified(true);
-      toast.success("LLM connected successfully!");
+      toast.success('LLM connected successfully!');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Test failed");
+      toast.error(err instanceof Error ? err.message : 'Test failed');
       setLlmVerified(false);
     } finally {
       setTestingLlm(false);
@@ -191,24 +186,24 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
 
   async function handleFinish() {
     // Validate cloud mode
-    if (connectionMode === "cloud") {
+    if (connectionMode === 'cloud') {
       if (!apiKey.trim()) {
-        toast.error("Please enter your API key.");
+        toast.error('Please enter your API key.');
         return;
       }
       if (!cloudVerified) {
-        toast.error("Please verify your API key first.");
+        toast.error('Please verify your API key first.');
         return;
       }
     }
     // Validate custom mode
-    if (connectionMode === "custom") {
+    if (connectionMode === 'custom') {
       if (!embeddingVerified) {
-        toast.error("Please test your embedding connection first.");
+        toast.error('Please test your embedding connection first.');
         return;
       }
       if (!llmVerified) {
-        toast.error("Please test your LLM connection first.");
+        toast.error('Please test your LLM connection first.');
         return;
       }
     }
@@ -216,36 +211,35 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
     setBusy(true);
     try {
       // Create a default server
-      const server = await createServer("my-rag");
+      const server = await createServer('my-rag');
 
       // Build config
-      const isCloud = connectionMode === "cloud";
+      const isCloud = connectionMode === 'cloud';
       const embeddingModelId = isCloud
-        ? (DEFAULT_EMBEDDING_MODEL[provider] ?? "openai/text-embedding-3-large")
+        ? DEFAULT_EMBEDDING_MODEL[provider] ?? 'openai/text-embedding-3-large'
         : `custom:${embeddingModelName}`;
 
       const configBody: Record<string, unknown> = {
-        projectName: "my-rag",
-        embeddingProvider: isCloud ? provider : "custom",
-        embeddingApiKey: isCloud ? apiKey : "",
+        projectName: 'my-rag',
+        embeddingProvider: isCloud ? provider : 'custom',
+        embeddingApiKey: isCloud ? apiKey : '',
         embeddingModelId,
-        indexType: "hybrid",
-        chunking: { chunkSize: 512, chunkOverlap: 64, strategy: "recursive" },
-        vectorStore: "lancedb",
+        indexType: 'hybrid',
+        chunking: { chunkSize: 512, chunkOverlap: 64, strategy: 'recursive' },
+        vectorStore: 'lancedb',
         storeConfig: {
-          mode: "local",
+          mode: 'local',
           dbPath: `./.larkup/servers/${server?.id}/lancedb`,
-          tableName: "documents",
+          tableName: 'documents',
         },
         topK: 5,
         // Chat configuration
-        chatProvider: isCloud ? provider : "custom",
-        chatApiKey: isCloud ? apiKey : "",
-        chatModelId: isCloud ? "" : undefined, // empty string lets the chat router pick default
+        chatProvider: isCloud ? provider : 'custom',
+        chatApiKey: isCloud ? apiKey : '',
+        chatModelId: isCloud ? '' : undefined, // empty string lets the chat router pick default
         updatedAt: new Date().toISOString(),
       };
 
-      // For custom mode, add custom embedding config and LLM config
       if (!isCloud) {
         configBody.customEmbeddings = [
           {
@@ -255,58 +249,52 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
             dimensions: detectedDims ?? 1536,
           },
         ];
-        configBody.chatProvider = "custom";
-        configBody.chatApiKey = llmApiKey || "";
+        configBody.chatProvider = 'custom';
+        configBody.chatApiKey = llmApiKey || '';
         configBody.chatModelId = llmModelName;
       }
 
       // Save config via API
       if (server?.id) {
         const configRes = await fetch(`/api/config?serverId=${encodeURIComponent(server.id)}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(configBody),
         });
         if (!configRes.ok) {
           const err = await configRes.json().catch(() => ({}));
-          throw new Error(err.error || "Failed to save configuration");
+          throw new Error(err.error || 'Failed to save configuration');
         }
       }
 
-      await setMode("simple");
+      await setMode('simple');
 
-      // Fire-and-forget: generate + launch RAG server so it's ready for chat
       (async () => {
         try {
           // Generate server code
-          await fetch("/api/server/generate");
+          await fetch('/api/server/generate');
           // Launch it
-          await fetch("/api/server/local", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "start" }),
+          await fetch('/api/server/local', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start' }),
           });
-        } catch {
-          // Non-blocking — server can be launched manually from settings
-        }
+        } catch {}
       })();
 
       toast.success("All set! Let's get started.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Setup failed. Please try again.");
+      toast.error(err instanceof Error ? err.message : 'Setup failed. Please try again.');
       setBusy(false);
     }
   }
 
-  const canProceed =
-    connectionMode === "cloud"
-      ? cloudVerified
-      : embeddingVerified && llmVerified;
+  const canProceed = connectionMode === 'cloud' ? cloudVerified : embeddingVerified && llmVerified;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto"
-      style={{ backgroundColor: "#FCFCFB" }}
+      style={{ backgroundColor: '#FCFCFB' }}
     >
       {/* Background */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -331,12 +319,10 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
             <img src="/logo9.png" className="size-8" alt="Larkup" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Connect your AI
-            </h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Connect your AI</h1>
             <p className="mt-1.5 text-sm text-muted-foreground text-pretty max-w-sm">
-              Choose how to connect to an AI provider. We&apos;ll handle
-              everything else automatically.
+              Choose how to connect to an AI provider. We&apos;ll handle everything else
+              automatically.
             </p>
           </div>
         </div>
@@ -345,12 +331,12 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
         <div className="w-full rounded-xl border bg-white p-1 flex gap-1">
           <button
             type="button"
-            onClick={() => setConnectionMode("cloud")}
+            onClick={() => setConnectionMode('cloud')}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all",
-              connectionMode === "cloud"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
+              'flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all',
+              connectionMode === 'cloud'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
             )}
           >
             <Cloud className="size-4" />
@@ -358,12 +344,12 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
           </button>
           <button
             type="button"
-            onClick={() => setConnectionMode("custom")}
+            onClick={() => setConnectionMode('custom')}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all",
-              connectionMode === "custom"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
+              'flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all',
+              connectionMode === 'custom'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
             )}
           >
             <Monitor className="size-4" />
@@ -373,7 +359,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
 
         {/* Form */}
         <div className="w-full rounded-2xl border bg-transparent p-6 space-y-5">
-          {connectionMode === "cloud" ? (
+          {connectionMode === 'cloud' ? (
             <>
               {/* Provider Selection */}
               <div className="space-y-2.5">
@@ -389,10 +375,10 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                         type="button"
                         onClick={() => onProviderChange(key)}
                         className={cn(
-                          "relative flex items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition-all duration-200",
+                          'relative flex items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition-all duration-200',
                           selected
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/30 hover:bg-muted/30",
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/30 hover:bg-muted/30',
                         )}
                       >
                         <ProviderIcon
@@ -426,7 +412,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                 <div className="relative">
                   <Input
                     id="simple-apikey"
-                    type={showApiKey ? "text" : "password"}
+                    type={showApiKey ? 'text' : 'password'}
                     placeholder="sk-..."
                     value={apiKey}
                     onChange={(e) => onApiKeyChange(e.target.value)}
@@ -437,11 +423,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                     onClick={() => setShowApiKey(!showApiKey)}
                     className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
                   >
-                    {showApiKey ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
+                    {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -483,10 +465,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                 </div>
                 <div className="grid gap-2.5 pl-8">
                   <div className="space-y-1.5">
-                    <Label
-                      htmlFor="emb-url"
-                      className="text-xs text-muted-foreground"
-                    >
+                    <Label htmlFor="emb-url" className="text-xs text-muted-foreground">
                       Base URL
                     </Label>
                     <Input
@@ -500,10 +479,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label
-                      htmlFor="emb-model"
-                      className="text-xs text-muted-foreground"
-                    >
+                    <Label htmlFor="emb-model" className="text-xs text-muted-foreground">
                       Model Name
                     </Label>
                     <Input
@@ -517,19 +493,13 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label
-                      htmlFor="emb-apikey"
-                      className="text-xs text-muted-foreground"
-                    >
-                      API Key{" "}
-                      <span className="text-muted-foreground/60">
-                        (optional)
-                      </span>
+                    <Label htmlFor="emb-apikey" className="text-xs text-muted-foreground">
+                      API Key <span className="text-muted-foreground/60">(optional)</span>
                     </Label>
                     <div className="relative">
                       <Input
                         id="emb-apikey"
-                        type={showEmbeddingApiKey ? "text" : "password"}
+                        type={showEmbeddingApiKey ? 'text' : 'password'}
                         placeholder="sk-..."
                         value={embeddingApiKey}
                         onChange={(e) => {
@@ -540,9 +510,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                       />
                       <button
                         type="button"
-                        onClick={() =>
-                          setShowEmbeddingApiKey(!showEmbeddingApiKey)
-                        }
+                        onClick={() => setShowEmbeddingApiKey(!showEmbeddingApiKey)}
                         className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
                       >
                         {showEmbeddingApiKey ? (
@@ -582,16 +550,11 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                   <span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
                     2
                   </span>
-                  <Label className="text-sm font-medium">
-                    Chat / LLM Model
-                  </Label>
+                  <Label className="text-sm font-medium">Chat / LLM Model</Label>
                 </div>
                 <div className="grid gap-2.5 pl-8">
                   <div className="space-y-1.5">
-                    <Label
-                      htmlFor="llm-url"
-                      className="text-xs text-muted-foreground"
-                    >
+                    <Label htmlFor="llm-url" className="text-xs text-muted-foreground">
                       Base URL
                     </Label>
                     <Input
@@ -602,10 +565,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label
-                      htmlFor="llm-model"
-                      className="text-xs text-muted-foreground"
-                    >
+                    <Label htmlFor="llm-model" className="text-xs text-muted-foreground">
                       Model Name
                     </Label>
                     <Input
@@ -619,19 +579,13 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label
-                      htmlFor="llm-apikey"
-                      className="text-xs text-muted-foreground"
-                    >
-                      API Key{" "}
-                      <span className="text-muted-foreground/60">
-                        (optional)
-                      </span>
+                    <Label htmlFor="llm-apikey" className="text-xs text-muted-foreground">
+                      API Key <span className="text-muted-foreground/60">(optional)</span>
                     </Label>
                     <div className="relative">
                       <Input
                         id="llm-apikey"
-                        type={showLlmApiKey ? "text" : "password"}
+                        type={showLlmApiKey ? 'text' : 'password'}
                         placeholder="sk-..."
                         value={llmApiKey}
                         onChange={(e) => {
@@ -645,11 +599,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
                         onClick={() => setShowLlmApiKey(!showLlmApiKey)}
                         className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
                       >
-                        {showLlmApiKey ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
+                        {showLlmApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>
                     </div>
                   </div>
@@ -689,11 +639,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
           onClick={() => void handleFinish()}
           disabled={busy || !canProceed}
         >
-          {busy ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <ArrowRight className="size-4" />
-          )}
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
           Get Started
         </Button>
       </div>

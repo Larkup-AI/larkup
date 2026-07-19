@@ -1,68 +1,68 @@
-import { NextResponse } from "next/server"
-import { getVectorStore, validateStoreConfig } from "@larkup/vector-stores/registry"
-import { createAdapter } from "@larkup/vector-stores/factory"
-import type { RagConfig } from "@larkup/core/types"
+import { NextResponse } from 'next/server';
+import { getVectorStore, validateStoreConfig } from '@larkup/vector-stores/registry';
+import { createAdapter } from '@larkup/vector-stores/factory';
+import type { RagConfig } from '@larkup/core/types';
 
-// Uses node:fs — must run on the Node.js runtime, not edge.
-export const runtime = "nodejs"
+export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  let body: RagConfig
+  let body: RagConfig;
   try {
-    body = (await request.json()) as RagConfig
+    body = (await request.json()) as RagConfig;
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
   // Validate the store + its dynamic, store-specific fields.
-  const store = getVectorStore(body.vectorStore)
+  const store = getVectorStore(body.vectorStore);
   if (!store) {
     return NextResponse.json(
       { error: `Unknown vector store: ${body.vectorStore}` },
       { status: 400 },
-    )
+    );
   }
 
-  const fieldErrors = validateStoreConfig(store, body.storeConfig ?? {}, body.indexType)
+  const fieldErrors = validateStoreConfig(store, body.storeConfig ?? {}, body.indexType);
   if (Object.keys(fieldErrors).length > 0) {
     return NextResponse.json(
-      { error: "Missing required vector store fields", fieldErrors },
+      { error: 'Missing required vector store fields', fieldErrors },
       { status: 422 },
-    )
+    );
   }
 
-  let dimensions = 1536
-  const isCustom = body.embeddingModelId.startsWith("custom:")
+  let dimensions = 1536;
+  const isCustom = body.embeddingModelId.startsWith('custom:');
   if (isCustom) {
-    const modelName = body.embeddingModelId.slice("custom:".length)
-    const found = body.customEmbeddings?.find((m) => m.modelName === modelName)
+    const modelName = body.embeddingModelId.slice('custom:'.length);
+    const found = body.customEmbeddings?.find((m) => m.modelName === modelName);
     if (!found) {
       return NextResponse.json(
         { error: `Custom embedding model "${modelName}" not found in customEmbeddings` },
         { status: 400 },
-      )
+      );
     }
-    dimensions = found.dimensions ?? 1536
+    dimensions = found.dimensions ?? 1536;
   } else {
-    const { getEmbeddingModel, EMBEDDING_DIMENSIONS } = await import("@larkup/core/embeddings/registry")
-    const embeddingModel = getEmbeddingModel(body.embeddingModelId)
+    const { getEmbeddingModel, EMBEDDING_DIMENSIONS } = await import(
+      '@larkup/core/embeddings/registry'
+    );
+    const embeddingModel = getEmbeddingModel(body.embeddingModelId);
     if (embeddingModel) {
-      dimensions = embeddingModel.dimensions
+      dimensions = embeddingModel.dimensions;
     } else {
-      // For dynamic models from gateway not in hardcoded registry, use known dimensions or fallback
-      const known = EMBEDDING_DIMENSIONS[body.embeddingModelId]
-      dimensions = known?.dimensions ?? 768
+      const known = EMBEDDING_DIMENSIONS[body.embeddingModelId];
+      dimensions = known?.dimensions ?? 768;
     }
   }
 
   try {
-    const adapter = await createAdapter(body)
-    await adapter.testConnection(dimensions)
-    return NextResponse.json({ success: true })
+    const adapter = await createAdapter(body);
+    await adapter.testConnection(dimensions);
+    return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Connection failed" },
+      { error: error instanceof Error ? error.message : 'Connection failed' },
       { status: 400 },
-    )
+    );
   }
 }

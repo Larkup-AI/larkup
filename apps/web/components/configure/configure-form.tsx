@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import useSWR from "swr";
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import useSWR from 'swr';
 import {
   ChevronDown,
   Cloud,
@@ -19,8 +19,8 @@ import {
   Download,
   Clock,
   Settings,
-} from "lucide-react";
-import { GenericAlert } from "@/components/alerts/generic-alert";
+} from 'lucide-react';
+import { GenericAlert } from '@/components/alerts/generic-alert';
 import {
   Dialog,
   DialogContent,
@@ -28,24 +28,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -53,14 +42,10 @@ import {
   SelectTrigger,
   SelectGroup,
   SelectLabel,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 import {
   DEFAULT_CONFIG,
   type IndexType,
@@ -68,31 +53,27 @@ import {
   type VectorStoreId,
   type EmbeddingProvider,
   type CustomModelConfig,
-} from "@larkup/core/types";
-import {
-  EMBEDDING_MODELS,
-  getEmbeddingModel,
-} from "@larkup/core/embeddings/registry";
+} from '@larkup/core/types';
+import { EMBEDDING_MODELS, getEmbeddingModel } from '@larkup/core/embeddings/registry';
 import {
   getVectorStore,
   validateStoreConfig,
   VECTOR_STORE_LIST,
-} from "@larkup/vector-stores/registry";
-import { StoreFields } from "@/components/configure/store-fields";
-import { useRouter } from "next/navigation";
-import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
-import { CustomModelModal } from "./custom-model-modal";
-import { ServerFormDialog } from "@/components/workspace/server-form-dialog";
+} from '@larkup/vector-stores/registry';
+import { StoreFields } from '@/components/configure/store-fields';
+import { useRouter } from 'next/navigation';
+import { PROVIDER_META, ProviderIcon } from '@/components/ui/provider-icon';
+import { CustomModelModal } from './custom-model-modal';
+import { ServerFormDialog } from '@/components/workspace/server-form-dialog';
 
-const fetcher = (url: string) =>
-  fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
+const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
 // ── Index types ───────────────────────────────────────────────────────────────
 
 const INDEX_TYPES: { value: IndexType; label: string; hint: string }[] = [
-  { value: "lexical", label: "Lexical", hint: "Keyword / BM25 matching" },
-  { value: "semantic", label: "Semantic", hint: "Pure vector similarity" },
-  { value: "hybrid", label: "Hybrid", hint: "Lexical + semantic, reranked" },
+  { value: 'lexical', label: 'Lexical', hint: 'Keyword / BM25 matching' },
+  { value: 'semantic', label: 'Semantic', hint: 'Pure vector similarity' },
+  { value: 'hybrid', label: 'Hybrid', hint: 'Lexical + semantic, reranked' },
 ];
 
 // ── Vector-store branding (real icons from /icons/) ───────────────────────────
@@ -104,50 +85,49 @@ type StoreMeta = {
 
 const STORE_META: Record<VectorStoreId, StoreMeta> = {
   lancedb: {
-    iconSrc: "/icons/lancedb2.png",
-    pillBg: "bg-yellow-50 dark:bg-yellow-950/40",
+    iconSrc: '/icons/lancedb2.png',
+    pillBg: 'bg-yellow-50 dark:bg-yellow-950/40',
   },
   pinecone: {
-    iconSrc: "/icons/pinecone.png",
-    pillBg: "bg-green-50 dark:bg-green-950/40",
+    iconSrc: '/icons/pinecone.png',
+    pillBg: 'bg-green-50 dark:bg-green-950/40',
   },
   weaviate: {
-    iconSrc: "/icons/weaviate.webp",
-    pillBg: "bg-teal-50 dark:bg-teal-950/40",
+    iconSrc: '/icons/weaviate.webp',
+    pillBg: 'bg-teal-50 dark:bg-teal-950/40',
   },
   qdrant: {
-    iconSrc: "/icons/qdrant.svg",
-    pillBg: "bg-red-50 dark:bg-red-950/40",
+    iconSrc: '/icons/qdrant.svg',
+    pillBg: 'bg-red-50 dark:bg-red-950/40',
   },
   chroma: {
-    iconSrc: "/icons/chroma.png",
-    pillBg: "bg-purple-50 dark:bg-purple-950/40",
+    iconSrc: '/icons/chroma.png',
+    pillBg: 'bg-purple-50 dark:bg-purple-950/40',
   },
   pgvector: {
-    iconSrc: "/icons/pgvector2.png",
-    pillBg: "bg-blue-50 dark:bg-blue-950/40",
+    iconSrc: '/icons/pgvector2.png',
+    pillBg: 'bg-blue-50 dark:bg-blue-950/40',
   },
   supabase: {
-    iconSrc: "/icons/supabase.png",
-    pillBg: "bg-emerald-50 dark:bg-emerald-950/40",
+    iconSrc: '/icons/supabase.png',
+    pillBg: 'bg-emerald-50 dark:bg-emerald-950/40',
   },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// Group embedding models by provider for the grouped select
-const EMBEDDING_BY_PROVIDER = EMBEDDING_MODELS.reduce<
-  Record<string, typeof EMBEDDING_MODELS>
->((acc, m) => {
-  (acc[m.provider] ??= []).push(m);
-  return acc;
-}, {});
+const EMBEDDING_BY_PROVIDER = EMBEDDING_MODELS.reduce<Record<string, typeof EMBEDDING_MODELS>>(
+  (acc, m) => {
+    (acc[m.provider] ??= []).push(m);
+    return acc;
+  },
+  {},
+);
 
 // ── Main component ────────────────────────────────────────────────────────────
 
 const indexFetcher = (url: string) => fetch(url).then((r) => r.json());
 
-// Expose dirty state + save trigger so the configure page can place the button in the header
 export type ConfigureFormHandle = {
   dirty: boolean;
   saving: boolean;
@@ -160,13 +140,13 @@ export function ConfigureForm({
   onHandleReady?: (handle: ConfigureFormHandle) => void;
 }) {
   const router = useRouter();
-  const { data, isLoading, mutate } = useSWR("/api/config", fetcher);
-  const { data: indexData } = useSWR("/api/index", indexFetcher, {
+  const { data, isLoading, mutate } = useSWR('/api/config', fetcher);
+  const { data: indexData } = useSWR('/api/index', indexFetcher, {
     refreshInterval: 0,
   });
   // Fetch install status for optional vector stores
   const { data: storeStatusData, mutate: mutateStoreStatus } = useSWR(
-    "/api/vector-stores/status",
+    '/api/vector-stores/status',
     (url: string) => fetch(url).then((r) => r.json()),
     { refreshInterval: 0 },
   );
@@ -192,12 +172,11 @@ export function ConfigureForm({
   const [testingKey, setTestingKey] = useState(false);
   const [showProviderApiKey, setShowProviderApiKey] = useState(false);
 
-  // Is the currently selected store actually installed (for installable stores)?
   const isStoreInstalled = useCallback(
     (storeId: VectorStoreId) => {
       const desc = getVectorStore(storeId);
-      if (desc.installStatus === "installed") return true;
-      if (desc.installStatus === "coming-soon") return false;
+      if (desc.installStatus === 'installed') return true;
+      if (desc.installStatus === 'coming-soon') return false;
       // installable — check runtime status
       return storeStatusData?.stores?.[storeId]?.installed === true;
     },
@@ -205,29 +184,23 @@ export function ConfigureForm({
   );
 
   const currentStoreInstalled = isStoreInstalled(form.vectorStore);
-  // Cache storeConfig per store id so switching A→B→A restores A's values.
   const storeConfigCache = useRef<Record<string, Record<string, string>>>({});
 
-  // Hydrate local form from the persisted config once it loads.
   useEffect(() => {
     if (data?.config && !hydrated) {
       setForm(data.config);
-      storeConfigCache.current[data.config.vectorStore] =
-        data.config.storeConfig;
+      storeConfigCache.current[data.config.vectorStore] = data.config.storeConfig;
       setHydrated(true);
     }
   }, [data, hydrated]);
 
   const store = getVectorStore(form.vectorStore);
-  // Resolve the active custom model from the array when id starts with "custom:"
-  const activeCustomModel = form.embeddingModelId.startsWith("custom:")
+  const activeCustomModel = form.embeddingModelId.startsWith('custom:')
     ? (form.customEmbeddings ?? []).find(
-        (m) => m.modelName === form.embeddingModelId.slice("custom:".length),
+        (m) => m.modelName === form.embeddingModelId.slice('custom:'.length),
       )
     : undefined;
-  const embeddingModel = activeCustomModel
-    ? null
-    : getEmbeddingModel(form.embeddingModelId);
+  const embeddingModel = activeCustomModel ? null : getEmbeddingModel(form.embeddingModelId);
   const embeddingMeta = embeddingModel
     ? PROVIDER_META[embeddingModel.provider as EmbeddingProvider]
     : null;
@@ -247,21 +220,18 @@ export function ConfigureForm({
   };
 
   // Whether a completed index already exists
-  const indexedRun =
-    indexData?.run?.status === "completed" ? indexData.run : null;
+  const indexedRun = indexData?.run?.status === 'completed' ? indexData.run : null;
   const indexedDimensions: number | null = indexedRun?.dimensions ?? null;
-  const indexedVectorStore: VectorStoreId | null =
-    indexedRun?.vectorStore ?? null;
+  const indexedVectorStore: VectorStoreId | null = indexedRun?.vectorStore ?? null;
 
   const selectStore = (id: VectorStoreId) => {
     if (id === form.vectorStore) return;
     // Block "coming soon" stores
     const desc = getVectorStore(id);
-    if (desc.installStatus === "coming-soon") {
+    if (desc.installStatus === 'coming-soon') {
       toast.info(`${desc.label} support is coming soon!`);
       return;
     }
-    // Block if a completed index exists with a different vector store
     if (indexedVectorStore && id !== indexedVectorStore) {
       setStoreBlockAlertOpen(true);
       return;
@@ -284,22 +254,18 @@ export function ConfigureForm({
   const handleInstallStore = async (storeId: VectorStoreId) => {
     setInstalling(true);
     try {
-      const res = await fetch("/api/vector-stores/install", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/vector-stores/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ storeId }),
       });
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.error ?? "Installation failed");
+        throw new Error(json.error ?? 'Installation failed');
       }
-      toast.success(
-        `${getVectorStore(storeId).label} installed successfully!`,
-        {
-          description: `The ${json.package} package has been added to your project.`,
-        },
-      );
-      // Refresh install status optimistically so the UI instantly hides the install card
+      toast.success(`${getVectorStore(storeId).label} installed successfully!`, {
+        description: `The ${json.package} package has been added to your project.`,
+      });
       await mutateStoreStatus(
         (current: any) => ({
           ...current,
@@ -311,20 +277,17 @@ export function ConfigureForm({
         { revalidate: true },
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Installation failed");
+      toast.error(err instanceof Error ? err.message : 'Installation failed');
     } finally {
       setInstalling(false);
     }
   };
 
-  // Returns true if the given model ID would have different dimensions than the indexed run
   function wouldBreakDimensions(newModelId: string): boolean {
     if (!indexedDimensions) return false;
-    if (newModelId.startsWith("custom:")) {
-      const name = newModelId.slice("custom:".length);
-      const custom = (form.customEmbeddings ?? []).find(
-        (m) => m.modelName === name,
-      );
+    if (newModelId.startsWith('custom:')) {
+      const name = newModelId.slice('custom:'.length);
+      const custom = (form.customEmbeddings ?? []).find((m) => m.modelName === name);
       if (!custom) return false;
       return custom.dimensions !== indexedDimensions;
     }
@@ -336,12 +299,12 @@ export function ConfigureForm({
   function handleStructuralChangeBlock() {
     setApiKeyModalOpen(false);
     setCustomModalOpen(false);
-    toast("Cannot modify configuration", {
+    toast('Cannot modify configuration', {
       description:
-        "You cannot change this in the current project because it already has an index. You must initiate a new project.",
+        'You cannot change this in the current project because it already has an index. You must initiate a new project.',
       duration: Number.POSITIVE_INFINITY,
       action: {
-        label: "New Project",
+        label: 'New Project',
         onClick: () => {
           setNewServerModalOpen(true);
         },
@@ -358,11 +321,10 @@ export function ConfigureForm({
       setModelBlockAlertOpen(true);
       return;
     }
-    set("embeddingModelId", v);
+    set('embeddingModelId', v);
     if (!form.embeddingApiKey) {
-      toast.error("API Key Required", {
-        description:
-          "Please set an API key for this provider. Recommended: Vercel AI Gateway Key.",
+      toast.error('API Key Required', {
+        description: 'Please set an API key for this provider. Recommended: Vercel AI Gateway Key.',
       });
       setApiKeyModalOpen(true);
     }
@@ -378,35 +340,32 @@ export function ConfigureForm({
     const handler = (e: BeforeUnloadEvent) => {
       if (dirty) {
         e.preventDefault();
-        e.returnValue = "";
+        e.returnValue = '';
       }
     };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
   }, [dirty]);
 
-  // Intercept Next.js App Router client-side link clicks when there are unsaved changes
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (!dirtyRef.current) return;
-      const anchor = (e.target as Element)?.closest("a[href]");
+      const anchor = (e.target as Element)?.closest('a[href]');
       if (!anchor) return;
-      const href = anchor.getAttribute("href") ?? "";
-      // Only intercept same-origin relative navigation (not # links or external)
-      if (!href || href.startsWith("#") || href.startsWith("http")) return;
+      const href = anchor.getAttribute('href') ?? '';
+      if (!href || href.startsWith('#') || href.startsWith('http')) return;
       // Skip if it's already the configure page
-      if (href === "/configure" || href === "/") return;
+      if (href === '/configure' || href === '/') return;
       e.preventDefault();
       e.stopPropagation();
       setPendingHref(href);
       setNavBlockOpen(true);
     };
-    document.addEventListener("click", handleClick, { capture: true });
-    return () =>
-      document.removeEventListener("click", handleClick, { capture: true });
+    document.addEventListener('click', handleClick, { capture: true });
+    return () => document.removeEventListener('click', handleClick, { capture: true });
   }, []);
 
   // Expose handle to parent
@@ -421,80 +380,70 @@ export function ConfigureForm({
   }, [dirty, saving, onHandleReady]);
 
   async function performSave() {
-    const fieldErrors = validateStoreConfig(
-      store,
-      form.storeConfig,
-      form.indexType,
-    );
+    const fieldErrors = validateStoreConfig(store, form.storeConfig, form.indexType);
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
-      toast.error("Please complete the required vector store fields.");
+      toast.error('Please complete the required vector store fields.');
       return;
     }
     setSaving(true);
     try {
-      const testRes = await fetch("/api/config/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const testRes = await fetch('/api/config/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
       const testJson = await testRes.json();
       if (!testRes.ok) {
         if (testJson.fieldErrors) setErrors(testJson.fieldErrors);
-        throw new Error(
-          `Connection test failed: ${testJson.error ?? "Invalid credentials"}`,
-        );
+        throw new Error(`Connection test failed: ${testJson.error ?? 'Invalid credentials'}`);
       }
-      const res = await fetch("/api/config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
       const json = await res.json();
       if (!res.ok) {
         if (json.fieldErrors) setErrors(json.fieldErrors);
-        throw new Error(json.error ?? "Failed to save configuration");
+        throw new Error(json.error ?? 'Failed to save configuration');
       }
       await mutate(json, { revalidate: false });
       setForm(json.config);
-      toast.success("Configuration saved", {
-        description: "Written to .larkup/config.json",
+      toast.success('Configuration saved', {
+        description: 'Written to .larkup/config.json',
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(false);
     }
   }
 
   async function handleTestConnection() {
-    const fieldErrors = validateStoreConfig(
-      store,
-      form.storeConfig,
-      form.indexType,
-    );
+    const fieldErrors = validateStoreConfig(store, form.storeConfig, form.indexType);
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
-      toast.error("Please complete the required vector store fields.");
+      toast.error('Please complete the required vector store fields.');
       return;
     }
     setTesting(true);
     try {
-      const res = await fetch("/api/config/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/config/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
       const json = await res.json();
       if (!res.ok) {
         if (json.fieldErrors) setErrors(json.fieldErrors);
-        throw new Error(json.error ?? "Connection failed");
+        throw new Error(json.error ?? 'Connection failed');
       }
-      toast.success("Connection successful", {
-        description: "Credentials and settings are valid.",
+      toast.success('Connection successful', {
+        description: 'Credentials and settings are valid.',
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Connection failed");
+      toast.error(err instanceof Error ? err.message : 'Connection failed');
     } finally {
       setTesting(false);
     }
@@ -511,31 +460,30 @@ export function ConfigureForm({
 
   // Build summary rows for confirm dialog
   const summaryItems = [
-    { label: "Project", value: form.projectName },
+    { label: 'Project', value: form.projectName },
     {
-      label: "Embedding model",
-      value:
-        activeCustomModel?.modelName ??
-        embeddingModel?.label ??
-        form.embeddingModelId,
+      label: 'Embedding model',
+      value: activeCustomModel?.modelName ?? embeddingModel?.label ?? form.embeddingModelId,
     },
     {
-      label: "Provider",
+      label: 'Provider',
       value: activeCustomModel
-        ? "Custom (OpenAI-compatible)"
-        : (embeddingMeta?.label ?? embeddingModel?.provider ?? "—"),
+        ? 'Custom (OpenAI-compatible)'
+        : embeddingMeta?.label ?? embeddingModel?.provider ?? '—',
     },
     {
-      label: "Dimensions",
-      value: String(
-        activeCustomModel?.dimensions ?? embeddingModel?.dimensions ?? "—",
-      ),
+      label: 'Dimensions',
+      value: String(activeCustomModel?.dimensions ?? embeddingModel?.dimensions ?? '—'),
       mono: true,
     },
-    { label: "Index type", value: indexTypeMeta?.label ?? form.indexType },
-    { label: "Vector store", value: store.label },
-    { label: "Chunk size / overlap", value: `${form.chunking.chunkSize} / ${form.chunking.chunkOverlap} tokens`, mono: true },
-    { label: "Top-K", value: String(form.topK), mono: true },
+    { label: 'Index type', value: indexTypeMeta?.label ?? form.indexType },
+    { label: 'Vector store', value: store.label },
+    {
+      label: 'Chunk size / overlap',
+      value: `${form.chunking.chunkSize} / ${form.chunking.chunkOverlap} tokens`,
+      mono: true,
+    },
+    { label: 'Top-K', value: String(form.topK), mono: true },
   ];
 
   return (
@@ -564,7 +512,7 @@ export function ConfigureForm({
                   id="projectName"
                   value={form.projectName}
                   spellCheck={false}
-                  onChange={(e) => set("projectName", e.target.value)}
+                  onChange={(e) => set('projectName', e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
@@ -575,13 +523,9 @@ export function ConfigureForm({
                   min={1}
                   max={50}
                   value={form.topK}
-                  onChange={(e) =>
-                    set("topK", Math.max(1, Number(e.target.value) || 1))
-                  }
+                  onChange={(e) => set('topK', Math.max(1, Number(e.target.value) || 1))}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Documents returned per query.
-                </p>
+                <p className="text-xs text-muted-foreground">Documents returned per query.</p>
               </div>
             </CardContent>
           </Card>
@@ -614,18 +558,16 @@ export function ConfigureForm({
                 <div className="flex gap-2 items-start">
                   <Select
                     value={form.embeddingModelId}
-                    onValueChange={(v) =>
-                      handleEmbeddingModelChange((v as string) ?? "")
-                    }
+                    onValueChange={(v) => handleEmbeddingModelChange((v as string) ?? '')}
                   >
                     <SelectTrigger
                       className="w-full flex-1"
                       onPointerDown={(e) => {
                         if (!form.embeddingApiKey) {
                           e.preventDefault();
-                          toast.info("API Key Required", {
+                          toast.info('API Key Required', {
                             description:
-                              "Please set an API key first. Recommended: Vercel AI Gateway Key.",
+                              'Please set an API key first. Recommended: Vercel AI Gateway Key.',
                           });
                           setApiKeyModalOpen(true);
                         }
@@ -654,29 +596,22 @@ export function ConfigureForm({
                             size={20}
                           />
                           <span className="flex flex-col items-start leading-none">
-                            <span className="font-medium text-sm ">
-                              {embeddingModel.label}
-                            </span>
+                            <span className="font-medium text-sm ">{embeddingModel.label}</span>
                           </span>
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">
-                          Select a model…
-                        </span>
+                        <span className="text-muted-foreground">Select a model…</span>
                       )}
                     </SelectTrigger>
                     <SelectContent className="max-h-[320px]">
                       {Object.entries(EMBEDDING_BY_PROVIDER)
                         .filter(
                           ([provider]) =>
-                            form.embeddingProvider === "vercel_ai_gateway" ||
+                            form.embeddingProvider === 'vercel_ai_gateway' ||
                             provider === form.embeddingProvider,
                         )
                         .map(([provider, models]) => {
-                          const meta =
-                            PROVIDER_META[
-                              provider as keyof typeof PROVIDER_META
-                            ];
+                          const meta = PROVIDER_META[provider as keyof typeof PROVIDER_META];
                           return (
                             <SelectGroup key={provider}>
                               <SelectLabel className="flex items-center gap-2 py-1.5">
@@ -688,16 +623,10 @@ export function ConfigureForm({
                                     size={18}
                                   />
                                 )}
-                                <span className="font-medium">
-                                  {meta?.label ?? provider}
-                                </span>
+                                <span className="font-medium">{meta?.label ?? provider}</span>
                               </SelectLabel>
                               {models.map((m) => (
-                                <SelectItem
-                                  key={m.id}
-                                  value={m.id}
-                                  className="pl-8"
-                                >
+                                <SelectItem key={m.id} value={m.id} className="pl-8">
                                   <span className="flex items-center gap-2">
                                     <span>{m.label}</span>
                                     <span className="text-[10px] text-muted-foreground font-mono">
@@ -798,9 +727,7 @@ export function ConfigureForm({
                     <Badge variant="outline" className="font-mono">
                       OpenAI Compatible
                     </Badge>
-                    <span className="text-muted-foreground">
-                      Custom configuration
-                    </span>
+                    <span className="text-muted-foreground">Custom configuration</span>
                   </div>
                 ) : embeddingModel ? (
                   <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -808,12 +735,9 @@ export function ConfigureForm({
                       {embeddingModel.dimensions} dims
                     </Badge>
                     <Badge variant="outline" className="font-mono">
-                      {embeddingModel.maxInputTokens.toLocaleString()} max
-                      tokens
+                      {embeddingModel.maxInputTokens.toLocaleString()} max tokens
                     </Badge>
-                    <span className="text-muted-foreground">
-                      {embeddingModel.description}
-                    </span>
+                    <span className="text-muted-foreground">{embeddingModel.description}</span>
                   </div>
                 ) : null}
               </div>
@@ -823,8 +747,8 @@ export function ConfigureForm({
                 <CollapsibleTrigger className="-ml-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                   <ChevronDown
                     className={cn(
-                      "size-4 transition-transform duration-200",
-                      advancedOpen && "rotate-180",
+                      'size-4 transition-transform duration-200',
+                      advancedOpen && 'rotate-180',
                     )}
                   />
                   Advanced chunking
@@ -839,7 +763,7 @@ export function ConfigureForm({
                         min={64}
                         value={form.chunking.chunkSize}
                         onChange={(e) =>
-                          set("chunking", {
+                          set('chunking', {
                             ...form.chunking,
                             chunkSize: Number(e.target.value) || 0,
                           })
@@ -855,7 +779,7 @@ export function ConfigureForm({
                         min={0}
                         value={form.chunking.chunkOverlap}
                         onChange={(e) =>
-                          set("chunking", {
+                          set('chunking', {
                             ...form.chunking,
                             chunkOverlap: Number(e.target.value) || 0,
                           })
@@ -868,9 +792,9 @@ export function ConfigureForm({
                       <Select
                         value={form.chunking.strategy}
                         onValueChange={(v) =>
-                          set("chunking", {
+                          set('chunking', {
                             ...form.chunking,
-                            strategy: v as RagConfig["chunking"]["strategy"],
+                            strategy: v as RagConfig['chunking']['strategy'],
                           })
                         }
                       >
@@ -899,8 +823,7 @@ export function ConfigureForm({
               Indexing &amp; Vector store
             </CardTitle>
             <CardDescription className="text-xs">
-              Choose how documents are matched at retrieval time and where
-              vectors are stored.
+              Choose how documents are matched at retrieval time and where vectors are stored.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -913,19 +836,15 @@ export function ConfigureForm({
                 </Label>
                 <Select
                   value={form.indexType}
-                  onValueChange={(v) => set("indexType", v as IndexType)}
+                  onValueChange={(v) => set('indexType', v as IndexType)}
                 >
                   <SelectTrigger className="w-full">
                     {indexTypeMeta ? (
                       <span className="flex flex-col items-start leading-none">
-                        <span className="font-medium text-sm">
-                          {indexTypeMeta.label}
-                        </span>
+                        <span className="font-medium text-sm">{indexTypeMeta.label}</span>
                       </span>
                     ) : (
-                      <span className="text-muted-foreground">
-                        Select index type…
-                      </span>
+                      <span className="text-muted-foreground">Select index type…</span>
                     )}
                   </SelectTrigger>
                   <SelectContent>
@@ -933,9 +852,7 @@ export function ConfigureForm({
                       <SelectItem key={t.value} value={t.value}>
                         <span className="flex flex-col">
                           <span className="font-medium">{t.label}</span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {t.hint}
-                          </span>
+                          <span className="text-[11px] text-muted-foreground">{t.hint}</span>
                         </span>
                       </SelectItem>
                     ))}
@@ -962,29 +879,25 @@ export function ConfigureForm({
                           size={20}
                         />
                         <span className="flex flex-col items-start leading-none">
-                          <span className="font-medium text-sm">
-                            {store.label}
-                          </span>
+                          <span className="font-medium text-sm">{store.label}</span>
                         </span>
                       </span>
                     ) : (
-                      <span className="text-muted-foreground">
-                        Select a vector store…
-                      </span>
+                      <span className="text-muted-foreground">Select a vector store…</span>
                     )}
                   </SelectTrigger>
                   <SelectContent>
                     {VECTOR_STORE_LIST.map((s) => {
                       const meta = STORE_META[s.id];
-                      const isComingSoon = s.installStatus === "coming-soon";
-                      const isInstallable = s.installStatus === "installable";
+                      const isComingSoon = s.installStatus === 'coming-soon';
+                      const isInstallable = s.installStatus === 'installable';
                       const installed = isStoreInstalled(s.id);
                       return (
                         <SelectItem
                           key={s.id}
                           value={s.id}
                           disabled={isComingSoon}
-                          className={isComingSoon ? "opacity-50" : ""}
+                          className={isComingSoon ? 'opacity-50' : ''}
                         >
                           <span className="flex items-center gap-2.5 w-full">
                             {meta && (
@@ -997,9 +910,7 @@ export function ConfigureForm({
                             )}
                             <span className="flex flex-col flex-1 min-w-0">
                               <span className="flex items-center gap-2">
-                                <span className="font-medium text-sm leading-tight">
-                                  {s.label}
-                                </span>
+                                <span className="font-medium text-sm leading-tight">{s.label}</span>
                                 {isComingSoon && (
                                   <Badge
                                     variant="outline"
@@ -1020,7 +931,7 @@ export function ConfigureForm({
                                 )}
                               </span>
                               <span className="text-[10px] text-muted-foreground leading-tight">
-                                {s.description.split(".")[0]}
+                                {s.description.split('.')[0]}
                               </span>
                             </span>
                           </span>
@@ -1032,10 +943,7 @@ export function ConfigureForm({
 
                 {/* Store badges */}
                 <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] font-mono uppercase"
-                  >
+                  <Badge variant="outline" className="text-[10px] font-mono uppercase">
                     {store.runtime}
                   </Badge>
                   {store.docsUrl && (
@@ -1058,7 +966,7 @@ export function ConfigureForm({
             </p>
 
             {/* Store config fields — or install prompt if not yet installed */}
-            {store.installStatus === "installable" && !currentStoreInstalled ? (
+            {store.installStatus === 'installable' && !currentStoreInstalled ? (
               /* ── Install panel for installable stores ─────────────────── */
               <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-50/50 dark:bg-amber-950/20 p-6 space-y-4 transition-all duration-300">
                 <div className="flex items-start gap-3">
@@ -1070,17 +978,16 @@ export function ConfigureForm({
                       {store.label} is not installed
                     </p>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      {store.label} is an optional dependency and not included
-                      by default. Click <strong>Install</strong> to add the{" "}
+                      {store.label} is an optional dependency and not included by default. Click{' '}
+                      <strong>Install</strong> to add the{' '}
                       <code className="text-[11px] font-mono bg-muted px-1 py-0.5 rounded">
                         {Object.keys(store.serverDependencies)[0]}
-                      </code>{" "}
+                      </code>{' '}
                       package to your project.
                     </p>
                     <p className="text-[11px] text-amber-700 dark:text-amber-400/80 leading-relaxed mt-2">
-                      ⚠ Install only works in local development. For production
-                      deployments, add the package to your dependencies before
-                      deploying.
+                      ⚠ Install only works in local development. For production deployments, add the
+                      package to your dependencies before deploying.
                     </p>
                   </div>
                 </div>
@@ -1096,11 +1003,11 @@ export function ConfigureForm({
                     ) : (
                       <Download className="size-4" />
                     )}
-                    {installing ? "Installing…" : `Install ${store.label}`}
+                    {installing ? 'Installing…' : `Install ${store.label}`}
                   </Button>
                 </div>
               </div>
-            ) : store.installStatus === "coming-soon" ? (
+            ) : store.installStatus === 'coming-soon' ? (
               /* ── Coming Soon panel ──────────────────────────────────── */
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-6 space-y-2 transition-all duration-300">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -1145,12 +1052,11 @@ export function ConfigureForm({
         </Card>
 
         {/* Last saved timestamp */}
-        {data?.config?.updatedAt &&
-          data.config.updatedAt !== new Date(0).toISOString() && (
-            <p className="text-center text-xs text-muted-foreground pb-2">
-              Last saved {new Date(data.config.updatedAt).toLocaleString()}
-            </p>
-          )}
+        {data?.config?.updatedAt && data.config.updatedAt !== new Date(0).toISOString() && (
+          <p className="text-center text-xs text-muted-foreground pb-2">
+            Last saved {new Date(data.config.updatedAt).toLocaleString()}
+          </p>
+        )}
       </div>
 
       {/* ── Save confirmation dialog ─────────────────────────────────────── */}
@@ -1161,23 +1067,16 @@ export function ConfigureForm({
               <CheckCircle2 className="size-5 text-primary" />
               Confirm configuration
             </DialogTitle>
-            <DialogDescription>
-              Review your settings before saving.
-            </DialogDescription>
+            <DialogDescription>Review your settings before saving.</DialogDescription>
           </DialogHeader>
           <div className="divide-y divide-border rounded-lg border border-border overflow-hidden text-sm">
             {summaryItems.map((item) => (
-              <div
-                key={item.label}
-                className="flex items-center justify-between px-3 py-2 gap-3"
-              >
-                <span className="text-muted-foreground text-xs">
-                  {item.label}
-                </span>
+              <div key={item.label} className="flex items-center justify-between px-3 py-2 gap-3">
+                <span className="text-muted-foreground text-xs">{item.label}</span>
                 <span
                   className={cn(
-                    "font-medium text-right truncate",
-                    item.mono && "font-mono text-xs",
+                    'font-medium text-right truncate',
+                    item.mono && 'font-mono text-xs',
                   )}
                 >
                   {item.value}
@@ -1229,17 +1128,13 @@ export function ConfigureForm({
         onOpenChange={setCustomModalOpen}
         onSave={async (cfg) => {
           const nextId = `custom:${cfg.modelName}`;
-          // Upsert: replace existing model with same name, or append a new one.
           const existing = form.customEmbeddings ?? [];
-          const updatedList = existing.some(
-            (m) => m.modelName === cfg.modelName,
-          )
+          const updatedList = existing.some((m) => m.modelName === cfg.modelName)
             ? existing.map((m) => (m.modelName === cfg.modelName ? cfg : m))
             : [...existing, cfg];
 
           if (indexedRun && data?.config && nextId !== data.config.embeddingModelId) {
             handleStructuralChangeBlock();
-            // Just save the custom model to the list so it's not lost, but don't select it
             setForm({ ...form, customEmbeddings: updatedList });
             return;
           }
@@ -1262,9 +1157,9 @@ export function ConfigureForm({
           if (Object.keys(fieldErrors).length === 0) {
             setSaving(true);
             try {
-              const res = await fetch("/api/config", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
+              const res = await fetch('/api/config', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(nextForm),
               });
               if (res.ok) {
@@ -1281,7 +1176,7 @@ export function ConfigureForm({
             }
           }
 
-          toast.info("Custom model added", {
+          toast.info('Custom model added', {
             description: "Click 'Save configuration' to persist your changes.",
           });
         }}
@@ -1296,21 +1191,19 @@ export function ConfigureForm({
         description={
           <>
             <span className="block">
-              Your index was built with{" "}
+              Your index was built with{' '}
               <span className="font-semibold text-foreground">
                 {indexedVectorStore
-                  ? (getVectorStore(indexedVectorStore)?.label ??
-                    indexedVectorStore)
+                  ? getVectorStore(indexedVectorStore)?.label ?? indexedVectorStore
                   : form.vectorStore}
               </span>
-              . Switching to a different vector store would make the existing
-              index incompatible — vectors are bound to the store they were
-              written to.
+              . Switching to a different vector store would make the existing index incompatible —
+              vectors are bound to the store they were written to.
             </span>
             <span className="block">
-              To use a different vector store, go to the{" "}
-              <strong className="text-foreground">Index</strong> page and run a
-              full re-index with your new settings.
+              To use a different vector store, go to the{' '}
+              <strong className="text-foreground">Index</strong> page and run a full re-index with
+              your new settings.
             </span>
           </>
         }
@@ -1323,7 +1216,7 @@ export function ConfigureForm({
         }
         variant="destructive"
         onAction={() => {
-          window.location.href = "/index-data";
+          window.location.href = '/index-data';
         }}
       />
 
@@ -1336,21 +1229,16 @@ export function ConfigureForm({
         description={
           <>
             <span className="block">
-              Your index was built with{" "}
-              <span className="font-semibold text-foreground">
-                {indexedDimensions} dimensions
-              </span>
-              . The selected model outputs a different vector size, which is
-              incompatible with the existing index.
+              Your index was built with{' '}
+              <span className="font-semibold text-foreground">{indexedDimensions} dimensions</span>.
+              The selected model outputs a different vector size, which is incompatible with the
+              existing index.
             </span>
             <span className="block">
-              ✓ You can freely switch to any model that also produces{" "}
-              <span className="font-semibold text-foreground">
-                {indexedDimensions}d
-              </span>{" "}
-              vectors. To use a different dimension size, go to the{" "}
-              <strong className="text-foreground">Index</strong> page and run a
-              full re-index.
+              ✓ You can freely switch to any model that also produces{' '}
+              <span className="font-semibold text-foreground">{indexedDimensions}d</span> vectors.
+              To use a different dimension size, go to the{' '}
+              <strong className="text-foreground">Index</strong> page and run a full re-index.
             </span>
           </>
         }
@@ -1363,7 +1251,7 @@ export function ConfigureForm({
         }
         variant="destructive"
         onAction={() => {
-          window.location.href = "/index-data";
+          window.location.href = '/index-data';
         }}
       />
 
@@ -1374,10 +1262,10 @@ export function ConfigureForm({
         title="Delete custom model?"
         description={
           <>
-            This will remove{" "}
+            This will remove{' '}
             <span className="font-semibold text-foreground">
               &quot;{activeCustomModel?.modelName}&quot;
-            </span>{" "}
+            </span>{' '}
             from your saved custom models. This action cannot be undone.
           </>
         }
@@ -1403,9 +1291,9 @@ export function ConfigureForm({
 
           setSaving(true);
           try {
-            const res = await fetch("/api/config", {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
+            const res = await fetch('/api/config', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(nextForm),
             });
             if (res.ok) {
@@ -1415,7 +1303,7 @@ export function ConfigureForm({
               toast.success(`Custom model "${modelName}" deleted`);
             }
           } catch {
-            toast.error("Failed to save after deletion");
+            toast.error('Failed to save after deletion');
           } finally {
             setSaving(false);
           }
@@ -1435,66 +1323,65 @@ export function ConfigureForm({
             <div className="space-y-2">
               <Label>Provider</Label>
               <Select
-                value={form.embeddingProvider || "openai"}
+                value={form.embeddingProvider || 'openai'}
                 onValueChange={(v) => {
                   if (indexedRun && data?.config && v !== data.config.embeddingProvider) {
                     handleStructuralChangeBlock();
                     return;
                   }
-                  set("embeddingProvider", v as string);
-                  // Reset model when provider changes (except for vercel_ai_gateway which shows all)
-                  if (v !== "vercel_ai_gateway" && v !== "custom") {
-                    const firstModel = EMBEDDING_MODELS.find(
-                      (m) => m.provider === v,
-                    )?.id;
+                  set('embeddingProvider', v as string);
+                  if (v !== 'vercel_ai_gateway' && v !== 'custom') {
+                    const firstModel = EMBEDDING_MODELS.find((m) => m.provider === v)?.id;
                     if (firstModel) {
-                      set("embeddingModelId", firstModel);
+                      set('embeddingModelId', firstModel);
                     }
                   }
                 }}
               >
                 <SelectTrigger className="w-full">
                   <span className="flex items-center gap-2">
-                    {PROVIDER_META[
-                      form.embeddingProvider as keyof typeof PROVIDER_META
-                    ]?.label || form.embeddingProvider}
+                    {PROVIDER_META[form.embeddingProvider as keyof typeof PROVIDER_META]?.label ||
+                      form.embeddingProvider}
                   </span>
                 </SelectTrigger>
                 <SelectContent>
                   {[
-                    "vercel_ai_gateway",
-                    "openai",
-                    "google",
+                    'vercel_ai_gateway',
+                    'openai',
+                    'google',
                     // "cohere",
-                    "voyage",
-                    "mistral",
-                    "jina",
-                    "nomic",
-                    "custom",
-                  ].filter(
-                    (key) => (EMBEDDING_BY_PROVIDER[key] && EMBEDDING_BY_PROVIDER[key].length > 0) || key === "vercel_ai_gateway" || key === "custom"
-                  ).map((providerKey) => {
-                    const meta =
-                      PROVIDER_META[providerKey as keyof typeof PROVIDER_META];
-                    if (!meta) return null;
-                    return (
-                      <SelectItem key={providerKey} value={providerKey}>
-                        <div className="flex items-center gap-2">
-                          <ProviderIcon
-                            src={meta.iconSrc}
-                            alt={meta.label}
-                            pillBg={meta.pillBg}
-                            size={16}
-                          />
-                          <span>
-                            {meta.label}
-                            {providerKey === "vercel_ai_gateway" &&
-                              " (Recommended)"}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
+                    'voyage',
+                    'mistral',
+                    'jina',
+                    'nomic',
+                    'custom',
+                  ]
+                    .filter(
+                      (key) =>
+                        (EMBEDDING_BY_PROVIDER[key] && EMBEDDING_BY_PROVIDER[key].length > 0) ||
+                        key === 'vercel_ai_gateway' ||
+                        key === 'custom',
+                    )
+                    .map((providerKey) => {
+                      const meta = PROVIDER_META[providerKey as keyof typeof PROVIDER_META];
+                      if (!meta) return null;
+                      return (
+                        <SelectItem key={providerKey} value={providerKey}>
+                          <div className="flex items-center gap-2">
+                            <ProviderIcon
+                              src={meta.iconSrc}
+                              alt={meta.label}
+                              pillBg={meta.pillBg}
+                              size={16}
+                            />
+                            <span>
+                              {meta.label}
+                              {providerKey === 'vercel_ai_gateway' && ' (Recommended)'}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                 </SelectContent>
               </Select>
             </div>
@@ -1503,10 +1390,10 @@ export function ConfigureForm({
               <div className="relative">
                 <Input
                   id="apiKey"
-                  type={showProviderApiKey ? "text" : "password"}
+                  type={showProviderApiKey ? 'text' : 'password'}
                   placeholder="Enter API Key..."
-                  value={form.embeddingApiKey || ""}
-                  onChange={(e) => set("embeddingApiKey", e.target.value)}
+                  value={form.embeddingApiKey || ''}
+                  onChange={(e) => set('embeddingApiKey', e.target.value)}
                   className="pr-10"
                 />
                 <button
@@ -1514,11 +1401,7 @@ export function ConfigureForm({
                   onClick={() => setShowProviderApiKey(!showProviderApiKey)}
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
                 >
-                  {showProviderApiKey ? (
-                    <EyeOff className="size-4" />
-                  ) : (
-                    <Eye className="size-4" />
-                  )}
+                  {showProviderApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
@@ -1533,9 +1416,9 @@ export function ConfigureForm({
               onClick={async () => {
                 setTestingKey(true);
                 try {
-                  const res = await fetch("/api/config/test-provider", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                  const res = await fetch('/api/config/test-provider', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       embeddingProvider: form.embeddingProvider,
                       embeddingApiKey: form.embeddingApiKey,
@@ -1544,28 +1427,23 @@ export function ConfigureForm({
                     }),
                   });
                   const data = await res.json();
-                  if (!res.ok)
-                    throw new Error(data.error || "Connection failed");
+                  if (!res.ok) throw new Error(data.error || 'Connection failed');
 
-                  toast.success("Settings saved", {
+                  toast.success('Settings saved', {
                     description: `Connection verified for ${form.embeddingProvider}.`,
                   });
                   setApiKeyModalOpen(false);
                 } catch (err) {
-                  toast.error("Invalid API Key", {
+                  toast.error('Invalid API Key', {
                     description:
-                      err instanceof Error
-                        ? err.message
-                        : "Could not connect to provider.",
+                      err instanceof Error ? err.message : 'Could not connect to provider.',
                   });
                 } finally {
                   setTestingKey(false);
                 }
               }}
             >
-              {testingKey ? (
-                <Loader2 className="size-4 animate-spin mr-2" />
-              ) : null}
+              {testingKey ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
               Save changes
             </Button>
           </DialogFooter>
@@ -1574,5 +1452,3 @@ export function ConfigureForm({
     </div>
   );
 }
-
-

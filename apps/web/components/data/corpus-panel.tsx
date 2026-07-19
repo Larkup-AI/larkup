@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { formatErrorMessage } from "@/lib/error-formatter";
+import { useEffect, useState, useRef } from 'react';
+import { toast } from 'sonner';
+import { formatErrorMessage } from '@/lib/error-formatter';
 import {
   FileText,
   Trash2,
@@ -15,14 +15,23 @@ import {
   ChevronLeft,
   ChevronRight,
   Database,
-} from "lucide-react";
-import type { DocumentSource, SourceDocument } from "@larkup/core/types";
-import { GenericAlert } from "@/components/alerts/generic-alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+  Film,
+  Upload,
+} from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { DocumentSource, SourceDocument } from '@larkup/core/types';
+import { GenericAlert } from '@/components/alerts/generic-alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -30,7 +39,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -38,19 +47,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
 
-const SOURCE_META: Record<
-  DocumentSource,
-  { label: string; icon: typeof Globe }
-> = {
-  scrape: { label: "Scraped", icon: Globe },
-  paste: { label: "Pasted", icon: ClipboardPaste },
-  upload: { label: "Uploaded", icon: FileUp },
-  tabular: { label: "Tabular", icon: Database },
+const SOURCE_META: Record<DocumentSource, { label: string; icon: typeof Globe }> = {
+  scrape: { label: 'Scraped', icon: Globe },
+  paste: { label: 'Pasted', icon: ClipboardPaste },
+  upload: { label: 'Uploaded', icon: FileUp },
+  tabular: { label: 'Tabular', icon: Database },
+  media: { label: 'Media', icon: Film },
 };
 
 export function CorpusPanel({
@@ -62,30 +69,28 @@ export function CorpusPanel({
 }) {
   const [active, setActive] = useState<SourceDocument | null>(null);
   const [deleteTask, setDeleteTask] = useState<
-    | { type: "single"; doc: SourceDocument }
-    | { type: "all" }
-    | { type: "selected" }
-    | null
+    { type: 'single'; doc: SourceDocument } | { type: 'all' } | { type: 'selected' } | null
   >(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [page, setPage] = useState(0);
 
+  const [sourceFilter, setSourceFilter] = useState<DocumentSource | 'all'>('all');
+
+  const filteredDocuments =
+    sourceFilter === 'all' ? documents : documents.filter((d) => d.source === sourceFilter);
+
   const PAGE_SIZE = 10;
-  const totalPages = Math.max(1, Math.ceil(documents.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
-  const pageDocuments = documents.slice(
-    safePage * PAGE_SIZE,
-    (safePage + 1) * PAGE_SIZE,
-  );
+  const pageDocuments = filteredDocuments.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const allPageSelected =
-    pageDocuments.length > 0 &&
-    pageDocuments.every((d) => selectedIds.has(d.id));
+    pageDocuments.length > 0 && pageDocuments.every((d) => selectedIds.has(d.id));
 
   async function del(id: string) {
-    await fetch(`/api/documents?id=${id}`, { method: "DELETE" });
-    toast.message("Document deleted");
+    await fetch(`/api/documents?id=${id}`, { method: 'DELETE' });
+    toast.message('Document deleted');
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -95,15 +100,15 @@ export function CorpusPanel({
   }
   async function delSelected() {
     if (selectedIds.size === 0) return;
-    const ids = Array.from(selectedIds).join(",");
-    await fetch(`/api/documents?ids=${ids}`, { method: "DELETE" });
+    const ids = Array.from(selectedIds).join(',');
+    await fetch(`/api/documents?ids=${ids}`, { method: 'DELETE' });
     toast.message(`Deleted ${selectedIds.size} document(s)`);
     setSelectedIds(new Set());
     onChanged();
   }
   async function clearAll() {
-    await fetch("/api/documents", { method: "DELETE" });
-    toast.message("Corpus and vector index cleared");
+    await fetch('/api/documents', { method: 'DELETE' });
+    toast.message('Corpus and vector index cleared');
     setSelectedIds(new Set());
     onChanged();
   }
@@ -116,8 +121,8 @@ export function CorpusPanel({
         </div>
         <p className="mt-3 text-lg font-medium">Your corpus is empty</p>
         <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-          Scrape the web, paste text, or upload files. Everything you collect is
-          stored locally and ready to index in the next step.
+          Scrape the web, paste text, or upload files. Everything you collect is stored locally and
+          ready to index in the next step.
         </p>
       </div>
     );
@@ -125,20 +130,35 @@ export function CorpusPanel({
 
   return (
     <>
-      <div className="flex items-center justify-between pb-3">
-        <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">
-            {documents.length}
-          </span>{" "}
-          document{documents.length === 1 ? "" : "s"} in corpus
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between pb-3">
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{filteredDocuments.length}</span> document
+            {filteredDocuments.length === 1 ? '' : 's'} in corpus
+          </p>
+        </div>
         <div className="flex items-center gap-2">
+          {documents.length > 0 && (
+            <Select value={sourceFilter} onValueChange={(v: any) => setSourceFilter(v)}>
+              <SelectTrigger className="w-[140px] shadow-none border-border/70 bg-white  h-8 text-xs">
+                <SelectValue placeholder="All Sources" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sources</SelectItem>
+                {Object.entries(SOURCE_META).map(([key, meta]) => (
+                  <SelectItem key={key} value={key}>
+                    {meta.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {selectedIds.size > 0 && (
             <Button
               size="sm"
-              variant="ghost"
+              variant="secondary"
               className="h-8 text-xs text-muted-foreground hover:text-destructive"
-              onClick={() => setDeleteTask({ type: "selected" })}
+              onClick={() => setDeleteTask({ type: 'selected' })}
             >
               <Trash2 className="size-3.5" />
               Delete {selectedIds.size} selected
@@ -146,12 +166,12 @@ export function CorpusPanel({
           )}
           <Button
             size="sm"
-            variant="ghost"
-            className="h-8 text-xs text-muted-foreground hover:text-destructive"
-            onClick={() => setDeleteTask({ type: "all" })}
+            variant="destructive"
+            className="h-8.5 border border-border text-xs text-muted-foreground hover:text-destructive"
+            onClick={() => setDeleteTask({ type: 'all' })}
           >
             <Trash2 className="size-3.5" />
-            Clear corpus
+            {/* Clear corpus */}
           </Button>
         </div>
       </div>
@@ -186,7 +206,10 @@ export function CorpusPanel({
           </TableHeader>
           <TableBody>
             {pageDocuments.map((doc) => {
-              const meta = SOURCE_META[doc.source];
+              const meta = SOURCE_META[doc.source as DocumentSource] || {
+                label: doc.source || 'Unknown',
+                icon: FileText,
+              };
               const Icon = meta.icon;
               return (
                 <TableRow key={doc.id}>
@@ -219,7 +242,7 @@ export function CorpusPanel({
                     </button>
                   </TableCell>
                   <TableCell>
-                    {doc.status === "indexed" ? (
+                    {doc.status === 'indexed' ? (
                       <Badge
                         variant="outline"
                         className="text-green-600 bg-green-50/10 border-green-500 font-normal"
@@ -257,7 +280,7 @@ export function CorpusPanel({
                       <button
                         type="button"
                         aria-label="Delete document"
-                        onClick={() => setDeleteTask({ type: "single", doc })}
+                        onClick={() => setDeleteTask({ type: 'single', doc })}
                         className="text-muted-foreground transition-colors hover:text-destructive"
                       >
                         <Trash2 className="size-4" />
@@ -275,9 +298,9 @@ export function CorpusPanel({
       {totalPages > 1 && (
         <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            {safePage * PAGE_SIZE + 1}–
-            {Math.min((safePage + 1) * PAGE_SIZE, documents.length)} of{" "}
-            {documents.length}
+            {filteredDocuments.length === 0 ? 0 : safePage * PAGE_SIZE + 1}–
+            {Math.min((safePage + 1) * PAGE_SIZE, filteredDocuments.length)} of{' '}
+            {filteredDocuments.length}
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -310,7 +333,7 @@ export function CorpusPanel({
         }}
         onDelete={(id) => {
           if (active) {
-            setDeleteTask({ type: "single", doc: active });
+            setDeleteTask({ type: 'single', doc: active });
           }
         }}
       />
@@ -321,29 +344,29 @@ export function CorpusPanel({
           if (!open) setDeleteTask(null);
         }}
         title={
-          deleteTask?.type === "all"
-            ? "Clear corpus"
-            : deleteTask?.type === "selected"
-              ? "Delete selected documents"
-              : "Delete document"
+          deleteTask?.type === 'all'
+            ? 'Clear corpus'
+            : deleteTask?.type === 'selected'
+            ? 'Delete selected documents'
+            : 'Delete document'
         }
         description={
-          deleteTask?.type === "all"
-            ? "Are you sure you want to delete all documents in the corpus? This action cannot be undone."
-            : deleteTask?.type === "selected"
-              ? `Are you sure you want to delete ${selectedIds.size} selected documents?`
-              : `Are you sure you want to delete "${
-                  deleteTask?.type === "single" ? deleteTask.doc.title : ""
-                }"?`
+          deleteTask?.type === 'all'
+            ? 'Are you sure you want to delete all documents in the corpus? This action cannot be undone.'
+            : deleteTask?.type === 'selected'
+            ? `Are you sure you want to delete ${selectedIds.size} selected documents?`
+            : `Are you sure you want to delete "${
+                deleteTask?.type === 'single' ? deleteTask.doc.title : ''
+              }"?`
         }
         actionText="Delete"
         variant="destructive"
         onAction={() => {
-          if (deleteTask?.type === "all") {
+          if (deleteTask?.type === 'all') {
             clearAll();
-          } else if (deleteTask?.type === "selected") {
+          } else if (deleteTask?.type === 'selected') {
             delSelected();
-          } else if (deleteTask?.type === "single") {
+          } else if (deleteTask?.type === 'single') {
             del(deleteTask.doc.id);
             if (active?.id === deleteTask.doc.id) {
               setActive(null);
@@ -367,17 +390,18 @@ function DocumentDialog({
   onDelete: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
-  const [content, setContent] = useState("");
+  const [title, setTitle] = useState('');
+  const [url, setUrl] = useState('');
+  const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset local state whenever a different document is opened.
   useEffect(() => {
     if (doc) {
       setEditing(false);
       setTitle(doc.title);
-      setUrl(doc.url ?? "");
+      setUrl(doc.url ?? '');
       setContent(doc.content);
     }
   }, [doc]);
@@ -390,12 +414,12 @@ function DocumentDialog({
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/documents", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/documents', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: doc.id,
-          title: title.trim() || "Untitled",
+          title: title.trim() || 'Untitled',
           url: url.trim(),
           content,
         }),
@@ -403,18 +427,50 @@ function DocumentDialog({
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         toast.error(
-          body.error
-            ? formatErrorMessage(new Error(body.error))
-            : "Failed to save document.",
+          body.error ? formatErrorMessage(new Error(body.error)) : 'Failed to save document.',
         );
         return;
       }
-      toast.success("Document saved");
+      toast.success('Document saved');
       onSaved();
     } catch (err) {
-      toast.error(formatErrorMessage(err) || "Could not reach the server.");
+      toast.error(formatErrorMessage(err) || 'Could not reach the server.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingMedia(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to upload file');
+      }
+
+      const data = await res.json();
+      if (data.assets && data.assets.length > 0) {
+        setUrl(`/api/media/${data.assets[0].id}`);
+        toast.success('File uploaded and URL updated');
+      }
+    } catch (err) {
+      toast.error(formatErrorMessage(err) || 'Failed to upload');
+    } finally {
+      setUploadingMedia(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   }
 
@@ -423,17 +479,14 @@ function DocumentDialog({
       <DialogContent className="w-full max-w-2xl max-h-[90%] ">
         <DialogHeader>
           <DialogTitle className="text-balance">
-            {editing ? "Edit document" : doc?.title}
+            {editing ? 'Edit document' : doc?.title}
           </DialogTitle>
           {!editing && doc?.url && (
-            <DialogDescription className="break-all">
-              {doc.url}
-            </DialogDescription>
+            <DialogDescription className="break-all">{doc.url}</DialogDescription>
           )}
           {editing && (
             <DialogDescription>
-              Changes are saved to this server&apos;s corpus. Re-index to apply
-              them to search.
+              Changes are saved to this server&apos;s corpus. Re-index to apply them to search.
             </DialogDescription>
           )}
         </DialogHeader>
@@ -441,7 +494,7 @@ function DocumentDialog({
         {editing ? (
           <div
             className="grid gap-4 overflow-y-auto pr-2 pb-2"
-            style={{ maxHeight: "calc(80vh - 150px)" }}
+            style={{ maxHeight: 'calc(80vh - 150px)' }}
           >
             <div className="grid gap-2">
               <Label htmlFor="doc-title">Title</Label>
@@ -453,7 +506,31 @@ function DocumentDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="doc-url">URL (optional)</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="doc-url">URL (optional)</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[10px] uppercase font-medium text-primary hover:bg-primary/10"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingMedia}
+                >
+                  {uploadingMedia ? (
+                    <Loader2 className="size-3 mr-1 animate-spin" />
+                  ) : (
+                    <Upload className="size-3 mr-1" />
+                  )}
+                  Upload File
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  accept="image/*,video/*,audio/*"
+                />
+              </div>
               <Input
                 id="doc-url"
                 value={url}
@@ -478,25 +555,38 @@ function DocumentDialog({
             </div>
           </div>
         ) : (
-          <ScrollArea className="max-h-[60vh] rounded-md border border-border bg-muted/30">
-            <pre
-              className={cn(
-                "whitespace-pre-wrap break-all px-4 py-3 font-mono text-xs leading-relaxed text-foreground",
-              )}
-            >
-              {doc?.content}
-            </pre>
-          </ScrollArea>
+          <div className="flex flex-col gap-4">
+            {doc?.source === 'media' && doc?.url && (
+              <div className="rounded-md border border-border bg-muted/30 overflow-hidden flex items-center justify-center p-4">
+                {doc.url.match(/\.(mp4|webm|ogg|mov)$/i) ? (
+                  <video src={doc.url} controls className="max-h-[40vh] max-w-full" />
+                ) : doc.url.match(/\.(mp3|wav|ogg|m4a)$/i) ? (
+                  <audio src={doc.url} controls className="w-full" />
+                ) : (
+                  <img
+                    src={doc.url}
+                    alt={doc.title}
+                    className="max-h-[40vh] max-w-full object-contain"
+                  />
+                )}
+              </div>
+            )}
+            <ScrollArea className="max-h-[60vh] rounded-md border border-border bg-muted/30">
+              <pre
+                className={cn(
+                  'whitespace-pre-wrap break-all px-4 py-3 font-mono text-xs leading-relaxed text-foreground',
+                )}
+              >
+                {doc?.content}
+              </pre>
+            </ScrollArea>
+          </div>
         )}
 
         <DialogFooter className="flex-row items-center justify-between gap-2 sm:justify-between">
           {editing ? (
             <>
-              <Button
-                variant="ghost"
-                onClick={() => setEditing(false)}
-                disabled={saving}
-              >
+              <Button variant="ghost" onClick={() => setEditing(false)} disabled={saving}>
                 <X className="size-4" />
                 Cancel
               </Button>

@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import useSWR from "swr";
+import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import {
   CheckCircle2,
   Copy,
@@ -12,30 +12,22 @@ import {
   Square,
   Terminal,
   Trash2,
-} from "lucide-react";
-import { SdkConnectDialog } from "@/components/simple/sdk-connect-dialog";
+} from 'lucide-react';
+import { SdkConnectDialog } from '@/components/simple/sdk-connect-dialog';
 
 // Vercel triangle icon
 function VercelIcon({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className={className}
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
       <path d="M12 2L2 19.778h20L12 2z" />
     </svg>
   );
 }
-import type { RagConfig } from "@larkup/core/types";
-import type {
-  GeneratedFile,
-  GeneratedServer,
-} from "@larkup/core/generator/generate-server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { RagConfig } from '@larkup/core/types';
+import type { GeneratedFile, GeneratedServer } from '@larkup/core/generator/generate-server';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,10 +38,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+} from '@/components/ui/alert-dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -68,17 +60,9 @@ interface LocalServerState {
   lastError?: string;
 }
 
-export function ServerWorkspace({
-  onServerId,
-}: {
-  onServerId?: (id: string) => void;
-}) {
-  const { data, isLoading } = useSWR<GenerateResponse>(
-    "/api/server/generate",
-    fetcher,
-  );
+export function ServerWorkspace({ onServerId }: { onServerId?: (id: string) => void }) {
+  const { data, isLoading } = useSWR<GenerateResponse>('/api/server/generate', fetcher);
 
-  // Notify parent of the active serverId as soon as we have it
   useEffect(() => {
     if (data?.serverId) onServerId?.(data.serverId);
   }, [data?.serverId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -98,24 +82,16 @@ export function ServerWorkspace({
   );
 }
 
-export function LaunchPanel({
-  serverId,
-}: {
-  serverId: string;
-}) {
-  const [busy, setBusy] = useState<"start" | "stop" | null>(null);
+export function LaunchPanel({ serverId }: { serverId: string }) {
+  const [busy, setBusy] = useState<'start' | 'stop' | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
   const [remoteProvider, setRemoteProvider] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey, setApiKey] = useState('');
 
   useEffect(() => {
-    // Read deployed remote URL (set by DeployButton on success).
-    // Keys are scoped per-server to avoid stale URLs from old servers.
     const url = localStorage.getItem(`vercel_deployed_url_${serverId}`);
-    const provider = localStorage.getItem(
-      `vercel_deployed_provider_${serverId}`,
-    );
-    const savedApiKey = localStorage.getItem("rag_server_api_key");
+    const provider = localStorage.getItem(`vercel_deployed_provider_${serverId}`);
+    const savedApiKey = localStorage.getItem('rag_server_api_key');
     if (url) setRemoteUrl(url);
     if (provider) setRemoteProvider(provider);
     if (savedApiKey) setApiKey(savedApiKey);
@@ -126,35 +102,33 @@ export function LaunchPanel({
     localStorage.removeItem(`vercel_deployed_provider_${serverId}`);
     setRemoteUrl(null);
     setRemoteProvider(null);
-    toast.success("Remote server removed.");
+    toast.success('Remote server removed.');
   }
 
-  const { data, mutate } = useSWR<{ state: LocalServerState }>(
-    "/api/server/local",
-    fetcher,
-    { refreshInterval: (d) => (d?.state.running ? 5000 : 0) },
-  );
+  const { data, mutate } = useSWR<{ state: LocalServerState }>('/api/server/local', fetcher, {
+    refreshInterval: (d) => (d?.state.running ? 5000 : 0),
+  });
   const state = data?.state;
 
-  async function control(action: "start" | "stop") {
+  async function control(action: 'start' | 'stop') {
     setBusy(action);
     try {
-      const currentApiKey = localStorage.getItem("rag_server_api_key") || "";
-      const res = await fetch("/api/server/local", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const currentApiKey = localStorage.getItem('rag_server_api_key') || '';
+      const res = await fetch('/api/server/local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, serverApiKey: currentApiKey }),
       });
       const body = await res.json();
-      if (action === "start") {
-        if (body.state?.running) toast.success("Local server is running.");
-        else toast.error(body.state?.lastError ?? "Server did not start.");
+      if (action === 'start') {
+        if (body.state?.running) toast.success('Local server is running.');
+        else toast.error(body.state?.lastError ?? 'Server did not start.');
       } else {
-        toast.success("Local server stopped.");
+        toast.success('Local server stopped.');
       }
       mutate();
     } catch {
-      toast.error("Could not reach the local server controller.");
+      toast.error('Could not reach the local server controller.');
     } finally {
       setBusy(null);
     }
@@ -180,9 +154,8 @@ export function LaunchPanel({
       <CardContent className="space-y-6">
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Spin up the generated server right here to test your RAG endpoints.
-            Settings and API keys configured in the Deploy menu will be
-            automatically applied.
+            Spin up the generated server right here to test your RAG endpoints. Settings and API
+            keys configured in the Deploy menu will be automatically applied.
           </p>
 
           <Alert>
@@ -206,8 +179,8 @@ export function LaunchPanel({
                     target="_blank"
                     rel="noreferrer"
                     className={buttonVariants({
-                      variant: "outline",
-                      size: "sm",
+                      variant: 'outline',
+                      size: 'sm',
                     })}
                   >
                     Open API Reference
@@ -224,9 +197,7 @@ export function LaunchPanel({
           {state?.lastError && !state.running && (
             <Alert variant="destructive">
               <AlertTitle>Launch failed</AlertTitle>
-              <AlertDescription className="wrap-break-word">
-                {state.lastError}
-              </AlertDescription>
+              <AlertDescription className="wrap-break-word">{state.lastError}</AlertDescription>
             </Alert>
           )}
 
@@ -235,11 +206,11 @@ export function LaunchPanel({
               <>
                 <Button
                   variant="destructive"
-                  onClick={() => control("stop")}
+                  onClick={() => control('stop')}
                   disabled={busy !== null}
-                  className={""}
+                  className={''}
                 >
-                  {busy === "stop" ? (
+                  {busy === 'stop' ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
                     <Square className="size-4 text-white!" />
@@ -250,7 +221,7 @@ export function LaunchPanel({
                   href={`${state.endpoint}`}
                   target="_blank"
                   rel="noreferrer"
-                  className={buttonVariants({ variant: "secondary" })}
+                  className={buttonVariants({ variant: 'secondary' })}
                 >
                   <ExternalLink className="size-4" />
                   {state.endpoint}
@@ -258,20 +229,17 @@ export function LaunchPanel({
               </>
             ) : (
               <>
-                <Button
-                  onClick={() => control("start")}
-                  disabled={busy !== null}
-                >
-                  {busy === "start" ? (
+                <Button onClick={() => control('start')} disabled={busy !== null}>
+                  {busy === 'start' ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
                     <Play className="size-4" />
                   )}
-                  {busy === "start" ? "Starting…" : "Launch local server"}
+                  {busy === 'start' ? 'Starting…' : 'Launch local server'}
                 </Button>
               </>
             )}
-            <SdkConnectDialog serverUrl={state?.endpoint || "http://localhost:8080"} />
+            <SdkConnectDialog serverUrl={state?.endpoint || 'http://localhost:8080'} />
           </div>
         </div>
 
@@ -282,7 +250,9 @@ export function LaunchPanel({
               Try it
             </div>
             <CodeLine
-              text={`curl -X POST ${state.endpoint}/query -H "Content-Type: application/json"${apiKey ? ` -H "Authorization: Bearer ${apiKey}"` : ""} -d '{"query":"hello"}'`}
+              text={`curl -X POST ${state.endpoint}/query -H "Content-Type: application/json"${
+                apiKey ? ` -H "Authorization: Bearer ${apiKey}"` : ''
+              } -d '{"query":"hello"}'`}
             />
           </div>
         )}
@@ -292,7 +262,7 @@ export function LaunchPanel({
           <>
             <div className="flex items-center gap-3 pt-2 border-t border-border">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground min-w-[110px]">
-                {remoteProvider === "vercel" ? (
+                {remoteProvider === 'vercel' ? (
                   <VercelIcon className="size-4 shrink-0" />
                 ) : (
                   <Server className="size-4 shrink-0" />
@@ -303,10 +273,10 @@ export function LaunchPanel({
                 href={remoteUrl}
                 target="_blank"
                 rel="noreferrer"
-                className={buttonVariants({ variant: "outline" })}
+                className={buttonVariants({ variant: 'outline' })}
               >
                 <ExternalLink className="size-4" />
-                {remoteUrl.replace(/^https?:\/\//, "")}
+                {remoteUrl.replace(/^https?:\/\//, '')}
               </a>
               <AlertDialog>
                 <AlertDialogTrigger
@@ -324,9 +294,8 @@ export function LaunchPanel({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Remove remote server?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will remove the remote server connection from this
-                      workspace. The deployed server itself will not be deleted
-                      from your provider.
+                      This will remove the remote server connection from this workspace. The
+                      deployed server itself will not be deleted from your provider.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -347,7 +316,9 @@ export function LaunchPanel({
                 Try remote
               </div>
               <CodeLine
-                text={`curl -X POST ${remoteUrl}/query -H "Content-Type: application/json"${apiKey ? ` -H "Authorization: Bearer ${apiKey}"` : ""} -d '{"query":"hello"}'`}
+                text={`curl -X POST ${remoteUrl}/query -H "Content-Type: application/json"${
+                  apiKey ? ` -H "Authorization: Bearer ${apiKey}"` : ''
+                } -d '{"query":"hello"}'`}
               />
             </div>
           </>
@@ -370,12 +341,8 @@ function CopyButton({ text }: { text: string }) {
         setTimeout(() => setCopied(false), 1500);
       }}
     >
-      {copied ? (
-        <CheckCircle2 className="size-3.5 text-primary" />
-      ) : (
-        <Copy className="size-3.5" />
-      )}
-      {copied ? "Copied" : "Copy"}
+      {copied ? <CheckCircle2 className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
+      {copied ? 'Copied' : 'Copy'}
     </Button>
   );
 }

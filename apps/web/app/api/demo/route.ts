@@ -1,15 +1,15 @@
-import { NextResponse } from "next/server";
-import { readConfig } from "@larkup/core/config-store";
-import { readRun } from "@larkup/core/index-store";
-import { refreshServerStatus } from "@larkup/core/generator/server-runtime";
-import { createAdapter } from "@larkup/vector-stores/factory";
-import { getEmbeddingModel } from "@larkup/core/embeddings/registry";
-import { getVectorStore } from "@larkup/vector-stores/registry";
-import type { QueryHit } from "@larkup/vector-stores/adapter";
-import { runWithServer } from "@larkup/core/workspace";
-import { embedQuery } from "@larkup/core/indexing/embedder";
+import { NextResponse } from 'next/server';
+import { readConfig } from '@larkup/core/config-store';
+import { readRun } from '@larkup/core/index-store';
+import { refreshServerStatus } from '@larkup/core/generator/server-runtime';
+import { createAdapter } from '@larkup/vector-stores/factory';
+import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
+import { getVectorStore } from '@larkup/vector-stores/registry';
+import type { QueryHit } from '@larkup/vector-stores/adapter';
+import { runWithServer } from '@larkup/core/workspace';
+import { embedQuery } from '@larkup/core/indexing/embedder';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 /** Run a handler against a specific server when `serverId` is provided. */
 function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
@@ -24,7 +24,7 @@ function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
  * `?serverId=` to inspect a specific server instead of the active one.
  */
 export async function GET(req: Request) {
-  const serverId = new URL(req.url).searchParams.get("serverId");
+  const serverId = new URL(req.url).searchParams.get('serverId');
   return withServer(serverId, () => snapshot());
 }
 
@@ -33,13 +33,13 @@ async function snapshot() {
   const run = await readRun();
   const server = await refreshServerStatus();
 
-  const indexed = run?.status === "completed" && (run.totalChunks ?? 0) > 0;
+  const indexed = run?.status === 'completed' && (run.totalChunks ?? 0) > 0;
   const ready = indexed || server.running;
 
   const blockers: string[] = [];
   if (!ready) {
     blockers.push(
-      "Build a larkup index (or launch a generated server) before running a demo query.",
+      'Build a larkup index (or launch a generated server) before running a demo query.',
     );
   }
 
@@ -61,7 +61,7 @@ async function snapshot() {
 interface DemoResult {
   query: string;
   hits: QueryHit[];
-  source: "server" | "direct";
+  source: 'server' | 'direct';
   endpoint?: string;
   tookMs: number;
 }
@@ -80,37 +80,27 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
   const query = body.query?.trim();
   if (!query) {
-    return NextResponse.json(
-      { error: "A non-empty 'query' is required." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "A non-empty 'query' is required." }, { status: 400 });
   }
 
-  return withServer(body.serverId ?? null, () =>
-    runQuery(query, body.topK, started),
-  );
+  return withServer(body.serverId ?? null, () => runQuery(query, body.topK, started));
 }
 
-async function runQuery(
-  query: string,
-  requestedTopK: number | undefined,
-  started: number,
-) {
+async function runQuery(query: string, requestedTopK: number | undefined, started: number) {
   const config = await readConfig();
   const topK = Math.min(Math.max(Number(requestedTopK) || config.topK, 1), 20);
 
-  // 1) Prefer the running generated server — the real serving path.
   const server = await refreshServerStatus();
   if (server.running) {
     try {
       const res = await fetch(`${server.endpoint}/query`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, topK }),
         signal: AbortSignal.timeout(30_000),
       });
@@ -119,31 +109,30 @@ async function runQuery(
         const result: DemoResult = {
           query,
           hits: data.hits ?? [],
-          source: "server",
+          source: 'server',
           endpoint: server.endpoint,
           tookMs: Date.now() - started,
         };
         return NextResponse.json(result);
       }
-      // Fall through to direct retrieval if the server errored.
-    } catch {
-      // Server unreachable — fall back to direct retrieval below.
-    }
+    } catch {}
   }
 
-  // 2) Fallback: in-process retrieval against the toolkit's own store.
   const run = await readRun();
-  if (!run || run.status !== "completed" || (run.totalChunks ?? 0) === 0) {
+  if (!run || run.status !== 'completed' || (run.totalChunks ?? 0) === 0) {
     return NextResponse.json(
       {
         error:
-          "No index to query yet. Build an index in the Index stage, or launch a server first.",
+          'No index to query yet. Build an index in the Index stage, or launch a server first.',
       },
       { status: 409 },
     );
   }
 
-  if (!getEmbeddingModel(config.embeddingModelId) && !config.embeddingModelId?.startsWith("custom:")) {
+  if (
+    !getEmbeddingModel(config.embeddingModelId) &&
+    !config.embeddingModelId?.startsWith('custom:')
+  ) {
     return NextResponse.json(
       { error: `Unknown embedding model "${config.embeddingModelId}".` },
       { status: 400 },
@@ -164,13 +153,12 @@ async function runQuery(
     const result: DemoResult = {
       query,
       hits,
-      source: "direct",
+      source: 'direct',
       tookMs: Date.now() - started,
     };
     return NextResponse.json(result);
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Retrieval failed unexpectedly.";
+    const message = err instanceof Error ? err.message : 'Retrieval failed unexpectedly.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

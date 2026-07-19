@@ -1,46 +1,42 @@
-"use client";
+'use client';
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export type ThemeVariant =
-  | "default"
-  | "theme-gaia"
-  | "theme-docker"
-  | "theme-pinecone"
-  | "theme-vercel"
-  | "theme-elevenlabs"
-  | "theme-espresso"
-  | "theme-sienna"
-  | "theme-caramel";
+  | 'default'
+  | 'theme-gaia'
+  | 'theme-docker'
+  | 'theme-pinecone'
+  | 'theme-vercel'
+  | 'theme-elevenlabs'
+  | 'theme-espresso'
+  | 'theme-sienna'
+  | 'theme-caramel';
 
 export type BackgroundVariant =
-  | "bg-default"
-  | "bg-warm"
-  | "bg-soft"
-  | "bg-pure"
-  | "bg-silver"
-  | "bg-sage"
-  | "bg-fafafa"
-  | "bg-stone";
+  | 'bg-default'
+  | 'bg-warm'
+  | 'bg-soft'
+  | 'bg-pure'
+  | 'bg-silver'
+  | 'bg-sage'
+  | 'bg-fafafa'
+  | 'bg-stone';
 
 export type PanelBgVariant =
-  | "panel-default"
-  | "panel-white"
-  | "panel-fafafa"
-  | "panel-warm"
-  | "panel-soft"
-  | "panel-silver"
-  | "panel-stone";
+  | 'panel-default'
+  | 'panel-white'
+  | 'panel-fafafa'
+  | 'panel-warm'
+  | 'panel-soft'
+  | 'panel-silver'
+  | 'panel-stone';
 
-export type LayoutVariant = "sidebar" | "topnav" | "collapsed";
+export type LayoutVariant = 'sidebar' | 'topnav' | 'collapsed';
 
-export type RadiusVariant =
-  | "radius-0"
-  | "radius-sm"
-  | "radius-default"
-  | "radius-lg";
+export type RadiusVariant = 'radius-0' | 'radius-sm' | 'radius-default' | 'radius-lg';
 
-export type PageStyleVariant = "card" | "fused";
+export type PageStyleVariant = 'card' | 'fused';
 
 interface ThemeCustomizerContextValue {
   theme: ThemeVariant;
@@ -60,52 +56,36 @@ interface ThemeCustomizerContextValue {
   isMounted: boolean;
 }
 
-const ThemeCustomizerContext =
-  createContext<ThemeCustomizerContextValue | null>(null);
+const ThemeCustomizerContext = createContext<ThemeCustomizerContextValue | null>(null);
 
 export function useThemeCustomizer() {
   const ctx = useContext(ThemeCustomizerContext);
   if (!ctx) {
-    throw new Error(
-      "useThemeCustomizer must be used within a ThemeCustomizerProvider",
-    );
+    throw new Error('useThemeCustomizer must be used within a ThemeCustomizerProvider');
   }
   return ctx;
 }
 
-export function ThemeCustomizerProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function ThemeCustomizerProvider({ children }: { children: React.ReactNode }) {
   const [isMounted, setIsMounted] = useState(false);
-  // Default to "default" theme (black primary). User can switch themes freely.
-  const [theme, setThemeState] = useState<ThemeVariant>("default");
-  const [layout, setLayout] = useState<LayoutVariant>("sidebar");
-  const [radius, setRadius] = useState<RadiusVariant>("radius-default");
-  const [background, setBackground] = useState<BackgroundVariant>("bg-default");
-  const [panelBg, setPanelBg] = useState<PanelBgVariant>("panel-default");
-  const [navBg, setNavBg] = useState<PanelBgVariant>("panel-default");
-  const [pageStyle, setPageStyle] = useState<PageStyleVariant>("card");
+  const [theme, setThemeState] = useState<ThemeVariant>('default');
+  const [layout, setLayout] = useState<LayoutVariant>('sidebar');
+  const [radius, setRadius] = useState<RadiusVariant>('radius-default');
+  const [background, setBackground] = useState<BackgroundVariant>('bg-default');
+  const [panelBg, setPanelBg] = useState<PanelBgVariant>('panel-default');
+  const [navBg, setNavBg] = useState<PanelBgVariant>('panel-default');
+  const [pageStyle, setPageStyle] = useState<PageStyleVariant>('card');
 
   useEffect(() => {
     setIsMounted(true);
 
-    const savedTheme = localStorage.getItem("app-theme") as ThemeVariant;
-    const savedLayout = localStorage.getItem("app-layout") as LayoutVariant;
-    const savedRadius = localStorage.getItem("app-radius") as RadiusVariant;
-    const savedBackground = localStorage.getItem(
-      "app-background",
-    ) as BackgroundVariant;
-    const savedPanelBg = localStorage.getItem(
-      "app-panel-bg",
-    ) as PanelBgVariant;
-    const savedNavBg = localStorage.getItem(
-      "app-nav-bg",
-    ) as PanelBgVariant;
-    const savedPageStyle = localStorage.getItem(
-      "app-pagestyle",
-    ) as PageStyleVariant;
+    const savedTheme = localStorage.getItem('app-theme') as ThemeVariant;
+    const savedLayout = localStorage.getItem('app-layout') as LayoutVariant;
+    const savedRadius = localStorage.getItem('app-radius') as RadiusVariant;
+    const savedBackground = localStorage.getItem('app-background') as BackgroundVariant;
+    const savedPanelBg = localStorage.getItem('app-panel-bg') as PanelBgVariant;
+    const savedNavBg = localStorage.getItem('app-nav-bg') as PanelBgVariant;
+    const savedPageStyle = localStorage.getItem('app-pagestyle') as PageStyleVariant;
 
     if (savedTheme) setThemeState(savedTheme);
     if (savedLayout) setLayout(savedLayout);
@@ -118,31 +98,27 @@ export function ThemeCustomizerProvider({
 
   useEffect(() => {
     if (!isMounted) return;
-    localStorage.setItem("app-theme", theme);
-    localStorage.setItem("app-layout", layout);
-    localStorage.setItem("app-radius", radius);
-    localStorage.setItem("app-background", background);
-    localStorage.setItem("app-panel-bg", panelBg);
-    localStorage.setItem("app-nav-bg", navBg);
-    localStorage.setItem("app-pagestyle", pageStyle);
+    localStorage.setItem('app-theme', theme);
+    localStorage.setItem('app-layout', layout);
+    localStorage.setItem('app-radius', radius);
+    localStorage.setItem('app-background', background);
+    localStorage.setItem('app-panel-bg', panelBg);
+    localStorage.setItem('app-nav-bg', navBg);
+    localStorage.setItem('app-pagestyle', pageStyle);
 
     // Update body classes
     const body = document.body;
 
     // Remove old classes
     Array.from(body.classList).forEach((cls) => {
-      if (
-        cls.startsWith("theme-") ||
-        cls.startsWith("radius-") ||
-        cls.startsWith("bg-")
-      ) {
+      if (cls.startsWith('theme-') || cls.startsWith('radius-') || cls.startsWith('bg-')) {
         body.classList.remove(cls);
       }
     });
 
     // Add new classes
-    if (theme !== "default") body.classList.add(theme);
-    if (radius !== "radius-default") body.classList.add(radius);
+    if (theme !== 'default') body.classList.add(theme);
+    if (radius !== 'radius-default') body.classList.add(radius);
     if (background) body.classList.add(background);
   }, [theme, layout, radius, background, panelBg, navBg, pageStyle, isMounted]);
 

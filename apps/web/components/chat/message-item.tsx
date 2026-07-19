@@ -1,27 +1,19 @@
-"use client";
+'use client';
 
-import { useState, useMemo } from "react";
-import type { UIMessage } from "ai";
-import { KnowledgeBaseResult } from "@/components/chat/tools/knowledge-base-result";
-import {
-  ChatChart,
-  type ChartConfig,
-} from "@/components/chat/tools/chat-chart";
-import {
-  ChatDataTable,
-  type DataTableConfig,
-} from "@/components/chat/tools/chat-data-table";
+import { useState, useMemo } from 'react';
+import type { UIMessage } from 'ai';
+import { KnowledgeBaseResult } from '@/components/chat/tools/knowledge-base-result';
+import { ChatChart, type ChartConfig } from '@/components/chat/tools/chat-chart';
+import { ChatDataTable, type DataTableConfig } from '@/components/chat/tools/chat-data-table';
 import {
   ChatSandboxResult,
   type SandboxResultConfig,
-} from "@/components/chat/tools/chat-sandbox-result";
-import { ChatTabs } from "@/components/chat/tools/chat-tabs";
-import { ChatCardSimple } from "@/components/chat/tools/chat-card";
-import {
-  ChatGrid,
-  type ChatGridConfig,
-} from "@/components/chat/tools/chat-grid";
-import { Sparkles, BarChart3, Table2, FlaskConical } from "lucide-react";
+} from '@/components/chat/tools/chat-sandbox-result';
+import { ChatTabs } from '@/components/chat/tools/chat-tabs';
+import { ChatCardSimple } from '@/components/chat/tools/chat-card';
+import { ChatGrid, type ChatGridConfig } from '@/components/chat/tools/chat-grid';
+import { Sparkles, BarChart3, Table2, FlaskConical } from 'lucide-react';
+import { ChatMediaPreview, parseMediaRefs } from '@/components/chat/tools/chat-media-preview';
 
 function FollowUpButtons({
   suggestions,
@@ -41,8 +33,8 @@ function FollowUpButtons({
           onClick={() => onSelect?.(s)}
           className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
             i === 0
-              ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
-              : "border-border bg-card text-foreground hover:bg-secondary"
+              ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/20'
+              : 'border-border bg-card text-foreground hover:bg-secondary'
           }`}
         >
           {s}
@@ -59,33 +51,28 @@ interface ParsedTable {
 
 function splitTextAndTables(
   text: string,
-): Array<
-  { type: "text"; content: string } | { type: "table"; table: ParsedTable }
-> {
+): Array<{ type: 'text'; content: string } | { type: 'table'; table: ParsedTable }> {
   if (!text) return [];
 
-  const lines = text.split("\n");
-  const segments: Array<
-    { type: "text"; content: string } | { type: "table"; table: ParsedTable }
-  > = [];
+  const lines = text.split('\n');
+  const segments: Array<{ type: 'text'; content: string } | { type: 'table'; table: ParsedTable }> =
+    [];
   let currentText: string[] = [];
   let tableLines: string[] = [];
   let inTable = false;
 
   const isTableRow = (line: string) => {
     const trimmed = line.trim();
-    return (
-      trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 2
-    );
+    return trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2;
   };
 
   const isSeparatorRow = (line: string) => /^\|[\s\-:|]+\|$/.test(line.trim());
 
   const flushText = () => {
     if (currentText.length > 0) {
-      const content = currentText.join("\n").trim();
+      const content = currentText.join('\n').trim();
       if (content) {
-        segments.push({ type: "text", content });
+        segments.push({ type: 'text', content });
       }
       currentText = [];
     }
@@ -100,7 +87,7 @@ function splitTextAndTables(
 
     const headerLine = tableLines[0];
     const columns = headerLine
-      .split("|")
+      .split('|')
       .map((c) => c.trim())
       .filter(Boolean);
 
@@ -112,22 +99,22 @@ function splitTextAndTables(
     const rows: Record<string, any>[] = [];
     for (let i = dataStart; i < tableLines.length; i++) {
       const rawCells = tableLines[i]
-        .split("|")
+        .split('|')
         .slice(1, -1)
         .map((c) => c.trim());
 
       const row: Record<string, any> = {};
       columns.forEach((col, j) => {
-        const val = rawCells[j] ?? "";
+        const val = rawCells[j] ?? '';
         const num = Number(val);
-        row[col] = !isNaN(num) && val !== "" ? num : val;
+        row[col] = !isNaN(num) && val !== '' ? num : val;
       });
       rows.push(row);
     }
 
     if (columns.length > 0 && rows.length > 0) {
       segments.push({
-        type: "table",
+        type: 'table',
         table: { columns, rows },
       });
     }
@@ -174,40 +161,35 @@ function getToolInfo(part: any): {
   output: any;
   input: any;
 } {
-  // Format 1: New AI SDK v4+ → { type: "tool-invocation", toolInvocation: { toolName, state, result, args } }
-  if (part.type === "tool-invocation") {
+  if (part.type === 'tool-invocation') {
     const ti = part.toolInvocation;
     const state = ti.state;
     return {
       toolName: ti.toolName,
-      isExecuting: state === "partial-call" || state === "call",
+      isExecuting: state === 'partial-call' || state === 'call',
       isCompleted:
-        (state === "result" ||
-          state === "output" ||
-          state === "output-available") &&
+        (state === 'result' || state === 'output' || state === 'output-available') &&
         ti.result !== undefined,
       output: ti.result,
       input: ti.args,
     };
   }
 
-  // Format 2: Legacy → { type: "tool-<toolName>", state: "output-available" | "output" | "input-streaming" | ..., output: {...}, input: {...} }
-  if (part.type?.startsWith("tool-") && part.type !== "tool-invocation") {
-    const toolName = part.type.replace("tool-", "");
+  if (part.type?.startsWith('tool-') && part.type !== 'tool-invocation') {
+    const toolName = part.type.replace('tool-', '');
     const state = part.state;
     return {
       toolName,
-      isExecuting: state === "input-streaming" || state === "input-available",
+      isExecuting: state === 'input-streaming' || state === 'input-available',
       isCompleted:
-        (state === "output" || state === "output-available") &&
-        part.output !== undefined,
+        (state === 'output' || state === 'output-available') && part.output !== undefined,
       output: part.output,
       input: part.input,
     };
   }
 
   return {
-    toolName: "",
+    toolName: '',
     isExecuting: false,
     isCompleted: false,
     output: undefined,
@@ -220,12 +202,11 @@ function getToolInfo(part: any): {
 /* ------------------------------------------------------------------ */
 
 function renderToolPart(part: any, index: number): React.ReactNode | null {
-  const { toolName, isExecuting, isCompleted, output, input } =
-    getToolInfo(part);
+  const { toolName, isExecuting, isCompleted, output, input } = getToolInfo(part);
 
   // Still executing
   if (isExecuting) {
-    if (toolName === "searchKnowledgeBase") return null;
+    if (toolName === 'searchKnowledgeBase') return null;
     return (
       <div
         key={index}
@@ -233,14 +214,11 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
       >
         <Sparkles className="size-4 text-foreground/60" />
         <span className="font-medium text-foreground/80">
-          {toolName === "queryTabularData" && "Querying data..."}
-          {toolName === "generateVisualization" && "Generating chart..."}
-          {toolName === "executeAnalysis" && "Running analysis..."}
-          {![
-            "queryTabularData",
-            "generateVisualization",
-            "executeAnalysis",
-          ].includes(toolName) && "Processing..."}
+          {toolName === 'queryTabularData' && 'Querying data...'}
+          {toolName === 'generateVisualization' && 'Generating chart...'}
+          {toolName === 'executeAnalysis' && 'Running analysis...'}
+          {!['queryTabularData', 'generateVisualization', 'executeAnalysis'].includes(toolName) &&
+            'Processing...'}
         </span>
       </div>
     );
@@ -249,7 +227,7 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
   // Completed
   if (isCompleted) {
     switch (toolName) {
-      case "queryTabularData": {
+      case 'queryTabularData': {
         if (output.error) return null;
         const tableConfig: DataTableConfig = {
           columns: output.columns ?? [],
@@ -257,18 +235,17 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
           totalRows: output.totalRows ?? 0,
           aggregationResults: output.aggregationResults,
         };
-        if (tableConfig.rows.length === 0 && !tableConfig.aggregationResults)
-          return null;
+        if (tableConfig.rows.length === 0 && !tableConfig.aggregationResults) return null;
         return <ChatDataTable key={index} config={tableConfig} />;
       }
 
-      case "generateVisualization": {
+      case 'generateVisualization': {
         const chartConfig = output as ChartConfig;
         if (!chartConfig?.data || chartConfig.data.length === 0) return null;
         return <ChatChart key={index} config={chartConfig} />;
       }
 
-      case "executeAnalysis": {
+      case 'executeAnalysis': {
         const result = output as SandboxResultConfig;
         const code = input?.code;
         return <ChatSandboxResult key={index} config={result} code={code} />;
@@ -295,9 +272,8 @@ export function MessageItem({
   isLast?: boolean;
   isStreaming?: boolean;
 }) {
-  const isUser = message.role === "user";
+  const isUser = message.role === 'user';
 
-  // Normalise parts and handle missing tools in parts array at runtime
   const anyMessage = message as any;
   const parts: any[] = message.parts ? [...message.parts] : [];
 
@@ -305,21 +281,19 @@ export function MessageItem({
     anyMessage.toolInvocations.forEach((t: any) => {
       if (
         !parts.some(
-          (p: any) =>
-            p.type === "tool-invocation" &&
-            p.toolInvocation?.toolCallId === t.toolCallId,
+          (p: any) => p.type === 'tool-invocation' && p.toolInvocation?.toolCallId === t.toolCallId,
         )
       ) {
-        parts.push({ type: "tool-invocation", toolInvocation: t });
+        parts.push({ type: 'tool-invocation', toolInvocation: t });
       }
     });
   }
 
   if (isUser) {
     const text = parts
-      .filter((p: any) => p.type === "text")
+      .filter((p: any) => p.type === 'text')
       .map((p: any) => p.text)
-      .join("");
+      .join('');
     return (
       <div className="message user-message flex justify-end" data-role="user">
         <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[#edecec] px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
@@ -334,25 +308,22 @@ export function MessageItem({
   // Categorize parts using unified detection
   const kbParts = parts.filter((p: any) => {
     const { toolName } = getToolInfo(p);
-    return toolName === "searchKnowledgeBase";
+    return toolName === 'searchKnowledgeBase';
   });
 
   const toolParts = parts.filter((p: any) => {
     const { toolName } = getToolInfo(p);
-    return toolName && toolName !== "searchKnowledgeBase";
+    return toolName && toolName !== 'searchKnowledgeBase';
   });
 
-  const textParts = parts.filter((p: any) => p.type === "text");
+  const textParts = parts.filter((p: any) => p.type === 'text');
 
   const isShimmering =
-    textParts.every((p: any) => !p.text || p.text.trim().length === 0) &&
-    isLast &&
-    isStreaming;
+    textParts.every((p: any) => !p.text || p.text.trim().length === 0) && isLast && isStreaming;
 
-  // Check if we have multiple visualization outputs for tabs
   const isVizPart = (p: any) => {
     const { toolName, isCompleted } = getToolInfo(p);
-    return toolName === "generateVisualization" && isCompleted;
+    return toolName === 'generateVisualization' && isCompleted;
   };
 
   const vizParts = toolParts.filter(isVizPart);
@@ -373,18 +344,13 @@ export function MessageItem({
   // Separate in-progress tool parts for loading indicators
   const executingParts = toolParts.filter((p: any) => {
     const { isExecuting, toolName } = getToolInfo(p);
-    return isExecuting && toolName !== "searchKnowledgeBase";
+    return isExecuting && toolName !== 'searchKnowledgeBase';
   });
 
   return (
-    <div
-      className="message assistant-message flex flex-col gap-4"
-      data-role="assistant"
-    >
+    <div className="message assistant-message flex flex-col gap-4" data-role="assistant">
       {/* Knowledge base results */}
-      {kbParts.length > 0 && (
-        <KnowledgeBaseResult parts={kbParts} isShimmering={isShimmering} />
-      )}
+      {kbParts.length > 0 && <KnowledgeBaseResult parts={kbParts} isShimmering={isShimmering} />}
 
       {/* Non-visualization tool outputs (data tables, sandbox results) */}
       {nonVizToolParts
@@ -401,24 +367,31 @@ export function MessageItem({
       {/* Loading states for in-progress tools */}
       {executingParts.map((part: any, i: number) => renderToolPart(part, i))}
 
-      {/* Text parts — with markdown table detection */}
+      {/* Text parts — with markdown table detection + media refs */}
       {textParts.map((part: any, i: number) => {
-        const rawText = part.text || "";
+        const rawText = part.text || '';
         if (!rawText.trim()) return null;
-        const segments = splitTextAndTables(rawText);
+
+        // Extract media references before processing
+        const mediaRefs = parseMediaRefs(rawText);
+        // Strip media refs from text for markdown rendering
+        let cleanText = rawText;
+        for (const ref of mediaRefs) {
+          cleanText = cleanText.replace(ref.fullMatch, '');
+        }
+
+        const segments = splitTextAndTables(cleanText);
 
         return (
           <div key={i} className="flex flex-col gap-4">
             {segments.map((seg, j) => {
-              if (seg.type === "table") {
+              if (seg.type === 'table') {
                 const tableConfig: DataTableConfig = {
                   columns: seg.table.columns,
                   rows: seg.table.rows,
                   totalRows: seg.table.rows.length,
                 };
-                return (
-                  <ChatDataTable key={`table-${j}`} config={tableConfig} />
-                );
+                return <ChatDataTable key={`table-${j}`} config={tableConfig} />;
               }
               return (
                 <div
@@ -430,6 +403,17 @@ export function MessageItem({
                 />
               );
             })}
+            {/* Render inline media previews */}
+            {mediaRefs.map((ref, j) => (
+              <ChatMediaPreview
+                key={`media-${j}`}
+                assetId={ref.assetId}
+                mediaType={ref.type}
+                fileName={ref.extra}
+                startSecs={ref.startSecs}
+                endSecs={ref.endSecs}
+              />
+            ))}
           </div>
         );
       })}
@@ -442,15 +426,11 @@ export function MessageItem({
 /* ------------------------------------------------------------------ */
 
 function renderMarkdown(text: string): string {
-  if (!text) return "";
+  if (!text) return '';
 
-  let html = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  // Remove markdown images entirely (charts are handled via tools)
-  html = html.replace(/!\[.*?\]\(.*?\)/g, "");
+  html = html.replace(/!\[.*?\]\(.*?\)/g, '');
 
   // Code blocks — styled premium
   html = html.replace(
@@ -465,7 +445,7 @@ function renderMarkdown(text: string): string {
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="msg-bold">$1</strong>');
 
   // Italic
-  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
   // Links
   html = html.replace(
@@ -473,7 +453,6 @@ function renderMarkdown(text: string): string {
     '<a href="$2" target="_blank" rel="noreferrer" class="msg-link">$1</a>',
   );
 
-  // Headings — styled as section headers with subtle dividers
   html = html.replace(/^### (.+)$/gm, '<h3 class="msg-h3">$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2 class="msg-h2">$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1 class="msg-h1">$1</h1>');
@@ -496,11 +475,10 @@ function renderMarkdown(text: string): string {
   // Paragraphs
   html = html.replace(/\n\n/g, '</p><p class="msg-p">');
 
-  // Clean up newlines around block elements to prevent huge spaces
-  html = html.replace(/(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)\n+/g, "$1");
-  html = html.replace(/\n+(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)/g, "$1");
+  html = html.replace(/(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)\n+/g, '$1');
+  html = html.replace(/\n+(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)/g, '$1');
 
-  html = html.replace(/\n/g, "<br/>");
+  html = html.replace(/\n/g, '<br/>');
 
   return html;
 }

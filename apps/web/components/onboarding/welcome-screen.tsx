@@ -1,77 +1,53 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import {
-  ArrowRight,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  Pencil,
-} from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useWorkspace } from "@/components/workspace/workspace-provider";
-import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
+import { useState } from 'react';
+import { ArrowRight, Loader2, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useWorkspace } from '@/components/workspace/workspace-provider';
+import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
-import { CustomModelForm } from "@/components/configure/custom-model-modal";
-import { useRouter } from "next/navigation";
-import type { CustomModelConfig } from "@larkup/core/types";
+} from '@/components/ui/dialog';
+import { PROVIDER_META, ProviderIcon } from '@/components/ui/provider-icon';
+import { CustomModelForm } from '@/components/configure/custom-model-modal';
+import { useRouter } from 'next/navigation';
+import type { CustomModelConfig } from '@larkup/core/types';
 
 // Providers shown in the welcome screen dropdowns
-const WELCOME_PROVIDERS = [
-  "vercel_ai_gateway",
-  "openai",
-  "google",
-  "mistral",
-  "custom",
-] as const;
+const WELCOME_PROVIDERS = ['vercel_ai_gateway', 'openai', 'google', 'mistral', 'custom'] as const;
 
 export function WelcomeScreen() {
   const { setUsername, createServer, refresh } = useWorkspace();
   const router = useRouter();
-  const [name, setName] = useState("");
+  const [name, setName] = useState('');
 
   // Embedding state
-  const [embeddingProvider, setEmbeddingProvider] =
-    useState<string>("vercel_ai_gateway");
-  const [embeddingApiKey, setEmbeddingApiKey] = useState("");
-  const [embeddingCustomConfig, setEmbeddingCustomConfig] =
-    useState<CustomModelConfig | null>(null);
+  const [embeddingProvider, setEmbeddingProvider] = useState<string>('vercel_ai_gateway');
+  const [embeddingApiKey, setEmbeddingApiKey] = useState('');
+  const [embeddingCustomConfig, setEmbeddingCustomConfig] = useState<CustomModelConfig | null>(
+    null,
+  );
 
   // Chat state
-  const [chatProvider, setChatProvider] = useState<string>("vercel_ai_gateway");
-  const [chatApiKey, setChatApiKey] = useState("");
-  const [chatCustomConfig, setChatCustomConfig] =
-    useState<CustomModelConfig | null>(null);
+  const [chatProvider, setChatProvider] = useState<string>('vercel_ai_gateway');
+  const [chatApiKey, setChatApiKey] = useState('');
+  const [chatCustomConfig, setChatCustomConfig] = useState<CustomModelConfig | null>(null);
 
   // UI state
   const [saving, setSaving] = useState(false);
   const [showSeparateChat, setShowSeparateChat] = useState(false);
-  const [customModalOpen, setCustomModalOpen] = useState<
-    "embedding" | "chat" | null
-  >(null);
+  const [customModalOpen, setCustomModalOpen] = useState<'embedding' | 'chat' | null>(null);
 
-  const isCustomEmbedding = embeddingProvider === "custom";
-  const isCustomChat = chatProvider === "custom";
+  const isCustomEmbedding = embeddingProvider === 'custom';
+  const isCustomChat = chatProvider === 'custom';
 
-  // When both providers are the same non-custom provider, share the key
-  const sharedKey =
-    !showSeparateChat &&
-    !isCustomEmbedding &&
-    embeddingProvider === chatProvider;
+  const sharedKey = !showSeparateChat && !isCustomEmbedding && embeddingProvider === chatProvider;
 
   const effectiveChatApiKey = sharedKey ? embeddingApiKey : chatApiKey;
 
@@ -99,13 +75,13 @@ export function WelcomeScreen() {
     setSaving(true);
     try {
       // Build config payload first (before creating server)
-      const configRes = await fetch("/api/config");
+      const configRes = await fetch('/api/config');
       const { config } = await configRes.json();
 
       const payload: Record<string, any> = { ...config };
 
       if (isCustomEmbedding && embeddingCustomConfig) {
-        payload.embeddingProvider = "custom";
+        payload.embeddingProvider = 'custom';
         payload.embeddingModelId = `custom:${embeddingCustomConfig.modelName}`;
         payload.embeddingApiKey = embeddingCustomConfig.apiKey || undefined;
         payload.customEmbeddings = [embeddingCustomConfig];
@@ -116,7 +92,7 @@ export function WelcomeScreen() {
 
       if (showSeparateChat) {
         if (isCustomChat && chatCustomConfig) {
-          payload.chatProvider = "custom";
+          payload.chatProvider = 'custom';
           payload.chatModelId = `custom:${chatCustomConfig.modelName}`;
           payload.chatApiKey = chatCustomConfig.apiKey || undefined;
           payload.customChatModels = [chatCustomConfig];
@@ -127,17 +103,15 @@ export function WelcomeScreen() {
       } else {
         // Mirror embedding provider for chat
         if (isCustomEmbedding && embeddingCustomConfig) {
-          // Can't auto-mirror custom embedding to chat — leave chat defaults
         } else {
           payload.chatProvider = embeddingProvider;
           payload.chatApiKey = embeddingApiKey;
         }
       }
 
-      // Verify the API key / model connection before saving anything
-      const verifyRes = await fetch("/api/config/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const verifyRes = await fetch('/api/config/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           embeddingProvider: payload.embeddingProvider,
           embeddingApiKey: payload.embeddingApiKey,
@@ -152,33 +126,29 @@ export function WelcomeScreen() {
 
       if (!verifyRes.ok) {
         const err = await verifyRes.json();
-        toast.error(
-          err.error || "Verification failed — please check your API key.",
-          {
-            duration: 8000,
-          },
-        );
+        toast.error(err.error || 'Verification failed — please check your API key.', {
+          duration: 8000,
+        });
         setSaving(false);
         return;
       }
 
-      // Verification passed — now create server and save config
       if (name.trim()) {
         await setUsername(name.trim());
       }
 
-      await createServer("My Project");
+      await createServer('My Project');
 
-      await fetch("/api/config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+      await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       refresh();
-      router.push("/chat");
+      router.push('/chat');
     } catch (error) {
-      toast.error("Failed to complete setup");
+      toast.error('Failed to complete setup');
     } finally {
       setSaving(false);
     }
@@ -192,31 +162,28 @@ export function WelcomeScreen() {
       }
 
       // Create a default server so isFirstRun becomes false
-      await createServer("My Project");
+      await createServer('My Project');
 
       refresh();
-      router.push("/chat");
+      router.push('/chat');
     } catch (error) {
-      toast.error("Failed to complete setup");
+      toast.error('Failed to complete setup');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleProviderChange = (
-    value: string,
-    target: "embedding" | "chat",
-  ) => {
-    if (value === "custom") {
+  const handleProviderChange = (value: string, target: 'embedding' | 'chat') => {
+    if (value === 'custom') {
       // Open modal for test connection flow
-      if (target === "embedding") {
-        setEmbeddingProvider("custom");
+      if (target === 'embedding') {
+        setEmbeddingProvider('custom');
       } else {
-        setChatProvider("custom");
+        setChatProvider('custom');
       }
       setCustomModalOpen(target);
     } else {
-      if (target === "embedding") {
+      if (target === 'embedding') {
         setEmbeddingProvider(value);
         setEmbeddingCustomConfig(null);
         // Sync chat provider if not separately configured
@@ -231,24 +198,18 @@ export function WelcomeScreen() {
   };
 
   const handleCustomModelSave = (cfg: CustomModelConfig) => {
-    if (customModalOpen === "embedding") {
+    if (customModalOpen === 'embedding') {
       setEmbeddingCustomConfig(cfg);
-      setEmbeddingProvider("custom");
-    } else if (customModalOpen === "chat") {
+      setEmbeddingProvider('custom');
+    } else if (customModalOpen === 'chat') {
       setChatCustomConfig(cfg);
-      setChatProvider("custom");
+      setChatProvider('custom');
     }
     setCustomModalOpen(null);
   };
 
-  const renderProviderSelect = (
-    value: string,
-    target: "embedding" | "chat",
-  ) => (
-    <Select
-      value={value}
-      onValueChange={(val) => handleProviderChange(val ?? "", target)}
-    >
+  const renderProviderSelect = (value: string, target: 'embedding' | 'chat') => (
+    <Select value={value} onValueChange={(val) => handleProviderChange(val ?? '', target)}>
       <SelectTrigger className="w-full bg-white/90 hover:bg-white">
         <span className="flex items-center gap-2">
           {PROVIDER_META[value as keyof typeof PROVIDER_META] ? (
@@ -256,15 +217,13 @@ export function WelcomeScreen() {
               <ProviderIcon
                 src={PROVIDER_META[value as keyof typeof PROVIDER_META].iconSrc}
                 alt={PROVIDER_META[value as keyof typeof PROVIDER_META].label}
-                pillBg={
-                  PROVIDER_META[value as keyof typeof PROVIDER_META].pillBg
-                }
+                pillBg={PROVIDER_META[value as keyof typeof PROVIDER_META].pillBg}
                 size={16}
               />
               {PROVIDER_META[value as keyof typeof PROVIDER_META].label}
             </>
           ) : (
-            "Select provider"
+            'Select provider'
           )}
         </span>
       </SelectTrigger>
@@ -275,16 +234,11 @@ export function WelcomeScreen() {
           return (
             <SelectItem key={key} value={key}>
               <div className="flex items-center gap-2">
-                <ProviderIcon
-                  src={meta.iconSrc}
-                  alt={meta.label}
-                  pillBg={meta.pillBg}
-                  size={16}
-                />
+                <ProviderIcon src={meta.iconSrc} alt={meta.label} pillBg={meta.pillBg} size={16} />
                 <span>
                   {meta.label}
-                  {key === "vercel_ai_gateway" && " (Recommended)"}
-                  {key === "custom" && " (OpenAI-compatible)"}
+                  {key === 'vercel_ai_gateway' && ' (Recommended)'}
+                  {key === 'custom' && ' (OpenAI-compatible)'}
                 </span>
               </div>
             </SelectItem>
@@ -295,10 +249,7 @@ export function WelcomeScreen() {
   );
 
   /** Pill showing a verified custom model with edit button */
-  const renderCustomBadge = (
-    config: CustomModelConfig,
-    target: "embedding" | "chat",
-  ) => (
+  const renderCustomBadge = (config: CustomModelConfig, target: 'embedding' | 'chat') => (
     <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50/50 px-3 py-2">
       <span className="text-green-600 text-xs">✓</span>
       <span className="flex-1 truncate text-xs font-medium text-foreground">
@@ -332,8 +283,7 @@ export function WelcomeScreen() {
                 Welcome to Larkup
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Let&apos;s set up your AI models. You can change these later in
-                Settings.
+                Let&apos;s set up your AI models. You can change these later in Settings.
               </p>
             </div>
           </div>
@@ -341,9 +291,7 @@ export function WelcomeScreen() {
           <div className="w-full space-y-5 rounded-2xl p-6 backdrop-blur-xl">
             {/* Name */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">
-                Your Name (Optional)
-              </label>
+              <label className="text-xs font-medium text-foreground">Your Name (Optional)</label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -354,13 +302,11 @@ export function WelcomeScreen() {
 
             {/* Embedding Provider */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">
-                Embedding Provider
-              </label>
-              {renderProviderSelect(embeddingProvider, "embedding")}
+              <label className="text-xs font-medium text-foreground">Embedding Provider</label>
+              {renderProviderSelect(embeddingProvider, 'embedding')}
               {isCustomEmbedding &&
                 embeddingCustomConfig &&
-                renderCustomBadge(embeddingCustomConfig, "embedding")}
+                renderCustomBadge(embeddingCustomConfig, 'embedding')}
               {isCustomEmbedding && !embeddingCustomConfig && (
                 <p className="text-[11px] text-amber-600 mt-1">
                   Please configure and test your custom model to continue.
@@ -375,7 +321,7 @@ export function WelcomeScreen() {
                   API Key
                   {!showSeparateChat && (
                     <span className="text-muted-foreground font-normal">
-                      {" "}
+                      {' '}
                       (used for both embedding & chat)
                     </span>
                   )}
@@ -408,13 +354,9 @@ export function WelcomeScreen() {
             {showSeparateChat && (
               <div className="space-y-3 rounded-xl border border-border/40 bg-muted/20 p-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">
-                    Chat Provider
-                  </label>
-                  {renderProviderSelect(chatProvider, "chat")}
-                  {isCustomChat &&
-                    chatCustomConfig &&
-                    renderCustomBadge(chatCustomConfig, "chat")}
+                  <label className="text-xs font-medium text-foreground">Chat Provider</label>
+                  {renderProviderSelect(chatProvider, 'chat')}
+                  {isCustomChat && chatCustomConfig && renderCustomBadge(chatCustomConfig, 'chat')}
                   {isCustomChat && !chatCustomConfig && (
                     <p className="text-[11px] text-amber-600 mt-1">
                       Please configure and test your custom model to continue.
@@ -425,9 +367,7 @@ export function WelcomeScreen() {
                 {/* Chat API Key — shown for all non-custom providers */}
                 {!isCustomChat && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground">
-                      Chat API Key
-                    </label>
+                    <label className="text-xs font-medium text-foreground">Chat API Key</label>
                     <Input
                       type="password"
                       value={chatApiKey}
@@ -441,18 +381,12 @@ export function WelcomeScreen() {
             )}
 
             <p className="text-[11px] text-muted-foreground">
-              More providers and fine-grained model selection available in
-              Settings → AI Models.
+              More providers and fine-grained model selection available in Settings → AI Models.
             </p>
 
             {/* Buttons */}
             <div className="pt-2 flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleSkip}
-                disabled={saving}
-              >
+              <Button variant="outline" className="flex-1" onClick={handleSkip} disabled={saving}>
                 Skip for now
               </Button>
               <Button
@@ -478,12 +412,11 @@ export function WelcomeScreen() {
         open={customModalOpen !== null}
         onOpenChange={(open) => {
           if (!open) {
-            // If closing without saving, revert to previous provider if no config exists
-            if (customModalOpen === "embedding" && !embeddingCustomConfig) {
-              setEmbeddingProvider("vercel_ai_gateway");
+            if (customModalOpen === 'embedding' && !embeddingCustomConfig) {
+              setEmbeddingProvider('vercel_ai_gateway');
             }
-            if (customModalOpen === "chat" && !chatCustomConfig) {
-              setChatProvider("vercel_ai_gateway");
+            if (customModalOpen === 'chat' && !chatCustomConfig) {
+              setChatProvider('vercel_ai_gateway');
             }
             setCustomModalOpen(null);
           }
@@ -492,13 +425,11 @@ export function WelcomeScreen() {
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>
-              Custom {customModalOpen === "embedding" ? "Embedding" : "Chat"}{" "}
-              Model
+              Custom {customModalOpen === 'embedding' ? 'Embedding' : 'Chat'} Model
             </DialogTitle>
             <DialogDescription>
-              Connect an OpenAI-compatible{" "}
-              {customModalOpen === "embedding" ? "embedding" : "chat"} model.
-              Test the connection before adding.
+              Connect an OpenAI-compatible {customModalOpen === 'embedding' ? 'embedding' : 'chat'}{' '}
+              model. Test the connection before adding.
             </DialogDescription>
           </DialogHeader>
           {customModalOpen && (
@@ -506,11 +437,11 @@ export function WelcomeScreen() {
               type={customModalOpen}
               onSave={handleCustomModelSave}
               onCancel={() => {
-                if (customModalOpen === "embedding" && !embeddingCustomConfig) {
-                  setEmbeddingProvider("vercel_ai_gateway");
+                if (customModalOpen === 'embedding' && !embeddingCustomConfig) {
+                  setEmbeddingProvider('vercel_ai_gateway');
                 }
-                if (customModalOpen === "chat" && !chatCustomConfig) {
-                  setChatProvider("vercel_ai_gateway");
+                if (customModalOpen === 'chat' && !chatCustomConfig) {
+                  setChatProvider('vercel_ai_gateway');
                 }
                 setCustomModalOpen(null);
               }}
