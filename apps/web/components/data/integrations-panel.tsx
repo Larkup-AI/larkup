@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import useSWR from "swr";
 import { NotionPanel } from "@/components/data/notion-panel";
 import { cn } from "@/lib/utils";
 import { ChevronRight, ExternalLink } from "lucide-react";
@@ -10,6 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -129,11 +131,18 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
   const [activeIntegration, setActiveIntegration] = useState<string | null>(
     null,
   );
-  const [connectedStatus, setConnectedStatus] = useState<
-    Record<string, boolean>
-  >({});
+
+  const { data: notionData, isLoading: isNotionLoading, mutate: mutateNotion } = useSWR(
+    "/api/integrations/notion",
+    (url) => fetch(url).then((res) => res.json())
+  );
+
+  const connectedStatus: Record<string, boolean> = { notion: notionData?.connected ?? false };
+  const isLoadingStatus = isNotionLoading && notionData === undefined;
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [requestName, setRequestName] = useState("");
+  const [requestCompany, setRequestCompany] = useState("");
   const [requestEmail, setRequestEmail] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
   const [isRequesting, setIsRequesting] = useState(false);
@@ -146,17 +155,21 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
     setIsRequesting(true);
     try {
       const res = await fetch(
-        process.env.NEXT_PUBLIC_CONNECT_API_URL || "https://www.larkup.de/api/connect",
+        process.env.NEXT_PUBLIC_CONNECT_API_URL ||
+          "https://www.larkup.de/api/connect",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-        body: JSON.stringify({
-          email: requestEmail,
-          message: requestMessage,
-        }),
-      });
+          body: JSON.stringify({
+            name: requestName,
+            company: requestCompany,
+            email: requestEmail,
+            message: requestMessage,
+          }),
+        },
+      );
 
       if (!res.ok) {
         throw new Error("Failed to send request");
@@ -168,6 +181,8 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
       setTimeout(() => {
         setIsRequestModalOpen(false);
         setRequestSuccess(false);
+        setRequestName("");
+        setRequestCompany("");
         setRequestEmail("");
         setRequestMessage("");
       }, 2000);
@@ -179,28 +194,21 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
   };
 
   const fetchStatuses = () => {
-    fetch("/api/integrations/notion")
-      .then((res) => res.json())
-      .then((data) => {
-        setConnectedStatus((prev) => ({ ...prev, notion: data.connected }));
-      })
-      .catch(() => {});
+    mutateNotion();
   };
 
   useEffect(() => {
-    fetchStatuses();
-
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "notion_oauth") {
         if (event.data.status === "connected") {
-          fetchStatuses();
+          mutateNotion();
         }
       }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [mutateNotion]);
 
   const handleConnectNotion = () => {
     // Use the official Larkup Proxy by default, or an override if provided
@@ -265,7 +273,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
                 )}
               >
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/50">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/30">
                     <img
                       src={integration.icon}
                       alt={integration.name}
@@ -289,11 +297,15 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
 
                 <div className="shrink-0">
                   {integration.available ? (
-                    isConnected ? (
+                    isLoadingStatus ? (
+                      <Button variant="outline" size="sm" className="h-8 w-[84px]" disabled>
+                        <Loader2 className="size-3.5 animate-spin" />
+                      </Button>
+                    ) : isConnected ? (
                       <Button
                         variant="default"
                         size="sm"
-                        className="h-8"
+                        className="h-8 w-[84px]"
                         onClick={() => setActiveIntegration(integration.id)}
                       >
                         Configure
@@ -302,7 +314,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8"
+                        className="h-8 w-[84px]"
                         onClick={() => {
                           if (integration.id === "notion") {
                             handleConnectNotion();
@@ -333,15 +345,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
             setActiveIntegration(null);
             // Re-fetch status when closing modal to update UI
             if (activeIntegration === "notion") {
-              fetch("/api/integrations/notion")
-                .then((res) => res.json())
-                .then((data) => {
-                  setConnectedStatus((prev) => ({
-                    ...prev,
-                    notion: data.connected,
-                  }));
-                })
-                .catch(() => {});
+              mutateNotion();
             }
           }
         }}
@@ -350,7 +354,12 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
           <DialogHeader className="sr-only">
             <DialogTitle>Integration Panel</DialogTitle>
           </DialogHeader>
-          {activeIntegration === "notion" && <NotionPanel onAdded={onAdded} />}
+          {activeIntegration === "notion" && (
+            <NotionPanel 
+              onAdded={onAdded} 
+              onClose={() => setActiveIntegration(null)} 
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -374,8 +383,32 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
               onSubmit={handleRequestIntegration}
               className="space-y-4 mt-4"
             >
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="John Doe"
+                    value={requestName}
+                    onChange={(e) => setRequestName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company">Company</Label>
+                  <Input
+                    id="company"
+                    type="text"
+                    placeholder="Acme Inc."
+                    value={requestCompany}
+                    onChange={(e) => setRequestCompany(e.target.value)}
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Your Email *</Label>
+                <Label htmlFor="email">
+                  Your Email <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -396,12 +429,21 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
                   onChange={(e) => setRequestMessage(e.target.value)}
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={isRequesting}>
-                {isRequesting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Submit Request
-              </Button>
+              <DialogFooter className="bg-muted/50 border-border/70 mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsRequestModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isRequesting}>
+                  {isRequesting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Submit Request
+                </Button>
+              </DialogFooter>
             </form>
           )}
         </DialogContent>

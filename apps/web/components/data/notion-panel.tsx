@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import useSWR from "swr";
 import { toast } from "sonner";
 import { formatErrorMessage } from "@/lib/error-formatter";
 import {
@@ -45,37 +46,38 @@ interface NotionStatus {
   error?: string;
 }
 
-export function NotionPanel({ onAdded }: { onAdded: () => void }) {
-  const [status, setStatus] = useState<NotionStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+export function NotionPanel({
+  onAdded,
+  onClose,
+}: {
+  onAdded: () => void;
+  onClose?: () => void;
+}) {
+  const { data: statusData, error: swrError, isLoading, mutate } = useSWR<NotionStatus>(
+    "/api/integrations/notion",
+    (url: string) => fetch(url).then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    })
+  );
+
+  const status = statusData || {
+    connected: false,
+    configured: false,
+    pages: [],
+    error: swrError ? formatErrorMessage(swrError) : undefined,
+  };
+
+  const loading = isLoading && !statusData;
+
+  const fetchStatus = () => mutate();
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [search, setSearch] = useState("");
   const [showType, setShowType] = useState<"all" | "pages" | "databases">(
     "all",
   );
-
-  useEffect(() => {
-    fetchStatus();
-  }, []);
-
-  async function fetchStatus() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/integrations/notion");
-      const data = await res.json();
-      setStatus(data);
-    } catch (err) {
-      setStatus({
-        connected: false,
-        configured: false,
-        pages: [],
-        error: formatErrorMessage(err),
-      });
-    } finally {
-      setLoading(false);
-    }
-  }
 
   // connectNotion removed since it's handled by IntegrationsPanel
 
@@ -328,16 +330,25 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
       )}
 
       {/* Import actions */}
-      {selected.size > 0 && (
-        <DialogFooter className="mt-2 border-t-0 p-4 flex-row justify-end space-x-2 gap-0 sm:gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setSelected(new Set())}
-            disabled={importing}
-          >
+      <DialogFooter className="mt-5 border-border/70 flex flex-row items-center justify-between sm:justify-between space-x-0 gap-2">
+        <Button
+          variant="destructive"
+          onClick={() => {
+            // Disconnect logic to be implemented
+            toast.error("Disconnect not implemented yet");
+          }}
+          disabled={importing}
+        >
+          Disconnect
+        </Button>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={onClose} disabled={importing}>
             Cancel
           </Button>
-          <Button onClick={importSelected} disabled={importing}>
+          <Button
+            onClick={importSelected}
+            disabled={importing || selected.size === 0}
+          >
             {importing ? (
               <Loader2 className="size-4 mr-2 animate-spin" />
             ) : (
@@ -349,8 +360,8 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
             )}
             Import {selected.size} page{selected.size !== 1 ? "s" : ""}
           </Button>
-        </DialogFooter>
-      )}
+        </div>
+      </DialogFooter>
     </div>
   );
 }
