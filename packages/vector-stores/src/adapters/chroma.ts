@@ -1,4 +1,4 @@
-import type { QueryHit, VectorRecord, VectorStoreAdapter } from "./base";
+import type { QueryHit, VectorRecord, VectorStoreAdapter } from './base';
 
 /**
  * Chroma adapter — self-hosted (client-server) or Chroma Cloud.
@@ -47,7 +47,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
   private readonly collectionName: string;
 
   constructor(private readonly config: ChromaConfig) {
-    this.collectionName = config.collectionName?.trim() || "documents";
+    this.collectionName = config.collectionName?.trim() || 'documents';
   }
 
   /**
@@ -60,37 +60,37 @@ export class ChromaAdapter implements VectorStoreAdapter {
 
     let chromadb: any;
     try {
-      chromadb = await import("chromadb");
+      chromadb = await import('chromadb');
     } catch {
       throw new Error(
         'The "chromadb" package is not installed. Please install it first via the Configure page or run: pnpm add chromadb --filter @larkup/vector-stores',
       );
     }
 
-    if (this.config.mode === "cloud") {
+    if (this.config.mode === 'cloud') {
       if (!this.config.apiKey) {
-        throw new Error("Chroma Cloud requires an API key.");
+        throw new Error('Chroma Cloud requires an API key.');
       }
       const CloudClientClass = chromadb.CloudClient ?? chromadb.default?.CloudClient;
       if (!CloudClientClass) {
-        throw new Error("Could not find CloudClient in the chromadb package.");
+        throw new Error('Could not find CloudClient in the chromadb package.');
       }
       this.client = new CloudClientClass({
         apiKey: this.config.apiKey,
-        tenant: this.config.tenant || "default_tenant",
-        database: this.config.database || "default_database",
+        tenant: this.config.tenant || 'default_tenant',
+        database: this.config.database || 'default_database',
       });
     } else {
       // Server mode
-      const host = this.config.host?.trim() || "http://localhost:8000";
+      const host = this.config.host?.trim() || 'http://localhost:8000';
       const ClientClass = chromadb.ChromaClient ?? chromadb.default?.ChromaClient;
       if (!ClientClass) {
-        throw new Error("Could not find ChromaClient in the chromadb package.");
+        throw new Error('Could not find ChromaClient in the chromadb package.');
       }
       const opts: any = { path: host };
       if (this.config.authToken) {
         opts.auth = {
-          provider: "token",
+          provider: 'token',
           credentials: this.config.authToken,
         };
       }
@@ -105,7 +105,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
     const client = await this.getClient();
     this.collection = await client.getOrCreateCollection({
       name: this.collectionName,
-      metadata: { "hnsw:space": "cosine" },
+      metadata: { 'hnsw:space': 'cosine' },
     });
     return this.collection;
   }
@@ -145,7 +145,6 @@ export class ChromaAdapter implements VectorStoreAdapter {
       metadatas.push(this.buildMetadata(r));
     }
 
-    // Chroma has a max batch size of ~5000 for upsert, process in chunks
     const BATCH = 4096;
     for (let i = 0; i < ids.length; i += BATCH) {
       await collection.upsert({
@@ -169,7 +168,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
     if (r.metadata) {
       for (const [k, v] of Object.entries(r.metadata)) {
         if (v === null || v === undefined) continue;
-        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
           meta[k] = v;
         } else {
           meta[k] = JSON.stringify(v);
@@ -192,14 +191,10 @@ export class ChromaAdapter implements VectorStoreAdapter {
 
   // ── Query ──────────────────────────────────────────────────────────────────
 
-  async query(
-    vector: number[],
-    topK: number,
-    queryText?: string,
-  ): Promise<QueryHit[]> {
+  async query(vector: number[], topK: number, queryText?: string): Promise<QueryHit[]> {
     const collection = await this.getCollection();
-    const isSemantic = this.config.indexType === "semantic";
-    const isLexical = this.config.indexType === "lexical";
+    const isSemantic = this.config.indexType === 'semantic';
+    const isLexical = this.config.indexType === 'lexical';
 
     // Semantic only
     if (isSemantic || !queryText?.trim()) {
@@ -226,15 +221,11 @@ export class ChromaAdapter implements VectorStoreAdapter {
     return denseHits;
   }
 
-  private async denseQuery(
-    collection: any,
-    vector: number[],
-    topK: number,
-  ): Promise<QueryHit[]> {
+  private async denseQuery(collection: any, vector: number[], topK: number): Promise<QueryHit[]> {
     const result = await collection.query({
       queryEmbeddings: [vector],
       nResults: topK,
-      include: ["documents", "metadatas", "distances"],
+      include: ['documents', 'metadatas', 'distances'],
     });
 
     return this.parseQueryResult(result);
@@ -245,11 +236,10 @@ export class ChromaAdapter implements VectorStoreAdapter {
     queryText: string,
     topK: number,
   ): Promise<QueryHit[]> {
-    // Chroma supports substring filtering natively via get() with whereDocument
     const result = await collection.get({
-      whereDocument: { "$contains": queryText },
+      whereDocument: { $contains: queryText },
       limit: topK,
-      include: ["documents", "metadatas"],
+      include: ['documents', 'metadatas'],
     });
 
     return this.parseGetResult(result);
@@ -266,24 +256,16 @@ export class ChromaAdapter implements VectorStoreAdapter {
       const meta = (metadatas[i] ?? {}) as Record<string, any>;
       const score = 1.0; // Exact/lexical matches get max base score before RRF
 
-      const {
-        title,
-        url,
-        source,
-        documentId,
-        chunkIndex,
-        ...customMetadata
-      } = meta;
+      const { title, url, source, documentId, chunkIndex, ...customMetadata } = meta;
 
       return {
         id,
         score,
-        text: (documents[i] as string) ?? "",
-        title: (title as string) ?? "Untitled",
+        text: (documents[i] as string) ?? '',
+        title: (title as string) ?? 'Untitled',
         url: (url as string) || undefined,
-        documentId: (documentId as string) ?? "",
-        metadata:
-          Object.keys(customMetadata).length > 0 ? customMetadata : undefined,
+        documentId: (documentId as string) ?? '',
+        metadata: Object.keys(customMetadata).length > 0 ? customMetadata : undefined,
       };
     });
   }
@@ -299,28 +281,19 @@ export class ChromaAdapter implements VectorStoreAdapter {
     return ids.map((id, i) => {
       const meta = (metadatas[i] ?? {}) as Record<string, any>;
       const distance = distances[i] ?? 0;
-      // Chroma cosine distance: 0 = identical, 2 = opposite
       // Convert to a similarity score
       const score = 1 / (1 + distance);
 
-      const {
-        title,
-        url,
-        source,
-        documentId,
-        chunkIndex,
-        ...customMetadata
-      } = meta;
+      const { title, url, source, documentId, chunkIndex, ...customMetadata } = meta;
 
       return {
         id,
         score,
-        text: (documents[i] as string) ?? "",
-        title: (title as string) ?? "Untitled",
+        text: (documents[i] as string) ?? '',
+        title: (title as string) ?? 'Untitled',
         url: (url as string) || undefined,
-        documentId: (documentId as string) ?? "",
-        metadata:
-          Object.keys(customMetadata).length > 0 ? customMetadata : undefined,
+        documentId: (documentId as string) ?? '',
+        metadata: Object.keys(customMetadata).length > 0 ? customMetadata : undefined,
       };
     });
   }
@@ -339,29 +312,26 @@ export class ChromaAdapter implements VectorStoreAdapter {
     try {
       await client.heartbeat();
     } catch (err: any) {
-      const msg: string = err.message ?? "";
+      const msg: string = err.message ?? '';
 
       if (
-        msg.includes("401") ||
-        msg.includes("Unauthorized") ||
-        msg.includes("403") ||
-        msg.includes("Forbidden")
+        msg.includes('401') ||
+        msg.includes('Unauthorized') ||
+        msg.includes('403') ||
+        msg.includes('Forbidden')
       ) {
-        throw new Error(
-          "Invalid Chroma credentials. Please check your auth token or API key.",
-        );
+        throw new Error('Invalid Chroma credentials. Please check your auth token or API key.');
       }
 
-      if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
+      if (msg.includes('ECONNREFUSED') || msg.includes('fetch failed')) {
         throw new Error(
-          "Could not reach the Chroma server. Is it running and accessible at the configured URL?",
+          'Could not reach the Chroma server. Is it running and accessible at the configured URL?',
         );
       }
 
       throw new Error(`Failed to reach Chroma server: ${msg}`);
     }
 
-    // Verify we can access the specified tenant/database by listing collections
     try {
       await client.listCollections();
     } catch (err: any) {
@@ -374,11 +344,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function rrfMerge(
-  denseHits: QueryHit[],
-  sparseHits: QueryHit[],
-  topK: number,
-): QueryHit[] {
+function rrfMerge(denseHits: QueryHit[], sparseHits: QueryHit[], topK: number): QueryHit[] {
   const scores = new Map<string, { hit: QueryHit; score: number }>();
 
   const addList = (hits: QueryHit[]) =>

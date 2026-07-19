@@ -1,6 +1,6 @@
-import type { SearchResultItem } from "@larkup/core/types";
-import { readConfig } from "@larkup/core/config-store";
-import { readLocalState } from "./local-runtime";
+import type { SearchResultItem } from '@larkup/core/types';
+import { readConfig } from '@larkup/core/config-store';
+import { readLocalState } from './local-runtime';
 
 /**
  * Minimal, dependency-free Firecrawl v1 client.
@@ -15,36 +15,33 @@ import { readLocalState } from "./local-runtime";
  *  2. The Firecrawl cloud via FIRECRAWL_API_KEY.
  */
 
-const CLOUD_BASE = "https://api.firecrawl.dev/v1";
+const CLOUD_BASE = 'https://api.firecrawl.dev/v1';
 
 export class FirecrawlError extends Error {
-  constructor(
-    message: string,
-    readonly status?: number,
-  ) {
+  constructor(message: string, readonly status?: number) {
     super(message);
-    this.name = "FirecrawlError";
+    this.name = 'FirecrawlError';
   }
 }
 
 interface Endpoint {
   base: string;
   key: string;
-  mode: "local" | "cloud";
+  mode: 'local' | 'cloud';
 }
 
 /** Resolve which Firecrawl to talk to: a running local instance wins. */
 async function resolveEndpoint(): Promise<Endpoint> {
   const local = await readLocalState();
   if (local.running && local.apiKey) {
-    return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: "local" };
+    return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: 'local' };
   }
   const config = await readConfig();
   const key = config.firecrawlApiKey;
-  if (key) return { base: CLOUD_BASE, key, mode: "cloud" };
+  if (key) return { base: CLOUD_BASE, key, mode: 'cloud' };
 
   throw new FirecrawlError(
-    "No Firecrawl available. Launch a local instance or configure FIRECRAWL_API_KEY in the UI to run web search and scraping.",
+    'No Firecrawl available. Launch a local instance or configure FIRECRAWL_API_KEY in the UI to run web search and scraping.',
     401,
   );
 }
@@ -66,19 +63,17 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
     },
-    cache: "no-store",
+    cache: 'no-store',
   });
 
   const text = await res.text();
   const json = text ? safeParse(text) : {};
 
   if (!res.ok) {
-    const msg =
-      (json as { error?: string })?.error ||
-      `Firecrawl request failed (${res.status})`;
+    const msg = (json as { error?: string })?.error || `Firecrawl request failed (${res.status})`;
     throw new FirecrawlError(msg, res.status);
   }
   return json as T;
@@ -89,14 +84,12 @@ async function callAbsolute<T>(url: string): Promise<T> {
   const { key } = await resolveEndpoint();
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${key}` },
-    cache: "no-store",
+    cache: 'no-store',
   });
   const text = await res.text();
   const json = text ? safeParse(text) : {};
   if (!res.ok) {
-    const msg =
-      (json as { error?: string })?.error ||
-      `Firecrawl request failed (${res.status})`;
+    const msg = (json as { error?: string })?.error || `Firecrawl request failed (${res.status})`;
     throw new FirecrawlError(msg, res.status);
   }
   return json as T;
@@ -117,12 +110,9 @@ interface FcSearchResponse {
   data?: Array<{ url: string; title?: string; description?: string }>;
 }
 
-export async function searchWeb(
-  query: string,
-  limit = 10,
-): Promise<SearchResultItem[]> {
-  const json = await call<FcSearchResponse>("/search", {
-    method: "POST",
+export async function searchWeb(query: string, limit = 10): Promise<SearchResultItem[]> {
+  const json = await call<FcSearchResponse>('/search', {
+    method: 'POST',
     body: JSON.stringify({ query, limit }),
   });
   return (json.data ?? []).map((r) => ({
@@ -152,22 +142,21 @@ const STEALTH_OPTIONS = {
   waitFor: 10000,
   onlyMainContent: false, // capture ALL content, not just what Firecrawl deems "main"
   headers: {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Sec-Ch-Ua":
-      '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": '"Windows"',
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"Windows"',
   },
 };
 
 export async function scrapePage(url: string): Promise<ScrapedPage> {
-  const json = await call<FcScrapeResponse>("/scrape", {
-    method: "POST",
+  const json = await call<FcScrapeResponse>('/scrape', {
+    method: 'POST',
     body: JSON.stringify({
       url,
-      formats: ["markdown"],
+      formats: ['markdown'],
       ...STEALTH_OPTIONS,
     }),
   });
@@ -175,7 +164,7 @@ export async function scrapePage(url: string): Promise<ScrapedPage> {
   return {
     url: d.metadata?.sourceURL || url,
     title: d.metadata?.title || d.metadata?.ogTitle || url,
-    markdown: d.markdown ?? "",
+    markdown: d.markdown ?? '',
   };
 }
 
@@ -188,24 +177,24 @@ interface FcCrawlStartResponse {
 
 /** Kick off an async crawl of an entire site. Returns the Firecrawl job id. */
 export async function startCrawl(url: string, limit: number): Promise<string> {
-  const json = await call<FcCrawlStartResponse>("/crawl", {
-    method: "POST",
+  const json = await call<FcCrawlStartResponse>('/crawl', {
+    method: 'POST',
     body: JSON.stringify({
       url,
       limit,
       allowExternalLinks: false,
       scrapeOptions: {
         ...STEALTH_OPTIONS,
-        formats: ["markdown"],
+        formats: ['markdown'],
         onlyMainContent: true,
       },
     }),
   });
-  if (!json.id) throw new FirecrawlError("Firecrawl did not return a crawl id");
+  if (!json.id) throw new FirecrawlError('Firecrawl did not return a crawl id');
   return json.id;
 }
 
-export type FcCrawlState = "scraping" | "completed" | "failed" | "cancelled";
+export type FcCrawlState = 'scraping' | 'completed' | 'failed' | 'cancelled';
 
 export interface CrawlStatus {
   state: FcCrawlState;
@@ -231,26 +220,21 @@ interface FcCrawlStatusResponse {
  * Poll a crawl's status. `cursor` follows Firecrawl's pagination so callers can
  * pull freshly-scraped pages incrementally as a long crawl progresses.
  */
-export async function getCrawlStatus(
-  idOrCursor: string,
-  isCursor = false,
-): Promise<CrawlStatus> {
-  // The pagination cursor is a full absolute URL returned by Firecrawl, so we
-  // fetch it directly; otherwise build a relative path against the resolved base.
+export async function getCrawlStatus(idOrCursor: string, isCursor = false): Promise<CrawlStatus> {
   const json = isCursor
     ? await callAbsolute<FcCrawlStatusResponse>(idOrCursor)
     : await call<FcCrawlStatusResponse>(`/crawl/${idOrCursor}`, {
-        method: "GET",
+        method: 'GET',
       });
   return {
-    state: json.status ?? "scraping",
+    state: json.status ?? 'scraping',
     total: json.total ?? 0,
     completed: json.completed ?? 0,
     next: json.next,
     pages: (json.data ?? []).map((p) => ({
-      url: p.metadata?.sourceURL || p.metadata?.url || "",
-      title: p.metadata?.title || p.metadata?.sourceURL || "Untitled",
-      markdown: p.markdown ?? "",
+      url: p.metadata?.sourceURL || p.metadata?.url || '',
+      title: p.metadata?.title || p.metadata?.sourceURL || 'Untitled',
+      markdown: p.markdown ?? '',
     })),
   };
 }
@@ -258,7 +242,7 @@ export async function getCrawlStatus(
 /** Cancel a running crawl on Firecrawl's side (best-effort). */
 export async function cancelCrawl(id: string): Promise<void> {
   try {
-    await call(`/crawl/${id}`, { method: "DELETE" });
+    await call(`/crawl/${id}`, { method: 'DELETE' });
   } catch {
     // best-effort; local job is cancelled regardless
   }

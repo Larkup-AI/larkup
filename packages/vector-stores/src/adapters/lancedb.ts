@@ -1,7 +1,7 @@
-import path from "node:path";
-import fs from "node:fs/promises";
-import * as lancedb from "@lancedb/lancedb";
-import type { QueryHit, VectorRecord, VectorStoreAdapter } from "./base";
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import * as lancedb from '@lancedb/lancedb';
+import type { QueryHit, VectorRecord, VectorStoreAdapter } from './base';
 
 /**
  * LanceDB adapter — embedded/on-disk for local dev, or LanceDB Cloud.
@@ -36,34 +36,30 @@ export class LanceDBAdapter implements VectorStoreAdapter {
   private readonly tableName: string;
 
   constructor(private readonly config: LanceConfig) {
-    this.tableName = config.tableName?.trim() || "documents";
+    this.tableName = config.tableName?.trim() || 'documents';
   }
 
   private async connect(): Promise<lancedb.Connection> {
     if (this.conn) return this.conn;
-    if (this.config.mode === "cloud") {
+    if (this.config.mode === 'cloud') {
       if (!this.config.uri || !this.config.apiKey) {
-        throw new Error("LanceDB Cloud requires both a URI and an API key.");
+        throw new Error('LanceDB Cloud requires both a URI and an API key.');
       }
-      if (!this.config.uri.startsWith("db://")) {
-        throw new Error(
-          "LanceDB Cloud URI must start with 'db://' (e.g. db://my-database).",
-        );
+      if (!this.config.uri.startsWith('db://')) {
+        throw new Error("LanceDB Cloud URI must start with 'db://' (e.g. db://my-database).");
       }
       this.conn = await lancedb.connect(this.config.uri, {
         apiKey: this.config.apiKey,
       });
     } else {
-      const dir = this.config.dbPath?.trim() || "./.larkup/lancedb";
+      const dir = this.config.dbPath?.trim() || './.larkup/lancedb';
       let abs = path.isAbsolute(dir) ? dir : path.join(process.cwd(), dir);
 
       try {
         await fs.mkdir(abs, { recursive: true });
       } catch (err: any) {
         if (path.isAbsolute(dir)) {
-          // The user likely forgot the dot (e.g. typed "/lancedb" instead of "./lancedb").
-          // Automatically retry by prepending "." to make it relative to the workspace.
-          const fallbackDir = "." + dir;
+          const fallbackDir = '.' + dir;
           abs = path.join(process.cwd(), fallbackDir);
           try {
             await fs.mkdir(abs, { recursive: true });
@@ -73,9 +69,7 @@ export class LanceDBAdapter implements VectorStoreAdapter {
             );
           }
         } else {
-          throw new Error(
-            `Could not create directory for LanceDB at "${abs}": ${err.message}`,
-          );
+          throw new Error(`Could not create directory for LanceDB at "${abs}": ${err.message}`);
         }
       }
 
@@ -107,7 +101,7 @@ export class LanceDBAdapter implements VectorStoreAdapter {
       vector: r.vector,
       text: r.text,
       title: r.title,
-      url: r.url ?? "",
+      url: r.url ?? '',
       source: r.source,
       documentId: r.documentId,
       chunkIndex: r.chunkIndex,
@@ -151,27 +145,23 @@ export class LanceDBAdapter implements VectorStoreAdapter {
       await this.init();
       if (!this.table) return [];
     }
-    const rows = (await this.table
-      .search(vector)
-      .limit(topK)
-      .toArray()) as Array<LanceRow & { _distance?: number }>;
+    const rows = (await this.table.search(vector).limit(topK).toArray()) as Array<
+      LanceRow & { _distance?: number }
+    >;
 
     return rows.map((row) => ({
       id: row.id as string,
-      // Convert L2 distance → a 0..1 similarity-ish score for display.
-      score: typeof row._distance === "number" ? 1 / (1 + row._distance) : 0,
+      score: typeof row._distance === 'number' ? 1 / (1 + row._distance) : 0,
       text: row.text as string,
       title: row.title as string,
       url: (row.url as string) || undefined,
       documentId: row.documentId as string,
-      metadata:
-        typeof row.metadata === "string" ? JSON.parse(row.metadata) : undefined,
+      metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : undefined,
     }));
   }
 
   async testConnection(dimensions: number): Promise<void> {
-    // ── Local mode: just verify the directory is reachable ──────────────────
-    if (this.config.mode !== "cloud") {
+    if (this.config.mode !== 'cloud') {
       try {
         await this.connect();
         return;
@@ -181,7 +171,6 @@ export class LanceDBAdapter implements VectorStoreAdapter {
     }
 
     // ── Cloud mode ───────────────────────────────────────────────────────────
-    // connect() is lazy (never contacts the server), so we call tableNames()
     // to force a real authenticated HTTP round-trip.
     let conn: lancedb.Connection;
     try {
@@ -193,22 +182,21 @@ export class LanceDBAdapter implements VectorStoreAdapter {
     try {
       await conn.tableNames();
     } catch (err: any) {
-      const msg: string = err.message ?? "";
+      const msg: string = err.message ?? '';
 
-      // The SDK puts the HTTP status INSIDE the message string (not as a
       // property). Pattern: "Http error: ... 401 Unauthorized: Unauthorized"
       if (
-        msg.includes("401") ||
-        msg.includes("Unauthorized") ||
-        msg.includes("403") ||
-        msg.includes("Forbidden")
+        msg.includes('401') ||
+        msg.includes('Unauthorized') ||
+        msg.includes('403') ||
+        msg.includes('Forbidden')
       ) {
         throw new Error(
-          "Invalid LanceDB Cloud API key. Please check your credentials in the LanceDB Cloud dashboard.",
+          'Invalid LanceDB Cloud API key. Please check your credentials in the LanceDB Cloud dashboard.',
         );
       }
 
-      if (msg.includes("404") || msg.includes("Not Found")) {
+      if (msg.includes('404') || msg.includes('Not Found')) {
         throw new Error(
           `LanceDB Cloud database not found. Please verify your URI (e.g. "db://my-database").`,
         );

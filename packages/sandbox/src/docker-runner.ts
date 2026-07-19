@@ -6,11 +6,11 @@
  * generated files, then auto-removes the container.
  */
 
-import Docker from "dockerode";
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import os from "node:os";
-import { randomUUID } from "node:crypto";
+import Docker from 'dockerode';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { randomUUID } from 'node:crypto';
 import type {
   DockerConfig,
   ExecutionRequest,
@@ -18,12 +18,12 @@ import type {
   ExecutionArtifact,
   SandboxHealthCheck,
   DEFAULT_DOCKER_CONFIG,
-} from "./types.js";
+} from './types.js';
 
-const SANDBOX_IMAGE = "larkup-sandbox:latest";
-const OUTPUT_DIR = "/sandbox/output";
-const INPUT_DIR = "/sandbox/input";
-const DOCKERFILE_DIR = path.join(import.meta.dirname ?? __dirname, "..");
+const SANDBOX_IMAGE = 'larkup-sandbox:latest';
+const OUTPUT_DIR = '/sandbox/output';
+const INPUT_DIR = '/sandbox/input';
+const DOCKERFILE_DIR = path.join(import.meta.dirname ?? __dirname, '..');
 
 let dockerInstance: Docker | null = null;
 
@@ -46,16 +46,16 @@ export async function checkDockerHealth(): Promise<SandboxHealthCheck> {
       filters: { reference: [SANDBOX_IMAGE] },
     });
     return {
-      status: images.length > 0 ? "ready" : "image-not-found",
-      backend: "docker",
+      status: images.length > 0 ? 'ready' : 'image-not-found',
+      backend: 'docker',
       dockerVersion: info.Version,
       imageReady: images.length > 0,
     };
   } catch (err: any) {
     return {
-      status: "docker-not-found",
-      backend: "docker",
-      error: err.message ?? "Docker daemon not available",
+      status: 'docker-not-found',
+      backend: 'docker',
+      error: err.message ?? 'Docker daemon not available',
     };
   }
 }
@@ -64,11 +64,9 @@ export async function checkDockerHealth(): Promise<SandboxHealthCheck> {
 /* Image management                                                    */
 /* ------------------------------------------------------------------ */
 
-export async function buildSandboxImage(
-  onProgress?: (msg: string) => void,
-): Promise<void> {
+export async function buildSandboxImage(onProgress?: (msg: string) => void): Promise<void> {
   const docker = getDocker();
-  const dockerfilePath = path.join(DOCKERFILE_DIR, "Dockerfile");
+  const dockerfilePath = path.join(DOCKERFILE_DIR, 'Dockerfile');
 
   // Check if Dockerfile exists in the package
   try {
@@ -80,10 +78,10 @@ export async function buildSandboxImage(
     );
   }
 
-  onProgress?.("Building sandbox image…");
+  onProgress?.('Building sandbox image…');
 
   const stream = await docker.buildImage(
-    { context: DOCKERFILE_DIR, src: ["Dockerfile"] },
+    { context: DOCKERFILE_DIR, src: ['Dockerfile'] },
     { t: SANDBOX_IMAGE },
   );
 
@@ -103,7 +101,7 @@ export async function buildSandboxImage(
     );
   });
 
-  onProgress?.("Sandbox image built successfully ✓");
+  onProgress?.('Sandbox image built successfully ✓');
 }
 
 export async function ensureImage(): Promise<boolean> {
@@ -193,8 +191,8 @@ export async function executeInDocker(
 
   // Create a temporary directory for input files
   const tmpDir = path.join(os.tmpdir(), `larkup-sandbox-${randomUUID()}`);
-  const inputDir = path.join(tmpDir, "input");
-  const outputDir = path.join(tmpDir, "output");
+  const inputDir = path.join(tmpDir, 'input');
+  const outputDir = path.join(tmpDir, 'output');
   await fs.mkdir(inputDir, { recursive: true });
   await fs.mkdir(outputDir, { recursive: true });
 
@@ -203,9 +201,9 @@ export async function executeInDocker(
     for (const file of request.files) {
       const filePath = path.join(inputDir, file.name);
       if (file.isBase64) {
-        await fs.writeFile(filePath, Buffer.from(file.content, "base64"));
+        await fs.writeFile(filePath, Buffer.from(file.content, 'base64'));
       } else {
-        await fs.writeFile(filePath, file.content, "utf8");
+        await fs.writeFile(filePath, file.content, 'utf8');
       }
     }
   }
@@ -214,17 +212,16 @@ export async function executeInDocker(
   let execCode: string;
   let cmd: string[];
 
-  if (request.language === "python") {
+  if (request.language === 'python') {
     execCode = wrapPythonCode(request.code);
-    // Write the script to a file so we can mount it
-    const scriptPath = path.join(tmpDir, "run.py");
-    await fs.writeFile(scriptPath, execCode, "utf8");
-    cmd = ["python3", "/sandbox/run.py"];
+    const scriptPath = path.join(tmpDir, 'run.py');
+    await fs.writeFile(scriptPath, execCode, 'utf8');
+    cmd = ['python3', '/sandbox/run.py'];
   } else {
     // JavaScript/TypeScript (future)
-    const scriptPath = path.join(tmpDir, "run.js");
-    await fs.writeFile(scriptPath, request.code, "utf8");
-    cmd = ["node", "/sandbox/run.js"];
+    const scriptPath = path.join(tmpDir, 'run.js');
+    await fs.writeFile(scriptPath, request.code, 'utf8');
+    cmd = ['node', '/sandbox/run.js'];
   }
 
   const timeout = request.timeout ?? config.timeoutMs;
@@ -235,12 +232,12 @@ export async function executeInDocker(
       Image: config.imageName,
       Cmd: cmd,
       Entrypoint: [],
-      WorkingDir: "/sandbox/input",
+      WorkingDir: '/sandbox/input',
       HostConfig: {
         AutoRemove: false,
         Memory: config.memoryMB * 1024 * 1024,
         CpuShares: config.cpuShares,
-        NetworkMode: config.networkDisabled ? "none" : "bridge",
+        NetworkMode: config.networkDisabled ? 'none' : 'bridge',
         Binds: [
           `${inputDir}:${INPUT_DIR}:ro`,
           `${outputDir}:${OUTPUT_DIR}:rw`,
@@ -291,7 +288,7 @@ export async function executeInDocker(
         artifacts.push({
           name: file,
           mimeType,
-          data: content.toString("base64"),
+          data: content.toString('base64'),
         });
       }
     } catch {
@@ -310,8 +307,8 @@ export async function executeInDocker(
     };
   } catch (err: any) {
     return {
-      stdout: "",
-      stderr: err.message ?? "Execution failed",
+      stdout: '',
+      stderr: err.message ?? 'Execution failed',
       exitCode: 1,
       artifacts: [],
       executionTimeMs: Date.now() - startTime,
@@ -345,12 +342,11 @@ function demuxDockerStream(buffer: Buffer): {
   stdout: string;
   stderr: string;
 } {
-  let stdout = "";
-  let stderr = "";
+  let stdout = '';
+  let stderr = '';
 
-  // If buffer is actually a string (some Docker versions)
-  if (typeof buffer === "string") {
-    return { stdout: buffer, stderr: "" };
+  if (typeof buffer === 'string') {
+    return { stdout: buffer, stderr: '' };
   }
 
   let offset = 0;
@@ -360,36 +356,35 @@ function demuxDockerStream(buffer: Buffer): {
     const size = buffer.readUInt32BE(offset + 4);
     offset += 8;
     if (offset + size > buffer.length) break;
-    const payload = buffer.subarray(offset, offset + size).toString("utf8");
+    const payload = buffer.subarray(offset, offset + size).toString('utf8');
     if (type === 1) stdout += payload;
     else if (type === 2) stderr += payload;
     offset += size;
   }
 
-  // Fallback: if demux produced nothing, treat entire buffer as stdout
   if (!stdout && !stderr && buffer.length > 0) {
-    stdout = buffer.toString("utf8");
+    stdout = buffer.toString('utf8');
   }
 
   return { stdout, stderr };
 }
 
 function cleanArtifactMarkers(stdout: string): string {
-  return stdout.replace(/\n__ARTIFACTS__:.*$/m, "").trimEnd();
+  return stdout.replace(/\n__ARTIFACTS__:.*$/m, '').trimEnd();
 }
 
 function getMimeType(ext: string): string {
   const map: Record<string, string> = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".svg": "image/svg+xml",
-    ".gif": "image/gif",
-    ".csv": "text/csv",
-    ".json": "application/json",
-    ".txt": "text/plain",
-    ".html": "text/html",
-    ".pdf": "application/pdf",
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+    '.gif': 'image/gif',
+    '.csv': 'text/csv',
+    '.json': 'application/json',
+    '.txt': 'text/plain',
+    '.html': 'text/html',
+    '.pdf': 'application/pdf',
   };
-  return map[ext] ?? "application/octet-stream";
+  return map[ext] ?? 'application/octet-stream';
 }

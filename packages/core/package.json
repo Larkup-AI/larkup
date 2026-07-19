@@ -22,7 +22,9 @@
     "./generator/server-runtime": "./src/generator/server-runtime.ts",
     "./chat-models/registry": "./src/chat-models/registry.ts",
     "./models-cache": "./src/models-cache.ts",
-    "./tabular-store": "./src/tabular-store.ts"
+    "./tabular-store": "./src/tabular-store.ts",
+    "./analytics-store": "./src/analytics-store.ts",
+    "./media-store": "./src/media-store.ts"
   },
   "dependencies": {
     "@ai-sdk/cohere": "^3.0.39",

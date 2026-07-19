@@ -13,17 +13,24 @@
 /* Vector stores                                                       */
 /* ------------------------------------------------------------------ */
 
-export type VectorStoreId = "lancedb" | "pinecone" | "weaviate" | "qdrant" | "chroma" | "pgvector" | "supabase"
+export type VectorStoreId =
+  | 'lancedb'
+  | 'pinecone'
+  | 'weaviate'
+  | 'qdrant'
+  | 'chroma'
+  | 'pgvector'
+  | 'supabase';
 
 /** Where a given store is able to run. */
-export type StoreRuntime = "local" | "cloud" | "both"
+export type StoreRuntime = 'local' | 'cloud' | 'both';
 
 /** Primitive kinds a credential/config field can be. */
-export type FieldType = "text" | "password" | "path" | "select"
+export type FieldType = 'text' | 'password' | 'path' | 'select';
 
 export interface StoreFieldOption {
-  label: string
-  value: string
+  label: string;
+  value: string;
 }
 
 /**
@@ -33,84 +40,94 @@ export interface StoreFieldOption {
  */
 export interface StoreField {
   /** key used in the saved config object */
-  key: string
-  label: string
-  type: FieldType
-  placeholder?: string
-  required: boolean
+  key: string;
+  label: string;
+  type: FieldType;
+  placeholder?: string;
+  required: boolean;
   /** human hint shown under the input */
-  help?: string
+  help?: string;
   /** only for type === "select" */
-  options?: StoreFieldOption[]
+  options?: StoreFieldOption[];
   /** default value */
-  defaultValue?: string
+  defaultValue?: string;
   /**
    * Optional dependency: only show/require this field when another field
    * (by key) has one of these values. Powers LanceDB local-vs-cloud.
    */
-  showWhen?: { key: string; equals: string[] }
+  showWhen?: { key: string; equals: string[] };
   /**
    * Optional cross-concern dependency: only show/require this field when the
    * global `indexType` is one of these values. Powers Pinecone sparse model
    * field (visible only for lexical / hybrid).
    */
-  showWhenIndexType?: IndexType[]
+  showWhenIndexType?: IndexType[];
   /** mark a field as a secret that should come from an env var on the server */
-  secret?: boolean
+  secret?: boolean;
 }
 
 export interface VectorStoreDescriptor {
-  id: VectorStoreId
-  label: string
-  description: string
-  runtime: StoreRuntime
+  id: VectorStoreId;
+  label: string;
+  description: string;
+  runtime: StoreRuntime;
   /** Whether this store is pre-installed, installable on demand, or coming soon */
-  installStatus: "installed" | "installable" | "coming-soon"
+  installStatus: 'installed' | 'installable' | 'coming-soon';
   /** npm packages the GENERATED server needs when this store is selected */
-  serverDependencies: Record<string, string>
+  serverDependencies: Record<string, string>;
   /** the dynamic config/credential fields */
-  fields: StoreField[]
+  fields: StoreField[];
   /** docs link for the store */
-  docsUrl?: string
+  docsUrl?: string;
 }
 
 /* ------------------------------------------------------------------ */
 /* Embeddings                                                          */
 /* ------------------------------------------------------------------ */
 
-export type EmbeddingProvider = "openai" | "google" | "cohere" | "voyage" | "mistral" | "jina" | "nomic" | "custom" | "vercel_ai_gateway" | "deepseek"
+export type EmbeddingProvider =
+  | 'openai'
+  | 'google'
+  | 'cohere'
+  | 'voyage'
+  | 'mistral'
+  | 'jina'
+  | 'nomic'
+  | 'custom'
+  | 'vercel_ai_gateway'
+  | 'deepseek';
 
 export interface CustomModelConfig {
-  baseUrl: string
-  apiKey?: string
-  modelName: string
-  dimensions?: number
+  baseUrl: string;
+  apiKey?: string;
+  modelName: string;
+  dimensions?: number;
 }
 
 export interface EmbeddingModelDescriptor {
-  id: string
-  label: string
-  provider: EmbeddingProvider
+  id: string;
+  label: string;
+  provider: EmbeddingProvider;
   /** output vector dimensions */
-  dimensions: number
+  dimensions: number;
   /** max input tokens per request */
-  maxInputTokens: number
-  description: string
+  maxInputTokens: number;
+  description: string;
 }
 
 /* ------------------------------------------------------------------ */
 /* Indexing / chunking                                                 */
 /* ------------------------------------------------------------------ */
 
-export type IndexType = "lexical" | "semantic" | "hybrid"
+export type IndexType = 'lexical' | 'semantic' | 'hybrid';
 
 export interface ChunkingParams {
   /** target chunk size in tokens */
-  chunkSize: number
+  chunkSize: number;
   /** overlap between chunks in tokens */
-  chunkOverlap: number
+  chunkOverlap: number;
   /** split strategy */
-  strategy: "recursive" | "sentence" | "fixed"
+  strategy: 'recursive' | 'sentence' | 'fixed';
 }
 
 /* ------------------------------------------------------------------ */
@@ -119,18 +136,18 @@ export interface ChunkingParams {
 
 export interface RagConfig {
   /** project label, used when generating the server */
-  projectName: string
-  embeddingProvider: string
-  embeddingApiKey?: string
-  embeddingModelId: string
-  customEmbeddings?: CustomModelConfig[]
-  indexType: IndexType
-  chunking: ChunkingParams
-  vectorStore: VectorStoreId
+  projectName: string;
+  embeddingProvider: string;
+  embeddingApiKey?: string;
+  embeddingModelId: string;
+  customEmbeddings?: CustomModelConfig[];
+  indexType: IndexType;
+  chunking: ChunkingParams;
+  vectorStore: VectorStoreId;
   /** dynamic, store-specific values keyed by StoreField.key */
-  storeConfig: Record<string, string>
+  storeConfig: Record<string, string>;
   /** topK default used by the generated server + demo */
-  topK: number
+  topK: number;
   /** Optional: LLM model for the Chat demo. Auto-selected from provider if omitted. */
   chatModelId?: string;
   chatProvider?: string;
@@ -143,41 +160,41 @@ export interface RagConfig {
   scraperProxyUsername?: string;
   scraperProxyPassword?: string;
   firecrawlApiKey?: string;
-  updatedAt: string
+  updatedAt: string;
 }
 
 export const DEFAULT_CONFIG: RagConfig = {
-  projectName: "my-rag",
-  embeddingProvider: "openai",
-  embeddingApiKey: "",
-  embeddingModelId: "openai/text-embedding-3-small",
-  indexType: "hybrid",
+  projectName: 'my-rag',
+  embeddingProvider: 'openai',
+  embeddingApiKey: '',
+  embeddingModelId: 'openai/text-embedding-3-small',
+  indexType: 'hybrid',
   chunking: {
     chunkSize: 512,
     chunkOverlap: 64,
-    strategy: "recursive",
+    strategy: 'recursive',
   },
-  vectorStore: "lancedb",
+  vectorStore: 'lancedb',
   storeConfig: {
-    mode: "local",
-    dbPath: "./.larkup/lancedb",
-    tableName: "documents",
+    mode: 'local',
+    dbPath: './.larkup/lancedb',
+    tableName: 'documents',
   },
   topK: 5,
-  serperApiKey: "",
-  scraperProxyServer: "",
-  scraperProxyUsername: "",
-  scraperProxyPassword: "",
-  firecrawlApiKey: "",
+  serperApiKey: '',
+  scraperProxyServer: '',
+  scraperProxyUsername: '',
+  scraperProxyPassword: '',
+  firecrawlApiKey: '',
   updatedAt: new Date(0).toISOString(),
-}
+};
 
 /* ------------------------------------------------------------------ */
 /* Data loading / ETL (Phase 2)                                        */
 /* ------------------------------------------------------------------ */
 
 /** How a document entered the corpus. */
-export type DocumentSource = "paste" | "upload" | "scrape" | "tabular"
+export type DocumentSource = 'paste' | 'upload' | 'scrape' | 'tabular' | 'media';
 
 /**
  * A single cleaned document in the corpus. This is the unit that Phase 3
@@ -185,21 +202,61 @@ export type DocumentSource = "paste" | "upload" | "scrape" | "tabular"
  * long crawl is interrupted.
  */
 export interface SourceDocument {
-  id: string
-  title: string
+  id: string;
+  title: string;
   /** origin URL for scraped/uploaded-from-web docs */
-  url?: string
-  source: DocumentSource
+  url?: string;
+  source: DocumentSource;
   /** cleaned markdown / plain text */
-  content: string
-  charCount: number
+  content: string;
+  charCount: number;
   /** crawl job that produced this doc, if any */
-  jobId?: string
+  jobId?: string;
   /** custom metadata fields mapped during ingestion */
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>;
   /** indexing status */
-  status?: "indexed" | "unindexed"
-  createdAt: string
+  status?: 'indexed' | 'unindexed';
+  createdAt: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Media assets                                                        */
+/* ------------------------------------------------------------------ */
+
+export type MediaType = 'image' | 'video' | 'audio';
+
+export type MediaProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+/**
+ * A media file in the corpus. Images, video, and audio are stored as
+ * MediaAssets and processed into SourceDocuments (via captioning /
+ * transcription) for indexing.
+ */
+export interface MediaAsset {
+  id: string;
+  type: MediaType;
+  fileName: string;
+  mimeType: string;
+  /** Storage URI (e.g. "local://images/abc.png" or future "s3://...") */
+  storageUri: string;
+  thumbnailUri?: string;
+  /** Original URL if imported from web */
+  originalUrl?: string;
+  /** File size in bytes */
+  fileSize: number;
+  /** Image/video dimensions */
+  dimensions?: { width: number; height: number };
+  /** Video/audio duration in seconds */
+  durationSecs?: number;
+  /** Processing status */
+  processingStatus: MediaProcessingStatus;
+  processingError?: string;
+  /** Generated caption or transcript summary */
+  caption?: string;
+  /** IDs of SourceDocuments generated from this asset */
+  documentIds: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -209,32 +266,27 @@ export interface SourceDocument {
 /** Links a document back to the tabular dataset it originated from. */
 export interface TabularRef {
   /** ID of the TabularDataset */
-  datasetId: string
+  datasetId: string;
   /** Row index within the dataset */
-  rowIndex: number
+  rowIndex: number;
   /** Mapping of column names used in the document content */
-  columnMap: string[]
+  columnMap: string[];
 }
 
-export type CrawlJobStatus =
-  | "queued"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled"
+export type CrawlJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 /** Whether to scrape a single page or crawl an entire domain. */
-export type CrawlScope = "page" | "domain"
+export type CrawlScope = 'page' | 'domain';
 
 /** One URL/domain inside a crawl job. */
 export interface CrawlTarget {
-  url: string
-  scope: CrawlScope
+  url: string;
+  scope: CrawlScope;
   /** Firecrawl crawl id, once started (domain scope only) */
-  firecrawlId?: string
-  status: CrawlJobStatus
-  pagesCrawled: number
-  error?: string
+  firecrawlId?: string;
+  status: CrawlJobStatus;
+  pagesCrawled: number;
+  error?: string;
 }
 
 /**
@@ -242,24 +294,24 @@ export interface CrawlTarget {
  * incrementally and documents are persisted as they arrive.
  */
 export interface CrawlJob {
-  id: string
-  keywords: string
-  targets: CrawlTarget[]
-  status: CrawlJobStatus
+  id: string;
+  keywords: string;
+  targets: CrawlTarget[];
+  status: CrawlJobStatus;
   /** per-domain page cap passed to Firecrawl */
-  pageLimit: number
-  pagesCrawled: number
-  docCount: number
-  error?: string
-  createdAt: string
-  updatedAt: string
+  pageLimit: number;
+  pagesCrawled: number;
+  docCount: number;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** A single result from a keyword web search. */
 export interface SearchResultItem {
-  url: string
-  title: string
-  description?: string
+  url: string;
+  title: string;
+  description?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -267,14 +319,14 @@ export interface SearchResultItem {
 /* ------------------------------------------------------------------ */
 
 export type IndexRunStatus =
-  | "idle"
-  | "chunking"
-  | "embedding"
-  | "upserting"
-  | "completed"
-  | "failed"
+  | 'idle'
+  | 'chunking'
+  | 'embedding'
+  | 'upserting'
+  | 'completed'
+  | 'failed';
 
-export type IndexRunStage = "chunk" | "embed" | "upsert"
+export type IndexRunStage = 'chunk' | 'embed' | 'upsert';
 
 /**
  * Live state of an indexing run. Persisted to disk so the UI can poll progress
@@ -282,41 +334,41 @@ export type IndexRunStage = "chunk" | "embed" | "upsert"
  * is enough for a local toolkit.
  */
 export interface IndexRun {
-  id: string
-  status: IndexRunStatus
+  id: string;
+  status: IndexRunStatus;
   /** snapshot of the config used for this run */
-  embeddingModelId: string
-  vectorStore: VectorStoreId
-  indexType: IndexType
+  embeddingModelId: string;
+  vectorStore: VectorStoreId;
+  indexType: IndexType;
   /** total chunks produced from the corpus */
-  totalChunks: number
+  totalChunks: number;
   /** chunks embedded + upserted so far */
-  processedChunks: number
+  processedChunks: number;
   /** documents seen */
-  docCount: number
+  docCount: number;
   /** vector dimensions of the embeddings */
-  dimensions: number
-  error?: string
+  dimensions: number;
+  error?: string;
   /** Transient warning (e.g. rate-limit pause). Cleared when resolved. */
-  warning?: string
-  startedAt: string
-  updatedAt: string
-  finishedAt?: string
+  warning?: string;
+  startedAt: string;
+  updatedAt: string;
+  finishedAt?: string;
   /** ms the run took, once finished */
-  durationMs?: number
+  durationMs?: number;
 }
 
 /* ------------------------------------------------------------------ */
 /* Pipeline stages (drive the sidebar nav + gating)                    */
 /* ------------------------------------------------------------------ */
 
-export type StageId = "configure" | "data" | "server" | "demo" | "chat"
+export type StageId = 'configure' | 'data' | 'server' | 'demo' | 'chat';
 
 export interface StageMeta {
-  id: StageId
-  label: string
-  href: string
-  description: string
+  id: StageId;
+  label: string;
+  href: string;
+  description: string;
   /** phase this stage is delivered in; lets UI mark "coming soon" */
-  phase: number
+  phase: number;
 }

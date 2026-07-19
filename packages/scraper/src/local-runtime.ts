@@ -1,10 +1,10 @@
-import { promises as fs, existsSync } from "node:fs";
-import path from "node:path";
-import net from "node:net";
-import { randomUUID } from "node:crypto";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
-import { readConfig } from "@larkup/core/config-store";
+import { promises as fs, existsSync } from 'node:fs';
+import path from 'node:path';
+import net from 'node:net';
+import { randomUUID } from 'node:crypto';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+import { readConfig } from '@larkup/core/config-store';
 
 /**
  * Manages a LOCAL, self-hosted Firecrawl instance via Docker.
@@ -24,18 +24,18 @@ const execAsync = promisify(exec);
 async function runCmd(cmd: string, timeout?: number) {
   const env = {
     ...process.env,
-    PATH: `${process.env.PATH || ""}:/usr/local/bin:/opt/homebrew/bin:/bin:/usr/bin`,
+    PATH: `${process.env.PATH || ''}:/usr/local/bin:/opt/homebrew/bin:/bin:/usr/bin`,
   };
   return execAsync(cmd, { timeout, env });
 }
 
-const DATA_DIR = path.join(process.cwd(), ".larkup");
-const STATE_PATH = path.join(DATA_DIR, "firecrawl-local.json");
-const COMPOSE_PATH = path.join(DATA_DIR, "firecrawl", "docker-compose.yml");
+const DATA_DIR = path.join(process.cwd(), '.larkup');
+const STATE_PATH = path.join(DATA_DIR, 'firecrawl-local.json');
+const COMPOSE_PATH = path.join(DATA_DIR, 'firecrawl', 'docker-compose.yml');
 
-const CONTAINER_PREFIX = "ragtoolkit-firecrawl";
+const CONTAINER_PREFIX = 'ragtoolkit-firecrawl';
 const DEFAULT_PORT = 3002;
-const IMAGE = "ghcr.io/firecrawl/firecrawl:latest";
+const IMAGE = 'ghcr.io/firecrawl/firecrawl:latest';
 
 async function getFreePort(startingPort: number): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -44,8 +44,8 @@ async function getFreePort(startingPort: number): Promise<number> {
       const port = (server.address() as net.AddressInfo).port;
       server.close(() => resolve(port));
     });
-    server.on("error", (err: any) => {
-      if (err.code === "EADDRINUSE") {
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
         getFreePort(startingPort === 0 ? 0 : startingPort + 1).then(resolve, reject);
       } else {
         reject(err);
@@ -54,38 +54,40 @@ async function getFreePort(startingPort: number): Promise<number> {
   });
 }
 
-async function getProxy(): Promise<{ server: string; username?: string; password?: string } | null> {
-  // Option 1 (Most Efficient): Try reading from proxies.txt for direct connections
-  // By picking a direct IP ourselves, we bypass the rotating proxy load balancer 
+async function getProxy(): Promise<{
+  server: string;
+  username?: string;
+  password?: string;
+} | null> {
   // which slightly improves latency and avoids session stickiness.
   try {
-    const proxiesPath = path.join(process.cwd(), "proxies.txt");
-    const raw = await fs.readFile(proxiesPath, "utf8");
-    const lines = raw.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    const proxiesPath = path.join(process.cwd(), 'proxies.txt');
+    const raw = await fs.readFile(proxiesPath, 'utf8');
+    const lines = raw
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
 
     if (lines.length > 0) {
       const randomLine = lines[Math.floor(Math.random() * lines.length)];
-      const parts = randomLine.split(":");
-      
+      const parts = randomLine.split(':');
+
       if (parts.length >= 4) {
         return {
           server: `http://${parts[0]}:${parts[1]}`,
           username: parts[2],
-          password: parts[3]
+          password: parts[3],
         };
       }
     }
-  } catch (err) {
-    // If proxies.txt isn't found, silently fall through to the env variables fallback
-  }
+  } catch (err) {}
 
-  // Option 2 (Convenient Fallback): Use the proxy endpoint from configuration
   const config = await readConfig();
   if (config.scraperProxyServer) {
     return {
       server: config.scraperProxyServer,
       username: config.scraperProxyUsername,
-      password: config.scraperProxyPassword
+      password: config.scraperProxyPassword,
     };
   }
 
@@ -106,7 +108,7 @@ export interface LocalFirecrawlState {
 const EMPTY: LocalFirecrawlState = {
   running: false,
   endpoint: `http://localhost:${DEFAULT_PORT}`,
-  apiKey: "",
+  apiKey: '',
   port: DEFAULT_PORT,
   project: CONTAINER_PREFIX,
 };
@@ -115,7 +117,7 @@ const EMPTY: LocalFirecrawlState = {
 
 export async function readLocalState(): Promise<LocalFirecrawlState> {
   try {
-    const raw = await fs.readFile(STATE_PATH, "utf8");
+    const raw = await fs.readFile(STATE_PATH, 'utf8');
     return { ...EMPTY, ...(JSON.parse(raw) as Partial<LocalFirecrawlState>) };
   } catch {
     return EMPTY;
@@ -124,7 +126,7 @@ export async function readLocalState(): Promise<LocalFirecrawlState> {
 
 async function writeState(state: LocalFirecrawlState) {
   await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(STATE_PATH, JSON.stringify(state, null, 2), "utf8");
+  await fs.writeFile(STATE_PATH, JSON.stringify(state, null, 2), 'utf8');
   return state;
 }
 
@@ -136,21 +138,21 @@ async function resolveDocker(): Promise<{
   compose: string | null;
 }> {
   try {
-    await runCmd("docker --version");
+    await runCmd('docker --version');
   } catch (err) {
-    console.error("DOCKER ERR:", err);
+    console.error('DOCKER ERR:', err);
     return { docker: false, compose: null };
   }
   try {
-    await runCmd("docker compose version");
-    return { docker: true, compose: "docker compose" };
+    await runCmd('docker compose version');
+    return { docker: true, compose: 'docker compose' };
   } catch (err) {
-    console.error("DOCKER COMPOSE ERR:", err);
+    console.error('DOCKER COMPOSE ERR:', err);
     // fall through
   }
   try {
-    await runCmd("docker-compose version");
-    return { docker: true, compose: "docker-compose" };
+    await runCmd('docker-compose version');
+    return { docker: true, compose: 'docker-compose' };
   } catch {
     return { docker: true, compose: null };
   }
@@ -177,26 +179,31 @@ export async function checkDocker(): Promise<DockerAvailability> {
       docker: true,
       compose: false,
       message:
-        "Docker is installed but the Compose plugin was not found. Install `docker compose` to launch Firecrawl locally.",
+        'Docker is installed but the Compose plugin was not found. Install `docker compose` to launch Firecrawl locally.',
     };
   }
-  return { docker: true, compose: true, message: "Docker is ready." };
+  return { docker: true, compose: true, message: 'Docker is ready.' };
 }
 
 /**
  * Compose topology for a minimal self-hosted Firecrawl:
  * redis + the API + the headless Playwright scraping service.
  */
-function composeFile(apiKey: string, port: number, proxy: { server: string, username?: string, password?: string } | null) {
-  const proxyEnvLines = proxy ? [
-    `PROXY_SERVER: "${proxy.server}"`,
-    ...(proxy.username && proxy.password ? [
-      `PROXY_USERNAME: "${proxy.username}"`,
-      `PROXY_PASSWORD: "${proxy.password}"`
-    ] : [])
-  ] : [];
+function composeFile(
+  apiKey: string,
+  port: number,
+  proxy: { server: string; username?: string; password?: string } | null,
+) {
+  const proxyEnvLines = proxy
+    ? [
+        `PROXY_SERVER: "${proxy.server}"`,
+        ...(proxy.username && proxy.password
+          ? [`PROXY_USERNAME: "${proxy.username}"`, `PROXY_PASSWORD: "${proxy.password}"`]
+          : []),
+      ]
+    : [];
 
-  const pwEnv = ["PORT: \"3000\"", ...proxyEnvLines].map(l => `      ${l}`).join("\n");
+  const pwEnv = ['PORT: "3000"', ...proxyEnvLines].map((l) => `      ${l}`).join('\n');
   const apiEnv = [
     `PORT: "3002"`,
     ...proxyEnvLines,
@@ -209,8 +216,10 @@ function composeFile(apiKey: string, port: number, proxy: { server: string, user
     `BULL_AUTH_KEY: "${apiKey}"`,
     `DATABASE_URL: "postgresql://user:password@db:5432/postgres"`,
     `NUQ_DATABASE_URL: "postgresql://user:password@db:5432/postgres"`,
-    `NUQ_RABBITMQ_URL: "amqp://user:password@rabbitmq:5672"`
-  ].map(l => `      ${l}`).join("\n");
+    `NUQ_RABBITMQ_URL: "amqp://user:password@rabbitmq:5672"`,
+  ]
+    .map((l) => `      ${l}`)
+    .join('\n');
 
   return `# Auto-generated by RAG Toolkit. Do not edit by hand.
 services:
@@ -276,39 +285,31 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
 
   const { compose } = await resolveDocker();
   const prev = await readLocalState();
-  // Reuse an existing token if we have one, otherwise generate a fresh key.
   const apiKey = prev.apiKey || `fc-local-${randomUUID()}`;
   let port = prev.port || DEFAULT_PORT;
 
   const proxy = await getProxy();
 
   await fs.mkdir(path.dirname(COMPOSE_PATH), { recursive: true });
-  await fs.writeFile(COMPOSE_PATH, composeFile(apiKey, port, proxy), "utf8");
+  await fs.writeFile(COMPOSE_PATH, composeFile(apiKey, port, proxy), 'utf8');
 
   try {
-    await runCmd(
-      `${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" up -d`,
-      180_000
-    );
+    await runCmd(`${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" up -d`, 180_000);
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "docker compose failed";
-      
-    if (message.includes("address already in use") || message.includes("Ports are not available")) {
+    const message = err instanceof Error ? err.message : 'docker compose failed';
+
+    if (message.includes('address already in use') || message.includes('Ports are not available')) {
       try {
         port = await getFreePort(port + 1);
-        await fs.writeFile(COMPOSE_PATH, composeFile(apiKey, port, proxy), "utf8");
-        await runCmd(
-          `${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" up -d`,
-          180_000
-        );
+        await fs.writeFile(COMPOSE_PATH, composeFile(apiKey, port, proxy), 'utf8');
+        await runCmd(`${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" up -d`, 180_000);
       } catch (retryErr) {
         return writeState({
           ...prev,
           apiKey,
           port,
           running: false,
-          lastError: retryErr instanceof Error ? retryErr.message : "docker compose retry failed",
+          lastError: retryErr instanceof Error ? retryErr.message : 'docker compose retry failed',
         });
       }
     } else {
@@ -322,8 +323,8 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
     }
   }
 
-  const isDockerContainer = existsSync("/.dockerenv");
-  const host = isDockerContainer ? "host.docker.internal" : "localhost";
+  const isDockerContainer = existsSync('/.dockerenv');
+  const host = isDockerContainer ? 'host.docker.internal' : 'localhost';
   const endpoint = `http://${host}:${port}`;
   const healthy = await waitForHealth(endpoint, 60_000);
 
@@ -336,7 +337,7 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
     startedAt: new Date().toISOString(),
     lastError: healthy
       ? undefined
-      : "Containers started but the API did not become healthy in time. It may still be warming up — try refreshing in a moment.",
+      : 'Containers started but the API did not become healthy in time. It may still be warming up — try refreshing in a moment.',
   });
 }
 
@@ -346,10 +347,7 @@ export async function stopLocal(): Promise<LocalFirecrawlState> {
   const prev = await readLocalState();
   if (compose) {
     try {
-      await runCmd(
-        `${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" down`,
-        60_000
-      );
+      await runCmd(`${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" down`, 60_000);
     } catch {
       // best-effort
     }
@@ -373,10 +371,9 @@ export async function refreshLocalStatus(): Promise<LocalFirecrawlState> {
 async function isHealthy(endpoint: string): Promise<boolean> {
   try {
     const res = await fetch(endpoint, {
-      method: "GET",
+      method: 'GET',
       signal: AbortSignal.timeout(4000),
     });
-    // Self-hosted Firecrawl root returns a friendly 200; any response means it's up.
     return res.status > 0;
   } catch {
     return false;
@@ -397,9 +394,9 @@ async function waitForHealth(endpoint: string, timeoutMs: number) {
 /** Whether Larkup is itself running inside a Docker container. */
 export function isInsideDocker(): boolean {
   return (
-    process.env.DOCKER_ENV === "true" ||
-    process.env.DOCKER_BUILD === "1" ||
-    existsSync("/.dockerenv")
+    process.env.DOCKER_ENV === 'true' ||
+    process.env.DOCKER_BUILD === '1' ||
+    existsSync('/.dockerenv')
   );
 }
 
@@ -410,14 +407,14 @@ export function isInsideDocker(): boolean {
  *
  * Docker Compose DNS resolves "firecrawl-api" to the sibling container.
  */
-const DOCKER_SIBLING_ENDPOINT = "http://firecrawl-api:3002";
+const DOCKER_SIBLING_ENDPOINT = 'http://firecrawl-api:3002';
 
 export async function checkDockerSibling(): Promise<{
   available: boolean;
   endpoint: string;
 }> {
   if (!isInsideDocker()) {
-    return { available: false, endpoint: "" };
+    return { available: false, endpoint: '' };
   }
   const up = await isHealthy(DOCKER_SIBLING_ENDPOINT);
   return { available: up, endpoint: DOCKER_SIBLING_ENDPOINT };
@@ -434,7 +431,7 @@ export async function connectDockerSibling(): Promise<LocalFirecrawlState> {
       ...EMPTY,
       running: false,
       lastError:
-        "Firecrawl sibling service is not running. Restart with: docker compose --profile crawler up",
+        'Firecrawl sibling service is not running. Restart with: docker compose --profile crawler up',
     });
   }
   const apiKey = `fc-docker-${randomUUID()}`;
@@ -443,7 +440,7 @@ export async function connectDockerSibling(): Promise<LocalFirecrawlState> {
     endpoint: DOCKER_SIBLING_ENDPOINT,
     apiKey,
     port: DEFAULT_PORT,
-    project: "docker-sibling",
+    project: 'docker-sibling',
     startedAt: new Date().toISOString(),
   });
 }

@@ -1,9 +1,5 @@
-import {
-  Pinecone,
-  type Index,
-  type RecordSparseValues,
-} from "@pinecone-database/pinecone";
-import type { QueryHit, VectorRecord, VectorStoreAdapter } from "./base";
+import { Pinecone, type Index, type RecordSparseValues } from '@pinecone-database/pinecone';
+import type { QueryHit, VectorRecord, VectorStoreAdapter } from './base';
 
 /**
  * Pinecone adapter — fully-managed cloud vector DB.
@@ -86,8 +82,8 @@ function is429(err: unknown): boolean {
   return (
     e?.status === 429 ||
     e?.statusCode === 429 ||
-    String(e?.message ?? "").includes("429") ||
-    String(e?.message ?? "").includes("RESOURCE_EXHAUSTED")
+    String(e?.message ?? '').includes('429') ||
+    String(e?.message ?? '').includes('RESOURCE_EXHAUSTED')
   );
 }
 
@@ -99,10 +95,10 @@ export class PineconeAdapter implements VectorStoreAdapter {
   private currentInterBatchDelayMs = 0;
 
   constructor(private readonly config: PineconeConfig) {
-    if (!config.apiKey) throw new Error("Pinecone requires an API key.");
-    if (!config.indexName) throw new Error("Pinecone requires an index name.");
+    if (!config.apiKey) throw new Error('Pinecone requires an API key.');
+    if (!config.indexName) throw new Error('Pinecone requires an index name.');
     this.indexName = config.indexName.trim();
-    this.namespace = config.namespace?.trim() || "default";
+    this.namespace = config.namespace?.trim() || 'default';
   }
 
   private getClient() {
@@ -113,9 +109,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
   }
 
   private get needsSparse() {
-    return (
-      this.config.indexType === "lexical" || this.config.indexType === "hybrid"
-    );
+    return this.config.indexType === 'lexical' || this.config.indexType === 'hybrid';
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -126,12 +120,12 @@ export class PineconeAdapter implements VectorStoreAdapter {
     const exists = (indexes ?? []).some((i) => i.name === this.indexName);
 
     if (!exists) {
-      const metric = this.needsSparse ? "dotproduct" : "cosine";
+      const metric = this.needsSparse ? 'dotproduct' : 'cosine';
       await pc.createIndex({
         name: this.indexName,
         dimension: dimensions,
         metric,
-        spec: { serverless: { cloud: "aws", region: "us-east-1" } },
+        spec: { serverless: { cloud: 'aws', region: 'us-east-1' } },
         waitUntilReady: true,
       });
     }
@@ -158,9 +152,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
    * Before each retry-sleep the `onRateLimit` hook is called so the indexer
    * can patch the run store with a warning that the UI polls.
    */
-  private async embedSparseWithRetry(
-    texts: string[],
-  ): Promise<RecordSparseValues[]> {
+  private async embedSparseWithRetry(texts: string[]): Promise<RecordSparseValues[]> {
     const pc = this.getClient();
 
     for (let attempt = 1; attempt <= RATE_LIMIT_MAX_RETRIES + 1; attempt++) {
@@ -168,7 +160,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
         const result = await pc.inference.embed({
           model: this.config.sparseModel!,
           inputs: texts,
-          parameters: { input_type: "passage", truncate: "END" },
+          parameters: { input_type: 'passage', truncate: 'END' },
         });
         return result.data.map((emb) => {
           const s = emb as any;
@@ -182,7 +174,6 @@ export class PineconeAdapter implements VectorStoreAdapter {
           const waitSecs = Math.round(RATE_LIMIT_WAIT_MS / 1000);
           await this.config.onRateLimit?.(waitSecs, attempt);
           await sleep(RATE_LIMIT_WAIT_MS);
-          // Slow down future batches to avoid hitting the rate limit again
           this.currentInterBatchDelayMs = Math.max(
             this.currentInterBatchDelayMs,
             BASE_INTER_BATCH_DELAY_MS,
@@ -193,12 +184,10 @@ export class PineconeAdapter implements VectorStoreAdapter {
       }
     }
     // Unreachable but TypeScript needs it
-    throw new Error("Sparse embedding failed after max retries.");
+    throw new Error('Sparse embedding failed after max retries.');
   }
 
-  private async buildSparseVectors(
-    texts: string[],
-  ): Promise<RecordSparseValues[]> {
+  private async buildSparseVectors(texts: string[]): Promise<RecordSparseValues[]> {
     const result: RecordSparseValues[] = [];
 
     for (let i = 0; i < texts.length; i += SPARSE_BATCH) {
@@ -206,11 +195,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
       const vecs = await this.embedSparseWithRetry(batch);
       result.push(...vecs);
 
-      // Rate-limit guard: delay between batches (skip after the last one)
-      if (
-        i + SPARSE_BATCH < texts.length &&
-        this.currentInterBatchDelayMs > 0
-      ) {
+      if (i + SPARSE_BATCH < texts.length && this.currentInterBatchDelayMs > 0) {
         await sleep(this.currentInterBatchDelayMs);
       }
     }
@@ -218,9 +203,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
     return result;
   }
 
-  private async buildQuerySparseVector(
-    text: string,
-  ): Promise<RecordSparseValues> {
+  private async buildQuerySparseVector(text: string): Promise<RecordSparseValues> {
     const pc = this.getClient();
 
     for (let attempt = 1; attempt <= RATE_LIMIT_MAX_RETRIES + 1; attempt++) {
@@ -228,7 +211,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
         const result = await pc.inference.embed({
           model: this.config.sparseModel!,
           inputs: [text],
-          parameters: { input_type: "query", truncate: "END" },
+          parameters: { input_type: 'query', truncate: 'END' },
         });
         const s = result.data[0] as any;
         return {
@@ -243,7 +226,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
         throw err;
       }
     }
-    throw new Error("Sparse query embedding failed after max retries.");
+    throw new Error('Sparse query embedding failed after max retries.');
   }
 
   // ── Upsert ─────────────────────────────────────────────────────────────────
@@ -256,16 +239,9 @@ export class PineconeAdapter implements VectorStoreAdapter {
       const safe: Record<string, any> = {};
       for (const [k, v] of Object.entries(meta)) {
         if (v === null || v === undefined) continue;
-        if (
-          typeof v === "string" ||
-          typeof v === "number" ||
-          typeof v === "boolean"
-        ) {
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
           safe[k] = v;
-        } else if (
-          Array.isArray(v) &&
-          v.every((item) => typeof item === "string")
-        ) {
+        } else if (Array.isArray(v) && v.every((item) => typeof item === 'string')) {
           safe[k] = v;
         } else {
           safe[k] = JSON.stringify(v);
@@ -278,7 +254,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
       ...sanitizeMeta(r.metadata),
       text: r.text,
       title: r.title,
-      url: r.url ?? "",
+      url: r.url ?? '',
       source: r.source,
       documentId: r.documentId,
       chunkIndex: r.chunkIndex,
@@ -297,9 +273,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
     }
 
     // ── Hybrid / Lexical ───────────────────────────────────────────────────
-    const sparseVecs = await this.buildSparseVectors(
-      records.map((r) => r.text),
-    );
+    const sparseVecs = await this.buildSparseVectors(records.map((r) => r.text));
 
     await this.ns().upsert({
       records: records.map((r, i) => ({
@@ -313,11 +287,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
 
   // ── Query ──────────────────────────────────────────────────────────────────
 
-  async query(
-    vector: number[],
-    topK: number,
-    queryText?: string,
-  ): Promise<QueryHit[]> {
+  async query(vector: number[], topK: number, queryText?: string): Promise<QueryHit[]> {
     const canHybrid = this.needsSparse && this.config.sparseModel && queryText;
 
     if (!canHybrid) {
@@ -333,10 +303,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
     return rrfMerge(denseHits, sparseHits, topK);
   }
 
-  private async denseQuery(
-    vector: number[],
-    topK: number,
-  ): Promise<QueryHit[]> {
+  private async denseQuery(vector: number[], topK: number): Promise<QueryHit[]> {
     const res = await this.ns().query({ vector, topK, includeMetadata: true });
     return (res.matches ?? []).map(hitFromMatch);
   }
@@ -370,11 +337,7 @@ export class PineconeAdapter implements VectorStoreAdapter {
   async count(): Promise<number | null> {
     try {
       const stats = await this.ns().describeIndexStats();
-      return (
-        stats.namespaces?.[this.namespace]?.recordCount ??
-        stats.totalRecordCount ??
-        0
-      );
+      return stats.namespaces?.[this.namespace]?.recordCount ?? stats.totalRecordCount ?? 0;
     } catch {
       return null;
     }
@@ -389,18 +352,16 @@ export class PineconeAdapter implements VectorStoreAdapter {
       indexList = await pc.listIndexes();
     } catch (err: any) {
       if (
-        err.message?.toLowerCase().includes("api key") ||
-        err.name === "PineconeAuthorizationError" ||
+        err.message?.toLowerCase().includes('api key') ||
+        err.name === 'PineconeAuthorizationError' ||
         err.status === 401
       ) {
-        throw new Error("Invalid Pinecone API key.");
+        throw new Error('Invalid Pinecone API key.');
       }
       throw new Error(`Failed to connect to Pinecone: ${err.message}`);
     }
 
-    const indexModel = (indexList.indexes ?? []).find(
-      (i) => i.name === this.indexName,
-    );
+    const indexModel = (indexList.indexes ?? []).find((i) => i.name === this.indexName);
     if (!indexModel) {
       throw new Error(
         `Index "${this.indexName}" does not exist in your Pinecone project. Please create it first.`,
@@ -415,14 +376,11 @@ export class PineconeAdapter implements VectorStoreAdapter {
 
     if (this.needsSparse) {
       if (!this.config.sparseModel) {
-        throw new Error(
-          "Hybrid/lexical search requires a sparse model to be selected.",
-        );
+        throw new Error('Hybrid/lexical search requires a sparse model to be selected.');
       }
 
-      const metric =
-        (indexModel as any).metric ?? (indexModel as any).spec?.metric;
-      if (metric && metric !== "dotproduct") {
+      const metric = (indexModel as any).metric ?? (indexModel as any).spec?.metric;
+      if (metric && metric !== 'dotproduct') {
         throw new Error(
           `Hybrid/lexical requires your Pinecone index to use the "dotproduct" metric, ` +
             `but "${this.indexName}" uses "${metric}". ` +
@@ -437,33 +395,20 @@ export class PineconeAdapter implements VectorStoreAdapter {
 
 function hitFromMatch(m: any): QueryHit {
   const meta = (m.metadata ?? {}) as PineMeta;
-  const {
-    text,
-    title,
-    url,
-    source,
-    documentId,
-    chunkIndex,
-    ...customMetadata
-  } = meta;
+  const { text, title, url, source, documentId, chunkIndex, ...customMetadata } = meta;
 
   return {
     id: m.id,
     score: m.score ?? 0,
-    text: (text as string) ?? "",
-    title: (title as string) ?? "Untitled",
+    text: (text as string) ?? '',
+    title: (title as string) ?? 'Untitled',
     url: (url as string) || undefined,
-    documentId: (documentId as string) ?? "",
-    metadata:
-      Object.keys(customMetadata).length > 0 ? customMetadata : undefined,
+    documentId: (documentId as string) ?? '',
+    metadata: Object.keys(customMetadata).length > 0 ? customMetadata : undefined,
   };
 }
 
-function rrfMerge(
-  denseHits: QueryHit[],
-  sparseHits: QueryHit[],
-  topK: number,
-): QueryHit[] {
+function rrfMerge(denseHits: QueryHit[], sparseHits: QueryHit[], topK: number): QueryHit[] {
   const scores = new Map<string, { hit: QueryHit; score: number }>();
 
   const addList = (hits: QueryHit[]) =>

@@ -1,12 +1,12 @@
-import type { RagConfig } from "../types";
-import { getVectorStore } from "@larkup/vector-stores/registry";
-import { getEmbeddingModel } from "../embeddings/registry";
+import type { RagConfig } from '../types';
+import { getVectorStore } from '@larkup/vector-stores/registry';
+import { getEmbeddingModel } from '../embeddings/registry';
 
 export interface GeneratedFile {
   path: string;
   contents: string;
   language: string;
-  encoding?: "utf8" | "base64";
+  encoding?: 'utf8' | 'base64';
 }
 
 export interface GeneratedServer {
@@ -17,12 +17,12 @@ export interface GeneratedServer {
 }
 
 function lang(path: string): string {
-  if (path.endsWith(".json")) return "json";
-  if (path.endsWith(".mjs") || path.endsWith(".js")) return "javascript";
-  if (path.endsWith(".md")) return "markdown";
-  if (path.endsWith("Dockerfile")) return "dockerfile";
-  if (path.endsWith(".yml") || path.endsWith(".yaml")) return "yaml";
-  return "text";
+  if (path.endsWith('.json')) return 'json';
+  if (path.endsWith('.mjs') || path.endsWith('.js')) return 'javascript';
+  if (path.endsWith('.md')) return 'markdown';
+  if (path.endsWith('Dockerfile')) return 'dockerfile';
+  if (path.endsWith('.yml') || path.endsWith('.yaml')) return 'yaml';
+  return 'text';
 }
 
 function lancedbStore(): string {
@@ -30,8 +30,6 @@ function lancedbStore(): string {
 import path from "node:path"
 
 const MODE = process.env.LANCEDB_MODE || "local"
-// On Vercel (and other serverless platforms), /var/task is read-only.
-// Fall back to /tmp which is writable, though ephemeral per invocation.
 const IS_SERVERLESS = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME
 const DEFAULT_DB_PATH = IS_SERVERLESS ? "/tmp/lancedb" : "./.larkup/lancedb"
 const DB_PATH = process.env.LANCEDB_PATH || DEFAULT_DB_PATH
@@ -88,8 +86,6 @@ export async function query(vector, topK) {
 export async function list({ page = 1, limit = 20 } = {}) {
   const t = await getTable()
   if (!t) return { documents: [], total: 0, page, limit, totalPages: 0 }
-  // Fetch all rows to get total count, then slice for the page.
-  // We explicitly exclude the "vector" column to avoid memory bloat and Rust panics on full scans.
   const allRows = await t.query().select(["id", "text", "title", "url", "documentId"]).toArray()
   const total = allRows.length
   const start = (page - 1) * limit
@@ -273,48 +269,58 @@ function embedSource(config: RagConfig): string {
   let imports = `import { embed } from "ai"\n`;
   let init = ``;
 
-  if (config.embeddingModelId.startsWith("custom:")) {
-    const customName = config.embeddingModelId.slice("custom:".length);
-    const custom = (config.customEmbeddings ?? []).find(
-      (m) => m.modelName === customName,
-    );
+  if (config.embeddingModelId.startsWith('custom:')) {
+    const customName = config.embeddingModelId.slice('custom:'.length);
+    const custom = (config.customEmbeddings ?? []).find((m) => m.modelName === customName);
     imports += `import { createOpenAICompatible } from "@ai-sdk/openai-compatible"\n`;
     init = `const provider = createOpenAICompatible({
   name: "custom_provider",
-  baseURL: process.env.EMBEDDING_BASE_URL || ${JSON.stringify(custom?.baseUrl || "")},
+  baseURL: process.env.EMBEDDING_BASE_URL || ${JSON.stringify(custom?.baseUrl || '')},
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embeddingModel(process.env.EMBEDDING_MODEL || ${JSON.stringify(custom?.modelName || "")})`;
-  } else if (config.embeddingProvider === "deepseek") {
+const MODEL = provider.embeddingModel(process.env.EMBEDDING_MODEL || ${JSON.stringify(
+      custom?.modelName || '',
+    )})`;
+  } else if (config.embeddingProvider === 'deepseek') {
     imports += `import { createDeepSeek } from "@ai-sdk/deepseek"\n`;
     init = `const provider = createDeepSeek({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embeddingModel(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
-  } else if (config.embeddingProvider === "google") {
+const MODEL = provider.embeddingModel(process.env.EMBEDDING_MODEL || ${JSON.stringify(
+      config.embeddingModelId,
+    )})`;
+  } else if (config.embeddingProvider === 'google') {
     imports += `import { createGoogleGenerativeAI } from "@ai-sdk/google"\n`;
     init = `const provider = createGoogleGenerativeAI({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.textEmbeddingModel(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
-  } else if (config.embeddingProvider === "cohere") {
+const MODEL = provider.textEmbeddingModel(process.env.EMBEDDING_MODEL || ${JSON.stringify(
+      config.embeddingModelId,
+    )})`;
+  } else if (config.embeddingProvider === 'cohere') {
     imports += `import { createCohere } from "@ai-sdk/cohere"\n`;
     init = `const provider = createCohere({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
-  } else if (config.embeddingProvider === "mistral") {
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(
+      config.embeddingModelId,
+    )})`;
+  } else if (config.embeddingProvider === 'mistral') {
     imports += `import { createMistral } from "@ai-sdk/mistral"\n`;
     init = `const provider = createMistral({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
-  } else if (config.embeddingProvider === "vercel_ai_gateway") {
+const MODEL = provider.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(
+      config.embeddingModelId,
+    )})`;
+  } else if (config.embeddingProvider === 'vercel_ai_gateway') {
     imports += `import { createGateway } from "@ai-sdk/gateway"\n`;
     init = `const gateway = createGateway({
   apiKey: process.env.EMBEDDING_API_KEY
 })
-const MODEL = gateway.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(config.embeddingModelId)})`;
+const MODEL = gateway.embedding(process.env.EMBEDDING_MODEL || ${JSON.stringify(
+      config.embeddingModelId,
+    )})`;
   } else {
     imports += `import { createOpenAI } from "@ai-sdk/openai"\n`;
     init = `const provider = createOpenAI({
@@ -345,7 +351,9 @@ import * as cheerio from "cheerio"
 const PORT = process.env.PORT || 8080
 const DEFAULT_TOP_K = Number(process.env.TOP_K || ${config.topK})
 
-console.log('[${config.projectName}] SERVER_API_KEY:', process.env.SERVER_API_KEY ? 'SET ('+process.env.SERVER_API_KEY.length+' chars, starts with: '+process.env.SERVER_API_KEY.slice(0,8)+'...)' : 'NOT SET (open access)')
+console.log('[${
+    config.projectName
+  }] SERVER_API_KEY:', process.env.SERVER_API_KEY ? 'SET ('+process.env.SERVER_API_KEY.length+' chars, starts with: '+process.env.SERVER_API_KEY.slice(0,8)+'...)' : 'NOT SET (open access)')
 
 function send(res, status, body) {
   const json = JSON.stringify(body)
@@ -823,7 +831,7 @@ function dockerCompose(projectName: string, usesLocalLance: boolean): string {
     ? `    volumes:
       - ./.larkup:/app/.larkup
 `
-    : "";
+    : '';
   return `services:
   ${projectName}:
     build: .
@@ -850,15 +858,15 @@ function vercelJson(): string {
 
 function envExample(server: GeneratedServer): string {
   return server.envVars
-    .map((e) => `# ${e.help}${e.required ? "" : " (optional)"}\n${e.key}=`)
-    .join("\n");
+    .map((e) => `# ${e.help}${e.required ? '' : ' (optional)'}\n${e.key}=`)
+    .join('\n');
 }
 
 function readme(config: RagConfig, server: GeneratedServer): string {
   const store = getVectorStore(config.vectorStore);
   const deps = Object.entries(server.dependencies)
     .map(([k, v]) => `- \`${k}@${v}\``)
-    .join("\n");
+    .join('\n');
   return `# ${config.projectName}
 
 A lightweight RAG retrieval server generated by **larkup**.
@@ -916,88 +924,87 @@ vercel deploy
 export function generateServer(config: RagConfig): GeneratedServer {
   const store = getVectorStore(config.vectorStore);
   const model = getEmbeddingModel(config.embeddingModelId);
-  const usesLocalLance =
-    config.vectorStore === "lancedb" && config.storeConfig.mode !== "cloud";
+  const usesLocalLance = config.vectorStore === 'lancedb' && config.storeConfig.mode !== 'cloud';
 
   const dependencies: Record<string, string> = {
-    ai: "^6.0.0",
-    cheerio: "^1.0.0",
+    ai: '^6.0.0',
+    cheerio: '^1.0.0',
     ...store.serverDependencies,
   };
 
-  const envVars: GeneratedServer["envVars"] = [
+  const envVars: GeneratedServer['envVars'] = [
     {
-      key: "EMBEDDING_API_KEY",
+      key: 'EMBEDDING_API_KEY',
       required: true,
-      help: "API key used to embed incoming queries.",
+      help: 'API key used to embed incoming queries.',
     },
     {
-      key: "PORT",
+      key: 'PORT',
       required: false,
-      help: "Port to listen on (default 8080).",
+      help: 'Port to listen on (default 8080).',
     },
     {
-      key: "SERVER_API_KEY",
+      key: 'SERVER_API_KEY',
       required: false,
       help: "Bearer token to secure your server endpoints. If set, requests must include 'Authorization: Bearer <key>'.",
     },
     {
-      key: "TOP_K",
+      key: 'TOP_K',
       required: false,
       help: `Default number of documents to retrieve (default ${config.topK}).`,
     },
   ];
 
-  if (config.vectorStore === "pinecone") {
+  if (config.vectorStore === 'pinecone') {
     envVars.push(
-      { key: "PINECONE_API_KEY", required: true, help: "Pinecone API key." },
+      { key: 'PINECONE_API_KEY', required: true, help: 'Pinecone API key.' },
       {
-        key: "PINECONE_INDEX",
+        key: 'PINECONE_INDEX',
         required: true,
-        help: "Pinecone index name to query.",
+        help: 'Pinecone index name to query.',
       },
       {
-        key: "PINECONE_NAMESPACE",
+        key: 'PINECONE_NAMESPACE',
         required: false,
         help: "Pinecone namespace (default 'default').",
       },
       {
-        key: "PINECONE_SPARSE_MODEL",
+        key: 'PINECONE_SPARSE_MODEL',
         required: false,
-        help: "Pinecone sparse model (for hybrid search).",
+        help: 'Pinecone sparse model (for hybrid search).',
       },
       {
-        key: "PINECONE_SPARSE_INDEX",
+        key: 'PINECONE_SPARSE_INDEX',
         required: false,
-        help: "Pinecone sparse index name (for hybrid search).",
+        help: 'Pinecone sparse index name (for hybrid search).',
       },
     );
   } else {
     envVars.push(
       {
-        key: "LANCEDB_MODE",
+        key: 'LANCEDB_MODE',
         required: false,
         help: "'local' (on-disk) or 'cloud' (default 'local').",
       },
       {
-        key: "LANCEDB_PATH",
+        key: 'LANCEDB_PATH',
         required: false,
-        help: "On-disk path to the LanceDB tables (local mode).",
+        help: 'On-disk path to the LanceDB tables (local mode).',
       },
       {
-        key: "LANCEDB_TABLE",
+        key: 'LANCEDB_TABLE',
         required: false,
         help: "Table name holding the embedded chunks (default 'documents').",
       },
       {
-        key: "LANCEDB_URI",
+        key: 'LANCEDB_URI',
         required: false,
-        help: "LanceDB Cloud database URI (cloud mode).",
+        help: 'LanceDB Cloud database URI (cloud mode).',
       },
       {
-        key: "LANCEDB_API_KEY",
+        key: 'LANCEDB_API_KEY',
         required: false,
-        help: "LanceDB Cloud API key (cloud mode).",
+        help: 'LanceDB Cloud API key (cloud mode).',
       },
     );
   }
@@ -1011,78 +1018,72 @@ export function generateServer(config: RagConfig): GeneratedServer {
 
   const pkg = {
     name: config.projectName,
-    version: "1.0.0",
+    version: '1.0.0',
     private: true,
-    type: "module",
+    type: 'module',
     description: `Lightweight RAG server (${store.label}) generated by larkup`,
     scripts: {
-      start: "node server.mjs",
-      demo: "node demo.mjs",
+      start: 'node server.mjs',
+      demo: 'node demo.mjs',
     },
     dependencies,
-    engines: { node: ">=20" },
+    engines: { node: '>=20' },
   };
 
   const generatedEnv = server.envVars
     .map((e) => {
-      let val = "";
-      if (e.key === "EMBEDDING_API_KEY") val = config.embeddingApiKey || "";
-      // Pre-fill other env vars if they are in storeConfig
-      if (e.key === "PINECONE_API_KEY") val = config.storeConfig.apiKey || "";
-      if (e.key === "PINECONE_INDEX") val = config.storeConfig.indexName || "";
-      if (e.key === "PINECONE_NAMESPACE")
-        val = config.storeConfig.namespace || "";
-      if (e.key === "LANCEDB_URI") val = config.storeConfig.uri || "";
-      if (e.key === "LANCEDB_API_KEY") val = config.storeConfig.apiKey || "";
+      let val = '';
+      if (e.key === 'EMBEDDING_API_KEY') val = config.embeddingApiKey || '';
+      if (e.key === 'PINECONE_API_KEY') val = config.storeConfig.apiKey || '';
+      if (e.key === 'PINECONE_INDEX') val = config.storeConfig.indexName || '';
+      if (e.key === 'PINECONE_NAMESPACE') val = config.storeConfig.namespace || '';
+      if (e.key === 'LANCEDB_URI') val = config.storeConfig.uri || '';
+      if (e.key === 'LANCEDB_API_KEY') val = config.storeConfig.apiKey || '';
       return `${e.key}=${val}`;
     })
-    .join("\n");
+    .join('\n');
 
   const files: GeneratedFile[] = [
-    { path: "package.json", contents: JSON.stringify(pkg, null, 2) + "\n" },
-    { path: "server.mjs", contents: serverSource(config) },
-    { path: "embed.mjs", contents: embedSource(config) },
+    { path: 'package.json', contents: JSON.stringify(pkg, null, 2) + '\n' },
+    { path: 'server.mjs', contents: serverSource(config) },
+    { path: 'embed.mjs', contents: embedSource(config) },
     {
-      path: "store.mjs",
-      contents:
-        config.vectorStore === "pinecone" ? pineconeStore() : lancedbStore(),
+      path: 'store.mjs',
+      contents: config.vectorStore === 'pinecone' ? pineconeStore() : lancedbStore(),
     },
-    { path: "demo.mjs", contents: demoSource() },
-    { path: "Dockerfile", contents: dockerfile() },
-    { path: ".dockerignore", contents: dockerignore() },
+    { path: 'demo.mjs', contents: demoSource() },
+    { path: 'Dockerfile', contents: dockerfile() },
+    { path: '.dockerignore', contents: dockerignore() },
     {
-      path: "docker-compose.yml",
+      path: 'docker-compose.yml',
       contents: dockerCompose(config.projectName, usesLocalLance),
     },
-    { path: "vercel.json", contents: vercelJson() },
-    { path: ".env.example", contents: envExample(server) },
-    { path: ".env", contents: generatedEnv },
-    { path: ".gitignore", contents: "node_modules\n.env\n.DS_Store\n" },
-    { path: "README.md", contents: readme(config, server) },
+    { path: 'vercel.json', contents: vercelJson() },
+    { path: '.env.example', contents: envExample(server) },
+    { path: '.env', contents: generatedEnv },
+    { path: '.gitignore', contents: 'node_modules\n.env\n.DS_Store\n' },
+    { path: 'README.md', contents: readme(config, server) },
   ].map((f) => ({ ...f, language: lang(f.path) }));
 
   try {
-    const fs = require("node:fs");
-    const path = require("node:path");
-    const faviconPath = path.resolve(process.cwd(), "public/favicon2.ico");
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const faviconPath = path.resolve(process.cwd(), 'public/favicon2.ico');
     if (fs.existsSync(faviconPath)) {
       files.push({
-        path: "public/favicon2.ico",
-        contents: fs.readFileSync(faviconPath).toString("base64"),
-        language: "ico",
-        encoding: "base64",
+        path: 'public/favicon2.ico',
+        contents: fs.readFileSync(faviconPath).toString('base64'),
+        language: 'ico',
+        encoding: 'base64',
       });
     } else {
-      const webFaviconPath = path.resolve(
-        process.cwd(),
-        "apps/web/public/favicon2.ico",
-      );
+      const webFaviconPath = path.resolve(process.cwd(), 'apps/web/public/favicon2.ico');
       if (fs.existsSync(webFaviconPath)) {
         files.push({
-          path: "public/favicon2.ico",
-          contents: fs.readFileSync(webFaviconPath).toString("base64"),
-          language: "ico",
-          encoding: "base64",
+          path: 'public/favicon2.ico',
+          contents: fs.readFileSync(webFaviconPath).toString('base64'),
+          language: 'ico',
+          encoding: 'base64',
         });
       }
     }
