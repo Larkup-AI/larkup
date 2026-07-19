@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import useSWR from "swr";
-import { Loader2, Save } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import type { RagConfig } from "@larkup/core/types";
+import { useState, useEffect } from 'react';
+import useSWR from 'swr';
+import { Loader2, Save } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import type { RagConfig } from '@larkup/core/types';
 import {
   Card,
   CardContent,
@@ -15,18 +15,17 @@ import {
   CardHeader,
   CardTitle,
   CardFooter,
-} from "@/components/ui/card";
-import { useWorkspace } from "@/components/workspace/workspace-provider";
+} from '@/components/ui/card';
+import { useWorkspace } from '@/components/workspace/workspace-provider';
 
-const fetcher = (url: string) =>
-  fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
+const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
 export function GeneralSection() {
-  const { data, isLoading, mutate } = useSWR("/api/config", fetcher);
+  const { data, isLoading, mutate } = useSWR('/api/config', fetcher);
   const [form, setForm] = useState<Partial<RagConfig>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const { username, setUsername } = useWorkspace();
-  const [localName, setLocalName] = useState(username || "");
+  const [localName, setLocalName] = useState(username || '');
 
   useEffect(() => {
     if (data?.config) setForm(data.config);
@@ -36,48 +35,52 @@ export function GeneralSection() {
     if (username && localName !== username) setLocalName(username);
   }, [username]);
 
-  const dirtyUsername = localName.trim() !== (username || "");
-  const dirtyWebSearch = form.serperApiKey !== data?.config?.serperApiKey;
+  const dirtyUsername = localName.trim() !== (username || '');
+  const dirtyWebSearch =
+    form.serperApiKey !== data?.config?.serperApiKey ||
+    form.webSearchProvider !== data?.config?.webSearchProvider ||
+    form.tavilyApiKey !== data?.config?.tavilyApiKey;
   const dirtyScraper =
     form.scraperProxyServer !== data?.config?.scraperProxyServer ||
     form.scraperProxyUsername !== data?.config?.scraperProxyUsername ||
     form.scraperProxyPassword !== data?.config?.scraperProxyPassword ||
     form.firecrawlApiKey !== data?.config?.firecrawlApiKey;
-
-  async function handleSave(section: "username" | "webSearch" | "scraper") {
+  async function handleSave(section: 'username' | 'webSearch' | 'scraper') {
     setSaving(section);
     try {
       let payload = { ...data?.config };
 
-      if (section === "username") {
+      if (section === 'username') {
         if (localName.trim() && localName.trim() !== username) {
           await setUsername(localName.trim());
         }
         setSaving(null);
-        toast.success("Settings saved");
+        toast.success('Settings saved');
         return;
-      } else if (section === "webSearch") {
+      } else if (section === 'webSearch') {
         payload.serperApiKey = form.serperApiKey;
-      } else if (section === "scraper") {
+        payload.webSearchProvider = form.webSearchProvider;
+        payload.tavilyApiKey = form.tavilyApiKey;
+      } else if (section === 'scraper') {
         payload.scraperProxyServer = form.scraperProxyServer;
         payload.scraperProxyUsername = form.scraperProxyUsername;
         payload.scraperProxyPassword = form.scraperProxyPassword;
         payload.firecrawlApiKey = form.firecrawlApiKey;
       }
 
-      const res = await fetch("/api/config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Failed to save");
+      if (!res.ok) throw new Error(json.error ?? 'Failed to save');
 
       setForm((prev) => ({ ...prev, ...json.config }));
       await mutate(json, { revalidate: false });
-      toast.success("Settings saved");
+      toast.success('Settings saved');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      toast.error(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(null);
     }
@@ -96,9 +99,7 @@ export function GeneralSection() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">General</h2>
-          <p className="text-sm text-muted-foreground">
-            Workspace and integration settings.
-          </p>
+          <p className="text-sm text-muted-foreground">Workspace and integration settings.</p>
         </div>
       </div>
 
@@ -106,9 +107,7 @@ export function GeneralSection() {
       <Card className="">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Your Name</CardTitle>
-          <CardDescription className="text-xs">
-            Displayed in the workspace header.
-          </CardDescription>
+          <CardDescription className="text-xs">Displayed in the workspace header.</CardDescription>
         </CardHeader>
         <CardContent>
           <Input
@@ -121,11 +120,11 @@ export function GeneralSection() {
         <CardFooter className="flex justify-end pt-4 border-t">
           <Button
             size="sm"
-            disabled={saving === "username" || !dirtyUsername}
-            onClick={() => handleSave("username")}
+            disabled={saving === 'username' || !dirtyUsername}
+            onClick={() => handleSave('username')}
             className="gap-1.5"
           >
-            {saving === "username" ? (
+            {saving === 'username' ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <Save className="size-3.5" />
@@ -143,28 +142,53 @@ export function GeneralSection() {
             Enable AI-powered web search for enriched answers.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs">Serper.dev API Key</Label>
+            <Label className="text-xs">Web Search Provider</Label>
+            <select
+              className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              value={form.webSearchProvider || 'tavily'}
+              onChange={(e) =>
+                setForm({ ...form, webSearchProvider: e.target.value as 'tavily' | 'server' })
+              }
+            >
+              <option value="tavily">Tavily</option>
+              <option value="server">Server</option>
+            </select>
+          </div>
+
+          {form.webSearchProvider === 'tavily' && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tavily API Key</Label>
+              <Input
+                type="password"
+                className="text-sm"
+                value={form.tavilyApiKey || ''}
+                onChange={(e) => setForm({ ...form, tavilyApiKey: e.target.value })}
+                placeholder="Your Tavily API Key"
+              />
+            </div>
+          )}
+
+          <div className="space-y-1.5 pt-2 border-t border-border/50">
+            <Label className="text-xs text-muted-foreground">Legacy Serper.dev API Key</Label>
             <Input
               type="password"
               className="text-sm"
-              value={form.serperApiKey || ""}
-              onChange={(e) =>
-                setForm({ ...form, serperApiKey: e.target.value })
-              }
-              placeholder="Your Serper API Key"
+              value={form.serperApiKey || ''}
+              onChange={(e) => setForm({ ...form, serperApiKey: e.target.value })}
+              placeholder="Your Serper API Key (Optional)"
             />
           </div>
         </CardContent>
         <CardFooter className="flex justify-end pt-4 border-t">
           <Button
             size="sm"
-            disabled={saving === "webSearch" || !dirtyWebSearch}
-            onClick={() => handleSave("webSearch")}
+            disabled={saving === 'webSearch' || !dirtyWebSearch}
+            onClick={() => handleSave('webSearch')}
             className="gap-1.5"
           >
-            {saving === "webSearch" ? (
+            {saving === 'webSearch' ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <Save className="size-3.5" />
@@ -187,10 +211,8 @@ export function GeneralSection() {
             <Label className="text-xs">Proxy Server</Label>
             <Input
               className="text-sm"
-              value={form.scraperProxyServer || ""}
-              onChange={(e) =>
-                setForm({ ...form, scraperProxyServer: e.target.value })
-              }
+              value={form.scraperProxyServer || ''}
+              onChange={(e) => setForm({ ...form, scraperProxyServer: e.target.value })}
               placeholder="http://proxy.example.com:8080"
             />
           </div>
@@ -199,10 +221,8 @@ export function GeneralSection() {
               <Label className="text-xs">Proxy Username</Label>
               <Input
                 className="text-sm"
-                value={form.scraperProxyUsername || ""}
-                onChange={(e) =>
-                  setForm({ ...form, scraperProxyUsername: e.target.value })
-                }
+                value={form.scraperProxyUsername || ''}
+                onChange={(e) => setForm({ ...form, scraperProxyUsername: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
@@ -210,10 +230,8 @@ export function GeneralSection() {
               <Input
                 type="password"
                 className="text-sm"
-                value={form.scraperProxyPassword || ""}
-                onChange={(e) =>
-                  setForm({ ...form, scraperProxyPassword: e.target.value })
-                }
+                value={form.scraperProxyPassword || ''}
+                onChange={(e) => setForm({ ...form, scraperProxyPassword: e.target.value })}
               />
             </div>
           </div>
@@ -222,10 +240,8 @@ export function GeneralSection() {
             <Input
               type="password"
               className="text-sm"
-              value={form.firecrawlApiKey || ""}
-              onChange={(e) =>
-                setForm({ ...form, firecrawlApiKey: e.target.value })
-              }
+              value={form.firecrawlApiKey || ''}
+              onChange={(e) => setForm({ ...form, firecrawlApiKey: e.target.value })}
               placeholder="fc-..."
             />
           </div>
@@ -233,11 +249,11 @@ export function GeneralSection() {
         <CardFooter className="flex justify-end pt-4 border-t">
           <Button
             size="sm"
-            disabled={saving === "scraper" || !dirtyScraper}
-            onClick={() => handleSave("scraper")}
+            disabled={saving === 'scraper' || !dirtyScraper}
+            onClick={() => handleSave('scraper')}
             className="gap-1.5"
           >
-            {saving === "scraper" ? (
+            {saving === 'scraper' ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <Save className="size-3.5" />

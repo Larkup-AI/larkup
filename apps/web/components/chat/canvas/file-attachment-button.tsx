@@ -19,9 +19,10 @@ interface FileAttachmentButtonProps {
   /** Callback when a file is selected (for adding to chat message) */
   onFileSelected?: (file: File) => void;
   className?: string;
+  id?: string;
 }
 
-export function FileAttachmentButton({ onFileSelected, className }: FileAttachmentButtonProps) {
+export function FileAttachmentButton({ onFileSelected, className, id }: FileAttachmentButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { openCanvas, isLoading } = useDocEditor();
 
@@ -54,6 +55,7 @@ export function FileAttachmentButton({ onFileSelected, className }: FileAttachme
   return (
     <>
       <input
+        id={id}
         ref={inputRef}
         type="file"
         accept={ACCEPTED_EXTENSIONS}

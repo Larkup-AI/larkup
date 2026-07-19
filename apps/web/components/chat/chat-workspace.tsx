@@ -15,6 +15,9 @@ import {
   X,
   History,
   Trash2,
+  Plus,
+  Globe,
+  Paperclip,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { MessageItem } from '@/components/chat/message-item';
@@ -23,6 +26,8 @@ import { useWorkspace } from '@/components/workspace/workspace-provider';
 import { cn } from '@/lib/utils';
 import { getProviderMeta, ProviderIcon } from '@/components/ui/provider-icon';
 import { get, set, del } from 'idb-keyval';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
@@ -36,9 +41,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { DocEditorProvider } from '@/components/chat/canvas/doc-editor-provider';
+import { DocEditorProvider, useDocEditor } from '@/components/chat/canvas/doc-editor-provider';
 import { DocumentCanvas } from '@/components/chat/canvas/document-canvas';
 import { FileAttachmentButton } from '@/components/chat/canvas/file-attachment-button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -82,6 +95,9 @@ function ChatWorkspaceInner() {
   const { data: status, isLoading: statusLoading } = useSWR<ChatStatus>(statusKey, fetcher, {
     refreshInterval: 10000,
   });
+
+  const { data: configData, mutate: mutateConfig } = useSWR('/api/config', fetcher);
+  const router = useRouter();
 
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [showModelSelect, setShowModelSelect] = useState(false);
@@ -249,6 +265,33 @@ function ChatWorkspaceInner() {
     setCurrentChatId(crypto.randomUUID());
   }
 
+  async function handleWebSearchToggle() {
+    const config = configData?.config;
+    if (!config) return;
+
+    const isTavily = config.webSearchProvider === 'tavily' || !config.webSearchProvider;
+    const hasKey = isTavily ? !!config.tavilyApiKey : !!config.serperApiKey; // Server uses its own or serper, fallback to check serper or just assume server doesn't need one if it's configured. Let's just check tavily if tavily.
+
+    if (isTavily && !config.tavilyApiKey && !config.serperApiKey) {
+      toast.error('Web Search API key is missing. Please configure it in Settings.');
+      router.push('/settings');
+      return;
+    }
+
+    const nextState = !config.webSearchEnabled;
+    try {
+      await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...config, webSearchEnabled: nextState }),
+      });
+      await mutateConfig();
+      toast.success(`Web Search ${nextState ? 'enabled' : 'disabled'}`);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update web search setting');
+    }
+  }
+
   async function loadChat(id: string) {
     const msgs = await get(`chat_messages_${id}`);
     if (msgs) {
@@ -286,7 +329,7 @@ function ChatWorkspaceInner() {
   return (
     <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
       {/* Header bar */}
-      <div className="flex items-center justify-between px-4 py-2">
+      <div className="relative z-40 flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-3">{/* We moved model selector to the right */}</div>
         <div className="flex items-center gap-2">
           {/* Model selector with search */}
@@ -570,10 +613,7 @@ function ChatWorkspaceInner() {
                     </button>
                   ))
                 ) : (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {/* <Loader2 className="size-3 animate-spin" /> Generating
-                    suggestions... */}
-                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground"></div>
                 )}
               </div>
             </div>
@@ -618,10 +658,62 @@ function ChatWorkspaceInner() {
 
       {/* Input area */}
       {ready && (
-        <div className="relative z-10000 mt-auto px-4 pb-5 pt-3 sm:px-6">
+        <div className="relative z-10 mt-auto px-4 pb-5 pt-3 sm:px-6">
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
             <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-1 focus-within:ring-ring">
-              <FileAttachmentButton />
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                    >
+                      <Plus className="h-[18px] w-[18px]" />
+                    </button>
+                  }
+                />
+                <DropdownMenuContent
+                  side="top"
+                  align="start"
+                  className="w-56 gap-1 flex flex-col"
+                  sideOffset={8}
+                >
+                  {/* File Attachment Button hidden input, clicked programmatically */}
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const fileInput = document.getElementById(
+                        'chat-file-attachment',
+                      ) as HTMLInputElement;
+                      fileInput?.click();
+                    }}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <Paperclip className="size-4" />
+                    <span>Attach Document</span>
+                  </DropdownMenuItem>
+                  {/* <DropdownMenuSeparator /> */}
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleWebSearchToggle();
+                    }}
+                    className="gap-2 justify-between cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Globe className="size-4" />
+                      <span>Web Search</span>
+                    </div>
+                    <Switch
+                      checked={configData?.config?.webSearchEnabled || false}
+                      className="pointer-events-none"
+                    />
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <div className="hidden">
+                <FileAttachmentButton id="chat-file-attachment" />
+              </div>
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -634,7 +726,7 @@ function ChatWorkspaceInner() {
                 }}
                 rows={1}
                 disabled={!ready}
-                placeholder="Ask about your knowledge base…"
+                placeholder="How can I help you…"
                 className="max-h-48 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40"
               />
               <button

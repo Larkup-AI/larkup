@@ -13,6 +13,7 @@ import {
   CorpusDataResult,
   type CorpusDataConfig,
 } from '@/components/chat/tools/corpus-data-result';
+import { ChatSignatureRequest } from '@/components/chat/tools/chat-signature-request';
 import { Sparkles, FileEdit, CheckCircle2 } from 'lucide-react';
 import { ChatMediaPreview, parseMediaRefs } from '@/components/chat/tools/chat-media-preview';
 import { useDocEditor } from '@/components/chat/canvas/doc-editor-provider';
@@ -223,6 +224,7 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
           {toolName === 'analyzeCorpusWithCode' && 'Analyzing corpus...'}
           {toolName === 'fillDocumentForm' && 'Filling form fields...'}
           {toolName === 'editDocument' && 'Editing document...'}
+          {toolName === 'requestDocumentSignature' && 'Processing signature request...'}
           {![
             'queryTabularData',
             'generateVisualization',
@@ -231,6 +233,7 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
             'analyzeCorpusWithCode',
             'fillDocumentForm',
             'editDocument',
+            'requestDocumentSignature',
           ].includes(toolName) && 'Processing...'}
         </span>
       </div>
@@ -297,6 +300,11 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
             </div>
           </div>
         );
+      }
+
+      case 'requestDocumentSignature': {
+        if (!output.success) return null;
+        return <ChatSignatureRequest key={index} detectedLocations={output.detectedLocations} />;
       }
 
       default:
