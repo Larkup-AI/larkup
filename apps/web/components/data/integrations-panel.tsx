@@ -11,6 +11,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 
 interface Integration {
   id: string;
@@ -121,8 +126,56 @@ const INTEGRATIONS: Integration[] = [
 ];
 
 export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
-  const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
-  const [connectedStatus, setConnectedStatus] = useState<Record<string, boolean>>({});
+  const [activeIntegration, setActiveIntegration] = useState<string | null>(
+    null,
+  );
+  const [connectedStatus, setConnectedStatus] = useState<
+    Record<string, boolean>
+  >({});
+
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [requestEmail, setRequestEmail] = useState("");
+  const [requestMessage, setRequestMessage] = useState("");
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState(false);
+
+  const handleRequestIntegration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestEmail) return;
+
+    setIsRequesting(true);
+    try {
+      const res = await fetch("https://larkup.de/api/connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer sk_larkup_618502dbca35d040d1afbb0ac0a37c8545da230ad2c724a7`,
+        },
+        body: JSON.stringify({
+          email: requestEmail,
+          message: requestMessage,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to send request");
+      }
+
+      setRequestSuccess(true);
+      toast.success("Request sent successfully!");
+
+      setTimeout(() => {
+        setIsRequestModalOpen(false);
+        setRequestSuccess(false);
+        setRequestEmail("");
+        setRequestMessage("");
+      }, 2000);
+    } catch (error) {
+      toast.error("Failed to send request. Please try again later.");
+    } finally {
+      setIsRequesting(false);
+    }
+  };
 
   const fetchStatuses = () => {
     fetch("/api/integrations/notion")
@@ -137,24 +190,26 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
     fetchStatuses();
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'notion_oauth') {
-        if (event.data.status === 'connected') {
+      if (event.data?.type === "notion_oauth") {
+        if (event.data.status === "connected") {
           fetchStatuses();
         }
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
   const handleConnectNotion = () => {
     // Use the official Larkup Proxy by default, or an override if provided
-    const customAuthUrl = process.env.NEXT_PUBLIC_NOTION_AUTHORIZATION_URL || "https://larkup-proxy.vercel.app/api/oauth/notion";
-    
+    const customAuthUrl =
+      process.env.NEXT_PUBLIC_NOTION_AUTHORIZATION_URL ||
+      "https://larkup-proxy.vercel.app/api/oauth/notion";
+
     const redirectUri = `${window.location.origin}/api/integrations/notion/callback`;
     const authUrl = `${customAuthUrl}?redirect_to=${encodeURIComponent(redirectUri)}`;
-    
+
     const width = 600;
     const height = 800;
     const left = window.innerWidth / 2 - width / 2 + window.screenX;
@@ -163,7 +218,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
     const popup = window.open(
       authUrl,
       "Notion Connection",
-      `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1,status=1,resizable=1`
+      `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1,status=1,resizable=1`,
     );
 
     if (popup) {
@@ -180,13 +235,24 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
     <div className="space-y-6">
       {/* Available integrations */}
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-4">
-          Available Integrations
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-foreground">
+            Available Integrations
+          </h3>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 bg-white/80 hover:bg-white"
+            onClick={() => setIsRequestModalOpen(true)}
+          >
+            <Sparkles className="size-3.5" />
+            Ask for integration
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {INTEGRATIONS.map((integration) => {
             const isConnected = connectedStatus[integration.id];
-            
+
             return (
               <div
                 key={integration.id}
@@ -269,7 +335,10 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
               fetch("/api/integrations/notion")
                 .then((res) => res.json())
                 .then((data) => {
-                  setConnectedStatus((prev) => ({ ...prev, notion: data.connected }));
+                  setConnectedStatus((prev) => ({
+                    ...prev,
+                    notion: data.connected,
+                  }));
                 })
                 .catch(() => {});
             }
@@ -281,6 +350,59 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
             <DialogTitle>Integration Panel</DialogTitle>
           </DialogHeader>
           {activeIntegration === "notion" && <NotionPanel onAdded={onAdded} />}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Ask for Integration</DialogTitle>
+          </DialogHeader>
+          {requestSuccess ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Thank you! We've received your request and will get back to you
+                soon.
+              </p>
+            </div>
+          ) : (
+            <form
+              onSubmit={handleRequestIntegration}
+              className="space-y-4 mt-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="email">Your Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  placeholder="name@company.com"
+                  value={requestEmail}
+                  onChange={(e) => setRequestEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="message">Which integration do you need?</Label>
+                <Textarea
+                  id="message"
+                  placeholder="Tell us which tool you want to connect and how you plan to use it..."
+                  className="resize-none min-h-[150px]"
+                  rows={11}
+                  value={requestMessage}
+                  onChange={(e) => setRequestMessage(e.target.value)}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isRequesting}>
+                {isRequesting && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Submit Request
+              </Button>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
