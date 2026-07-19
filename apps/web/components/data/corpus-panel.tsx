@@ -178,6 +178,7 @@ export function CorpusPanel({
                 />
               </TableHead>
               <TableHead>Title</TableHead>
+              <TableHead className="w-24">Status</TableHead>
               <TableHead className="w-28">Source</TableHead>
               <TableHead className="w-24 text-right">Chars</TableHead>
               <TableHead className="w-20" />
@@ -216,6 +217,23 @@ export function CorpusPanel({
                         </span>
                       )}
                     </button>
+                  </TableCell>
+                  <TableCell>
+                    {doc.status === "indexed" ? (
+                      <Badge
+                        variant="outline"
+                        className="text-green-600 bg-green-50/10 border-green-500 font-normal"
+                      >
+                        Indexed
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-orange-500 bg-orange-50 border-orange-200 font-normal"
+                      >
+                        Unindexed
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="gap-1 font-normal">
@@ -402,7 +420,7 @@ function DocumentDialog({
 
   return (
     <Dialog open={!!doc} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-2xl max-h-[80%]">
+      <DialogContent className="w-full max-w-2xl max-h-[90%] ">
         <DialogHeader>
           <DialogTitle className="text-balance">
             {editing ? "Edit document" : doc?.title}
@@ -490,15 +508,15 @@ function DocumentDialog({
           ) : (
             <>
               <Button
-                variant="ghost"
+                variant="destructive"
                 className="text-muted-foreground hover:text-destructive"
                 onClick={() => doc && onDelete(doc.id)}
               >
-                <Trash2 className="size-4" />
+                <Trash2 className="size-4 mr-2" />
                 Delete
               </Button>
               <Button onClick={() => setEditing(true)}>
-                <Pencil className="size-4" />
+                <Pencil className="size-4 mr-2" />
                 Edit
               </Button>
             </>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
+import Link from "next/link";
 import {
   AlertTriangle,
   Boxes,
@@ -158,11 +159,39 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
             Not ready to index
           </AlertTitle>
           <AlertDescription>
-            <ul className="list-disc pl-4">
-              {blockers.map((b) => (
-                <li key={b}>{b}</li>
-              ))}
+            <ul className="list-disc pl-4 mt-2 space-y-2">
+              {blockers.map((b) => {
+                if (b === "MISSING_EMBEDDING_API_KEY") {
+                  return (
+                    <li key={b} className="flex flex-col items-start gap-3">
+                      <span>
+                        An API key for your chosen embedding model is required.
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        render={
+                          <Link href="/settings">
+                            Go to AI Models in Settings
+                          </Link>
+                        }
+                      />
+                    </li>
+                  );
+                }
+                return <li key={b}>{b}</li>;
+              })}
             </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {run?.status === "failed" && (
+        <Alert variant="destructive">
+          <AlertTriangle className="size-4" />
+          <AlertTitle>Indexing failed</AlertTitle>
+          <AlertDescription className="wrap-break-word">
+            {run.error ?? "An unknown error occurred during indexing."}
           </AlertDescription>
         </Alert>
       )}
@@ -389,42 +418,42 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
         <StatusBadge status={run.status} />
       </CardHeader>
       <CardContent className="space-y-4">
-          <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {copy.phase ?? "Done"}
-                </span>
-                <span className="font-mono tabular-nums">
-                  {run.processedChunks.toLocaleString()}
-                  {run.totalChunks > 0 &&
-                    ` / ${run.totalChunks.toLocaleString()}`}{" "}
-                  chunks
-                </span>
-              </div>
-              <Progress
-                value={pct}
-                className="**:data-[slot=progress-indicator]:bg-green-600"
-              />
-            </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              {copy.phase ?? "Done"}
+            </span>
+            <span className="font-mono tabular-nums">
+              {run.processedChunks.toLocaleString()}
+              {run.totalChunks > 0 &&
+                ` / ${run.totalChunks.toLocaleString()}`}{" "}
+              chunks
+            </span>
+          </div>
+          <Progress
+            value={pct}
+            className="**:data-[slot=progress-indicator]:bg-green-600"
+          />
+        </div>
 
-            <dl className="grid grid-cols-2 gap-4 pt-1 sm:grid-cols-4">
-              <Stat label="Documents" value={run.docCount.toLocaleString()} />
-              <Stat label="Chunks" value={run.totalChunks.toLocaleString()} />
-              <Stat
-                label="Dimensions"
-                value={run.dimensions ? run.dimensions.toLocaleString() : "—"}
-              />
-              <Stat
-                label="Duration"
-                value={
-                  run.durationMs
-                    ? `${(run.durationMs / 1000).toFixed(1)}s`
-                    : running
-                      ? "running…"
-                      : "—"
-                }
-              />
-            </dl>
+        <dl className="grid grid-cols-2 gap-4 pt-1 sm:grid-cols-4">
+          <Stat label="Documents" value={run.docCount.toLocaleString()} />
+          <Stat label="Chunks" value={run.totalChunks.toLocaleString()} />
+          <Stat
+            label="Dimensions"
+            value={run.dimensions ? run.dimensions.toLocaleString() : "—"}
+          />
+          <Stat
+            label="Duration"
+            value={
+              run.durationMs
+                ? `${(run.durationMs / 1000).toFixed(1)}s`
+                : running
+                  ? "running…"
+                  : "—"
+            }
+          />
+        </dl>
       </CardContent>
     </Card>
   );

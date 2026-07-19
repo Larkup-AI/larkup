@@ -152,7 +152,7 @@ export function DataWorkspace() {
     running: boolean;
     run: IndexRun | null;
   }>("/api/index", fetcher, {
-    refreshInterval: (d) => (d?.running ? 2000 : 15000),
+    refreshInterval: (d) => (d?.running ? 2000 : 0),
   });
   const unindexedCount = indexQuery.data?.unindexedCount ?? 0;
   const indexRunning = indexQuery.data?.running ?? false;
@@ -444,7 +444,7 @@ export function DataWorkspace() {
               )}
 
               {activeSubTab === "text" && (
-                <div className="max-w-3xl animate-in fade-in duration-200">
+                <div className=" animate-in fade-in duration-200">
                   <PastePanel onAdded={handleDataAdded} />
                 </div>
               )}

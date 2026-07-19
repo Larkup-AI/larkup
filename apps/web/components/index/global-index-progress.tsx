@@ -16,7 +16,7 @@ const ACTIVE: IndexRun["status"][] = ["chunking", "embedding", "upserting"];
 
 export function GlobalIndexProgress() {
   const { data } = useSWR<IndexStatus>("/api/index", fetcher, {
-    refreshInterval: (d) => (d?.run && ACTIVE.includes(d.run.status) ? 1000 : 5000),
+    refreshInterval: (d) => (d?.run && ACTIVE.includes(d.run.status) ? 1000 : 0),
   });
 
   const running = Boolean(data?.run && ACTIVE.includes(data.run.status));

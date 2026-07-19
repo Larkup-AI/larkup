@@ -43,12 +43,13 @@ export function PastePanel({ onAdded }: { onAdded: () => void }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full">
       <div className="space-y-2">
         <Label htmlFor="paste-title">Title</Label>
         <Input
           id="paste-title"
-          placeholder="e.g. TUHH — About page"
+          placeholder="Demo Title"
+          className="w-full"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
@@ -58,7 +59,7 @@ export function PastePanel({ onAdded }: { onAdded: () => void }) {
         <Textarea
           id="paste-content"
           placeholder="Paste any text, markdown, or notes here…"
-          className="min-h-48 font-mono text-xs leading-relaxed bg-white"
+          className="min-h-48 placeholder:text-muted-foreground/50 placeholder:text-xs font-mono text-xs leading-relaxed bg-white"
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />

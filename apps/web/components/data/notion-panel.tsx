@@ -10,13 +10,13 @@ import {
   Database,
   FileText,
   RefreshCw,
-  Link2,
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 interface NotionPage {
@@ -51,7 +51,9 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [search, setSearch] = useState("");
-  const [showType, setShowType] = useState<"all" | "pages" | "databases">("all");
+  const [showType, setShowType] = useState<"all" | "pages" | "databases">(
+    "all",
+  );
 
   useEffect(() => {
     fetchStatus();
@@ -60,7 +62,7 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
   async function fetchStatus() {
     setLoading(true);
     try {
-      const res = await fetch("/api/notion");
+      const res = await fetch("/api/integrations/notion");
       const data = await res.json();
       setStatus(data);
     } catch (err) {
@@ -75,26 +77,7 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
     }
   }
 
-  function connectNotion() {
-    const clientId = status?.configured
-      ? undefined
-      : prompt("Enter your Notion Client ID (from notion.so/my-integrations):");
-
-    if (!status?.configured && !clientId) return;
-
-    // For OAuth flow, redirect to Notion authorization
-    const notionClientId = clientId || process.env.NEXT_PUBLIC_NOTION_CLIENT_ID;
-    if (!notionClientId) {
-      toast.error(
-        "Set NOTION_CLIENT_ID and NOTION_CLIENT_SECRET in your .env file, then restart the server.",
-      );
-      return;
-    }
-
-    const redirectUri = `${window.location.origin}/api/notion/callback`;
-    const authUrl = `https://api.notion.com/v1/oauth/authorize?client_id=${notionClientId}&response_type=code&owner=user&redirect_uri=${encodeURIComponent(redirectUri)}`;
-    window.location.href = authUrl;
-  }
+  // connectNotion removed since it's handled by IntegrationsPanel
 
   function togglePage(id: string) {
     setSelected((prev) => {
@@ -130,7 +113,7 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
 
     setImporting(true);
     try {
-      const res = await fetch("/api/notion", {
+      const res = await fetch("/api/integrations/notion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pageIds: Array.from(selected) }),
@@ -162,7 +145,7 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
     );
   }
 
-  // Not connected state
+  // Not connected state (fallback, though we mostly trigger this when connected)
   if (!status?.connected) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-12">
@@ -171,11 +154,10 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
         </div>
         <div className="text-center max-w-md">
           <h3 className="text-lg font-semibold text-foreground">
-            Connect Notion
+            Notion Not Connected
           </h3>
           <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
-            Import pages and databases from your Notion workspace directly into
-            your knowledge base.
+            Please connect Notion from the integrations panel.
           </p>
 
           {status?.error && (
@@ -184,59 +166,6 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
               {status.error}
             </div>
           )}
-
-          <div className="mt-4 space-y-3">
-            {!status?.configured ? (
-              <div className="rounded-lg border border-border bg-muted/30 p-4 text-left space-y-2.5">
-                <p className="text-xs font-medium text-foreground">
-                  Setup required:
-                </p>
-                <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal ml-4">
-                  <li>
-                    Go to{" "}
-                    <a
-                      href="https://www.notion.so/my-integrations"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline inline-flex items-center gap-0.5"
-                    >
-                      notion.so/my-integrations
-                      <ExternalLink className="size-2.5" />
-                    </a>
-                  </li>
-                  <li>Create a new <strong>Public</strong> integration</li>
-                  <li>
-                    Set redirect URI to:{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">
-                      {typeof window !== "undefined"
-                        ? `${window.location.origin}/api/notion/callback`
-                        : "/api/notion/callback"}
-                    </code>
-                  </li>
-                  <li>
-                    Add <code className="rounded bg-muted px-1 font-mono text-[10px]">NOTION_CLIENT_ID</code>{" "}
-                    and{" "}
-                    <code className="rounded bg-muted px-1 font-mono text-[10px]">NOTION_CLIENT_SECRET</code>{" "}
-                    to your <code className="rounded bg-muted px-1 font-mono text-[10px]">.env</code>
-                  </li>
-                  <li>Restart the server and click Connect below</li>
-                </ol>
-              </div>
-            ) : null}
-
-            <Button onClick={connectNotion} className="gap-2">
-              <Link2 className="size-4" />
-              {status?.configured
-                ? "Connect Notion Account"
-                : "I've Set Up My Integration — Connect"}
-            </Button>
-
-            {!status?.configured && (
-              <p className="text-[10px] text-muted-foreground/70">
-                Or set <code className="font-mono">NOTION_ACCESS_TOKEN</code> directly in .env for internal integrations.
-              </p>
-            )}
-          </div>
         </div>
       </div>
     );
@@ -263,15 +192,15 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
         : [...filteredPages, ...filteredDatabases];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 ">
       {/* Connection status */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="size-4 text-green-600" />
-          <span className="text-sm font-medium text-foreground">
+      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 p-2 pt-3">
+        <div className="flex items-center flex-wrap sm:flex-nowrap gap-2 min-w-0">
+          <CheckCircle2 className="size-4 shrink-0 text-green-600" />
+          <span className="text-sm font-medium text-foreground shrink-0">
             Notion Connected
           </span>
-          <Badge variant="outline" className="text-[10px]">
+          <Badge variant="outline" className="text-[10px] shrink-0">
             {allPages.length} pages · {allDatabases.length} databases
           </Badge>
         </div>
@@ -279,7 +208,7 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
           variant="ghost"
           size="sm"
           onClick={fetchStatus}
-          className="h-7 gap-1.5 text-xs"
+          className="h-7 gap-1.5 text-xs shrink-0"
         >
           <RefreshCw className="size-3" />
           Refresh
@@ -287,23 +216,23 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
       </div>
 
       {/* Search + filter */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-0">
         <Input
           placeholder="Search pages…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1"
+          className="flex-1 w-full"
         />
-        <div className="flex items-center rounded-lg border border-border p-0.5">
+        <div className="flex items-center h-10 w-full sm:w-auto rounded-lg border border-border p-1">
           {(["all", "pages", "databases"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setShowType(t)}
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors capitalize",
+                "h-full flex-1 sm:flex-none rounded-md px-3 text-xs font-medium transition-colors capitalize",
                 showType === t
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-background text-foreground "
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -385,29 +314,42 @@ export function NotionPanel({ onAdded }: { onAdded: () => void }) {
           </ul>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            {search
-              ? "No pages match your search."
-              : "No pages found. Make sure your integration has access to pages in Notion."}
+        <div className="flex flex-col items-center justify-center rounded-lg py-12 text-center">
+          <FileText className="size-8 text-muted-foreground/30 mb-3" />
+          <p className="text-sm font-medium text-foreground">
+            {search ? "No pages match your search." : "No pages found."}
           </p>
+          {!search && (
+            <p className="text-xs text-muted-foreground mt-1 max-w-[350px]">
+              Make sure your integration has access to pages in Notion.
+            </p>
+          )}
         </div>
       )}
 
-      {/* Import button */}
+      {/* Import actions */}
       {selected.size > 0 && (
-        <Button
-          onClick={importSelected}
-          disabled={importing}
-          className="w-full"
-        >
-          {importing ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <img src="/notion.png" alt="Notion" className="size-4" />
-          )}
-          Import {selected.size} page{selected.size !== 1 ? "s" : ""}
-        </Button>
+        <DialogFooter className="mt-2 border-t-0 p-4 flex-row justify-end space-x-2 gap-0 sm:gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setSelected(new Set())}
+            disabled={importing}
+          >
+            Cancel
+          </Button>
+          <Button onClick={importSelected} disabled={importing}>
+            {importing ? (
+              <Loader2 className="size-4 mr-2 animate-spin" />
+            ) : (
+              <img
+                src="/notion-white.png"
+                alt="Notion"
+                className="size-4 mr-2"
+              />
+            )}
+            Import {selected.size} page{selected.size !== 1 ? "s" : ""}
+          </Button>
+        </DialogFooter>
       )}
     </div>
   );

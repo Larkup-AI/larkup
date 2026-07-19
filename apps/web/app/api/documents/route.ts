@@ -19,7 +19,13 @@ export const dynamic = "force-dynamic"
 /** GET → the full corpus plus summary stats. */
 export async function GET() {
   const [documents, stats] = await Promise.all([readDocuments(), corpusStats()])
-  return NextResponse.json({ documents, stats })
+  
+  // Sort documents by createdAt descending (newest first)
+  const sortedDocuments = documents.sort((a, b) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+
+  return NextResponse.json({ documents: sortedDocuments, stats })
 }
 
 /**

@@ -19,6 +19,23 @@ function assessReadiness(config: RagConfig, docCount: number) {
   const model = getEmbeddingModel(config.embeddingModelId)
   if (!model && !config.embeddingModelId?.startsWith("custom:")) blockers.push("No embedding model is selected.")
 
+  // Check for embedding model API key (Strict UI/DB check, no .env)
+  let hasKey = !!config.embeddingApiKey?.trim()
+  if (!hasKey) {
+    if (config.embeddingModelId?.startsWith("custom:")) {
+      const customName = config.embeddingModelId.slice("custom:".length)
+      const custom = (config.customEmbeddings ?? []).find((m) => m.modelName === customName)
+      hasKey = !!custom?.apiKey || true // custom might be local, so we don't strictly block
+    } else {
+      // For all standard providers, if it's not set in the config, it's missing.
+      hasKey = false
+    }
+  }
+
+  if (!hasKey) {
+    blockers.push("MISSING_EMBEDDING_API_KEY")
+  }
+
   if (docCount === 0)
     blockers.push("The corpus is empty — load documents in the Data stage.")
 
