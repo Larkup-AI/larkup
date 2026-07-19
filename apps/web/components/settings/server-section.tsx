@@ -72,7 +72,9 @@ export function ServerSection() {
 
   useEffect(() => {
     const url = localStorage.getItem(`vercel_deployed_url_${serverId}`);
-    const provider = localStorage.getItem(`vercel_deployed_provider_${serverId}`);
+    const provider = localStorage.getItem(
+      `vercel_deployed_provider_${serverId}`,
+    );
     const savedApiKey = localStorage.getItem("rag_server_api_key");
     if (url) setRemoteUrl(url);
     if (provider) setRemoteProvider(provider);
@@ -166,7 +168,8 @@ export function ServerSection() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Start the server locally to test your AI endpoints. Your configuration and API keys will be applied automatically.
+            Start the server locally to test your AI endpoints. Your
+            configuration and API keys will be applied automatically.
           </p>
 
           {state?.running && (
@@ -179,7 +182,10 @@ export function ServerSection() {
                     href={`${state.endpoint}/reference`}
                     target="_blank"
                     rel="noreferrer"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "sm",
+                    })}
                   >
                     Open API Reference
                   </a>
@@ -223,7 +229,11 @@ export function ServerSection() {
                 </a>
               </>
             ) : (
-              <Button onClick={() => control("start")} disabled={busy !== null}>
+              <Button
+                className={"rounded-md"}
+                onClick={() => control("start")}
+                disabled={busy !== null}
+              >
                 {busy === "start" ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
@@ -232,7 +242,9 @@ export function ServerSection() {
                 {busy === "start" ? "Starting…" : "Launch server"}
               </Button>
             )}
-            <SdkConnectDialog serverUrl={state?.endpoint || "http://localhost:8080"} />
+            <SdkConnectDialog
+              serverUrl={state?.endpoint || "http://localhost:8080"}
+            />
           </div>
 
           {state?.running && (
@@ -242,8 +254,14 @@ export function ServerSection() {
                 <span>Test your endpoint</span>
               </div>
               <Dialog>
-                <DialogTrigger 
-                  render={<Button variant="outline" size="sm" className="h-7 text-xs px-2 gap-1.5" />}
+                <DialogTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs px-2 gap-1.5"
+                    />
+                  }
                 >
                   <Terminal className="size-3" />
                   Try it (cURL)
@@ -266,7 +284,9 @@ export function ServerSection() {
                       size="icon"
                       className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
                       onClick={() => {
-                        navigator.clipboard.writeText(`curl -X POST ${state.endpoint}/query -H "Content-Type: application/json"${apiKey ? ` -H "Authorization: Bearer ${apiKey}"` : ""} -d '{"query":"hello"}'`);
+                        navigator.clipboard.writeText(
+                          `curl -X POST ${state.endpoint}/query -H "Content-Type: application/json"${apiKey ? ` -H "Authorization: Bearer ${apiKey}"` : ""} -d '{"query":"hello"}'`,
+                        );
                         toast.success("Command copied");
                       }}
                     >
@@ -310,7 +330,9 @@ export function ServerSection() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Remove remote server?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will remove the remote server connection from this workspace. The deployed server itself will not be deleted from your provider.
+                        This will remove the remote server connection from this
+                        workspace. The deployed server itself will not be
+                        deleted from your provider.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -331,8 +353,12 @@ export function ServerSection() {
             <div className="space-y-3 pt-4 border-t border-border">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-foreground">Deploy to Cloud</h3>
-                  <p className="text-xs text-muted-foreground">Deploy your AI server to Vercel for production use.</p>
+                  <h3 className="text-sm font-medium text-foreground">
+                    Deploy to Cloud
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Deploy your AI server to Vercel for production use.
+                  </p>
                 </div>
                 <DeployButton serverId={serverId} />
               </div>
@@ -348,8 +374,11 @@ export function ServerSection() {
             Server API Key
           </CardTitle>
           <CardDescription className="text-xs">
-            Protect your server with an API key. Clients must send this key in the{" "}
-            <code className="text-[11px] bg-muted px-1 py-0.5 rounded">Authorization</code>{" "}
+            Protect your server with an API key. Clients must send this key in
+            the{" "}
+            <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+              Authorization
+            </code>{" "}
             header.
           </CardDescription>
         </CardHeader>
@@ -377,8 +406,8 @@ export function ServerSection() {
             </Button>
             <Button
               variant="outline"
-              size="sm"
-              className="shrink-0 gap-1.5"
+              size="default"
+              className="shrink-0 gap-1.5 h-9"
               onClick={generateApiKey}
             >
               <RefreshCw className="size-3.5" />
@@ -386,7 +415,8 @@ export function ServerSection() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Stored locally in your browser. Generate a new key or paste your own.
+            Stored locally in your browser. Generate a new key or paste your
+            own.
           </p>
         </CardContent>
       </Card>

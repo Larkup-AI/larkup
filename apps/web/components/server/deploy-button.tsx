@@ -594,7 +594,7 @@ export function DeployButton({ serverId = "default" }: DeployButtonProps) {
             />
           }
         >
-          <div className="w-full flex items-center justify-between">
+          <div className="w-full flex items-center justify-between rounded-lg">
             <div className="flex items-center">
               <Rocket className="size-4 mr-2" />
               Deploy

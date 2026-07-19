@@ -38,7 +38,7 @@ export function GeneralSection() {
 
   const dirtyUsername = localName.trim() !== (username || "");
   const dirtyWebSearch = form.serperApiKey !== data?.config?.serperApiKey;
-  const dirtyScraper = 
+  const dirtyScraper =
     form.scraperProxyServer !== data?.config?.scraperProxyServer ||
     form.scraperProxyUsername !== data?.config?.scraperProxyUsername ||
     form.scraperProxyPassword !== data?.config?.scraperProxyPassword ||
@@ -72,7 +72,7 @@ export function GeneralSection() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed to save");
-      
+
       setForm((prev) => ({ ...prev, ...json.config }));
       await mutate(json, { revalidate: false });
       toast.success("Settings saved");
@@ -103,7 +103,7 @@ export function GeneralSection() {
       </div>
 
       {/* Username */}
-      <Card>
+      <Card className="">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Your Name</CardTitle>
           <CardDescription className="text-xs">

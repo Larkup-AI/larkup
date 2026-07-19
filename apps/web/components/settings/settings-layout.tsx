@@ -39,7 +39,7 @@ const SECTION_GROUPS: SectionGroup[] = [
       { id: "general", label: "General", icon: Settings2 },
       { id: "models", label: "AI Models", icon: Sparkles },
       { id: "storage", label: "Storage", icon: Database },
-      { id: "server", label: "Server connection", icon: Server },
+      { id: "server", label: "Larkup Server", icon: Server },
     ],
   },
   {
