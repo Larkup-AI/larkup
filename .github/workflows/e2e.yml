@@ -31,9 +31,12 @@ jobs:
     - name: Install Playwright Browsers
       run: pnpm --filter @larkup/e2e exec playwright install --with-deps
 
+    - name: Build Web App
+      run: pnpm --filter @larkup/web build
+
     - name: Run E2E tests
       run: |
-        pnpm dev &
+        pnpm --filter "./apps/web" start &
         pnpm dlx wait-on http://localhost:4567 -t 60000
         cd e2e
         pnpm test
