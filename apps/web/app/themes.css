@@ -535,8 +535,8 @@
 }
 
 .bg-default {
-  --background: #fff !important;
-  --sidebar: #f4f4f4 !important;
+  --background: #FAFAFA !important;
+  --sidebar: #FAFAFA !important;
   --card: #ffffff !important;
   --popover: #ffffff !important;
   --border: #e5e5e5 !important;
@@ -733,8 +733,8 @@
 }
 
 .bg-fafafa {
-  --background: #f4f4f4 !important;
-  --sidebar: #eeeeee !important;
+  --background: #FAFAFA !important;
+  --sidebar: #FAFAFA !important;
   --card: #ffffff !important;
   --popover: #ffffff !important;
   --border: #e0e0e0 !important;

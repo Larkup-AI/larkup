@@ -84,8 +84,8 @@ export function ThemeCustomizerProvider({
   const [layout, setLayout] = useState<LayoutVariant>("sidebar");
   const [radius, setRadius] = useState<RadiusVariant>("radius-default");
   const [background, setBackground] = useState<BackgroundVariant>("bg-default");
-  const [panelBg, setPanelBg] = useState<PanelBgVariant>("panel-white");
-  const [navBg, setNavBg] = useState<PanelBgVariant>("panel-silver");
+  const [panelBg, setPanelBg] = useState<PanelBgVariant>("panel-default");
+  const [navBg, setNavBg] = useState<PanelBgVariant>("panel-default");
   const [pageStyle, setPageStyle] = useState<PageStyleVariant>("card");
 
   useEffect(() => {
