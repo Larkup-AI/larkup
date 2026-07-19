@@ -224,6 +224,22 @@ export async function startServer(
 
   const healthy = await waitForHealth(endpoint, 20_000);
 
+  let lastError: string | undefined = undefined;
+  if (!healthy) {
+    lastError =
+      'The AI server failed to start within the expected time limit. Please try restarting.';
+    try {
+      const logs = await fs.readFile(logPath, 'utf8');
+      const trimmed = logs.trim();
+      if (trimmed) {
+        const lastLines = trimmed.split('\n').slice(-5).join('\n');
+        lastError = `The AI server failed to start. Error details:\n${lastLines}`;
+      }
+    } catch (err) {
+      // ignore
+    }
+  }
+
   return writeState({
     running: healthy,
     pid: child.pid,
@@ -231,9 +247,7 @@ export async function startServer(
     endpoint,
     generatedAt: new Date().toISOString(),
     startedAt: new Date().toISOString(),
-    lastError: healthy
-      ? undefined
-      : "Server process started but did not become healthy in time. Check the server's generated-server/server.log.",
+    lastError,
   });
 }
 

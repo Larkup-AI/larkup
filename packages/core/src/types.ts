@@ -156,6 +156,9 @@ export interface RagConfig {
   chatSuggestions?: string[];
   systemPrompt?: string;
   serperApiKey?: string;
+  webSearchEnabled?: boolean;
+  webSearchProvider?: 'tavily' | 'server';
+  tavilyApiKey?: string;
   scraperProxyServer?: string;
   scraperProxyUsername?: string;
   scraperProxyPassword?: string;
@@ -182,6 +185,9 @@ export const DEFAULT_CONFIG: RagConfig = {
   },
   topK: 5,
   serperApiKey: '',
+  webSearchEnabled: false,
+  webSearchProvider: 'tavily',
+  tavilyApiKey: '',
   scraperProxyServer: '',
   scraperProxyUsername: '',
   scraperProxyPassword: '',

@@ -653,22 +653,22 @@ const server = createServer(async (req, res) => {
           documentId: d.documentId, text: (d.text || "").slice(0, 1000)
         }))
         res.writeHead(200, { "Content-Type": "application/x-ndjson", "Access-Control-Allow-Origin": "*" })
-        return res.end(lines.join("\n"))
+        return res.end(lines.join("\\n"))
       }
 
       // Default: CSV
       const header = "id,title,url,documentId,charCount,content"
       const csvEscape = (v) => {
         const s = String(v || "")
-        return s.includes(",") || s.includes('"') || s.includes("\n") ? '"' + s.replace(/"/g, '""') + '"' : s
+        return s.includes(",") || s.includes('"') || s.includes("\\n") ? '"' + s.replace(/"/g, '""') + '"' : s
       }
       const rows = docs.map(d => [
         d.id, d.title, d.url || "", d.documentId,
         (d.text || "").length,
-        (d.text || "").slice(0, 1000).replace(/\n/g, " ")
+        (d.text || "").slice(0, 1000).replace(/\\n/g, " ")
       ].map(csvEscape).join(","))
       res.writeHead(200, { "Content-Type": "text/csv", "Access-Control-Allow-Origin": "*" })
-      return res.end([header, ...rows].join("\n"))
+      return res.end([header, ...rows].join("\\n"))
     } catch (err) {
       return send(res, 500, { error: String(err?.message || err) })
     }
@@ -1065,10 +1065,31 @@ export function generateServer(config: RagConfig): GeneratedServer {
   const usesLocalLance = config.vectorStore === 'lancedb' && config.storeConfig.mode !== 'cloud';
 
   const dependencies: Record<string, string> = {
-    ai: '^6.0.0',
+    ai: '^3.0.0',
     cheerio: '^1.0.0',
     ...store.serverDependencies,
   };
+
+  if (config.embeddingModelId.startsWith('custom:')) {
+    dependencies['@ai-sdk/openai-compatible'] = 'latest';
+  } else if (config.embeddingProvider === 'deepseek') {
+    dependencies['@ai-sdk/deepseek'] = 'latest';
+  } else if (config.embeddingProvider === 'google') {
+    dependencies['@ai-sdk/google'] = 'latest';
+  } else if (config.embeddingProvider === 'cohere') {
+    dependencies['@ai-sdk/cohere'] = 'latest';
+  } else if (config.embeddingProvider === 'mistral') {
+    dependencies['@ai-sdk/mistral'] = 'latest';
+  } else if (config.embeddingProvider === 'vercel_ai_gateway') {
+    dependencies['@ai-sdk/gateway'] = 'latest';
+  } else if (config.embeddingProvider === 'jina') {
+    // Actually, Jina uses openai compatible or an explicit jina one? There's no @ai-sdk/jina in the standard set, but let's assume openai or openai-compatible
+    // Wait, the embedSource didn't have 'jina' branch. It falls back to `createOpenAI` in `embedSource`!
+    // Let's just fallback to openai.
+    dependencies['@ai-sdk/openai'] = 'latest';
+  } else {
+    dependencies['@ai-sdk/openai'] = 'latest';
+  }
 
   const envVars: GeneratedServer['envVars'] = [
     {
