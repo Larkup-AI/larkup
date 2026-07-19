@@ -162,7 +162,7 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
         </Alert>
       )}
 
-      {run?.status === 'failed' && (
+      {run?.status === 'failed' && !run.error?.toLowerCase().includes('corpus cleared') && (
         <Alert variant="destructive">
           <AlertTriangle className="size-4" />
           <AlertTitle>Indexing failed</AlertTitle>
