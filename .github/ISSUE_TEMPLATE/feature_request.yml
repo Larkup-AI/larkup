@@ -1,0 +1,49 @@
+name: Feature Request
+description: Suggest an idea for Larkup
+title: '[FEATURE] '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a feature! We really appreciate it.
+
+  - type: textarea
+    attributes:
+      label: Description
+      description: A clear and concise description of what you want to achieve.
+      placeholder: 'I would love to have a feature that...'
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Use Case
+      description: Describe the problem you are trying to solve or the situation where this feature would be useful.
+      placeholder: 'When I am working on X, I often need to do Y. Currently, this requires me to...'
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Proposed Solution
+      description: How would you like this feature to work? (Optional but helpful)
+      placeholder: 'A new button in the UI that does...'
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: 'I could use feature Z, but it lacks...'
+    validations:
+      required: false
+
+  - type: checkboxes
+    attributes:
+      label: Verification
+      description: Before submitting, please make sure you've completed the following
+      options:
+        - label: I have searched the existing issues to make sure this is not a duplicate
+          required: true

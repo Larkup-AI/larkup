@@ -1,0 +1,23 @@
+name: Q&A
+description: Ask a question about Larkup
+title: '[Question] '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about using Larkup? We're happy to help!
+
+  - type: textarea
+    attributes:
+      label: Your question
+      description: Please be as specific as possible.
+      placeholder: 'How do I configure the vector store to...'
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Context
+      description: Any code snippets, screenshots, or context that might help us understand the question.
+    validations:
+      required: false

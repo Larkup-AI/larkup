@@ -1,0 +1,30 @@
+# Larkup Monorepo CODEOWNERS
+# Last matching pattern wins. General patterns first, specific overrides last.
+# Each line: pattern @owner1 @owner2 [@owner3]
+
+# ============================================================================
+# Default fallback
+# ============================================================================
+* @AbdelrahmanAbounida
+
+# ============================================================================
+# Core packages
+# ============================================================================
+packages/core/ @AbdelrahmanAbounida
+packages/vector-stores/ @AbdelrahmanAbounida
+packages/marketplace/ @AbdelrahmanAbounida
+
+# ============================================================================
+# Applications
+# ============================================================================
+apps/web/ @AbdelrahmanAbounida
+apps/cli/ @AbdelrahmanAbounida
+apps/sdk/ @AbdelrahmanAbounida
+
+# ============================================================================
+# Infrastructure & CI
+# ============================================================================
+.github/ @AbdelrahmanAbounida
+docker/ @AbdelrahmanAbounida
+scripts/ @AbdelrahmanAbounida
+e2e/ @AbdelrahmanAbounida

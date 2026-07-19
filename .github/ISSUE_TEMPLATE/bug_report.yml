@@ -1,0 +1,60 @@
+name: Bug Report
+description: Report a bug to help us improve Larkup
+title: '[BUG] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please provide as much detail as possible to help us address the issue quickly.
+
+  - type: textarea
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+      placeholder: 'When trying to run the RAG query, the execution fails with an error message...'
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Steps To Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Start the app with `pnpm run dev`
+        2. Navigate to the dashboard
+        3. Click on the knowledge base tab
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: 'The knowledge base should load the files and index them properly.'
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Environment Information
+      description: Provide the environment where this bug occurred (e.g., Mac/Windows/Linux, browser version, node/pnpm versions).
+      render: block
+      placeholder: |
+        - OS: macOS Sonoma
+        - Browser: Chrome 120
+        - Node Version: 20
+        - PNPM Version: 8
+    validations:
+      required: true
+
+  - type: checkboxes
+    attributes:
+      label: Verification
+      description: Before submitting, please make sure you've completed the following
+      options:
+        - label: I have searched the existing issues to make sure this is not a duplicate
+          required: true
+        - label: I have included sufficient information for the team to reproduce and understand the issue
+          required: true

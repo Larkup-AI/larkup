@@ -1,0 +1,75 @@
+# See https://github.com/actions/labeler
+
+docs:
+  - all:
+    - changed-files:
+      - any-glob-to-any-file:
+        - docs/**
+        - README.md
+        - CONTRIBUTING.md
+        - .agents/skills/docs-guide/**
+
+infrastructure:
+  - all:
+    - changed-files:
+      - any-glob-to-any-file:
+        - docker/**
+        - scripts/**
+        - .github/**
+        - .husky/**
+        - .changeset/**
+        - package.json
+        - pnpm-workspace.yaml
+        - turbo.json
+
+ui:
+  - all:
+    - changed-files:
+      - any-glob-to-any-file:
+        - 'apps/web/components/**'
+        - 'apps/web/app/**'
+        - .agents/skills/ui-development-guide/**
+
+core:
+  - all:
+    - changed-files:
+      - any-glob-to-any-file:
+        - 'packages/core/**'
+        - 'packages/vector-stores/**'
+        - .agents/skills/database-guide/**
+
+marketplace:
+  - all:
+    - changed-files:
+      - any-glob-to-any-file:
+        - 'packages/marketplace/**'
+        - 'packages/tools/**'
+        - .agents/skills/marketplace-tools/**
+
+cli:
+  - all:
+    - changed-files:
+      - any-glob-to-any-file:
+        - 'apps/cli/**'
+
+sdk:
+  - all:
+    - changed-files:
+      - any-glob-to-any-file:
+        - 'apps/sdk/**'
+
+e2e:
+  - all:
+    - changed-files:
+      - any-glob-to-any-file:
+        - 'e2e/**'
+        - .agents/skills/running-and-testing-locally/**
+
+tests:
+  - all:
+    - changed-files:
+      - any-glob-to-any-file:
+        - '**/*.test.ts'
+        - '**/*.test.tsx'
+        - '**/*.spec.ts'
+        - '**/*.spec.tsx'

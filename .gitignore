@@ -1,65 +1,62 @@
+# ═══════════════════════════════════════════════════
+# Larkup Monorepo — .gitignore
+# ═══════════════════════════════════════════════════
+
+# ── Environment & Secrets ─────────────────────────
+.env
+.env.*
+!.env.example
 .snowflake/
+
+# ── Dependencies & Build ─────────────────────────
+node_modules/
+dist/
+build/
+.next/
+.turbo/
 .vercel/
 
-# Environment variables
-.env*.local
-.env
-.env.dev
-# Common ignores
-node_modules/
-.next/
+# ── OS & IDE ─────────────────────────────────────
 .DS_Store
+**/.DS_Store
+.vscode/
+*.swp
+*.swo
 
-# RAG Toolkit local state
-.larkup/
-proxies.txt
-
-# LanceDB data
-dummy/
-lancedb/
-
-# Turbo
-.turbo/
-
-# Python
+# ── Python ───────────────────────────────────────
 __pycache__/
 *.egg-info/
-build/
 venv/
 .venv/
 .pytest_cache/
 
-# Build artifacts
-dist/
+# ── Larkup Local State ──────────────────────────
+.larkup/
+lancedb/
+proxies.txt
 
-# App-specific ignores
+# ── Test Artifacts ───────────────────────────────
+playwright-report/
+e2e/playwright-report/
+e2e/test-results/
+apps/web/webui.log
 
+# ── App-Specific ─────────────────────────────────
 apps/web/demo
 apps/local-chat-connection-larkup
 
-# Sensitive scripts
-npm-login.sh
-
-# Archive
-archive/
-
-# e2e
-apps/e2e/demo-data
-apps/e2e/playwright-report
-apps/e2e/test-results
-playwright-report
-.env.e2e
-hpi-connect.txt
-apps/web/webui.log
-
-# Hidden agent guides (internal only)
-.agents/
-
-# Desktop app sidecar binaries
+# ── Desktop Binaries ─────────────────────────────
 apps/desktop/src-tauri/binaries/
 apps/desktop/src-tauri/target/
-apps/api
-TODO.md
+
+# ── Sensitive / Internal ─────────────────────────
+npm-login.sh
+hpi-connect.txt
 keys.txt
-apps/e2e/keys.txt
-.vercel
+TODO.md
+
+# ── Archived / Generated ────────────────────────
+archive/
+dummy/
+demo-repos/
+apps/api
