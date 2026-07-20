@@ -182,14 +182,7 @@ export function ChatSandboxResult({
         </div>
       )}
 
-      {/* Stderr (if any) */}
-      {stderr && (
-        <div className="bg-red-50 px-4 py-3 dark:bg-red-900/10">
-          <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-red-600 dark:text-red-400 [&::-webkit-scrollbar]:hidden">
-            {stderr}
-          </pre>
-        </div>
-      )}
+      {/* Stderr is hidden from non-technical users, but available to the AI model */}
     </Card>
   );
 }

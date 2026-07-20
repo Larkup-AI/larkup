@@ -10,6 +10,7 @@ import {
   Database,
   Plug,
   Store,
+  Share2,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ export type SettingsSection =
   | 'prompts'
   | 'playground'
   | 'appearance'
+  | 'deployment'
   | 'marketplace';
 
 interface SectionItem {
@@ -45,6 +47,7 @@ const SECTION_GROUPS: SectionGroup[] = [
       { id: 'storage', label: 'Storage', icon: Database },
       { id: 'server', label: 'Larkup Server', icon: Server },
       { id: 'connections', label: 'Connections', icon: Plug },
+      // { id: 'deployment', label: 'Deploy & Share', icon: Share2 },
     ],
   },
   {

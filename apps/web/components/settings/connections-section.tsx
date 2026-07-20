@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Code2, Sparkles, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+import { Code2, Sparkles, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -10,19 +10,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 
-type ConnectionId =
-  | "webhook"
-  | "slack"
-  | "discord"
-  | "telegram"
-  | "whatsapp"
-  | "widget";
+type ConnectionId = 'webhook' | 'slack' | 'discord' | 'telegram' | 'whatsapp' | 'widget';
 
 interface ConnectionItem {
   id: ConnectionId;
@@ -35,92 +29,92 @@ interface ConnectionItem {
 
 const CONNECTIONS: ConnectionItem[] = [
   {
-    id: "webhook",
-    name: "Webhook",
-    description: "Custom webhook integration",
-    iconPath: "/icons/webhook.png",
+    id: 'webhook',
+    name: 'Webhook',
+    description: 'Custom webhook integration',
+    iconPath: '/icons/webhook.png',
     fields: [
       {
-        id: "url",
-        label: "Webhook URL",
-        type: "url",
-        placeholder: "https://your-domain.com/webhook",
+        id: 'url',
+        label: 'Webhook URL',
+        type: 'url',
+        placeholder: 'https://your-domain.com/webhook',
       },
     ],
   },
   {
-    id: "slack",
-    name: "Slack",
-    description: "Connect to a Slack workspace",
-    iconPath: "/icons/slack.png",
+    id: 'slack',
+    name: 'Slack',
+    description: 'Connect to a Slack workspace',
+    iconPath: '/icons/slack.png',
     fields: [
       {
-        id: "token",
-        label: "Bot User OAuth Token",
-        type: "password",
-        placeholder: "xoxb-...",
+        id: 'token',
+        label: 'Bot User OAuth Token',
+        type: 'password',
+        placeholder: 'xoxb-...',
       },
     ],
   },
   {
-    id: "discord",
-    name: "Discord",
-    description: "Add a Discord bot",
-    iconPath: "/icons/discord.png",
+    id: 'discord',
+    name: 'Discord',
+    description: 'Add a Discord bot',
+    iconPath: '/icons/discord.png',
     fields: [
       {
-        id: "token",
-        label: "Bot Token",
-        type: "password",
-        placeholder: "Paste your Discord bot token",
+        id: 'token',
+        label: 'Bot Token',
+        type: 'password',
+        placeholder: 'Paste your Discord bot token',
       },
     ],
   },
   {
-    id: "telegram",
-    name: "Telegram",
-    description: "Create a Telegram bot",
-    iconPath: "/icons/telegram.png",
+    id: 'telegram',
+    name: 'Telegram',
+    description: 'Create a Telegram bot',
+    iconPath: '/icons/telegram.png',
     fields: [
       {
-        id: "token",
-        label: "Bot Token",
-        type: "password",
-        placeholder: "Paste your Telegram bot token from BotFather",
+        id: 'token',
+        label: 'Bot Token',
+        type: 'password',
+        placeholder: 'Paste your Telegram bot token from BotFather',
       },
     ],
   },
   {
-    id: "whatsapp",
-    name: "WhatsApp",
-    description: "WhatsApp Business API",
-    iconPath: "/icons/whatsapp.png",
+    id: 'whatsapp',
+    name: 'WhatsApp',
+    description: 'WhatsApp Business API',
+    iconPath: '/icons/whatsapp.png',
     fields: [
       {
-        id: "phoneNumberId",
-        label: "Phone Number ID",
-        type: "text",
-        placeholder: "e.g. 10123456789",
+        id: 'phoneNumberId',
+        label: 'Phone Number ID',
+        type: 'text',
+        placeholder: 'e.g. 10123456789',
       },
       {
-        id: "token",
-        label: "Access Token",
-        type: "password",
-        placeholder: "Permanent or temporary access token",
+        id: 'token',
+        label: 'Access Token',
+        type: 'password',
+        placeholder: 'Permanent or temporary access token',
       },
     ],
   },
   {
-    id: "widget",
-    name: "Website Widget",
-    description: "Inject a chat UI in your website",
+    id: 'widget',
+    name: 'Website Widget',
+    description: 'Inject a chat UI in your website',
     IconComponent: Code2,
     fields: [
       {
-        id: "domain",
-        label: "Allowed Domain",
-        type: "text",
-        placeholder: "https://your-website.com",
+        id: 'domain',
+        label: 'Allowed Domain',
+        type: 'text',
+        placeholder: 'https://your-website.com',
       },
     ],
   },
@@ -129,17 +123,32 @@ const CONNECTIONS: ConnectionItem[] = [
 export function ConnectionsSection() {
   const [connected, setConnected] = useState<Record<string, boolean>>({});
 
+  useEffect(() => {
+    fetch('/api/connections')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.error) setConnected(data);
+      });
+  }, []);
+
+  const saveConnectionsState = async (newState: Record<string, boolean>) => {
+    setConnected(newState);
+    await fetch('/api/connections', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newState),
+    });
+  };
+
   // Dialog state
   const [activeDialog, setActiveDialog] = useState<ConnectionId | null>(null);
-  const [dialogType, setDialogType] = useState<"connect" | "configure" | null>(
-    null,
-  );
+  const [dialogType, setDialogType] = useState<'connect' | 'configure' | null>(null);
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  const [requestName, setRequestName] = useState("");
-  const [requestCompany, setRequestCompany] = useState("");
-  const [requestEmail, setRequestEmail] = useState("");
-  const [requestMessage, setRequestMessage] = useState("");
+  const [requestName, setRequestName] = useState('');
+  const [requestCompany, setRequestCompany] = useState('');
+  const [requestEmail, setRequestEmail] = useState('');
+  const [requestMessage, setRequestMessage] = useState('');
   const [isRequesting, setIsRequesting] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
 
@@ -150,12 +159,11 @@ export function ConnectionsSection() {
     setIsRequesting(true);
     try {
       const res = await fetch(
-        process.env.NEXT_PUBLIC_CONNECT_API_URL ||
-          "https://www.larkup.de/api/connect",
+        process.env.NEXT_PUBLIC_CONNECT_API_URL || 'https://www.larkup.de/api/connect',
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             name: requestName,
@@ -167,22 +175,22 @@ export function ConnectionsSection() {
       );
 
       if (!res.ok) {
-        throw new Error("Failed to send request");
+        throw new Error('Failed to send request');
       }
 
       setRequestSuccess(true);
-      toast.success("Request sent successfully!");
+      toast.success('Request sent successfully!');
 
       setTimeout(() => {
         setIsRequestModalOpen(false);
         setRequestSuccess(false);
-        setRequestName("");
-        setRequestCompany("");
-        setRequestEmail("");
-        setRequestMessage("");
+        setRequestName('');
+        setRequestCompany('');
+        setRequestEmail('');
+        setRequestMessage('');
       }, 2000);
     } catch (error) {
-      toast.error("Failed to send request. Please try again later.");
+      toast.error('Failed to send request. Please try again later.');
     } finally {
       setIsRequesting(false);
     }
@@ -190,26 +198,26 @@ export function ConnectionsSection() {
 
   const handleConnectClick = (id: ConnectionId) => {
     setActiveDialog(id);
-    setDialogType("connect");
+    setDialogType('connect');
   };
 
   const handleConfigureClick = (id: ConnectionId) => {
     setActiveDialog(id);
-    setDialogType("configure");
+    setDialogType('configure');
   };
 
   const activeConnection = CONNECTIONS.find((c) => c.id === activeDialog);
 
   const handleSave = () => {
     if (activeDialog) {
-      setConnected((prev) => ({ ...prev, [activeDialog]: true }));
+      saveConnectionsState({ ...connected, [activeDialog]: true });
       setActiveDialog(null);
     }
   };
 
   const handleDisconnect = () => {
     if (activeDialog) {
-      setConnected((prev) => ({ ...prev, [activeDialog]: false }));
+      saveConnectionsState({ ...connected, [activeDialog]: false });
       setActiveDialog(null);
     }
   };
@@ -245,19 +253,13 @@ export function ConnectionsSection() {
               <div className="flex items-center gap-3.5 min-w-0">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/50 border border-border/30">
                   {conn.iconPath ? (
-                    <img
-                      src={conn.iconPath}
-                      alt={conn.name}
-                      className="size-6 object-contain"
-                    />
+                    <img src={conn.iconPath} alt={conn.name} className="size-6 object-contain" />
                   ) : conn.IconComponent ? (
                     <conn.IconComponent className="size-5 text-foreground" />
                   ) : null}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground">
-                    {conn.name}
-                  </div>
+                  <div className="text-sm font-medium text-foreground">{conn.name}</div>
                   <div className="text-xs text-muted-foreground mt-0.5 truncate">
                     {conn.description}
                   </div>
@@ -275,14 +277,19 @@ export function ConnectionsSection() {
                     Configure
                   </Button>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => handleConnectClick(conn.id)}
-                  >
-                    Connect
-                  </Button>
+                  <>
+                    {/* <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => handleConnectClick(conn.id)}
+                    >
+                      Connect
+                    </Button> */}
+                    <Button variant="outline" size="sm" className="h-8" disabled>
+                      Coming soon
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -290,38 +297,31 @@ export function ConnectionsSection() {
         })}
       </div>
 
-      <Dialog
-        open={!!activeDialog}
-        onOpenChange={(open) => !open && setActiveDialog(null)}
-      >
+      <Dialog open={!!activeDialog} onOpenChange={(open) => !open && setActiveDialog(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {dialogType === "connect"
+              {dialogType === 'connect'
                 ? `Connect ${activeConnection?.name}`
                 : `Configure ${activeConnection?.name}`}
             </DialogTitle>
             <DialogDescription>
-              {dialogType === "connect"
+              {dialogType === 'connect'
                 ? `Enter the required details to connect your ${activeConnection?.name} integration.`
                 : `Manage your ${activeConnection?.name} integration settings.`}
             </DialogDescription>
           </DialogHeader>
 
-          {dialogType === "connect" && activeConnection && (
+          {dialogType === 'connect' && activeConnection && (
             <div className="space-y-4 py-4">
               {activeConnection.fields.map((field) => (
                 <div key={field.id} className="space-y-2">
                   <Label htmlFor={field.id}>{field.label}</Label>
-                  <Input
-                    id={field.id}
-                    type={field.type}
-                    placeholder={field.placeholder}
-                  />
+                  <Input id={field.id} type={field.type} placeholder={field.placeholder} />
                 </div>
               ))}
 
-              {activeConnection.id === "widget" && (
+              {activeConnection.id === 'widget' && (
                 <div className="mt-4 p-4 bg-muted rounded-md border border-border">
                   <Label className="mb-2 block">Widget Code</Label>
                   <code className="text-xs text-muted-foreground break-all">
@@ -332,7 +332,7 @@ export function ConnectionsSection() {
             </div>
           )}
 
-          {dialogType === "configure" && activeConnection && (
+          {dialogType === 'configure' && activeConnection && (
             <div className="space-y-4 py-4">
               <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border border-border/50">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background border border-border">
@@ -347,9 +347,7 @@ export function ConnectionsSection() {
                   ) : null}
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-foreground">
-                    Status: Connected
-                  </div>
+                  <div className="text-sm font-medium text-foreground">Status: Connected</div>
                   <div className="text-xs text-green-600 flex items-center gap-1 mt-0.5">
                     <span className="relative flex size-2">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
@@ -363,7 +361,7 @@ export function ConnectionsSection() {
           )}
 
           <DialogFooter className="gap-2 sm:gap-0">
-            {dialogType === "configure" ? (
+            {dialogType === 'configure' ? (
               <div className="flex w-full justify-between items-center">
                 <Button variant="destructive" onClick={handleDisconnect}>
                   Disconnect
@@ -392,8 +390,7 @@ export function ConnectionsSection() {
                 <Sparkles className="h-6 w-6" />
               </div>
               <p className="text-sm text-muted-foreground">
-                Thank you! We've received your request and will get back to you
-                soon.
+                Thank you! We've received your request and will get back to you soon.
               </p>
             </div>
           ) : (
@@ -453,9 +450,7 @@ export function ConnectionsSection() {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isRequesting}>
-                  {isRequesting && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
+                  {isRequesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Submit Request
                 </Button>
               </DialogFooter>

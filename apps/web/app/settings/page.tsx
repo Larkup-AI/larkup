@@ -11,6 +11,7 @@ import { PlaygroundSection } from '@/components/settings/playground-section';
 import { AppearanceSection } from '@/components/settings/appearance-section';
 import { StorageSection } from '@/components/settings/storage-section';
 import { ConnectionsSection } from '@/components/settings/connections-section';
+import { DeploymentSection } from '@/components/settings/deployment-section';
 import { MarketplaceSection } from '@/components/settings/marketplace-section';
 
 function SettingsContent() {
@@ -59,6 +60,7 @@ function SettingsContent() {
       {activeSection === 'storage' && <StorageSection />}
       {activeSection === 'server' && <ServerSection />}
       {activeSection === 'connections' && <ConnectionsSection />}
+      {activeSection === 'deployment' && <DeploymentSection />}
       {activeSection === 'marketplace' && <MarketplaceSection />}
       {activeSection === 'prompts' && <PromptsSection />}
       {activeSection === 'playground' && <PlaygroundSection />}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import type { UIMessage } from 'ai';
 import { KnowledgeBaseResult } from '@/components/chat/tools/knowledge-base-result';
 import { ChatChart, type ChartConfig } from '@/components/chat/tools/chat-chart';
@@ -207,8 +208,13 @@ function getToolInfo(part: any): {
 function renderToolPart(part: any, index: number): React.ReactNode | null {
   const { toolName, isExecuting, isCompleted, output, input } = getToolInfo(part);
 
-  // Still executing
-  if (isExecuting) {
+  const isFailedSandbox =
+    isCompleted &&
+    (toolName === 'executeAnalysis' || toolName === 'analyzeCorpusWithCode') &&
+    output?.exitCode !== 0;
+
+  // Still executing (or failed sandbox trying to hide error)
+  if (isExecuting || isFailedSandbox) {
     if (toolName === 'searchKnowledgeBase') return null;
     return (
       <div
@@ -241,7 +247,7 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
   }
 
   // Completed
-  if (isCompleted) {
+  if (isCompleted && !isFailedSandbox) {
     switch (toolName) {
       case 'queryTabularData': {
         if (output.error) return null;
@@ -342,28 +348,26 @@ export function MessageItem({
   const parts: any[] = message.parts ? [...message.parts] : [];
 
   // Effect to apply document edits to the Canvas context
-  import('react').then(({ useEffect }) => {
-    useEffect(() => {
-      if (!updateFromToolResult || !isLast) return;
+  useEffect(() => {
+    if (!updateFromToolResult || !isLast) return;
 
-      const completedDocTools = parts.filter((p: any) => {
-        const info = getToolInfo(p);
-        return (
-          info.isCompleted &&
-          info.output?.success &&
-          (info.toolName === 'fillDocumentForm' || info.toolName === 'editDocument')
-        );
-      });
+    const completedDocTools = parts.filter((p: any) => {
+      const info = getToolInfo(p);
+      return (
+        info.isCompleted &&
+        info.output?.success &&
+        (info.toolName === 'fillDocumentForm' || info.toolName === 'editDocument')
+      );
+    });
 
-      if (completedDocTools.length > 0) {
-        // Find the latest output
-        const latest = getToolInfo(completedDocTools[completedDocTools.length - 1]).output;
-        if (latest && latest.fileBase64) {
-          updateFromToolResult(latest);
-        }
+    if (completedDocTools.length > 0) {
+      // Find the latest output
+      const latest = getToolInfo(completedDocTools[completedDocTools.length - 1]).output;
+      if (latest && latest.fileBase64) {
+        updateFromToolResult(latest);
       }
-    }, [parts, isLast, updateFromToolResult]);
-  });
+    }
+  }, [parts, isLast, updateFromToolResult]);
 
   if (anyMessage.toolInvocations && Array.isArray(anyMessage.toolInvocations)) {
     anyMessage.toolInvocations.forEach((t: any) => {

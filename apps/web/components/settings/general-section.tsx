@@ -2,10 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import type { RagConfig } from '@larkup/core/types';
 import {
@@ -26,6 +33,7 @@ export function GeneralSection() {
   const [saving, setSaving] = useState<string | null>(null);
   const { username, setUsername } = useWorkspace();
   const [localName, setLocalName] = useState(username || '');
+  const [showApiKey, setShowApiKey] = useState(false);
 
   useEffect(() => {
     if (data?.config) setForm(data.config);
@@ -145,40 +153,58 @@ export function GeneralSection() {
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Web Search Provider</Label>
-            <select
-              className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            <Select
               value={form.webSearchProvider || 'tavily'}
-              onChange={(e) =>
-                setForm({ ...form, webSearchProvider: e.target.value as 'tavily' | 'server' })
+              onValueChange={(value) =>
+                setForm({ ...form, webSearchProvider: value as 'tavily' | 'serper' })
               }
             >
-              <option value="tavily">Tavily</option>
-              <option value="server">Server</option>
-            </select>
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tavily">Tavily</SelectItem>
+                <SelectItem value="serper">Serper</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {form.webSearchProvider === 'tavily' && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Tavily API Key</Label>
+          <div className="space-y-1.5 pt-2">
+            <Label className="text-xs">
+              {form.webSearchProvider === 'serper' ? 'Serper API Key' : 'Tavily API Key'}
+            </Label>
+            <div className="relative">
               <Input
-                type="password"
-                className="text-sm"
-                value={form.tavilyApiKey || ''}
-                onChange={(e) => setForm({ ...form, tavilyApiKey: e.target.value })}
-                placeholder="Your Tavily API Key"
+                type={showApiKey ? 'text' : 'password'}
+                className="text-sm pr-10"
+                value={
+                  form.webSearchProvider === 'serper'
+                    ? form.serperApiKey || ''
+                    : form.tavilyApiKey || ''
+                }
+                onChange={(e) => {
+                  if (form.webSearchProvider === 'serper') {
+                    setForm({ ...form, serperApiKey: e.target.value });
+                  } else {
+                    setForm({ ...form, tavilyApiKey: e.target.value });
+                  }
+                }}
+                placeholder={
+                  form.webSearchProvider === 'serper'
+                    ? 'Your Serper API Key'
+                    : 'Your Tavily API Key'
+                }
               />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
+                onClick={() => setShowApiKey(!showApiKey)}
+              >
+                {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </Button>
             </div>
-          )}
-
-          <div className="space-y-1.5 pt-2 border-t border-border/50">
-            <Label className="text-xs text-muted-foreground">Legacy Serper.dev API Key</Label>
-            <Input
-              type="password"
-              className="text-sm"
-              value={form.serperApiKey || ''}
-              onChange={(e) => setForm({ ...form, serperApiKey: e.target.value })}
-              placeholder="Your Serper API Key (Optional)"
-            />
           </div>
         </CardContent>
         <CardFooter className="flex justify-end pt-4 border-t">

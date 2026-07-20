@@ -150,6 +150,37 @@ function ChatWorkspaceInner() {
     }
   }, [status?.ready, status?.suggestions, serverId]);
 
+  const chatBody = useMemo(
+    () => ({
+      serverId,
+      chatModelId: selectedModel || undefined,
+      docSessionId: docEditorState.sessionId,
+      docFields: docEditorState.fields,
+    }),
+    [serverId, selectedModel, docEditorState.sessionId, JSON.stringify(docEditorState.fields)],
+  );
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/chat',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        prepareSendMessagesRequest({ messages, id, body }) {
+          return {
+            body: {
+              messages,
+              id,
+              ...chatBody,
+              ...body,
+            },
+          };
+        },
+      }),
+    [chatBody],
+  );
+
   const {
     messages,
     sendMessage,
@@ -158,26 +189,7 @@ function ChatWorkspaceInner() {
     error,
     regenerate,
   } = useChat({
-    // api: "/api/chat",
-    transport: new DefaultChatTransport({
-      api: '/api/chat',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      prepareSendMessagesRequest({ messages, id, body }) {
-        return {
-          body: {
-            messages,
-            id,
-            serverId,
-            chatModelId: selectedModel || undefined,
-            docSessionId: docEditorState.sessionId,
-            docFields: docEditorState.fields,
-            ...body,
-          },
-        };
-      },
-    }),
+    transport,
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -216,6 +228,11 @@ function ChatWorkspaceInner() {
         (firstMsg as any)?.text;
 
       const title = firstMsgText ? firstMsgText.substring(0, 40) : 'New Chat';
+
+      // Prevent infinite loop by returning the same reference if nothing changed recently
+      if (existing && existing.title === title && Date.now() - existing.updatedAt < 2000) {
+        return prev;
+      }
 
       let next;
       if (existing) {
@@ -727,7 +744,7 @@ function ChatWorkspaceInner() {
                 rows={1}
                 disabled={!ready}
                 placeholder="How can I help you…"
-                className="max-h-48 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40"
+                className="max-h-48 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:hidden"
               />
               <button
                 type="submit"
