@@ -25,6 +25,7 @@ Larkup is an open-source Custom AI infrastructure project allowing users to inge
 
 3. **Applications**:
    - `apps/web`: A Next.js application that serves as the main Web UI (Dashboard) and API server. It configures pipelines, ingests data, and deploys the generated custom AI servers. Uses Vercel AI SDK heavily.
+   - `apps/hub`: The Larkup Hub API — marketplace catalog, tool install tracking, and CI publish webhook. Hono on Vercel. Serves `/v1/tools` endpoints for remote tool discovery.
    - `apps/cli`: A command-line interface (`@larkup/cli`) to initialize, index, and query pipelines directly from the terminal.
    - `apps/sdk`: Contains SDK wrappers for JS (`js-sdk`) and Python (`py-sdk`) to interact with the deployed AI servers.
    - `apps/docs`: Documentation site built with Mintlify.
@@ -43,4 +44,4 @@ Larkup is an open-source Custom AI infrastructure project allowing users to inge
 - **Indexing**: The `indexer` chunks text, embeds it using `@ai-sdk` providers, and stores it in the configured vector store.
 - **Deployment**: The user's configuration is used to dynamically spin up a custom AI server with an OpenAPI-compatible endpoint.
 - **Media Indexing**: Images, video, and audio are uploaded via the Media panel. Images are captioned (vision LLM) and indexed as text. Video/audio require the "Video & Audio" marketplace tool for transcription and frame extraction.
-- **Marketplace**: Optional features are installable tools. The `@larkup/marketplace` package manages the registry, installation, and dynamic loading. Tools live under `packages/tools/` and are workspace packages.
+- **Marketplace**: Optional features are installable tools. The `@larkup/marketplace` package manages the dynamic registry (reads `tool.manifest.json` files, queries the Hub API), installation (real `npm install` into isolated `.larkup/tools/node_modules/`), and runtime loading. Tools are published as standalone npm packages (`@larkup/tool-*`). The Hub API (`apps/hub`) serves the remote catalog, tracks installs, and provides curl install scripts.
