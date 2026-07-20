@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 /** GET → get tool details. */
 export async function GET(_req: Request, { params }: { params: Promise<{ toolId: string }> }) {
   const { toolId } = await params;
-  const descriptor = getToolById(toolId);
+  const descriptor = await getToolById(toolId);
   if (!descriptor) {
     return NextResponse.json({ error: 'Tool not found' }, { status: 404 });
   }
@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ toolId:
 /** POST → install a tool. */
 export async function POST(_req: Request, { params }: { params: Promise<{ toolId: string }> }) {
   const { toolId } = await params;
-  const descriptor = getToolById(toolId);
+  const descriptor = await getToolById(toolId);
   if (!descriptor) {
     return NextResponse.json({ error: 'Tool not found' }, { status: 404 });
   }
