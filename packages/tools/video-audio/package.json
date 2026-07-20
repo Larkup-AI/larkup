@@ -2,18 +2,48 @@
   "name": "@larkup/tool-video-audio",
   "version": "0.1.0",
   "type": "module",
-  "private": true,
+  "description": "Larkup marketplace tool: video & audio indexing with transcription and frame analysis.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "tool.manifest.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --outDir dist",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@larkup/core": "workspace:*",
-    "@larkup/marketplace": "workspace:*",
     "fluent-ffmpeg": "^2.1.3",
     "@ffmpeg-installer/ffmpeg": "^1.1.0"
   },
+  "peerDependencies": {
+    "@larkup/marketplace": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@larkup/marketplace": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@larkup/marketplace": "workspace:*",
     "@types/fluent-ffmpeg": "^2.1.27",
     "typescript": "5.7.3"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Larkup-AI/larkup-rag",
+    "directory": "packages/tools/video-audio"
   }
 }

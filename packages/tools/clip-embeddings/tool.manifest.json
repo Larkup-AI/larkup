@@ -1,0 +1,22 @@
+{
+  "$schema": "https://hub.larkup.dev/schemas/tool-manifest.v1.json",
+  "id": "clip-embeddings",
+  "name": "CLIP Image Search",
+  "description": "Direct image-to-image similarity search using CLIP/SigLIP embeddings.",
+  "longDescription": "Enable native visual similarity search by embedding images with CLIP or SigLIP models. Search your image library by uploading a query image or describing what you're looking for. Requires downloading a ~200MB model on first use.",
+  "category": "embedding",
+  "version": "0.1.0",
+  "pricing": "free",
+  "emoji": "🔍",
+  "icon": "ScanEye",
+  "packageName": "@larkup/tool-clip-embeddings",
+  "installSize": "~200 MB",
+  "author": "Larkup",
+  "capabilities": ["clip-embeddings", "image-similarity"],
+  "tags": ["clip", "siglip", "image-search", "visual-similarity"],
+  "downloads": 0,
+  "repositoryUrl": "https://github.com/Larkup-AI/larkup-rag",
+  "license": "Apache-2.0",
+  "updatedAt": "2026-07-20",
+  "comingSoon": true
+}

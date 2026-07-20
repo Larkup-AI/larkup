@@ -2,22 +2,64 @@
   "name": "@larkup/tool-doc-editor",
   "version": "0.1.0",
   "type": "module",
-  "private": true,
+  "description": "Larkup marketplace tool: AI-powered form filling and document editing.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./types": "./src/types.ts",
-    "./parsers": "./src/parsers.ts",
-    "./editor": "./src/editor.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./src/types.ts",
+      "default": "./dist/types.js"
+    },
+    "./parsers": {
+      "types": "./dist/parsers.d.ts",
+      "import": "./src/parsers.ts",
+      "default": "./dist/parsers.js"
+    },
+    "./editor": {
+      "types": "./dist/editor.d.ts",
+      "import": "./src/editor.ts",
+      "default": "./dist/editor.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "tool.manifest.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --outDir dist",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@larkup/core": "workspace:*",
-    "@larkup/marketplace": "workspace:*",
     "@larkup/sandbox": "workspace:*",
     "jszip": "^3.10.1",
     "mammoth": "^1.12.0",
     "pdf-lib": "^1.17.1"
   },
+  "peerDependencies": {
+    "@larkup/marketplace": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@larkup/marketplace": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@larkup/marketplace": "workspace:*",
     "typescript": "5.7.3"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Larkup-AI/larkup-rag",
+    "directory": "packages/tools/doc-editor"
   }
 }

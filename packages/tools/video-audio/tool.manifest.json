@@ -1,0 +1,48 @@
+{
+  "$schema": "https://hub.larkup.dev/schemas/tool-manifest.v1.json",
+  "id": "video-audio",
+  "name": "Video & Audio",
+  "description": "Index video and audio files with transcription and frame analysis.",
+  "longDescription": "Process video and audio files for your knowledge base. Extracts audio transcripts using AI speech-to-text, captures keyframes from video, and generates scene descriptions using vision models. Supports YouTube URLs, direct file upload, and bulk processing. Requires ffmpeg on your system.",
+  "category": "media",
+  "version": "0.1.0",
+  "pricing": "free",
+  "emoji": "🎬",
+  "icon": "Film",
+  "packageName": "@larkup/tool-video-audio",
+  "installSize": "~15 MB",
+  "systemDeps": ["ffmpeg"],
+  "author": "Larkup",
+  "capabilities": [
+    "video-indexing",
+    "audio-indexing",
+    "transcription",
+    "frame-extraction",
+    "youtube-import"
+  ],
+  "tags": ["transcription", "ffmpeg", "video", "audio", "whisper"],
+  "downloads": 0,
+  "repositoryUrl": "https://github.com/Larkup-AI/larkup-rag",
+  "license": "Apache-2.0",
+  "updatedAt": "2026-07-20",
+  "configSchema": [
+    {
+      "key": "frameInterval",
+      "label": "Frame extraction interval (seconds)",
+      "type": "text",
+      "defaultValue": "10",
+      "help": "Extract one keyframe every N seconds from video files."
+    },
+    {
+      "key": "transcriptionProvider",
+      "label": "Transcription method",
+      "type": "select",
+      "defaultValue": "api",
+      "help": "Use your AI provider's API or local Whisper model.",
+      "options": [
+        { "label": "AI Provider API (recommended)", "value": "api" },
+        { "label": "Local Whisper", "value": "local" }
+      ]
+    }
+  ]
+}
