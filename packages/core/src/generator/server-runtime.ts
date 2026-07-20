@@ -4,18 +4,11 @@ import { spawn, exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { RagConfig } from '../types';
 import { generateServer } from './generate-server';
+import { generateAgentServer } from './generate-agent-server';
 import { getActiveServer, getDataDir, requireDataDir } from '../workspace';
 
 /**
  * Launches a server's GENERATED RAG server locally as a detached Node process.
- *
- * Flow: emit the files to the server's `generated-server/` dir, `npm install`
- * the (minimal) deps, then `node server.mjs` on that server's assigned port.
- * We persist the pid + port so the UI can show status and stop it. Each
- * workspace server has its own port, so many can run at once.
- *
- * Only meaningful for stores that can run from the toolkit host (LanceDB
- * local). Cloud stores (Pinecone, LanceDB Cloud) are deploy-only.
  */
 
 const execAsync = promisify(exec);
@@ -62,6 +55,18 @@ function emptyState(port: number): LocalServerState {
     port,
     endpoint: `http://localhost:${port}`,
   };
+}
+
+async function agentOutDir(create: boolean): Promise<string | null> {
+  const dir = create ? await requireDataDir() : await getDataDir();
+  if (!dir) return null;
+  return path.join(dir, 'generated-agent-server');
+}
+
+async function agentStatePath(create: boolean): Promise<string | null> {
+  const dir = create ? await requireDataDir() : await getDataDir();
+  if (!dir) return null;
+  return path.join(dir, 'agent-server-local.json');
 }
 
 async function outDir(create: boolean): Promise<string | null> {
@@ -249,6 +254,168 @@ export async function startServer(
     startedAt: new Date().toISOString(),
     lastError,
   });
+}
+
+export async function readAgentServerState(): Promise<LocalServerState> {
+  const port = 8081;
+  const file = await agentStatePath(false);
+  if (!file) return emptyState(port);
+  try {
+    const raw = await fs.readFile(file, 'utf8');
+    return { ...emptyState(port), ...(JSON.parse(raw) as Partial<LocalServerState>), port };
+  } catch {
+    return emptyState(port);
+  }
+}
+
+async function writeAgentState(state: LocalServerState) {
+  const file = await agentStatePath(true);
+  if (file) await fs.writeFile(file, JSON.stringify(state, null, 2), 'utf8');
+  return state;
+}
+
+export async function emitAgentToDisk(config: RagConfig): Promise<string> {
+  const server = generateAgentServer(config);
+  const dir = await agentOutDir(true);
+  if (!dir) throw new Error('No active server to emit to.');
+  await fs.mkdir(dir, { recursive: true });
+  for (const file of server.files) {
+    const dest = path.join(dir, file.path);
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    if (file.encoding === 'base64') {
+      await fs.writeFile(dest, Buffer.from(file.contents, 'base64'));
+    } else {
+      await fs.writeFile(dest, file.contents, 'utf8');
+    }
+  }
+  return dir;
+}
+
+export async function startAgentServer(
+  config: RagConfig,
+  serverApiKey?: string,
+): Promise<LocalServerState> {
+  const port = 8081;
+  const endpoint = `http://localhost:${port}`;
+
+  const prev = await readAgentServerState();
+  if (prev.pid && pidAlive(prev.pid)) {
+    try {
+      process.kill(prev.pid, 9);
+    } catch {
+      /* already gone */
+    }
+  }
+  await killPort(port);
+
+  const dir = await emitAgentToDisk(config);
+
+  try {
+    await execAsync('npm install --omit=dev', {
+      cwd: dir,
+      timeout: 240_000,
+      env: {
+        ...process.env,
+        HOME: process.env.HOME || dir,
+        npm_config_cache: path.join(dir, '.npm-cache'),
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'npm install failed';
+    return writeAgentState({ ...emptyState(port), lastError: message });
+  }
+
+  const dbPath = config.storeConfig.dbPath || './.larkup/lancedb';
+  const absDb = path.isAbsolute(dbPath) ? dbPath : path.join(process.cwd(), dbPath);
+
+  const logPath = path.join(dir, 'server.log');
+  await fs.writeFile(logPath, '', 'utf8');
+  const logFd = await fs.open(logPath, 'a');
+  const script = ['server', 'mjs'].join('.');
+  const child = spawn('node', [script], {
+    cwd: dir,
+    detached: true,
+    stdio: ['ignore', logFd.fd, logFd.fd],
+    env: {
+      ...process.env,
+      PORT: String(port),
+      TOP_K: String(config.topK),
+      SERVER_API_KEY: serverApiKey || '',
+      AGENT_AUTH_MODE: config.deployment?.authMode || 'none',
+      AGENT_JOIN_CODE: config.deployment?.joinCode || '',
+      CHAT_API_KEY:
+        config.deployment?.chatApiKey || config.chatApiKey || process.env.OPENAI_API_KEY || '',
+      EMBEDDING_API_KEY:
+        config.embeddingApiKey || process.env.EMBEDDING_API_KEY || process.env.OPENAI_API_KEY || '',
+      OPENAI_API_KEY:
+        config.embeddingApiKey || config.chatApiKey || process.env.OPENAI_API_KEY || '',
+      PINECONE_API_KEY: config.storeConfig.apiKey || '',
+      PINECONE_INDEX: config.storeConfig.indexName || '',
+      PINECONE_NAMESPACE: config.storeConfig.namespace || '',
+      PINECONE_SPARSE_MODEL: config.storeConfig.sparseModel || '',
+      PINECONE_SPARSE_INDEX: config.storeConfig.sparseIndexName || '',
+      LANCEDB_MODE: config.storeConfig.mode || 'local',
+      LANCEDB_PATH: absDb,
+      LANCEDB_URI: config.storeConfig.uri || '',
+      LANCEDB_API_KEY: config.storeConfig.apiKey || '',
+      LANCEDB_TABLE: config.storeConfig.tableName || 'documents',
+    },
+  });
+
+  child.unref();
+  await logFd.close();
+
+  const healthy = await waitForHealth(endpoint, 20_000);
+
+  let lastError: string | undefined = undefined;
+  if (!healthy) {
+    lastError = 'The AI agent server failed to start.';
+    try {
+      const logs = await fs.readFile(logPath, 'utf8');
+      const trimmed = logs.trim();
+      if (trimmed) {
+        const lastLines = trimmed.split('\n').slice(-5).join('\n');
+        lastError = `The AI agent server failed to start. Error details:\n${lastLines}`;
+      }
+    } catch (err) {}
+  }
+
+  return writeAgentState({
+    running: healthy,
+    pid: child.pid,
+    port,
+    endpoint,
+    generatedAt: new Date().toISOString(),
+    startedAt: new Date().toISOString(),
+    lastError,
+  });
+}
+
+export async function stopAgentServer(): Promise<LocalServerState> {
+  const state = await readAgentServerState();
+  const port = state.port || 8081;
+  if (state.pid && pidAlive(state.pid)) {
+    try {
+      process.kill(state.pid, 9);
+    } catch {}
+  }
+  await killPort(port);
+  return writeAgentState({
+    ...state,
+    running: false,
+    pid: undefined,
+    startedAt: undefined,
+  });
+}
+
+export async function refreshAgentServerStatus(): Promise<LocalServerState> {
+  const state = await readAgentServerState();
+  if (!state.startedAt) return state;
+  const alive = pidAlive(state.pid) && (await isHealthy(state.endpoint));
+  if (alive !== state.running) {
+    return writeAgentState({ ...state, running: alive });
+  }
+  return state;
 }
 
 export async function stopServer(): Promise<LocalServerState> {

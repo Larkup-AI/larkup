@@ -324,3 +324,15 @@ app.get('/v1/schema/tool-manifest.v1', (c) => {
 /* ------------------------------------------------------------------ */
 
 export default app;
+
+/* ------------------------------------------------------------------ */
+/* Local dev server (tsx watch)                                        */
+/* ------------------------------------------------------------------ */
+
+if (!process.env.VERCEL) {
+  const { serve } = await import('@hono/node-server');
+  const port = Number(process.env.PORT || 3456);
+  serve({ fetch: app.fetch, port }, () => {
+    console.log(`[larkup-hub] listening on http://localhost:${port}`);
+  });
+}

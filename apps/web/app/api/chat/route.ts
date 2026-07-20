@@ -83,6 +83,7 @@ LARGE DATASET HANDLING:
 - For simple lookups, counts, or single aggregations, queryTabularData or getIndexedData is fine.
 - When using executeAnalysis, the tabular dataset is available as 'data.csv'. Use: df = pd.read_csv('data.csv')
 - When using analyzeCorpusWithCode, the corpus is available as 'corpus.csv'. Use: df = pd.read_csv('corpus.csv')
+- Pandas 2.0+ is used. ALWAYS use "ME" instead of "M" for month-end resampling (e.g., df.resample("ME")). Ensure code is error-free and updated for latest pandas versions.
 - Always print the final results clearly. Use plt.show() for charts.
 `;
 
@@ -421,7 +422,7 @@ ${docFields?.map((f) => `- [${f.id}] ${f.name} (${f.type})`).join('\n') || 'None
           code: z
             .string()
             .describe(
-              'Python code to execute. Has pandas, numpy, matplotlib, scipy, sklearn, seaborn available. Print results and use plt.show() for charts.',
+              'Python code to execute. Has pandas (2.0+), numpy, matplotlib, scipy, sklearn, seaborn available. ALWAYS use "ME" instead of "M" for resample frequency. Print results and use plt.show() for charts.',
             ),
           datasetId: z
             .string()
@@ -461,7 +462,7 @@ ${docFields?.map((f) => `- [${f.id}] ${f.name} (${f.type})`).join('\n') || 'None
             }
 
             const result = await sandboxManager.execute({
-              code,
+              code: `import warnings\nwarnings.filterwarnings('ignore')\n${code}`,
               language: 'python',
               files,
               timeout: 30_000,
@@ -571,7 +572,7 @@ ${docFields?.map((f) => `- [${f.id}] ${f.name} (${f.type})`).join('\n') || 'None
           code: z
             .string()
             .describe(
-              'Python code to execute. The corpus file is in the working directory. Use pandas to load it: df = pd.read_csv("corpus.csv") or for JSONL: df = pd.read_json("corpus.jsonl", lines=True). Has pandas, numpy, matplotlib, scipy, sklearn, seaborn available. Print results and use plt.show() for charts.',
+              'Python code to execute. The corpus file is in the working directory. Use pandas to load it: df = pd.read_csv("corpus.csv") or for JSONL: df = pd.read_json("corpus.jsonl", lines=True). Has pandas (2.0+), numpy, matplotlib, scipy, sklearn, seaborn available. ALWAYS use "ME" instead of "M" for resample frequency. Print results and use plt.show() for charts.',
             ),
           format: z
             .enum(['csv', 'jsonl'])
@@ -601,7 +602,7 @@ ${docFields?.map((f) => `- [${f.id}] ${f.name} (${f.type})`).join('\n') || 'None
             const files = [{ name: fileName, content: corpusData }];
 
             const result = await sandboxManager.execute({
-              code,
+              code: `import warnings\nwarnings.filterwarnings('ignore')\n${code}`,
               language: 'python',
               files,
               timeout: 30_000,

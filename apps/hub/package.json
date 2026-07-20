@@ -4,10 +4,12 @@
   "type": "module",
   "description": "Larkup Hub — marketplace catalog API, tool registry, and install tracking.",
   "scripts": {
+    "dev": "tsx watch src/index.ts",
     "build": "tsc --noEmit",
     "deploy": "vercel deploy"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.10",
     "hono": "^4.12.30"
   },
   "devDependencies": {

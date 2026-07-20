@@ -1,18 +1,3 @@
-/**
- * Shared contracts for the RAG Toolkit.
- *
- * These types are the single source of truth used by BOTH:
- *  - the Web UI + CLI (the heavyweight local "toolkit")
- *  - the lightweight generated RAG server (Phase 4)
- *
- * Keeping them framework-agnostic (no React / Next imports) means the
- * generated server can import the same contracts without dragging in UI deps.
- */
-
-/* ------------------------------------------------------------------ */
-/* Vector stores                                                       */
-/* ------------------------------------------------------------------ */
-
 export type VectorStoreId =
   | 'lancedb'
   | 'pinecone'
@@ -157,13 +142,14 @@ export interface RagConfig {
   systemPrompt?: string;
   serperApiKey?: string;
   webSearchEnabled?: boolean;
-  webSearchProvider?: 'tavily' | 'server';
+  webSearchProvider?: 'tavily' | 'serper';
   tavilyApiKey?: string;
   scraperProxyServer?: string;
   scraperProxyUsername?: string;
   scraperProxyPassword?: string;
   firecrawlApiKey?: string;
   updatedAt: string;
+  deployment?: AgentDeploymentConfig;
 }
 
 export const DEFAULT_CONFIG: RagConfig = {
@@ -378,3 +364,56 @@ export interface StageMeta {
   /** phase this stage is delivered in; lets UI mark "coming soon" */
   phase: number;
 }
+
+/* ------------------------------------------------------------------ */
+/* Agent Deployment Types                                              */
+/* ------------------------------------------------------------------ */
+
+export type AgentAuthMode = 'none' | 'api-key' | 'join-code';
+
+export interface AgentWidgetStyle {
+  primaryColor: string;
+  position: 'bottom-right' | 'bottom-left';
+  title: string;
+  welcomeMessage: string;
+  placeholder: string;
+  avatarUrl?: string;
+  darkMode: boolean;
+  borderRadius: 'sm' | 'md' | 'lg' | 'full';
+}
+
+export interface AgentDeploymentConfig {
+  type: 'rag-only' | 'full-agent';
+  authMode: AgentAuthMode;
+  joinCode?: string;
+  enabledToolIds: string[];
+  widgetStyle: AgentWidgetStyle;
+  chatModelId?: string;
+  chatProvider?: string;
+  chatApiKey?: string;
+  systemPrompt?: string;
+  allowedOrigins: string[];
+  webSearchEnabled?: boolean;
+  webSearchApiKey?: string;
+  webSearchProvider?: 'tavily' | 'serper';
+  /** Vercel Blob token for LanceDB cloud storage */
+  vercelBlobToken?: string;
+}
+
+export const DEFAULT_WIDGET_STYLE: AgentWidgetStyle = {
+  primaryColor: '#000000',
+  position: 'bottom-right',
+  title: 'Chat with AI',
+  welcomeMessage: 'Hi! How can I help you today?',
+  placeholder: 'Type a message...',
+  darkMode: false,
+  borderRadius: 'lg',
+};
+
+export const DEFAULT_DEPLOYMENT_CONFIG: AgentDeploymentConfig = {
+  type: 'rag-only',
+  authMode: 'none',
+  enabledToolIds: [],
+  widgetStyle: DEFAULT_WIDGET_STYLE,
+  allowedOrigins: ['*'],
+};
