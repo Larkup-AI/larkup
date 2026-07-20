@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev -p 4567",
     "build": "next build",
-    "postbuild": "find .next/standalone -type l ! -exec test -e {} \\; -delete",
+    "postbuild": "find .next/standalone -type l ! -exec test -e {} \\; -delete 2>/dev/null || true",
     "start": "next start -p 4567",
     "lint": "echo \"No lint configured\""
   },

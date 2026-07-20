@@ -22,9 +22,7 @@ test.describe.serial('Chat Page', () => {
       return;
     }
 
-    const chatInput = page
-      .locator('textarea[placeholder*="Ask about your knowledge base" i]')
-      .first();
+    const chatInput = page.locator('textarea[placeholder*="How can I help you" i]').first();
     await expect(chatInput).toBeVisible({ timeout: 10_000 });
   });
 
@@ -37,9 +35,7 @@ test.describe.serial('Chat Page', () => {
       return;
     }
 
-    const chatInput = page
-      .locator('textarea[placeholder*="Ask about your knowledge base" i]')
-      .first();
+    const chatInput = page.locator('textarea[placeholder*="How can I help you" i]').first();
 
     if (await chatInput.isVisible()) {
       await chatInput.fill('What is Larkup?');
@@ -75,9 +71,7 @@ test.describe.serial('Chat Page', () => {
       return;
     }
 
-    const chatInput = page
-      .locator('textarea[placeholder*="Ask about your knowledge base" i]')
-      .first();
+    const chatInput = page.locator('textarea[placeholder*="How can I help you" i]').first();
 
     if (await chatInput.isVisible()) {
       // First message

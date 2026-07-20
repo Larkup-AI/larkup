@@ -4,8 +4,7 @@
   "type": "module",
   "description": "Larkup Hub — marketplace catalog API, tool registry, and install tracking.",
   "scripts": {
-    "dev": "vercel dev",
-    "build": "vercel build",
+    "build": "tsc --noEmit",
     "deploy": "vercel deploy"
   },
   "dependencies": {

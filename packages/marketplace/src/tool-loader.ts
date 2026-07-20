@@ -38,7 +38,7 @@ export async function loadTool<T = any>(toolId: string): Promise<T | null> {
   try {
     // Determine what to import
     const importPath = resolveImportPath(installed);
-    const mod = await import(importPath);
+    const mod = await import(/* webpackIgnore: true */ importPath);
     moduleCache.set(toolId, mod);
     return mod as T;
   } catch (err) {
