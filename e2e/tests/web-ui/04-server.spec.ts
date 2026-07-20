@@ -27,15 +27,16 @@ test.describe.serial('Server Page', () => {
       await page.waitForTimeout(5_000);
 
       // Wait for server to start — look for running indicator
-      const runningIndicator = page.getByText(/running|:8080|started/i).first();
+      const runningIndicator = page.getByText(/running on :/i).first();
       await expect(runningIndicator).toBeVisible({ timeout: 60_000 });
 
       console.log('  ✓ RAG server launched successfully');
 
       // Verify the endpoint URL is shown
-      const endpointLink = page.getByText('http://localhost:8080').first();
+      const endpointLink = page.getByRole('link', { name: /http:\/\/localhost:\d+/ }).first();
       if (await endpointLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        console.log('  ✓ Endpoint URL visible: http://localhost:8080');
+        const endpointUrl = await endpointLink.textContent();
+        console.log(`  ✓ Endpoint URL visible: ${endpointUrl}`);
       }
 
       // Verify API reference link
@@ -83,20 +84,23 @@ test.describe.serial('Server Page', () => {
     }
 
     // Verify server is reachable via direct fetch
-    const runningIndicator = page.getByText(/running|:8080/i).first();
+    const runningIndicator = page.getByText(/running on :/i).first();
     if (await runningIndicator.isVisible({ timeout: 30_000 }).catch(() => false)) {
+      const endpointLink = page.getByRole('link', { name: /http:\/\/localhost:\d+/ }).first();
+      const endpoint = await endpointLink.textContent();
+
       // Test the RAG server directly via the web UI's context
-      const healthOk = await page.evaluate(async () => {
+      const healthOk = await page.evaluate(async (url) => {
         try {
-          const res = await fetch('http://localhost:8080/health');
+          const res = await fetch(`${url}/health`);
           const data = await res.json();
           return data.ok === true || res.ok;
         } catch {
           return false;
         }
-      });
+      }, endpoint);
       expect(healthOk).toBe(true);
-      console.log('  ✓ RAG server health check passed via browser');
+      console.log(`  ✓ RAG server health check passed via browser against ${endpoint}`);
     }
   });
 });

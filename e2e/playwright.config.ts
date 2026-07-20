@@ -33,28 +33,42 @@ export default defineConfig({
 
   projects: [
     {
-      name: 'web-ui',
-      testDir: './tests/web-ui',
-      use: { ...devices['Desktop Chrome'] },
-    },
-    {
       name: 'api',
       testDir: './tests/api',
     },
     {
-      name: 'sdk',
-      testDir: './tests/sdk',
+      name: 'web-ui',
+      testDir: './tests/web-ui',
+      use: { ...devices['Desktop Chrome'] },
       dependencies: ['api'],
+    },
+    {
+      name: 'sdk-js',
+      testDir: './tests/sdk',
+      testMatch: 'js-sdk.spec.ts',
+      dependencies: ['web-ui'],
+    },
+    {
+      name: 'sdk-integrations',
+      testDir: './tests/sdk',
+      testMatch: 'integrations.spec.ts',
+      dependencies: ['sdk-js'],
+    },
+    {
+      name: 'sdk-py',
+      testDir: './tests/sdk',
+      testMatch: 'py-sdk.spec.ts',
+      dependencies: ['sdk-integrations'],
     },
     {
       name: 'cli',
       testDir: './tests/cli',
-      dependencies: ['api'],
+      dependencies: ['sdk-py'],
     },
     {
       name: 'installation',
       testDir: './tests/installation',
-      dependencies: ['web-ui'],
+      dependencies: ['cli'],
     },
   ],
 

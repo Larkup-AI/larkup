@@ -33,7 +33,7 @@ test.describe.serial('Data Page', () => {
     await page.waitForTimeout(3_000);
 
     // Verify the document appears in the corpus list
-    await expect(page.getByText('demo.pdf').or(page.getByText('demo'))).toBeVisible({
+    await expect(page.getByText('demo').first()).toBeVisible({
       timeout: 60_000,
     });
   });
@@ -51,7 +51,7 @@ test.describe.serial('Data Page', () => {
     await fileInput.setInputFiles(FIXTURES.txt);
     await page.waitForTimeout(3_000);
 
-    await expect(page.getByText('demo.txt').or(page.getByText('demo'))).toBeVisible({
+    await expect(page.getByText('demo').first()).toBeVisible({
       timeout: 60_000,
     });
   });
@@ -70,7 +70,7 @@ test.describe.serial('Data Page', () => {
     await fileInput.setInputFiles(FIXTURES.docx);
     await page.waitForTimeout(3_000);
 
-    await expect(page.getByText('demo.docx').or(page.getByText('demo'))).toBeVisible({
+    await expect(page.getByText('demo').first()).toBeVisible({
       timeout: 60_000,
     });
   });
@@ -111,7 +111,7 @@ test.describe.serial('Data Page', () => {
     await fileInput.setInputFiles(FIXTURES.csv);
     await page.waitForTimeout(3_000);
 
-    await expect(page.getByText('demo.csv').or(page.getByText('demo'))).toBeVisible({
+    await expect(page.getByText('demo').first()).toBeVisible({
       timeout: 60_000,
     });
   });
