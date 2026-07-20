@@ -21,7 +21,9 @@ COPY packages/sandbox/package.json ./packages/sandbox/
 COPY packages/scraper/package.json ./packages/scraper/
 COPY packages/vector-stores/package.json ./packages/vector-stores/
 COPY packages/tools/clip-embeddings/package.json ./packages/tools/clip-embeddings/
+COPY packages/tools/doc-editor/package.json ./packages/tools/doc-editor/
 COPY packages/tools/video-audio/package.json ./packages/tools/video-audio/
+COPY apps/hub/package.json ./apps/hub/
 
 RUN pnpm install --frozen-lockfile
 
