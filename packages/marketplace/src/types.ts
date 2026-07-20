@@ -3,9 +3,13 @@
  *
  * These types define the plugin/tool system that powers the Larkup Hub.
  * Tools are optional features users can install from the marketplace UI.
- * The architecture is designed so the hub can later be served from a
- * remote API (subscription checks, remote registry, etc.) while the
- * local runtime stays identical.
+ *
+ * Architecture:
+ * - Tools are standalone npm packages published as `@larkup/tool-*`
+ * - Each package ships a `tool.manifest.json` describing its capabilities
+ * - Install downloads real packages into `.larkup/tools/node_modules/`
+ * - The Hub API (apps/hub) serves the remote catalog and tracks installs
+ * - The loader resolves installed tools at runtime from the isolated dir
  */
 
 /* ------------------------------------------------------------------ */
@@ -118,12 +122,29 @@ export interface ToolConfigField {
 /* Installed tool state (persisted to disk)                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Where the tool was installed from.
+ * - `registry`: Downloaded from npm / Hub API (the standard path)
+ * - `local`: Workspace package (monorepo development mode)
+ * - `sandbox`: Installed inside a remote sandbox (E2B / Modal)
+ */
+export type ToolSource = 'registry' | 'local' | 'sandbox';
+
 export interface InstalledTool {
   id: string;
   version: string;
   installedAt: string;
-  /** Resolved path to the installed package */
-  packagePath: string;
+  /** npm package name (e.g., "@larkup/tool-video-audio") */
+  packageName: string;
+  /**
+   * Absolute path to the resolved module entry point.
+   * Set after install — used by the loader for `import(resolvedPath)`.
+   * For local (monorepo) installs, this is the workspace path.
+   * For registry installs, this is inside `.larkup/tools/node_modules/`.
+   */
+  resolvedPath: string;
+  /** Where this tool was installed from */
+  source: ToolSource;
   /** User-provided configuration values */
   config: Record<string, any>;
 }
@@ -155,6 +176,33 @@ export interface InstallProgress {
   message: string;
   error?: string;
 }
+
+/* ------------------------------------------------------------------ */
+/* Deployment target                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Determines how tool installation and loading behaves.
+ * - `local`: User's machine (CLI, Desktop, or `pnpm run dev`)
+ * - `docker`: Inside a Docker container (VPS / self-hosted)
+ * - `serverless`: Vercel / AWS Lambda (cannot install at runtime)
+ * - `sandbox`: E2B / Modal sandbox (ephemeral, can install dynamically)
+ */
+export type DeploymentTarget = 'local' | 'docker' | 'serverless' | 'sandbox';
+
+/* ------------------------------------------------------------------ */
+/* Hub API configuration                                               */
+/* ------------------------------------------------------------------ */
+
+export interface HubConfig {
+  /** Base URL of the Hub API (e.g., "https://hub.larkup.dev") */
+  baseUrl: string;
+  /** Optional API key for authenticated requests */
+  apiKey?: string;
+}
+
+/** Default Hub API URL. Can be overridden via LARKUP_HUB_URL env var. */
+export const DEFAULT_HUB_URL = process.env.LARKUP_HUB_URL ?? 'https://hub.larkup.dev';
 
 /* ------------------------------------------------------------------ */
 /* Storage provider abstraction                                        */
