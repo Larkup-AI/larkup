@@ -32,9 +32,11 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { GenericAlert } from '@/components/alerts/generic-alert';
 import { cn } from '@/lib/utils';
-import { FirecrawlNotice } from '@/components/data/firecrawl-notice';
-
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import useSWR from 'swr';
+import type { RagConfig } from '@larkup/core/types';
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
 function domainOf(url: string) {
   try {
@@ -80,7 +82,7 @@ interface SearchState {
   totalPages: number;
   hasMore: boolean;
   query: string;
-  searchProvider: 'firecrawl' | 'serper';
+  searchProvider: 'firecrawl' | 'serper' | 'google' | 'brave' | 'bing' | 'tavily';
 }
 
 export function ScrapePanel({
@@ -108,6 +110,8 @@ export function ScrapePanel({
   const [serperConfigured, setSerperConfigured] = useState<boolean | null>(null);
   const [firecrawlConfigured, setFirecrawlConfigured] = useState<boolean | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const { data: configData } = useSWR('/api/config', fetcher);
+  const activeProvider = configData?.config?.webSearchProvider || 'tavily';
   const [fetchingCount, setFetchingCount] = useState(false);
   const [serperTotalForQuery, setSerperTotalForQuery] = useState<{
     query: string;
@@ -172,13 +176,7 @@ export function ScrapePanel({
     });
   }
 
-  // Check providers on mount
   useEffect(() => {
-    // Check Serper
-    fetch('/api/search/google')
-      .then((r) => r.json())
-      .then((d) => setSerperConfigured(d.configured ?? false))
-      .catch(() => setSerperConfigured(false));
     // Check Firecrawl
     fetch('/api/search')
       .then((r) => r.json())
@@ -221,23 +219,45 @@ export function ScrapePanel({
 
       if (newItems.length === 0 && !isMulti) toast.message('No results — try different keywords.');
 
-      if (serperConfigured && !isMulti) {
-        fetchSerperTotalCount(q);
+      if (activeProvider && !isMulti) {
+        fetchProviderTotalCount(q, activeProvider);
       }
     } catch (err) {
       toast.error(formatErrorMessage(err));
     }
   }
 
-  /** Search using Serper (fallback if Firecrawl not available). */
-  async function searchSerper(q: string, page: number, isMulti: boolean, appendPagination = false) {
-    if (!appendPagination) {
-    } else {
+  /** Search using generic provider. */
+  async function searchGeneric(
+    q: string,
+    provider: string,
+    page: number,
+    isMulti: boolean,
+    appendPagination = false,
+  ) {
+    if (appendPagination) {
       setLoadingMore(true);
     }
 
+    const endpoint =
+      provider === 'serper' || provider === 'google'
+        ? '/api/search/google'
+        : provider === 'brave'
+        ? '/api/search/brave'
+        : provider === 'bing'
+        ? '/api/search/bing'
+        : provider === 'tavily'
+        ? '/api/search/tavily'
+        : null;
+
+    if (!endpoint) {
+      toast.error('Invalid search provider');
+      if (appendPagination) setLoadingMore(false);
+      return;
+    }
+
     try {
-      const res = await fetch('/api/search/google', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q, page }),
@@ -266,7 +286,7 @@ export function ScrapePanel({
           totalPages: data.totalPages ?? 1,
           hasMore: data.hasMore ?? false,
           query: data.query ?? q,
-          searchProvider: 'serper',
+          searchProvider: provider as any,
         };
       });
 
@@ -274,7 +294,7 @@ export function ScrapePanel({
       setSelected((prev) => ({ ...prev, ...newSelected }));
 
       if (!isMulti) {
-        // Update Serper total
+        // Update total
         setSerperTotalForQuery({
           query: q,
           total: data.totalResults ?? 0,
@@ -292,11 +312,24 @@ export function ScrapePanel({
     }
   }
 
-  /** Fetch total count from Serper without using it for results (saves on Firecrawl credits) */
-  async function fetchSerperTotalCount(q: string) {
+  /** Fetch total count from provider without using it for results (saves on Firecrawl credits) */
+  async function fetchProviderTotalCount(q: string, provider: string) {
+    const endpoint =
+      provider === 'serper' || provider === 'google'
+        ? '/api/search/google'
+        : provider === 'brave'
+        ? '/api/search/brave'
+        : provider === 'bing'
+        ? '/api/search/bing'
+        : provider === 'tavily'
+        ? '/api/search/tavily'
+        : null;
+
+    if (!endpoint) return;
+
     setFetchingCount(true);
     try {
-      const res = await fetch('/api/search/google', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q, page: 1 }),
@@ -338,13 +371,13 @@ export function ScrapePanel({
     try {
       if (firecrawlConfigured) {
         await Promise.all(queries.map((q) => searchFirecrawl(q, queries.length > 1)));
-      } else if (serperConfigured) {
-        await Promise.all(queries.map((q) => searchSerper(q, 1, queries.length > 1, false)));
+      } else if (activeProvider) {
+        await Promise.all(
+          queries.map((q) => searchGeneric(q, activeProvider, 1, queries.length > 1, false)),
+        );
       } else {
         toast.error(
-          formatErrorMessage(
-            new Error('No search provider available. Configure Firecrawl or add SERPER_API_KEY.'),
-          ),
+          formatErrorMessage(new Error('No search provider available. Configure one in Settings.')),
         );
       }
     } finally {
@@ -354,24 +387,43 @@ export function ScrapePanel({
 
   async function loadNextPage() {
     if (!searchState?.hasMore || loadingMore) return;
-    if (searchState.searchProvider === 'serper') {
-      await searchSerper(searchState.query, searchState.currentPage + 1, false, true);
+    if (searchState.searchProvider !== 'firecrawl') {
+      await searchGeneric(
+        searchState.query,
+        searchState.searchProvider,
+        searchState.currentPage + 1,
+        false,
+        true,
+      );
     }
   }
 
-  /** Automatically paginate through ALL available Serper results. */
+  /** Automatically paginate through ALL available provider results. */
   async function gatherAll() {
-    if (!searchState || searchState.searchProvider !== 'serper') return;
+    if (!searchState || searchState.searchProvider === 'firecrawl') return;
     setGatheringAll(true);
     setGatherProgress(searchState.currentPage);
 
     let page = searchState.currentPage + 1;
     const total = searchState.totalPages;
+    const provider = searchState.searchProvider;
+
+    const endpoint =
+      provider === 'serper' || provider === 'google'
+        ? '/api/search/google'
+        : provider === 'brave'
+        ? '/api/search/brave'
+        : provider === 'bing'
+        ? '/api/search/bing'
+        : provider === 'tavily'
+        ? '/api/search/tavily'
+        : null;
 
     try {
       while (page <= total) {
         setGatherProgress(page);
-        const res = await fetch('/api/search/google', {
+        if (!endpoint) break;
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: query.trim(), page }),
@@ -529,7 +581,7 @@ export function ScrapePanel({
 
   const results = searchState?.results ?? [];
   const gatherAllAvailable =
-    searchState?.searchProvider === 'serper' && searchState.hasMore && !gatheringAll;
+    searchState?.searchProvider !== 'firecrawl' && searchState?.hasMore && !gatheringAll;
 
   // Estimate for confirmation modal
   const effectiveScopeForEstimate: CrawlScope = specificUrls ? 'page' : scope;
@@ -708,14 +760,13 @@ export function ScrapePanel({
       </div>
 
       {/* No provider configured hint */}
-      {firecrawlConfigured === false && serperConfigured === false && (
+      {firecrawlConfigured === false && !activeProvider && (
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" />
           <span>
             <strong className="text-foreground">No search provider configured.</strong> Set up
-            Firecrawl (recommended) for search and scraping, or add{' '}
-            <code className="rounded bg-muted px-1 font-mono">SERPER_API_KEY</code> to your{' '}
-            <code className="rounded bg-muted px-1 font-mono">.env</code> for Google search.
+            Firecrawl (recommended) for search and scraping, or configure a Web Search provider in
+            Settings.
           </span>
         </div>
       )}

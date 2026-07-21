@@ -24,6 +24,7 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { useWorkspace } from '@/components/workspace/workspace-provider';
+import Image from 'next/image';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
@@ -34,6 +35,11 @@ export function GeneralSection() {
   const { username, setUsername } = useWorkspace();
   const [localName, setLocalName] = useState(username || '');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState<{
+    status: 'success' | 'error' | null;
+    message?: string;
+  }>({ status: null });
 
   useEffect(() => {
     if (data?.config) setForm(data.config);
@@ -47,7 +53,10 @@ export function GeneralSection() {
   const dirtyWebSearch =
     form.serperApiKey !== data?.config?.serperApiKey ||
     form.webSearchProvider !== data?.config?.webSearchProvider ||
-    form.tavilyApiKey !== data?.config?.tavilyApiKey;
+    form.tavilyApiKey !== data?.config?.tavilyApiKey ||
+    form.googleApiKey !== data?.config?.googleApiKey ||
+    form.braveApiKey !== data?.config?.braveApiKey ||
+    form.bingApiKey !== data?.config?.bingApiKey;
   const dirtyScraper =
     form.scraperProxyServer !== data?.config?.scraperProxyServer ||
     form.scraperProxyUsername !== data?.config?.scraperProxyUsername ||
@@ -69,6 +78,9 @@ export function GeneralSection() {
         payload.serperApiKey = form.serperApiKey;
         payload.webSearchProvider = form.webSearchProvider;
         payload.tavilyApiKey = form.tavilyApiKey;
+        payload.googleApiKey = form.googleApiKey;
+        payload.braveApiKey = form.braveApiKey;
+        payload.bingApiKey = form.bingApiKey;
       } else if (section === 'scraper') {
         payload.scraperProxyServer = form.scraperProxyServer;
         payload.scraperProxyUsername = form.scraperProxyUsername;
@@ -91,6 +103,38 @@ export function GeneralSection() {
       toast.error(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(null);
+    }
+  }
+
+  async function handleVerify() {
+    if (!form.webSearchProvider) return;
+    setVerifying(true);
+    setVerifyStatus({ status: null });
+
+    let apiKey = '';
+    if (form.webSearchProvider === 'serper' || form.webSearchProvider === 'google')
+      apiKey = form.serperApiKey || '';
+    if (form.webSearchProvider === 'tavily') apiKey = form.tavilyApiKey || '';
+    if (form.webSearchProvider === 'brave') apiKey = form.braveApiKey || '';
+    if (form.webSearchProvider === 'bing') apiKey = form.bingApiKey || '';
+
+    try {
+      const res = await fetch('/api/search/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: form.webSearchProvider, apiKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Verification failed');
+
+      setVerifyStatus({ status: 'success' });
+      toast.success('API Key verified successfully!');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Verification failed';
+      setVerifyStatus({ status: 'error', message: msg });
+      toast.error(msg);
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -155,54 +199,141 @@ export function GeneralSection() {
             <Label className="text-xs">Web Search Provider</Label>
             <Select
               value={form.webSearchProvider || 'tavily'}
-              onValueChange={(value) =>
-                setForm({ ...form, webSearchProvider: value as 'tavily' | 'serper' })
-              }
+              onValueChange={(value) => {
+                setForm({ ...form, webSearchProvider: value as any });
+                setVerifyStatus({ status: null });
+              }}
             >
-              <SelectTrigger className="h-9 w-full">
-                <SelectValue placeholder="Select provider" />
+              <SelectTrigger className=" w-full">
+                <div className="flex items-center gap-2">
+                  {/* {form.webSearchProvider === 'google' && <Image src="/icons/google.png" alt="Google" width={16} height={16} />} */}
+                  {form.webSearchProvider === 'serper' && (
+                    <Image src="/icons/serper.png" alt="Serper" width={16} height={16} />
+                  )}
+                  {form.webSearchProvider === 'tavily' && (
+                    <Image src="/icons/tavily.png" alt="Tavily" width={16} height={16} />
+                  )}
+                  {form.webSearchProvider === 'brave' && (
+                    <Image src="/icons/brave.png" alt="Brave" width={16} height={16} />
+                  )}
+                  {form.webSearchProvider === 'bing' && (
+                    <Image src="/icons/serpapi.svg" alt="SerpApi" width={16} height={16} />
+                  )}
+                  <SelectValue placeholder="Select provider" />
+                </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="tavily">Tavily</SelectItem>
-                <SelectItem value="serper">Serper</SelectItem>
+                {/* <SelectItem value="google">
+                  <div className="flex items-center gap-2">
+                    <Image src="/icons/google.png" alt="Google" width={16} height={16} />
+                    <span>Google (via Serper)</span>
+                  </div>
+                </SelectItem> */}
+                <SelectItem value="serper">
+                  <div className="flex items-center gap-2">
+                    <Image src="/icons/serper.png" alt="Serper" width={16} height={16} />
+                    <span>Serper</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="tavily">
+                  <div className="flex items-center gap-2">
+                    <Image src="/icons/tavily.png" alt="Tavily" width={16} height={16} />
+                    <span>Tavily</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="brave">
+                  <div className="flex items-center gap-2">
+                    <Image src="/icons/brave.png" alt="Brave" width={16} height={16} />
+                    <span>Brave</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="bing">
+                  <div className="flex items-center gap-2">
+                    <Image src="/icons/serpapi.svg" alt="SerpApi" width={16} height={16} />
+                    <span>Bing (via SerpApi)</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5 pt-2">
-            <Label className="text-xs">
-              {form.webSearchProvider === 'serper' ? 'Serper API Key' : 'Tavily API Key'}
-            </Label>
-            <div className="relative">
-              <Input
-                type={showApiKey ? 'text' : 'password'}
-                className="text-sm pr-10"
-                value={
-                  form.webSearchProvider === 'serper'
-                    ? form.serperApiKey || ''
-                    : form.tavilyApiKey || ''
-                }
-                onChange={(e) => {
-                  if (form.webSearchProvider === 'serper') {
-                    setForm({ ...form, serperApiKey: e.target.value });
-                  } else {
-                    setForm({ ...form, tavilyApiKey: e.target.value });
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">
+                {form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
+                  ? 'Serper API Key'
+                  : form.webSearchProvider === 'brave'
+                  ? 'Brave API Key'
+                  : form.webSearchProvider === 'bing'
+                  ? 'SerpApi API Key'
+                  : 'Tavily API Key'}
+              </Label>
+              {verifyStatus.status === 'success' && (
+                <span className="text-[10px] text-green-500 font-medium">✓ Verified</span>
+              )}
+              {verifyStatus.status === 'error' && (
+                <span className="text-[10px] text-red-500 font-medium truncate max-w-[150px]">
+                  {verifyStatus.message}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  type={showApiKey ? 'text' : 'password'}
+                  className="text-sm pr-10"
+                  value={
+                    form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
+                      ? form.serperApiKey || ''
+                      : form.webSearchProvider === 'brave'
+                      ? form.braveApiKey || ''
+                      : form.webSearchProvider === 'bing'
+                      ? form.bingApiKey || ''
+                      : form.tavilyApiKey || ''
                   }
-                }}
-                placeholder={
-                  form.webSearchProvider === 'serper'
-                    ? 'Your Serper API Key'
-                    : 'Your Tavily API Key'
-                }
-              />
+                  onChange={(e) => {
+                    setVerifyStatus({ status: null });
+                    if (
+                      form.webSearchProvider === 'serper' ||
+                      form.webSearchProvider === 'google'
+                    ) {
+                      setForm({ ...form, serperApiKey: e.target.value });
+                    } else if (form.webSearchProvider === 'brave') {
+                      setForm({ ...form, braveApiKey: e.target.value });
+                    } else if (form.webSearchProvider === 'bing') {
+                      setForm({ ...form, bingApiKey: e.target.value });
+                    } else {
+                      setForm({ ...form, tavilyApiKey: e.target.value });
+                    }
+                  }}
+                  placeholder={
+                    form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
+                      ? 'Your Serper API Key'
+                      : form.webSearchProvider === 'brave'
+                      ? 'Your Brave API Key'
+                      : form.webSearchProvider === 'bing'
+                      ? 'Your SerpApi API Key'
+                      : 'Your Tavily API Key'
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                >
+                  {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </Button>
+              </div>
               <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
-                onClick={() => setShowApiKey(!showApiKey)}
+                className={'rounded-lg'}
+                variant="outline"
+                size="default"
+                onClick={handleVerify}
+                disabled={verifying}
               >
-                {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                {verifying ? <Loader2 className="size-4 animate-spin" /> : 'Verify'}
               </Button>
             </div>
           </div>
