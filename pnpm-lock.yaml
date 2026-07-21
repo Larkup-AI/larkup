@@ -414,6 +414,9 @@ importers:
       pdf-parse:
         specifier: 1.1.1
         version: 1.1.1
+      pdfjs-dist:
+        specifier: ^6.1.200
+        version: 6.1.200
       react:
         specifier: ^19
         version: 19.2.4

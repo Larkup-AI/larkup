@@ -54,6 +54,7 @@
     "node-ssh": "^13.2.1",
     "papaparse": "^5.5.3",
     "pdf-parse": "1.1.1",
+    "pdfjs-dist": "^6.1.200",
     "react": "^19",
     "react-dom": "^19",
     "recharts": "^3.9.2",
