@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { resolve } from 'path';
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/notion → Returns connection status and connected pages.
@@ -21,15 +23,15 @@ export async function GET() {
 
   try {
     // Use search endpoint to discover accessible pages
-    const res = await fetch("https://api.notion.com/v1/search", {
-      method: "POST",
+    const res = await fetch('https://api.notion.com/v1/search', {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
-        "Notion-Version": "2022-06-28",
-        "Content-Type": "application/json",
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        filter: { property: "object", value: "page" },
+        filter: { property: 'object', value: 'page' },
         page_size: 100,
       }),
     });
@@ -39,7 +41,7 @@ export async function GET() {
       return NextResponse.json({
         connected: false,
         configured: true,
-        error: err.message || "Failed to connect to Notion",
+        error: err.message || 'Failed to connect to Notion',
         pages: [],
       });
     }
@@ -51,19 +53,19 @@ export async function GET() {
       icon: page.icon?.emoji || page.icon?.external?.url || null,
       url: page.url,
       lastEdited: page.last_edited_time,
-      parentType: page.parent?.type || "workspace",
+      parentType: page.parent?.type || 'workspace',
     }));
 
     // Also fetch databases
-    const dbRes = await fetch("https://api.notion.com/v1/search", {
-      method: "POST",
+    const dbRes = await fetch('https://api.notion.com/v1/search', {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
-        "Notion-Version": "2022-06-28",
-        "Content-Type": "application/json",
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        filter: { property: "object", value: "database" },
+        filter: { property: 'object', value: 'database' },
         page_size: 100,
       }),
     });
@@ -73,11 +75,11 @@ export async function GET() {
       const dbData = await dbRes.json();
       databases = (dbData.results || []).map((db: any) => ({
         id: db.id,
-        title: db.title?.[0]?.plain_text || "Untitled Database",
+        title: db.title?.[0]?.plain_text || 'Untitled Database',
         icon: db.icon?.emoji || db.icon?.external?.url || null,
         url: db.url,
         lastEdited: db.last_edited_time,
-        type: "database" as const,
+        type: 'database' as const,
       }));
     }
 
@@ -92,7 +94,7 @@ export async function GET() {
       {
         connected: false,
         configured: true,
-        error: err instanceof Error ? err.message : "Connection failed",
+        error: err instanceof Error ? err.message : 'Connection failed',
         pages: [],
       },
       { status: 500 },
@@ -108,7 +110,7 @@ export async function POST(req: Request) {
   const token = process.env.NOTION_ACCESS_TOKEN;
   if (!token) {
     return NextResponse.json(
-      { error: "Notion not connected. Set NOTION_ACCESS_TOKEN." },
+      { error: 'Notion not connected. Set NOTION_ACCESS_TOKEN.' },
       { status: 400 },
     );
   }
@@ -116,10 +118,7 @@ export async function POST(req: Request) {
   try {
     const { pageIds } = (await req.json()) as { pageIds: string[] };
     if (!pageIds?.length) {
-      return NextResponse.json(
-        { error: "No pages selected." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'No pages selected.' }, { status: 400 });
     }
 
     const results: { id: string; title: string; status: string; error?: string }[] = [];
@@ -132,38 +131,38 @@ export async function POST(req: Request) {
         const title = extractTitle(pageInfo);
 
         // Add to documents corpus
-        const docRes = await fetch(new URL("/api/documents", req.url).toString(), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const docRes = await fetch(new URL('/api/documents', req.url).toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            title: title || "Untitled Notion Page",
+            title: title || 'Untitled Notion Page',
             content,
-            source: "paste",
+            source: 'paste',
             url: pageInfo.url,
             metadata: {
               notionPageId: pageId,
-              importedFrom: "notion",
+              importedFrom: 'notion',
             },
           }),
         });
 
         if (!docRes.ok) {
           const err = await docRes.json();
-          results.push({ id: pageId, title, status: "failed", error: err.error });
+          results.push({ id: pageId, title, status: 'failed', error: err.error });
         } else {
-          results.push({ id: pageId, title, status: "success" });
+          results.push({ id: pageId, title, status: 'success' });
         }
       } catch (err) {
         results.push({
           id: pageId,
           title: pageId,
-          status: "failed",
-          error: err instanceof Error ? err.message : "Unknown error",
+          status: 'failed',
+          error: err instanceof Error ? err.message : 'Unknown error',
         });
       }
     }
 
-    const successCount = results.filter((r) => r.status === "success").length;
+    const successCount = results.filter((r) => r.status === 'success').length;
     return NextResponse.json({
       imported: successCount,
       total: pageIds.length,
@@ -171,7 +170,31 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Import failed." },
+      { error: err instanceof Error ? err.message : 'Import failed.' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * DELETE /api/notion → Disconnect Notion by removing the access token.
+ */
+export async function DELETE() {
+  try {
+    const envPath = resolve(process.cwd(), '.env.local');
+    if (existsSync(envPath)) {
+      const envContent = readFileSync(envPath, 'utf-8');
+      if (envContent.includes('NOTION_ACCESS_TOKEN=')) {
+        const updated = envContent.replace(/NOTION_ACCESS_TOKEN=.*\n?/g, '');
+        writeFileSync(envPath, updated, 'utf-8');
+      }
+    }
+    delete process.env.NOTION_ACCESS_TOKEN;
+
+    return NextResponse.json({ success: true, message: 'Disconnected from Notion' });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to disconnect' },
       { status: 500 },
     );
   }
@@ -184,19 +207,19 @@ function extractTitle(page: any): string {
   const props = page.properties || {};
   for (const key of Object.keys(props)) {
     const prop = props[key];
-    if (prop.type === "title" && prop.title?.length > 0) {
-      return prop.title.map((t: any) => t.plain_text).join("");
+    if (prop.type === 'title' && prop.title?.length > 0) {
+      return prop.title.map((t: any) => t.plain_text).join('');
     }
   }
   // Fallback
-  return page.title?.[0]?.plain_text || "Untitled";
+  return page.title?.[0]?.plain_text || 'Untitled';
 }
 
 async function fetchPageInfo(token: string, pageId: string) {
   const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
     headers: {
       Authorization: `Bearer ${token}`,
-      "Notion-Version": "2022-06-28",
+      'Notion-Version': '2022-06-28',
     },
   });
   if (!res.ok) throw new Error(`Failed to fetch page ${pageId}`);
@@ -209,13 +232,13 @@ async function fetchPageContent(token: string, pageId: string): Promise<string> 
 
   do {
     const url = new URL(`https://api.notion.com/v1/blocks/${pageId}/children`);
-    if (cursor) url.searchParams.set("start_cursor", cursor);
-    url.searchParams.set("page_size", "100");
+    if (cursor) url.searchParams.set('start_cursor', cursor);
+    url.searchParams.set('page_size', '100');
 
     const res = await fetch(url.toString(), {
       headers: {
         Authorization: `Bearer ${token}`,
-        "Notion-Version": "2022-06-28",
+        'Notion-Version': '2022-06-28',
       },
     });
 
@@ -235,45 +258,47 @@ function blocksToMarkdown(blocks: any[]): string {
       const content = block[type];
 
       switch (type) {
-        case "paragraph":
-          return richTextToPlain(content?.rich_text) + "\n";
-        case "heading_1":
+        case 'paragraph':
+          return richTextToPlain(content?.rich_text) + '\n';
+        case 'heading_1':
           return `# ${richTextToPlain(content?.rich_text)}\n`;
-        case "heading_2":
+        case 'heading_2':
           return `## ${richTextToPlain(content?.rich_text)}\n`;
-        case "heading_3":
+        case 'heading_3':
           return `### ${richTextToPlain(content?.rich_text)}\n`;
-        case "bulleted_list_item":
+        case 'bulleted_list_item':
           return `- ${richTextToPlain(content?.rich_text)}`;
-        case "numbered_list_item":
+        case 'numbered_list_item':
           return `1. ${richTextToPlain(content?.rich_text)}`;
-        case "to_do":
-          return `- [${content?.checked ? "x" : " "}] ${richTextToPlain(content?.rich_text)}`;
-        case "toggle":
+        case 'to_do':
+          return `- [${content?.checked ? 'x' : ' '}] ${richTextToPlain(content?.rich_text)}`;
+        case 'toggle':
           return richTextToPlain(content?.rich_text);
-        case "quote":
+        case 'quote':
           return `> ${richTextToPlain(content?.rich_text)}\n`;
-        case "callout":
-          return `> ${content?.icon?.emoji || "💡"} ${richTextToPlain(content?.rich_text)}\n`;
-        case "code":
-          return `\`\`\`${content?.language || ""}\n${richTextToPlain(content?.rich_text)}\n\`\`\`\n`;
-        case "divider":
-          return "---\n";
-        case "image":
-          return `![image](${content?.file?.url || content?.external?.url || ""})\n`;
-        case "bookmark":
+        case 'callout':
+          return `> ${content?.icon?.emoji || '💡'} ${richTextToPlain(content?.rich_text)}\n`;
+        case 'code':
+          return `\`\`\`${content?.language || ''}\n${richTextToPlain(
+            content?.rich_text,
+          )}\n\`\`\`\n`;
+        case 'divider':
+          return '---\n';
+        case 'image':
+          return `![image](${content?.file?.url || content?.external?.url || ''})\n`;
+        case 'bookmark':
           return `[${content?.url}](${content?.url})\n`;
-        case "link_preview":
+        case 'link_preview':
           return `[${content?.url}](${content?.url})\n`;
         default:
-          return "";
+          return '';
       }
     })
     .filter(Boolean)
-    .join("\n");
+    .join('\n');
 }
 
 function richTextToPlain(richText: any[]): string {
-  if (!richText) return "";
-  return richText.map((t: any) => t.plain_text || "").join("");
+  if (!richText) return '';
+  return richText.map((t: any) => t.plain_text || '').join('');
 }

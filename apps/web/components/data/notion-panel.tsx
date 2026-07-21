@@ -72,6 +72,7 @@ export function NotionPanel({ onAdded, onClose }: { onAdded: () => void; onClose
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [search, setSearch] = useState('');
   const [showType, setShowType] = useState<'all' | 'pages' | 'databases'>('all');
 
@@ -317,19 +318,35 @@ export function NotionPanel({ onAdded, onClose }: { onAdded: () => void; onClose
       <DialogFooter className="mt-5 border-border/70 flex flex-row items-center justify-between sm:justify-between space-x-0 gap-2">
         <Button
           variant="destructive"
-          onClick={() => {
-            // Disconnect logic to be implemented
-            toast.error('Disconnect not implemented yet');
+          onClick={async () => {
+            setDisconnecting(true);
+            try {
+              const res = await fetch('/api/integrations/notion', { method: 'DELETE' });
+              if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to disconnect');
+              }
+              toast.success('Disconnected from Notion');
+              fetchStatus();
+            } catch (err) {
+              toast.error(formatErrorMessage(err));
+            } finally {
+              setDisconnecting(false);
+            }
           }}
-          disabled={importing}
+          disabled={importing || disconnecting}
         >
+          {disconnecting ? <Loader2 className="size-4 mr-2 animate-spin" /> : null}
           Disconnect
         </Button>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={onClose} disabled={importing}>
+          <Button variant="outline" onClick={onClose} disabled={importing || disconnecting}>
             Cancel
           </Button>
-          <Button onClick={importSelected} disabled={importing || selected.size === 0}>
+          <Button
+            onClick={importSelected}
+            disabled={importing || disconnecting || selected.size === 0}
+          >
             {importing ? (
               <Loader2 className="size-4 mr-2 animate-spin" />
             ) : (
