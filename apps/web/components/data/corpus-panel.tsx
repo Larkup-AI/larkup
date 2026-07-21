@@ -63,9 +63,11 @@ const SOURCE_META: Record<DocumentSource, { label: string; icon: typeof Globe }>
 export function CorpusPanel({
   documents,
   onChanged,
+  isIndexing,
 }: {
   documents: SourceDocument[];
   onChanged: () => void;
+  isIndexing?: boolean;
 }) {
   const [active, setActive] = useState<SourceDocument | null>(null);
   const [deleteTask, setDeleteTask] = useState<
@@ -248,6 +250,14 @@ export function CorpusPanel({
                         className="text-green-600 bg-green-50/10 border-green-500 font-normal"
                       >
                         Indexed
+                      </Badge>
+                    ) : isIndexing ? (
+                      <Badge
+                        variant="outline"
+                        className="text-blue-500 bg-blue-50 border-blue-200 font-normal flex items-center gap-1.5"
+                      >
+                        <Loader2 className="size-3 animate-spin" />
+                        Indexing
                       </Badge>
                     ) : (
                       <Badge

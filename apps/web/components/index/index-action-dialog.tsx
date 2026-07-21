@@ -127,7 +127,6 @@ export function IndexActionDialog({ open, onOpenChange, trigger }: IndexActionDi
         return;
       }
       toast.success('Indexing started.');
-      setIsIndexing(true);
       mutate();
     } catch {
       toast.error('Could not start indexing.');
@@ -210,7 +209,7 @@ export function IndexActionDialog({ open, onOpenChange, trigger }: IndexActionDi
         </div>
       )}
 
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto ">
         <DialogHeader>
           <DialogTitle>Index Data</DialogTitle>
           <DialogDescription>
@@ -291,12 +290,12 @@ export function IndexActionDialog({ open, onOpenChange, trigger }: IndexActionDi
                   size="lg"
                 >
                   {Boolean(data.run && ACTIVE.includes(data.run.status)) || starting ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader2 className="size-4 animate-spin mr-2" />
                   ) : (
-                    <Play className="size-4" />
+                    <Play className="size-4 mr-2" />
                   )}
                   {Boolean(data.run && ACTIVE.includes(data.run.status))
-                    ? 'Indexing…'
+                    ? `Indexing…`
                     : data.run?.status === 'completed'
                     ? `Index new documents (${data.unindexedCount})`
                     : `Start indexing (${data.unindexedCount})`}

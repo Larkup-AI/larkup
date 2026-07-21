@@ -39,6 +39,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { DialogFooter } from '../ui/dialog';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -60,8 +61,13 @@ interface IndexStatus {
 
 const ACTIVE: IndexRun['status'][] = ['chunking', 'embedding', 'upserting'];
 
-export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
+export function IndexWorkspace({
+  onDone,
+  onClose,
+}: { onDone?: () => void; onClose?: () => void } = {}) {
   const [starting, setStarting] = useState(false);
+  const [isIndexing, setIsIndexing] = useState(false);
+
   const { data, isLoading, mutate } = useSWR<IndexStatus>('/api/index', fetcher, {
     refreshInterval: (d) => (d?.run && ACTIVE.includes(d.run.status) ? 1000 : 0),
   });
@@ -79,6 +85,19 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
     }
     lastWarning.current = warning;
   }, [data?.run?.warning]);
+
+  useEffect(() => {
+    const status = data?.run?.status;
+    const isNowActive = Boolean(data?.run && status && ACTIVE.includes(status));
+
+    if (isNowActive) {
+      setIsIndexing(true);
+    } else if (isIndexing && status === 'completed') {
+      setIsIndexing(false);
+      toast.success('Indexing completed successfully!');
+      onClose?.();
+    }
+  }, [data?.run?.status, isIndexing, onClose]);
 
   if (isLoading || !data) {
     return (
@@ -114,28 +133,8 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
     }
   }
 
-  async function cancel() {
-    setStarting(true);
-    try {
-      const res = await fetch('/api/index', { method: 'DELETE' });
-      if (!res.ok) {
-        toast.error('Could not cancel indexing.');
-        return;
-      }
-      toast.success('Indexing cancelled.');
-      mutate();
-      onDone?.();
-    } catch {
-      toast.error('Could not cancel indexing.');
-    } finally {
-      setStarting(false);
-    }
-  }
-
   return (
     <div className="space-y-6">
-      <ConfigSummary config={config} docCount={docCount} charCount={charCount} />
-
       {!ready && (
         <Alert variant="default">
           <AlertTriangle className="size-4 text-orange-500!" />
@@ -210,7 +209,10 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
         </Alert>
       )} */}
 
-      <div className="flex items-center gap-3">
+      <div className="flex w-full items-center justify-between pt-4 mt-2">
+        <Button onClick={() => onClose?.()} size="lg" variant="outline">
+          Cancel
+        </Button>
         <Button
           onClick={() => build(run?.status === 'completed')}
           disabled={
@@ -219,9 +221,9 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
           size="lg"
         >
           {running || starting ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader2 className="size-4 animate-spin mr-2" />
           ) : (
-            <Play className="size-4" />
+            <Play className="size-4 mr-2" />
           )}
           {running
             ? 'Indexing…'
@@ -229,36 +231,6 @@ export function IndexWorkspace({ onDone }: { onDone?: () => void } = {}) {
             ? `Index new documents (${unindexedCount})`
             : `Start indexing (${unindexedCount})`}
         </Button>
-        {running && (
-          <Button onClick={cancel} disabled={starting} size="lg" variant="destructive">
-            Cancel
-          </Button>
-        )}
-        {run?.status === 'completed' && (
-          <AlertDialog>
-            <AlertDialogTrigger
-              render={
-                <Button disabled={!ready || running || starting} size="lg" variant="outline">
-                  <RotateCcw className="size-4 mr-2" />
-                  Re-Index
-                </Button>
-              }
-            />
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure you want to re-index?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will rebuild the entire index from scratch. All documents will be
-                  re-processed.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => build(false)}>Continue</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
       </div>
     </div>
   );

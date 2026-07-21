@@ -193,6 +193,14 @@ export function DataWorkspace() {
   const indexRunning = indexQuery.data?.running ?? false;
   const hasCompletedIndex = indexQuery.data?.run?.status === 'completed';
 
+  const prevIndexRunning = useRef(indexRunning);
+  useEffect(() => {
+    if (prevIndexRunning.current && !indexRunning) {
+      docsQuery.mutate();
+    }
+    prevIndexRunning.current = indexRunning;
+  }, [indexRunning, docsQuery]);
+
   const { mutate: mutateGlobal } = useSWRConfig();
 
   const refreshAll = () => {
@@ -356,7 +364,7 @@ export function DataWorkspace() {
                 </Button>
               }
             />
-            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto ">
               <DialogHeader>
                 <DialogTitle>Build Index</DialogTitle>
                 <DialogDescription>
@@ -368,6 +376,7 @@ export function DataWorkspace() {
                   indexQuery.mutate();
                   setResetKey((k) => k + 1);
                 }}
+                onClose={() => setIndexDialogOpen(false)}
               />
             </DialogContent>
           </Dialog>
@@ -486,7 +495,7 @@ export function DataWorkspace() {
 
         {activeTab === 'corpus' && (
           <div className="animate-in fade-in duration-300">
-            <CorpusPanel documents={documents} onChanged={refreshAll} />
+            <CorpusPanel documents={documents} onChanged={refreshAll} isIndexing={indexRunning} />
           </div>
         )}
       </div>
