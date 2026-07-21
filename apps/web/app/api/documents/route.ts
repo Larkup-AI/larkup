@@ -124,6 +124,45 @@ export async function DELETE(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
   const ids = url.searchParams.get('ids');
+
+  // Clean up associated media assets
+  const docs = await readDocuments();
+  let toDeleteDocs = [];
+  if (id) {
+    toDeleteDocs = docs.filter((d) => d.id === id);
+  } else if (ids) {
+    const idList = ids.split(',');
+    toDeleteDocs = docs.filter((d) => idList.includes(d.id));
+  } else {
+    toDeleteDocs = docs;
+  }
+
+  for (const doc of toDeleteDocs) {
+    const cleanupUrls = [doc.url, doc.metadata?.imageUrl].filter(Boolean);
+    for (const docUrl of cleanupUrls) {
+      if (docUrl?.startsWith('/api/media/')) {
+        const assetId = docUrl.split('/api/media/')[1]?.split('?')[0];
+        if (assetId) {
+          const { getMediaAsset, deleteMediaAsset } = await import('@larkup/core/media-store');
+          const { createStorageProvider } = await import('@larkup/marketplace/storage');
+          const asset = await getMediaAsset(assetId);
+          if (asset) {
+            const storage = createStorageProvider();
+            await storage.delete(asset.storageUri).catch(() => {});
+            if (asset.thumbnailUri) await storage.delete(asset.thumbnailUri).catch(() => {});
+            await deleteMediaAsset(assetId);
+          }
+        }
+      } else if (docUrl?.startsWith('/api/uploads/')) {
+        const filename = docUrl.split('/api/uploads/')[1]?.split('?')[0];
+        if (filename) {
+          const uploadsDir = path.join(process.cwd(), '../../.larkup/uploads');
+          await fs.unlink(path.join(uploadsDir, filename)).catch(() => {});
+        }
+      }
+    }
+  }
+
   if (id) await deleteDocument(id);
   else if (ids) await deleteDocuments(ids.split(','));
   else {
