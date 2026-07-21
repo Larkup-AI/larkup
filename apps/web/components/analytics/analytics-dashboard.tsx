@@ -66,7 +66,10 @@ function formatTokens(num: number): string {
 
 function formatCost(cost: number): string {
   if (cost === 0) return '$0.00';
-  if (cost < 0.01) return '<$0.01';
+  if (cost < 0.01) {
+    if (cost < 0.0001) return '<$0.0001';
+    return `$${cost.toFixed(4)}`;
+  }
   return `$${cost.toFixed(2)}`;
 }
 

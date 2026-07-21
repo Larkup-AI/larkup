@@ -105,4 +105,52 @@ test.describe('Settings Page', () => {
       }
     }
   });
+  test('smart proxy parsing', async ({ page }) => {
+    const generalLink = page.getByText('General', { exact: true }).first();
+    if (await generalLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await generalLink.click();
+      await page.waitForTimeout(500);
+
+      // Verify proxy input parsing
+      const proxyServerInput = page
+        .getByPlaceholder('http://proxy.example.com:8080 (or paste one-liner)')
+        .first();
+      if (await proxyServerInput.isVisible()) {
+        // Test http format with auth
+        await proxyServerInput.fill('http://myuser:mypassword@proxy.host.com:8080');
+        await page.waitForTimeout(200); // Wait for state update
+
+        // Switch to form tab to see individual fields
+        await page.getByRole('tab', { name: 'Form' }).click();
+
+        const formProxyServerInput = page
+          .getByPlaceholder('http://proxy.example.com:8080', { exact: true })
+          .first();
+        await expect(formProxyServerInput).toHaveValue('http://proxy.host.com:8080');
+
+        // Find username and password inputs by finding the label, going to parent, then finding input
+        const usernameInput = page
+          .getByText('Proxy Username', { exact: true })
+          .locator('..')
+          .locator('input');
+        await expect(usernameInput).toHaveValue('myuser');
+
+        const passwordInput = page
+          .getByText('Proxy Password', { exact: true })
+          .locator('..')
+          .locator('input');
+        await expect(passwordInput).toHaveValue('mypassword');
+
+        // Test ip:port:user:pass format
+        await page.getByRole('tab', { name: 'One Line' }).click();
+        await proxyServerInput.fill('1.2.3.4:8080:user2:pass2');
+        await page.waitForTimeout(200);
+
+        await page.getByRole('tab', { name: 'Form' }).click();
+        await expect(formProxyServerInput).toHaveValue('http://1.2.3.4:8080');
+        await expect(usernameInput).toHaveValue('user2');
+        await expect(passwordInput).toHaveValue('pass2');
+      }
+    }
+  });
 });

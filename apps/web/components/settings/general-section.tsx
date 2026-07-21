@@ -25,6 +25,9 @@ import {
 } from '@/components/ui/card';
 import { useWorkspace } from '@/components/workspace/workspace-provider';
 import Image from 'next/image';
+import { Tabs, TabsTrigger, TabsList, TabsContent } from '../ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
@@ -36,6 +39,7 @@ export function GeneralSection() {
   const [localName, setLocalName] = useState(username || '');
   const [showApiKey, setShowApiKey] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [showProxyPassword, setShowProxyPassword] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState<{
     status: 'success' | 'error' | null;
     message?: string;
@@ -57,12 +61,16 @@ export function GeneralSection() {
     form.googleApiKey !== data?.config?.googleApiKey ||
     form.braveApiKey !== data?.config?.braveApiKey ||
     form.bingApiKey !== data?.config?.bingApiKey;
-  const dirtyScraper =
+  const dirtyWebCrawler =
+    form.webCrawlerProvider !== data?.config?.webCrawlerProvider ||
+    form.firecrawlApiKey !== data?.config?.firecrawlApiKey;
+  const dirtyProxy =
     form.scraperProxyServer !== data?.config?.scraperProxyServer ||
     form.scraperProxyUsername !== data?.config?.scraperProxyUsername ||
     form.scraperProxyPassword !== data?.config?.scraperProxyPassword ||
-    form.firecrawlApiKey !== data?.config?.firecrawlApiKey;
-  async function handleSave(section: 'username' | 'webSearch' | 'scraper') {
+    form.useScraperProxy !== data?.config?.useScraperProxy;
+
+  async function handleSave(section: 'username' | 'webSearch' | 'webCrawler' | 'proxy') {
     setSaving(section);
     try {
       let payload = { ...data?.config };
@@ -81,11 +89,14 @@ export function GeneralSection() {
         payload.googleApiKey = form.googleApiKey;
         payload.braveApiKey = form.braveApiKey;
         payload.bingApiKey = form.bingApiKey;
-      } else if (section === 'scraper') {
+      } else if (section === 'webCrawler') {
+        payload.webCrawlerProvider = form.webCrawlerProvider;
+        payload.firecrawlApiKey = form.firecrawlApiKey;
+      } else if (section === 'proxy') {
         payload.scraperProxyServer = form.scraperProxyServer;
         payload.scraperProxyUsername = form.scraperProxyUsername;
         payload.scraperProxyPassword = form.scraperProxyPassword;
-        payload.firecrawlApiKey = form.firecrawlApiKey;
+        payload.useScraperProxy = form.useScraperProxy;
       }
 
       const res = await fetch('/api/config', {
@@ -135,6 +146,37 @@ export function GeneralSection() {
       toast.error(msg);
     } finally {
       setVerifying(false);
+    }
+  }
+
+  const [verifyingCrawler, setVerifyingCrawler] = useState(false);
+  const [verifyCrawlerStatus, setVerifyCrawlerStatus] = useState<{
+    status: 'success' | 'error' | null;
+    message?: string;
+  }>({ status: null });
+
+  async function handleVerifyCrawler() {
+    if (form.webCrawlerProvider !== 'cloud') return;
+    setVerifyingCrawler(true);
+    setVerifyCrawlerStatus({ status: null });
+
+    try {
+      const res = await fetch('/api/search/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'firecrawl', apiKey: form.firecrawlApiKey || '' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Verification failed');
+
+      setVerifyCrawlerStatus({ status: 'success' });
+      toast.success('Crawler API Key verified successfully!');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Verification failed';
+      setVerifyCrawlerStatus({ status: 'error', message: msg });
+      toast.error(msg);
+    } finally {
+      setVerifyingCrawler(false);
     }
   }
 
@@ -226,12 +268,6 @@ export function GeneralSection() {
                 </div>
               </SelectTrigger>
               <SelectContent>
-                {/* <SelectItem value="google">
-                  <div className="flex items-center gap-2">
-                    <Image src="/icons/google.png" alt="Google" width={16} height={16} />
-                    <span>Google (via Serper)</span>
-                  </div>
-                </SelectItem> */}
                 <SelectItem value="serper">
                   <div className="flex items-center gap-2">
                     <Image src="/icons/serper.png" alt="Serper" width={16} height={16} />
@@ -366,62 +402,305 @@ export function GeneralSection() {
         </CardFooter>
       </Card>
 
-      {/* Scraper */}
+      {/* Web Scraper Provider */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Web Scraper</CardTitle>
           <CardDescription className="text-xs">
-            Configure proxy and scraping settings for data collection.
+            Select your web crawler provider (Local or Cloud).
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs">Proxy Server</Label>
-            <Input
-              className="text-sm"
-              value={form.scraperProxyServer || ''}
-              onChange={(e) => setForm({ ...form, scraperProxyServer: e.target.value })}
-              placeholder="http://proxy.example.com:8080"
-            />
+            <Label className="text-xs">Web Scraper Provider</Label>
+            <Select
+              value={form.webCrawlerProvider || 'local'}
+              onValueChange={(val) => {
+                setForm({ ...form, webCrawlerProvider: val as 'local' | 'cloud' });
+                setVerifyCrawlerStatus({ status: null });
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <div className="flex items-center gap-2">
+                  <Image src="/icons/firecrawl.png" alt="Firecrawl" width={16} height={16} />
+                  <span>
+                    {form.webCrawlerProvider === 'cloud'
+                      ? 'Firecrawl (Cloud)'
+                      : 'Local (Firecrawl)'}
+                  </span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="local">
+                  <div className="flex items-center gap-2">
+                    <Image src="/icons/firecrawl.png" alt="Local Crawler" width={16} height={16} />
+                    <span>Local (Firecrawl)</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="cloud">
+                  <div className="flex items-center gap-2">
+                    <Image
+                      src="/icons/firecrawl.png"
+                      alt="Firecrawl Cloud"
+                      width={16}
+                      height={16}
+                    />
+                    <span>Firecrawl (Cloud)</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Proxy Username</Label>
-              <Input
-                className="text-sm"
-                value={form.scraperProxyUsername || ''}
-                onChange={(e) => setForm({ ...form, scraperProxyUsername: e.target.value })}
-              />
+
+          {form.webCrawlerProvider === 'cloud' && (
+            <div className="space-y-1.5 pt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Firecrawl API Key (Cloud)</Label>
+                {verifyCrawlerStatus.status === 'success' && (
+                  <span className="text-[10px] text-green-500 font-medium">✓ Verified</span>
+                )}
+                {verifyCrawlerStatus.status === 'error' && (
+                  <span className="text-[10px] text-red-500 font-medium truncate max-w-[150px]">
+                    {verifyCrawlerStatus.message}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showApiKey ? 'text' : 'password'}
+                    className="text-sm pr-10"
+                    value={form.firecrawlApiKey || ''}
+                    onChange={(e) => {
+                      setVerifyCrawlerStatus({ status: null });
+                      setForm({ ...form, firecrawlApiKey: e.target.value });
+                    }}
+                    placeholder="fc-..."
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                  >
+                    {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </Button>
+                </div>
+                <Button
+                  className="rounded-lg"
+                  variant="outline"
+                  size="default"
+                  disabled={verifyingCrawler}
+                  onClick={handleVerifyCrawler}
+                >
+                  {verifyingCrawler ? <Loader2 className="size-4 animate-spin" /> : 'Verify'}
+                </Button>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Proxy Password</Label>
-              <Input
-                type="password"
-                className="text-sm"
-                value={form.scraperProxyPassword || ''}
-                onChange={(e) => setForm({ ...form, scraperProxyPassword: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5 pt-2">
-            <Label className="text-xs">Firecrawl API Key (Cloud)</Label>
-            <Input
-              type="password"
-              className="text-sm"
-              value={form.firecrawlApiKey || ''}
-              onChange={(e) => setForm({ ...form, firecrawlApiKey: e.target.value })}
-              placeholder="fc-..."
-            />
-          </div>
+          )}
         </CardContent>
         <CardFooter className="flex justify-end pt-4 border-t">
           <Button
             size="sm"
-            disabled={saving === 'scraper' || !dirtyScraper}
-            onClick={() => handleSave('scraper')}
+            disabled={saving === 'webCrawler' || !dirtyWebCrawler}
+            onClick={() => handleSave('webCrawler')}
             className="gap-1.5"
           >
-            {saving === 'scraper' ? (
+            {saving === 'webCrawler' ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Save className="size-3.5" />
+            )}
+            Save
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* Proxy Settings */}
+      <Card>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle className="text-sm">Local Proxy Settings</CardTitle>
+            <CardDescription className="text-xs">
+              Configure proxy settings for the local scraper.
+            </CardDescription>
+          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={form.useScraperProxy || false}
+                      onCheckedChange={(checked) => setForm({ ...form, useScraperProxy: checked })}
+                    />
+                  </div>
+                }
+              />
+              <TooltipContent>
+                <p>Enable proxy for web scraping</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Tabs defaultValue="one-line" className="w-full ">
+            <div className="flex mb-4">
+              <TabsList className="grid w-[140px] grid-cols-2 h-8! bg-muted/10">
+                <TabsTrigger value="one-line" className="text-xs h-6">
+                  One Line
+                </TabsTrigger>
+                <TabsTrigger value="form" className="text-xs h-6">
+                  Form
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="one-line" className="mt-0 w-full">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Proxy URL</Label>
+                <Input
+                  className="text-sm"
+                  value={(() => {
+                    if (!form.scraperProxyServer) return '';
+                    try {
+                      const url = new URL(form.scraperProxyServer);
+                      if (form.scraperProxyUsername)
+                        url.username = encodeURIComponent(form.scraperProxyUsername);
+                      if (form.scraperProxyPassword)
+                        url.password = encodeURIComponent(form.scraperProxyPassword);
+                      return url.toString().replace(/\/$/, '');
+                    } catch {
+                      return form.scraperProxyServer;
+                    }
+                  })()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    let server = val;
+                    let username = '';
+                    let password = '';
+                    const trimmed = val.trim();
+                    if (trimmed) {
+                      try {
+                        const url = new URL(trimmed);
+                        if (url.username || url.password) {
+                          username = decodeURIComponent(url.username);
+                          password = decodeURIComponent(url.password);
+                          url.username = '';
+                          url.password = '';
+                          server = url.toString().replace(/\/$/, '');
+                        }
+                      } catch {
+                        const parts = trimmed.split(':');
+                        if (parts.length === 4 && !trimmed.startsWith('http')) {
+                          server = `http://${parts[0]}:${parts[1]}`;
+                          username = parts[2];
+                          password = parts[3];
+                        }
+                      }
+                    }
+                    setForm({
+                      ...form,
+                      scraperProxyServer: server,
+                      scraperProxyUsername: username,
+                      scraperProxyPassword: password,
+                    });
+                  }}
+                  placeholder="http://proxy.example.com:8080 (or paste one-liner)"
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="form" className="mt-0 space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Proxy Server</Label>
+                <Input
+                  className="text-sm"
+                  value={form.scraperProxyServer || ''}
+                  onChange={(e) => setForm({ ...form, scraperProxyServer: e.target.value })}
+                  placeholder="http://proxy.example.com:8080"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Proxy Username</Label>
+                  <Input
+                    className="text-sm"
+                    value={form.scraperProxyUsername || ''}
+                    onChange={(e) => setForm({ ...form, scraperProxyUsername: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Proxy Password</Label>
+                  <div className="relative">
+                    <Input
+                      type={showProxyPassword ? 'text' : 'password'}
+                      className="text-sm pr-10"
+                      value={form.scraperProxyPassword || ''}
+                      onChange={(e) => setForm({ ...form, scraperProxyPassword: e.target.value })}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
+                      onClick={() => setShowProxyPassword(!showProxyPassword)}
+                    >
+                      {showProxyPassword ? (
+                        <EyeOff className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+        <CardFooter className="flex justify-end gap-2 pt-4 border-t">
+          <Button
+            className="rounded-lg gap-2"
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const promise = (async () => {
+                if (!form.scraperProxyServer) {
+                  throw new Error('Proxy server is required');
+                }
+                const res = await fetch('/api/proxy/verify', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    server: form.scraperProxyServer,
+                    username: form.scraperProxyUsername,
+                    password: form.scraperProxyPassword,
+                  }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                  throw new Error(data.error || 'Proxy verification failed');
+                }
+                return data;
+              })();
+
+              toast.promise(promise, {
+                loading: 'Verifying proxy...',
+                success: 'Proxy configuration is valid!',
+                error: (err) => err.message || 'Proxy verification failed',
+              });
+            }}
+          >
+            Verify Proxy
+          </Button>
+          <Button
+            size="sm"
+            disabled={saving === 'proxy' || !dirtyProxy}
+            onClick={() => handleSave('proxy')}
+            className="gap-1.5"
+          >
+            {saving === 'proxy' ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <Save className="size-3.5" />
