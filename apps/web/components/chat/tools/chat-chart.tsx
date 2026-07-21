@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   BarChart,
   Bar,
@@ -173,6 +173,7 @@ const SCATTER_CURSOR = { strokeDasharray: '3 3' };
 const POLAR_ANGLE_TICK = { fontSize: 11, fill: 'var(--muted-foreground)' };
 const POLAR_RADIUS_TICK = { fontSize: 10, fill: 'var(--muted-foreground)' };
 const ACTIVE_DOT = { r: 4, strokeWidth: 2, stroke: 'var(--card)' };
+const BAR_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
 
 const renderPieLabel = ({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`;
 
@@ -185,7 +186,7 @@ function useDeepMemo<T>(factory: () => T, deps: any[]): T {
 
   const depsStr = JSON.stringify(deps);
 
-  if (ref.current === null || ref.current.deps.toString() !== depsStr) {
+  if (ref.current === null || JSON.stringify(ref.current.deps) !== depsStr) {
     ref.current = { deps: JSON.parse(depsStr), value: factory() };
   }
 
@@ -211,6 +212,8 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     xAxisLabel,
     yAxisLabel,
   } = config;
+
+  const stableData = useDeepMemo(() => data, [data]);
 
   const chartColors = useDeepMemo(
     () => series.map((s, i) => s.color || CHART_COLORS[i % CHART_COLORS.length]),
@@ -263,7 +266,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     switch (chartType) {
       case 'bar':
         return (
-          <BarChart data={data} barGap={4} barCategoryGap="20%">
+          <BarChart data={stableData} barGap={4} barCategoryGap="20%">
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="var(--border)"
@@ -294,7 +297,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
                 name={s.label || s.dataKey}
                 fill={chartColors[i]}
                 stackId={stacked ? 'stack' : undefined}
-                radius={[4, 4, 0, 0]}
+                radius={BAR_RADIUS as any}
                 maxBarSize={40}
                 animationDuration={700}
                 animationEasing="ease-in-out"
@@ -305,7 +308,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
 
       case 'area':
         return (
-          <AreaChart data={data}>
+          <AreaChart data={stableData}>
             <ChartGradients series={stableSeries} />
             <CartesianGrid
               strokeDasharray="3 3"
@@ -344,7 +347,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
 
       case 'line':
         return (
-          <LineChart data={data}>
+          <LineChart data={stableData}>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="var(--border)"
@@ -386,7 +389,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
           <PieChart>
             <Tooltip content={CustomTooltip} />
             <Pie
-              data={data}
+              data={stableData}
               dataKey={dataKey}
               nameKey={xAxisKey}
               cx="50%"
@@ -399,7 +402,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               label={renderPieLabel}
               labelLine={PIE_LABEL_LINE}
             >
-              {data.map((entry, i) => (
+              {stableData.map((entry, i) => (
                 <Cell
                   key={`cell-${i}`}
                   fill={chartColors[i % chartColors.length]}
@@ -443,7 +446,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
             <Tooltip content={CustomTooltip} cursor={SCATTER_CURSOR} />
             <Scatter
               name={stableSeries[0]?.label || stableSeries[0]?.dataKey}
-              data={data}
+              data={stableData}
               fill={chartColors[0]}
               animationDuration={700}
               animationEasing="ease-in-out"
@@ -453,7 +456,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
 
       case 'radar':
         return (
-          <RadarChart data={data} outerRadius="75%">
+          <RadarChart data={stableData} outerRadius="75%">
             <PolarGrid stroke="var(--border)" opacity={0.5} />
             <PolarAngleAxis dataKey={xAxisKey} tick={POLAR_ANGLE_TICK} />
             <PolarRadiusAxis tick={POLAR_RADIUS_TICK} />
@@ -482,10 +485,24 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     }
   };
 
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center border border-border/70 rounded-xl my-4 bg-transparent text-muted-foreground">
+        <p className="text-sm">No data available for this chart</p>
+        <p className="text-xs opacity-70 mt-1">The AI did not provide any data to plot.</p>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={chartRef}
-      className="overflow-hidden rounded-xl border border-border/70 bg-white my-4 animate-in fade-in zoom-in-[0.98] duration-500 [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_*:focus-visible]:ring-0"
+      // NOTE: removed `zoom-in-[0.98]` from the entrance animation.
+      // A scale() transform animating on this wrapper fights with
+      // ResponsiveContainer's ResizeObserver (it keeps reporting new
+      // sizes every animation frame), which caused the
+      // "Maximum update depth exceeded" crash. Fade-only is safe.
+      className="overflow-hidden rounded-xl border border-border/70 bg-white my-4 animate-in fade-in duration-300 [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_*:focus-visible]:ring-0"
     >
       {/* Header */}
       <div className="flex flex-row justify-between items-center gap-4 border-b border-border/30 px-4 py-3">
@@ -498,7 +515,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
       {/* Chart area — compact height */}
       <div className="px-2 py-4 pb-2">
         <div style={{ width: '100%', height: 240, minHeight: 240 }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" debounce={50}>
             {renderChart() as any}
           </ResponsiveContainer>
         </div>

@@ -25,47 +25,10 @@ export interface SandboxResultConfig {
 /* ------------------------------------------------------------------ */
 
 function tryParseStdoutAsTable(stdout: string): DataTableConfig | null {
-  if (!stdout || stdout.trim().length === 0) return null;
-
-  const lines = stdout.trim().split('\n');
-  if (lines.length < 2) return null;
-
-  const firstLine = lines[0];
-  const commaCount = (firstLine.match(/,/g) || []).length;
-  const tabCount = (firstLine.match(/\t/g) || []).length;
-
-  let separator: string | null = null;
-  if (commaCount >= 1 && commaCount === (lines[1]?.match(/,/g) || []).length) {
-    separator = ',';
-  } else if (tabCount >= 1 && tabCount === (lines[1]?.match(/\t/g) || []).length) {
-    separator = '\t';
-  }
-
-  if (!separator) return null;
-
-  const columns = lines[0].split(separator).map((c) => c.trim().replace(/^"|"$/g, ''));
-  if (columns.length < 2) return null;
-
-  const rows: Record<string, any>[] = [];
-  for (let i = 1; i < lines.length && i <= 200; i++) {
-    const cells = lines[i].split(separator).map((c) => c.trim().replace(/^"|"$/g, ''));
-    if (cells.length !== columns.length) continue;
-    const row: Record<string, any> = {};
-    columns.forEach((col, j) => {
-      const val = cells[j];
-      const num = Number(val);
-      row[col] = !isNaN(num) && val !== '' ? num : val;
-    });
-    rows.push(row);
-  }
-
-  if (rows.length < 2) return null;
-
-  return {
-    columns,
-    rows,
-    totalRows: rows.length,
-  };
+  // Disabled: Aggressive auto-parsing of stdout to tables causes simple print statements
+  // to be rendered as UI tables inappropriately.
+  // Explicit tabular data should be requested via the 'queryTabularData' tool instead.
+  return null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -182,7 +145,31 @@ export function ChatSandboxResult({
         </div>
       )}
 
-      {/* Stderr is hidden from non-technical users, but available to the AI model */}
+      {/* Error display */}
+      {!isSuccess && (
+        <div className="border-t border-border/40 bg-red-50/50 p-4 dark:bg-red-900/10">
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-red-800 dark:text-red-400">
+              Analysis encountered an issue
+            </span>
+            <span className="text-xs text-red-600/80 dark:text-red-400/80">
+              The AI model provided invalid code or encountered a runtime error. It will attempt to
+              fix the issue automatically.
+            </span>
+            {stderr && (
+              <details className="mt-2 group">
+                <summary className="cursor-pointer text-xs font-medium text-red-600/70 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 transition-colors list-none flex items-center gap-1">
+                  <ChevronDown className="size-3 transition-transform group-open:rotate-180" />
+                  Technical Details
+                </summary>
+                <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-red-100/50 p-3 text-[11px] leading-relaxed text-red-900/70 dark:bg-red-900/20 dark:text-red-200/70 [&::-webkit-scrollbar]:hidden">
+                  {stderr}
+                </pre>
+              </details>
+            )}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

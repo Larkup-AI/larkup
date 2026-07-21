@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { UIMessage } from 'ai';
 import { KnowledgeBaseResult } from '@/components/chat/tools/knowledge-base-result';
 import { ChatChart, type ChartConfig } from '@/components/chat/tools/chat-chart';
@@ -208,13 +208,8 @@ function getToolInfo(part: any): {
 function renderToolPart(part: any, index: number): React.ReactNode | null {
   const { toolName, isExecuting, isCompleted, output, input } = getToolInfo(part);
 
-  const isFailedSandbox =
-    isCompleted &&
-    (toolName === 'executeAnalysis' || toolName === 'analyzeCorpusWithCode') &&
-    output?.exitCode !== 0;
-
-  // Still executing (or failed sandbox trying to hide error)
-  if (isExecuting || isFailedSandbox) {
+  // Still executing — show loading indicator
+  if (isExecuting) {
     if (toolName === 'searchKnowledgeBase') return null;
     return (
       <div
@@ -246,8 +241,8 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
     );
   }
 
-  // Completed
-  if (isCompleted && !isFailedSandbox) {
+  // Completed — render the result (including failed sandbox — ChatSandboxResult handles error display)
+  if (isCompleted) {
     switch (toolName) {
       case 'queryTabularData': {
         if (output.error) return null;
@@ -267,7 +262,8 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
         return <ChatChart key={index} config={chartConfig} />;
       }
 
-      case 'executeAnalysis': {
+      case 'executeAnalysis':
+      case 'analyzeCorpusWithCode': {
         const result = output as SandboxResultConfig;
         const code = input?.code;
         return <ChatSandboxResult key={index} config={result} code={code} />;
@@ -277,12 +273,6 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
         const corpusConfig = output as CorpusDataConfig;
         if (!corpusConfig) return null;
         return <CorpusDataResult key={index} config={corpusConfig} />;
-      }
-
-      case 'analyzeCorpusWithCode': {
-        const corpusResult = output as SandboxResultConfig;
-        const corpusCode = input?.code;
-        return <ChatSandboxResult key={index} config={corpusResult} code={corpusCode} />;
       }
 
       case 'fillDocumentForm':
@@ -345,11 +335,37 @@ export function MessageItem({
   }
 
   const anyMessage = message as any;
-  const parts: any[] = message.parts ? [...message.parts] : [];
+
+  // Stabilize the parts array to prevent re-renders from creating new array refs each time
+  const parts: any[] = useMemo(() => {
+    return message.parts ? [...message.parts] : [];
+  }, [message.parts]);
+
+  // Track which tool call IDs have already been applied to prevent re-application
+  const appliedToolCallsRef = useRef<Set<string>>(new Set());
 
   // Effect to apply document edits to the Canvas context
+  // Uses a stable fingerprint to avoid re-triggering on every render
+  const docToolFingerprint = useMemo(() => {
+    if (!isLast) return '';
+    return parts
+      .filter((p: any) => {
+        const info = getToolInfo(p);
+        return (
+          info.isCompleted &&
+          info.output?.success &&
+          (info.toolName === 'fillDocumentForm' || info.toolName === 'editDocument')
+        );
+      })
+      .map((p: any) => {
+        const ti = p.toolInvocation ?? p;
+        return ti.toolCallId || ti.id || '';
+      })
+      .join(',');
+  }, [parts, isLast]);
+
   useEffect(() => {
-    if (!updateFromToolResult || !isLast) return;
+    if (!updateFromToolResult || !isLast || !docToolFingerprint) return;
 
     const completedDocTools = parts.filter((p: any) => {
       const info = getToolInfo(p);
@@ -361,13 +377,20 @@ export function MessageItem({
     });
 
     if (completedDocTools.length > 0) {
-      // Find the latest output
-      const latest = getToolInfo(completedDocTools[completedDocTools.length - 1]).output;
+      const latestPart = completedDocTools[completedDocTools.length - 1];
+      const ti = latestPart.toolInvocation ?? latestPart;
+      const callId = ti.toolCallId || ti.id || '';
+
+      // Skip if we already applied this specific tool result
+      if (callId && appliedToolCallsRef.current.has(callId)) return;
+
+      const latest = getToolInfo(latestPart).output;
       if (latest && latest.fileBase64) {
+        if (callId) appliedToolCallsRef.current.add(callId);
         updateFromToolResult(latest);
       }
     }
-  }, [parts, isLast, updateFromToolResult]);
+  }, [docToolFingerprint, updateFromToolResult, isLast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (anyMessage.toolInvocations && Array.isArray(anyMessage.toolInvocations)) {
     anyMessage.toolInvocations.forEach((t: any) => {
@@ -434,10 +457,14 @@ export function MessageItem({
       : null;
 
   // Separate in-progress tool parts for loading indicators
-  const executingParts = toolParts.filter((p: any) => {
-    const { isExecuting, toolName } = getToolInfo(p);
-    return isExecuting && toolName !== 'searchKnowledgeBase';
-  });
+  const executingParts = useMemo(
+    () =>
+      toolParts.filter((p: any) => {
+        const { isExecuting, toolName } = getToolInfo(p);
+        return isExecuting && toolName !== 'searchKnowledgeBase';
+      }),
+    [toolParts],
+  );
 
   return (
     <div className="message assistant-message flex flex-col gap-4" data-role="assistant">

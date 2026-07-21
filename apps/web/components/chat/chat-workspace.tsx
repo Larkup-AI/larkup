@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import {
@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { getProviderMeta, ProviderIcon } from '@/components/ui/provider-icon';
 import { get, set, del } from 'idb-keyval';
 import { useRouter } from 'next/navigation';
+import { useChatStore } from '@/store/chat-store';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -49,7 +50,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 
@@ -99,7 +99,7 @@ function ChatWorkspaceInner() {
   const { data: configData, mutate: mutateConfig } = useSWR('/api/config', fetcher);
   const router = useRouter();
 
-  const [selectedModel, setSelectedModel] = useState<string>('');
+  const { selectedModel, setSelectedModel } = useChatStore();
   const [showModelSelect, setShowModelSelect] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   const [input, setInput] = useState('');
@@ -204,47 +204,65 @@ function ChatWorkspaceInner() {
     return () => cancelAnimationFrame(id);
   }, [messages, chatStatus]);
 
-  // Save messages to history
+  // Save messages to history — debounced to prevent cascading re-renders during streaming
+  const historySaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
   useEffect(() => {
     if (messages.length === 0) return;
+    // Don't save while actively streaming — wait for it to settle
+    if (chatStatus === 'streaming' || chatStatus === 'submitted') return;
 
-    let activeId = currentChatId;
-    if (!activeId) {
-      activeId = crypto.randomUUID();
-      setCurrentChatId(activeId);
-    }
+    // Debounce: clear previous timer
+    if (historySaveTimer.current) clearTimeout(historySaveTimer.current);
 
-    set(`chat_messages_${activeId}`, messages);
+    historySaveTimer.current = setTimeout(() => {
+      const currentMessages = messagesRef.current;
+      if (currentMessages.length === 0) return;
 
-    setHistory((prev) => {
-      const existing = prev.find((p) => p.id === activeId);
-      const firstMsg = messages[0];
-      const firstMsgText =
-        (firstMsg as any)?.parts
-          ?.filter((p: any) => p.type === 'text')
-          ?.map((p: any) => p.text)
-          ?.join('') ||
-        (firstMsg as any)?.content ||
-        (firstMsg as any)?.text;
-
-      const title = firstMsgText ? firstMsgText.substring(0, 40) : 'New Chat';
-
-      // Prevent infinite loop by returning the same reference if nothing changed recently
-      if (existing && existing.title === title && Date.now() - existing.updatedAt < 2000) {
-        return prev;
+      let activeId = currentChatId;
+      if (!activeId) {
+        activeId = crypto.randomUUID();
+        setCurrentChatId(activeId);
       }
 
-      let next;
-      if (existing) {
-        next = prev.map((p) => (p.id === activeId ? { ...p, title, updatedAt: Date.now() } : p));
-      } else {
-        next = [{ id: activeId, title, updatedAt: Date.now() }, ...prev];
-      }
+      set(`chat_messages_${activeId}`, currentMessages);
 
-      set('chat_sessions', next);
-      return next;
-    });
-  }, [messages, currentChatId]);
+      setHistory((prev) => {
+        const existing = prev.find((p) => p.id === activeId);
+        const firstMsg = currentMessages[0];
+        const firstMsgText =
+          (firstMsg as any)?.parts
+            ?.filter((p: any) => p.type === 'text')
+            ?.map((p: any) => p.text)
+            ?.join('') ||
+          (firstMsg as any)?.content ||
+          (firstMsg as any)?.text;
+
+        const title = firstMsgText ? firstMsgText.substring(0, 40) : 'New Chat';
+
+        // Prevent update if nothing changed
+        if (existing && existing.title === title) {
+          return prev;
+        }
+
+        let next;
+        if (existing) {
+          next = prev.map((p) => (p.id === activeId ? { ...p, title, updatedAt: Date.now() } : p));
+        } else {
+          next = [{ id: activeId, title, updatedAt: Date.now() }, ...prev];
+        }
+
+        set('chat_sessions', next);
+        return next;
+      });
+    }, 500);
+
+    return () => {
+      if (historySaveTimer.current) clearTimeout(historySaveTimer.current);
+    };
+  }, [messages, currentChatId, chatStatus]);
 
   // Group and filter models
   const groupedModels = useMemo(() => {
