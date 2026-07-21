@@ -142,7 +142,7 @@ export interface RagConfig {
   systemPrompt?: string;
   serperApiKey?: string;
   webSearchEnabled?: boolean;
-  webSearchProvider?: 'tavily' | 'serper' | 'google' | 'brave' | 'bing';
+  webSearchProvider?: 'tavily' | 'serper' | 'google' | 'brave' | 'bing' | 'local';
   tavilyApiKey?: string;
   googleApiKey?: string;
   braveApiKey?: string;
@@ -402,7 +402,7 @@ export interface AgentDeploymentConfig {
   allowedOrigins: string[];
   webSearchEnabled?: boolean;
   webSearchApiKey?: string;
-  webSearchProvider?: 'tavily' | 'serper' | 'google' | 'brave' | 'bing';
+  webSearchProvider?: 'tavily' | 'serper' | 'google' | 'brave' | 'bing' | 'local';
   /** Vercel Blob token for LanceDB cloud storage */
   vercelBlobToken?: string;
 }

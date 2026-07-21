@@ -95,6 +95,16 @@ export class LanceDBAdapter implements VectorStoreAdapter {
     this.table = null;
   }
 
+  async deleteByDocumentIds(documentIds: string[]): Promise<void> {
+    if (documentIds.length === 0) return;
+    if (!this.table) {
+      await this.init();
+      if (!this.table) return;
+    }
+    const idsString = documentIds.map((id) => `'${id}'`).join(', ');
+    await this.table.delete(`documentId IN (${idsString})`);
+  }
+
   private toRow(r: VectorRecord): LanceRow {
     return {
       id: r.id,

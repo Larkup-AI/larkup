@@ -126,6 +126,16 @@ export class ChromaAdapter implements VectorStoreAdapter {
     this.collection = null;
   }
 
+  async deleteByDocumentIds(documentIds: string[]): Promise<void> {
+    if (documentIds.length === 0) return;
+    try {
+      const collection = await this.getCollection();
+      await collection.delete({ where: { documentId: { $in: documentIds } } });
+    } catch (err) {
+      console.error('Failed to delete vectors by documentIds in Chroma:', err);
+    }
+  }
+
   // ── Upsert ─────────────────────────────────────────────────────────────────
 
   async upsert(records: VectorRecord[]): Promise<void> {

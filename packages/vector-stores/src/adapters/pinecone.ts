@@ -145,6 +145,15 @@ export class PineconeAdapter implements VectorStoreAdapter {
     }
   }
 
+  async deleteByDocumentIds(documentIds: string[]): Promise<void> {
+    if (documentIds.length === 0) return;
+    try {
+      await this.ns().deleteMany({ documentId: { $in: documentIds } });
+    } catch (err: any) {
+      console.error('Failed to delete vectors by documentIds in Pinecone:', err);
+    }
+  }
+
   // ── Sparse vector generation with rate-limit handling ─────────────────────
 
   /**
