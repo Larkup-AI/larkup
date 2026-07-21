@@ -97,36 +97,66 @@ function applyOverlap(chunks: string[], overlapChars: number): string[] {
 export function chunkDocument(doc: SourceDocument, params: ChunkingParams): Chunk[] {
   const maxChars = tokensToChars(params.chunkSize);
   const overlapChars = tokensToChars(params.chunkOverlap);
-  const text = doc.content.trim();
-  if (!text) return [];
+  const text = doc.content?.trim() || '';
 
-  let raw: string[];
-  switch (params.strategy) {
-    case 'sentence':
-      raw = splitSentences(text, maxChars);
-      break;
-    case 'fixed':
-      raw = hardSlice(text, maxChars);
-      break;
-    case 'recursive':
-    default:
-      raw = splitRecursive(text, maxChars);
-      break;
+  const chunks: Chunk[] = [];
+
+  if (text) {
+    let raw: string[];
+    switch (params.strategy) {
+      case 'sentence':
+        raw = splitSentences(text, maxChars);
+        break;
+      case 'fixed':
+        raw = hardSlice(text, maxChars);
+        break;
+      case 'recursive':
+      default:
+        raw = splitRecursive(text, maxChars);
+        break;
+    }
+
+    const withOverlap = applyOverlap(raw.map((c) => c.trim()).filter(Boolean), overlapChars);
+
+    chunks.push(
+      ...withOverlap.map((textChunk, index) => ({
+        id: `${doc.id}#${index}`,
+        documentId: doc.id,
+        index,
+        text: textChunk,
+        title: doc.title,
+        url: doc.url,
+        source: doc.source,
+        charCount: textChunk.length,
+        metadata: doc.metadata,
+      })),
+    );
   }
 
-  const withOverlap = applyOverlap(raw.map((c) => c.trim()).filter(Boolean), overlapChars);
+  if (doc.metadata?.images && Array.isArray(doc.metadata.images)) {
+    let nextIndex = chunks.length;
+    for (const img of doc.metadata.images) {
+      chunks.push({
+        id: `${doc.id}#img${img.index}`,
+        documentId: doc.id,
+        index: nextIndex++,
+        text: img.description || `An image extracted from ${doc.title} on page ${img.pageNumber}.`,
+        title: `${doc.title} - Image ${img.index + 1}`,
+        url: img.imageUrl || doc.url,
+        source: doc.source,
+        charCount: 0,
+        metadata: {
+          isImage: true,
+          imageUrl: img.imageUrl,
+          pageNumber: img.pageNumber,
+          originalFile: doc.title,
+          description: img.description,
+        },
+      });
+    }
+  }
 
-  return withOverlap.map((textChunk, index) => ({
-    id: `${doc.id}#${index}`,
-    documentId: doc.id,
-    index,
-    text: textChunk,
-    title: doc.title,
-    url: doc.url,
-    source: doc.source,
-    charCount: textChunk.length,
-    metadata: doc.metadata,
-  }));
+  return chunks;
 }
 
 /** Chunk an entire corpus. */

@@ -15,6 +15,8 @@ import {
 } from '@larkup/core/corpus-retriever';
 import { SandboxManager } from '@larkup/sandbox';
 import { applyFieldEdits, applyContentEdits } from '@larkup/tool-doc-editor';
+import { loadTool } from '@larkup/marketplace/loader';
+import { getInstalledTools } from '@larkup/marketplace/installer';
 
 /**
  * Retrieves documents from the knowledge base
@@ -87,10 +89,14 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
   return serverId ? runWithServer(serverId, doRetrieve) : doRetrieve();
 }
 
-export function getChatTools(context: { serverId?: string; docSessionId?: string }) {
-  const { serverId, docSessionId } = context;
+export async function getChatTools(context: {
+  serverId?: string;
+  docSessionId?: string;
+  config?: any;
+}) {
+  const { serverId, docSessionId, config } = context;
 
-  return {
+  const builtInTools: Record<string, any> = {
     searchKnowledgeBase: tool({
       description:
         'Search the private RAG knowledge base for relevant documents. Use this for factual questions about the indexed content.',
@@ -564,4 +570,37 @@ export function getChatTools(context: { serverId?: string; docSessionId?: string
       },
     }),
   };
+
+  const enabledTools = config?.enabledTools || [];
+  const finalTools: Record<string, any> = {};
+
+  // If empty, default to all built-in tools (backwards compatibility)
+  const isEnabled = (id: string) => enabledTools.length === 0 || enabledTools.includes(id);
+
+  // 1. Add enabled built-in tools
+  for (const [id, toolDef] of Object.entries(builtInTools)) {
+    if (isEnabled(id)) {
+      finalTools[id] = toolDef;
+    }
+  }
+
+  // 2. Add enabled marketplace tools
+  // We fetch installed tools to see which ones are available
+  try {
+    const installed = await getInstalledTools();
+    for (const t of installed) {
+      if (isEnabled(t.id)) {
+        const mod = await loadTool(t.id);
+        if (mod && mod.default) {
+          finalTools[t.id] = mod.default(context);
+        } else if (mod && mod.tool) {
+          finalTools[t.id] = mod.tool(context);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[marketplace] Failed to load marketplace tools for chat:', err);
+  }
+
+  return finalTools;
 }

@@ -228,7 +228,7 @@ ${docFields?.map((f) => `- [${f.id}] ${f.name} (${f.type})`).join('\n') || 'None
         timestamp: new Date().toISOString(),
       });
     },
-    tools: getChatTools({ serverId, docSessionId }),
+    tools: await getChatTools({ serverId, docSessionId, config }),
   });
 
   return result.toUIMessageStreamResponse({

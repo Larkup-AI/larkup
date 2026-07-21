@@ -150,6 +150,7 @@ export interface RagConfig {
   firecrawlApiKey?: string;
   updatedAt: string;
   deployment?: AgentDeploymentConfig;
+  enabledTools?: string[];
 }
 
 export const DEFAULT_CONFIG: RagConfig = {
