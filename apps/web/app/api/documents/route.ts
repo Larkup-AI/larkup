@@ -28,6 +28,10 @@ export async function GET() {
   return NextResponse.json({ documents: sortedDocuments, stats });
 }
 
+import { randomUUID } from 'crypto';
+import fs from 'fs/promises';
+import path from 'path';
+
 /**
  * POST → ingest pasted text or an uploaded file's contents.
  * Body: { title, content, source: "paste" | "upload", url? }
@@ -44,6 +48,28 @@ export async function POST(req: Request) {
     if (!body.content || !body.content.trim()) {
       return NextResponse.json({ error: 'Content is empty.' }, { status: 400 });
     }
+
+    // Intercept imageBase64 and write it to disk
+    if (body.metadata && body.metadata.isImage && body.metadata.imageBase64) {
+      try {
+        const base64Data = body.metadata.imageBase64.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const filename = `${randomUUID()}.png`;
+        const uploadsDir = path.join(process.cwd(), '../../.larkup/uploads');
+        await fs.mkdir(uploadsDir, { recursive: true });
+        await fs.writeFile(path.join(uploadsDir, filename), buffer);
+
+        // Remove base64 string and save the URL instead
+        delete body.metadata.imageBase64;
+        body.metadata.imageUrl = `/api/uploads/${filename}`;
+
+        // Use imageUrl as the url for the document
+        body.url = body.metadata.imageUrl;
+      } catch (err) {
+        console.error('Failed to save extracted image to disk', err);
+      }
+    }
+
     const doc = await addDocument({
       title: body.title ?? 'Untitled',
       content: body.content,
