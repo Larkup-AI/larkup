@@ -84,6 +84,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<{
+    message?: string;
     current: number;
     total: number;
   } | null>(null);
@@ -96,6 +97,15 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
     const next: StagedFile[] = [];
     for (const file of Array.from(files)) {
       const ext = file.name.split('.').pop()?.toLowerCase();
+
+      // Prevent dragging media into the documents tab
+      if (ext && !ACCEPT.includes(`.${ext}`)) {
+        toast.error(
+          `Unsupported file type: ${file.name}. Please upload media files in the Media tab.`,
+        );
+        continue;
+      }
+
       const id = Math.random().toString(36).slice(2);
       try {
         if (ext === 'csv') {
@@ -282,54 +292,69 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
         const uploadedImages: any[] = [];
 
         // Extract images if requested (for PDFs)
-        if (
-          (f.indexImages || indexAllImages) &&
-          f.fileObject &&
-          f.name.toLowerCase().endsWith('.pdf')
-        ) {
+        if (f.indexImages && f.fileObject && f.name.toLowerCase().endsWith('.pdf')) {
           try {
+            setProgress({ message: `Extracting images from ${f.name}...`, current: 0, total: 100 });
             const { extractImagesFromPDF } = await import('@/lib/pdf-images');
             const images = await extractImagesFromPDF(f.fileObject);
+            const BATCH_SIZE = 5;
+            for (let i = 0; i < images.length; i += BATCH_SIZE) {
+              const batch = images.slice(i, i + BATCH_SIZE);
 
-            for (const img of images) {
-              const res = await fetch(img.base64);
-              const blob = await res.blob();
-              const file = new File([blob], `image-${img.index}.png`, { type: 'image/png' });
-
-              const formData = new FormData();
-              formData.append('file', file);
-              const uploadRes = await fetch('/api/upload-file', {
-                method: 'POST',
-                body: formData,
-              });
-              if (uploadRes.ok) {
-                const { url } = await uploadRes.json();
-
-                let description = '';
-                try {
-                  const descRes = await fetch('/api/describe-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ base64: img.base64 }),
+              await Promise.all(
+                batch.map(async (img, batchIdx) => {
+                  const currentIdx = i + batchIdx;
+                  setProgress({
+                    message: `Analyzing image ${currentIdx + 1} of ${images.length} from ${
+                      f.name
+                    }...`,
+                    current: currentIdx,
+                    total: images.length || 1,
                   });
-                  if (descRes.ok) {
-                    const descData = await descRes.json();
-                    if (descData.description) {
-                      description = descData.description;
-                    }
-                  }
-                } catch (e) {
-                  console.error('Failed to describe image:', e);
-                }
 
-                uploadedImages.push({
-                  imageUrl: url,
-                  pageNumber: img.pageNumber,
-                  index: img.index,
-                  description,
-                });
-              }
+                  const res = await fetch(img.base64);
+                  const blob = await res.blob();
+                  const file = new File([blob], `image-${img.index}.png`, { type: 'image/png' });
+
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  const uploadRes = await fetch('/api/upload-file', {
+                    method: 'POST',
+                    body: formData,
+                  });
+
+                  if (uploadRes.ok) {
+                    const { url } = await uploadRes.json();
+
+                    let description = '';
+                    try {
+                      const descRes = await fetch('/api/describe-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ base64: img.base64 }),
+                      });
+                      if (descRes.ok) {
+                        const descData = await descRes.json();
+                        if (descData.description) {
+                          description = descData.description;
+                        }
+                      }
+                    } catch (e) {
+                      console.error('Failed to describe image:', e);
+                    }
+
+                    uploadedImages.push({
+                      imageUrl: url,
+                      pageNumber: img.pageNumber,
+                      index: img.index,
+                      description,
+                    });
+                  }
+                }),
+              );
             }
+            // Ensure images remain in original order after concurrent processing
+            uploadedImages.sort((a, b) => a.index - b.index);
           } catch (err) {
             console.error('Failed to extract images from PDF:', err);
           }
@@ -354,7 +379,16 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
             content: contentStr,
             source: 'upload',
             url: fileUrl,
-            metadata: uploadedImages.length > 0 ? { images: uploadedImages } : undefined,
+            metadata:
+              uploadedImages.length > 0
+                ? {
+                    images: uploadedImages.map((img) => ({
+                      imageUrl: img.imageUrl,
+                      pageNumber: img.pageNumber,
+                      index: img.index,
+                    })),
+                  }
+                : undefined,
           });
         }
       } else if (f.format === 'lines' && f.rawContent) {
@@ -412,7 +446,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
       }
     }
 
-    setProgress({ current: 0, total: payloads.length });
+    setProgress({ message: 'Uploading documents...', current: 0, total: payloads.length || 1 });
 
     for (const [index, p] of payloads.entries()) {
       try {
@@ -425,12 +459,17 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
       } catch {
         /* continue */
       }
-      setProgress({ current: index + 1, total: payloads.length });
+      setProgress({
+        message: 'Uploading documents...',
+        current: index + 1,
+        total: payloads.length || 1,
+      });
     }
 
     const stagedCount = staged.length;
     setSaving(false);
     setProgress(null);
+    globalStagedFiles = [];
     setStaged([]);
 
     // Also explicitly clear the input value just in case
@@ -503,7 +542,16 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                 <div className="flex items-center gap-1.5">
                   <Switch
                     checked={indexAllImages}
-                    onCheckedChange={setIndexAllImages}
+                    onCheckedChange={(val) => {
+                      setIndexAllImages(val);
+                      setStaged((p) =>
+                        p.map((item) =>
+                          item.name.toLowerCase().endsWith('.pdf')
+                            ? { ...item, indexImages: val }
+                            : item,
+                        ),
+                      );
+                    }}
                     id="global-index-images"
                     className="scale-75 origin-right"
                   />
@@ -646,7 +694,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
       {progress && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Uploading documents...</span>
+            <span>{progress.message || 'Processing...'}</span>
             <span className="tabular-nums font-mono">
               {progress.current} / {progress.total}
             </span>

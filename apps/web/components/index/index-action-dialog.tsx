@@ -296,6 +296,8 @@ export function IndexActionDialog({ open, onOpenChange, trigger }: IndexActionDi
                   )}
                   {Boolean(data.run && ACTIVE.includes(data.run.status))
                     ? `Indexing…`
+                    : starting
+                    ? `Starting…`
                     : data.run?.status === 'completed'
                     ? `Index new documents (${data.unindexedCount})`
                     : `Start indexing (${data.unindexedCount})`}

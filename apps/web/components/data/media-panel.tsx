@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { toast } from 'sonner';
 import { formatErrorMessage } from '@/lib/error-formatter';
@@ -21,6 +21,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { useWorkspace } from '@/components/workspace/workspace-provider';
+import Link from 'next/link';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -113,10 +122,23 @@ export function MediaPanel({ onAdded }: { onAdded: () => void }) {
 
   const { data: toolsData, mutate: mutateTools } = useSWR('/api/marketplace', toolFetcher);
 
-  // Check if Video & Audio tool is installed
+  const { activeServer } = useWorkspace();
+  const serverId = activeServer?.id;
+  const configUrl = serverId
+    ? `/api/config?serverId=${encodeURIComponent(serverId)}`
+    : '/api/config';
+  const { data: configData } = useSWR(configUrl, (url) => fetch(url).then((r) => r.json()));
+
+  // Check if Video & Audio tool is installed and enabled
   const videoAudioTool = toolsData?.tools?.find((t: any) => t.id === 'video-audio');
   const isToolInstalled = videoAudioTool?.status === 'installed';
+  const enabledTools = configData?.config?.enabledTools;
+  const isToolEnabled = enabledTools
+    ? enabledTools.length === 0 || enabledTools.includes('video-audio')
+    : true;
+
   const needsTool = activeTab !== 'images' && !isToolInstalled;
+  const isToolDisabled = activeTab !== 'images' && isToolInstalled && !isToolEnabled;
 
   const assets = data?.assets ?? [];
   const storageBytes = data?.storage?.usedBytes ?? 0;
@@ -183,6 +205,8 @@ export function MediaPanel({ onAdded }: { onAdded: () => void }) {
           systemDeps={videoAudioTool?.systemDeps}
           onInstallComplete={() => mutateTools()}
         />
+      ) : isToolDisabled ? (
+        <DisabledPrompt />
       ) : (
         <MediaContent
           mediaType={mediaType}
@@ -278,8 +302,31 @@ function InstallPrompt({
 }
 
 /* ------------------------------------------------------------------ */
-/* Media content (upload zone + gallery)                               */
+/* Disabled prompt (for Video & Audio tab when tool is disabled)        */
 /* ------------------------------------------------------------------ */
+
+function DisabledPrompt() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="flex size-14 items-center border border-border/90 justify-center rounded-xl bg-white">
+        <AlertCircle className="size-6 text-muted-foreground" />
+      </div>
+      <h3 className="mt-4 text-sm font-medium text-foreground">
+        Video & Audio Processing Disabled
+      </h3>
+      <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
+        The Video & Audio tool is currently disabled in your agent settings. You cannot index new
+        video or audio files until it is re-enabled.
+      </p>
+      <Button
+        variant="default"
+        size="sm"
+        className="mt-5 text-[12px]"
+        render={<Link href="/settings?tab=prompts">Go to Settings</Link>}
+      />
+    </div>
+  );
+}
 
 function MediaContent({
   mediaType,
@@ -316,6 +363,7 @@ function MediaContent({
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<{
+    message?: string;
     current: number;
     total: number;
   } | null>(null);
@@ -351,13 +399,14 @@ function MediaContent({
     if (staged.length === 0) return;
     setUploading(true);
 
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = 1;
     let uploaded = 0;
     const total = staged.length;
-    setProgress({ current: 0, total });
+    setProgress({ message: 'Starting upload...', current: 0, total });
 
     try {
       for (let i = 0; i < staged.length; i += BATCH_SIZE) {
+        setProgress({ message: 'Uploading files...', current: uploaded, total });
         const batch = staged.slice(i, i + BATCH_SIZE);
         const formData = new FormData();
         batch.forEach((item) => formData.append('file', item.file));
@@ -373,7 +422,7 @@ function MediaContent({
         }
 
         uploaded += batch.length;
-        setProgress({ current: uploaded, total });
+        setProgress({ message: 'Uploading files...', current: uploaded, total });
       }
 
       toast.success(`${uploaded} file${uploaded !== 1 ? 's' : ''} uploaded`);
@@ -386,21 +435,42 @@ function MediaContent({
         .map((a: MediaAsset) => a.id);
 
       if (pendingIds.length > 0) {
-        fetch('/api/media/process', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assetIds: pendingIds }),
-        }).catch(() => {}); // fire and forget
+        let processed = 0;
+        for (const id of pendingIds) {
+          setProgress({
+            message: 'Processing media...',
+            current: processed,
+            total: pendingIds.length,
+          });
+          try {
+            await fetch('/api/media/process', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ assetIds: [id] }),
+            });
+          } catch (e) {
+            console.error('Media processing failed:', e);
+          }
+          processed++;
+          setProgress({
+            message: 'Processing media...',
+            current: processed,
+            total: pendingIds.length,
+          });
+        }
       }
+
+      staged.forEach((f) => {
+        if (f.preview) URL.revokeObjectURL(f.preview);
+      });
+      globalStagedMedia[mediaType] = [];
+      setStaged([]);
+      setUploading(false);
+      setProgress(null);
 
       onUploadComplete();
     } catch (err) {
       toast.error(formatErrorMessage(err));
-    } finally {
-      staged.forEach((f) => {
-        if (f.preview) URL.revokeObjectURL(f.preview);
-      });
-      setStaged([]);
       setUploading(false);
       setProgress(null);
     }
@@ -465,32 +535,60 @@ function MediaContent({
       {/* Staged files */}
       {staged.length > 0 && (
         <div className="space-y-3">
+          {/* Progress */}
+          {progress && (
+            <div className="space-y-1.5 pb-1">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums">
+                <span>
+                  {progress.message || `Uploading ${progress.current} of ${progress.total}`}
+                </span>
+                <span>{Math.round((progress.current / progress.total) * 100)}%</span>
+              </div>
+              <Progress value={(progress.current / progress.total) * 100} className="h-1.5" />
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-medium text-foreground">
               {staged.length} file{staged.length !== 1 ? 's' : ''} ready
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                staged.forEach((f) => {
-                  if (f.preview) URL.revokeObjectURL(f.preview);
-                });
-                setStaged([]);
-              }}
-              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
-              Clear All
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  staged.forEach((f) => {
+                    if (f.preview) URL.revokeObjectURL(f.preview);
+                  });
+                  setStaged([]);
+                }}
+                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                Clear All
+              </button>
+              <Button
+                onClick={uploadAll}
+                disabled={uploading || staged.length === 0}
+                size="sm"
+                className="h-7 text-xs px-3"
+              >
+                {uploading ? (
+                  <Loader2 className="size-3 animate-spin mr-1.5" />
+                ) : (
+                  <FileUp className="size-3 mr-1.5" />
+                )}
+                Upload {staged.length} file{staged.length !== 1 ? 's' : ''}
+              </Button>
+            </div>
           </div>
 
           <div className="max-h-[350px] overflow-y-auto pr-1">
             {/* Grid preview for staged images */}
             {mediaType === 'image' ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {staged.map((item) => (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {staged.slice(0, 8).map((item) => (
                   <div
                     key={item.id}
-                    className="group relative aspect-[2/1] sm:aspect-[21/9] rounded-xl overflow-hidden bg-muted/30 border border-border/50"
+                    className="group relative aspect-[4/3] rounded-xl overflow-hidden bg-muted/30 border border-border/50"
                   >
                     {item.preview && (
                       <img
@@ -511,10 +609,15 @@ function MediaContent({
                     </button>
                   </div>
                 ))}
+                {staged.length > 8 && (
+                  <div className="flex items-center justify-center rounded-xl bg-muted/30 border border-border/50 text-muted-foreground text-sm font-medium aspect-[4/3]">
+                    +{staged.length - 8} more
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col gap-1.5">
-                {staged.map((item) => {
+                {staged.slice(0, 10).map((item) => {
                   const Icon = mediaType === 'video' ? Video : AudioLines;
                   return (
                     <div
@@ -542,33 +645,14 @@ function MediaContent({
                     </div>
                   );
                 })}
+                {staged.length > 10 && (
+                  <div className="flex items-center justify-center py-2 text-xs text-muted-foreground border border-dashed rounded-lg bg-muted/10">
+                    +{staged.length - 10} more files
+                  </div>
+                )}
               </div>
             )}
           </div>
-
-          {/* Progress */}
-          {progress && (
-            <div className="space-y-1">
-              <Progress value={(progress.current / progress.total) * 100} className="h-1" />
-              <p className="text-[11px] text-muted-foreground text-center tabular-nums">
-                Uploading {progress.current} of {progress.total}
-              </p>
-            </div>
-          )}
-
-          <Button
-            onClick={uploadAll}
-            disabled={uploading || staged.length === 0}
-            size="sm"
-            className="w-full"
-          >
-            {uploading ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <FileUp className="size-3.5" />
-            )}
-            Upload {staged.length} file{staged.length !== 1 ? 's' : ''}
-          </Button>
         </div>
       )}
 
@@ -579,14 +663,35 @@ function MediaContent({
         </div>
       ) : assets.length > 0 ? (
         <div className="space-y-2">
-          <h4 className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">
-            Uploaded
-          </h4>
-          {mediaType === 'image' ? (
-            <ImageGallery assets={assets} onDelete={handleDelete} />
-          ) : (
-            <FileList assets={assets} mediaType={mediaType} onDelete={handleDelete} />
-          )}
+          <div className="flex items-center justify-between py-2 px-3 rounded-lg border border-border bg-muted/20">
+            <h4 className="text-[13px] font-medium text-foreground">
+              {assets.length} Uploaded {mediaType === 'image' ? 'Image' : 'File'}
+              {assets.length !== 1 ? 's' : ''}
+            </h4>
+            <Dialog>
+              <DialogTrigger
+                render={
+                  <Button variant="outline" size="sm" className="h-7 text-xs px-3">
+                    View Uploads
+                  </Button>
+                }
+              />
+              <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0">
+                <DialogHeader className="px-6 py-4 border-b">
+                  <DialogTitle>
+                    Uploaded {mediaType === 'image' ? 'Images' : 'Files'} ({assets.length})
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                  {mediaType === 'image' ? (
+                    <ImageGallery assets={assets} onDelete={handleDelete} />
+                  ) : (
+                    <FileList assets={assets} mediaType={mediaType} onDelete={handleDelete} />
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       ) : staged.length === 0 ? (
         <div className="py-10 text-center">

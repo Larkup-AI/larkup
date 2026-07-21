@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { toast } from "sonner";
+import { useState } from 'react';
+import { toast } from 'sonner';
 import {
   CheckCircle2,
   CircleDashed,
@@ -15,11 +15,11 @@ import {
   Copy,
   XIcon,
   Square,
-} from "lucide-react";
-import type { CrawlJob, CrawlJobStatus } from "@larkup/core/types";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+} from 'lucide-react';
+import type { CrawlJob, CrawlJobStatus } from '@larkup/core/types';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -27,8 +27,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 8;
 
@@ -42,53 +42,46 @@ const STATUS: Record<
   }
 > = {
   queued: {
-    label: "Queued",
+    label: 'Queued',
     icon: CircleDashed,
-    className: "text-orange-500 border-orange-500/30 bg-orange-500/10",
-    badgeVariant: "outline",
+    className: 'text-orange-500 border-orange-500/30 bg-orange-500/10',
+    badgeVariant: 'outline',
   },
   running: {
-    label: "Running",
+    label: 'Running',
     icon: Loader2,
-    className: "text-orange-500 border-orange-500/30 bg-orange-500/10",
-    badgeVariant: "outline",
+    className: 'text-orange-500 border-orange-500/30 bg-orange-500/10',
+    badgeVariant: 'outline',
   },
   completed: {
-    label: "Completed",
+    label: 'Completed',
     icon: CheckCircle2,
-    className: "text-green-600 border-green-600/50 bg-green-600/10",
-    badgeVariant: "outline",
+    className: 'text-green-600 border-green-600/50 bg-green-600/10',
+    badgeVariant: 'outline',
   },
   failed: {
-    label: "Failed",
+    label: 'Failed',
     icon: TriangleAlert,
-    className: "text-destructive border-destructive/30 bg-destructive/10",
-    badgeVariant: "outline",
+    className: 'text-destructive border-destructive/30 bg-destructive/10',
+    badgeVariant: 'outline',
   },
   cancelled: {
-    label: "Cancelled",
+    label: 'Cancelled',
     icon: Octagon,
-    className: "text-muted-foreground border-muted-foreground/30 bg-muted/30",
-    badgeVariant: "outline",
+    className: 'text-muted-foreground border-muted-foreground/30 bg-muted/30',
+    badgeVariant: 'outline',
   },
 };
 
 function progressFor(job: CrawlJob): number {
-  const domainTargets = job.targets.filter((t) => t.scope === "domain").length;
-  const denom =
-    domainTargets > 0 ? domainTargets * job.pageLimit : job.targets.length;
+  const domainTargets = job.targets.filter((t) => t.scope === 'domain').length;
+  const denom = domainTargets > 0 ? domainTargets * job.pageLimit : job.targets.length;
   if (denom === 0) return 0;
-  if (job.status === "completed") return 100;
+  if (job.status === 'completed') return 100;
   return Math.min(99, Math.round((job.pagesCrawled / denom) * 100));
 }
 
-export function JobsPanel({
-  jobs,
-  onChanged,
-}: {
-  jobs: CrawlJob[];
-  onChanged: () => void;
-}) {
+export function JobsPanel({ jobs, onChanged }: { jobs: CrawlJob[]; onChanged: () => void }) {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<{
@@ -107,8 +100,7 @@ export function JobsPanel({
   const safePage = Math.min(page, totalPages - 1);
   const pageJobs = jobs.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
-  const allPageSelected =
-    pageJobs.length > 0 && pageJobs.every((j) => selected.has(j.id));
+  const allPageSelected = pageJobs.length > 0 && pageJobs.every((j) => selected.has(j.id));
   const somePageSelected = pageJobs.some((j) => selected.has(j.id));
 
   function toggleAll() {
@@ -130,8 +122,8 @@ export function JobsPanel({
   async function executeCancel(id: string) {
     setCancelling(true);
     try {
-      await fetch(`/api/jobs/${id}`, { method: "DELETE" });
-      toast.message("Job cancelled");
+      await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+      toast.message('Job cancelled');
       onChanged();
     } finally {
       setCancelling(false);
@@ -147,19 +139,13 @@ export function JobsPanel({
   async function executeDelete(ids: string[]) {
     setDeleting(true);
     try {
-      await Promise.all(
-        ids.map((id) =>
-          fetch(`/api/jobs/${id}?remove=1`, { method: "DELETE" }),
-        ),
-      );
+      await Promise.all(ids.map((id) => fetch(`/api/jobs/${id}?remove=1`, { method: 'DELETE' })));
       setSelected((prev) => {
         const next = new Set(prev);
         ids.forEach((id) => next.delete(id));
         return next;
       });
-      toast.success(
-        ids.length === 1 ? "Job removed" : `${ids.length} jobs removed`,
-      );
+      toast.success(ids.length === 1 ? 'Job removed' : `${ids.length} jobs removed`);
       onChanged();
     } finally {
       setDeleting(false);
@@ -189,7 +175,7 @@ export function JobsPanel({
   const selectedArray = Array.from(selected);
   const removableSelected = selectedArray.filter((id) => {
     const j = jobs.find((j) => j.id === id);
-    return j && j.status !== "running" && j.status !== "queued";
+    return j && j.status !== 'running' && j.status !== 'queued';
   });
 
   return (
@@ -197,9 +183,7 @@ export function JobsPanel({
       {/* Bulk action bar */}
       {selected.size > 0 && (
         <div className="mb-2 flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-1.5">
-          <span className="text-xs text-muted-foreground">
-            {selected.size} selected
-          </span>
+          <span className="text-xs text-muted-foreground">{selected.size} selected</span>
           <Button
             size="sm"
             variant="ghost"
@@ -232,9 +216,7 @@ export function JobsPanel({
               <th className="pb-2 pr-3 text-right font-medium text-muted-foreground whitespace-nowrap">
                 Pages
               </th>
-              <th className="pb-2 pr-3 text-left font-medium text-muted-foreground">
-                Status
-              </th>
+              <th className="pb-2 pr-3 text-left font-medium text-muted-foreground">Status</th>
               <th className="pb-2 text-right font-medium text-muted-foreground" />
             </tr>
           </thead>
@@ -242,24 +224,18 @@ export function JobsPanel({
             {pageJobs.map((job) => {
               const s = STATUS[job.status];
               const Icon = s.icon;
-              const active =
-                job.status === "running" || job.status === "queued";
+              const active = job.status === 'running' || job.status === 'queued';
               const pct = progressFor(job);
 
-              const domainTargets = job.targets.filter(
-                (t) => t.scope === "domain",
-              ).length;
-              const denom =
-                domainTargets > 0
-                  ? domainTargets * job.pageLimit
-                  : job.targets.length;
+              const domainTargets = job.targets.filter((t) => t.scope === 'domain').length;
+              const denom = domainTargets > 0 ? domainTargets * job.pageLimit : job.targets.length;
 
               return (
                 <tr
                   key={job.id}
                   className={cn(
-                    "border-b border-border/50 transition-colors last:border-0",
-                    selected.has(job.id) && "bg-muted/30",
+                    'border-b border-border/50 transition-colors last:border-0',
+                    selected.has(job.id) && 'bg-muted/30',
                   )}
                 >
                   {/* Checkbox */}
@@ -279,7 +255,7 @@ export function JobsPanel({
                     </p>
                     <p className="text-muted-foreground/70 text-[10px]">
                       {job.targets.length} target
-                      {job.targets.length === 1 ? "" : "s"}
+                      {job.targets.length === 1 ? '' : 's'}
                     </p>
                   </td>
 
@@ -299,36 +275,48 @@ export function JobsPanel({
                   </td>
 
                   {/* Status badge */}
-                  <td className="py-2 pr-3">
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        s.className,
-                        "gap-1 px-1.5 py-0.5 font-mono text-[10px] whitespace-nowrap",
-                      )}
-                    >
-                      <Icon
+                  <td className="py-2 pr-3 align-top">
+                    <div className="flex flex-col gap-1 items-start">
+                      <Badge
+                        variant="outline"
                         className={cn(
-                          "size-2.5 shrink-0",
-                          job.status === "running" && "animate-spin",
+                          s.className,
+                          'gap-1 px-1.5 py-0.5 font-mono text-[10px] whitespace-nowrap',
                         )}
-                      />
-                      {s.label}
-                    </Badge>
+                      >
+                        <Icon
+                          className={cn(
+                            'size-2.5 shrink-0',
+                            job.status === 'running' && 'animate-spin',
+                          )}
+                        />
+                        {s.label}
+                      </Badge>
+                      {job.status === 'failed' && (
+                        <span
+                          className="text-[10px] text-destructive max-w-[140px] truncate"
+                          title={
+                            job.error || job.targets.find((t) => t.error)?.error || 'Unknown error'
+                          }
+                        >
+                          {job.error || job.targets.find((t) => t.error)?.error || 'Unknown error'}
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   {/* Action */}
                   <td className="py-2 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {job.targets.some((t) => t.status === "failed") && (
+                      {job.targets.some((t) => t.status === 'failed') && (
                         <button
                           onClick={() => {
                             const failedUrls = job.targets
-                              .filter((t) => t.status === "failed")
+                              .filter((t) => t.status === 'failed')
                               .map((t) => t.url)
-                              .join("\n");
+                              .join('\n');
                             navigator.clipboard.writeText(failedUrls);
-                            toast.success("Copied failed URLs to clipboard");
+                            toast.success('Copied failed URLs to clipboard');
                           }}
                           className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
                           title="Copy failed URLs"
@@ -366,8 +354,8 @@ export function JobsPanel({
       {totalPages > 1 && (
         <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            {safePage * PAGE_SIZE + 1}–
-            {Math.min((safePage + 1) * PAGE_SIZE, jobs.length)} of {jobs.length}
+            {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, jobs.length)} of{' '}
+            {jobs.length}
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -392,10 +380,7 @@ export function JobsPanel({
       )}
 
       {/* Confirm delete dialog */}
-      <Dialog
-        open={!!confirmDelete}
-        onOpenChange={(open) => !open && setConfirmDelete(null)}
-      >
+      <Dialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -403,11 +388,9 @@ export function JobsPanel({
               Confirm deletion
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to remove{" "}
-              <span className="font-medium text-foreground">
-                {confirmDelete?.label}
-              </span>
-              ? This action cannot be undone.
+              Are you sure you want to remove{' '}
+              <span className="font-medium text-foreground">{confirmDelete?.label}</span>? This
+              action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -437,10 +420,7 @@ export function JobsPanel({
       </Dialog>
 
       {/* Confirm cancel dialog */}
-      <Dialog
-        open={!!confirmCancel}
-        onOpenChange={(open) => !open && setConfirmCancel(null)}
-      >
+      <Dialog open={!!confirmCancel} onOpenChange={(open) => !open && setConfirmCancel(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -448,11 +428,9 @@ export function JobsPanel({
               Confirm cancellation
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel the job{" "}
-              <span className="font-medium text-foreground">
-                {confirmCancel?.label}
-              </span>
-              ? In-progress pages will be discarded.
+              Are you sure you want to cancel the job{' '}
+              <span className="font-medium text-foreground">{confirmCancel?.label}</span>?
+              In-progress pages will be discarded.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
