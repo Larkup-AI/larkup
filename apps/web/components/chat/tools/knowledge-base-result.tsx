@@ -51,42 +51,45 @@ export function KnowledgeBaseResult({
     .filter(Boolean);
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-card">
-      {isShimmering && (
-        <div className="pointer-events-none absolute inset-0 z-10 animate-pulse bg-linear-to-r from-transparent via-foreground/5 to-transparent" />
-      )}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
-      >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-foreground">
+    <div className="mb-2 w-full">
+      <div className="relative inline-flex items-center">
+        {isShimmering && (
+          <div className="pointer-events-none absolute inset-0 z-10 animate-pulse bg-linear-to-r from-transparent via-foreground/5 to-transparent" />
+        )}
+        <button
+          type="button"
+          onClick={() => hits.length > 0 && setOpen((o) => !o)}
+          className={`flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground transition-colors rounded-md ${
+            hits.length > 0 ? 'hover:bg-muted/50 cursor-pointer' : 'cursor-default'
+          }`}
+        >
           {isRunning ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
           ) : (
-            <Database className="size-4" />
+            <Database className="h-3.5 w-3.5 shrink-0" />
           )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-foreground">
-            {isRunning ? 'Searching knowledge base…' : 'Knowledge base'}
-          </div>
-          <div className="truncate text-xs text-muted-foreground">
-            {queries.length > 0
-              ? `"${queries[0]}"${queries.length > 1 ? ` and ${queries.length - 1} more` : ''}`
-              : 'RAG retrieval'}
-            {!isRunning ? ` · ${hits.length} ${hits.length === 1 ? 'result' : 'results'}` : ''}
-          </div>
-        </div>
-        {!isRunning && hits.length > 0 ? (
-          <ChevronDown
-            className={`h-4 w-4 text-muted-foreground transition ${open ? 'rotate-180' : ''}`}
-          />
-        ) : null}
-      </button>
+          <span className="truncate max-w-[250px] sm:max-w-[400px]">
+            {isRunning
+              ? 'Searching knowledge base…'
+              : queries.length > 0
+              ? `Searched for "${queries[0]}"`
+              : 'Searched knowledge base'}
+          </span>
+          {!isRunning && hits.length > 0 ? (
+            <span className="shrink-0 text-[10px] bg-secondary text-foreground px-1.5 py-0.5 rounded-full font-medium ml-1">
+              {hits.length} result{hits.length === 1 ? '' : 's'}
+            </span>
+          ) : null}
+          {!isRunning && hits.length > 0 ? (
+            <ChevronDown
+              className={`h-3 w-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+            />
+          ) : null}
+        </button>
+      </div>
 
       {open && hits.length > 0 ? (
-        <div className="flex flex-col gap-px border-t border-border bg-border">
+        <div className="mt-2 flex flex-col gap-px border border-border rounded-xl bg-border overflow-hidden">
           {hits.map((h, i) => (
             <div key={i} className="bg-card px-3.5 py-3">
               <div className="flex items-center justify-between gap-2">
@@ -121,6 +124,15 @@ export function KnowledgeBaseResult({
                       className="mt-1 max-h-32 rounded-md object-contain border border-border/50 bg-muted/20"
                     />
                   ) : null}
+                  {/* If there are embedded images in the hit metadata (e.g. from PDF) */}
+                  {((h as any).metadata?.images || []).map((img: any, idx: number) => (
+                    <img
+                      key={idx}
+                      src={img.imageUrl}
+                      alt={`Extracted image ${img.index}`}
+                      className="mt-1 max-h-32 rounded-md object-contain border border-border/50 bg-muted/20"
+                    />
+                  ))}
                 </div>
               ) : null}
               {(h as any).startSecs !== undefined && (

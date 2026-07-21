@@ -336,9 +336,22 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
         }
 
         if (hasText || uploadedImages.length > 0) {
+          let contentStr = hasText ? f.rawContent : `Images extracted from ${f.name}`;
+          if (uploadedImages.length > 0) {
+            const descriptions = uploadedImages
+              .map(
+                (img) =>
+                  `Image ${img.index + 1} (Page ${img.pageNumber}): ${
+                    img.description || 'No description'
+                  }`,
+              )
+              .join('\n');
+            contentStr += `\n\nImage Descriptions:\n${descriptions}`;
+          }
+
           payloads.push({
             title: f.name,
-            content: hasText ? f.rawContent : `Images extracted from ${f.name}`,
+            content: contentStr,
             source: 'upload',
             url: fileUrl,
             metadata: uploadedImages.length > 0 ? { images: uploadedImages } : undefined,

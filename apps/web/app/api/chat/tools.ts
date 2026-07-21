@@ -57,6 +57,7 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
               url: h.url ?? '',
               score: Number((h.score ?? 0).toFixed(3)),
               text: (h.text ?? '').slice(0, 1200),
+              metadata: h.metadata,
             })),
           };
         }
@@ -82,6 +83,7 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
         url: h.url ?? '',
         score: Number((h.score ?? 0).toFixed(3)),
         text: (h.text ?? '').slice(0, 1200),
+        metadata: h.metadata,
       })),
     };
   };

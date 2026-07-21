@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
             _name: string,
             _instructions: string,
             _instructionsLang: string,
-            prompts: { prompt: string; echo: boolean }[],
+            prompts: any[],
             finish: (responses: string[]) => void,
           ) => {
             if (prompts.length > 0 && privateKeyOrPassword.type === 'password') {
@@ -290,7 +290,7 @@ export async function POST(req: NextRequest) {
               _name: string,
               _instructions: string,
               _instructionsLang: string,
-              prompts: { prompt: string; echo: boolean }[],
+              prompts: any[],
               finish: (responses: string[]) => void,
             ) => {
               if (prompts.length > 0) {

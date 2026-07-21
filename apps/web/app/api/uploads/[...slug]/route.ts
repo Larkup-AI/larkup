@@ -5,9 +5,10 @@ import path from 'path';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request, { params }: { params: { slug: string[] } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ slug: string[] }> }) {
   try {
-    const slug = params.slug;
+    const resolvedParams = await params;
+    const slug = resolvedParams.slug;
     if (!slug || slug.length === 0) {
       return new NextResponse('File not found', { status: 404 });
     }
