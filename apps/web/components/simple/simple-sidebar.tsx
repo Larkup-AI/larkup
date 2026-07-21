@@ -98,7 +98,18 @@ export function SimpleSidebar() {
                     <Link
                       href={item.href}
                       aria-current={active ? 'page' : undefined}
-                      className="group relative flex w-16 flex-col items-center gap-0.5 rounded-2xl py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={(e) => {
+                        if (item.id === 'chat' && pathname === item.href) {
+                          e.preventDefault();
+                          window.dispatchEvent(new CustomEvent('new-chat'));
+                        }
+                      }}
+                      className={cn(
+                        'group relative flex size-10 items-center justify-center rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        active
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                      )}
                     />
                   }
                 >

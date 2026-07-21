@@ -134,6 +134,12 @@ export function UnifiedSidebar() {
                       <Link
                         href={item.href}
                         aria-current={active ? 'page' : undefined}
+                        onClick={(e) => {
+                          if (item.id === 'chat' && pathname === '/chat') {
+                            e.preventDefault();
+                            window.dispatchEvent(new CustomEvent('new-chat'));
+                          }
+                        }}
                         className={cn(
                           'group relative flex size-10 items-center justify-center rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
                           active
@@ -157,6 +163,12 @@ export function UnifiedSidebar() {
                 key={item.id}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
+                onClick={(e) => {
+                  if (item.id === 'chat' && pathname === '/chat') {
+                    e.preventDefault();
+                    window.dispatchEvent(new CustomEvent('new-chat'));
+                  }
+                }}
                 className={cn(
                   'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   active

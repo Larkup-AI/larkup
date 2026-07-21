@@ -115,6 +115,7 @@ function ChatWorkspaceInner() {
 
   const [currentChatId, setCurrentChatId] = useState<string>('');
   const [history, setHistory] = useState<{ id: string; title: string; updatedAt: number }[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // Load history on mount
   useEffect(() => {
@@ -300,6 +301,12 @@ function ChatWorkspaceInner() {
     setCurrentChatId(crypto.randomUUID());
   }
 
+  useEffect(() => {
+    const handleNewChat = () => newChat();
+    window.addEventListener('new-chat', handleNewChat);
+    return () => window.removeEventListener('new-chat', handleNewChat);
+  }, []);
+
   async function handleWebSearchToggle() {
     const config = configData?.config;
     if (!config) return;
@@ -332,6 +339,7 @@ function ChatWorkspaceInner() {
     if (msgs) {
       setMessages(msgs);
       setCurrentChatId(id);
+      setIsHistoryOpen(false);
     }
   }
 
@@ -494,7 +502,7 @@ function ChatWorkspaceInner() {
           <div className="h-4 w-px bg-border mx-1" />
 
           <TooltipProvider delay={50}>
-            <Sheet>
+            <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
               <Tooltip>
                 <TooltipTrigger
                   render={

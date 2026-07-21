@@ -135,6 +135,12 @@ export function AppSidebar() {
                       <Link
                         href={stage.href}
                         aria-current={active ? 'page' : undefined}
+                        onClick={(e) => {
+                          if (stage.id === 'chat' && pathname === '/chat') {
+                            e.preventDefault();
+                            window.dispatchEvent(new CustomEvent('new-chat'));
+                          }
+                        }}
                         className="group relative flex w-16 flex-col items-center gap-0.5 rounded-2xl py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     )
