@@ -56,6 +56,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
+    if (provider === 'firecrawl') {
+      const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: 'https://example.com', formats: ['markdown'] }),
+      });
+      if (res.status === 401) throw new Error('Invalid Firecrawl API Key');
+      return NextResponse.json({ success: true });
+    }
+
     return NextResponse.json({ error: 'Unsupported provider' }, { status: 400 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Verification failed';

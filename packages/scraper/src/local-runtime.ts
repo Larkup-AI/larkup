@@ -83,7 +83,7 @@ async function getProxy(): Promise<{
   } catch (err) {}
 
   const config = await readConfig();
-  if (config.scraperProxyServer) {
+  if (config.useScraperProxy && config.scraperProxyServer) {
     return {
       server: config.scraperProxyServer,
       username: config.scraperProxyUsername,

@@ -30,30 +30,44 @@ interface Endpoint {
   mode: 'local' | 'cloud';
 }
 
-/** Resolve which Firecrawl to talk to: a running local instance wins. */
+/** Resolve which Firecrawl to talk to based on config. */
 async function resolveEndpoint(): Promise<Endpoint> {
-  const local = await readLocalState();
-  if (local.running && local.apiKey) {
-    return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: 'local' };
-  }
   const config = await readConfig();
+  const provider = config.webCrawlerProvider || 'local';
+
+  if (provider === 'local') {
+    const local = await readLocalState();
+    if (local.running && local.apiKey) {
+      return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: 'local' };
+    }
+    throw new FirecrawlError(
+      'Local Firecrawl is selected but not running. Launch a local instance from the UI.',
+      401,
+    );
+  }
+
+  // cloud
   const key = config.firecrawlApiKey;
   if (key) return { base: CLOUD_BASE, key, mode: 'cloud' };
 
   throw new FirecrawlError(
-    'No Firecrawl available. Launch a local instance or configure FIRECRAWL_API_KEY in the UI to run web search and scraping.',
+    'Cloud Firecrawl is selected but no API key is configured. Set FIRECRAWL_API_KEY in Settings.',
     401,
   );
 }
 
 /**
- * Whether web scraping is available — true if a local instance is running OR a
- * cloud key is set. UI uses this to show/hide the setup notice.
+ * Whether web scraping is available based on selected provider.
  */
 export async function isFirecrawlConfigured() {
-  const local = await readLocalState();
-  if (local.running && local.apiKey) return true;
   const config = await readConfig();
+  const provider = config.webCrawlerProvider || 'local';
+
+  if (provider === 'local') {
+    const local = await readLocalState();
+    return Boolean(local.running && local.apiKey);
+  }
+
   return Boolean(config.firecrawlApiKey);
 }
 

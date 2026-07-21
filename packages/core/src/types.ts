@@ -150,6 +150,8 @@ export interface RagConfig {
   scraperProxyServer?: string;
   scraperProxyUsername?: string;
   scraperProxyPassword?: string;
+  useScraperProxy?: boolean;
+  webCrawlerProvider?: 'local' | 'cloud';
   firecrawlApiKey?: string;
   updatedAt: string;
   deployment?: AgentDeploymentConfig;
@@ -184,6 +186,8 @@ export const DEFAULT_CONFIG: RagConfig = {
   scraperProxyServer: '',
   scraperProxyUsername: '',
   scraperProxyPassword: '',
+  useScraperProxy: false,
+  webCrawlerProvider: 'local',
   firecrawlApiKey: '',
   updatedAt: new Date(0).toISOString(),
 };
