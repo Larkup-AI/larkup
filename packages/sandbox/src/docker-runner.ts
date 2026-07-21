@@ -125,9 +125,11 @@ export async function ensureImage(): Promise<boolean> {
 
 /**
  * Build the Python wrapper script that:
- * 1. Runs the user code
- * 2. Saves any matplotlib figures to /sandbox/output/
- * 3. Lists generated artifacts
+ * 1. Sets up pandas compatibility shims to handle deprecated APIs
+ * 2. Auto-imports common data analysis modules
+ * 3. Runs the user code with robust error handling
+ * 4. Saves any matplotlib figures to /sandbox/output/
+ * 5. Lists generated artifacts
  */
 function wrapPythonCode(code: string): string {
   return `
@@ -136,7 +138,82 @@ import sys, os, json, traceback
 # Ensure output directory exists
 os.makedirs("${OUTPUT_DIR}", exist_ok=True)
 
+# ============================================================
+# SAFETY PREAMBLE: Suppress warnings & patch deprecated APIs
+# ============================================================
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+warnings.filterwarnings('ignore', category=UserWarning)
+
+# Auto-import common data analysis modules
+import numpy as np
+
+try:
+    import pandas as pd
+
+    # --- Patch 1: DataFrame.append() was removed in pandas 2.0 ---
+    if not hasattr(pd.DataFrame, 'append'):
+        def _df_append(self, other, ignore_index=False, verify_integrity=False, sort=False, **kwargs):
+            """Backwards-compatible append using pd.concat."""
+            if isinstance(other, (list, tuple)):
+                to_concat = [self] + list(other)
+            elif isinstance(other, dict):
+                to_concat = [self, pd.DataFrame([other])]
+            else:
+                to_concat = [self, other]
+            return pd.concat(to_concat, ignore_index=ignore_index, verify_integrity=verify_integrity, sort=sort)
+        pd.DataFrame.append = _df_append
+
+    # --- Patch 2: Series.append() was removed in pandas 2.0 ---
+    if not hasattr(pd.Series, 'append'):
+        def _series_append(self, to_append, ignore_index=False, verify_integrity=False):
+            """Backwards-compatible Series.append using pd.concat."""
+            if isinstance(to_append, (list, tuple)):
+                to_concat = [self] + list(to_append)
+            else:
+                to_concat = [self, to_append]
+            return pd.concat(to_concat, ignore_index=ignore_index, verify_integrity=verify_integrity)
+        pd.Series.append = _series_append
+
+    # --- Patch 3: Fix deprecated resample frequency aliases ---
+    # "M" -> "ME", "Q" -> "QE", "Y" -> "YE", "H" -> "h", "T" -> "min", "S" -> "s"
+    _original_resample = pd.DataFrame.resample
+    _FREQ_ALIAS_MAP = {
+        'M': 'ME', 'Q': 'QE', 'Y': 'YE', 'A': 'YE',
+        'BM': 'BME', 'BQ': 'BQE', 'BA': 'BYE', 'BY': 'BYE',
+        'BMS': 'BMS', 'QS': 'QS', 'AS': 'YS', 'BAS': 'BYS',
+        'H': 'h', 'T': 'min', 'S': 's', 'L': 'ms', 'U': 'us', 'N': 'ns',
+    }
+    def _patched_resample(self, rule, *args, **kwargs):
+        if isinstance(rule, str) and rule in _FREQ_ALIAS_MAP:
+            rule = _FREQ_ALIAS_MAP[rule]
+        return _original_resample(self, rule, *args, **kwargs)
+    pd.DataFrame.resample = _patched_resample
+
+    # Also patch Series.resample
+    _original_series_resample = pd.Series.resample
+    def _patched_series_resample(self, rule, *args, **kwargs):
+        if isinstance(rule, str) and rule in _FREQ_ALIAS_MAP:
+            rule = _FREQ_ALIAS_MAP[rule]
+        return _original_series_resample(self, rule, *args, **kwargs)
+    pd.Series.resample = _patched_series_resample
+
+    # --- Patch 4: Fix pd.Grouper freq aliases ---
+    _original_grouper = pd.Grouper
+    class _PatchedGrouper(_original_grouper):
+        def __init__(self, *args, **kwargs):
+            if 'freq' in kwargs and isinstance(kwargs['freq'], str):
+                kwargs['freq'] = _FREQ_ALIAS_MAP.get(kwargs['freq'], kwargs['freq'])
+            super().__init__(*args, **kwargs)
+    pd.Grouper = _PatchedGrouper
+
+except ImportError:
+    pass
+
+# ============================================================
 # Patch matplotlib to auto-save figures
+# ============================================================
 _figure_count = [0]
 try:
     import matplotlib
@@ -155,7 +232,9 @@ try:
 except ImportError:
     pass
 
-# Execute user code
+# ============================================================
+# Execute user code with robust error handling
+# ============================================================
 try:
     exec(${JSON.stringify(code)})
     
@@ -166,8 +245,22 @@ try:
             plt.show()
     except (ImportError, Exception):
         pass
-except Exception:
-    traceback.print_exc()
+except SystemExit as e:
+    # Let explicit sys.exit() calls through
+    if e.code != 0:
+        sys.exit(e.code)
+except Exception as e:
+    # Print a clean, user-readable error instead of raw traceback
+    error_type = type(e).__name__
+    error_msg = str(e)
+    print(f"Error ({error_type}): {error_msg}", file=sys.stderr)
+    # Also print the relevant part of the traceback for debugging
+    tb = traceback.extract_tb(sys.exc_info()[2])
+    # Filter to only show the exec'd code frames (skip wrapper frames)
+    user_frames = [f for f in tb if f.filename == '<string>']
+    if user_frames:
+        last = user_frames[-1]
+        print(f"  at line {last.lineno}: {last.line}", file=sys.stderr)
     sys.exit(1)
 
 # List generated artifacts
