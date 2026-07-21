@@ -300,10 +300,7 @@ export function DataWorkspace() {
             <AlertDialog>
               <AlertDialogTrigger
                 render={
-                  <Button
-                    variant="outline"
-                    className="h-10 px-4 text-sm gap-1.5 bg-transparent hover:bg-white"
-                  >
+                  <Button variant="outline" className="h-10 bg-white px-4 text-sm gap-1.5">
                     <RotateCcw className="size-3.5" />
                     Re-Index
                   </Button>

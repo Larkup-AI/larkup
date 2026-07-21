@@ -12,10 +12,13 @@ import {
   type LucideIcon,
   Film,
   ScanEye,
+  CircleIcon,
+  Megaphone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { Input } from '../ui/input';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -173,7 +176,7 @@ export function MarketplaceSection() {
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input
+          <Input
             type="text"
             placeholder="Search tools…"
             value={searchQuery}
@@ -264,7 +267,7 @@ function ToolRow({
       )}
     >
       {/* Icon */}
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/50 border">
         {tool.emoji ? (
           <span className="text-xl leading-none">{tool.emoji}</span>
         ) : (
@@ -341,7 +344,10 @@ function ToolRow({
         )}
 
         {isComingSoon ? (
-          <span className="text-[11px] font-medium text-muted-foreground/50 px-2">Coming soon</span>
+          <Button size="sm" className={'h-7 text-[11px]'} variant={'default'} disabled>
+            <Megaphone className="size-3" />
+            Soon
+          </Button>
         ) : isInstalled ? (
           <div className="flex items-center gap-1.5">
             <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
@@ -351,7 +357,7 @@ function ToolRow({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 p-0 text-muted-foreground/40 hover:text-destructive"
+              className="size-7 p-0 text-muted-foreground/40 hover:text-destructive"
               onClick={() => onUninstall(tool.id)}
             >
               <Trash2 className="size-3" />
@@ -359,7 +365,7 @@ function ToolRow({
           </div>
         ) : (
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             className="h-7 gap-1.5 text-[11px] px-3"
             disabled={installing}

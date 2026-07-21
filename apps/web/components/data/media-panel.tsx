@@ -233,7 +233,7 @@ function InstallPrompt({
         ) : null} */}
       </div>
       <Button
-        variant="outline"
+        variant="default"
         size="sm"
         className="mt-5 gap-1.5 text-[12px]"
         onClick={() => {
