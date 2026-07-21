@@ -361,13 +361,19 @@ export function CorpusPanel({
             : 'Delete document'
         }
         description={
-          deleteTask?.type === 'all'
-            ? 'Are you sure you want to delete all documents in the corpus? This action cannot be undone.'
-            : deleteTask?.type === 'selected'
-            ? `Are you sure you want to delete ${selectedIds.size} selected documents?`
-            : `Are you sure you want to delete "${
-                deleteTask?.type === 'single' ? deleteTask.doc.title : ''
-              }"?`
+          deleteTask?.type === 'all' ? (
+            'Are you sure you want to delete all documents in the corpus? This action cannot be undone.'
+          ) : deleteTask?.type === 'selected' ? (
+            `Are you sure you want to delete ${selectedIds.size} selected documents?`
+          ) : (
+            <span className="break-words">
+              Are you sure you want to delete "
+              <span className="break-all font-medium">
+                {deleteTask?.type === 'single' ? deleteTask.doc.title : ''}
+              </span>
+              "?
+            </span>
+          )
         }
         actionText="Delete"
         variant="destructive"
