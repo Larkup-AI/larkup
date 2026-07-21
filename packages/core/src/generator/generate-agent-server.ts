@@ -352,7 +352,7 @@ const SECRET = process.env.SERVER_API_KEY || process.env.AGENT_JOIN_CODE || 'lar
 function createToken() {
   const payload = Buffer.from(JSON.stringify({ exp: Date.now() + 1000 * 60 * 60 * 24 * 7 })).toString('base64');
   const signature = crypto.createHmac('sha256', SECRET).update(payload).digest('base64');
-  return \`${payload}.${signature}\`;
+  return \`\${payload}.\${signature}\`;
 }
 
 function verifyToken(token) {
@@ -395,9 +395,9 @@ export function handleVerify(req, res) {
         const token = createToken();
         res.writeHead(200, {
           'Content-Type': 'application/json',
-          'Set-Cookie': \`agent_session=${token}; HttpOnly; Path=/; Max-Age=${
-    60 * 60 * 24 * 7
-  }; SameSite=Lax\`
+          'Set-Cookie': \`agent_session=\${token}; HttpOnly; Path=/; Max-Age=${
+            60 * 60 * 24 * 7
+          }; SameSite=Lax\`
         });
         res.end(JSON.stringify({ success: true }));
       } else {
@@ -443,9 +443,7 @@ export async function handleChat(req, res) {
         const topK = Number(process.env.TOP_K || 5);
         const hits = await storeQuery(vector, topK);
         if (hits.length > 0) {
-          contextStr = "Relevant context from knowledge base:\\n" + hits.map(h => \`- ${h.title}: ${
-    h.text
-  }\`).join('\\n\\n');
+          contextStr = "Relevant context from knowledge base:\\n" + hits.map(h => \`- \${h.title}: \${h.text}\`).join('\\n\\n');
         }
       }
 
@@ -464,7 +462,7 @@ export async function handleChat(req, res) {
       });
       
       for await (const chunk of result.textStream) {
-        res.write(\`data: ${JSON.stringify(chunk)}\\n\\n\`);
+        res.write(\`data: \${JSON.stringify(chunk)}\\n\\n\`);
       }
       res.end();
     } catch (err) {
@@ -593,7 +591,7 @@ function send(res, status, body) {
 
 const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 204, {})
-  const url = new URL(req.url, \`http://${req.headers.host}\`)
+  const url = new URL(req.url, \`http://\${req.headers.host}\`)
 
   if (req.method === "GET" && url.pathname === "/health") {
     return send(res, 200, { ok: true, service: "${config.projectName}-agent" })
