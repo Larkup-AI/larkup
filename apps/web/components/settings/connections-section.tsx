@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Code2, Sparkles, Loader2 } from 'lucide-react';
+import {
+  Code2,
+  Sparkles,
+  Loader2,
+  CableIcon,
+  PlugIcon,
+  EthernetPort,
+  BlocksIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -237,7 +245,7 @@ export function ConnectionsSection() {
           className="h-8 gap-2 "
           onClick={() => setIsRequestModalOpen(true)}
         >
-          <Sparkles className="size-3.5" />
+          <BlocksIcon className="size-3.5" />
           Ask for connection
         </Button>
       </div>
