@@ -12,13 +12,11 @@ import {
   X,
   Upload,
   FileUp,
-  Link2,
   Check,
   AlertCircle,
   Clock,
   Trash2,
   Store,
-  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -64,6 +62,8 @@ interface MediaApiResponse {
   };
   storage: { usedBytes: number; fileCount: number };
 }
+
+let globalStagedMedia: Record<string, StagedMedia[]> = { image: [], video: [], audio: [] };
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -216,7 +216,7 @@ function InstallPrompt({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="flex size-14 items-center border border-border/90 justify-center rounded-xl bg-muted/50">
+      <div className="flex size-14 items-center border border-border/90 justify-center rounded-xl bg-white">
         <Store className="size-6 text-muted-foreground" />
       </div>
       <h3 className="mt-4 text-sm font-medium text-foreground">{toolName}</h3>
@@ -270,7 +270,20 @@ function MediaContent({
   onUploadComplete: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [staged, setStaged] = useState<StagedMedia[]>([]);
+  const [staged, setStagedState] = useState<StagedMedia[]>(globalStagedMedia[mediaType] || []);
+
+  useEffect(() => {
+    setStagedState(globalStagedMedia[mediaType] || []);
+  }, [mediaType]);
+
+  const setStaged = (val: React.SetStateAction<StagedMedia[]>) => {
+    setStagedState((prev) => {
+      const next = typeof val === 'function' ? (val as Function)(prev) : val;
+      globalStagedMedia[mediaType] = next;
+      return next;
+    });
+  };
+
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<{
@@ -435,72 +448,74 @@ function MediaContent({
                 });
                 setStaged([]);
               }}
-              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
-              Clear
+              Clear All
             </button>
           </div>
 
-          {/* Grid preview for staged images */}
-          {mediaType === 'image' ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {staged.map((item) => (
-                <div
-                  key={item.id}
-                  className="group relative aspect-[2/1] sm:aspect-[21/9] rounded-xl overflow-hidden bg-muted/30 border border-border/50"
-                >
-                  {item.preview && (
-                    <img
-                      src={item.preview}
-                      alt={item.file.name}
-                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  )}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFile(item.id);
-                    }}
-                    className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              {staged.map((item) => {
-                const Icon = mediaType === 'video' ? Video : AudioLines;
-                return (
+          <div className="max-h-[350px] overflow-y-auto pr-1">
+            {/* Grid preview for staged images */}
+            {mediaType === 'image' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {staged.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 group"
+                    className="group relative aspect-[2/1] sm:aspect-[21/9] rounded-xl overflow-hidden bg-muted/30 border border-border/50"
                   >
-                    <div className="flex size-8 items-center justify-center rounded-md bg-muted">
-                      <Icon className="size-3.5 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[12px] font-medium text-foreground">
-                        {item.file.name}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {formatSize(item.file.size)}
-                      </p>
-                    </div>
+                    {item.preview && (
+                      <img
+                        src={item.preview}
+                        alt={item.file.name}
+                        className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    )}
                     <button
                       type="button"
-                      onClick={() => removeFile(item.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-foreground transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFile(item.id);
+                      }}
+                      className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      <X className="size-3" />
+                      <X className="size-3.5" />
                     </button>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {staged.map((item) => {
+                  const Icon = mediaType === 'video' ? Video : AudioLines;
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 group"
+                    >
+                      <div className="flex size-8 items-center justify-center rounded-md bg-muted">
+                        <Icon className="size-3.5 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[12px] font-medium text-foreground">
+                          {item.file.name}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {formatSize(item.file.size)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(item.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-foreground transition-all"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Progress */}
           {progress && (
@@ -618,7 +633,7 @@ function ImageGallery({
             )}
             {asset.processingStatus === 'pending' && (
               <div className="absolute bottom-2 right-2">
-                <Clock className="size-3.5 text-white/80 drop-shadow-md" />
+                <Clock className="size-3.5 text-white/80 " />
               </div>
             )}
 
@@ -661,7 +676,7 @@ function ImageGallery({
             <img
               src={`/api/media/${expandedAsset.id}`}
               alt={expandedAsset.fileName}
-              className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain"
+              className="max-w-full max-h-[90vh] rounded-lg object-contain"
               onClick={(e) => e.stopPropagation()} // Prevent click from closing immediately
             />
             <button

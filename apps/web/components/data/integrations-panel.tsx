@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { NotionPanel } from '@/components/data/notion-panel';
 import { cn } from '@/lib/utils';
-import { ChevronRight, ExternalLink } from 'lucide-react';
+import { CableIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -249,7 +249,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
             className="h-8 gap-2 bg-white/80 hover:bg-white"
             onClick={() => setIsRequestModalOpen(true)}
           >
-            <Sparkles className="size-3.5" />
+            <CableIcon className="size-3.5" />
             Ask for integration
           </Button>
         </div>
