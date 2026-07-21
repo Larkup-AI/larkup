@@ -236,11 +236,11 @@ export function CorpusPanel({
                       <span className="line-clamp-1 text-sm font-medium group-hover:text-primary">
                         {doc.title}
                       </span>
-                      {doc.url && (
+                      {/* {doc.url && (
                         <span className="line-clamp-1 text-xs text-muted-foreground">
                           {doc.url}
                         </span>
-                      )}
+                      )} */}
                     </button>
                   </TableCell>
                   <TableCell>

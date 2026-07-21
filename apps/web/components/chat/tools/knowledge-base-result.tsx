@@ -105,7 +105,23 @@ export function KnowledgeBaseResult({
                 </span>
               </div>
               {h.url ? (
-                <div className="mt-0.5 truncate text-xs text-muted-foreground">{h.url}</div>
+                <div className="mt-1.5 flex flex-col gap-1">
+                  <a
+                    href={h.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="truncate text-xs text-primary hover:underline"
+                  >
+                    View Source ↗
+                  </a>
+                  {(h as any).mediaType === 'image' || h.url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                    <img
+                      src={h.url}
+                      alt="Source preview"
+                      className="mt-1 max-h-32 rounded-md object-contain border border-border/50 bg-muted/20"
+                    />
+                  ) : null}
+                </div>
               ) : null}
               {(h as any).startSecs !== undefined && (
                 <div className="mt-0.5 text-[11px] text-muted-foreground/70 tabular-nums">

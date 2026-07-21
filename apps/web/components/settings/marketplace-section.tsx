@@ -307,7 +307,7 @@ function ToolRow({
       </div>
 
       {/* Meta column */}
-      <div className="hidden sm:flex shrink-0 flex-col items-end gap-1 text-[11px] text-muted-foreground/60">
+      <div className="hidden sm:flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground/60">
         <span className="tabular-nums">{tool.installSize}</span>
         {tool.downloads > 0 && (
           <span className="tabular-nums">↓ {formatDownloads(tool.downloads)}</span>

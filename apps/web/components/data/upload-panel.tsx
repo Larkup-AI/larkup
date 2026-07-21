@@ -3,7 +3,16 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { formatErrorMessage } from '@/lib/error-formatter';
-import { FileUp, Loader2, X, Settings2, Columns, Plus, Database } from 'lucide-react';
+import {
+  FileUp,
+  Loader2,
+  X,
+  Settings2,
+  Columns,
+  Plus,
+  Database,
+  Image as ImageIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -28,6 +37,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const ACCEPT = '.txt,.md,.markdown,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx';
 
@@ -51,6 +61,10 @@ interface StagedFile {
   indexAsTabular?: boolean;
   /** Expanded preview state */
   showPreview?: boolean;
+  /** When true, images from PDF will be extracted and indexed */
+  indexImages?: boolean;
+  /** The original file object for client-side processing */
+  fileObject?: File;
 }
 
 let globalStagedFiles: StagedFile[] = [];
@@ -58,6 +72,7 @@ let globalStagedFiles: StagedFile[] = [];
 export function UploadPanel({ onAdded }: { onAdded: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [staged, setStagedState] = useState<StagedFile[]>(globalStagedFiles);
+  const [indexAllImages, setIndexAllImages] = useState(false);
 
   const setStaged = (val: React.SetStateAction<StagedFile[]>) => {
     setStagedState((prev) => {
@@ -194,6 +209,8 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
             size: file.size,
             format: 'plain',
             rawContent: text,
+            fileObject: file,
+            indexImages: !text || text.trim().length === 0,
           });
         } else {
           const content = await file.text();
@@ -241,12 +258,92 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
 
     // Then: create document payloads
     for (const f of staged) {
-      if (f.format === 'plain' && f.rawContent) {
-        payloads.push({
-          title: f.name,
-          content: f.rawContent,
-          source: 'upload',
-        });
+      if (f.format === 'plain' && (f.rawContent || f.name.toLowerCase().endsWith('.pdf'))) {
+        let fileUrl = undefined;
+        // Upload the physical file so chat can link to it
+        if (f.fileObject) {
+          try {
+            const formData = new FormData();
+            formData.append('file', f.fileObject);
+            const uploadRes = await fetch('/api/upload-file', {
+              method: 'POST',
+              body: formData,
+            });
+            if (uploadRes.ok) {
+              const { url } = await uploadRes.json();
+              fileUrl = url;
+            }
+          } catch (err) {
+            console.error('Failed to upload file for citation link', err);
+          }
+        }
+
+        const hasText = f.rawContent && f.rawContent.trim().length > 0;
+        const uploadedImages: any[] = [];
+
+        // Extract images if requested (for PDFs)
+        if (
+          (f.indexImages || indexAllImages) &&
+          f.fileObject &&
+          f.name.toLowerCase().endsWith('.pdf')
+        ) {
+          try {
+            const { extractImagesFromPDF } = await import('@/lib/pdf-images');
+            const images = await extractImagesFromPDF(f.fileObject);
+
+            for (const img of images) {
+              const res = await fetch(img.base64);
+              const blob = await res.blob();
+              const file = new File([blob], `image-${img.index}.png`, { type: 'image/png' });
+
+              const formData = new FormData();
+              formData.append('file', file);
+              const uploadRes = await fetch('/api/upload-file', {
+                method: 'POST',
+                body: formData,
+              });
+              if (uploadRes.ok) {
+                const { url } = await uploadRes.json();
+
+                let description = '';
+                try {
+                  const descRes = await fetch('/api/describe-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ base64: img.base64 }),
+                  });
+                  if (descRes.ok) {
+                    const descData = await descRes.json();
+                    if (descData.description) {
+                      description = descData.description;
+                    }
+                  }
+                } catch (e) {
+                  console.error('Failed to describe image:', e);
+                }
+
+                uploadedImages.push({
+                  imageUrl: url,
+                  pageNumber: img.pageNumber,
+                  index: img.index,
+                  description,
+                });
+              }
+            }
+          } catch (err) {
+            console.error('Failed to extract images from PDF:', err);
+          }
+        }
+
+        if (hasText || uploadedImages.length > 0) {
+          payloads.push({
+            title: f.name,
+            content: hasText ? f.rawContent : `Images extracted from ${f.name}`,
+            source: 'upload',
+            url: fileUrl,
+            metadata: uploadedImages.length > 0 ? { images: uploadedImages } : undefined,
+          });
+        }
       } else if (f.format === 'lines' && f.rawContent) {
         const lines = f.rawContent
           .split(/\r?\n/)
@@ -318,18 +415,25 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
       setProgress({ current: index + 1, total: payloads.length });
     }
 
+    const stagedCount = staged.length;
     setSaving(false);
     setProgress(null);
     setStaged([]);
+
+    // Also explicitly clear the input value just in case
+    if (inputRef.current) {
+      inputRef.current.value = '';
+    }
+
     if (ok > 0) {
       toast.success(
-        `Added ${ok} document${ok > 1 ? 's' : ''} from ${staged.length} file${
-          staged.length > 1 ? 's' : ''
+        `Added ${ok} document${ok > 1 ? 's' : ''} from ${stagedCount} file${
+          stagedCount > 1 ? 's' : ''
         }`,
       );
       onAdded();
     } else {
-      toast.error('No documents could be added.');
+      toast.error('No text or images could be extracted from the uploaded files.');
     }
   }
 
@@ -381,13 +485,31 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
             <span className="text-[13px] font-medium text-foreground">
               {staged.length} file{staged.length !== 1 ? 's' : ''} staged
             </span>
-            <button
-              type="button"
-              onClick={() => setStaged([])}
-              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
-              Clear All
-            </button>
+            <div className="flex items-center gap-4">
+              {staged.some((f) => f.name.toLowerCase().endsWith('.pdf')) && (
+                <div className="flex items-center gap-1.5">
+                  <Switch
+                    checked={indexAllImages}
+                    onCheckedChange={setIndexAllImages}
+                    id="global-index-images"
+                    className="scale-75 origin-right"
+                  />
+                  <Label
+                    htmlFor="global-index-images"
+                    className="text-[11px] text-muted-foreground cursor-pointer"
+                  >
+                    Index all PDF images
+                  </Label>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setStaged([])}
+                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                Clear All
+              </button>
+            </div>
           </div>
           <ul className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
             {staged.map((f) => (
@@ -441,6 +563,41 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                       >
                         <Database className="size-3.5" />
                       </button>
+                    )}
+                    {/* Image indexing toggle for PDF files */}
+                    {f.name.toLowerCase().endsWith('.pdf') && (
+                      <TooltipProvider delay={0}>
+                        <Tooltip>
+                          <TooltipTrigger
+                            type="button"
+                            aria-label="Toggle image indexing"
+                            onClick={() =>
+                              setStaged((p) =>
+                                p.map((item) =>
+                                  item.id === f.id
+                                    ? { ...item, indexImages: !item.indexImages }
+                                    : item,
+                                ),
+                              )
+                            }
+                            className={cn(
+                              'p-1.5 border rounded-md transition-colors cursor-pointer',
+                              f.indexImages
+                                ? 'bg-blue-100 border-blue-300 text-blue-600 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-400'
+                                : 'bg-secondary text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                            )}
+                          >
+                            <ImageIcon className="size-3.5" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">
+                              {f.indexImages
+                                ? 'Image indexing ON'
+                                : 'Extract and index images from PDF'}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                     <button
                       type="button"

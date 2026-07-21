@@ -57,7 +57,7 @@ const SECTION_GROUPS: SectionGroup[] = [
   {
     label: 'Advanced',
     items: [
-      { id: 'prompts', label: 'Prompts', icon: MessageSquareText },
+      { id: 'prompts', label: 'Agent Customization', icon: MessageSquareText },
       { id: 'playground', label: 'Playground', icon: Search },
       { id: 'appearance', label: 'Appearance', icon: Palette },
     ],

@@ -80,7 +80,7 @@ export function ChatSandboxResult({
               ? `${executionTimeMs}ms`
               : `${(executionTimeMs / 1000).toFixed(1)}s`}
           </span>
-          {code && (
+          {/* {code && (
             <Button
               variant="ghost"
               size="sm"
@@ -93,7 +93,7 @@ export function ChatSandboxResult({
                 className={`size-3 transition-transform ${showCode ? 'rotate-180' : ''}`}
               />
             </Button>
-          )}
+          )} */}
         </div>
       </div>
 

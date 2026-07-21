@@ -111,7 +111,7 @@ export function MediaPanel({ onAdded }: { onAdded: () => void }) {
     refreshInterval: 5000,
   });
 
-  const { data: toolsData } = useSWR('/api/marketplace', toolFetcher);
+  const { data: toolsData, mutate: mutateTools } = useSWR('/api/marketplace', toolFetcher);
 
   // Check if Video & Audio tool is installed
   const videoAudioTool = toolsData?.tools?.find((t: any) => t.id === 'video-audio');
@@ -173,6 +173,7 @@ export function MediaPanel({ onAdded }: { onAdded: () => void }) {
       {/* Content: either install prompt or upload + gallery */}
       {needsTool ? (
         <InstallPrompt
+          toolId="video-audio"
           toolName={videoAudioTool?.name ?? 'Video & Audio'}
           toolDescription={
             videoAudioTool?.description ??
@@ -180,6 +181,7 @@ export function MediaPanel({ onAdded }: { onAdded: () => void }) {
           }
           installSize={videoAudioTool?.installSize ?? '~15 MB'}
           systemDeps={videoAudioTool?.systemDeps}
+          onInstallComplete={() => mutateTools()}
         />
       ) : (
         <MediaContent
@@ -204,16 +206,41 @@ export function MediaPanel({ onAdded }: { onAdded: () => void }) {
 /* ------------------------------------------------------------------ */
 
 function InstallPrompt({
+  toolId,
   toolName,
   toolDescription,
   installSize,
   systemDeps,
+  onInstallComplete,
 }: {
+  toolId: string;
   toolName: string;
   toolDescription: string;
   installSize: string;
   systemDeps?: string[];
+  onInstallComplete: () => void;
 }) {
+  const [installing, setInstalling] = useState(false);
+
+  const handleInstall = async () => {
+    setInstalling(true);
+    try {
+      const res = await fetch(`/api/marketplace/${toolId}`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Install failed');
+      }
+      toast.success('Tool installed successfully');
+      onInstallComplete();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to install tool');
+    } finally {
+      setInstalling(false);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="flex size-14 items-center border border-border/90 justify-center rounded-xl bg-white">
@@ -236,13 +263,15 @@ function InstallPrompt({
         variant="default"
         size="sm"
         className="mt-5 gap-1.5 text-[12px]"
-        onClick={() => {
-          // Navigate to settings marketplace
-          window.location.href = '/settings?section=marketplace';
-        }}
+        disabled={installing}
+        onClick={handleInstall}
       >
-        <Store className="size-3.5" />
-        Install from Marketplace
+        {installing ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Store className="size-3.5" />
+        )}
+        {installing ? 'Installing...' : 'Install directly'}
       </Button>
     </div>
   );
