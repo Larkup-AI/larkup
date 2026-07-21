@@ -13,7 +13,9 @@ import {
   Info,
   Clock,
   X,
+  Trash2,
 } from 'lucide-react';
+import { useScrapeStore, type SearchState } from '@/store/scrape-store';
 import type { CrawlScope, SearchResultItem } from '@larkup/core/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,17 +76,6 @@ function estimateEtlDuration(
   return { totalPages, estimatedSeconds };
 }
 
-interface SearchState {
-  results: SearchResultItem[];
-  totalResults: number;
-  totalResultsIsEstimate: boolean;
-  currentPage: number;
-  totalPages: number;
-  hasMore: boolean;
-  query: string;
-  searchProvider: 'firecrawl' | 'serper' | 'google' | 'brave' | 'bing' | 'tavily';
-}
-
 export function ScrapePanel({
   disabled,
   onStarted,
@@ -94,15 +85,30 @@ export function ScrapePanel({
   onStarted: () => void;
   crawlerControl?: React.ReactNode;
 }) {
-  const [query, setQuery] = useState('');
+  const {
+    query,
+    setQuery,
+    searchState,
+    setSearchState,
+    selected,
+    setSelected,
+    scope,
+    setScope,
+    pageLimit,
+    setPageLimit,
+    searchLimit,
+    setSearchLimit,
+    showAdvanced,
+    setShowAdvanced,
+    serperTotalForQuery,
+    setSerperTotalForQuery,
+    flush: flushSearch,
+  } = useScrapeStore();
+
   const [searching, setSearching] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [gatheringAll, setGatheringAll] = useState(false);
   const [gatherProgress, setGatherProgress] = useState(0);
-  const [searchState, setSearchState] = useState<SearchState | null>(null);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [scope, setScope] = useState<CrawlScope>('domain');
-  const [pageLimit, setPageLimit] = useState(25);
   const [manualUrl, setManualUrl] = useState('');
   const [starting, setStarting] = useState(false);
   /** When true: only the exact custom URLs are scraped — no deep crawl/pagination */
@@ -113,15 +119,8 @@ export function ScrapePanel({
   const { data: configData } = useSWR('/api/config', fetcher);
   const activeProvider = configData?.config?.webSearchProvider || 'tavily';
   const [fetchingCount, setFetchingCount] = useState(false);
-  const [serperTotalForQuery, setSerperTotalForQuery] = useState<{
-    query: string;
-    total: number;
-    totalPages: number;
-  } | null>(null);
   const [cachedQueries, setCachedQueries] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [searchLimit, setSearchLimit] = useState(15);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -217,7 +216,7 @@ export function ScrapePanel({
       const newSelected = Object.fromEntries(newItems.map((r) => [r.url, true]));
       setSelected((prev) => ({ ...prev, ...newSelected }));
 
-      if (newItems.length === 0 && !isMulti) toast.message('No results — try different keywords.');
+      if (newItems.length === 0 && !isMulti) toast.message('No results. Try different keywords.');
 
       if (activeProvider && !isMulti) {
         fetchProviderTotalCount(q, activeProvider);
@@ -302,10 +301,11 @@ export function ScrapePanel({
         });
       }
 
-      if (page === 1 && (data.totalResults ?? 0) === 0 && !isMulti) {
-        toast.message('No results — try different keywords.');
+      if (page === 1 && newItems.length === 0 && !isMulti) {
+        toast.message('No results. Try different keywords.');
       }
     } catch (err) {
+      if (page === 1) throw err;
       toast.error(formatErrorMessage(err));
     } finally {
       if (appendPagination) setLoadingMore(false);
@@ -369,16 +369,17 @@ export function ScrapePanel({
     // Removed setSearchState(null) so we append instead of clear
 
     try {
-      if (firecrawlConfigured) {
+      if (activeProvider === 'local' || !activeProvider) {
         await Promise.all(queries.map((q) => searchFirecrawl(q, queries.length > 1)));
-      } else if (activeProvider) {
-        await Promise.all(
-          queries.map((q) => searchGeneric(q, activeProvider, 1, queries.length > 1, false)),
-        );
       } else {
-        toast.error(
-          formatErrorMessage(new Error('No search provider available. Configure one in Settings.')),
-        );
+        try {
+          await Promise.all(
+            queries.map((q) => searchGeneric(q, activeProvider, 1, queries.length > 1, false)),
+          );
+        } catch (err) {
+          toast.error(`${activeProvider} search failed. Falling back to local crawler...`);
+          await Promise.all(queries.map((q) => searchFirecrawl(q, queries.length > 1)));
+        }
       }
     } finally {
       setSearching(false);
@@ -880,16 +881,26 @@ export function ScrapePanel({
               {results.length} source{results.length === 1 ? '' : 's'} · {selectedUrls.length}{' '}
               selected
             </span>
-            <button
-              type="button"
-              className="text-xs text-primary hover:underline"
-              onClick={() => {
-                const all = selectedUrls.length !== results.length;
-                setSelected(all ? Object.fromEntries(results.map((r) => [r.url, true])) : {});
-              }}
-            >
-              {selectedUrls.length === results.length ? 'Clear all' : 'Select all'}
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={() => {
+                  const all = selectedUrls.length !== results.length;
+                  setSelected(all ? Object.fromEntries(results.map((r) => [r.url, true])) : {});
+                }}
+              >
+                {selectedUrls.length === results.length ? 'Deselect all' : 'Select all'}
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs text-destructive hover:underline"
+                onClick={flushSearch}
+              >
+                <Trash2 className="size-3.5" />
+                Clear
+              </button>
+            </div>
           </div>
           <ul className="max-h-72 divide-y divide-border overflow-y-auto">
             {results.map((r) => {
