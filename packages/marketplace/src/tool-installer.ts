@@ -294,14 +294,13 @@ async function resolveManifest(toolId: string): Promise<ToolDescriptor> {
  */
 async function isWorkspaceTool(packageName: string): Promise<boolean> {
   try {
-    // Check if this package exists as a workspace symlink
-    const { stdout } = await execAsync(`npm ls ${packageName} --json 2>/dev/null || true`, {
+    // Check if this package exists in the pnpm workspace
+    const { stdout } = await execAsync(`pnpm ls -r --depth -1 --json 2>/dev/null || true`, {
       cwd: process.cwd(),
       timeout: 10_000,
     });
-    const data = JSON.parse(stdout || '{}');
-    const dep = data?.dependencies?.[packageName];
-    return dep?.resolved?.startsWith('file:') ?? false;
+    const data = JSON.parse(stdout || '[]');
+    return Array.isArray(data) && data.some((pkg: any) => pkg.name === packageName);
   } catch {
     return false;
   }

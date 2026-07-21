@@ -46,7 +46,18 @@ export async function POST(_req: Request, { params }: { params: Promise<{ toolId
     await installTool(toolId);
     return NextResponse.json({ status: 'installed' }, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Install failed.';
+    let message = err instanceof Error ? err.message : 'Install failed.';
+
+    // Sanitize technical NPM errors for non-technical users
+    if (
+      message.includes('npm install') ||
+      message.includes('Command failed') ||
+      message.includes('npm ERR!')
+    ) {
+      console.error(`[Marketplace] Tool installation failed:`, message);
+      message = 'Failed to install the tool. Please check your connection or try again later.';
+    }
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
