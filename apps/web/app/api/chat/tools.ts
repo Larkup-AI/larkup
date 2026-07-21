@@ -52,11 +52,11 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
         if (res.ok && data.hits) {
           return {
             query,
-            hits: (data.hits as any[]).map((h: any) => ({
+            hits: (data.hits as any[]).slice(0, topK).map((h: any) => ({
               title: h.title ?? 'Untitled',
               url: h.url ?? '',
               score: Number((h.score ?? 0).toFixed(3)),
-              text: (h.text ?? '').slice(0, 1200),
+              text: (h.text ?? '').slice(0, 800),
               metadata: h.metadata,
             })),
           };
@@ -78,11 +78,11 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
 
     return {
       query,
-      hits: hits.map((h) => ({
+      hits: hits.slice(0, topK).map((h) => ({
         title: h.title ?? 'Untitled',
         url: h.url ?? '',
         score: Number((h.score ?? 0).toFixed(3)),
-        text: (h.text ?? '').slice(0, 1200),
+        text: (h.text ?? '').slice(0, 800),
         metadata: h.metadata,
       })),
     };
@@ -289,6 +289,52 @@ export async function getChatTools(context: {
       },
     }),
 
+    analyzeImageDeeply: tool({
+      description:
+        'Use this tool when you need to answer a detailed question about an image (like a diagram, chart, or schema) found in the knowledge base. Pass the exact imageUrl found in the document metadata, along with specific instructions on what you need to extract from it.',
+      inputSchema: z.object({
+        imageUrl: z
+          .string()
+          .describe('The URL of the image to analyze (from metadata.images.imageUrl)'),
+        prompt: z
+          .string()
+          .describe(
+            'Specific instructions on what to extract or analyze from this image. Be as detailed as possible to get the best result.',
+          ),
+      }),
+      execute: async ({ imageUrl, prompt }) => {
+        try {
+          // Fetch the image to base64
+          // Handle both absolute URLs and relative local uploads
+          const fetchUrl = imageUrl.startsWith('/')
+            ? `http://127.0.0.1:${process.env.PORT || 3000}${imageUrl}`
+            : imageUrl;
+          const res = await fetch(fetchUrl);
+          if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
+          const buffer = await res.arrayBuffer();
+          const base64 = Buffer.from(buffer).toString('base64');
+          const mimeType = res.headers.get('content-type') || 'image/png';
+          const dataUrl = `data:${mimeType};base64,${base64}`;
+
+          // Post to our describe-image endpoint which handles model setup
+          const descRes = await fetch(
+            `http://127.0.0.1:${process.env.PORT || 3000}/api/describe-image`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ base64, prompt }),
+            },
+          );
+
+          if (!descRes.ok) throw new Error(`Vision API error: ${descRes.statusText}`);
+          const data = await descRes.json();
+          return { analysis: data.description };
+        } catch (err: any) {
+          return { error: `Failed to analyze image: ${err.message}` };
+        }
+      },
+    }),
+
     getIndexedData: tool({
       description:
         'Get structured access to ALL indexed source documents. Use this for counting, listing, filtering, and overview questions about the knowledge base. Returns document metadata (title, source type, status, custom metadata fields, dates). Use this when the user asks "how many documents?", "list all X", "show progress", "what sources?", or any structural question about the corpus.',
@@ -336,9 +382,12 @@ export async function getChatTools(context: {
       }),
       execute: async ({ filter, limit, offset, includeContent }) => {
         try {
+          const maxLimit = includeContent ? 20 : 100;
+          const actualLimit = Math.min(limit ?? (includeContent ? 20 : 100), maxLimit);
+
           return await getCorpusDocuments(
             filter as CorpusFilter | undefined,
-            limit ?? 200,
+            actualLimit,
             offset ?? 0,
             includeContent ?? false,
           );

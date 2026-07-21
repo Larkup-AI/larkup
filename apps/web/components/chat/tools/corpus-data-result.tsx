@@ -84,12 +84,10 @@ export function CorpusDataResult({ config }: { config: CorpusDataConfig }) {
 
   if (summary.totalDocuments === 0) {
     return (
-      <Card className="overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
-        <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
-          <Database className="size-4" />
-          <span>No documents found in the corpus.</span>
-        </div>
-      </Card>
+      <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <Database className="size-3" />
+        <span>No documents found in the corpus.</span>
+      </div>
     );
   }
 

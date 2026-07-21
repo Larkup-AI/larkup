@@ -58,7 +58,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { base64 } = await req.json();
+    const { base64, prompt } = await req.json();
     if (!base64) {
       return NextResponse.json({ error: 'Missing image data' }, { status: 400 });
     }
@@ -82,6 +82,8 @@ export async function POST(req: Request) {
 
     // Ensure data URL is formatted properly
     const urlFormat = base64.startsWith('data:') ? base64 : `data:image/png;base64,${base64}`;
+    const defaultPrompt =
+      'Provide a very brief, high-level summary of what this image contains (e.g., "A database ER diagram about films and actors", "A bar chart showing quarterly revenue"). Do NOT extract all text or exhaustively describe relationships. Keep it under 2 sentences.';
 
     const { text } = await generateText({
       model,
@@ -91,7 +93,7 @@ export async function POST(req: Request) {
           content: [
             {
               type: 'text',
-              text: 'Describe this image in high detail. If it contains diagrams, tables, text, or database schemas, extract all the text, relationships, columns, and structures accurately.',
+              text: prompt || defaultPrompt,
             },
             { type: 'image', image: urlFormat },
           ],

@@ -138,6 +138,18 @@ export async function DELETE(req: Request) {
   }
 
   for (const doc of toDeleteDocs) {
+    if (doc.metadata?.mediaAssetId) {
+      const { getMediaAsset, deleteMediaAsset } = await import('@larkup/core/media-store');
+      const { createStorageProvider } = await import('@larkup/marketplace/storage');
+      const asset = await getMediaAsset(doc.metadata.mediaAssetId);
+      if (asset) {
+        const storage = createStorageProvider();
+        await storage.delete(asset.storageUri).catch(() => {});
+        if (asset.thumbnailUri) await storage.delete(asset.thumbnailUri).catch(() => {});
+        await deleteMediaAsset(doc.metadata.mediaAssetId);
+      }
+    }
+
     const cleanupUrls = [doc.url, doc.metadata?.imageUrl].filter(Boolean);
     for (const docUrl of cleanupUrls) {
       if (docUrl?.startsWith('/api/media/')) {
@@ -163,9 +175,16 @@ export async function DELETE(req: Request) {
     }
   }
 
-  if (id) await deleteDocument(id);
-  else if (ids) await deleteDocuments(ids.split(','));
-  else {
+  let deletedIds: string[] = [];
+
+  if (id) {
+    await deleteDocument(id);
+    deletedIds = [id];
+  } else if (ids) {
+    const idList = ids.split(',');
+    await deleteDocuments(idList);
+    deletedIds = idList;
+  } else {
     await clearDocuments();
 
     try {
@@ -186,6 +205,17 @@ export async function DELETE(req: Request) {
       }
     } catch {
       // best-effort
+    }
+  }
+
+  if (deletedIds.length > 0) {
+    try {
+      const config = await readConfig();
+      const adapter = await createAdapter(config);
+      await adapter.init(0);
+      await adapter.deleteByDocumentIds(deletedIds);
+    } catch (err) {
+      console.error('Failed to delete vectors for specific documents:', err);
     }
   }
   return NextResponse.json({ ok: true });

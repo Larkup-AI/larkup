@@ -51,6 +51,12 @@ CRITICAL RULES FOR CHARTS AND VISUALIZATIONS:
 - You CANNOT generate a chart from thin air. ALWAYS get the data FIRST (via getIndexedData, queryTabularData, or analyzeCorpusWithCode), THEN call generateVisualization with that actual data.
 - The UI renders generateVisualization output as an interactive Recharts chart.
 
+CRITICAL RULES FOR IMAGES AND KNOWLEDGE BASE:
+- When a tool (like searchKnowledgeBase) returns document metadata containing images (e.g., 'metadata.images' with 'imageUrl'), you MUST display the image to the user in your response using standard Markdown syntax: '![Image Description](imageUrl)'. Do not just describe the image; show it!
+- The image description in the search results is only a brief, high-level summary.
+- If the user asks a detailed or structural question about an image (e.g., "what columns are in the film table in the diagram?", "how many items are listed?"), you MUST use the "analyzeImageDeeply" tool. Pass the 'imageUrl' and a detailed prompt to get the exact information you need directly from the image before answering.
+- Do not hallucinate or guess details about images. If the high-level summary doesn't contain the answer, use analyzeImageDeeply.
+
 RESPONSE FORMATTING (Analytics Style):
 - Structure your responses for an analytics dashboard — be concise and insight-driven.
 - Lead with the key insight or answer in bold (e.g., "**October had the highest revenue at $487,384**").
@@ -232,8 +238,21 @@ ${docFields?.map((f) => `- [${f.id}] ${f.name} (${f.type})`).join('\n') || 'None
   });
 
   return result.toUIMessageStreamResponse({
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('[chat] stream error:', error);
+      if (error && typeof error === 'object') {
+        if (error.message) {
+          return error.message;
+        }
+        if (error.error && error.error.message) {
+          return error.error.message;
+        }
+        try {
+          return JSON.stringify(error);
+        } catch {
+          return 'Something went wrong while generating a response.';
+        }
+      }
       const message = error instanceof Error ? error.message : String(error);
       return message || 'Something went wrong while generating a response.';
     },

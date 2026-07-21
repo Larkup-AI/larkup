@@ -193,6 +193,12 @@ function ChatWorkspaceInner() {
     transport,
   });
 
+  // Reset chat context when switching workspaces to prevent overlap
+  useEffect(() => {
+    setMessages([]);
+    setCurrentChatId('');
+  }, [serverId, setMessages]);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const isBusy = chatStatus === 'submitted' || chatStatus === 'streaming';
 

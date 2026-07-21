@@ -39,7 +39,7 @@ export async function POST(req: Request) {
         await updateMediaAsset(asset.id, { processingStatus: 'processing' });
 
         if (asset.type === 'image') {
-          await processImageAsset(asset);
+          await processImageAsset(asset, req.url);
           results.push({ id: asset.id, status: 'completed' });
         } else if (asset.type === 'video' || asset.type === 'audio') {
           const installed = await isToolInstalled('video-audio');
@@ -80,10 +80,29 @@ export async function POST(req: Request) {
 /* Image processing (built-in, no tool needed)                         */
 /* ------------------------------------------------------------------ */
 
-async function processImageAsset(asset: MediaAsset): Promise<void> {
-  // Create a simple document from the image metadata
-  // Vision LLM captioning can be added later when we detect a vision-capable model
-  const caption = `Image: ${asset.fileName}`;
+async function processImageAsset(asset: MediaAsset, reqUrl: string): Promise<void> {
+  let caption = `Image: ${asset.fileName}`;
+
+  try {
+    const storage = createStorageProvider();
+    const fileData = await storage.retrieve(asset.storageUri);
+    const base64 = fileData.toString('base64');
+
+    const descRes = await fetch(new URL('/api/describe-image', reqUrl).toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64 }),
+    });
+
+    if (descRes.ok) {
+      const descData = await descRes.json();
+      if (descData.description) {
+        caption = descData.description;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to describe image asset:', err);
+  }
 
   const doc = await addDocument({
     title: asset.fileName,
