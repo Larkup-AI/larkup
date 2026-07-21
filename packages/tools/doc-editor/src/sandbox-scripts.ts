@@ -10,7 +10,7 @@
  * All scripts expect input files in /sandbox/input/ and output to /sandbox/output/
  */
 
-import type { FieldEdit, ContentEdit } from './types';
+import type { FieldEdit, ContentEdit } from './types.js';
 
 /* ------------------------------------------------------------------ */
 /* PDF — Fill form fields using pypdf                                  */

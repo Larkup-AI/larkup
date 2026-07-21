@@ -28,7 +28,7 @@ export {
   applyContentEdits,
   applySignature,
   exportDocument,
-} from './editor';
+} from './editor.js';
 
 export {
   parseDocument,
@@ -38,7 +38,7 @@ export {
   parseTXT,
   detectDocumentType,
   enrichPDFWithText,
-} from './parsers';
+} from './parsers.js';
 
 export type {
   DocumentType,
@@ -49,4 +49,4 @@ export type {
   ContentEdit,
   EditorSession,
   EditResult,
-} from './types';
+} from './types.js';

@@ -5,8 +5,8 @@
  * Extracts transcripts, keyframes, and scene descriptions.
  */
 
-export { processVideo, extractFrames } from './video-processor';
-export { processAudio, transcribeAudio } from './audio-processor';
+export { processVideo, extractFrames } from './video-processor.js';
+export { processAudio, transcribeAudio } from './audio-processor.js';
 
 /** Tool metadata for the marketplace loader. */
 export const TOOL_META = {

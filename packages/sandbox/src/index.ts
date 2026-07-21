@@ -4,13 +4,13 @@
  * Re-exports the public API for the sandbox package.
  */
 
-export { SandboxManager } from "./sandbox-manager"
+export { SandboxManager } from './sandbox-manager.js';
 export {
   checkDockerHealth,
   buildSandboxImage,
   ensureImage,
   executeInDocker,
-} from "./docker-runner"
+} from './docker-runner.js';
 export type {
   SandboxBackend,
   SandboxConfig,
@@ -23,4 +23,4 @@ export type {
   ExecutionArtifact,
   SandboxStatus,
   SandboxHealthCheck,
-} from "./types"
+} from './types.js';

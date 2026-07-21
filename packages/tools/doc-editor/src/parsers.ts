@@ -11,7 +11,7 @@
 import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup } from 'pdf-lib';
 import mammoth from 'mammoth';
 import { randomUUID } from 'node:crypto';
-import type { DocumentType, DocumentField, DocumentPage, ParsedDocument } from './types';
+import type { DocumentType, DocumentField, DocumentPage, ParsedDocument } from './types.js';
 
 /* ------------------------------------------------------------------ */
 /* Detect document type from MIME / extension                          */

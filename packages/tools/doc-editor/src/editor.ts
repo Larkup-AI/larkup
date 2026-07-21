@@ -17,27 +17,15 @@ import {
   StandardFonts,
 } from 'pdf-lib';
 import { SandboxManager } from '@larkup/sandbox';
-import type {
-  EditorSession,
-  FieldEdit,
-  ContentEdit,
-  EditResult,
-  ParsedDocument,
-  SignatureData,
-} from './types';
-import { parseDocument, enrichPDFWithText } from './parsers';
+import type { EditorSession, FieldEdit, ContentEdit, EditResult, SignatureData } from './types.js';
+import { parseDocument, enrichPDFWithText } from './parsers.js';
 import {
-  generateFillPDFScript,
   generateFillDOCXScript,
   generateFillPPTXScript,
   generateEditDOCXScript,
   generateEditPPTXScript,
   generateExtractPDFTextScript,
-} from './sandbox-scripts';
-
-/* ------------------------------------------------------------------ */
-/* Session store (in-memory, per process)                              */
-/* ------------------------------------------------------------------ */
+} from './sandbox-scripts.js';
 
 const sessions = new Map<string, EditorSession>();
 
