@@ -9,9 +9,7 @@ const nextConfig = {
     "@larkup/core",
     "@larkup/vector-stores",
     "@larkup/scraper",
-    "@larkup/sandbox",
     "@larkup/marketplace",
-    "@larkup/tool-doc-editor",
   ],
   serverExternalPackages: ["@lancedb/lancedb", "chromadb", "dockerode"],
   typescript: {
@@ -23,6 +21,14 @@ const nextConfig = {
   output: process.env.E2E_BUILD ? undefined : "standalone",
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version,
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/uploads/:path*",
+        destination: "/api/uploads/:path*",
+      },
+    ];
   },
 };
 

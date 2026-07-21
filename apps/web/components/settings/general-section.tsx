@@ -219,6 +219,9 @@ export function GeneralSection() {
                   {form.webSearchProvider === 'bing' && (
                     <Image src="/icons/serpapi.svg" alt="SerpApi" width={16} height={16} />
                   )}
+                  {form.webSearchProvider === 'local' && (
+                    <Image src="/icons/firecrawl.png" alt="Local" width={16} height={16} />
+                  )}
                   <SelectValue placeholder="Select provider" />
                 </div>
               </SelectTrigger>
@@ -253,90 +256,98 @@ export function GeneralSection() {
                     <span>Bing (via SerpApi)</span>
                   </div>
                 </SelectItem>
+                <SelectItem value="local">
+                  <div className="flex items-center gap-2">
+                    <Image src="/icons/firecrawl.png" alt="Local Crawler" width={16} height={16} />
+                    <span>Local (Firecrawl)</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-1.5 pt-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">
-                {form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
-                  ? 'Serper API Key'
-                  : form.webSearchProvider === 'brave'
-                  ? 'Brave API Key'
-                  : form.webSearchProvider === 'bing'
-                  ? 'SerpApi API Key'
-                  : 'Tavily API Key'}
-              </Label>
-              {verifyStatus.status === 'success' && (
-                <span className="text-[10px] text-green-500 font-medium">✓ Verified</span>
-              )}
-              {verifyStatus.status === 'error' && (
-                <span className="text-[10px] text-red-500 font-medium truncate max-w-[150px]">
-                  {verifyStatus.message}
-                </span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  type={showApiKey ? 'text' : 'password'}
-                  className="text-sm pr-10"
-                  value={
-                    form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
-                      ? form.serperApiKey || ''
-                      : form.webSearchProvider === 'brave'
-                      ? form.braveApiKey || ''
-                      : form.webSearchProvider === 'bing'
-                      ? form.bingApiKey || ''
-                      : form.tavilyApiKey || ''
-                  }
-                  onChange={(e) => {
-                    setVerifyStatus({ status: null });
-                    if (
-                      form.webSearchProvider === 'serper' ||
-                      form.webSearchProvider === 'google'
-                    ) {
-                      setForm({ ...form, serperApiKey: e.target.value });
-                    } else if (form.webSearchProvider === 'brave') {
-                      setForm({ ...form, braveApiKey: e.target.value });
-                    } else if (form.webSearchProvider === 'bing') {
-                      setForm({ ...form, bingApiKey: e.target.value });
-                    } else {
-                      setForm({ ...form, tavilyApiKey: e.target.value });
+          {form.webSearchProvider !== 'local' && (
+            <div className="space-y-1.5 pt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">
+                  {form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
+                    ? 'Serper API Key'
+                    : form.webSearchProvider === 'brave'
+                    ? 'Brave API Key'
+                    : form.webSearchProvider === 'bing'
+                    ? 'SerpApi API Key'
+                    : 'Tavily API Key'}
+                </Label>
+                {verifyStatus.status === 'success' && (
+                  <span className="text-[10px] text-green-500 font-medium">✓ Verified</span>
+                )}
+                {verifyStatus.status === 'error' && (
+                  <span className="text-[10px] text-red-500 font-medium truncate max-w-[150px]">
+                    {verifyStatus.message}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showApiKey ? 'text' : 'password'}
+                    className="text-sm pr-10"
+                    value={
+                      form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
+                        ? form.serperApiKey || ''
+                        : form.webSearchProvider === 'brave'
+                        ? form.braveApiKey || ''
+                        : form.webSearchProvider === 'bing'
+                        ? form.bingApiKey || ''
+                        : form.tavilyApiKey || ''
                     }
-                  }}
-                  placeholder={
-                    form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
-                      ? 'Your Serper API Key'
-                      : form.webSearchProvider === 'brave'
-                      ? 'Your Brave API Key'
-                      : form.webSearchProvider === 'bing'
-                      ? 'Your SerpApi API Key'
-                      : 'Your Tavily API Key'
-                  }
-                />
+                    onChange={(e) => {
+                      setVerifyStatus({ status: null });
+                      if (
+                        form.webSearchProvider === 'serper' ||
+                        form.webSearchProvider === 'google'
+                      ) {
+                        setForm({ ...form, serperApiKey: e.target.value });
+                      } else if (form.webSearchProvider === 'brave') {
+                        setForm({ ...form, braveApiKey: e.target.value });
+                      } else if (form.webSearchProvider === 'bing') {
+                        setForm({ ...form, bingApiKey: e.target.value });
+                      } else {
+                        setForm({ ...form, tavilyApiKey: e.target.value });
+                      }
+                    }}
+                    placeholder={
+                      form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
+                        ? 'Your Serper API Key'
+                        : form.webSearchProvider === 'brave'
+                        ? 'Your Brave API Key'
+                        : form.webSearchProvider === 'bing'
+                        ? 'Your SerpApi API Key'
+                        : 'Your Tavily API Key'
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                  >
+                    {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </Button>
+                </div>
                 <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
-                  onClick={() => setShowApiKey(!showApiKey)}
+                  className={'rounded-lg'}
+                  variant="outline"
+                  size="default"
+                  onClick={handleVerify}
+                  disabled={verifying}
                 >
-                  {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {verifying ? <Loader2 className="size-4 animate-spin" /> : 'Verify'}
                 </Button>
               </div>
-              <Button
-                className={'rounded-lg'}
-                variant="outline"
-                size="default"
-                onClick={handleVerify}
-                disabled={verifying}
-              >
-                {verifying ? <Loader2 className="size-4 animate-spin" /> : 'Verify'}
-              </Button>
             </div>
-          </div>
+          )}
         </CardContent>
         <CardFooter className="flex justify-end pt-4 border-t">
           <Button

@@ -354,6 +354,9 @@ importers:
       '@larkup/tool-doc-editor':
         specifier: workspace:*
         version: link:../../packages/tools/doc-editor
+      '@larkup/tool-video-audio':
+        specifier: workspace:*
+        version: link:../../packages/tools/video-audio
       '@larkup/vector-stores':
         specifier: workspace:*
         version: link:../../packages/vector-stores

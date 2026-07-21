@@ -12,6 +12,7 @@ import {
   Store,
   Share2,
   type LucideIcon,
+  Grid2X2Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -57,7 +58,7 @@ const SECTION_GROUPS: SectionGroup[] = [
   {
     label: 'Advanced',
     items: [
-      { id: 'prompts', label: 'Agent Customization', icon: MessageSquareText },
+      { id: 'prompts', label: 'Agent Customization', icon: Grid2X2Plus },
       { id: 'playground', label: 'Playground', icon: Search },
       { id: 'appearance', label: 'Appearance', icon: Palette },
     ],

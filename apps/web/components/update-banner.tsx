@@ -4,9 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, ArrowUpCircle } from 'lucide-react';
 
 /**
- * UpdateBanner — Universal update notification for all channels.
- * Checks https://larkup.de/api/version on mount.
- * Dismissable: stores dismissal in localStorage for 24h.
+ * UpdateBanner, Universal update notification for all channels.
  */
 
 const VERSION_CHECK_URL = 'https://larkup.de/api/version';
