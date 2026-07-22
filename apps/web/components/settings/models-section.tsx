@@ -126,18 +126,6 @@ export function ModelsSection() {
     }
   };
 
-  function handleStructuralChangeBlock() {
-    toast('Cannot modify configuration', {
-      description:
-        'This project already has indexed data. You must create a new project to change this setting.',
-      duration: Number.POSITIVE_INFINITY,
-      action: {
-        label: 'New Project',
-        onClick: () => setNewServerModalOpen(true),
-      },
-    });
-  }
-
   async function handleSave(section: 'embedding' | 'chat') {
     if (!data?.config) return;
 
@@ -302,10 +290,6 @@ export function ModelsSection() {
               <Select
                 value={form.embeddingProvider ?? 'openai'}
                 onValueChange={(v: any) => {
-                  if (indexedRun && data?.config && v !== data.config.embeddingProvider) {
-                    handleStructuralChangeBlock();
-                    return;
-                  }
                   setForm({
                     ...form,
                     embeddingProvider: v,
@@ -417,10 +401,6 @@ export function ModelsSection() {
                   return;
                 }
                 setIsOtherEmbedding(false);
-                if (indexedRun && data?.config && v !== data.config.embeddingModelId) {
-                  handleStructuralChangeBlock();
-                  return;
-                }
                 setForm({ ...form, embeddingModelId: v });
                 clearError('embeddingModelId');
               }}
