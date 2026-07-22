@@ -247,6 +247,8 @@ export function ScrapePanel({
         ? '/api/search/bing'
         : provider === 'tavily'
         ? '/api/search/tavily'
+        : provider === 'exa'
+        ? '/api/search/exa'
         : null;
 
     if (!endpoint) {
@@ -323,6 +325,8 @@ export function ScrapePanel({
         ? '/api/search/bing'
         : provider === 'tavily'
         ? '/api/search/tavily'
+        : provider === 'exa'
+        ? '/api/search/exa'
         : null;
 
     if (!endpoint) return;
@@ -418,6 +422,8 @@ export function ScrapePanel({
         ? '/api/search/bing'
         : provider === 'tavily'
         ? '/api/search/tavily'
+        : provider === 'exa'
+        ? '/api/search/exa'
         : null;
 
     try {

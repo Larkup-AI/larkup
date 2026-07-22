@@ -654,6 +654,10 @@ export async function getChatTools(context: {
               const { POST: searchBing } = await import('../search/bing/route');
               res = await searchBing(req);
               break;
+            case 'exa':
+              const { POST: searchExa } = await import('../search/exa/route');
+              res = await searchExa(req);
+              break;
             case 'local':
             default:
               const { POST: searchLocal } = await import('../search/route');
