@@ -60,7 +60,8 @@ export function GeneralSection() {
     form.tavilyApiKey !== data?.config?.tavilyApiKey ||
     form.googleApiKey !== data?.config?.googleApiKey ||
     form.braveApiKey !== data?.config?.braveApiKey ||
-    form.bingApiKey !== data?.config?.bingApiKey;
+    form.bingApiKey !== data?.config?.bingApiKey ||
+    form.exaApiKey !== data?.config?.exaApiKey;
   const dirtyWebCrawler =
     form.webCrawlerProvider !== data?.config?.webCrawlerProvider ||
     form.firecrawlApiKey !== data?.config?.firecrawlApiKey;
@@ -89,6 +90,7 @@ export function GeneralSection() {
         payload.googleApiKey = form.googleApiKey;
         payload.braveApiKey = form.braveApiKey;
         payload.bingApiKey = form.bingApiKey;
+        payload.exaApiKey = form.exaApiKey;
       } else if (section === 'webCrawler') {
         payload.webCrawlerProvider = form.webCrawlerProvider;
         payload.firecrawlApiKey = form.firecrawlApiKey;
@@ -128,6 +130,7 @@ export function GeneralSection() {
     if (form.webSearchProvider === 'tavily') apiKey = form.tavilyApiKey || '';
     if (form.webSearchProvider === 'brave') apiKey = form.braveApiKey || '';
     if (form.webSearchProvider === 'bing') apiKey = form.bingApiKey || '';
+    if (form.webSearchProvider === 'exa') apiKey = form.exaApiKey || '';
 
     try {
       const res = await fetch('/api/search/verify', {
@@ -261,6 +264,9 @@ export function GeneralSection() {
                   {form.webSearchProvider === 'bing' && (
                     <Image src="/icons/serpapi.svg" alt="SerpApi" width={16} height={16} />
                   )}
+                  {form.webSearchProvider === 'exa' && (
+                    <Image src="/icons/exa.png" alt="Exa" width={16} height={16} />
+                  )}
                   {form.webSearchProvider === 'local' && (
                     <Image src="/icons/firecrawl.png" alt="Local" width={16} height={16} />
                   )}
@@ -292,6 +298,12 @@ export function GeneralSection() {
                     <span>Bing (via SerpApi)</span>
                   </div>
                 </SelectItem>
+                <SelectItem value="exa">
+                  <div className="flex items-center gap-2">
+                    <Image src="/icons/exa.png" alt="Exa" width={16} height={16} />
+                    <span>Exa</span>
+                  </div>
+                </SelectItem>
                 <SelectItem value="local">
                   <div className="flex items-center gap-2">
                     <Image src="/icons/firecrawl.png" alt="Local Crawler" width={16} height={16} />
@@ -312,6 +324,8 @@ export function GeneralSection() {
                     ? 'Brave API Key'
                     : form.webSearchProvider === 'bing'
                     ? 'SerpApi API Key'
+                    : form.webSearchProvider === 'exa'
+                    ? 'Exa API Key'
                     : 'Tavily API Key'}
                 </Label>
                 {verifyStatus.status === 'success' && (
@@ -335,6 +349,8 @@ export function GeneralSection() {
                         ? form.braveApiKey || ''
                         : form.webSearchProvider === 'bing'
                         ? form.bingApiKey || ''
+                        : form.webSearchProvider === 'exa'
+                        ? form.exaApiKey || ''
                         : form.tavilyApiKey || ''
                     }
                     onChange={(e) => {
@@ -348,6 +364,8 @@ export function GeneralSection() {
                         setForm({ ...form, braveApiKey: e.target.value });
                       } else if (form.webSearchProvider === 'bing') {
                         setForm({ ...form, bingApiKey: e.target.value });
+                      } else if (form.webSearchProvider === 'exa') {
+                        setForm({ ...form, exaApiKey: e.target.value });
                       } else {
                         setForm({ ...form, tavilyApiKey: e.target.value });
                       }
@@ -359,6 +377,8 @@ export function GeneralSection() {
                         ? 'Your Brave API Key'
                         : form.webSearchProvider === 'bing'
                         ? 'Your SerpApi API Key'
+                        : form.webSearchProvider === 'exa'
+                        ? 'Your Exa API Key'
                         : 'Your Tavily API Key'
                     }
                   />

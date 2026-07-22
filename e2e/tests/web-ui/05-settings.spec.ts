@@ -102,6 +102,24 @@ test.describe('Settings Page', () => {
           // Check if verification succeeded
           await expect(page.getByText('✓ Verified')).toBeVisible({ timeout: 5_000 });
         }
+
+        // Test Exa
+        await providerSelect.click();
+        const exaOption = page.getByText('Exa', { exact: true }).first();
+        if (await exaOption.isVisible()) {
+          await exaOption.click();
+
+          // Enter dummy API key
+          const exaKeyInput = page.getByPlaceholder('Your Exa API Key').first();
+          await exaKeyInput.fill('dummy-exa-key');
+
+          // Click Verify
+          const verifyBtn = page.getByRole('button', { name: 'Verify' }).first();
+          await verifyBtn.click();
+
+          // Check if verification succeeded
+          await expect(page.getByText('✓ Verified')).toBeVisible({ timeout: 5_000 });
+        }
       }
     }
   });

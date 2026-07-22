@@ -56,6 +56,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
+    if (provider === 'exa') {
+      const res = await fetch('https://api.exa.ai/search', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({ query: 'test', numResults: 1 }),
+      });
+      if (!res.ok) throw new Error('Invalid Exa API Key');
+      return NextResponse.json({ success: true });
+    }
+
     if (provider === 'firecrawl') {
       const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
         method: 'POST',

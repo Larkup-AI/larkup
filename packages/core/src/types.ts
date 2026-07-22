@@ -142,11 +142,12 @@ export interface RagConfig {
   systemPrompt?: string;
   serperApiKey?: string;
   webSearchEnabled?: boolean;
-  webSearchProvider?: 'tavily' | 'serper' | 'google' | 'brave' | 'bing' | 'local';
+  webSearchProvider?: 'tavily' | 'serper' | 'google' | 'brave' | 'bing' | 'exa' | 'local';
   tavilyApiKey?: string;
   googleApiKey?: string;
   braveApiKey?: string;
   bingApiKey?: string;
+  exaApiKey?: string;
   scraperProxyServer?: string;
   scraperProxyUsername?: string;
   scraperProxyPassword?: string;
@@ -183,6 +184,7 @@ export const DEFAULT_CONFIG: RagConfig = {
   googleApiKey: '',
   braveApiKey: '',
   bingApiKey: '',
+  exaApiKey: '',
   scraperProxyServer: '',
   scraperProxyUsername: '',
   scraperProxyPassword: '',
@@ -457,7 +459,7 @@ export interface AgentDeploymentConfig {
   allowedOrigins: string[];
   webSearchEnabled?: boolean;
   webSearchApiKey?: string;
-  webSearchProvider?: 'tavily' | 'serper' | 'google' | 'brave' | 'bing' | 'local';
+  webSearchProvider?: 'tavily' | 'serper' | 'google' | 'brave' | 'bing' | 'exa' | 'local';
   /** Vercel Blob token for LanceDB cloud storage */
   vercelBlobToken?: string;
 }
