@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useDocEditor } from '@/components/chat/canvas/doc-editor-provider';
 import {
   Card,
@@ -19,12 +19,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, PenTool, Type, Upload } from 'lucide-react';
+import { Loader2, PenTool, Type, Upload, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { get, set } from 'idb-keyval';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Slider } from '@/components/ui/slider';
 
 interface DetectedLocation {
   pageIndex: number;
   context: string;
+}
+
+interface SavedSignature {
+  id: string;
+  imagePayload: string;
+  mode: 'draw' | 'upload';
 }
 
 export function ChatSignatureRequest({
@@ -43,10 +52,34 @@ export function ChatSignatureRequest({
       : '0',
   );
 
+  // Saved Signatures State
+  const [savedSignatures, setSavedSignatures] = useState<SavedSignature[]>([]);
+  const [saveSignature, setSaveSignature] = useState(false);
+
+  useEffect(() => {
+    get('saved_signatures').then((val) => {
+      if (val) setSavedSignatures(val);
+    });
+  }, []);
+
+  const saveToIDB = async (newSig: SavedSignature) => {
+    const updated = [newSig, ...savedSignatures];
+    setSavedSignatures(updated);
+    await set('saved_signatures', updated);
+  };
+
+  const deleteSavedSignature = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = savedSignatures.filter((s) => s.id !== id);
+    setSavedSignatures(updated);
+    await set('saved_signatures', updated);
+  };
+
   // Type State
   const [text, setText] = useState('');
   const [font, setFont] = useState('Helvetica');
   const [color, setColor] = useState('black');
+  const [scale, setScale] = useState(100);
 
   // Extra Fields
   const [date, setDate] = useState('');
@@ -135,7 +168,6 @@ export function ChatSignatureRequest({
       let imagePayload: string | undefined;
 
       if (mode === 'draw' && canvasRef.current) {
-        // Ensure there's something drawn? Simple check: just grab data URL
         imagePayload = canvasRef.current.toDataURL('image/png');
       } else if (mode === 'upload' && uploadedImage) {
         imagePayload = uploadedImage;
@@ -153,6 +185,17 @@ export function ChatSignatureRequest({
         return;
       }
 
+      // Save for future use
+      if (saveSignature && (mode === 'draw' || mode === 'upload') && imagePayload) {
+        await saveToIDB({
+          id: crypto.randomUUID(),
+          imagePayload,
+          mode,
+        });
+      }
+
+      // Adjust dimensions/scale if necessary in the backend payload.
+      // We pass the scale to let the backend size it.
       const res = await fetch('/api/document/sign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -169,6 +212,7 @@ export function ChatSignatureRequest({
             pageIndex: parseInt(pageIndex, 10),
             x: 50,
             y: 50, // Default coordinates for now
+            scale: scale / 100, // Pass scale as a multiplier
           },
         }),
       });
@@ -230,6 +274,41 @@ export function ChatSignatureRequest({
             </SelectContent>
           </Select>
         </div>
+
+        {savedSignatures.length > 0 && (
+          <div className="space-y-2 mb-4">
+            <Label className="text-xs">Saved Signatures</Label>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {savedSignatures.map((sig) => (
+                <div
+                  key={sig.id}
+                  className="relative shrink-0 w-[100px] h-[50px] border rounded bg-white flex items-center justify-center cursor-pointer hover:border-primary group overflow-hidden"
+                  onClick={() => {
+                    setMode(sig.mode);
+                    if (sig.mode === 'upload') setUploadedImage(sig.imagePayload);
+                    else if (sig.mode === 'draw') {
+                      // Hacky way to reuse drawn signature via upload flow since canvas isn't easily hydrated with data URL
+                      setMode('upload');
+                      setUploadedImage(sig.imagePayload);
+                    }
+                  }}
+                >
+                  <img
+                    src={sig.imagePayload}
+                    alt="Saved Signature"
+                    className="max-h-full max-w-full object-contain"
+                  />
+                  <button
+                    onClick={(e) => deleteSavedSignature(sig.id, e)}
+                    className="absolute top-1 right-1 bg-destructive text-white rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Tabs value={mode} onValueChange={(v) => setMode(v as 'type' | 'draw' | 'upload')}>
           <TabsList className="grid w-full grid-cols-3">
@@ -295,26 +374,24 @@ export function ChatSignatureRequest({
           </TabsContent>
 
           <TabsContent value="upload" className="space-y-4 mt-4">
-            <div className="border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center text-center">
+            <div className="border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
               <input
                 type="file"
                 accept="image/png, image/jpeg"
                 onChange={handleFileUpload}
-                className="hidden"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 id="signature-upload"
               />
-              <Label
-                htmlFor="signature-upload"
-                className="cursor-pointer flex flex-col items-center space-y-2"
-              >
-                <Upload className="size-8 text-muted-foreground mb-2" />
-                <span className="text-sm font-medium">Click to upload signature</span>
-                <span className="text-xs text-muted-foreground">
-                  PNG or JPG with transparent background
-                </span>
-              </Label>
-              {uploadedImage && (
-                <div className="mt-4 max-h-[100px] overflow-hidden rounded border bg-white p-2 w-full flex justify-center">
+              {!uploadedImage ? (
+                <div className="flex flex-col items-center space-y-2 pointer-events-none">
+                  <Upload className="size-8 text-muted-foreground mb-2" />
+                  <span className="text-sm font-medium">Click or drag to upload signature</span>
+                  <span className="text-xs text-muted-foreground">
+                    PNG or JPG with transparent background
+                  </span>
+                </div>
+              ) : (
+                <div className="mt-2 max-h-[100px] overflow-hidden rounded bg-white w-full flex justify-center pointer-events-none">
                   <img
                     src={uploadedImage}
                     alt="Signature Preview"
@@ -326,20 +403,50 @@ export function ChatSignatureRequest({
           </TabsContent>
         </Tabs>
 
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Signature Color</Label>
-            <Select value={color} onValueChange={(val) => val && setColor(val)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Color" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="black">Black</SelectItem>
-                <SelectItem value="blue">Blue</SelectItem>
-                <SelectItem value="red">Red</SelectItem>
-              </SelectContent>
-            </Select>
+        {(mode === 'draw' || mode === 'upload') && (
+          <div className="flex items-center space-x-2 mt-4">
+            <Checkbox
+              id="save-signature"
+              checked={saveSignature}
+              onCheckedChange={(c) => setSaveSignature(!!c)}
+            />
+            <Label htmlFor="save-signature" className="text-sm font-medium leading-none">
+              Save signature for future use
+            </Label>
           </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <div className="space-y-2">
+            <Label className="text-xs block mb-1">Signature Color</Label>
+            <div className="flex gap-2">
+              {['black', 'blue', 'red'].map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={`size-6 rounded-full border ${
+                    color === c ? 'ring-2 ring-primary ring-offset-1' : ''
+                  }`}
+                  style={{ backgroundColor: c }}
+                  title={c}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs block mb-1">Size: {scale}%</Label>
+            <Slider
+              value={[scale]}
+              onValueChange={(val) => setScale(Array.isArray(val) ? val[0] : val)}
+              min={50}
+              max={200}
+              step={10}
+              className="mt-2"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mt-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Date (Optional)</Label>
             <Input
@@ -349,15 +456,14 @@ export function ChatSignatureRequest({
               className="h-9"
             />
           </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label className="text-xs">Extra Text (Optional)</Label>
-          <Input
-            value={extraText}
-            onChange={(e) => setExtraText(e.target.value)}
-            placeholder="Title, Company, etc."
-          />
+          <div className="space-y-1.5">
+            <Label className="text-xs">Extra Text (Optional)</Label>
+            <Input
+              value={extraText}
+              onChange={(e) => setExtraText(e.target.value)}
+              placeholder="Title, Company, etc."
+            />
+          </div>
         </div>
       </CardContent>
       <CardFooter className="flex justify-end pt-4 border-t">

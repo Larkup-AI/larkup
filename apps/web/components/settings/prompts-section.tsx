@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { Loader2, Save, Maximize2 } from 'lucide-react';
+import { Loader2, Save, Maximize, FileText } from 'lucide-react';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -85,7 +88,7 @@ export function PromptsSection() {
         </Button>
       </div>
 
-      <Card>
+      <Card className="bg-white/60">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">System Prompt</CardTitle>
           <CardDescription className="text-xs">
@@ -98,32 +101,41 @@ export function PromptsSection() {
               value={form.systemPrompt || ''}
               onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
               placeholder="You are a helpful research assistant..."
-              className="w-full rounded-lg border border-border/70 bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-border resize-none max-h-40 min-h-[120px] pb-10"
+              className="w-full rounded-lg border border-border/70 bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-border resize-none max-h-50 pb-10 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
             />
             <Dialog>
               <DialogTrigger
                 render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute bottom-2 right-2 h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md"
+                  <button
+                    type="button"
+                    className="absolute bottom-2 right-2 p-1.5 text-muted-foreground/60 hover:text-foreground transition-colors rounded-md cursor-pointer"
                   >
-                    <Maximize2 className="size-3.5" />
-                  </Button>
+                    <Maximize className="size-4" strokeWidth={1.75} />
+                  </button>
                 }
               />
-              <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] flex flex-col p-6">
-                <DialogHeader className="shrink-0">
-                  <DialogTitle>Edit System Prompt</DialogTitle>
+              <DialogContent className="max-w-[90vw] sm:max-w-[90vw] w-[90vw] h-[90vh] flex flex-col ">
+                <DialogHeader className="shrink-0 space-y-0 p-3 pb-0">
+                  <div className="flex items-center gap-2">
+                    <DialogTitle className="text-lg font-semibold">Edit text content.</DialogTitle>
+                    <FileText className="size-4 text-muted-foreground" />
+                  </div>
+                  <DialogDescription>Edit text content.</DialogDescription>
                 </DialogHeader>
-                <div className="flex-1 min-h-0 mt-4 relative">
+                <div className="flex-1 min-h-0 mt-2 relative ">
                   <Textarea
                     value={form.systemPrompt || ''}
                     onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
                     placeholder="You are a helpful research assistant..."
-                    className="h-full w-full rounded-lg border border-border/70 bg-card px-4 py-3 text-sm text-foreground outline-none transition focus:border-border resize-none"
+                    className="h-full w-full rounded-lg border border-border/40 bg-background px-4 py-3 text-sm text-foreground outline-none transition focus:border-border resize-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
                   />
                 </div>
+                <DialogFooter className="mt-6 justify-end flex items-center  gap-2 shrink-0">
+                  <DialogClose render={<Button variant="outline" className={'px-3'} />}>
+                    Cancel
+                  </DialogClose>
+                  <DialogClose render={<Button />}>Save</DialogClose>
+                </DialogFooter>
               </DialogContent>
             </Dialog>
           </div>
