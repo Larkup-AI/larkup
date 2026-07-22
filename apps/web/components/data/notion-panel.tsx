@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import useSWR from 'swr';
 import { toast } from 'sonner';
 import { useNotionAuth } from '@/hooks/use-notion-auth';

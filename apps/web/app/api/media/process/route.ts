@@ -108,6 +108,7 @@ async function processImageAsset(asset: MediaAsset, reqUrl: string): Promise<voi
     title: asset.fileName,
     content: caption,
     source: 'media',
+    url: `/api/media/${asset.id}`,
     metadata: {
       mediaAssetId: asset.id,
       mediaType: 'image',
@@ -115,6 +116,13 @@ async function processImageAsset(asset: MediaAsset, reqUrl: string): Promise<voi
       mimeType: asset.mimeType,
       fileSize: asset.fileSize,
       dimensions: asset.dimensions,
+      images: [
+        {
+          imageUrl: `/api/media/${asset.id}`,
+          pageNumber: 1,
+          index: 0,
+        },
+      ],
     },
   });
 

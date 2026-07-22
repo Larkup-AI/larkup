@@ -399,7 +399,7 @@ function MediaContent({
     if (staged.length === 0) return;
     setUploading(true);
 
-    const BATCH_SIZE = 1;
+    const BATCH_SIZE = 5;
     let uploaded = 0;
     const total = staged.length;
     setProgress({ message: 'Starting upload...', current: 0, total });
@@ -436,27 +436,33 @@ function MediaContent({
 
       if (pendingIds.length > 0) {
         let processed = 0;
-        for (const id of pendingIds) {
-          setProgress({
-            message: 'Processing media...',
-            current: processed,
-            total: pendingIds.length,
-          });
-          try {
-            await fetch('/api/media/process', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ assetIds: [id] }),
-            });
-          } catch (e) {
-            console.error('Media processing failed:', e);
-          }
-          processed++;
-          setProgress({
-            message: 'Processing media...',
-            current: processed,
-            total: pendingIds.length,
-          });
+        const PROCESS_BATCH_SIZE = 5;
+        for (let i = 0; i < pendingIds.length; i += PROCESS_BATCH_SIZE) {
+          const batch = pendingIds.slice(i, i + PROCESS_BATCH_SIZE);
+          await Promise.all(
+            batch.map(async (id: string) => {
+              setProgress({
+                message: 'Processing media...',
+                current: processed,
+                total: pendingIds.length,
+              });
+              try {
+                await fetch('/api/media/process', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ assetIds: [id] }),
+                });
+              } catch (e) {
+                console.error('Media processing failed:', e);
+              }
+              processed++;
+              setProgress({
+                message: 'Processing media...',
+                current: processed,
+                total: pendingIds.length,
+              });
+            }),
+          );
         }
       }
 
