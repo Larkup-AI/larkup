@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { useWorkspace } from '@/components/workspace/workspace-provider';
 import type { RagConfig } from '@larkup/core/types';
+import { DEFAULT_SYSTEM_PROMPT } from '@larkup/core/types';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
@@ -22,7 +23,12 @@ export function PromptsSection() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (data?.config) setForm(data.config);
+    if (data?.config) {
+      setForm({
+        ...data.config,
+        systemPrompt: data.config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
+      });
+    }
   }, [data]);
 
   const dirty =

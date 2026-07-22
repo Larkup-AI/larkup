@@ -72,7 +72,7 @@ export function KnowledgeBaseResult({
             {isRunning
               ? 'Searching knowledge base…'
               : queries.length > 0
-              ? `Searched for "${queries[0]}"`
+              ? `Searched knowledge base for "${queries[0]}"`
               : 'Searched knowledge base'}
           </span>
           {!isRunning && hits.length > 0 ? (

@@ -620,6 +620,66 @@ export async function getChatTools(context: {
         };
       },
     }),
+
+    webSearch: tool({
+      description:
+        'Search the public internet for current information, news, or facts that are not available in the local knowledge base.',
+      inputSchema: z.object({
+        query: z.string().describe('The search query.'),
+      }),
+      execute: async ({ query }) => {
+        const provider = config?.webSearchProvider || 'tavily';
+        const req = new Request('http://localhost/api/search', {
+          method: 'POST',
+          body: JSON.stringify({ query }),
+        });
+
+        let res: any;
+        try {
+          switch (provider) {
+            case 'google':
+            case 'serper':
+              const { POST: searchGoogle } = await import('../search/google/route');
+              res = await searchGoogle(req);
+              break;
+            case 'tavily':
+              const { POST: searchTavily } = await import('../search/tavily/route');
+              res = await searchTavily(req);
+              break;
+            case 'brave':
+              const { POST: searchBrave } = await import('../search/brave/route');
+              res = await searchBrave(req);
+              break;
+            case 'bing':
+              const { POST: searchBing } = await import('../search/bing/route');
+              res = await searchBing(req);
+              break;
+            case 'local':
+            default:
+              const { POST: searchLocal } = await import('../search/route');
+              res = await searchLocal(req);
+              break;
+          }
+
+          if (res.status >= 400) {
+            const err = await res.json();
+            return { error: err.error || 'Search failed', results: [] };
+          }
+
+          const data = await res.json();
+          const items = data.items || data.results || [];
+          return {
+            results: items.slice(0, 10).map((i: any) => ({
+              title: i.title,
+              url: i.url,
+              snippet: i.description || i.snippet || '',
+            })),
+          };
+        } catch (e: any) {
+          return { error: e.message || 'Search failed', results: [] };
+        }
+      },
+    }),
   };
 
   const enabledTools = config?.enabledTools || [];
@@ -630,9 +690,15 @@ export async function getChatTools(context: {
 
   // 1. Add enabled built-in tools
   for (const [id, toolDef] of Object.entries(builtInTools)) {
+    if (id === 'webSearch') continue; // Handled separately
     if (isEnabled(id)) {
       finalTools[id] = toolDef;
     }
+  }
+
+  // Add webSearch tool if explicitly enabled globally
+  if (config?.webSearchEnabled === true) {
+    finalTools['webSearch'] = builtInTools['webSearch'];
   }
 
   // 2. Add enabled marketplace tools

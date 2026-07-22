@@ -549,7 +549,11 @@ function renderMarkdown(text: string): string {
 
   let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  html = html.replace(/!\[.*?\]\(.*?\)/g, '');
+  // Images
+  html = html.replace(
+    /!\[(.*?)\]\((.*?)\)/g,
+    '<img src="$2" alt="$1" class="max-w-full rounded-lg my-2 border border-border" loading="lazy" />',
+  );
 
   // Code blocks — styled premium
   html = html.replace(
@@ -566,11 +570,17 @@ function renderMarkdown(text: string): string {
   // Italic
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
-  // Links
-  html = html.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noreferrer" class="msg-link">$1</a>',
-  );
+  // Links and Media (Video/Audio)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => {
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.match(/\.(mp4|webm|ogg)$/) || lowerUrl.includes('video')) {
+      return `<video src="${url}" controls preload="metadata" class="max-w-[360px] w-full rounded-lg my-2 border border-border bg-card"></video>`;
+    }
+    if (lowerUrl.match(/\.(mp3|wav|m4a|oga)$/) || lowerUrl.includes('audio')) {
+      return `<audio src="${url}" controls preload="metadata" class="max-w-[320px] w-full my-2"></audio>`;
+    }
+    return `<a href="${url}" target="_blank" rel="noreferrer" class="msg-link">${label}</a>`;
+  });
 
   html = html.replace(/^### (.+)$/gm, '<h3 class="msg-h3">$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2 class="msg-h2">$1</h2>');
