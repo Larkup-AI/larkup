@@ -34,7 +34,7 @@ interface DocEditorState {
 
 interface DocEditorActions {
   /** Open the canvas with a file */
-  openCanvas: (file: File) => Promise<void>;
+  openCanvas: (file: File, options?: { background?: boolean }) => Promise<void>;
   /** Close the canvas */
   closeCanvas: () => void;
   /** Toggle the canvas */
@@ -94,13 +94,13 @@ export function DocEditorProvider({ children }: { children: ReactNode }) {
   });
 
   /* ---- Open Canvas ---- */
-  const openCanvas = useCallback(async (file: File) => {
+  const openCanvas = useCallback(async (file: File, options?: { background?: boolean }) => {
     setState((s) => ({
       ...s,
       isLoading: true,
       error: null,
       activeFileName: file.name,
-      isCanvasOpen: true,
+      isCanvasOpen: options?.background ? s.isCanvasOpen : true,
     }));
 
     try {

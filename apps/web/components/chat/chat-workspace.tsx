@@ -18,6 +18,8 @@ import {
   Plus,
   Globe,
   Paperclip,
+  FileText,
+  ImageIcon,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { MessageItem } from '@/components/chat/message-item';
@@ -61,6 +63,59 @@ interface AvailableModel {
   provider: string;
   context_window?: number;
   tags?: string[];
+}
+
+function AttachmentCard({
+  file,
+  onClick,
+  onRemove,
+}: {
+  file: File;
+  onClick?: () => void;
+  onRemove: () => void;
+}) {
+  const isImage = file.type.startsWith('image/');
+  const url = useMemo(() => (isImage ? URL.createObjectURL(file) : null), [file, isImage]);
+
+  useEffect(() => {
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [url]);
+
+  return (
+    <div
+      className="relative group flex items-center gap-2 bg-muted/50 border border-border/60 rounded-xl h-14 px-3 p-1 shrink-0 cursor-pointer hover:bg-muted/80 transition-colors"
+      onClick={onClick}
+    >
+      {isImage && url ? (
+        <div className="h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-background">
+          <img src={url} alt={file.name} className="w-full h-full object-cover" />
+        </div>
+      ) : (
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground border border-border/50 shadow-sm">
+          <FileText className="size-5" />
+        </div>
+      )}
+      <div className="flex flex-col justify-center max-w-[120px]">
+        <span className="text-xs font-medium truncate text-foreground">{file.name}</span>
+        <span className="text-[10px] text-muted-foreground">
+          {(file.size / 1024).toFixed(0)} KB
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-background border border-border text-muted-foreground hover:bg-destructive hover:border-destructive hover:text-destructive-foreground transition shadow-sm opacity-0 group-hover:opacity-100"
+      >
+        <X className="size-3" />
+      </button>
+    </div>
+  );
 }
 
 interface ChatStatus {
@@ -107,6 +162,7 @@ function ChatWorkspaceInner() {
   const [showModelSelect, setShowModelSelect] = useState(false);
   const [modelSearch, setModelSearch] = useState('');
   const [input, setInput] = useState('');
+  const [attachments, setAttachments] = useState<File[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -300,9 +356,15 @@ function ChatWorkspaceInner() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const text = input.trim();
-    if (!text || isBusy) return;
-    sendMessage({ text });
+    if ((!text && attachments.length === 0) || isBusy) return;
+
+    const dt = new DataTransfer();
+    attachments.forEach((file) => dt.items.add(file));
+    const files = dt.files.length > 0 ? dt.files : undefined;
+
+    sendMessage({ text, files });
     setInput('');
+    setAttachments([]);
   }
 
   function newChat() {
@@ -399,28 +461,17 @@ function ChatWorkspaceInner() {
       setIsDragging(false);
       dragCounter.current = 0;
 
-      const file = e.dataTransfer.files?.[0];
-      if (!file) return;
+      const fileList = e.dataTransfer.files;
+      if (!fileList || fileList.length === 0) return;
 
-      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-      const validExts = ['.pdf', '.docx', '.pptx', '.txt'];
-      const acceptedTypes = [
-        'application/pdf',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'text/plain',
-      ];
+      const newAttachments = Array.from(fileList);
 
-      if (!acceptedTypes.includes(file.type) && !validExts.includes(ext)) {
-        toast.error('Unsupported file type. Please upload PDF, Word, PPT, or TXT.');
+      if (newAttachments.length === 0) {
+        toast.error('No valid files dropped.');
         return;
       }
 
-      try {
-        await openCanvas(file);
-      } catch (err: any) {
-        toast.error(err.message || 'Failed to attach document');
-      }
+      setAttachments((prev) => [...prev, ...newAttachments]);
     },
     [openCanvas],
   );
@@ -813,10 +864,17 @@ function ChatWorkspaceInner() {
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.preventDefault();
-                      const fileInput = document.getElementById(
-                        'chat-file-attachment',
-                      ) as HTMLInputElement;
-                      fileInput?.click();
+                      const fileInput = document.createElement('input');
+                      fileInput.type = 'file';
+                      fileInput.multiple = true;
+                      fileInput.accept = '*/*';
+                      fileInput.onchange = async (ev: any) => {
+                        const fileList = ev.target.files;
+                        if (!fileList || fileList.length === 0) return;
+                        const newAttachments = Array.from(fileList) as File[];
+                        setAttachments((prev) => [...prev, ...newAttachments]);
+                      };
+                      fileInput.click();
                     }}
                     className="gap-2 cursor-pointer"
                   >
@@ -845,24 +903,48 @@ function ChatWorkspaceInner() {
               <div className="hidden">
                 <FileAttachmentButton id="chat-file-attachment" />
               </div>
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit(e);
-                  }
-                }}
-                rows={1}
-                disabled={!ready}
-                placeholder="How can I help you…"
-                className="max-h-48 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:hidden"
-              />
+
+              <div className="flex flex-col flex-1 gap-2">
+                {/* Attachments List */}
+                {attachments.length > 0 && (
+                  <div className="flex w-full overflow-x-auto items-center gap-2 px-1 pt-1 pb-2 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/60">
+                    {attachments.map((file, idx) => (
+                      <AttachmentCard
+                        key={`${file.name}-${idx}`}
+                        file={file}
+                        onClick={() => {
+                          openCanvas(file, { background: false }).catch((err) => {
+                            toast.error(err.message || 'Failed to open document');
+                          });
+                        }}
+                        onRemove={() => {
+                          setAttachments((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
+                  rows={1}
+                  disabled={!ready}
+                  placeholder="How can I help you…"
+                  className="max-h-48 min-h-[44px] w-full resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:hidden"
+                />
+              </div>
+
               <button
                 type="submit"
-                disabled={!input.trim() || isBusy}
+                disabled={(!input.trim() && attachments.length === 0) || isBusy}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
               >
                 {isBusy ? (

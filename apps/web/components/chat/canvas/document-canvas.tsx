@@ -48,18 +48,13 @@ export function DocumentCanvas({ children }: DocumentCanvasProps) {
     window.addEventListener('mouseup', handleMouseUp);
   }, []);
 
-  /* ---- Full-width layout (no canvas) ---- */
-  if (!isCanvasOpen) {
-    return <>{children}</>;
-  }
-
   /* ---- Split-view layout ---- */
   return (
     <div ref={containerRef} className="flex h-full w-full overflow-hidden">
       {/* Left panel — Chat */}
       <motion.div
         initial={{ width: '100%' }}
-        animate={{ width: `${splitRatio}%` }}
+        animate={{ width: isCanvasOpen ? `${splitRatio}%` : '100%' }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         className="flex h-full min-w-0 flex-col overflow-hidden"
       >
@@ -67,33 +62,36 @@ export function DocumentCanvas({ children }: DocumentCanvasProps) {
       </motion.div>
 
       {/* Resize handle */}
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        onMouseDown={handleMouseDown}
-        className={cn(
-          'relative z-10 flex w-[3px] shrink-0 cursor-col-resize items-center justify-center',
-          'bg-border/40 transition-colors hover:bg-primary/30 active:bg-primary/50',
-          'group',
-        )}
-      >
-        {/* Visual handle indicator */}
-        <div className="absolute h-8 w-1 rounded-full bg-border group-hover:bg-primary/40 transition-colors" />
-      </div>
+      {isCanvasOpen && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          onMouseDown={handleMouseDown}
+          className={cn(
+            'relative z-10 flex w-[3px] shrink-0 cursor-col-resize items-center justify-center',
+            'bg-border/40 transition-colors hover:bg-primary/30 active:bg-primary/50',
+            'group',
+          )}
+        >
+          {/* Visual handle indicator */}
+          <div className="absolute h-8 w-1 rounded-full bg-border group-hover:bg-primary/40 transition-colors" />
+        </div>
+      )}
 
       {/* Right panel — Document Viewer */}
       <AnimatePresence mode="wait">
         {isCanvasOpen && (
           <motion.div
             key="canvas-panel"
-            initial={{ width: 0, opacity: 0 }}
+            initial={{ width: 0, opacity: 0, scale: 0.95 }}
             animate={{
               width: `${100 - splitRatio}%`,
               opacity: 1,
+              scale: 1,
             }}
-            exit={{ width: 0, opacity: 0 }}
+            exit={{ width: 0, opacity: 0, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="flex h-full min-w-0 flex-col overflow-hidden"
+            className="flex h-full min-w-0 flex-col overflow-hidden origin-top-left"
           >
             <DocumentViewer />
           </motion.div>
