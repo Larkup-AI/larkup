@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Maximize2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -86,13 +93,40 @@ export function PromptsSection() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Textarea
-            value={form.systemPrompt || ''}
-            onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
-            placeholder="You are a helpful research assistant..."
-            rows={8}
-            className="w-full rounded-lg border border-border/70 bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-border   resize-y min-h-[120px]"
-          />
+          <div className="relative">
+            <Textarea
+              value={form.systemPrompt || ''}
+              onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
+              placeholder="You are a helpful research assistant..."
+              className="w-full rounded-lg border border-border/70 bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-border resize-none max-h-40 min-h-[120px] pb-10"
+            />
+            <Dialog>
+              <DialogTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute bottom-2 right-2 h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md"
+                  >
+                    <Maximize2 className="size-3.5" />
+                  </Button>
+                }
+              />
+              <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] flex flex-col p-6">
+                <DialogHeader className="shrink-0">
+                  <DialogTitle>Edit System Prompt</DialogTitle>
+                </DialogHeader>
+                <div className="flex-1 min-h-0 mt-4 relative">
+                  <Textarea
+                    value={form.systemPrompt || ''}
+                    onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
+                    placeholder="You are a helpful research assistant..."
+                    className="h-full w-full rounded-lg border border-border/70 bg-card px-4 py-3 text-sm text-foreground outline-none transition focus:border-border resize-none"
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardContent>
       </Card>
 

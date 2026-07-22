@@ -342,7 +342,21 @@ export async function parseDocument(
     case 'txt':
       return parseTXT(buffer, fileName);
     default:
-      throw new Error(`Parser not implemented for type: ${type}`);
+      // Return a basic parsed document for unsupported types so they can be "viewed" without crashing
+      return {
+        sessionId: randomUUID(),
+        fileName,
+        type: (type as any) || 'unknown',
+        mimeType: mimeType || 'application/octet-stream',
+        fileSize: buffer.length,
+        pages: [],
+        fields: [],
+        rawText: `Preview not available for this file type.\nFile: ${fileName}\nSize: ${(
+          buffer.length / 1024
+        ).toFixed(1)} KB`,
+        metadata: {},
+        totalPages: 0,
+      };
   }
 }
 

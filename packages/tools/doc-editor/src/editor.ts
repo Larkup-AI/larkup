@@ -56,7 +56,8 @@ export async function createSession(
   let parsed = await parseDocument(buffer, fileName, mimeType);
 
   // For PDFs, try to extract text via sandbox for richer content
-  if (parsed.type === 'pdf' && parsed.rawText === '') {
+  // Skip heavy extraction for long PDFs (e.g. > 5 pages) to just "view" them quickly
+  if (parsed.type === 'pdf' && parsed.rawText === '' && parsed.totalPages <= 5) {
     try {
       const sandboxResult = await runSandboxScript(
         generateExtractPDFTextScript(),

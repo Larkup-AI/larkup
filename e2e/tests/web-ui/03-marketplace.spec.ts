@@ -20,7 +20,7 @@ test.describe('Marketplace', () => {
 
     // CLIP tool should be visible with "Coming soon"
     await expect(page.getByText('CLIP Image Search')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Coming soon')).toBeVisible();
+    await expect(page.getByText('Soon', { exact: true })).toBeVisible();
   });
 
   test('tools show Free badge', async ({ page }) => {

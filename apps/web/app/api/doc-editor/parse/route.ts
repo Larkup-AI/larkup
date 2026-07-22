@@ -25,13 +25,18 @@ export async function POST(req: Request) {
     const session = await createSession(buffer, file.name, file.type);
 
     // For PDFs, enrich with full text extraction via pdf-parse
+    // Skip heavy text extraction for long PDFs (e.g. > 5 pages) to just "view" them quickly
     if (session.type === 'pdf' && session.parsed.rawText === '') {
-      try {
-        const pdfData = await pdfParse(buffer);
-        const enrichedParsed = enrichPDFWithText(session.parsed, pdfData.text);
-        session.parsed = enrichedParsed;
-      } catch {
-        // pdf-parse failed — continue with whatever we have
+      if (session.parsed.totalPages <= 5) {
+        try {
+          const pdfData = await pdfParse(buffer);
+          const enrichedParsed = enrichPDFWithText(session.parsed, pdfData.text);
+          session.parsed = enrichedParsed;
+        } catch {
+          // pdf-parse failed — continue with whatever we have
+        }
+      } else {
+        session.parsed.rawText = `[Long PDF - Text extraction skipped for performance. You can still view it.]`;
       }
     }
 
