@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { NotionPanel } from '@/components/data/notion-panel';
+import { useNotionAuth } from '@/hooks/use-notion-auth';
 import { cn } from '@/lib/utils';
 import { CableIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -195,47 +196,15 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
     mutateNotion();
   };
 
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'notion_oauth') {
-        if (event.data.status === 'connected') {
-          mutateNotion();
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [mutateNotion]);
-
-  const handleConnectNotion = () => {
-    const customAuthUrl =
-      process.env.NEXT_PUBLIC_NOTION_AUTHORIZATION_URL ||
-      'https://larkup-proxy.vercel.app/api/oauth/notion';
-
-    const redirectUri = `${window.location.origin}/api/integrations/notion/callback`;
-    const authUrl = `${customAuthUrl}?redirect_to=${encodeURIComponent(redirectUri)}`;
-
-    const width = 600;
-    const height = 800;
-    const left = window.innerWidth / 2 - width / 2 + window.screenX;
-    const top = window.innerHeight / 2 - height / 2 + window.screenY;
-
-    const popup = window.open(
-      authUrl,
-      'Notion Connection',
-      `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1,status=1,resizable=1`,
-    );
-
-    if (popup) {
-      const timer = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(timer);
-          fetchStatuses();
-        }
-      }, 1000);
-    }
-  };
+  const { connectToNotion: handleConnectNotion } = useNotionAuth({
+    onSuccess: () => {
+      fetchStatuses();
+      toast.success('Successfully connected to Notion');
+    },
+    onError: (error) => {
+      toast.error(error);
+    },
+  });
 
   return (
     <div className="space-y-6">

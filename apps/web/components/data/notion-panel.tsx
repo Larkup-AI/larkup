@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { toast } from 'sonner';
+import { useNotionAuth } from '@/hooks/use-notion-auth';
 import { formatErrorMessage } from '@/lib/error-formatter';
 import {
   ExternalLink,
@@ -76,7 +77,12 @@ export function NotionPanel({ onAdded, onClose }: { onAdded: () => void; onClose
   const [search, setSearch] = useState('');
   const [showType, setShowType] = useState<'all' | 'pages' | 'databases'>('all');
 
-  // connectNotion removed since it's handled by IntegrationsPanel
+  const { connectToNotion } = useNotionAuth({
+    onSuccess: () => {
+      mutate();
+      toast.success('Successfully connected to Notion');
+    },
+  });
 
   function togglePage(id: string) {
     setSelected((prev) => {
@@ -147,14 +153,20 @@ export function NotionPanel({ onAdded, onClose }: { onAdded: () => void; onClose
   if (!status?.connected) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-12">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-          <img src="/notion.png" alt="Notion" className="size-6 opacity-60" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-background/30 border">
+          <img src="/notion.png" alt="Notion" className="size-6 opacity-100" />
         </div>
         <div className="text-center max-w-md">
           <h3 className="text-lg font-semibold text-foreground">Notion Not Connected</h3>
           <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
             Please connect Notion from the integrations panel.
           </p>
+
+          <div className="mt-4">
+            <Button size="sm" onClick={() => connectToNotion()}>
+              Connect Notion
+            </Button>
+          </div>
 
           {status?.error && (
             <div className="mt-3 flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
@@ -167,7 +179,6 @@ export function NotionPanel({ onAdded, onClose }: { onAdded: () => void; onClose
     );
   }
 
-  // Connected — show pages
   const allPages = status.pages || [];
   const allDatabases = status.databases || [];
   const query = search.toLowerCase().trim();
