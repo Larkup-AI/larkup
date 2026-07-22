@@ -447,10 +447,66 @@ export function MessageItem({
       .filter((p: any) => p.type === 'text')
       .map((p: any) => p.text)
       .join('');
+
+    const attachments = anyMessage.experimental_attachments || [];
+
+    const partAttachments = parts
+      .filter((p: any) => p.type === 'image' || p.type === 'file')
+      .map((p: any) => ({
+        url: p.image || p.data,
+        contentType: p.mimeType || (p.type === 'image' ? 'image/png' : 'application/octet-stream'),
+        name: p.name || (p.type === 'image' ? 'image.png' : 'file'),
+      }));
+
+    // Deduplicate or combine (usually they are either in experimental_attachments or parts, rarely both)
+    const allAttachments = attachments.length > 0 ? attachments : partAttachments;
+
     return (
       <div className="message user-message flex justify-end" data-role="user">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[#edecec] px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
-          {text}
+        <div className="max-w-[85%] flex flex-col gap-2 items-end">
+          {allAttachments.length > 0 && (
+            <div className="flex flex-wrap justify-end gap-2">
+              {allAttachments.map((att: any, i: number) => {
+                const isImage = att.contentType?.startsWith('image/');
+                const isVideo = att.contentType?.startsWith('video/');
+                const isAudio = att.contentType?.startsWith('audio/');
+
+                const ext = att.name?.split('.').pop()?.toLowerCase() || '';
+                let iconPath = '/icons/image.png'; // default fallback for images and unknown files
+                if (['csv', 'xls', 'xlsx'].includes(ext)) iconPath = '/icons/excel.png';
+                else if (['doc', 'docx'].includes(ext)) iconPath = '/icons/word.png';
+                else if (['md', 'markdown'].includes(ext)) iconPath = '/icons/markdown.png';
+                else if (['pdf'].includes(ext)) iconPath = '/icons/pdf.png';
+                else if (isVideo) iconPath = '/icons/video.png';
+                else if (isAudio) iconPath = '/icons/audio.png';
+
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 bg-muted/80 border border-border/60 rounded-xl h-12 px-3 p-1 shrink-0"
+                  >
+                    <div className="size-7 shrink-0 rounded-md overflow-hidden bg-background border border-border/90 flex items-center justify-center p-1">
+                      <img
+                        src={iconPath}
+                        alt={att.name || 'file'}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="flex flex-col justify-center max-w-[150px]">
+                      <span className="text-xs font-medium truncate text-foreground">
+                        {att.name || 'Attachment'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {text && (
+            <div className="rounded-2xl rounded-br-md bg-[#edecec] px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
+              {text}
+            </div>
+          )}
         </div>
       </div>
     );

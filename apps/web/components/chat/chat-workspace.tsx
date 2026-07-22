@@ -19,7 +19,14 @@ import {
   Globe,
   Paperclip,
   FileText,
-  ImageIcon,
+  FileImage,
+  FileSpreadsheet,
+  FileAudio,
+  FileVideo,
+  FileArchive,
+  FileCode,
+  FileJson,
+  File as FileIcon,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { MessageItem } from '@/components/chat/message-item';
@@ -65,6 +72,22 @@ interface AvailableModel {
   tags?: string[];
 }
 
+function getFileIconPath(file: File) {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  const mimeType = file.type;
+
+  if (['csv', 'xls', 'xlsx'].includes(extension || '')) return '/icons/excel.png';
+  if (['doc', 'docx'].includes(extension || '')) return '/icons/word.png';
+  if (['md', 'markdown'].includes(extension || '')) return '/icons/markdown.png';
+  if (['pdf'].includes(extension || '')) return '/icons/pdf.png';
+
+  if (mimeType.startsWith('video/')) return '/icons/video.png';
+  if (mimeType.startsWith('audio/')) return '/icons/audio.png';
+  if (mimeType.startsWith('image/')) return '/icons/image.png';
+
+  return '/icons/image.png'; // Fallback
+}
+
 function AttachmentCard({
   file,
   onClick,
@@ -74,29 +97,16 @@ function AttachmentCard({
   onClick?: () => void;
   onRemove: () => void;
 }) {
-  const isImage = file.type.startsWith('image/');
-  const url = useMemo(() => (isImage ? URL.createObjectURL(file) : null), [file, isImage]);
-
-  useEffect(() => {
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [url]);
+  const iconPath = getFileIconPath(file);
 
   return (
     <div
-      className="relative group flex items-center gap-2 bg-muted/50 border border-border/60 rounded-xl h-14 px-3 p-1 shrink-0 cursor-pointer hover:bg-muted/80 transition-colors"
+      className="relative mt-2 group flex items-center gap-2 bg-muted/50 border border-border/60 rounded-xl h-12 px-3 p-1 shrink-0 cursor-pointer hover:bg-muted/80 transition-colors"
       onClick={onClick}
     >
-      {isImage && url ? (
-        <div className="h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-background">
-          <img src={url} alt={file.name} className="w-full h-full object-cover" />
-        </div>
-      ) : (
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground border border-border/50 shadow-sm">
-          <FileText className="size-5" />
-        </div>
-      )}
+      <div className="size-7 shrink-0 rounded-md overflow-hidden bg-background border border-border/90 flex items-center justify-center p-1">
+        <img src={iconPath} alt={file.name} className="w-full h-full object-contain" />
+      </div>
       <div className="flex flex-col justify-center max-w-[120px]">
         <span className="text-xs font-medium truncate text-foreground">{file.name}</span>
         <span className="text-[10px] text-muted-foreground">
@@ -110,7 +120,7 @@ function AttachmentCard({
           e.stopPropagation();
           onRemove();
         }}
-        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-background border border-border text-muted-foreground hover:bg-destructive hover:border-destructive hover:text-destructive-foreground transition shadow-sm opacity-0 group-hover:opacity-100"
+        className="absolute cursor-pointer -top-3 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-background border border-border text-muted-foreground hover:bg-destructive hover:border-destructive hover:text-white transition  opacity-0 group-hover:opacity-100"
       >
         <X className="size-3" />
       </button>
