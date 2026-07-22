@@ -85,9 +85,13 @@ export function ChatWorkspace() {
 
 function ChatWorkspaceInner() {
   const { activeServer } = useWorkspace();
-  const { sessionId, parsedDocument } = useDocEditor();
+  const { sessionId, parsedDocument, openCanvas } = useDocEditor();
   const docEditorState = { sessionId, fields: parsedDocument?.fields || [] };
   const serverId = activeServer?.id ?? null;
+
+  // Track dragging state
+  const dragCounter = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   const statusKey = serverId
     ? `/api/chat/status?serverId=${encodeURIComponent(serverId)}`
@@ -363,6 +367,64 @@ function ChatWorkspaceInner() {
     }
   }
 
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      if (Array.from(e.dataTransfer.items).some((item) => item.kind === 'file')) {
+        setIsDragging(true);
+      }
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      dragCounter.current = 0;
+
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
+
+      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      const validExts = ['.pdf', '.docx', '.pptx', '.txt'];
+      const acceptedTypes = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'text/plain',
+      ];
+
+      if (!acceptedTypes.includes(file.type) && !validExts.includes(ext)) {
+        toast.error('Unsupported file type. Please upload PDF, Word, PPT, or TXT.');
+        return;
+      }
+
+      try {
+        await openCanvas(file);
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to attach document');
+      }
+    },
+    [openCanvas],
+  );
+
   const isEmpty = messages.length === 0;
   const ready = status?.ready ?? false;
   const selectedModelData = status?.availableModels?.find((m) => m.id === selectedModel);
@@ -376,7 +438,27 @@ function ChatWorkspaceInner() {
   }
 
   return (
-    <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
+    <div
+      className={cn(
+        'flex h-full w-full flex-1 flex-col overflow-hidden relative',
+        isDragging && 'bg-primary/5',
+      )}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm border-2 border-dashed border-primary/50 m-4 rounded-3xl pointer-events-none">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
+            <Paperclip className="size-10" />
+          </div>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">
+            Drop document to attach
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">PDF, Word, PPT, TXT</p>
+        </div>
+      )}
       {/* Header bar */}
       <div className="relative z-40 flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-3">{/* We moved model selector to the right */}</div>

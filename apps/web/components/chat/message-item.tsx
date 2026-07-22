@@ -15,7 +15,7 @@ import {
   type CorpusDataConfig,
 } from '@/components/chat/tools/corpus-data-result';
 import { ChatSignatureRequest } from '@/components/chat/tools/chat-signature-request';
-import { Sparkles, FileEdit, CheckCircle2 } from 'lucide-react';
+import { Sparkles, FileEdit, CheckCircle2, Globe } from 'lucide-react';
 import { ChatMediaPreview, parseMediaRefs } from '@/components/chat/tools/chat-media-preview';
 import { useDocEditor } from '@/components/chat/canvas/doc-editor-provider';
 
@@ -303,8 +303,46 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
         return <ChatSignatureRequest key={index} detectedLocations={output.detectedLocations} />;
       }
 
+      case 'webSearch': {
+        if (output.error) return null;
+        const resultsCount = output.results?.length || 0;
+        return (
+          <div key={index} className="mb-2 w-full">
+            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
+              <Globe className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate max-w-[250px] sm:max-w-[400px]">
+                Searched web for "{input?.query}"
+              </span>
+              <span className="shrink-0 text-[10px] bg-secondary text-foreground px-1.5 py-0.5 rounded-full font-medium ml-1">
+                {resultsCount} result{resultsCount === 1 ? '' : 's'}
+              </span>
+            </div>
+          </div>
+        );
+      }
+
+      case 'analyzeImageDeeply': {
+        if (output.error) return null;
+        return (
+          <div key={index} className="mb-2 w-full">
+            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
+              <Sparkles className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate max-w-[250px] sm:max-w-[400px]">Analyzed image</span>
+            </div>
+          </div>
+        );
+      }
+
       default:
-        return null;
+        // Generic fallback for any other tools (like marketplace tools) to prevent them from disappearing
+        return (
+          <div key={index} className="mb-2 w-full">
+            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate max-w-[250px] sm:max-w-[400px]">Used {toolName}</span>
+            </div>
+          </div>
+        );
     }
   }
 
@@ -485,6 +523,17 @@ export function MessageItem({
 
       {/* Loading states for in-progress tools */}
       {executingParts.map((part: any, i: number) => renderToolPart(part, i))}
+
+      {/* Thinking state when streaming but no tools executing and no text yet */}
+      {isLast &&
+        isStreaming &&
+        executingParts.length === 0 &&
+        textParts.every((p: any) => !p.text || p.text.trim().length === 0) && (
+          <div className="flex items-center gap-2.5 py-1 text-[13px] text-muted-foreground animate-pulse">
+            <Sparkles className="size-4 text-foreground/60" />
+            <span className="font-medium text-foreground/80">Thinking...</span>
+          </div>
+        )}
 
       {/* Text parts — with markdown table detection + media refs */}
       {textParts.map((part: any, i: number) => {
