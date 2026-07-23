@@ -205,12 +205,30 @@ function getToolInfo(part: any): {
 /* Tool part renderers                                                 */
 /* ------------------------------------------------------------------ */
 
-function renderToolPart(part: any, index: number): React.ReactNode | null {
+function renderToolPart(
+  part: any,
+  index: number,
+  addToolResult?: Function,
+  updateFromToolResult?: Function,
+): React.ReactNode | null {
   const { toolName, isExecuting, isCompleted, output, input } = getToolInfo(part);
 
   // Still executing — show loading indicator
   if (isExecuting) {
     if (toolName === 'searchKnowledgeBase') return null;
+
+    if (toolName === 'requestDocumentSignature') {
+      const callId = part.toolInvocation?.toolCallId || part.toolCallId || part.id || '';
+      return (
+        <ChatSignatureRequest
+          key={index}
+          detectedLocations={input?.detectedLocations}
+          toolCallId={callId}
+          addToolResult={addToolResult}
+        />
+      );
+    }
+
     return (
       <div
         key={index}
@@ -278,29 +296,83 @@ function renderToolPart(part: any, index: number): React.ReactNode | null {
       case 'fillDocumentForm':
       case 'editDocument': {
         if (!output.success) return null;
+
+        const fileName = output.fileName || 'Document';
+        const cType = output.mimeType || '';
+        const ext = fileName.split('.').pop()?.toLowerCase() || '';
+        let iconPath = '/icons/image.png'; // default fallback for images and unknown files
+        if (
+          ['csv', 'xls', 'xlsx'].includes(ext) ||
+          cType.includes('excel') ||
+          cType.includes('spreadsheet')
+        )
+          iconPath = '/icons/excel.png';
+        else if (['doc', 'docx'].includes(ext) || cType.includes('word'))
+          iconPath = '/icons/word.png';
+        else if (['md', 'markdown'].includes(ext)) iconPath = '/icons/markdown.png';
+        else if (['pdf'].includes(ext) || cType === 'application/pdf') iconPath = '/icons/pdf.png';
+        else if (!ext) iconPath = '/icons/word.png'; // Generic file icon
+
         return (
           <div
             key={index}
-            className="flex items-center gap-2 rounded-xl border border-border/60 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
+            onClick={() => {
+              if (updateFromToolResult && output.fileBase64) {
+                updateFromToolResult(output);
+              }
+            }}
+            className="group flex items-center gap-3 rounded-xl border border-border/60 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400 cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-emerald-900/20 transition"
           >
-            <CheckCircle2 className="size-4" />
-            <div className="flex flex-col">
-              <span className="font-medium">
-                {toolName === 'fillDocumentForm' ? 'Form fields updated' : 'Document edited'}
+            <div className="size-8 shrink-0 rounded-md overflow-hidden bg-white border border-emerald-200/50 flex items-center justify-center p-1.5 shadow-sm">
+              <img src={iconPath} alt={fileName} className="w-full h-full object-contain" />
+            </div>
+            <div className="flex flex-col flex-1">
+              <span className="font-medium text-emerald-800 dark:text-emerald-300">
+                {toolName === 'fillDocumentForm' ? 'Form fields updated in ' : 'Edited '}
+                <span className="font-bold">{fileName}</span>
               </span>
-              <span className="text-xs opacity-80">
+              <span className="text-xs opacity-80 mt-0.5">
                 {output.updatedFields?.length || 0}{' '}
                 {output.updatedFields?.length === 1 ? 'change' : 'changes'} applied. Preview updated
                 in Canvas.
               </span>
             </div>
+            {output.fileBase64 && (
+              <div className="opacity-0 group-hover:opacity-100 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 transition">
+                <FileEdit className="size-3" />
+                View this version
+              </div>
+            )}
           </div>
         );
       }
 
       case 'requestDocumentSignature': {
-        if (!output.success) return null;
-        return <ChatSignatureRequest key={index} detectedLocations={output.detectedLocations} />;
+        if (!output?.success) return null;
+        return (
+          <div
+            key={index}
+            onClick={() => {
+              if (updateFromToolResult && output.fileBase64) {
+                updateFromToolResult(output);
+              }
+            }}
+            className="group flex items-center gap-3 rounded-xl border border-border/60 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400 mt-2 cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-emerald-900/20 transition"
+          >
+            <CheckCircle2 className="size-5 shrink-0 text-emerald-500" />
+            <div className="flex-1 flex items-center justify-between">
+              <span className="font-medium text-emerald-800 dark:text-emerald-300">
+                Document signed successfully.
+              </span>
+              {output.fileBase64 && (
+                <div className="opacity-0 group-hover:opacity-100 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 transition">
+                  <FileEdit className="size-3" />
+                  View this version
+                </div>
+              )}
+            </div>
+          </div>
+        );
       }
 
       case 'webSearch': {
@@ -357,17 +429,21 @@ export function MessageItem({
   message,
   isLast,
   isStreaming,
+  addToolResult,
 }: {
   message: UIMessage;
   isLast?: boolean;
   isStreaming?: boolean;
+  addToolResult?: Function;
 }) {
   const isUser = message.role === 'user';
   let updateFromToolResult: ((result: any) => void) | undefined;
+  let openCanvas: ((file: File, options?: any) => Promise<void>) | undefined;
 
   try {
     const editor = useDocEditor();
     updateFromToolResult = editor.updateFromToolResult;
+    openCanvas = editor.openCanvas;
   } catch {
     // Not wrapped in DocEditorProvider in some contexts
   }
@@ -376,8 +452,22 @@ export function MessageItem({
 
   // Stabilize the parts array to prevent re-renders from creating new array refs each time
   const parts: any[] = useMemo(() => {
-    return message.parts ? [...message.parts] : [];
-  }, [message.parts]);
+    const p: any[] = message.parts ? [...message.parts] : [];
+    if (anyMessage.toolInvocations && Array.isArray(anyMessage.toolInvocations)) {
+      anyMessage.toolInvocations.forEach((t: any) => {
+        if (
+          !p.some(
+            (existing: any) =>
+              existing.type === 'tool-invocation' &&
+              existing.toolInvocation?.toolCallId === t.toolCallId,
+          )
+        ) {
+          p.push({ type: 'tool-invocation', toolInvocation: t });
+        }
+      });
+    }
+    return p;
+  }, [message.parts, anyMessage.toolInvocations]);
 
   // Track which tool call IDs have already been applied to prevent re-application
   const appliedToolCallsRef = useRef<Set<string>>(new Set());
@@ -392,7 +482,9 @@ export function MessageItem({
         return (
           info.isCompleted &&
           info.output?.success &&
-          (info.toolName === 'fillDocumentForm' || info.toolName === 'editDocument')
+          (info.toolName === 'fillDocumentForm' ||
+            info.toolName === 'editDocument' ||
+            info.toolName === 'requestDocumentSignature')
         );
       })
       .map((p: any) => {
@@ -410,37 +502,53 @@ export function MessageItem({
       return (
         info.isCompleted &&
         info.output?.success &&
-        (info.toolName === 'fillDocumentForm' || info.toolName === 'editDocument')
+        (info.toolName === 'fillDocumentForm' ||
+          info.toolName === 'editDocument' ||
+          info.toolName === 'requestDocumentSignature')
       );
     });
 
     if (completedDocTools.length > 0) {
-      const latestPart = completedDocTools[completedDocTools.length - 1];
-      const ti = latestPart.toolInvocation ?? latestPart;
-      const callId = ti.toolCallId || ti.id || '';
+      completedDocTools.forEach((part: any) => {
+        const ti = part.toolInvocation ?? part;
+        const callId = ti.toolCallId || ti.id || '';
 
-      // Skip if we already applied this specific tool result
-      if (callId && appliedToolCallsRef.current.has(callId)) return;
+        // Skip if we already applied this specific tool result
+        if (callId && appliedToolCallsRef.current.has(callId)) return;
 
-      const latest = getToolInfo(latestPart).output;
-      if (latest && latest.fileBase64) {
-        if (callId) appliedToolCallsRef.current.add(callId);
-        updateFromToolResult(latest);
-      }
+        const output = getToolInfo(part).output;
+        if (output && output.fileBase64) {
+          if (callId) appliedToolCallsRef.current.add(callId);
+          updateFromToolResult(output);
+        }
+      });
     }
   }, [docToolFingerprint, updateFromToolResult, isLast]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (anyMessage.toolInvocations && Array.isArray(anyMessage.toolInvocations)) {
-    anyMessage.toolInvocations.forEach((t: any) => {
-      if (
-        !parts.some(
-          (p: any) => p.type === 'tool-invocation' && p.toolInvocation?.toolCallId === t.toolCallId,
-        )
-      ) {
-        parts.push({ type: 'tool-invocation', toolInvocation: t });
+  // Auto-resolve duplicate signature tools
+  useEffect(() => {
+    if (!isLast || !addToolResult) return;
+    const signatureTools = parts.filter(
+      (p: any) => getToolInfo(p).toolName === 'requestDocumentSignature',
+    );
+    if (signatureTools.length > 1) {
+      // Keep the first one, auto-resolve the rest
+      for (let i = 1; i < signatureTools.length; i++) {
+        const info = getToolInfo(signatureTools[i]);
+        if (info.isExecuting) {
+          const ti = signatureTools[i].toolInvocation ?? signatureTools[i];
+          const callId = ti.toolCallId || ti.id;
+          if (callId && !appliedToolCallsRef.current.has(callId)) {
+            appliedToolCallsRef.current.add(callId);
+            addToolResult({
+              toolCallId: callId,
+              result: { success: true, message: 'Duplicate signature request auto-resolved.' },
+            });
+          }
+        }
       }
-    });
-  }
+    }
+  }, [parts, isLast, addToolResult]);
 
   if (isUser) {
     const text = parts
@@ -452,11 +560,33 @@ export function MessageItem({
 
     const partAttachments = parts
       .filter((p: any) => p.type === 'image' || p.type === 'file')
-      .map((p: any) => ({
-        url: p.image || p.data,
-        contentType: p.mimeType || (p.type === 'image' ? 'image/png' : 'application/octet-stream'),
-        name: p.name || (p.type === 'image' ? 'image.png' : 'file'),
-      }));
+      .map((p: any) => {
+        let name = p.name;
+        let cType = p.mimeType || p.contentType || (p.type === 'image' ? 'image/png' : '');
+
+        if (!cType && p.url && typeof p.url === 'string' && p.url.startsWith('data:')) {
+          const match = p.url.match(/^data:([^;]+);/);
+          if (match) cType = match[1];
+        }
+        if (!cType) cType = 'application/octet-stream';
+
+        if (!name) {
+          if (p.url && typeof p.url === 'string' && !p.url.startsWith('data:')) {
+            name = p.url.split('/').pop()?.split('?')[0];
+          } else {
+            name = p.type === 'image' ? 'image.png' : 'Document';
+            if (cType === 'application/pdf') name = 'Document.pdf';
+            else if (cType === 'text/plain') name = 'Text.txt';
+            else if (cType.includes('word')) name = 'Document.docx';
+            else if (cType.includes('excel') || cType.includes('spreadsheet')) name = 'Data.xlsx';
+          }
+        }
+        return {
+          url: p.image || p.data || p.url,
+          contentType: cType,
+          name,
+        };
+      });
 
     // Deduplicate or combine (usually they are either in experimental_attachments or parts, rarely both)
     const allAttachments = attachments.length > 0 ? attachments : partAttachments;
@@ -467,34 +597,102 @@ export function MessageItem({
           {allAttachments.length > 0 && (
             <div className="flex flex-wrap justify-end gap-2">
               {allAttachments.map((att: any, i: number) => {
-                const isImage = att.contentType?.startsWith('image/');
-                const isVideo = att.contentType?.startsWith('video/');
-                const isAudio = att.contentType?.startsWith('audio/');
+                let cType = att.contentType || att.type || '';
+                const isImage = cType.startsWith('image/');
+                const isVideo = cType.startsWith('video/');
+                const isAudio = cType.startsWith('audio/');
+                let nameStr = att.name;
 
-                const ext = att.name?.split('.').pop()?.toLowerCase() || '';
+                if (
+                  !cType &&
+                  att.url &&
+                  typeof att.url === 'string' &&
+                  att.url.startsWith('data:')
+                ) {
+                  const match = att.url.match(/^data:([^;]+);/);
+                  if (match) cType = match[1];
+                }
+
+                // AI SDK sometimes loses the MIME type and defaults to application/octet-stream
+                // We can sniff PDF magic bytes `%PDF-` -> `JVBERi0` in base64
+                if (
+                  (!cType || cType === 'application/octet-stream') &&
+                  att.url &&
+                  typeof att.url === 'string'
+                ) {
+                  if (att.url.includes('JVBERi0')) {
+                    cType = 'application/pdf';
+                  }
+                }
+
+                if (!nameStr || nameStr === 'Attachment') {
+                  nameStr = isImage ? 'image.png' : 'Document';
+                  if (cType === 'application/pdf') nameStr = 'Document.pdf';
+                  else if (cType === 'text/plain') nameStr = 'Text.txt';
+                  else if (cType.includes('word')) nameStr = 'Document.docx';
+                  else if (cType.includes('excel') || cType.includes('spreadsheet'))
+                    nameStr = 'Data.xlsx';
+                } else if (cType === 'application/pdf' && !nameStr.toLowerCase().endsWith('.pdf')) {
+                  nameStr += '.pdf';
+                }
+
+                const ext = nameStr.split('.').pop()?.toLowerCase() || '';
                 let iconPath = '/icons/image.png'; // default fallback for images and unknown files
-                if (['csv', 'xls', 'xlsx'].includes(ext)) iconPath = '/icons/excel.png';
-                else if (['doc', 'docx'].includes(ext)) iconPath = '/icons/word.png';
+                if (
+                  ['csv', 'xls', 'xlsx'].includes(ext) ||
+                  cType.includes('excel') ||
+                  cType.includes('spreadsheet')
+                )
+                  iconPath = '/icons/excel.png';
+                else if (['doc', 'docx'].includes(ext) || cType.includes('word'))
+                  iconPath = '/icons/word.png';
                 else if (['md', 'markdown'].includes(ext)) iconPath = '/icons/markdown.png';
-                else if (['pdf'].includes(ext)) iconPath = '/icons/pdf.png';
+                else if (['pdf'].includes(ext) || cType === 'application/pdf')
+                  iconPath = '/icons/pdf.png';
                 else if (isVideo) iconPath = '/icons/video.png';
                 else if (isAudio) iconPath = '/icons/audio.png';
+                else if (!isImage && !ext) iconPath = '/icons/word.png'; // Generic file icon
 
                 return (
                   <div
                     key={i}
-                    className="flex items-center gap-2 bg-muted/80 border border-border/60 rounded-xl h-12 px-3 p-1 shrink-0"
+                    onClick={() => {
+                      if (openCanvas) {
+                        if (att instanceof File || (att.name && att.size && !att.url)) {
+                          // It's a File object provided directly from input
+                          openCanvas(att as File, { background: false });
+                        } else if (att.url) {
+                          let fetchUrl = att.url;
+                          // If it's a raw base64 string without data prefix, add it
+                          if (!fetchUrl.startsWith('http') && !fetchUrl.startsWith('data:')) {
+                            fetchUrl = `data:${
+                              cType || 'application/octet-stream'
+                            };base64,${fetchUrl}`;
+                          }
+                          fetch(fetchUrl)
+                            .then((r) => r.blob())
+                            .then((blob) => {
+                              const file = new File([blob], nameStr, { type: cType });
+                              openCanvas(file, { background: false });
+                            })
+                            .catch((err) => {
+                              console.error('Failed to open attachment in canvas', err);
+                            });
+                        }
+                      }
+                    }}
+                    className={`flex items-center gap-2 bg-muted/80 border border-border/60 rounded-xl h-12 px-3 p-1 shrink-0 ${
+                      openCanvas && (att.url || att instanceof File || att.size)
+                        ? 'cursor-pointer hover:bg-muted'
+                        : ''
+                    }`}
                   >
                     <div className="size-7 shrink-0 rounded-md overflow-hidden bg-background border border-border/90 flex items-center justify-center p-1">
-                      <img
-                        src={iconPath}
-                        alt={att.name || 'file'}
-                        className="w-full h-full object-contain"
-                      />
+                      <img src={iconPath} alt={nameStr} className="w-full h-full object-contain" />
                     </div>
                     <div className="flex flex-col justify-center max-w-[150px]">
                       <span className="text-xs font-medium truncate text-foreground">
-                        {att.name || 'Attachment'}
+                        {nameStr}
                       </span>
                     </div>
                   </div>
@@ -520,9 +718,15 @@ export function MessageItem({
     return toolName === 'searchKnowledgeBase';
   });
 
+  let signatureFound = false;
   const toolParts = parts.filter((p: any) => {
     const { toolName } = getToolInfo(p);
-    return toolName && toolName !== 'searchKnowledgeBase';
+    if (toolName === 'searchKnowledgeBase') return false;
+    if (toolName === 'requestDocumentSignature') {
+      if (signatureFound) return false;
+      signatureFound = true;
+    }
+    return true;
   });
 
   const textParts = parts.filter((p: any) => p.type === 'text');
@@ -568,17 +772,23 @@ export function MessageItem({
       {/* Non-visualization tool outputs (data tables, sandbox results) */}
       {nonVizToolParts
         .filter((p: any) => getToolInfo(p).isCompleted)
-        .map((part: any, i: number) => renderToolPart(part, i))}
+        .map((part: any, i: number) =>
+          renderToolPart(part, i, addToolResult, updateFromToolResult),
+        )}
 
       {/* Visualization outputs */}
       {vizTabs ? (
         <ChatTabs config={{ tabs: vizTabs }} />
       ) : (
-        vizParts.map((part: any, i: number) => renderToolPart(part, i))
+        vizParts.map((part: any, i: number) =>
+          renderToolPart(part, i, addToolResult, updateFromToolResult),
+        )
       )}
 
       {/* Loading states for in-progress tools */}
-      {executingParts.map((part: any, i: number) => renderToolPart(part, i))}
+      {executingParts.map((part: any, i: number) =>
+        renderToolPart(part, i, addToolResult, updateFromToolResult),
+      )}
 
       {/* Thinking state when streaming but no tools executing and no text yet */}
       {isLast &&

@@ -121,6 +121,14 @@ export interface SignatureData {
   x?: number;
   /** Approximate Y coordinate (if known) */
   y?: number;
+  /** Signature scale multiplier */
+  scale?: number;
+  /** Optional base64 to use instead of current session base64 (for undo/replace) */
+  base64Override?: string;
+  /** The text context detected near the signature line (e.g. "Datum, Unterschrift des Empfängers") */
+  detectedContext?: string;
+  /** User-provided note about placement (e.g. "bottom right corner") */
+  placementNote?: string;
 }
 
 /** Active editing session */

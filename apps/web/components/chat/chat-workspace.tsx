@@ -150,7 +150,7 @@ export function ChatWorkspace() {
 
 function ChatWorkspaceInner() {
   const { activeServer } = useWorkspace();
-  const { sessionId, parsedDocument, openCanvas } = useDocEditor();
+  const { sessionId, parsedDocument, openCanvas, isLoading: isDocLoading } = useDocEditor();
   const docEditorState = { sessionId, fields: parsedDocument?.fields || [] };
   const serverId = activeServer?.id ?? null;
 
@@ -173,6 +173,7 @@ function ChatWorkspaceInner() {
   const [modelSearch, setModelSearch] = useState('');
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [pendingMessage, setPendingMessage] = useState<{ text: string; files?: any } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -231,6 +232,11 @@ function ChatWorkspaceInner() {
     [serverId, selectedModel, docEditorState.sessionId, JSON.stringify(docEditorState.fields)],
   );
 
+  const chatBodyRef = useRef(chatBody);
+  useEffect(() => {
+    chatBodyRef.current = chatBody;
+  }, [chatBody]);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -243,13 +249,13 @@ function ChatWorkspaceInner() {
             body: {
               messages,
               id,
-              ...chatBody,
+              ...chatBodyRef.current,
               ...body,
             },
           };
         },
       }),
-    [chatBody],
+    [],
   );
 
   const {
@@ -259,9 +265,62 @@ function ChatWorkspaceInner() {
     setMessages,
     error,
     regenerate,
+    addToolResult,
   } = useChat({
     transport,
   });
+
+  useEffect(() => {
+    if (pendingMessage && docEditorState.sessionId && !isDocLoading) {
+      sendMessage(pendingMessage);
+      setPendingMessage(null);
+    }
+  }, [pendingMessage, docEditorState.sessionId, isDocLoading, sendMessage]);
+
+  // Auto-open PDF if the AI uses a document tool and the canvas is not open
+  useEffect(() => {
+    if (!docEditorState.sessionId && openCanvas && messages.length > 0 && !isDocLoading) {
+      const lastMsg = messages[messages.length - 1] as any;
+      if (lastMsg.role === 'assistant' && lastMsg.toolInvocations) {
+        const hasDocTool = lastMsg.toolInvocations.some((t: any) =>
+          ['requestDocumentSignature', 'fillDocumentForm', 'editDocument'].includes(t.toolName),
+        );
+        if (hasDocTool) {
+          // Find the last PDF attachment in the chat
+          let targetAtt: any = null;
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i] as any;
+            if (m.experimental_attachments) {
+              const pdfs = m.experimental_attachments.filter(
+                (a: any) =>
+                  a.contentType?.includes('pdf') || a.name?.toLowerCase().endsWith('.pdf'),
+              );
+              if (pdfs.length > 0) {
+                targetAtt = pdfs[pdfs.length - 1];
+                break;
+              }
+            }
+          }
+
+          if (targetAtt && targetAtt.url) {
+            let fetchUrl = targetAtt.url;
+            if (!fetchUrl.startsWith('http') && !fetchUrl.startsWith('data:')) {
+              fetchUrl = `data:${targetAtt.contentType || 'application/pdf'};base64,${fetchUrl}`;
+            }
+            fetch(fetchUrl)
+              .then((r) => r.blob())
+              .then((blob) => {
+                const file = new File([blob], targetAtt.name || 'document.pdf', {
+                  type: targetAtt.contentType || 'application/pdf',
+                });
+                openCanvas(file, { background: false });
+              })
+              .catch((err) => console.error('Auto-open failed', err));
+          }
+        }
+      }
+    }
+  }, [messages, docEditorState.sessionId, openCanvas, isDocLoading]);
 
   // Reset chat context when switching workspaces to prevent overlap
   useEffect(() => {
@@ -280,7 +339,6 @@ function ChatWorkspaceInner() {
     });
     return () => cancelAnimationFrame(id);
   }, [messages, chatStatus]);
-
   // Save messages to history — debounced to prevent cascading re-renders during streaming
   const historySaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesRef = useRef(messages);
@@ -363,16 +421,95 @@ function ChatWorkspaceInner() {
     return groups;
   }, [status?.availableModels, modelSearch]);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     const text = input.trim();
-    if ((!text && attachments.length === 0) || isBusy) return;
+    if ((!text && attachments.length === 0) || isBusy || isDocLoading) return;
 
     const dt = new DataTransfer();
     attachments.forEach((file) => dt.items.add(file));
     const files = dt.files.length > 0 ? dt.files : undefined;
 
-    sendMessage({ text, files });
+    if (files) {
+      const docFile = Array.from(files).find(
+        (f) =>
+          f.type === 'application/pdf' ||
+          f.name.toLowerCase().endsWith('.pdf') ||
+          f.name.toLowerCase().endsWith('.doc') ||
+          f.name.toLowerCase().endsWith('.docx'),
+      );
+
+      // If we have a document that needs opening, open it BEFORE sending the message!
+      if (docFile && !docEditorState.sessionId) {
+        toast.info('Preparing document...');
+        setPendingMessage({ text, files });
+        openCanvas(docFile, { background: false }).catch((err) => {
+          toast.error(err.message || 'Failed to open document');
+          setPendingMessage(null);
+          // Send the message anyway so the user's text isn't lost
+          sendMessage({ text, files });
+        });
+        setInput('');
+        setAttachments([]);
+        return;
+      }
+
+      sendMessage({ text, files });
+    } else {
+      let docToOpen: any = null;
+      if (!docEditorState.sessionId) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const m = messages[i] as any;
+          if (m.experimental_attachments) {
+            const docs = m.experimental_attachments.filter(
+              (a: any) =>
+                a.contentType?.includes('pdf') ||
+                a.name?.toLowerCase().endsWith('.pdf') ||
+                a.name?.toLowerCase().endsWith('.doc') ||
+                a.name?.toLowerCase().endsWith('.docx'),
+            );
+            if (docs.length > 0) {
+              docToOpen = docs[docs.length - 1];
+              break;
+            }
+          }
+        }
+      }
+
+      if (docToOpen) {
+        toast.info('Preparing document...');
+        let fetchUrl = docToOpen.url;
+        if (!fetchUrl.startsWith('http') && !fetchUrl.startsWith('data:')) {
+          fetchUrl = `data:${docToOpen.contentType || 'application/pdf'};base64,${fetchUrl}`;
+        }
+
+        setPendingMessage({ text });
+        fetch(fetchUrl)
+          .then((r) => r.blob())
+          .then((blob) => {
+            const file = new File([blob], docToOpen.name || 'document.pdf', {
+              type: docToOpen.contentType || 'application/pdf',
+            });
+            openCanvas(file, { background: false }).catch((err) => {
+              toast.error(err.message || 'Failed to open document');
+              setPendingMessage(null);
+              sendMessage({ text });
+            });
+          })
+          .catch((err) => {
+            console.error('Auto-open failed', err);
+            setPendingMessage(null);
+            sendMessage({ text });
+          });
+
+        setInput('');
+        setAttachments([]);
+        return;
+      }
+
+      sendMessage({ text });
+    }
+
     setInput('');
     setAttachments([]);
   }
@@ -482,6 +619,16 @@ function ChatWorkspaceInner() {
       }
 
       setAttachments((prev) => [...prev, ...newAttachments]);
+
+      // Auto-open PDF if dropped
+      const pdfFile = newAttachments.find(
+        (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
+      );
+      if (pdfFile) {
+        openCanvas(pdfFile, { background: false }).catch((err) => {
+          toast.error(err.message || 'Failed to auto-open document');
+        });
+      }
     },
     [openCanvas],
   );
@@ -510,7 +657,7 @@ function ChatWorkspaceInner() {
       onDrop={handleDrop}
     >
       {isDragging && (
-        <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm border-2 border-dashed border-primary/50 m-4 rounded-3xl pointer-events-none">
+        <div className="absolute inset-0 z-100 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm border-2 border-dashed border-primary/50 m-4 rounded-3xl pointer-events-none">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
             <Paperclip className="size-10" />
           </div>
@@ -767,7 +914,7 @@ function ChatWorkspaceInner() {
                     ? '/settings?ai-models'
                     : '/settings'
                 }
-                className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90    disabled:pointer-events-none disabled:opacity-50"
               >
                 Go to Settings
               </a>
@@ -817,6 +964,7 @@ function ChatWorkspaceInner() {
                   message={m}
                   isLast={idx === messages.length - 1}
                   isStreaming={chatStatus === 'streaming'}
+                  addToolResult={addToolResult}
                 />
               ))}
               {chatStatus === 'submitted' ? (
@@ -852,7 +1000,7 @@ function ChatWorkspaceInner() {
       {ready && (
         <div className="relative z-10 mt-auto px-4 pb-5 pt-3 sm:px-6">
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
-            <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-1 focus-within:ring-ring">
+            <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-0.5 focus-within:ring-ring/20">
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
@@ -883,6 +1031,16 @@ function ChatWorkspaceInner() {
                         if (!fileList || fileList.length === 0) return;
                         const newAttachments = Array.from(fileList) as File[];
                         setAttachments((prev) => [...prev, ...newAttachments]);
+
+                        const pdfFile = newAttachments.find(
+                          (f) =>
+                            f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
+                        );
+                        if (pdfFile) {
+                          openCanvas(pdfFile, { background: false }).catch((err) => {
+                            toast.error(err.message || 'Failed to auto-open document');
+                          });
+                        }
                       };
                       fileInput.click();
                     }}
@@ -942,22 +1100,51 @@ function ChatWorkspaceInner() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
+                      if (isDocLoading) {
+                        toast.info('Document is loading...', {
+                          description: 'Please wait a moment before sending.',
+                        });
+                        return;
+                      }
                       handleSubmit(e);
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const items = e.clipboardData?.items;
+                    if (!items) return;
+                    const pastedFiles: File[] = [];
+                    for (let i = 0; i < items.length; i++) {
+                      if (items[i].kind === 'file') {
+                        const file = items[i].getAsFile();
+                        if (file) pastedFiles.push(file);
+                      }
+                    }
+                    if (pastedFiles.length > 0) {
+                      setAttachments((prev) => [...prev, ...pastedFiles]);
+                      const pdfFile = pastedFiles.find(
+                        (f) =>
+                          f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'),
+                      );
+                      if (pdfFile) {
+                        openCanvas(pdfFile, { background: false }).catch((err) => {
+                          toast.error(err.message || 'Failed to auto-open pasted document');
+                        });
+                      }
                     }
                   }}
                   rows={1}
                   disabled={!ready}
                   placeholder="How can I help you…"
-                  className="max-h-48 min-h-[44px] w-full resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:hidden"
+                  className="max-h-48 min-h-[44px] w-full resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:hidden disabled:opacity-50"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={(!input.trim() && attachments.length === 0) || isBusy}
+                disabled={(!input.trim() && attachments.length === 0) || isBusy || isDocLoading}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
               >
-                {isBusy ? (
+                {isBusy || isDocLoading ? (
                   <Loader2 className="h-[18px] w-[18px] animate-spin" />
                 ) : (
                   <ArrowUp className="h-[18px] w-[18px]" />

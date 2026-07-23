@@ -7,7 +7,7 @@ import { DocumentViewer } from './document-viewer';
 import { cn } from '@/lib/utils';
 
 /* ------------------------------------------------------------------ */
-/* DocumentCanvas — ChatGPT Canvas-style split-view container          */
+/* DocumentCanvas    */
 /* ------------------------------------------------------------------ */
 
 interface DocumentCanvasProps {

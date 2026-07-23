@@ -43,6 +43,10 @@ export function deleteSession(sessionId: string): boolean {
   return sessions.delete(sessionId);
 }
 
+export function restoreSession(session: EditorSession): void {
+  sessions.set(session.id, session);
+}
+
 /* ------------------------------------------------------------------ */
 /* Create session — parse and store document                           */
 /* ------------------------------------------------------------------ */
@@ -121,6 +125,10 @@ export async function createSession(
 export async function applyFieldEdits(sessionId: string, edits: FieldEdit[]): Promise<EditResult> {
   const session = sessions.get(sessionId);
   if (!session) {
+    console.error(
+      `[doc-editor] Session not found: ${sessionId}. Available sessions:`,
+      Array.from(sessions.keys()),
+    );
     return {
       success: false,
       parsed: null as any,
@@ -136,17 +144,56 @@ export async function applyFieldEdits(sessionId: string, edits: FieldEdit[]): Pr
     let resultBuffer: Buffer;
     let updatedFields: string[] = [];
 
+    // Map field IDs to actual field names for native PDF filling and sandbox scripts.
+    // The LLM sends field IDs like "pdf_field_0"; we resolve them to the actual PDF field names.
+    // If the ID doesn't match any field, try matching by name directly (case-insensitive).
+    const resolvedEdits = edits.map((edit) => {
+      // Primary: look up by ID
+      let field = session.parsed.fields.find((f) => f.id === edit.fieldId);
+      if (!field) {
+        // Fallback: match by name (case-insensitive, trimmed)
+        const needle = edit.fieldId.trim().toLowerCase();
+        field = session.parsed.fields.find((f) => f.name.trim().toLowerCase() === needle);
+      }
+      if (!field) {
+        // Fallback: match by partial name containment
+        const needle = edit.fieldId.trim().toLowerCase();
+        field = session.parsed.fields.find(
+          (f) =>
+            f.name.trim().toLowerCase().includes(needle) ||
+            needle.includes(f.name.trim().toLowerCase()),
+        );
+      }
+      const resolvedName = field ? field.name : edit.fieldId;
+      console.log(
+        `[doc-editor] Resolving fieldId "${
+          edit.fieldId
+        }" → "${resolvedName}" (matched: ${!!field})`,
+      );
+      return {
+        ...edit,
+        fieldId: resolvedName,
+      };
+    });
+
     switch (session.type) {
       case 'pdf': {
         // Use pdf-lib natively for PDF form filling (no sandbox needed!)
-        resultBuffer = await fillPDFNatively(buffer, edits);
-        updatedFields = edits.map((e) => e.fieldId);
+        const fillResult = await fillPDFNatively(buffer, resolvedEdits);
+        resultBuffer = fillResult.buffer;
+        updatedFields = fillResult.matchedFields;
+        if (fillResult.matchedFields.length === 0) {
+          console.warn(
+            `[doc-editor] WARNING: fillPDFNatively matched 0 fields. Edits:`,
+            resolvedEdits.map((e) => e.fieldId),
+          );
+        }
         break;
       }
 
       case 'docx': {
         // Use sandbox python-docx
-        const script = generateFillDOCXScript(edits);
+        const script = generateFillDOCXScript(resolvedEdits);
         const result = await runSandboxScript(script, buffer, 'document.docx');
 
         if (result.exitCode !== 0) {
@@ -178,7 +225,7 @@ export async function applyFieldEdits(sessionId: string, edits: FieldEdit[]): Pr
 
       case 'pptx': {
         // Use sandbox python-pptx
-        const script = generateFillPPTXScript(edits);
+        const script = generateFillPPTXScript(resolvedEdits);
         const result = await runSandboxScript(script, buffer, 'document.pptx');
 
         if (result.exitCode !== 0) {
@@ -210,17 +257,14 @@ export async function applyFieldEdits(sessionId: string, edits: FieldEdit[]): Pr
       case 'txt': {
         // Direct text editing — apply replacements
         let text = buffer.toString('utf-8');
-        for (const edit of edits) {
-          // For TXT, fieldId contains the search text
+        for (let i = 0; i < edits.length; i++) {
+          const edit = edits[i];
+          const resolvedEdit = resolvedEdits[i];
           if (edit.type === 'fill' || edit.type === 'replace') {
-            // Update field values in-place
-            const field = session.parsed.fields.find((f) => f.id === edit.fieldId);
-            if (field) {
-              // Replace "Label: ___" with "Label: value"
-              const pattern = new RegExp(`(${escapeRegExp(field.name)}:\\s*)[_\\s]*`, 'i');
-              text = text.replace(pattern, `$1${edit.value}`);
-              updatedFields.push(edit.fieldId);
-            }
+            // Replace "Label: ___" with "Label: value"
+            const pattern = new RegExp(`(${escapeRegExp(resolvedEdit.fieldId)}:\\s*)[_\\s]*`, 'i');
+            text = text.replace(pattern, `$1${edit.value}`);
+            updatedFields.push(edit.fieldId);
           }
         }
         resultBuffer = Buffer.from(text, 'utf-8');
@@ -255,6 +299,7 @@ export async function applyFieldEdits(sessionId: string, edits: FieldEdit[]): Pr
       updatedFields,
     };
   } catch (err: any) {
+    console.error('[doc-editor] applyFieldEdits error:', err);
     return {
       success: false,
       parsed: session.parsed,
@@ -400,44 +445,77 @@ export function exportDocument(
 /* Native PDF form filling using pdf-lib (no sandbox needed)           */
 /* ------------------------------------------------------------------ */
 
-async function fillPDFNatively(buffer: Buffer, edits: FieldEdit[]): Promise<Buffer> {
+async function fillPDFNatively(
+  buffer: Buffer,
+  edits: FieldEdit[],
+): Promise<{ buffer: Buffer; matchedFields: string[] }> {
   const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
   const form = pdfDoc.getForm();
   const allFields = form.getFields();
+  const matchedFields: string[] = [];
+
+  const allFieldNames = allFields.map((f) => f.getName());
+  console.log(
+    `[doc-editor] fillPDFNatively: ${allFields.length} PDF fields: [${allFieldNames.join(', ')}]`,
+  );
+  console.log(`[doc-editor] fillPDFNatively: ${edits.length} edits to apply`);
 
   for (const edit of edits) {
-    // Find the matching field by name or ID
+    let matched = false;
+    // Find the matching field by name
     for (const field of allFields) {
       const fieldName = field.getName();
-      if (
-        fieldName === edit.fieldId ||
-        edit.fieldId.endsWith(fieldName) ||
-        fieldName.includes(edit.fieldId)
-      ) {
+      const editId = edit.fieldId;
+
+      // Match by exact name, case-insensitive name, or containment
+      const isMatch =
+        fieldName === editId ||
+        fieldName.toLowerCase() === editId.toLowerCase() ||
+        editId.toLowerCase().endsWith(fieldName.toLowerCase()) ||
+        fieldName.toLowerCase().includes(editId.toLowerCase()) ||
+        editId.toLowerCase().includes(fieldName.toLowerCase());
+
+      if (isMatch) {
         if (edit.type === 'clear') {
           if (field instanceof PDFTextField) {
             field.setText('');
           }
-          continue;
+          matched = true;
+          matchedFields.push(fieldName);
+          console.log(`[doc-editor] Cleared field "${fieldName}"`);
+          break;
         }
 
         if (field instanceof PDFTextField) {
           field.setText(edit.value);
+          matched = true;
+          matchedFields.push(fieldName);
+          console.log(
+            `[doc-editor] Filled text field "${fieldName}" with "${edit.value.substring(0, 50)}${
+              edit.value.length > 50 ? '...' : ''
+            }"`,
+          );
         } else if (field instanceof PDFCheckBox) {
           if (edit.value === 'true' || edit.value === 'yes' || edit.value === '1') {
             field.check();
           } else {
             field.uncheck();
           }
+          matched = true;
+          matchedFields.push(fieldName);
         } else if (field instanceof PDFDropdown) {
           try {
             field.select(edit.value);
+            matched = true;
+            matchedFields.push(fieldName);
           } catch {
             // Value might not be in options
           }
         } else if (field instanceof PDFRadioGroup) {
           try {
             field.select(edit.value);
+            matched = true;
+            matchedFields.push(fieldName);
           } catch {
             // Value might not be in options
           }
@@ -445,10 +523,26 @@ async function fillPDFNatively(buffer: Buffer, edits: FieldEdit[]): Promise<Buff
         break;
       }
     }
+
+    if (!matched) {
+      console.warn(`[doc-editor] No matching PDF field found for edit "${edit.fieldId}"`);
+    }
+  }
+
+  console.log(
+    `[doc-editor] fillPDFNatively: matched ${matchedFields.length}/${edits.length} fields`,
+  );
+
+  // Very Important: update field appearances so the changes are visible in all PDF viewers!
+  try {
+    const defaultFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    form.updateFieldAppearances(defaultFont);
+  } catch (e) {
+    console.error('Failed to update field appearances, ignoring', e);
   }
 
   const modifiedBytes = await pdfDoc.save();
-  return Buffer.from(modifiedBytes);
+  return { buffer: Buffer.from(modifiedBytes), matchedFields };
 }
 
 /* ------------------------------------------------------------------ */
@@ -462,7 +556,10 @@ export async function applySignature(sessionId: string, data: SignatureData): Pr
   }
 
   try {
-    const buffer = Buffer.from(session.currentFileBase64, 'base64');
+    // ALWAYS re-sign from the original (unsigned) document to replace, not stack.
+    // Only use base64Override if explicitly provided from the frontend for undo flows.
+    const sourceBase64 = data.base64Override || session.originalFileBase64;
+    const buffer = Buffer.from(sourceBase64, 'base64');
 
     if (session.mimeType === 'application/pdf') {
       const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
@@ -470,20 +567,52 @@ export async function applySignature(sessionId: string, data: SignatureData): Pr
       const pageIndex = Math.min(Math.max(0, data.pageIndex), pages.length - 1);
       const page = pages[pageIndex];
 
-      const x = data.x ?? 50;
-      const y = data.y ?? 50;
+      const { width, height } = page.getSize();
+
+      // --- Smart Placement: try to find the detected context text position ---
+      let resolvedX: number | null = null;
+      let resolvedY: number | null = null;
+
+      if (data.detectedContext) {
+        try {
+          // Use sandbox PyPDF to find text coordinates on this page
+          const coords = await findTextPositionOnPage(buffer, pageIndex, data.detectedContext);
+          if (coords) {
+            // Place signature right below the detected text line
+            resolvedX = coords.x;
+            // coords.y is the bottom of the text in PDF coordinate system
+            // Place signature just below (subtract a small offset for spacing)
+            resolvedY = coords.y - 10;
+          }
+        } catch {
+          // Fallback to UI-provided coordinates
+        }
+      }
+
+      // Fall back to user-specified percentages
+      if (resolvedX === null || resolvedY === null) {
+        const xPct = data.x ?? 50;
+        const yPct = data.y ?? 50;
+        resolvedX = (xPct / 100) * width;
+        // Invert Y: UI treats y=0 as top, PDF treats y=0 as bottom
+        resolvedY = height - (yPct / 100) * height;
+      }
+
+      const x = resolvedX;
+      const y = resolvedY;
 
       if (data.mode === 'type' && data.text) {
-        const font = await pdfDoc.embedFont(StandardFonts.HelveticaOblique); // Using Helvetica Oblique as cursive placeholder
+        const font = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
 
         let color = rgb(0, 0, 0);
         if (data.color === 'blue') color = rgb(0, 0, 1);
         if (data.color === 'red') color = rgb(1, 0, 0);
 
+        const size = 24 * (data.scale ?? 1);
         page.drawText(data.text, {
           x,
-          y,
-          size: 24,
+          y: y - size, // Adjust for PDF drawing from baseline instead of top-left
+          size,
           font,
           color,
         });
@@ -502,12 +631,26 @@ export async function applySignature(sessionId: string, data: SignatureData): Pr
           embeddedImage = await pdfDoc.embedPng(imageBytes); // default PNG
         }
 
-        const dims = embeddedImage.scale(0.5); // scale down
+        const intrinsicHeight = embeddedImage.height;
+        let drawHeight = intrinsicHeight;
+        let drawWidth = embeddedImage.width;
+
+        // Match frontend's max-h-[60px] behavior
+        if (intrinsicHeight > 60) {
+          const ratio = 60 / intrinsicHeight;
+          drawHeight = 60;
+          drawWidth = drawWidth * ratio;
+        }
+
+        // Apply user scale
+        drawHeight *= data.scale ?? 1;
+        drawWidth *= data.scale ?? 1;
+
         page.drawImage(embeddedImage, {
           x,
-          y,
-          width: dims.width,
-          height: dims.height,
+          y: y - drawHeight, // Top-left alignment based on bottom-left drawing
+          width: drawWidth,
+          height: drawHeight,
         });
       }
 
@@ -536,13 +679,19 @@ export async function applySignature(sessionId: string, data: SignatureData): Pr
       const modifiedBytes = await pdfDoc.save();
       const newBase64 = Buffer.from(modifiedBytes).toString('base64');
 
+      // Re-parse the document so the canvas preview updates properly
+      const newBuffer = Buffer.from(modifiedBytes);
+      const newParsed = await parseDocument(newBuffer, session.fileName, session.mimeType);
+      newParsed.sessionId = sessionId;
+
       session.currentFileBase64 = newBase64;
+      session.parsed = newParsed;
       session.updatedAt = new Date().toISOString();
       sessions.set(sessionId, session);
 
       return {
         success: true,
-        parsed: session.parsed!,
+        parsed: newParsed,
         fileBase64: newBase64,
         updatedFields: [],
       };
@@ -552,6 +701,93 @@ export async function applySignature(sessionId: string, data: SignatureData): Pr
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to apply signature' } as any;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Find text position on a PDF page using sandbox PyPDF               */
+/* ------------------------------------------------------------------ */
+
+async function findTextPositionOnPage(
+  pdfBuffer: Buffer,
+  pageIndex: number,
+  searchText: string,
+): Promise<{ x: number; y: number } | null> {
+  try {
+    const code = `
+import json, sys
+try:
+    import pypdf
+    reader = pypdf.PdfReader("document.pdf")
+    page = reader.pages[${pageIndex}]
+    
+    search = ${JSON.stringify(searchText)}.lower()
+    
+    # Extract text with visitor to get positions
+    positions = []
+    def visitor(text, cm, tm, font_dict, font_size):
+        if text and text.strip():
+            x = tm[4]
+            y = tm[5]
+            positions.append({"text": text.strip(), "x": float(x), "y": float(y)})
+    
+    page.extract_text(visitor_text=visitor)
+    
+    # Find the best match
+    best = None
+    best_score = 0
+    for pos in positions:
+        t = pos["text"].lower()
+        # Check if search text is contained in this text segment or vice versa
+        if search in t or t in search:
+            score = len(t)
+            if score > best_score:
+                best_score = score
+                best = pos
+        # Also check word overlap
+        search_words = set(search.split())
+        text_words = set(t.split())
+        overlap = len(search_words & text_words)
+        if overlap > best_score:
+            best_score = overlap
+            best = pos
+    
+    if best:
+        print("__RESULT__:" + json.dumps({"x": best["x"], "y": best["y"]}))
+    else:
+        print("__RESULT__:null")
+except Exception as e:
+    print("__RESULT__:null")
+    print(f"Error: {e}", file=sys.stderr)
+`;
+
+    const sandboxManager = new SandboxManager({ backend: 'docker' });
+    const result = await sandboxManager.execute({
+      code,
+      language: 'python',
+      files: [
+        {
+          name: 'document.pdf',
+          content: pdfBuffer.toString('base64'),
+          isBase64: true,
+        },
+      ],
+      timeout: 15_000,
+    });
+
+    if (result.exitCode === 0) {
+      const match = result.stdout.match(/__RESULT__:(.+)/);
+      if (match) {
+        const parsed = JSON.parse(match[1]);
+        if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          return { x: parsed.x, y: parsed.y };
+        }
+      }
+    }
+  } catch {
+    // Sandbox not available — fall back to UI coordinates
+  }
+
+  return null;
 }
 
 /* ------------------------------------------------------------------ */

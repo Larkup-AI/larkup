@@ -24,6 +24,7 @@ export {
   getSession,
   getAllSessions,
   deleteSession,
+  restoreSession,
   applyFieldEdits,
   applyContentEdits,
   applySignature,

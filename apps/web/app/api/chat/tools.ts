@@ -18,6 +18,27 @@ import { applyFieldEdits, applyContentEdits } from '@larkup/tool-doc-editor';
 import { loadTool } from '@larkup/marketplace/loader';
 import { getInstalledTools } from '@larkup/marketplace/installer';
 
+function documentEditModelOutput({ output }: { output: any }) {
+  return {
+    type: 'json' as const,
+    value: output?.success
+      ? {
+          success: true,
+          action: output.action,
+          sessionId: output.sessionId,
+          updatedFields: output.updatedFields ?? [],
+          fileName: output.fileName,
+          totalPages: output.totalPages,
+          message:
+            'The document was updated successfully. Do not repeat the edit unless requested.',
+        }
+      : {
+          success: false,
+          error: output?.error ?? 'Document update failed',
+        },
+  };
+}
+
 /**
  * Retrieves documents from the knowledge base
  */
@@ -494,7 +515,7 @@ export async function getChatTools(context: {
 
     fillDocumentForm: tool({
       description:
-        'Fill form fields in the currently active document. You should use the searchKnowledgeBase tool to find answers to form questions if you do not know them. The available fields are provided in your system prompt.',
+        'Fill form fields, text inputs, or checkboxes in the currently active document. Use this when the user asks to "fill the form", "add data to fields", or "fill with dummy data". You should use the searchKnowledgeBase tool to find answers to form questions if you do not know them. The available fields are provided in your system prompt.',
       inputSchema: z.object({
         edits: z
           .array(
@@ -508,7 +529,12 @@ export async function getChatTools(context: {
           .describe('List of fields to fill and their new values'),
       }),
       execute: async ({ edits }) => {
-        if (!docSessionId) return { success: false, error: 'No active document session' };
+        if (!docSessionId)
+          return {
+            success: false,
+            error:
+              'Document not loaded yet. Please wait a moment or ask the user to click the document to open it in the canvas before filling it.',
+          };
 
         try {
           const fieldEdits = edits.map((edit) => ({
@@ -526,6 +552,8 @@ export async function getChatTools(context: {
             sessionId: docSessionId,
             edits,
             updatedFields: result.updatedFields,
+            fileName: result.parsed.fileName,
+            mimeType: result.parsed.mimeType,
             fields: result.parsed.fields,
             pages: result.parsed.pages.map((p) => ({
               index: p.index,
@@ -541,11 +569,12 @@ export async function getChatTools(context: {
           return { success: false, error: err.message };
         }
       },
+      toModelOutput: documentEditModelOutput,
     }),
 
     editDocument: tool({
       description:
-        'Edit the content (text) of the currently active document. Use this when the user asks to modify paragraphs or slides (not form fields).',
+        'Edit the content (text) of the currently active document. Use this when the user asks to modify paragraphs, rewrite text, or change slides (not form fields).',
       inputSchema: z.object({
         edits: z
           .array(
@@ -559,7 +588,12 @@ export async function getChatTools(context: {
           .describe('List of content edits to apply'),
       }),
       execute: async ({ edits }) => {
-        if (!docSessionId) return { success: false, error: 'No active document session' };
+        if (!docSessionId)
+          return {
+            success: false,
+            error:
+              'Document not loaded yet. Please wait a moment or ask the user to click the document to open it in the canvas before editing it.',
+          };
 
         try {
           const result = await applyContentEdits(docSessionId, edits);
@@ -573,6 +607,8 @@ export async function getChatTools(context: {
             sessionId: docSessionId,
             edits,
             updatedFields: result.updatedFields,
+            fileName: result.parsed.fileName,
+            mimeType: result.parsed.mimeType,
             pages: result.parsed.pages.map((p) => ({
               index: p.index,
               text: p.text.slice(0, 2000),
@@ -587,38 +623,23 @@ export async function getChatTools(context: {
           return { success: false, error: err.message };
         }
       },
+      toModelOutput: documentEditModelOutput,
     }),
 
     requestDocumentSignature: tool({
       description:
-        'Use this when the user asks to sign the currently active document. You should analyze the document to find the best place for a signature (e.g. searching for "Signature:" or "Sign Here"). Yield the UI for the user to confirm the placement and provide their signature.',
+        'STRICTLY ONLY use this when the user explicitly asks to "sign" the currently active document or asks for a "signature". CRITICAL: Do NOT use this tool for filling forms, answering questions, or adding dummy data. CRITICAL: NEVER call this tool more than once per user request. Yields a UI widget for the user to confirm the placement and provide their signature.',
       inputSchema: z.object({
         detectedLocations: z
           .array(
             z.object({
-              pageIndex: z
-                .number()
-                .describe('The page index (0-based) where the signature belongs'),
-              context: z
-                .string()
-                .describe(
-                  'The text context around the signature line, e.g. "Employee Signature: ____"',
-                ),
+              pageIndex: z.number(),
+              context: z.string(),
             }),
           )
-          .describe('The detected signature locations in the document.'),
+          .optional()
+          .describe('Optional. The detected signature locations in the document.'),
       }),
-      execute: async ({ detectedLocations }) => {
-        if (!docSessionId) return { success: false, error: 'No active document session' };
-
-        // We return the detected locations so the UI can render the configuration form.
-        return {
-          success: true,
-          action: 'request_signature',
-          sessionId: docSessionId,
-          detectedLocations,
-        };
-      },
     }),
 
     webSearch: tool({
@@ -695,7 +716,11 @@ export async function getChatTools(context: {
   // 1. Add enabled built-in tools
   for (const [id, toolDef] of Object.entries(builtInTools)) {
     if (id === 'webSearch') continue; // Handled separately
-    if (isEnabled(id)) {
+
+    if (
+      isEnabled(id) ||
+      ['fillDocumentForm', 'editDocument', 'requestDocumentSignature'].includes(id)
+    ) {
       finalTools[id] = toolDef;
     }
   }

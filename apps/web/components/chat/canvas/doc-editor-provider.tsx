@@ -30,6 +30,8 @@ interface DocEditorState {
   fillingFields: Set<string>;
   /** Recently updated fields (for highlight animation) */
   updatedFields: Set<string>;
+  /** Monotonically increasing version counter to force `<object>` remounting */
+  updateVersion: number;
 }
 
 interface DocEditorActions {
@@ -91,6 +93,7 @@ export function DocEditorProvider({ children }: { children: ReactNode }) {
     error: null,
     fillingFields: new Set(),
     updatedFields: new Set(),
+    updateVersion: 0,
   });
 
   /* ---- Open Canvas ---- */
@@ -149,6 +152,7 @@ export function DocEditorProvider({ children }: { children: ReactNode }) {
         activeFileType: data.type,
         fileMimeType: data.mimeType,
         fileBase64,
+        updateVersion: s.updateVersion + 1,
       }));
     } catch (err: any) {
       setState((s) => ({
@@ -216,6 +220,7 @@ export function DocEditorProvider({ children }: { children: ReactNode }) {
               }
             : null,
           fileBase64: data.fileBase64 || s.fileBase64,
+          updateVersion: s.updateVersion + 1,
         }));
 
         // Clear the updated highlight after 2 seconds
@@ -279,12 +284,40 @@ export function DocEditorProvider({ children }: { children: ReactNode }) {
                 pages: result.pages || s.parsedDocument.pages,
                 totalPages: result.totalPages || s.parsedDocument.totalPages,
               }
-            : null,
+            : {
+                sessionId: result.sessionId,
+                fileName: s.activeFileName || 'Document',
+                type: 'pdf',
+                mimeType: 'application/pdf',
+                fileSize: 0,
+                pages: result.pages || [],
+                fields: result.fields || [],
+                rawText: '',
+                metadata: {},
+                totalPages: result.totalPages || 1,
+              },
           fileBase64: result.fileBase64 || s.fileBase64,
           updatedFields: new Set(result.updatedFields),
           fillingFields: new Set(),
+          updateVersion: s.updateVersion + 1,
         };
       });
+
+      // Restore on the backend just in case the server restarted and memory was cleared
+      if (result.fileBase64 && result.sessionId) {
+        fetch('/api/doc-editor/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: result.sessionId,
+            fileBase64: result.fileBase64,
+            // Pass minimal required fields for the backend session
+            fileName: 'Document',
+            mimeType: 'application/pdf',
+            activeFileType: 'pdf',
+          }),
+        }).catch(console.error);
+      }
 
       // Clear highlight after animation
       setTimeout(() => {

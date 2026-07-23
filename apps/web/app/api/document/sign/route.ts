@@ -15,6 +15,10 @@ const requestSchema = z.object({
     pageIndex: z.number(),
     x: z.number().optional(),
     y: z.number().optional(),
+    scale: z.number().optional(),
+    base64Override: z.string().optional(),
+    detectedContext: z.string().optional(),
+    placementNote: z.string().optional(),
   }),
 });
 

@@ -74,7 +74,14 @@ export async function POST(req: Request) {
     serverId?: string;
     chatModelId?: string;
     docSessionId?: string;
-    docFields?: { id: string; name: string; type: string }[];
+    docFields?: {
+      id: string;
+      name: string;
+      type: string;
+      value?: string;
+      context?: string;
+      placeholder?: string;
+    }[];
   } = await req.json();
 
   const config = await readConfig();
@@ -108,6 +115,142 @@ export async function POST(req: Request) {
     config.customChatModels,
   ) as any;
 
+  // Strip large PDF base64 attachments and heavy doc-tool results from messages to prevent context window explosion.
+  // Also limit message history to last 20 messages to prevent unbounded growth.
+  const MAX_HISTORY_MESSAGES = 20;
+  const messagesToProcess =
+    messages.length > MAX_HISTORY_MESSAGES
+      ? messages.slice(messages.length - MAX_HISTORY_MESSAGES)
+      : messages;
+
+  const safeMessages = messagesToProcess.map((m) => {
+    const anyM = { ...m } as any;
+
+    // Helper: strip heavy keys from a tool result object
+    const stripHeavyResult = (result: any, toolName?: string): any => {
+      let resultObj = result;
+      let isString = false;
+      if (typeof result === 'string') {
+        try {
+          resultObj = JSON.parse(result);
+          isString = true;
+        } catch {
+          return result;
+        }
+      }
+      if (typeof resultObj !== 'object' || resultObj === null) return result;
+      const isDocTool =
+        toolName &&
+        ['fillDocumentForm', 'editDocument', 'requestDocumentSignature'].includes(toolName);
+      if (isDocTool || resultObj.fileBase64 || resultObj.pages) {
+        const copy = { ...resultObj };
+        delete copy.fileBase64;
+        delete copy.pages;
+        if (isDocTool) {
+          delete copy.fields;
+          if (copy.rawText) copy.rawText = copy.rawText.slice(0, 500);
+        }
+        return isString ? JSON.stringify(copy) : copy;
+      }
+      return result;
+    };
+
+    // Clean toolInvocations on historical messages — strip fileBase64, pages, and heavy field arrays
+    if (anyM.role === 'assistant' && anyM.toolInvocations) {
+      anyM.toolInvocations = anyM.toolInvocations
+        .filter(
+          (ti: any) =>
+            ti.state === 'result' || ti.state === 'output' || ti.state === 'output-available',
+        )
+        .map((ti: any) => {
+          if (ti.result) {
+            return { ...ti, result: stripHeavyResult(ti.result, ti.toolName) };
+          }
+          return ti;
+        });
+    }
+
+    // Clean parts (AI SDK v5 UIMessage format) — strip heavy data from tool results and file parts
+    if (Array.isArray(anyM.parts)) {
+      anyM.parts = anyM.parts.map((part: any) => {
+        // Tool invocation parts — strip heavy results
+        if (part.type === 'tool-invocation' && part.toolInvocation) {
+          const ti = part.toolInvocation;
+          if (ti.result !== undefined) {
+            return {
+              ...part,
+              toolInvocation: {
+                ...ti,
+                result: stripHeavyResult(ti.result, ti.toolName),
+              },
+            };
+          }
+        }
+        // New-format tool parts (tool-result)
+        if (part.type === 'tool-result' && part.result !== undefined) {
+          return { ...part, result: stripHeavyResult(part.result, part.toolName) };
+        }
+        // File parts — strip large non-image files (PDF base64)
+        if (part.type === 'file') {
+          const data = part.data || part.url || '';
+          if (typeof data === 'string' && data.length > 5000) {
+            const mimeType = (part.mimeType || part.mediaType || '').toLowerCase();
+            const isImage = mimeType.startsWith('image/');
+            if (!isImage) {
+              // Replace with a placeholder
+              return {
+                type: 'text',
+                text: `[File attachment: ${
+                  mimeType || 'document'
+                } — removed from context for size]`,
+              };
+            }
+          }
+        }
+        return part;
+      });
+    }
+
+    // Strip PDF attachments from experimental_attachments (base64 data URLs can be many MB)
+    if (anyM.experimental_attachments) {
+      anyM.experimental_attachments = anyM.experimental_attachments.filter((att: any) => {
+        if (att.url && att.url.length > 5000) {
+          const isPdf =
+            (att.contentType && att.contentType.toLowerCase().includes('pdf')) ||
+            (att.name && att.name.toLowerCase().endsWith('.pdf')) ||
+            att.url.substring(0, 50).toLowerCase().includes('pdf');
+
+          if (isPdf || !(att.contentType && att.contentType.toLowerCase().startsWith('image/'))) {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    if (Array.isArray(anyM.content)) {
+      anyM.content = anyM.content.filter((part: any) => {
+        const data = part.data || part.url || part.text;
+        if (typeof data === 'string' && data.length > 5000) {
+          const isPdf =
+            (part.mimeType && part.mimeType.toLowerCase().includes('pdf')) ||
+            (part.contentType && part.contentType.toLowerCase().includes('pdf')) ||
+            data.substring(0, 50).toLowerCase().includes('pdf');
+
+          if (
+            isPdf ||
+            !(part.mimeType?.startsWith('image/') || part.contentType?.startsWith('image/'))
+          ) {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    return anyM;
+  });
+
   let tabularContext = '';
   try {
     const datasets = await listTabularDatasets();
@@ -120,7 +263,6 @@ export async function POST(req: Request) {
               if (c.type === 'date' && c.dateRange) {
                 desc += ` [format: ${c.dateRange.format}, range: ${c.dateRange.min} to ${c.dateRange.max}]`;
               }
-              // Add sample values for reference
               if (c.sampleValues && c.sampleValues.length > 0) {
                 desc += ` [samples: ${c.sampleValues.slice(0, 3).join(', ')}]`;
               }
@@ -141,20 +283,44 @@ export async function POST(req: Request) {
 
   let docContext = '';
   if (docSessionId) {
+    // Build a rich field listing so the LLM can correctly match semantic meaning to field IDs.
+    // Include: ID, name/label, type, current value (if any), and surrounding context text.
+    const fieldLines =
+      docFields && docFields.length > 0
+        ? (docFields as any[])
+            .map((f: any) => {
+              let line = `- ID: "${f.id}" | Label: "${f.name}" | Type: ${f.type}`;
+              if (f.value) line += ` | Current value: "${f.value}"`;
+              if (f.context) line += ` | Surrounding text: "${String(f.context).slice(0, 120)}"`;
+              if (f.placeholder) line += ` | Placeholder: "${f.placeholder}"`;
+              return line;
+            })
+            .join('\n')
+        : 'None detected.';
+
     docContext = `\n\n[Active Document Session: ${docSessionId}]\nYou are currently editing a document in the Canvas.
 The user may ask you to fill out form fields or edit content.
-Use the "fillDocumentForm" or "editDocument" tools to apply changes.
-Available Form Fields:
-${docFields?.map((f) => `- [${f.id}] ${f.name} (${f.type})`).join('\n') || 'None detected.'}`;
+IMPORTANT: Use the exact field IDs listed below when calling "fillDocumentForm". Do NOT invent field IDs.
+Available Form Fields (${docFields?.length ?? 0} total):
+${fieldLines}`;
   }
 
   const systemPrompt = (config.systemPrompt || DEFAULT_SYSTEM_PROMPT) + tabularContext + docContext;
+  const tools = await getChatTools({ serverId, docSessionId, config });
+
+  // Debug: log payload sizes to console in development
+  if (process.env.NODE_ENV === 'development') {
+    const stringifiedMsgs = JSON.stringify(safeMessages);
+    console.log(
+      `[chat] Payload size — System Prompt: ${systemPrompt.length} chars, safeMessages: ${stringifiedMsgs.length} chars`,
+    );
+  }
 
   const result = streamText({
     model,
     system: systemPrompt,
-    messages: await convertToModelMessages(messages),
-    maxOutputTokens: 88192,
+    messages: await convertToModelMessages(safeMessages, { tools }),
+    maxOutputTokens: 8192,
     stopWhen: stepCountIs(8),
     onFinish: async ({ usage, response }) => {
       const { trackUsageEvent, estimateCost } = await import('@larkup/core/analytics-store');
@@ -170,7 +336,7 @@ ${docFields?.map((f) => `- [${f.id}] ${f.name} (${f.type})`).join('\n') || 'None
         timestamp: new Date().toISOString(),
       });
     },
-    tools: await getChatTools({ serverId, docSessionId, config }),
+    tools,
   });
 
   return result.toUIMessageStreamResponse({

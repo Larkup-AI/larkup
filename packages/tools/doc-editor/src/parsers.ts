@@ -1,11 +1,5 @@
 /**
  * Document parsers for PDF, DOCX, PPTX, and TXT files.
- *
- * Uses lightweight MIT-licensed packages:
- * - pdf-lib: PDF form field reading/filling (MIT)
- * - mammoth: DOCX → HTML + text extraction (MIT, already in web app)
- * - Sandbox python-pptx: PPTX parsing/editing
- * - Native: TXT passthrough
  */
 
 import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup } from 'pdf-lib';

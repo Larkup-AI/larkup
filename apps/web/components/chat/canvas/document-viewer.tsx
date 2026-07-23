@@ -35,6 +35,7 @@ export function DocumentViewer() {
     error,
     fillingFields,
     updatedFields,
+    updateVersion,
     closeCanvas,
     exportFile,
     applyEdits,
@@ -112,6 +113,7 @@ export function DocumentViewer() {
             className="transition-transform duration-200"
           >
             <object
+              key={`pdf-view-${updateVersion}`}
               data={`data:${fileMimeType};base64,${fileBase64}#page=${currentPage + 1}`}
               type="application/pdf"
               className="mx-auto w-full rounded-lg border border-border/40"
