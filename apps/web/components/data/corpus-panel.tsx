@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { formatErrorMessage } from '@/lib/error-formatter';
 import {
@@ -79,8 +79,40 @@ export function CorpusPanel({
 
   const [sourceFilter, setSourceFilter] = useState<DocumentSource | 'all'>('all');
 
+  const groupedDocuments = useMemo(() => {
+    const grouped = new Map<string, SourceDocument>();
+    const others: SourceDocument[] = [];
+
+    for (const doc of documents) {
+      if (doc.source === 'media' && doc.metadata?.mediaAssetId) {
+        const id = doc.metadata.mediaAssetId;
+        if (!grouped.has(id)) {
+          grouped.set(id, {
+            ...doc,
+            id: `media-group-${id}`,
+            title: doc.metadata.fileName || doc.title || 'Media Asset',
+            charCount: doc.charCount,
+            metadata: { ...doc.metadata, isGroup: true, childIds: [doc.id] },
+          });
+        } else {
+          const existing = grouped.get(id)!;
+          existing.charCount += doc.charCount;
+          existing.metadata!.childIds.push(doc.id);
+          if (doc.status !== 'indexed') existing.status = doc.status;
+        }
+      } else {
+        others.push(doc);
+      }
+    }
+    return [...Array.from(grouped.values()), ...others].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [documents]);
+
   const filteredDocuments =
-    sourceFilter === 'all' ? documents : documents.filter((d) => d.source === sourceFilter);
+    sourceFilter === 'all'
+      ? groupedDocuments
+      : groupedDocuments.filter((d) => d.source === sourceFilter);
 
   const PAGE_SIZE = 10;
   const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / PAGE_SIZE));
@@ -90,9 +122,13 @@ export function CorpusPanel({
   const allPageSelected =
     pageDocuments.length > 0 && pageDocuments.every((d) => selectedIds.has(d.id));
 
-  async function del(id: string) {
-    await fetch(`/api/documents?id=${id}`, { method: 'DELETE' });
-    toast.message('Document deleted');
+  async function del(id: string, doc?: SourceDocument) {
+    if (doc?.metadata?.isGroup && doc?.metadata?.mediaAssetId) {
+      await fetch(`/api/media?id=${doc.metadata.mediaAssetId}`, { method: 'DELETE' });
+    } else {
+      await fetch(`/api/documents?id=${id}`, { method: 'DELETE' });
+    }
+    toast.message('Deleted');
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -102,9 +138,15 @@ export function CorpusPanel({
   }
   async function delSelected() {
     if (selectedIds.size === 0) return;
-    const ids = Array.from(selectedIds).join(',');
-    await fetch(`/api/documents?ids=${ids}`, { method: 'DELETE' });
-    toast.message(`Deleted ${selectedIds.size} document(s)`);
+    const toDelete = pageDocuments.filter((d) => selectedIds.has(d.id));
+    for (const doc of toDelete) {
+      if (doc.metadata?.isGroup && doc.metadata?.mediaAssetId) {
+        await fetch(`/api/media?id=${doc.metadata.mediaAssetId}`, { method: 'DELETE' });
+      } else {
+        await fetch(`/api/documents?id=${doc.id}`, { method: 'DELETE' });
+      }
+    }
+    toast.message(`Deleted ${selectedIds.size} item(s)`);
     setSelectedIds(new Set());
     onChanged();
   }
@@ -230,12 +272,25 @@ export function CorpusPanel({
                   <TableCell>
                     <button
                       type="button"
-                      onClick={() => setActive(doc)}
-                      className="group flex flex-col items-start text-left"
+                      onClick={() => !doc.metadata?.isGroup && setActive(doc)}
+                      className={cn(
+                        'group flex flex-col items-start text-left',
+                        doc.metadata?.isGroup ? 'cursor-default' : 'cursor-pointer',
+                      )}
                     >
-                      <span className="line-clamp-1 text-sm font-medium group-hover:text-primary">
+                      <span
+                        className={cn(
+                          'line-clamp-1 text-sm font-medium',
+                          !doc.metadata?.isGroup && 'group-hover:text-primary',
+                        )}
+                      >
                         {doc.title}
                       </span>
+                      {doc.metadata?.isGroup && (
+                        <span className="line-clamp-1 text-[10px] text-muted-foreground mt-0.5">
+                          Video ({doc.metadata.childIds?.length} chunks)
+                        </span>
+                      )}
                       {/* {doc.url && (
                         <span className="line-clamp-1 text-xs text-muted-foreground">
                           {doc.url}
@@ -279,14 +334,16 @@ export function CorpusPanel({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-4">
-                      <button
-                        type="button"
-                        aria-label="Edit document"
-                        onClick={() => setActive(doc)}
-                        className="text-muted-foreground transition-colors hover:text-primary"
-                      >
-                        <Pencil className="size-4" />
-                      </button>
+                      {!doc.metadata?.isGroup && (
+                        <button
+                          type="button"
+                          aria-label="Edit document"
+                          onClick={() => setActive(doc)}
+                          className="text-muted-foreground transition-colors hover:text-primary"
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         aria-label="Delete document"
@@ -366,7 +423,7 @@ export function CorpusPanel({
           ) : deleteTask?.type === 'selected' ? (
             `Are you sure you want to delete ${selectedIds.size} selected documents?`
           ) : (
-            <span className="break-words">
+            <span className="wrap-break-word">
               Are you sure you want to delete "
               <span className="break-all font-medium">
                 {deleteTask?.type === 'single' ? deleteTask.doc.title : ''}
@@ -383,7 +440,7 @@ export function CorpusPanel({
           } else if (deleteTask?.type === 'selected') {
             delSelected();
           } else if (deleteTask?.type === 'single') {
-            del(deleteTask.doc.id);
+            del(deleteTask.doc.id, deleteTask.doc);
             if (active?.id === deleteTask.doc.id) {
               setActive(null);
             }
@@ -574,9 +631,9 @@ function DocumentDialog({
           <div className="flex flex-col gap-4">
             {doc?.source === 'media' && doc?.url && (
               <div className="rounded-md border border-border bg-muted/30 overflow-hidden flex items-center justify-center p-4">
-                {doc.url.match(/\.(mp4|webm|ogg|mov)$/i) ? (
+                {doc.metadata?.mediaType === 'video' ? (
                   <video src={doc.url} controls className="max-h-[40vh] max-w-full" />
-                ) : doc.url.match(/\.(mp3|wav|ogg|m4a)$/i) ? (
+                ) : doc.metadata?.mediaType === 'audio' ? (
                   <audio src={doc.url} controls className="w-full" />
                 ) : (
                   <img

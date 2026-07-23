@@ -1,13 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDown, Loader2, Database } from 'lucide-react';
+import { ChatMediaPreview } from '@/components/chat/tools/chat-media-preview';
 
 interface KBHit {
   title: string;
   url: string;
   score: number;
   text: string;
+  metadata?: {
+    mediaAssetId?: string;
+    mediaType?: 'image' | 'video' | 'audio';
+    fileName?: string;
+    startSecs?: number;
+    endSecs?: number;
+    images?: { imageUrl: string; index: number }[];
+  };
 }
 
 /**
@@ -49,6 +58,11 @@ export function KnowledgeBaseResult({
       return part.input?.query;
     })
     .filter(Boolean);
+  const hasMedia = hits.some((hit) => hit.metadata?.mediaAssetId);
+
+  useEffect(() => {
+    if (hasMedia) setOpen(true);
+  }, [hasMedia]);
 
   return (
     <div className="mb-2 w-full">
@@ -89,61 +103,52 @@ export function KnowledgeBaseResult({
       </div>
 
       {open && hits.length > 0 ? (
-        <div className="mt-2 flex flex-col gap-px border border-border rounded-xl bg-border overflow-hidden">
-          {hits.map((h, i) => (
-            <div key={i} className="bg-card px-3.5 py-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  {(h as any).mediaType && (
+        <div className="mt-2 flex flex-col gap-px border border-border rounded-xl bg-transparent overflow-hidden">
+          {hits.slice(0, 3).map((h, i) => (
+            <div key={i} className="px-3.5 py-4 border-b border-border/50 last:border-0">
+              {/* <p className="mb-3 text-sm leading-relaxed text-foreground">
+                {h.text}
+              </p> */}
+
+              {/* Media Preview (fills container) */}
+              {h.metadata?.mediaAssetId && h.metadata.mediaType ? (
+                <ChatMediaPreview
+                  assetId={h.metadata.mediaAssetId}
+                  mediaType={h.metadata.mediaType}
+                  fileName={h.metadata.fileName ?? h.title}
+                  startSecs={h.metadata.startSecs}
+                  endSecs={h.metadata.endSecs}
+                />
+              ) : null}
+
+              {/* Citation details: Underline title, View Source beside it */}
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  {h.metadata?.mediaType && (
                     <span className="shrink-0 text-[11px]">
-                      {(h as any).mediaType === 'image' && '🖼️'}
-                      {(h as any).mediaType === 'video' && '🎬'}
-                      {(h as any).mediaType === 'audio' && '🎵'}
+                      {h.metadata.mediaType === 'image' && '🖼️'}
+                      {h.metadata.mediaType === 'video' && '🎬'}
+                      {h.metadata.mediaType === 'audio' && '🎵'}
                     </span>
                   )}
-                  <span className="truncate text-sm font-medium text-foreground">{h.title}</span>
+                  <span className="truncate text-xs font-medium text-muted-foreground underline">
+                    {h.title}
+                  </span>
+                  {h.url ? (
+                    <a
+                      href={h.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-primary hover:text-primary/80 shrink-0"
+                    >
+                      View Source
+                    </a>
+                  ) : null}
                 </div>
                 <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground">
                   {Math.round(h.score * 100)}%
                 </span>
               </div>
-              {h.url ? (
-                <div className="mt-1.5 flex flex-col gap-1">
-                  <a
-                    href={h.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="truncate text-xs text-primary hover:underline"
-                  >
-                    View Source ↗
-                  </a>
-                  {(h as any).mediaType === 'image' || h.url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
-                    <img
-                      src={h.url}
-                      alt="Source preview"
-                      className="mt-1 max-h-32 rounded-md object-contain border border-border/50 bg-muted/20"
-                    />
-                  ) : null}
-                  {/* If there are embedded images in the hit metadata (e.g. from PDF) */}
-                  {((h as any).metadata?.images || []).map((img: any, idx: number) => (
-                    <img
-                      key={idx}
-                      src={img.imageUrl}
-                      alt={`Extracted image ${img.index}`}
-                      className="mt-1 max-h-32 rounded-md object-contain border border-border/50 bg-muted/20"
-                    />
-                  ))}
-                </div>
-              ) : null}
-              {(h as any).startSecs !== undefined && (
-                <div className="mt-0.5 text-[11px] text-muted-foreground/70 tabular-nums">
-                  ⏱ {formatTimeSecs((h as any).startSecs)}
-                  {(h as any).endSecs !== undefined && ` – ${formatTimeSecs((h as any).endSecs)}`}
-                </div>
-              )}
-              <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-                {h.text}
-              </p>
             </div>
           ))}
         </div>

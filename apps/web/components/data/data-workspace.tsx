@@ -477,7 +477,7 @@ export function DataWorkspace() {
 
               {activeSubTab === 'media' && (
                 <div className="animate-in fade-in duration-200">
-                  <MediaPanel onAdded={handleDataAdded} />
+                  <MediaPanel onAdded={refreshAll} />
                 </div>
               )}
 

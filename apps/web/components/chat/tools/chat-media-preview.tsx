@@ -33,7 +33,7 @@ export function ChatMediaPreview({
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="group relative my-2 inline-block max-w-[240px] overflow-hidden rounded-lg border border-border"
+          className="group relative my-2 inline-block w-full overflow-hidden rounded-lg border border-border"
         >
           <img
             src={`/api/media/${assetId}`}
@@ -72,10 +72,12 @@ export function ChatMediaPreview({
 
   if (mediaType === 'video') {
     return (
-      <div className="my-2 max-w-[360px] overflow-hidden rounded-lg border border-border bg-card">
+      <div className="my-2 w-full overflow-hidden rounded-lg border border-border bg-card">
         <video
           src={`/api/media/${assetId}${
-            startSecs ? `#t=${startSecs}${endSecs ? `,${endSecs}` : ''}` : ''
+            startSecs !== undefined
+              ? `#t=${startSecs}${endSecs !== undefined ? `,${endSecs}` : ''}`
+              : ''
           }`}
           controls
           preload="metadata"
@@ -99,17 +101,35 @@ export function ChatMediaPreview({
 
   if (mediaType === 'audio') {
     return (
-      <div className="my-2 flex max-w-[320px] items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2">
-        <AudioLines className="size-4 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1">
-          {fileName && (
-            <p className="truncate text-[11px] font-medium text-foreground">{fileName}</p>
-          )}
+      <div className="my-2 w-full overflow-hidden rounded-lg border border-border bg-card">
+        <div className="flex items-center gap-2.5 border-b border-border px-3 py-2">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <AudioLines className="size-3.5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11px] font-medium text-foreground">
+              {fileName ?? 'Audio recording'}
+            </p>
+            {startSecs !== undefined ? (
+              <p className="mt-0.5 text-[10px] tabular-nums text-muted-foreground">
+                {formatTimestamp(startSecs)}
+                {endSecs !== undefined ? ` – ${formatTimestamp(endSecs)}` : ''}
+              </p>
+            ) : (
+              <p className="mt-0.5 text-[10px] text-muted-foreground">Audio reference</p>
+            )}
+          </div>
+        </div>
+        <div className="px-3 py-2">
           <audio
-            src={`/api/media/${assetId}`}
+            src={`/api/media/${assetId}${
+              startSecs !== undefined
+                ? `#t=${startSecs}${endSecs !== undefined ? `,${endSecs}` : ''}`
+                : ''
+            }`}
             controls
             preload="metadata"
-            className="mt-1 h-7 w-full"
+            className="h-8 w-full"
           />
         </div>
       </div>
@@ -154,7 +174,7 @@ export function parseMediaRefs(text: string): ParsedMediaRef[] {
     let startSecs: number | undefined;
     let endSecs: number | undefined;
 
-    if (type === 'video' && extra?.includes('-')) {
+    if ((type === 'video' || type === 'audio') && extra?.includes('-')) {
       const [s, e] = extra.split('-').map(Number);
       if (!isNaN(s)) startSecs = s;
       if (!isNaN(e)) endSecs = e;
