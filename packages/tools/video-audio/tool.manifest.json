@@ -1,9 +1,9 @@
 {
-  "$schema": "https://hub.larkup.dev/schemas/tool-manifest.v1.json",
+  "$schema": "https://hub.larkup.de/schemas/tool-manifest.v1.json",
   "id": "video-audio",
   "name": "Video & Audio",
   "description": "Index video and audio files with transcription and frame analysis.",
-  "longDescription": "Process video and audio files for your knowledge base. Extracts audio transcripts using AI speech-to-text, captures keyframes from video, and generates scene descriptions using vision models. Supports YouTube URLs, direct file upload, and bulk processing. Requires ffmpeg on your system.",
+  "longDescription": "Process long video and audio files for your knowledge base. Splits oversized Whisper uploads, captures scene-change-aware frames in a bounded pass, and supports local files, bounded direct URL downloads, and YouTube videos/playlists. Requires ffmpeg; yt-dlp is only required for YouTube URLs.",
   "category": "media",
   "version": "0.1.0",
   "pricing": "free",
@@ -31,18 +31,28 @@
       "label": "Frame extraction interval (seconds)",
       "type": "text",
       "defaultValue": "10",
-      "help": "Extract one keyframe every N seconds from video files."
+      "help": "Fallback interval used when scene-change detection finds no frames."
     },
     {
-      "key": "transcriptionProvider",
-      "label": "Transcription method",
+      "key": "audioProvider",
+      "label": "Audio Provider",
       "type": "select",
-      "defaultValue": "api",
-      "help": "Use your AI provider's API or local Whisper model.",
+      "help": "Choose the provider that should transcribe both audio files and video audio tracks.",
       "options": [
-        { "label": "AI Provider API (recommended)", "value": "api" },
-        { "label": "Local Whisper", "value": "local" }
+        { "label": "OpenAI", "value": "openai" },
+        { "label": "Google", "value": "google" },
+        { "label": "Groq", "value": "groq" },
+        { "label": "Deepgram", "value": "deepgram" },
+        { "label": "ElevenLabs", "value": "elevenlabs" },
+        { "label": "Local Whisper", "value": "local" },
+        { "label": "Vercel AI Gateway", "value": "vercel_ai_gateway" }
       ]
+    },
+    {
+      "key": "audioApiKey",
+      "label": "Audio API Key",
+      "type": "password",
+      "help": "Required for the selected provider. This key is used only by the Video & Audio tool."
     }
   ]
 }

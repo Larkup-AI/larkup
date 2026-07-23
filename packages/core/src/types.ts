@@ -138,6 +138,10 @@ export interface RagConfig {
   chatProvider?: string;
   chatApiKey?: string;
   customChatModels?: CustomModelConfig[];
+
+  /** dynamic tool configuration */
+  toolConfigs?: Record<string, Record<string, any>>;
+
   chatSuggestions?: string[];
   systemPrompt?: string;
   serperApiKey?: string;
@@ -185,12 +189,15 @@ export const DEFAULT_CONFIG: RagConfig = {
   braveApiKey: '',
   bingApiKey: '',
   exaApiKey: '',
+  chatModelId: '',
+  chatApiKey: '',
   scraperProxyServer: '',
   scraperProxyUsername: '',
   scraperProxyPassword: '',
   useScraperProxy: false,
   webCrawlerProvider: 'local',
   firecrawlApiKey: '',
+  toolConfigs: {},
   updatedAt: new Date(0).toISOString(),
 };
 
@@ -206,7 +213,7 @@ You have these tools:
 
 TOOL SELECTION STRATEGY (follow this decision tree):
 1. Greeting or general question → respond directly, no tools needed.
-2. "Find me info about X", "What does Y say about Z?" → searchKnowledgeBase (semantic search, top-K).
+2. "Find me info about X", "What does Y say about Z?", or questions about specific matches, videos, or events → searchKnowledgeBase (semantic search, top-K).
 3. "How many documents?", "List all X", "Show progress", "What's the status?", "Show me documents by source" → getIndexedData (structured data access with filters).
 4. Complex analysis over hundreds of documents, pivot tables, grouping, pattern detection, progress tracking across many items → analyzeCorpusWithCode (Python sandbox with full corpus).
 5. Questions about uploaded CSV/Excel/JSON data → queryTabularData.
@@ -232,6 +239,8 @@ CRITICAL RULES FOR IMAGES AND KNOWLEDGE BASE:
 - The image description in the search results is only a brief, high-level summary.
 - If the user asks a detailed or structural question about an image (e.g., "what columns are in the film table in the diagram?", "how many items are listed?"), you MUST use the "analyzeImageDeeply" tool. Pass the 'imageUrl' and a detailed prompt to get the exact information you need directly from the image before answering.
 - Do not hallucinate or guess details about images. If the high-level summary doesn't contain the answer, use analyzeImageDeeply.
+- IF THE USER ASKS ABOUT A CURRENT EVENT, SPORTS MATCH, OR VIDEO CONTENT, YOU MUST ALWAYS USE THE 'searchKnowledgeBase' TOOL FIRST. NEVER REFUSE TO ANSWER OR CLAIM YOU LACK REAL-TIME DATA WITHOUT FIRST SEARCHING THE KNOWLEDGE BASE. The user's query likely refers to content they just indexed.
+- FOR WINNER, RESULT, OR OUTCOME QUESTIONS: inspect both the semantic matches and any returned endingContext. Prefer an explicit final announcement, final scoreboard, or celebration over an earlier lead; a participant leading mid-match is not proof they won.
 - IF THE KNOWLEDGE BASE SEARCH RETURNS EMPTY OR IRRELEVANT RESULTS, YOU MUST CLEARLY STATE THAT YOU DO NOT HAVE THE INFORMATION. DO NOT HALLUCINATE OR GUESS THE ANSWER BASED ON YOUR PRE-TRAINED KNOWLEDGE UNLESS EXPLICITLY ASKED TO DO SO.
 
 RESPONSE FORMATTING (Analytics Style):
@@ -307,6 +316,8 @@ export interface MediaAsset {
   /** Processing status */
   processingStatus: MediaProcessingStatus;
   processingError?: string;
+  processingProgress?: number;
+  processingMessage?: string;
   /** Generated caption or transcript summary */
   caption?: string;
   /** IDs of SourceDocuments generated from this asset */

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://hub.larkup.dev/schemas/tool-manifest.v1.json",
+  "$schema": "https://hub.larkup.de/schemas/tool-manifest.v1.json",
   "id": "clip-embeddings",
   "name": "CLIP Image Search",
   "description": "Direct image-to-image similarity search using CLIP/SigLIP embeddings.",

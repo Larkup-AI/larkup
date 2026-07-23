@@ -123,11 +123,16 @@ export function updateMediaAsset(
       MediaAsset,
       | 'processingStatus'
       | 'processingError'
+      | 'processingProgress'
+      | 'processingMessage'
       | 'caption'
       | 'thumbnailUri'
       | 'dimensions'
       | 'durationSecs'
       | 'documentIds'
+      | 'fileName'
+      | 'storageUri'
+      | 'fileSize'
     >
   >,
 ): Promise<MediaAsset | undefined> {
@@ -144,6 +149,60 @@ export function updateMediaAsset(
     };
     await writeAll(assets);
     return assets[idx];
+  });
+}
+
+/** Atomically claim an asset for the in-process media worker. */
+export function claimMediaAsset(id: string): Promise<MediaAsset | undefined> {
+  return serialize(async () => {
+    const assets = await readMediaAssets();
+    const index = assets.findIndex((asset) => asset.id === id);
+    if (
+      index < 0 ||
+      assets[index].processingStatus === 'processing' ||
+      assets[index].processingMessage === 'Queued for background processing...'
+    ) {
+      return undefined;
+    }
+    assets[index] = {
+      ...assets[index],
+      processingStatus: 'pending',
+      processingError: undefined,
+      processingMessage: 'Queued for background processing...',
+      processingProgress: 1,
+      updatedAt: new Date().toISOString(),
+    };
+    await writeAll(assets);
+    return assets[index];
+  });
+}
+
+/** Recover jobs whose worker disappeared after a process/container restart. */
+export function recoverStaleMediaAssets(maxAgeMs = 5 * 60_000): Promise<number> {
+  return serialize(async () => {
+    const assets = await readMediaAssets();
+    const cutoff = Date.now() - maxAgeMs;
+    let recovered = 0;
+    for (let index = 0; index < assets.length; index++) {
+      const asset = assets[index];
+      const wasRunning = asset.processingStatus === 'processing';
+      const wasQueued =
+        asset.processingStatus === 'pending' &&
+        asset.processingMessage === 'Queued for background processing...';
+      if ((wasRunning || wasQueued) && new Date(asset.updatedAt).getTime() < cutoff) {
+        assets[index] = {
+          ...asset,
+          processingStatus: 'failed',
+          processingError: 'The background worker stopped. Retry to resume media processing.',
+          processingMessage: undefined,
+          processingProgress: undefined,
+          updatedAt: new Date().toISOString(),
+        };
+        recovered++;
+      }
+    }
+    if (recovered > 0) await writeAll(assets);
+    return recovered;
   });
 }
 

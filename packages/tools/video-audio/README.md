@@ -6,7 +6,7 @@
 
 This tool processes video and audio files for your knowledge base:
 
-- **Video**: Extracts audio for transcription + keyframes for visual scene description
+- **Video**: Extracts audio for transcription + scene-change-aware frames for visual description
 - **Audio**: Transcribes speech to text with timestamped segments
 - **YouTube**: Import videos directly from YouTube URLs
 
@@ -16,18 +16,19 @@ This tool processes video and audio files for your knowledge base:
   - macOS: `brew install ffmpeg`
   - Ubuntu/Debian: `sudo apt install ffmpeg`
   - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+- **yt-dlp is only required for YouTube URLs** (local files and direct URLs do not require it)
 
 ## How It Works
 
 ### Video Pipeline
 1. **Extract audio** → WAV (16kHz mono) via ffmpeg
 2. **Transcribe audio** → Timestamped text chunks via Whisper API
-3. **Extract keyframes** → One frame every N seconds (configurable)
+3. **Extract frames** → Scene changes in one bounded ffmpeg pass, with adaptive interval fallback
 4. **Caption frames** → Vision LLM describes each keyframe
 5. **Index** → Combined transcript + scene descriptions become searchable documents
 
 ### Audio Pipeline
-1. **Transcribe** → Speech-to-text via Whisper API or local Whisper
+1. **Transcribe** → Speech-to-text via Whisper API or local Whisper; large API inputs are compressed and split into ≤10-minute uploads (maximum 3 concurrent)
 2. **Chunk** → Split into 30-second segments with timestamps
 3. **Index** → Each chunk becomes a searchable document
 
@@ -42,5 +43,5 @@ This tool processes video and audio files for your knowledge base:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Frame interval | 10s | Extract one keyframe every N seconds |
+| Frame interval | 10s | Fallback interval when no scene changes are detected |
 | Transcription method | API | Use AI provider API or local Whisper |

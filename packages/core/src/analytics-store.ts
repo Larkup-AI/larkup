@@ -6,7 +6,7 @@ import { ALL_MODELS } from './models-list';
 
 export interface UsageEvent {
   id: string;
-  type: 'chat' | 'embedding' | 'server_request';
+  type: 'chat' | 'embedding' | 'server_request' | 'media_processing';
   // Chat-specific
   modelId?: string;
   provider?: string;
@@ -22,6 +22,10 @@ export interface UsageEvent {
   method?: string;
   statusCode?: number;
   latencyMs?: number;
+  // Media processing-specific
+  mediaType?: 'image' | 'video' | 'audio';
+  durationSecs?: number;
+  frameCount?: number;
   // Cost
   estimatedCost?: number;
   // Common
@@ -179,6 +183,19 @@ export async function getAnalyticsSummary(days: number): Promise<AnalyticsSummar
         mData.requests += 1;
         modelMap.set(ev.embeddingModelId, mData);
       }
+    } else if (ev.type === 'media_processing') {
+      summary.totalCost += ev.estimatedCost || 0;
+      const modelId = ev.modelId || 'media-processing';
+      const mData = modelMap.get(modelId) || {
+        type: 'media_processing',
+        tokens: 0,
+        cost: 0,
+        requests: 0,
+      };
+      mData.tokens += ev.totalTokens || 0;
+      mData.cost += ev.estimatedCost || 0;
+      mData.requests += 1;
+      modelMap.set(modelId, mData);
     } else if (ev.type === 'server_request') {
       summary.totalRequests += 1;
 

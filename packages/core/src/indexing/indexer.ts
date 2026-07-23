@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { IndexRun, RagConfig } from '../types';
 import { readDocuments, updateDocumentsStatus } from '../documents-store';
-import { patchRun, writeRun } from '../index-store';
+import { claimRun, patchRun as patchStoredRun } from '../index-store';
 import { chunkCorpus } from './chunker';
 import { embedTexts, expectedDimensions } from './embedder';
 import { createAdapter } from '@larkup/vector-stores/factory';
@@ -34,7 +34,7 @@ export async function createRun(config: RagConfig): Promise<IndexRun> {
     startedAt: now,
     updatedAt: now,
   };
-  return writeRun(run);
+  return claimRun(run);
 }
 
 /**
@@ -47,11 +47,18 @@ export async function runIndexer(
   previousRun: IndexRun | null = null,
 ): Promise<void> {
   const started = Date.now();
+  const patchRun = async (patch: Partial<IndexRun>) => {
+    const updated = await patchStoredRun(patch, runId);
+    if (!updated) throw new Error('This index run no longer owns the active index lease.');
+    return updated;
+  };
   try {
     let docs = await readDocuments();
 
     if (previousRun && previousRun.status === 'completed') {
-      docs = docs.filter((d) => d.createdAt > previousRun.startedAt);
+      // Status is the durable source of truth. Timestamp filtering can skip
+      // documents produced during a long-running previous index job.
+      docs = docs.filter((document) => document.status !== 'indexed');
     }
 
     if (docs.length === 0) {
@@ -224,11 +231,14 @@ export async function runIndexer(
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Indexing failed unexpectedly.';
-    await patchRun({
-      status: 'failed',
-      error: message,
-      finishedAt: new Date().toISOString(),
-      durationMs: Date.now() - started,
-    });
+    await patchStoredRun(
+      {
+        status: 'failed',
+        error: message,
+        finishedAt: new Date().toISOString(),
+        durationMs: Date.now() - started,
+      },
+      runId,
+    );
   }
 }

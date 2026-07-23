@@ -1,5 +1,5 @@
 {
-  "$schema": "https://hub.larkup.dev/schemas/tool-manifest.v1.json",
+  "$schema": "https://hub.larkup.de/schemas/tool-manifest.v1.json",
   "id": "doc-editor",
   "name": "Document Editor",
   "description": "AI-powered form filling and document editing with Canvas-style live preview.",
