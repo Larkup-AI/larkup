@@ -1,6 +1,6 @@
 ---
-title: "Web Crawling & Data Loading"
-description: "Scrape websites, upload files, and build your knowledge corpus"
+title: 'Web Crawling & Data Loading'
+description: 'Scrape websites, upload files, and build your knowledge corpus'
 ---
 
 Larkup gives you a complete data pipeline out of the box. Crawl entire domains, upload local documents, or paste raw text then track every ingestion job in real time. Everything runs through a single **Data** tab with three views: **Add Data**, **Corpus**, and **ETL Jobs**.
@@ -12,6 +12,17 @@ The **Add Data** tab is your starting point for loading content into the pipelin
 - **Web Scrape**: Crawl websites by keyword search or direct URL. Powered by Firecrawl, with support for self-hosted and cloud modes.
 - **Paste Text**: Drop in raw text or a single URL for quick ingestion.
 - **Upload Files**: Drag-and-drop files directly. Supported formats include PDF, Word (`.docx`), Markdown, CSV, JSON, Excel, and plain text.
+- **Media**: Upload images, video, or audio. The optional **Video & Audio** marketplace tool also imports direct media URLs, YouTube videos, and playlists (up to 10 items per batch).
+
+### Video and audio indexing
+
+Before an upload or URL import starts, Larkup shows the detected duration, expected processing time, and estimated transcription cost. API transcription currently uses Whisper at an estimated **$0.006/minute**; local Whisper has no API charge. Vision-model pricing for video scenes depends on the configured model.
+
+Video indexing analyzes consecutive keyframes as chronological sequences, extracts actions and on-screen text, and aligns that visual evidence with timestamped speech in one-minute multimodal timeline segments. Audio indexing also links neighboring transcript segments. Long recordings use bounded scene sampling and API concurrency, while the Media panel shows live extraction, vision, transcription, and embedding progress. Completed assets are already embedded and searchable—no separate index build is required.
+
+Search retrieves more semantic candidates for media and expands a matching moment with its immediately preceding and following timeline segments. This gives the answering agent enough before → event → after context for questions about outcomes, actions, or a specific scene in a multi-hour recording.
+
+After indexing, matching chat sources include an embedded player and seek to the cited time range. YouTube citations also link to the original video at the matching timestamp. Direct URL imports reject private or local network addresses.
 
 <Frame caption="Launch a self-hosted Firecrawl crawler in Docker">
   <img src="/images/data/launch-firecrwal-server.png" alt="Launch web crawler" />
@@ -23,7 +34,7 @@ The **Add Data** tab is your starting point for loading content into the pipelin
 
 ## Your Corpus
 
-Once data is ingested, every document lands in the **Corpus**,  your central knowledge base. The corpus view shows all loaded documents with their source type (scraped, pasted, uploaded), character count, and actions to edit or delete.
+Once data is ingested, every document lands in the **Corpus**, your central knowledge base. The corpus view shows all loaded documents with their source type (scraped, pasted, uploaded), character count, and actions to edit or delete.
 
 <Frame caption="The Corpus table, browse, edit, or remove any document in your knowledge base">
   <img src="/images/data/corpus-table.png" alt="Corpus table view" />

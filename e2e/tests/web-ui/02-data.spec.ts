@@ -309,4 +309,27 @@ test.describe.serial('Data Page', () => {
       console.log(`  📦 Video tab install prompt visible: ${hasPrompt}`);
     }
   });
+
+  test('audio uploads provide a playable staged preview', async ({ page }) => {
+    const mediaTab = page.getByText('Media', { exact: true }).first();
+    await mediaTab.click();
+    await page.waitForTimeout(500);
+
+    const audioTab = page.getByText('Audio', { exact: true }).first();
+    await audioTab.click();
+
+    const fileInput = page.locator('input[type="file"]').first();
+    test.skip(
+      !(await fileInput.isVisible({ timeout: 5_000 }).catch(() => false)),
+      'The Video & Audio tool is not installed in this test environment.',
+    );
+
+    await fileInput.setInputFiles({
+      name: 'preview.wav',
+      mimeType: 'audio/wav',
+      buffer: Buffer.alloc(44),
+    });
+
+    await expect(page.getByLabel('Preview preview.wav')).toBeVisible();
+  });
 });

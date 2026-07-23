@@ -20,10 +20,11 @@ services:
       DOCKER_BUILD: "1"
       PORT: "4567"
       HOSTNAME: "0.0.0.0"
+      TMPDIR: "/app/.tmp"
     # Ephemeral volumes — no host state leaks into tests
     tmpfs:
-      - /app/data
-      - /app/apps/web/data
+      - /app/.larkup:uid=1001,gid=1001
+      - /app/.tmp:uid=1001,gid=1001
     healthcheck:
       test:
         [

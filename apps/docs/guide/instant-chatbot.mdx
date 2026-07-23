@@ -1,6 +1,6 @@
 ---
-title: "Chat with Your Data"
-description: "Turn your documents into an AI-powered chatbot in minutes, via CLI or the Web UI."
+title: 'Chat with Your Data'
+description: 'Turn your documents into an AI-powered chatbot in minutes, via CLI or the Web UI.'
 ---
 
 Larkup gives you two ways to chat with your knowledge base: a **CLI** for developers who prefer the terminal, and a full **Web UI** with a built-in chat interface. Both paths support multiple LLM providers out of the box.
@@ -17,7 +17,10 @@ Larkup isn't locked to OpenAI. You can choose from any of the following embeddin
 - **Custom**: bring your own OpenAI-compatible endpoint
 
 <Frame caption="Choose from 10+ embedding providers directly in the configuration UI">
-  <img src="/images/configuration/llm-embedding-providers.png" alt="Supported LLM and embedding providers" />
+  <img
+    src="/images/configuration/llm-embedding-providers.png"
+    alt="Supported LLM and embedding providers"
+  />
 </Frame>
 
 ---
@@ -73,6 +76,7 @@ Larkup isn't locked to OpenAI. You can choose from any of the following embeddin
     ```
 
     The AI pulls facts directly from your indexed documents to answer questions. Type `exit` to quit.
+
   </Tab>
 
   <Tab title="Web UI">
@@ -110,9 +114,12 @@ Larkup isn't locked to OpenAI. You can choose from any of the following embeddin
 
     Open the **Chat** tab for a full conversational interface. Select your LLM model from the dropdown (e.g., GPT-4o Mini via Gateway) and start asking questions grounded in your documents.
 
+    When an answer retrieves indexed video or audio, its source opens automatically with an embedded player, relevance score, transcript or scene excerpt, and the cited timestamp range. Local uploads and remote imports play from Larkup; YouTube sources also provide a timestamped link to the original video.
+
     <Frame caption="Built-in chat: ask questions and get answers grounded in your indexed documents">
       <img src="/images/chat.png" alt="Chat interface" />
     </Frame>
+
   </Tab>
 </Tabs>
 

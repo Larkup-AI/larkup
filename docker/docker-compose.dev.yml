@@ -9,10 +9,12 @@ services:
     environment:
       - NODE_ENV=production
       - DOCKER_BUILD=1
+      - TMPDIR=/app/.tmp
     volumes:
-      # Persist data directories
-      - ../data:/app/data
-      - ../apps/web/data:/app/apps/web/data
+      # All configs, corpus records, media, LanceDB indexes, and installed tools.
+      - larkup_data:/app/.larkup
+      # Keep large transient frame/audio files out of the container layer.
+      - media_tmp:/app/.tmp
     restart: unless-stopped
     networks:
       - app-network
@@ -20,3 +22,7 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  larkup_data:
+  media_tmp:

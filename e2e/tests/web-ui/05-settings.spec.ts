@@ -123,6 +123,110 @@ test.describe('Settings Page', () => {
       }
     }
   });
+
+  test('video-audio provider verification', async ({ page }) => {
+    // Intercept /api/marketplace to ensure video-audio is considered installed
+    await page.route('/api/marketplace', async (route) => {
+      const response = await route.fetch();
+      let json: { tools: any[] } = { tools: [] };
+      try {
+        json = await response.json();
+      } catch (e) {}
+
+      if (!json.tools) json.tools = [];
+      const vaTool = json.tools.find((t: any) => t.id === 'video-audio');
+      if (vaTool) {
+        vaTool.status = 'installed';
+      } else {
+        json.tools.push({
+          id: 'video-audio',
+          name: 'Video & Audio',
+          status: 'installed',
+          configSchema: [
+            {
+              key: 'audioProvider',
+              type: 'select',
+              options: [
+                { label: 'Deepgram', value: 'deepgram' },
+                { label: 'Groq', value: 'groq' },
+              ],
+            },
+            { key: 'audioApiKey', type: 'password' },
+          ],
+        });
+      }
+      await route.fulfill({ response, json });
+    });
+
+    // Intercept /api/config/verify endpoint
+    await page.route('/api/config/verify', async (route) => {
+      const body = JSON.parse(route.request().postData() || '{}');
+      if (body.audioProvider && body.audioApiKey) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true }),
+        });
+      } else {
+        await route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Missing provider or key' }),
+        });
+      }
+    });
+
+    const toolsLink = page.getByText('Installed Tools', { exact: true }).first();
+    if (await toolsLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await toolsLink.click();
+      await page.waitForTimeout(500);
+
+      // Verify the Video & Audio tool exists
+      const toolCard = page.locator('.border', { hasText: 'Video & Audio' }).first();
+      await expect(toolCard).toBeVisible({ timeout: 5_000 });
+
+      // There should be a combobox inside this card
+      const providerSelect = toolCard.getByRole('combobox').first();
+      if (await providerSelect.isVisible()) {
+        await providerSelect.click();
+
+        // Select Deepgram
+        const deepgramOption = page.getByRole('option', { name: 'Deepgram', exact: true }).first();
+        if (await deepgramOption.isVisible()) {
+          await deepgramOption.click();
+
+          // Enter dummy API key
+          const apiKeyInput = toolCard.locator('input[type="password"]').first();
+          await apiKeyInput.fill('dummy-deepgram-key');
+
+          // Click Verify
+          const verifyBtn = toolCard.getByRole('button', { name: 'Verify' }).first();
+          await verifyBtn.click();
+
+          // Check if verification succeeded
+          await expect(toolCard.getByText('✓ Verified').first()).toBeVisible({ timeout: 5_000 });
+        }
+
+        // Test Groq
+        await providerSelect.click();
+        const groqOption = page.getByRole('option', { name: 'Groq', exact: true }).first();
+        if (await groqOption.isVisible()) {
+          await groqOption.click();
+
+          // Enter dummy API key
+          const groqKeyInput = toolCard.locator('input[type="password"]').first();
+          await groqKeyInput.fill('dummy-groq-key');
+
+          // Click Verify
+          const verifyBtn = toolCard.getByRole('button', { name: 'Verify' }).first();
+          await verifyBtn.click();
+
+          // Check if verification succeeded
+          await expect(toolCard.getByText('✓ Verified').first()).toBeVisible({ timeout: 5_000 });
+        }
+      }
+    }
+  });
   test('smart proxy parsing', async ({ page }) => {
     const generalLink = page.getByText('General', { exact: true }).first();
     if (await generalLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
