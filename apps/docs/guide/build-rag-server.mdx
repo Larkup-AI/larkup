@@ -25,7 +25,7 @@ The core power of Larkup is turning your raw data into a deployable, high-perfor
       </Step>
 
       <Step title="Launch the Server">
-        Finally, go to the **Server** tab and click **Launch Server**. Larkup takes your entire configuration and generates a minimal, deployable Node.js server. 
+        Finally, go to the **Server** tab and click **Launch Server** to test the generated retrieval API locally. The deploy flow produces the full agent server with streamed chat and a website widget.
         
         <Frame>
           <img src="/images/server-scalar-api.png" alt="Server Launch Interface" />
@@ -81,6 +81,13 @@ When you launch your server, Larkup creates an optimized backend output director
 
 - **Zero Bloat**: Only dependencies for your specific Vector Store are bundled.
 - **No Build Step**: Runs directly as a Node ESM backend (`node server.mjs`).
+- **One deployable agent surface**: server download and Vercel deployment include the same retrieval, streamed chat, and widget routes.
+
+## Deploying to serverless
+
+Local LanceDB is ideal for development and a VPS with a persistent disk. It is not durable on Vercel or other serverless platforms. Before deploying there, switch **Settings → Storage** to LanceDB Cloud or another cloud vector store and re-index your local source documents. Vercel Blob is suitable for original files and media; use a vector database for retrieval.
+
+After deployment, copy the widget snippet from **Settings → Larkup Server** to add the chat UI to a website.
 
 ## SDK Usage
 

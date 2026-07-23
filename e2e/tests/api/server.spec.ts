@@ -12,6 +12,9 @@ test.describe('Server API (/api/server)', () => {
     expect(body.server).toHaveProperty('files');
     expect(Array.isArray(body.server.files)).toBe(true);
     expect(body.server.files.length).toBeGreaterThan(0);
+    expect(body.server.files.map((file: { path: string }) => file.path)).toEqual(
+      expect.arrayContaining(['chat.mjs', 'widget.js', 'chat-ui.html']),
+    );
     console.log(
       `  ✓ Server generated: ${body.server.files.length} files, serverId=${body.serverId}`,
     );

@@ -6,7 +6,7 @@
   "scripts": {
     "tauri": "tauri",
     "start": "tauri dev",
-    "build": "node build.js",
+    "build": "tauri build --no-bundle",
     "build:sidecar": "bash scripts/build_sidecar.sh",
     "test:e2e": "playwright test"
   },

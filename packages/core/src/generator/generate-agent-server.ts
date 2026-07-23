@@ -481,11 +481,21 @@ export async function handleChat(req, res) {
 
 function widgetSource(config: any) {
   return `export const WIDGET_JS = \`
-(function() {
-  const container = document.createElement('div');
-  container.innerHTML = '<div style="position:fixed;bottom:20px;right:20px;width:60px;height:60px;border-radius:50%;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:9999;" onclick="document.getElementById(\\'larkup-chat-iframe\\').style.display = document.getElementById(\\'larkup-chat-iframe\\').style.display === \\'none\\' ? \\'block\\' : \\'none\\'">💬</div><iframe id="larkup-chat-iframe" src="' + document.currentScript.src.replace('/widget.js', '/chat-ui') + '" style="display:none;position:fixed;bottom:90px;right:20px;width:350px;height:500px;border:none;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:9999;"></iframe>';
-  document.body.appendChild(container);
-})();
+export function embedWidget(options = {}) {
+  const url = (options.url || window.location.origin).replace(/\\/$/, '')
+  const id = options.id || 'larkup-chat-widget'
+  if (document.getElementById(id)) return
+  const theme = options.theme === 'dark' ? 'dark' : 'light'
+  const root = document.createElement('div')
+  root.id = id
+  root.innerHTML = '<button type="button" aria-label="Open chat" style="position:fixed;right:20px;bottom:20px;width:48px;height:48px;border:0;border-radius:999px;background:' + (theme === 'dark' ? '#fff' : '#000') + ';color:' + (theme === 'dark' ? '#000' : '#fff') + ';font-size:20px;cursor:pointer;z-index:2147483647">✦</button><iframe title="Chat" src="' + url + '/chat-ui" style="display:none;position:fixed;right:20px;bottom:80px;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 112px));border:1px solid #e5e5e5;border-radius:8px;background:#fff;z-index:2147483647"></iframe>'
+  const button = root.querySelector('button')
+  const frame = root.querySelector('iframe')
+  button.addEventListener('click', () => {
+    frame.style.display = frame.style.display === 'block' ? 'none' : 'block'
+  })
+  document.body.appendChild(root)
+}
 \`;`;
 }
 
@@ -789,9 +799,10 @@ export function generateAgentServer(config: RagConfig): GeneratedServer {
   const usesLocalLance = config.vectorStore === 'lancedb' && config.storeConfig.mode !== 'cloud';
 
   const dependencies: Record<string, string> = {
-    ai: '^3.3.0',
+    ai: '^6.0.197',
     zod: '^3.23.0',
     cheerio: '^1.0.0',
+    '@ai-sdk/openai': '^3.0.68',
     ...store.serverDependencies,
   };
 

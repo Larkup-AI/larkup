@@ -112,29 +112,6 @@ async function setProjectEnv(token: string, projectId: string, key: string, valu
   }
 }
 
-function getFilesRecursively(dir: string, baseDir: string): any[] {
-  let results: any[] = [];
-  if (!fs.existsSync(dir)) return results;
-  const list = fs.readdirSync(dir);
-  for (const file of list) {
-    if (file === 'node_modules' || file === '.git' || file === 'server.log') continue;
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    if (stat && stat.isDirectory()) {
-      results = results.concat(getFilesRecursively(filePath, baseDir));
-    } else {
-      const data = fs.readFileSync(filePath);
-      const relativePath = path.relative(baseDir, filePath).replace(/\\/g, '/');
-      results.push({
-        file: relativePath,
-        data: data.toString('base64'),
-        encoding: 'base64',
-      });
-    }
-  }
-  return results;
-}
-
 /** Deploy by sending files directly. */
 async function triggerDeploymentWithFiles(
   token: string,
@@ -166,6 +143,7 @@ export async function getServerEnvRequirements(serverId: string) {
 
   let vectorStore: string = 'lancedb';
   let storeConfig: Record<string, string> = {};
+  let ragConfig: Record<string, any> = {};
   const configCandidates = [
     path.join(cwd, '.larkup', 'servers', activeId, 'config.json'),
     path.join(cwd, '.larkup', 'config.json'),
@@ -174,6 +152,7 @@ export async function getServerEnvRequirements(serverId: string) {
     if (fs.existsSync(cfgPath)) {
       try {
         const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+        ragConfig = cfg;
         vectorStore = cfg.vectorStore ?? 'lancedb';
         storeConfig = cfg.storeConfig ?? {};
         break;
@@ -208,6 +187,19 @@ export async function getServerEnvRequirements(serverId: string) {
       help: 'API key used to embed incoming queries.',
     },
   ];
+
+  envVarDefs.push(
+    {
+      key: 'CHAT_API_KEY',
+      required: false,
+      help: 'OpenAI-compatible API key for streamed chat. Required when chat is enabled.',
+    },
+    {
+      key: 'CHAT_MODEL',
+      required: false,
+      help: 'Chat model ID (defaults to gpt-4o-mini).',
+    },
+  );
 
   if (vectorStore === 'pinecone') {
     envVarDefs.push(
@@ -281,6 +273,12 @@ export async function getServerEnvRequirements(serverId: string) {
         }
       }
     }
+    if (e.key === 'CHAT_API_KEY' && !defaultValue) {
+      defaultValue = ragConfig.deployment?.chatApiKey || ragConfig.chatApiKey || '';
+    }
+    if (e.key === 'CHAT_MODEL' && !defaultValue) {
+      defaultValue = ragConfig.deployment?.chatModelId || ragConfig.chatModelId || '';
+    }
     return {
       key: e.key,
       help: e.help,
@@ -332,8 +330,8 @@ export async function deployToVercel(
       }
     }
 
-    const cwd = process.cwd();
     let config: any = null;
+    const cwd = process.cwd();
     const configCandidates = [
       path.join(cwd, '.larkup', 'servers', activeId, 'config.json'),
       path.join(cwd, '.larkup', 'config.json'),
@@ -351,27 +349,23 @@ export async function deployToVercel(
       return { success: false, error: 'Configuration not found. Please save your settings first.' };
     }
 
-    const { generateServer } = await import('@larkup/core/generator/generate-server');
-    const generated = generateServer(config);
+    const isLanceLocal = config.vectorStore === 'lancedb' && config.storeConfig?.mode !== 'cloud';
+    if (isLanceLocal) {
+      return {
+        success: false,
+        error:
+          'Local LanceDB uses a filesystem and cannot be deployed safely to Vercel. Switch Storage to LanceDB Cloud or another cloud vector store, then re-index before deploying.',
+      };
+    }
+
+    const { generateAgentServer } = await import('@larkup/core/generator/generate-agent-server');
+    const generated = generateAgentServer(config);
 
     const files = generated.files.map((f) => ({
       file: f.path,
       data: f.encoding === 'base64' ? f.contents : Buffer.from(f.contents).toString('base64'),
       encoding: 'base64',
     }));
-
-    const isLanceLocal = config.vectorStore === 'lancedb' && config.storeConfig?.mode !== 'cloud';
-    if (isLanceLocal) {
-      await setProjectEnv(token, project.id, 'LANCEDB_PATH', './lancedb');
-      const lancedbDir = path.join(cwd, '.larkup', 'servers', activeId, 'lancedb');
-      if (fs.existsSync(lancedbDir)) {
-        const lancedbFiles = getFilesRecursively(
-          lancedbDir,
-          path.join(cwd, '.larkup', 'servers', activeId),
-        );
-        files.push(...lancedbFiles);
-      }
-    }
 
     if (files.length === 0) {
       return {

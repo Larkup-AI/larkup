@@ -334,29 +334,42 @@ export function DeploymentSection() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Cloud Storage Setup</CardTitle>
           <CardDescription className="text-xs">
-            If deploying to Vercel/serverless, connect Vercel Blob for persistent vector storage
+            Use Vercel Blob for original files and media. Configure a cloud vector store separately
+            for retrieval.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isBlobConnected ? (
             <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-md">
-              <Check className="w-5 h-5" /> Vercel Blob is connected. Serverless deployments are
-              ready.
+              <Check className="w-5 h-5" /> Vercel Blob is connected for media and file storage.
             </div>
           ) : (
-            <div className="flex items-end gap-3 max-w-lg">
-              <div className="space-y-2 flex-1">
-                <Label>Vercel Blob Read/Write Token</Label>
-                <Input
-                  type="password"
-                  placeholder="vercel_blob_rw_..."
-                  value={blobToken}
-                  onChange={(e) => setBlobToken(e.target.value)}
-                />
+            <div className="space-y-3 max-w-lg">
+              <a
+                href="https://vercel.com/integrations/vercel-blob"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex text-sm font-medium underline underline-offset-4"
+              >
+                Install Vercel Blob in your Vercel account
+              </a>
+              <p className="text-xs text-muted-foreground">
+                After installation, paste the Blob read/write token to connect this workspace.
+              </p>
+              <div className="flex items-end gap-3">
+                <div className="space-y-2 flex-1">
+                  <Label>Vercel Blob Read/Write Token</Label>
+                  <Input
+                    type="password"
+                    placeholder="vercel_blob_rw_..."
+                    value={blobToken}
+                    onChange={(e) => setBlobToken(e.target.value)}
+                  />
+                </div>
+                <Button onClick={connectBlob} disabled={!blobToken}>
+                  Connect
+                </Button>
               </div>
-              <Button onClick={connectBlob} disabled={!blobToken}>
-                Connect
-              </Button>
             </div>
           )}
         </CardContent>

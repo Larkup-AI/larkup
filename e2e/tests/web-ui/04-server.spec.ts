@@ -3,12 +3,14 @@ import { test, expect } from '@playwright/test';
 test.describe.serial('Server Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/settings?section=server');
-    await page.waitForSelector('text=Launch, manage, and connect', { timeout: 60_000 });
+    await page.waitForSelector('text=Test locally, then deploy', { timeout: 60_000 });
   });
 
   test('page loads with correct heading', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Server', exact: true })).toBeVisible();
-    await expect(page.getByText('Launch, manage, and connect to your AI server.')).toBeVisible();
+    await expect(
+      page.getByText('Test locally, then deploy one retrieval and chat server anywhere.'),
+    ).toBeVisible();
   });
 
   test('server generation panel loads', async ({ page }) => {

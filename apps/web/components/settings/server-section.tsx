@@ -20,6 +20,8 @@ import {
   Send,
   Phone,
   Plug,
+  Code2,
+  Database,
 } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +72,15 @@ export function ServerSection() {
   const [remoteProvider, setRemoteProvider] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedWidget, setCopiedWidget] = useState(false);
+
+  const widgetSnippet = remoteUrl
+    ? `<script type="module">
+  import { embedWidget } from "${remoteUrl}/widget.js";
+
+  embedWidget({ url: "${remoteUrl}", theme: "light" });
+</script>`
+    : '';
 
   useEffect(() => {
     const url = localStorage.getItem(`vercel_deployed_url_${serverId}`);
@@ -156,6 +167,14 @@ export function ServerSection() {
     setTimeout(() => setCopiedKey(false), 1500);
   }
 
+  async function copyWidgetSnippet() {
+    if (!widgetSnippet) return;
+    await navigator.clipboard.writeText(widgetSnippet);
+    setCopiedWidget(true);
+    setTimeout(() => setCopiedWidget(false), 1500);
+    toast.success('Widget snippet copied');
+  }
+
   function removeRemoteServer() {
     localStorage.removeItem(`vercel_deployed_url_${serverId}`);
     localStorage.removeItem(`vercel_deployed_provider_${serverId}`);
@@ -169,7 +188,7 @@ export function ServerSection() {
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Server</h2>
         <p className="text-sm text-muted-foreground">
-          Launch, manage, and connect to your AI server.
+          Test locally, then deploy one retrieval and chat server anywhere.
         </p>
       </div>
 
@@ -381,10 +400,64 @@ export function ServerSection() {
                 </div>
                 <DeployButton serverId={serverId} />
               </div>
+              <div className="flex items-start gap-3 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                <Database className="mt-0.5 size-3.5 shrink-0 text-foreground" />
+                <p>
+                  Serverless platforms need a cloud vector store. Local LanceDB is for local work or
+                  a VPS with a persistent disk.{' '}
+                  <a
+                    href="/settings?section=storage"
+                    className="font-medium text-foreground underline underline-offset-4"
+                  >
+                    Choose storage before deploying
+                  </a>
+                  . For media and source files,{' '}
+                  <a
+                    href="https://vercel.com/integrations/vercel-blob"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-foreground underline underline-offset-4"
+                  >
+                    install Vercel Blob
+                  </a>
+                  .
+                </p>
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {remoteUrl && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Code2 className="size-3.5 text-primary" />
+              Website widget
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Add a streamed chat experience backed by this deployed server.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <pre className="overflow-x-auto rounded-md border bg-muted/40 p-3 text-xs leading-5 text-foreground">
+              <code>{widgetSnippet}</code>
+            </pre>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={copyWidgetSnippet}>
+              {copiedWidget ? (
+                <CheckCircle2 className="size-3.5 text-primary" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+              Copy embed code
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              The widget loads from your server and opens its chat UI without adding a framework
+              dependency to your site.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-3">
