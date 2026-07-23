@@ -111,9 +111,9 @@ export function ModelsSection() {
     JSON.stringify(form.customEmbeddings) !== JSON.stringify(data?.config?.customEmbeddings);
 
   const dirtyChat =
-    form.chatProvider !== data?.config?.chatProvider ||
+    form.chatProvider !== (data?.config?.chatProvider || data?.config?.embeddingProvider) ||
     form.chatModelId !== data?.config?.chatModelId ||
-    form.chatApiKey !== data?.config?.chatApiKey ||
+    form.chatApiKey !== (data?.config?.chatApiKey || data?.config?.embeddingApiKey) ||
     JSON.stringify(form.customChatModels) !== JSON.stringify(data?.config?.customChatModels);
 
   const clearError = (key: string) => {
@@ -125,6 +125,18 @@ export function ModelsSection() {
       });
     }
   };
+
+  function handleStructuralChangeBlock() {
+    toast('Cannot modify configuration', {
+      description:
+        'This project already has indexed data. You must create a new project to change this setting.',
+      duration: Number.POSITIVE_INFINITY,
+      action: {
+        label: 'New Project',
+        onClick: () => setNewServerModalOpen(true),
+      },
+    });
+  }
 
   async function handleSave(section: 'embedding' | 'chat') {
     if (!data?.config) return;
@@ -177,19 +189,23 @@ export function ModelsSection() {
         if (form.customChatModels !== undefined) payload.customChatModels = form.customChatModels;
       }
 
+      const verifyPayload: any = {};
+      if (section === 'embedding') {
+        verifyPayload.embeddingProvider = payload.embeddingProvider;
+        verifyPayload.embeddingApiKey = payload.embeddingApiKey;
+        verifyPayload.embeddingModelId = payload.embeddingModelId;
+        verifyPayload.customEmbeddings = payload.customEmbeddings;
+      } else if (section === 'chat') {
+        verifyPayload.chatProvider = payload.chatProvider;
+        verifyPayload.chatApiKey = payload.chatApiKey;
+        verifyPayload.chatModelId = payload.chatModelId;
+        verifyPayload.customChatModels = payload.customChatModels;
+      }
+
       const verifyRes = await fetch('/api/config/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          embeddingProvider: payload.embeddingProvider,
-          embeddingApiKey: payload.embeddingApiKey,
-          embeddingModelId: payload.embeddingModelId,
-          customEmbeddings: payload.customEmbeddings,
-          chatProvider: payload.chatProvider,
-          chatApiKey: payload.chatApiKey,
-          chatModelId: payload.chatModelId,
-          customChatModels: payload.customChatModels,
-        }),
+        body: JSON.stringify(verifyPayload),
       });
 
       if (!verifyRes.ok) {
@@ -290,21 +306,16 @@ export function ModelsSection() {
               <Select
                 value={form.embeddingProvider ?? 'openai'}
                 onValueChange={(v: any) => {
+                  if (indexedRun) {
+                    handleStructuralChangeBlock();
+                    return;
+                  }
                   setForm({
                     ...form,
                     embeddingProvider: v,
                     embeddingModelId: '',
-                    chatProvider:
-                      !form.chatProvider || form.chatProvider === form.embeddingProvider
-                        ? v
-                        : form.chatProvider,
-                    chatModelId:
-                      !form.chatProvider || form.chatProvider === form.embeddingProvider
-                        ? ''
-                        : form.chatModelId,
                   });
                   clearError('embeddingProvider');
-                  clearError('chatProvider');
                 }}
               >
                 <SelectTrigger
@@ -382,7 +393,13 @@ export function ModelsSection() {
                 variant="outline"
                 size="icon"
                 type="button"
-                onClick={() => setCustomEmbeddingModalOpen(true)}
+                onClick={() => {
+                  if (indexedRun) {
+                    handleStructuralChangeBlock();
+                    return;
+                  }
+                  setCustomEmbeddingModalOpen(true);
+                }}
                 className="shrink-0 h-9 w-9"
               >
                 <Plus className="size-4" />
@@ -396,6 +413,10 @@ export function ModelsSection() {
               value={isOtherEmbedding ? 'other' : form.embeddingModelId || ''}
               onValueChange={(v: string | null) => {
                 if (!v) return;
+                if (indexedRun) {
+                  handleStructuralChangeBlock();
+                  return;
+                }
                 if (v === 'other') {
                   setIsOtherEmbedding(true);
                   return;
@@ -490,21 +511,18 @@ export function ModelsSection() {
 
           <div className="space-y-1.5">
             <Label className="text-xs">API Key</Label>
-            <div className="relative">
+            <div className="relative" onClick={() => indexedRun && handleStructuralChangeBlock()}>
               <Input
                 type={showEmbeddingKey ? 'text' : 'password'}
                 value={form.embeddingApiKey || ''}
+                readOnly={!!indexedRun}
                 onChange={(e) => {
+                  if (indexedRun) return;
                   setForm({
                     ...form,
                     embeddingApiKey: e.target.value,
-                    chatApiKey:
-                      !form.chatApiKey || form.chatApiKey === form.embeddingApiKey
-                        ? e.target.value
-                        : form.chatApiKey,
                   });
                   clearError('embeddingApiKey');
-                  clearError('chatApiKey');
                 }}
                 placeholder="sk-..."
                 className={cn('pr-10', errors.embeddingApiKey && 'border-destructive')}

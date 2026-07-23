@@ -257,9 +257,9 @@ export function ServerSection() {
                 disabled={busy !== null}
               >
                 {busy === 'start' ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader2 className="size-4 mr-2 animate-spin" />
                 ) : (
-                  <Play className="size-4" />
+                  <Play className="size-4 mr-2" />
                 )}
                 {busy === 'start' ? 'Starting…' : 'Launch server'}
               </Button>

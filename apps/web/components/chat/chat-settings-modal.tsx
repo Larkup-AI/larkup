@@ -1,26 +1,16 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Settings, Eye, EyeOff } from "lucide-react";
-import { toast } from "sonner";
-import { useWorkspace } from "@/components/workspace/workspace-provider";
-import useSWR from "swr";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
-import { PROVIDER_META, ProviderIcon } from "@/components/ui/provider-icon";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { CustomModelForm } from "@/components/configure/custom-model-modal";
-import type { CustomModelConfig } from "@larkup/core/types";
+import { useState, useEffect } from 'react';
+import { Settings, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
+import { useWorkspace } from '@/components/workspace/workspace-provider';
+import useSWR from 'swr';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { PROVIDER_META, ProviderIcon } from '@/components/ui/provider-icon';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { CustomModelForm } from '@/components/configure/custom-model-modal';
+import type { CustomModelConfig } from '@larkup/core/types';
 import {
   Dialog,
   DialogTrigger,
@@ -30,7 +20,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "../ui/dialog";
+} from '../ui/dialog';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -46,25 +36,23 @@ export function ChatSettingsModal() {
 
   const config = configData?.config;
 
-  const [provider, setProvider] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
+  const [provider, setProvider] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
-  const [view, setView] = useState<"main" | "custom">("main");
-  const [customChatModels, setCustomChatModels] = useState<CustomModelConfig[]>(
-    [],
-  );
+  const [view, setView] = useState<'main' | 'custom'>('main');
+  const [customChatModels, setCustomChatModels] = useState<CustomModelConfig[]>([]);
 
   useEffect(() => {
     if (config && open) {
-      setProvider(config.chatProvider || config.embeddingProvider || "openai");
-      setApiKey(config.chatApiKey || "");
-      setSystemPrompt(config.systemPrompt || "");
+      setProvider(config.chatProvider || config.embeddingProvider || 'openai');
+      setApiKey(config.chatApiKey || '');
+      setSystemPrompt(config.systemPrompt || '');
       setCustomChatModels(config.customChatModels || []);
     }
     if (!open) {
-      setView("main");
+      setView('main');
     }
   }, [config, open]);
 
@@ -74,28 +62,25 @@ export function ChatSettingsModal() {
 
     setIsSaving(true);
     try {
-      const res = await fetch(
-        `/api/config?serverId=${encodeURIComponent(serverId)}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...config,
-            chatProvider: provider,
-            chatApiKey: apiKey,
-            systemPrompt: systemPrompt,
-            customChatModels: customChatModels,
-          }),
-        },
-      );
+      const res = await fetch(`/api/config?serverId=${encodeURIComponent(serverId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...config,
+          chatProvider: provider,
+          chatApiKey: apiKey,
+          systemPrompt: systemPrompt,
+          customChatModels: customChatModels,
+        }),
+      });
 
-      if (!res.ok) throw new Error("Failed to save settings");
+      if (!res.ok) throw new Error('Failed to save settings');
 
-      toast.success("Chat settings saved.");
+      toast.success('Chat settings saved.');
       mutate();
       setOpen(false);
     } catch (err: any) {
-      toast.error(err.message || "Error saving settings");
+      toast.error(err.message || 'Error saving settings');
     } finally {
       setIsSaving(false);
     }
@@ -124,85 +109,58 @@ export function ChatSettingsModal() {
       </TooltipProvider>
 
       <DialogContent className="max-w-md overflow-hidden transition-all duration-300">
-        {view === "main" ? (
+        {view === 'main' ? (
           <div className="flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <DialogHeader>
               <DialogTitle>Chat Provider Settings</DialogTitle>
               <DialogDescription>
-                Configure the AI provider and API key used for the Chat
-                interface. This can be different from your embedding provider.
+                Configure the AI provider and API key used for the Chat interface. This can be
+                different from your embedding provider.
               </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleSave} className="flex flex-col gap-4 mt-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-foreground">
-                  AI Provider
-                </label>
+                <label className="text-sm font-medium text-foreground">AI Provider</label>
                 <div className="flex items-center gap-2">
-                  <Select
-                    value={provider}
-                    onValueChange={(v) => setProvider(v ?? "")}
-                  >
+                  <Select value={provider} onValueChange={(v) => setProvider(v ?? '')}>
                     <SelectTrigger className="w-full">
                       <span className="flex items-center gap-2">
-                        {provider &&
-                        PROVIDER_META[
-                          provider as keyof typeof PROVIDER_META
-                        ] ? (
+                        {provider && PROVIDER_META[provider as keyof typeof PROVIDER_META] ? (
                           <>
                             <ProviderIcon
-                              src={
-                                PROVIDER_META[
-                                  provider as keyof typeof PROVIDER_META
-                                ].iconSrc
-                              }
-                              alt={
-                                PROVIDER_META[
-                                  provider as keyof typeof PROVIDER_META
-                                ].label
-                              }
-                              pillBg={
-                                PROVIDER_META[
-                                  provider as keyof typeof PROVIDER_META
-                                ].pillBg
-                              }
+                              src={PROVIDER_META[provider as keyof typeof PROVIDER_META].iconSrc}
+                              alt={PROVIDER_META[provider as keyof typeof PROVIDER_META].label}
+                              pillBg={PROVIDER_META[provider as keyof typeof PROVIDER_META].pillBg}
                               size={16}
                             />
                             <span>
-                              {
-                                PROVIDER_META[
-                                  provider as keyof typeof PROVIDER_META
-                                ].label
-                              }
+                              {PROVIDER_META[provider as keyof typeof PROVIDER_META].label}
                             </span>
                           </>
                         ) : (
-                          <span className="text-muted-foreground">
-                            Select an AI Provider
-                          </span>
+                          <span className="text-muted-foreground">Select an AI Provider</span>
                         )}
                       </span>
                     </SelectTrigger>
                     <SelectContent>
                       {[
-                        "vercel_ai_gateway",
-                        "openai",
-                        "anthropic",
-                        "google",
-                        "mistral",
-                        "deepseek",
-                        "cohere",
-                        "meta",
-                        "xai",
-                        "perplexity",
-                        "groq",
-                        "together-ai",
-                        "fireworks",
-                        "cerebras",
+                        'vercel_ai_gateway',
+                        'openai',
+                        'anthropic',
+                        'google',
+                        'mistral',
+                        'deepseek',
+                        'cohere',
+                        'meta',
+                        'xai',
+                        'perplexity',
+                        'groq',
+                        'together-ai',
+                        'fireworks',
+                        'cerebras',
                       ].map((key) => {
-                        const meta =
-                          PROVIDER_META[key as keyof typeof PROVIDER_META];
+                        const meta = PROVIDER_META[key as keyof typeof PROVIDER_META];
                         if (!meta) return null;
                         return (
                           <SelectItem key={key} value={key}>
@@ -219,13 +177,10 @@ export function ChatSettingsModal() {
                         );
                       })}
                       {customChatModels?.map((cfg) => (
-                        <SelectItem
-                          key={`custom:${cfg.modelName}`}
-                          value="custom"
-                        >
+                        <SelectItem key={`custom:${cfg.modelName}`} value="custom">
                           <div className="flex items-center gap-2">
                             <ProviderIcon
-                              src={PROVIDER_META.custom?.iconSrc ?? ""}
+                              src={PROVIDER_META.custom?.iconSrc ?? ''}
                               alt="Custom"
                               pillBg={PROVIDER_META.custom?.pillBg}
                               size={16}
@@ -244,7 +199,7 @@ export function ChatSettingsModal() {
                             variant="outline"
                             size="icon"
                             type="button"
-                            onClick={() => setView("custom")}
+                            onClick={() => setView('custom')}
                             className="shrink-0 h-9 w-9"
                           >
                             <Settings className="size-4 hidden" />
@@ -273,12 +228,10 @@ export function ChatSettingsModal() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-foreground">
-                  API Key
-                </label>
+                <label className="text-sm font-medium text-foreground">API Key</label>
                 <div className="relative flex items-center">
                   <input
-                    type={showApiKey ? "text" : "password"}
+                    type={showApiKey ? 'text' : 'password'}
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="Leave blank to use environment variable"
@@ -289,29 +242,22 @@ export function ChatSettingsModal() {
                     onClick={() => setShowApiKey(!showApiKey)}
                     className="absolute right-3 text-muted-foreground hover:text-foreground"
                   >
-                    {showApiKey ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  If left blank, it falls back to{" "}
-                  <code>AI_GATEWAY_API_KEY</code> or{" "}
+                  If left blank, it falls back to <code>AI_GATEWAY_API_KEY</code> or{' '}
                   <code>EMBEDDING_API_KEY</code> in your environment.
                 </p>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-foreground">
-                  System Prompt
-                </label>
+                <label className="text-sm font-medium text-foreground">System Prompt</label>
                 <textarea
                   value={systemPrompt}
                   onChange={(e) => setSystemPrompt(e.target.value)}
                   placeholder="Leave blank to use default system prompt"
-                  className="w-full min-h-[100px] rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="w-full min-h-[140px] rounded-lg border bg-card border-border  px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
                 />
                 <p className="text-xs text-muted-foreground">
                   Override the default instructions given to the agent.
@@ -335,7 +281,7 @@ export function ChatSettingsModal() {
                   disabled={isSaving}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
                 >
-                  {isSaving ? "Saving..." : "Save Settings"}
+                  {isSaving ? 'Saving...' : 'Save Settings'}
                 </button>
               </DialogFooter>
             </form>
@@ -344,24 +290,20 @@ export function ChatSettingsModal() {
           <div className="flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
             <DialogHeader>
               <DialogTitle>Custom Chat Model</DialogTitle>
-              <DialogDescription>
-                Connect an OpenAI-compatible chat model.
-              </DialogDescription>
+              <DialogDescription>Connect an OpenAI-compatible chat model.</DialogDescription>
             </DialogHeader>
             <CustomModelForm
               type="chat"
               onSave={(cfg) => {
                 const next = [...customChatModels];
-                const idx = next.findIndex(
-                  (m) => m.modelName === cfg.modelName,
-                );
+                const idx = next.findIndex((m) => m.modelName === cfg.modelName);
                 if (idx >= 0) next[idx] = cfg;
                 else next.push(cfg);
                 setCustomChatModels(next);
-                setProvider("custom");
-                setView("main");
+                setProvider('custom');
+                setView('main');
               }}
-              onCancel={() => setView("main")}
+              onCancel={() => setView('main')}
             />
           </div>
         )}
