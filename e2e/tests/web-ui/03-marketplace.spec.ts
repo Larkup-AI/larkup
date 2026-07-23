@@ -35,7 +35,9 @@ test.describe('Marketplace', () => {
   test('install button is visible for available tools', async ({ page }) => {
     await page.waitForTimeout(2_000);
 
-    const installBtn = page.getByRole('button', { name: /Install/i }).first();
-    await expect(installBtn).toBeVisible({ timeout: 10_000 });
+    const actionBtn = page
+      .locator('button:has-text("Install"), span:has-text("Installed")')
+      .first();
+    await expect(actionBtn).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -89,16 +89,17 @@ test.describe.serial('Server Page', () => {
       const endpointLink = page.getByRole('link', { name: /http:\/\/localhost:\d+/ }).first();
       const endpoint = await endpointLink.textContent();
 
-      // Test the RAG server directly via the web UI's context
-      const healthOk = await page.evaluate(async (url) => {
+      // Test the RAG server directly via Node.js fetch (simulating SDK/curl)
+      const healthOk = await (async (url) => {
         try {
           const res = await fetch(`${url}/health`);
           const data = await res.json();
           return data.ok === true || res.ok;
-        } catch {
+        } catch (e) {
+          console.error('Fetch error:', e);
           return false;
         }
-      }, endpoint);
+      })(endpoint?.trim() || '');
       expect(healthOk).toBe(true);
       console.log(`  ✓ RAG server health check passed via browser against ${endpoint}`);
     }

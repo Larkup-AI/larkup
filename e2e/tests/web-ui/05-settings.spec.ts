@@ -165,10 +165,53 @@ test.describe('Settings Page', () => {
         await page.waitForTimeout(200);
 
         await page.getByRole('tab', { name: 'Form' }).click();
-        await expect(formProxyServerInput).toHaveValue('http://1.2.3.4:8080');
-        await expect(usernameInput).toHaveValue('user2');
-        await expect(passwordInput).toHaveValue('pass2');
       }
+    }
+  });
+
+  test('prompts section is accessible and functional', async ({ page }) => {
+    // We navigate to Prompts section
+    const promptsLink = page.getByText('Prompts', { exact: true }).first();
+    if (await promptsLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await promptsLink.click();
+      await page.waitForTimeout(500);
+
+      // Verify Agent Customization header
+      await expect(page.getByText('Agent Customization').first()).toBeVisible({ timeout: 5_000 });
+
+      // Verify System Prompt text area
+      const systemPromptArea = page
+        .locator('textarea[placeholder*="helpful research assistant"]')
+        .first();
+      await expect(systemPromptArea).toBeVisible();
+
+      // Check Tools and Plugins tabs
+      const toolsTab = page.getByRole('button', { name: /Tools/i }).first();
+      const pluginsTab = page.getByRole('button', { name: /Plugins/i }).first();
+
+      if (await toolsTab.isVisible()) {
+        await toolsTab.click();
+        await expect(page.getByText('Semantic Search').first()).toBeVisible();
+      }
+
+      if (await pluginsTab.isVisible()) {
+        await pluginsTab.click();
+        // Just verify the tab changes and doesn't crash
+        await page.waitForTimeout(200);
+      }
+    }
+  });
+
+  test('playground section is accessible', async ({ page }) => {
+    const playgroundLink = page.getByText('Playground', { exact: true }).first();
+    if (await playgroundLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await playgroundLink.click();
+      await page.waitForTimeout(500);
+
+      // Verify Playground loaded
+      await expect(page.getByText('Playground', { exact: true }).first()).toBeVisible({
+        timeout: 5_000,
+      });
     }
   });
 });

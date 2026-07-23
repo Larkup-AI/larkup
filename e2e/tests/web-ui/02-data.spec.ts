@@ -21,10 +21,8 @@ test.describe.serial('Data Page', () => {
     test.setTimeout(60_000);
 
     const uploadTab = page.getByText('Files', { exact: true }).first();
-    if (await uploadTab.isVisible()) {
-      await uploadTab.click();
-      await page.waitForTimeout(300);
-    }
+    await uploadTab.click();
+    await page.waitForTimeout(300);
 
     // Find the file input (may be hidden, so we use setInputFiles)
     await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
@@ -42,10 +40,8 @@ test.describe.serial('Data Page', () => {
     test.setTimeout(60_000);
 
     const uploadTab = page.getByText('Files', { exact: true }).first();
-    if (await uploadTab.isVisible()) {
-      await uploadTab.click();
-      await page.waitForTimeout(300);
-    }
+    await uploadTab.click();
+    await page.waitForTimeout(300);
 
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(FIXTURES.txt);
@@ -60,10 +56,8 @@ test.describe.serial('Data Page', () => {
     test.setTimeout(60_000);
 
     const uploadTab = page.getByText('Files', { exact: true }).first();
-    if (await uploadTab.isVisible()) {
-      await uploadTab.click();
-      await page.waitForTimeout(300);
-    }
+    await uploadTab.click();
+    await page.waitForTimeout(300);
 
     await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
     const fileInput = page.locator('input[type="file"]').first();
@@ -79,10 +73,8 @@ test.describe.serial('Data Page', () => {
     test.setTimeout(60_000);
 
     const uploadTab = page.getByText('Files', { exact: true }).first();
-    if (await uploadTab.isVisible()) {
-      await uploadTab.click();
-      await page.waitForTimeout(300);
-    }
+    await uploadTab.click();
+    await page.waitForTimeout(300);
 
     await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
     const fileInput = page.locator('input[type="file"]').first();
@@ -101,10 +93,8 @@ test.describe.serial('Data Page', () => {
     test.setTimeout(60_000);
 
     const uploadTab = page.getByText('Files', { exact: true }).first();
-    if (await uploadTab.isVisible()) {
-      await uploadTab.click();
-      await page.waitForTimeout(300);
-    }
+    await uploadTab.click();
+    await page.waitForTimeout(300);
 
     await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
     const fileInput = page.locator('input[type="file"]').first();
@@ -123,10 +113,8 @@ test.describe.serial('Data Page', () => {
 
     // Look for a paste/text tab or button
     const pasteTab = page.getByText('Text', { exact: true }).first();
-    if (await pasteTab.isVisible()) {
-      await pasteTab.click();
-      await page.waitForTimeout(300);
-    }
+    await pasteTab.click();
+    await page.waitForTimeout(300);
 
     // Find the text area for pasting
     const textArea = page.locator('textarea').first();
@@ -175,17 +163,13 @@ test.describe.serial('Data Page', () => {
     test.setTimeout(120_000);
 
     const scrapeTab = page.getByText('Website', { exact: true }).first();
-    if (await scrapeTab.isVisible()) {
-      await scrapeTab.click();
-      await page.waitForTimeout(500);
-    }
+    await scrapeTab.click();
+    await page.waitForTimeout(500);
 
     // Switch to Direct URL mode
     const directUrlTab = page.getByText('Direct URL').first();
-    if (await directUrlTab.isVisible()) {
-      await directUrlTab.click();
-      await page.waitForTimeout(300);
-    }
+    await directUrlTab.click();
+    await page.waitForTimeout(300);
 
     // Enter a URL to scrape
     const urlInput = page
@@ -217,10 +201,8 @@ test.describe.serial('Data Page', () => {
 
     // Navigate to the scrape section
     const scrapeTab = page.getByText('Website', { exact: true }).first();
-    if (await scrapeTab.isVisible()) {
-      await scrapeTab.click();
-      await page.waitForTimeout(500);
-    }
+    await scrapeTab.click();
+    await page.waitForTimeout(500);
 
     // Look for search functionality
     const searchInput = page.locator('input[placeholder*="search" i]').first();
@@ -239,10 +221,8 @@ test.describe.serial('Data Page', () => {
   test('corpus document list shows uploaded documents', async ({ page }) => {
     // Switch to Knowledge Base tab
     const kbTab = page.getByText('Knowledge Base', { exact: true }).first();
-    if (await kbTab.isVisible()) {
-      await kbTab.click();
-      await page.waitForTimeout(500);
-    }
+    await kbTab.click();
+    await page.waitForTimeout(500);
 
     // After previous uploads, verify the corpus has documents
     const docItems = page.locator('[class*="document"], [class*="corpus"], tr, [class*="item"]');
@@ -254,10 +234,8 @@ test.describe.serial('Data Page', () => {
   test('delete a document from corpus', async ({ page }) => {
     // Switch to Knowledge Base tab
     const kbTab = page.getByText('Knowledge Base', { exact: true }).first();
-    if (await kbTab.isVisible()) {
-      await kbTab.click();
-      await page.waitForTimeout(500);
-    }
+    await kbTab.click();
+    await page.waitForTimeout(500);
 
     // Find a delete button on any document
     const deleteBtn = page
@@ -297,10 +275,8 @@ test.describe.serial('Data Page', () => {
     test.setTimeout(60_000);
 
     const mediaTab = page.getByText('Media', { exact: true }).first();
-    if (await mediaTab.isVisible()) {
-      await mediaTab.click();
-      await page.waitForTimeout(500);
-    }
+    await mediaTab.click();
+    await page.waitForTimeout(500);
 
     // Find the file input in the media panel
     await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
@@ -318,10 +294,8 @@ test.describe.serial('Data Page', () => {
 
   test('media video tab shows install prompt', async ({ page }) => {
     const mediaTab = page.getByText('Media', { exact: true }).first();
-    if (await mediaTab.isVisible()) {
-      await mediaTab.click();
-      await page.waitForTimeout(500);
-    }
+    await mediaTab.click();
+    await page.waitForTimeout(500);
 
     // Switch to Video sub-tab
     const videoTab = page.getByText('Video', { exact: true }).first();

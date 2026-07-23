@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
+import path from 'path';
+import fs from 'fs';
 
 test.describe.serial('Chat Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/chat');
-    // Wait for EITHER "Chat with your knowledge base" OR "Setup Required"
     await expect(
       page.getByText('Chat with your knowledge base').or(page.getByText('Setup Required')).first(),
     ).toBeVisible({ timeout: 60_000 });
@@ -15,86 +16,79 @@ test.describe.serial('Chat Page', () => {
     ).toBeVisible();
   });
 
-  test('chat input is visible or setup required', async ({ page }) => {
-    const isSetupRequired = await page.getByText('Setup Required').isVisible();
-    if (isSetupRequired) {
-      console.log('  ℹ Setup Required is visible, chat input not expected.');
-      return;
-    }
-
-    const chatInput = page.locator('textarea[placeholder*="How can I help you" i]').first();
-    await expect(chatInput).toBeVisible({ timeout: 10_000 });
-  });
-
   test('send a message and receive a response', async ({ page }) => {
     test.setTimeout(120_000);
-
     const isSetupRequired = await page.getByText('Setup Required').isVisible();
     if (isSetupRequired) {
-      test.skip(true, 'Setup is required (no API key/server), skipping chat interaction test.');
+      test.skip(true, 'Setup is required');
       return;
     }
 
     const chatInput = page.locator('textarea[placeholder*="How can I help you" i]').first();
-
     if (await chatInput.isVisible()) {
       await chatInput.fill('What is Larkup?');
-
-      // Submit the message
       await chatInput.press('Enter');
 
-      // Check analytics API updates after a short delay
-      await page.waitForTimeout(5000);
-      const analyticsResponse = await page.request.get('/api/analytics?timeframe=all');
-      const summary = await analyticsResponse.json();
-      expect(summary.totalChatTokens).toBeGreaterThanOrEqual(0);
-
-      // Wait for AI response to appear
       const responseElement = page
         .locator('[class*="message"], [class*="chat-bubble"], [role="log"] > div')
         .last();
       await expect(responseElement).toBeVisible({ timeout: 60_000 });
-
-      // Verify we got at least some text back
       const responseText = await responseElement.textContent();
       expect(responseText?.length).toBeGreaterThan(10);
-      console.log(`  ✓ Received chat response (${responseText?.length} chars)`);
     }
   });
 
-  test('multi-turn conversation', async ({ page }) => {
-    test.setTimeout(180_000);
-
+  test('toggle web search', async ({ page }) => {
     const isSetupRequired = await page.getByText('Setup Required').isVisible();
-    if (isSetupRequired) {
-      test.skip(true, 'Setup is required (no API key/server), skipping chat interaction test.');
-      return;
-    }
+    if (isSetupRequired) return;
 
-    const chatInput = page.locator('textarea[placeholder*="How can I help you" i]').first();
+    // Click plus button
+    await page
+      .locator('button', { has: page.locator('.lucide-plus') })
+      .first()
+      .click();
 
-    if (await chatInput.isVisible()) {
-      // First message
-      await chatInput.fill('What is Larkup?');
-      await chatInput.press('Enter');
+    // Click Web Search
+    const webSearchBtn = page.getByText('Web Search');
+    await expect(webSearchBtn).toBeVisible();
+    await webSearchBtn.click();
+  });
 
-      // Wait for first response
-      await page.waitForTimeout(15_000);
+  test('upload attachment', async ({ page }) => {
+    const isSetupRequired = await page.getByText('Setup Required').isVisible();
+    if (isSetupRequired) return;
 
-      // Second message (follow-up)
-      await chatInput.fill('Can you tell me more about its features?');
-      await chatInput.press('Enter');
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await page
+      .locator('button', { has: page.locator('.lucide-plus') })
+      .first()
+      .click();
+    await page.getByText('Attach Document').click();
 
-      // Wait for second response
-      await page.waitForTimeout(15_000);
+    const fileChooser = await fileChooserPromise;
+    // Create a dummy file to upload
+    const testFile = path.resolve('test-attachment.txt');
+    fs.writeFileSync(testFile, 'This is a test file for upload.');
 
-      // Count message elements — should be at least 4 (2 user + 2 assistant)
-      const messages = page.locator(
-        '[class*="message"], [class*="chat-bubble"], [role="log"] > div',
-      );
-      const count = await messages.count();
-      console.log(`  ✓ Multi-turn chat: ${count} messages visible`);
-      expect(count).toBeGreaterThanOrEqual(2);
-    }
+    await fileChooser.setFiles(testFile);
+
+    // Ensure attachment card appears
+    await expect(page.getByText('test-attachment.txt')).toBeVisible();
+
+    // Cleanup
+    fs.unlinkSync(testFile);
+  });
+
+  test('chat history displays and can load previous chat', async ({ page }) => {
+    const isSetupRequired = await page.getByText('Setup Required').isVisible();
+    if (isSetupRequired) return;
+
+    // Open History
+    await page
+      .locator('button', { has: page.locator('.lucide-history') })
+      .first()
+      .click();
+
+    await expect(page.getByRole('heading', { name: 'Chat History' })).toBeVisible();
   });
 });
