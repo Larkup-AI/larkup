@@ -41,6 +41,7 @@ import { ServerFormDialog } from '@/components/workspace/server-form-dialog';
 
 import { CustomModelModal } from '@/components/configure/custom-model-modal';
 import type { RagConfig, CustomModelConfig, EmbeddingModelDescriptor } from '@larkup/core/types';
+import { EMBEDDING_DIMENSIONS } from '@larkup/core/embeddings/registry';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
@@ -145,6 +146,34 @@ export function ModelsSection() {
     });
   }
 
+  function getEmbeddingDimensions(modelId: string | undefined): number | undefined {
+    if (!modelId) return undefined;
+    return (
+      embeddingModels.find((model) => model.id === modelId)?.dimensions ??
+      form.customEmbeddings?.find((model) => `custom:${model.modelName}` === modelId)?.dimensions ??
+      EMBEDDING_DIMENSIONS[modelId]?.dimensions
+    );
+  }
+
+  function canUseEmbeddingModel(modelId: string | undefined, knownDimensions?: number): boolean {
+    if (!indexedRun) return true;
+    const dimensions = knownDimensions ?? getEmbeddingDimensions(modelId);
+    if (dimensions === indexedRun.dimensions) return true;
+
+    toast.error('This embedding model is not compatible with the current index', {
+      description:
+        dimensions === undefined
+          ? `The current index uses ${indexedRun.dimensions} dimensions. Choose a model with the same dimension or create a new project.`
+          : `The current index uses ${indexedRun.dimensions} dimensions, but this model uses ${dimensions}. Create a new project to use it.`,
+      duration: Number.POSITIVE_INFINITY,
+      action: {
+        label: 'New Project',
+        onClick: () => setNewServerModalOpen(true),
+      },
+    });
+    return false;
+  }
+
   async function handleSave(section: string) {
     if (!data?.config) return;
 
@@ -159,6 +188,12 @@ export function ModelsSection() {
       if (!form.embeddingApiKey) {
         newErrors.embeddingApiKey = 'Required';
         hasError = true;
+      }
+      if (!form.embeddingModelId) {
+        newErrors.embeddingModelId = 'Required';
+        hasError = true;
+      } else if (!canUseEmbeddingModel(form.embeddingModelId)) {
+        return;
       }
     } else if (section === 'chat') {
       if (!form.chatProvider) {
@@ -291,10 +326,12 @@ export function ModelsSection() {
         open={customEmbeddingModalOpen}
         onOpenChange={setCustomEmbeddingModalOpen}
         onSave={(cfg) => {
+          const modelId = `custom:${cfg.modelName}`;
+          if (!canUseEmbeddingModel(modelId, cfg.dimensions)) return;
           setForm({
             ...form,
             embeddingProvider: 'custom',
-            embeddingModelId: `custom:${cfg.modelName}`,
+            embeddingModelId: modelId,
             customEmbeddings: [cfg],
           });
           clearError('embeddingProvider');
@@ -333,10 +370,6 @@ export function ModelsSection() {
               <Select
                 value={form.embeddingProvider ?? 'openai'}
                 onValueChange={(v: any) => {
-                  if (indexedRun) {
-                    handleStructuralChangeBlock();
-                    return;
-                  }
                   setForm({
                     ...form,
                     embeddingProvider: v,
@@ -421,10 +454,6 @@ export function ModelsSection() {
                 size="icon"
                 type="button"
                 onClick={() => {
-                  if (indexedRun) {
-                    handleStructuralChangeBlock();
-                    return;
-                  }
                   setCustomEmbeddingModalOpen(true);
                 }}
                 className="shrink-0 h-9 w-9"
@@ -440,14 +469,11 @@ export function ModelsSection() {
               value={isOtherEmbedding ? 'other' : form.embeddingModelId || ''}
               onValueChange={(v: string | null) => {
                 if (!v) return;
-                if (indexedRun) {
-                  handleStructuralChangeBlock();
-                  return;
-                }
                 if (v === 'other') {
                   setIsOtherEmbedding(true);
                   return;
                 }
+                if (!canUseEmbeddingModel(v)) return;
                 setIsOtherEmbedding(false);
                 setForm({ ...form, embeddingModelId: v });
                 clearError('embeddingModelId');

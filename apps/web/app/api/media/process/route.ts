@@ -360,7 +360,7 @@ async function processMediaWithTool(
       // Process audio transcript
       if (!sourceTranscript && result.audioPath && tool.processAudio) {
         transcriptPromise = (async () => {
-          onProgress?.('Transcribing and timestamping the audio track...', 25);
+          onProgress?.(`Transcribing with ${formatProviderName(provider)}...`, 25);
           return await tool.processAudio(result.audioPath, { provider, apiKey, language });
         })();
       }
@@ -450,8 +450,8 @@ async function processMediaWithTool(
       });
       documentIds.push(document.id);
 
-      onProgress?.('Embedding linked segments for semantic search...', 85);
-      await ensureSearchable(onProgress);
+      onProgress?.('Preparing the video for semantic search...', 85);
+      await ensureSearchable(onProgress, provider);
       await updateMediaAsset(asset.id, {
         processingStatus: 'completed',
         caption: `Video: ${result.meta.durationSecs.toFixed(0)}s, ${
@@ -467,7 +467,7 @@ async function processMediaWithTool(
       await cleanupReplacedDocuments(asset.documentIds);
       await trackMediaProcessing('video', result.meta.durationSecs, result.frames.length, provider);
     } else if (asset.type === 'audio' && tool.processAudio) {
-      onProgress?.('Transcribing and timestamping the audio track...', 20);
+      onProgress?.(`Transcribing with ${formatProviderName(provider)}...`, 20);
       const transcript = await tool.processAudio(tmpFile, { provider, apiKey, language });
       const segments = tool.buildMultimodalSegments(
         transcript.chunks,
@@ -499,8 +499,8 @@ async function processMediaWithTool(
       });
       documentIds.push(document.id);
 
-      onProgress?.('Embedding linked segments for semantic search...', 85);
-      await ensureSearchable(onProgress);
+      onProgress?.('Preparing the audio for semantic search...', 85);
+      await ensureSearchable(onProgress, provider);
       await updateMediaAsset(asset.id, {
         processingStatus: 'completed',
         caption: `Audio: ${transcript.durationSecs.toFixed(0)}s, ${
@@ -591,7 +591,10 @@ function groupFramesByWindow<T extends { timestampSecs: number }>(
 // timeline is actually searchable.
 let indexChain: Promise<void> = Promise.resolve();
 
-function ensureSearchable(onProgress?: (msg: string, progress?: number) => void): Promise<void> {
+function ensureSearchable(
+  onProgress?: (msg: string, progress?: number) => void,
+  transcriptionProvider?: string,
+): Promise<void> {
   const run = indexChain.then(async () => {
     const { readDocuments } = await import('@larkup/core/documents-store');
     const { createRun, runIndexer } = await import('@larkup/core/indexing/indexer');
@@ -618,18 +621,50 @@ function ensureSearchable(onProgress?: (msg: string, progress?: number) => void)
         await new Promise((resolve) => setTimeout(resolve, 1_000));
       }
     }
-    onProgress?.('Building the searchable multimodal index...', 90);
+    onProgress?.(
+      `Building the searchable index with ${
+        config.embeddingModelId || config.embeddingProvider
+      }...`,
+      90,
+    );
     await runIndexer(nextRun.id, config, previousRun?.status === 'completed' ? previousRun : null);
 
     const completedRun = await readRun();
     if (completedRun?.id !== nextRun.id || completedRun.status !== 'completed') {
-      throw new Error(completedRun?.error || 'Search indexing did not complete.');
+      throw describeSearchIndexFailure(
+        completedRun?.error || 'Search indexing did not complete.',
+        config,
+        transcriptionProvider,
+      );
     }
     onProgress?.('Media is searchable.', 99);
   });
 
   indexChain = run.catch(() => {});
   return run;
+}
+
+function formatProviderName(provider: string): string {
+  return provider === 'deepgram' ? 'Deepgram' : provider.replace(/_/g, ' ');
+}
+
+function describeSearchIndexFailure(
+  error: string,
+  config: Awaited<ReturnType<typeof readConfig>>,
+  transcriptionProvider?: string,
+): Error {
+  const embeddingModel =
+    config.embeddingModelId || config.embeddingProvider || 'your embedding model';
+  if (/quota|billing|insufficient_quota/i.test(error)) {
+    return new Error(
+      `Transcription used ${formatProviderName(
+        transcriptionProvider || 'the selected audio provider',
+      )}. ` +
+        `Semantic search then tried ${embeddingModel}, which has no available quota. ` +
+        'Update the Embedding Model and API key in Settings → Models, then retry.',
+    );
+  }
+  return new Error(error);
 }
 
 async function deleteIndexedDocuments(documentIds: string[]): Promise<void> {

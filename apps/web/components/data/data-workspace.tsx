@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { toast } from 'sonner';
@@ -131,12 +131,15 @@ export function DataWorkspace() {
     }
   }, [searchParams, activeTab, activeSubTab]);
 
-  const setActiveTab = (tab: TopTabId) => {
-    setActiveTabState(tab);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', tab);
-    window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
-  };
+  const setActiveTab = useCallback(
+    (tab: TopTabId) => {
+      setActiveTabState(tab);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', tab);
+      window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
+    },
+    [pathname, searchParams],
+  );
 
   const setActiveSubTab = (subtab: SubTabId) => {
     setActiveSubTabState(subtab);
@@ -178,6 +181,7 @@ export function DataWorkspace() {
   const docsQuery = useSWR<DocsResponse>('/api/documents', fetcher, {
     refreshInterval: hasActive ? 5000 : 0,
   });
+  const { mutate: mutateDocuments } = docsQuery;
   const documents = docsQuery.data?.documents ?? [];
   const stats = docsQuery.data?.stats;
   const docCount = stats?.docCount ?? 0;
@@ -192,6 +196,7 @@ export function DataWorkspace() {
   const unindexedCount = indexQuery.data?.unindexedCount ?? 0;
   const indexRunning = indexQuery.data?.running ?? false;
   const hasCompletedIndex = indexQuery.data?.run?.status === 'completed';
+  const { mutate: mutateIndex } = indexQuery;
 
   const prevIndexRunning = useRef(indexRunning);
   useEffect(() => {
@@ -214,6 +219,15 @@ export function DataWorkspace() {
     refreshAll();
     setActiveTab('corpus');
   };
+
+  const handleMediaIndexed = useCallback(() => {
+    // A media asset only emits this after its timeline has been embedded. Fetch
+    // immediately, then take the user to the now-populated Knowledge Base.
+    void mutateDocuments();
+    void mutateIndex();
+    setActiveTab('corpus');
+    toast.success('Media indexed and added to your Knowledge Base.');
+  }, [mutateDocuments, mutateIndex, setActiveTab]);
 
   return (
     <div className="px-6 md:px-8">
@@ -477,7 +491,7 @@ export function DataWorkspace() {
 
               {activeSubTab === 'media' && (
                 <div className="animate-in fade-in duration-200">
-                  <MediaPanel onAdded={refreshAll} />
+                  <MediaPanel onAdded={refreshAll} onIndexed={handleMediaIndexed} />
                 </div>
               )}
 

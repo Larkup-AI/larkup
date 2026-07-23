@@ -18,14 +18,32 @@ export const dynamic = 'force-dynamic';
 
 /** GET → the full corpus plus summary stats. */
 export async function GET() {
-  const [documents, stats] = await Promise.all([readDocuments(), corpusStats()]);
+  const [storedDocuments, stats] = await Promise.all([readDocuments(), corpusStats()]);
+
+  // Media transcripts/timelines are staged in the document store so the
+  // indexer can embed them. Do not expose those temporary records in the
+  // Knowledge Base until the indexer has actually completed successfully.
+  // If indexing fails, the media worker removes the staged record again.
+  const documents = storedDocuments.filter(
+    (document) => document.source !== 'media' || document.status === 'indexed',
+  );
+  const visibleChars = documents.reduce((total, document) => total + document.charCount, 0);
+  const visibleStats = {
+    ...stats,
+    docCount: documents.length,
+    charCount: visibleChars,
+    bySource: documents.reduce<Record<string, number>>((counts, document) => {
+      counts[document.source] = (counts[document.source] ?? 0) + 1;
+      return counts;
+    }, {}),
+  };
 
   // Sort documents by createdAt descending (newest first)
   const sortedDocuments = documents.sort((a, b) => {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  return NextResponse.json({ documents: sortedDocuments, stats });
+  return NextResponse.json({ documents: sortedDocuments, stats: visibleStats });
 }
 
 import { randomUUID } from 'crypto';

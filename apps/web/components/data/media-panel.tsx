@@ -164,17 +164,44 @@ const INDEXING_PROGRESS_CLASS =
 /* Main component                                                      */
 /* ------------------------------------------------------------------ */
 
-export function MediaPanel({ onAdded }: { onAdded: () => void }) {
+export function MediaPanel({
+  onAdded,
+  onIndexed,
+}: {
+  onAdded: () => void;
+  onIndexed: (asset: MediaAsset) => void;
+}) {
   const [activeTab, setActiveTab] = useState<MediaSubTab>('images');
   const mediaType = TAB_TO_TYPE[activeTab];
+  const previousStatusesRef = useRef<Map<string, MediaAsset['processingStatus']> | null>(null);
 
   const { data, mutate, isLoading } = useSWR(`/api/media?type=${mediaType}`, fetcher);
 
   useEffect(() => {
+    previousStatusesRef.current = null;
     const stream = new EventSource(`/api/media/stream?type=${mediaType}`);
     const handleUpdate = (event: MessageEvent<string>) => {
       try {
         const nextData = JSON.parse(event.data) as MediaApiResponse;
+        const previousStatuses = previousStatusesRef.current;
+        const nextStatuses = new Map(
+          nextData.assets.map((asset) => [asset.id, asset.processingStatus]),
+        );
+
+        // The first SSE snapshot establishes the baseline. Subsequent updates
+        // let us react only to a job that just finished, not old completed media.
+        if (previousStatuses) {
+          for (const asset of nextData.assets) {
+            const previousStatus = previousStatuses.get(asset.id);
+            if (
+              asset.processingStatus === 'completed' &&
+              (previousStatus === 'pending' || previousStatus === 'processing')
+            ) {
+              onIndexed(asset);
+            }
+          }
+        }
+        previousStatusesRef.current = nextStatuses;
         void mutate(nextData, { revalidate: false });
       } catch {
         // Ignore a malformed update and keep the last successful snapshot.
@@ -186,7 +213,7 @@ export function MediaPanel({ onAdded }: { onAdded: () => void }) {
       stream.removeEventListener('media-update', handleUpdate);
       stream.close();
     };
-  }, [mediaType, mutate]);
+  }, [mediaType, mutate, onIndexed]);
 
   const { data: toolsData, mutate: mutateTools } = useSWR('/api/marketplace', toolFetcher);
 
@@ -455,7 +482,8 @@ function MediaContent({
           return null;
         }
         const id = Math.random().toString(36).slice(2);
-        const preview = type === 'image' ? URL.createObjectURL(file) : undefined;
+        const preview =
+          type === 'image' || type === 'audio' ? URL.createObjectURL(file) : undefined;
         const durationSecs = type === 'image' ? undefined : await readMediaDuration(file);
         return { id, file, type, preview, durationSecs };
       }),
@@ -792,46 +820,61 @@ function MediaContent({
                 />
               </div>
 
-              {remoteEstimates
-                .filter((est: any) => est.mediaType === 'video')
-                .slice(0, 1)
-                .map((est: any, i: number) => {
-                  let embedUrl = est.originalUrl;
-                  if (est.isYouTube) {
-                    try {
-                      const u = new URL(est.originalUrl);
-                      const v = u.hostname.includes('youtu.be')
-                        ? u.pathname.slice(1)
-                        : u.searchParams.get('v');
-                      embedUrl = `https://www.youtube.com/embed/${v}`;
-                    } catch (e) {
-                      // ignore
-                    }
-                    return (
-                      <div
-                        key={i}
-                        className="relative w-full overflow-hidden rounded-xl aspect-video shadow-md border border-border/50 ring-1 ring-border/20 bg-black"
-                      >
-                        <iframe
-                          src={embedUrl}
-                          className="absolute inset-0 w-full h-full"
-                          frameBorder="0"
-                          allowFullScreen
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        />
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <video
-                        key={i}
-                        src={embedUrl}
+              {(mediaType === 'audio'
+                ? remoteEstimates.slice(0, 1)
+                : remoteEstimates.filter((est: any) => est.mediaType === 'video').slice(0, 1)
+              ).map((est: any, i: number) => {
+                if (mediaType === 'audio') {
+                  return (
+                    <div key={i} className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                      <p className="mb-2 truncate text-[11px] font-medium text-foreground">
+                        Preview before importing
+                      </p>
+                      <audio
                         controls
-                        className="w-full max-w-sm rounded-md aspect-video bg-muted object-cover shadow-sm border border-border"
+                        preload="metadata"
+                        src={est.originalUrl}
+                        className="h-9 w-full"
                       />
-                    );
+                    </div>
+                  );
+                }
+                let embedUrl = est.originalUrl;
+                if (est.isYouTube) {
+                  try {
+                    const u = new URL(est.originalUrl);
+                    const v = u.hostname.includes('youtu.be')
+                      ? u.pathname.slice(1)
+                      : u.searchParams.get('v');
+                    embedUrl = `https://www.youtube.com/embed/${v}`;
+                  } catch (e) {
+                    // ignore
                   }
-                })}
+                  return (
+                    <div
+                      key={i}
+                      className="relative w-full overflow-hidden rounded-xl aspect-video shadow-md border border-border/50 ring-1 ring-border/20 bg-black"
+                    >
+                      <iframe
+                        src={embedUrl}
+                        className="absolute inset-0 w-full h-full"
+                        frameBorder="0"
+                        allowFullScreen
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      />
+                    </div>
+                  );
+                } else {
+                  return (
+                    <video
+                      key={i}
+                      src={embedUrl}
+                      controls
+                      className="w-full max-w-sm rounded-md aspect-video bg-muted object-cover shadow-sm border border-border"
+                    />
+                  );
+                }
+              })}
             </div>
           ) : null}
         </div>
@@ -988,6 +1031,16 @@ function MediaContent({
                           {formatSize(item.file.size)}
                         </p>
                       </div>
+                      {mediaType === 'audio' && item.preview ? (
+                        <audio
+                          aria-label={`Preview ${item.file.name}`}
+                          controls
+                          preload="metadata"
+                          src={item.preview}
+                          className="h-8 max-w-44"
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => removeFile(item.id)}
@@ -1258,7 +1311,7 @@ function FileList({
             {asset.processingStatus === 'failed' ? (
               <Button
                 type="button"
-                variant="ghost"
+                variant="secondary"
                 size="sm"
                 className="h-7 px-2 text-[11px]"
                 onClick={() => onProcess(asset.id)}
@@ -1270,7 +1323,7 @@ function FileList({
               type="button"
               aria-label={`Delete ${asset.fileName}`}
               onClick={() => onDelete(asset.id)}
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded text-muted-foreground hover:text-destructive transition-all"
+              className="text-red-500 p-1.5 rounded cursor-pointer hover:text-red-600 transition-all"
             >
               <Trash2 className="size-3.5" />
             </button>

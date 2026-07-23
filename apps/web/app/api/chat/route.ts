@@ -3,6 +3,7 @@ import { readConfig } from '@larkup/core/config-store';
 import { getModelsByType } from '@larkup/core/models-cache';
 import { toChatDescriptor, getDefaultChatModel } from '@larkup/core/chat-models/registry';
 import { listTabularDatasets } from '@larkup/core/tabular-store';
+import { readDocuments } from '@larkup/core/documents-store';
 
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -60,6 +61,27 @@ function createChatModel(
     default:
       return createGateway({ apiKey })(modelId);
   }
+}
+
+function latestUserText(messages: UIMessage[]): string {
+  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user') as
+    | (UIMessage & { content?: string })
+    | undefined;
+  if (!lastUserMessage) return '';
+  if (typeof lastUserMessage.content === 'string') return lastUserMessage.content;
+  return (lastUserMessage.parts ?? [])
+    .filter((part: any) => part.type === 'text')
+    .map((part: any) => part.text)
+    .join(' ');
+}
+
+function isMediaEvidenceRequest(text: string): boolean {
+  // These requests are often phrased without saying "audio file" explicitly
+  // (for example: "say the demo numbers"). If the workspace has indexed media,
+  // retrieve it before allowing the model to give a generic answer.
+  return /\b(audio|voice|recording|podcast|transcript|pronounc\w*|speak\w*|spoken|listen|hear|sound|video|clip|demo|number|said|say)\b/i.test(
+    text,
+  );
 }
 
 export async function POST(req: Request) {
@@ -307,6 +329,14 @@ ${fieldLines}`;
 
   const systemPrompt = (config.systemPrompt || DEFAULT_SYSTEM_PROMPT) + tabularContext + docContext;
   const tools = await getChatTools({ serverId, docSessionId, config });
+  const userText = latestUserText(messagesToProcess);
+  const hasIndexedMedia = (await readDocuments()).some(
+    (document) =>
+      document.source === 'media' &&
+      document.status === 'indexed' &&
+      (document.metadata?.mediaType === 'audio' || document.metadata?.mediaType === 'video'),
+  );
+  const requireMediaSearch = hasIndexedMedia && isMediaEvidenceRequest(userText);
 
   // Debug: log payload sizes to console in development
   if (process.env.NODE_ENV === 'development') {
@@ -322,6 +352,15 @@ ${fieldLines}`;
     messages: await convertToModelMessages(safeMessages, { tools }),
     maxOutputTokens: 8192,
     stopWhen: stepCountIs(8),
+    prepareStep: ({ stepNumber }) => {
+      if (requireMediaSearch && stepNumber === 0) {
+        return {
+          activeTools: ['searchKnowledgeBase'],
+          toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' },
+        };
+      }
+      return undefined;
+    },
     onFinish: async ({ usage, response }) => {
       const { trackUsageEvent, estimateCost } = await import('@larkup/core/analytics-store');
       const u = usage as any;
