@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hub.larkup.de/schemas/tool-manifest.v1.json",
+  "title": "Larkup Tool Manifest",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "description",
+    "category",
+    "version",
+    "pricing",
+    "icon",
+    "packageName",
+    "installSize",
+    "author",
+    "capabilities"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "longDescription": { "type": "string" },
+    "category": { "type": "string" },
+    "version": { "type": "string" },
+    "pricing": { "type": "string" },
+    "emoji": { "type": "string" },
+    "iconUrl": { "type": "string" },
+    "icon": { "type": "string" },
+    "packageName": { "type": "string" },
+    "installSize": { "type": "string" },
+    "systemDeps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "author": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "downloads": { "type": "integer" },
+    "repositoryUrl": { "type": "string" },
+    "license": { "type": "string" },
+    "changelog": { "type": "string" },
+    "minLarkupVersion": { "type": "string" },
+    "updatedAt": { "type": "string" },
+    "comingSoon": { "type": "boolean" },
+    "configSchema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "type"],
+        "properties": {
+          "key": { "type": "string" },
+          "label": { "type": "string" },
+          "type": { "enum": ["text", "password", "select", "toggle"] },
+          "defaultValue": { "type": "string" },
+          "help": { "type": "string" },
+          "required": { "type": "boolean" },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["label", "value"],
+              "properties": {
+                "label": { "type": "string" },
+                "value": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

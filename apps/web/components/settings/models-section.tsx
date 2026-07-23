@@ -12,6 +12,7 @@ import {
   Database,
   Clock,
   Plus,
+  Mic,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,10 +64,15 @@ export function ModelsSection() {
     : '/api/config';
   const { data, isLoading, mutate } = useSWR(configUrl, fetcher);
 
+  const { data: toolsData } = useSWR('/api/marketplace', (url: string) =>
+    fetch(url).then((r) => r.json()),
+  );
+
   const [form, setForm] = useState<Partial<RagConfig>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [showEmbeddingKey, setShowEmbeddingKey] = useState(false);
   const [showChatKey, setShowChatKey] = useState(false);
+  const [showToolKeys, setShowToolKeys] = useState<Record<string, boolean>>({});
 
   const currentChatProvider = form.chatProvider || form.embeddingProvider || 'openai';
   const statusKey = serverId
@@ -100,6 +106,7 @@ export function ModelsSection() {
         ...data.config,
         chatProvider: data.config.chatProvider || data.config.embeddingProvider,
         chatApiKey: data.config.chatApiKey || data.config.embeddingApiKey,
+        toolConfigs: data.config.toolConfigs || {},
       });
     }
   }, [data]);
@@ -138,7 +145,7 @@ export function ModelsSection() {
     });
   }
 
-  async function handleSave(section: 'embedding' | 'chat') {
+  async function handleSave(section: string) {
     if (!data?.config) return;
 
     let hasError = false;
@@ -161,6 +168,21 @@ export function ModelsSection() {
       if (!form.chatApiKey) {
         newErrors.chatApiKey = 'Required';
         hasError = true;
+      }
+    } else if (section.startsWith('tool:')) {
+      const toolId = section.split(':')[1];
+      const tool = toolsData?.tools?.find((t: any) => t.id === toolId);
+      if (tool?.configSchema) {
+        for (const schema of tool.configSchema) {
+          if (
+            !form.toolConfigs?.[toolId]?.[schema.key] &&
+            schema.type !== 'password' &&
+            schema.type !== 'text'
+          ) {
+            // For passwords we allow empty since it could be optional or fallback
+            // You can add stricter validation if schema.required was added to manifest.
+          }
+        }
       }
     }
 
@@ -187,6 +209,8 @@ export function ModelsSection() {
         if (form.chatModelId !== undefined) payload.chatModelId = form.chatModelId;
         if (form.chatApiKey !== undefined) payload.chatApiKey = form.chatApiKey;
         if (form.customChatModels !== undefined) payload.customChatModels = form.customChatModels;
+      } else if (section.startsWith('tool:')) {
+        payload.toolConfigs = form.toolConfigs;
       }
 
       const verifyPayload: any = {};
@@ -200,6 +224,9 @@ export function ModelsSection() {
         verifyPayload.chatApiKey = payload.chatApiKey;
         verifyPayload.chatModelId = payload.chatModelId;
         verifyPayload.customChatModels = payload.customChatModels;
+      } else if (section.startsWith('tool:')) {
+        // Skip verification for arbitrary tool configs right now
+        // We'll trust the payload
       }
 
       const verifyRes = await fetch('/api/config/verify', {

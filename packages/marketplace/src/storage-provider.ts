@@ -32,10 +32,30 @@ export class LocalStorageProvider implements StorageProvider {
     return `local://${key}`;
   }
 
-  async retrieve(uri: string): Promise<Buffer> {
-    const key = uri.replace('local://', '');
+  async storeFile(key: string, sourcePath: string, _mimeType: string): Promise<string> {
     const dir = await this.mediaDir();
-    return fs.readFile(path.join(dir, key));
+    const filePath = path.join(dir, key);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.copyFile(sourcePath, filePath);
+    return `local://${key}`;
+  }
+
+  async retrieve(uri: string): Promise<Buffer> {
+    const filePath = await this.resolvePath(uri);
+    if (!filePath) throw new Error(`Unsupported local storage URI: ${uri}`);
+    return fs.readFile(filePath);
+  }
+
+  async resolvePath(uri: string): Promise<string | undefined> {
+    if (!uri.startsWith('local://')) return undefined;
+    const key = uri.slice('local://'.length);
+    const dir = await this.mediaDir();
+    const filePath = path.resolve(dir, key);
+    const relative = path.relative(dir, filePath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new Error('Invalid local storage URI');
+    }
+    return filePath;
   }
 
   async delete(uri: string): Promise<void> {

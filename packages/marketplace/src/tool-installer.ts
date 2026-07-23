@@ -95,7 +95,28 @@ async function writeManifest(manifest: InstalledToolsManifest) {
 
 export async function getInstalledTools(): Promise<InstalledTool[]> {
   const manifest = await readManifest();
-  return manifest.tools;
+  const tools = [...manifest.tools];
+  const bundledIds = (process.env.LARKUP_BUNDLED_TOOLS ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  for (const toolId of bundledIds) {
+    if (tools.some((tool) => tool.id === toolId)) continue;
+    const descriptor = await getToolById(toolId);
+    if (!descriptor) continue;
+    tools.push({
+      id: toolId,
+      version: descriptor.version,
+      installedAt: 'bundled',
+      packageName: descriptor.packageName,
+      resolvedPath: descriptor.packageName,
+      source: 'local',
+      config: buildDefaultConfig(descriptor),
+    });
+  }
+
+  return tools;
 }
 
 export async function isToolInstalled(toolId: string): Promise<boolean> {
@@ -464,7 +485,7 @@ export async function updateToolConfig(toolId: string, config: Record<string, an
  * This is fire-and-forget — never blocks the install flow.
  */
 async function notifyHubInstall(toolId: string): Promise<void> {
-  const hubUrl = process.env.LARKUP_HUB_URL ?? 'https://hub.larkup.dev';
+  const hubUrl = process.env.LARKUP_HUB_URL ?? 'https://hub.larkup.de';
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);

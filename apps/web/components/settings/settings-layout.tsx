@@ -26,7 +26,8 @@ export type SettingsSection =
   | 'playground'
   | 'appearance'
   | 'deployment'
-  | 'marketplace';
+  | 'marketplace'
+  | 'tool-settings';
 
 interface SectionItem {
   id: SettingsSection;
@@ -53,7 +54,10 @@ const SECTION_GROUPS: SectionGroup[] = [
   },
   {
     label: 'Hub',
-    items: [{ id: 'marketplace', label: 'Marketplace', icon: Store }],
+    items: [
+      { id: 'marketplace', label: 'Marketplace', icon: Store },
+      { id: 'tool-settings', label: 'Installed Tools', icon: Plug },
+    ],
   },
   {
     label: 'Advanced',

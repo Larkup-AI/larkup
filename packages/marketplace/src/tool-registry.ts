@@ -35,8 +35,11 @@ async function discoverLocalManifests(): Promise<Record<string, ToolDescriptor>>
   const searchPaths = [
     // Monorepo development: packages/tools/*
     path.resolve(process.cwd(), 'packages', 'tools'),
+    // Next.js dev server runs in apps/web
+    path.resolve(process.cwd(), '..', '..', 'packages', 'tools'),
     // Installed tools: .larkup/tools/node_modules/@larkup
     path.resolve(process.cwd(), '.larkup', 'tools', 'node_modules', '@larkup'),
+    path.resolve(process.cwd(), '..', '..', '.larkup', 'tools', 'node_modules', '@larkup'),
   ];
 
   for (const searchPath of searchPaths) {
@@ -169,15 +172,26 @@ const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
         help: 'Extract one keyframe every N seconds from video files.',
       },
       {
-        key: 'transcriptionProvider',
-        label: 'Transcription method',
+        key: 'audioProvider',
+        label: 'Audio Provider',
         type: 'select',
-        defaultValue: 'api',
-        help: "Use your AI provider's API or local Whisper model.",
+        defaultValue: 'openai',
+        help: 'Provider to use for transcription. Leave empty to use Chat Provider if it supports audio.',
         options: [
-          { label: 'AI Provider API (recommended)', value: 'api' },
+          { label: 'OpenAI', value: 'openai' },
+          { label: 'Google', value: 'google' },
+          { label: 'Groq', value: 'groq' },
+          { label: 'Deepgram', value: 'deepgram' },
+          { label: 'ElevenLabs', value: 'elevenlabs' },
           { label: 'Local Whisper', value: 'local' },
+          { label: 'Vercel AI Gateway', value: 'vercel_ai_gateway' },
         ],
+      },
+      {
+        key: 'audioApiKey',
+        label: 'Audio API Key',
+        type: 'password',
+        help: 'Optional if covered by your Chat API key. Required otherwise.',
       },
     ],
   },

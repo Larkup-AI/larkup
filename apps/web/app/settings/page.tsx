@@ -13,6 +13,7 @@ import { StorageSection } from '@/components/settings/storage-section';
 import { ConnectionsSection } from '@/components/settings/connections-section';
 import { DeploymentSection } from '@/components/settings/deployment-section';
 import { MarketplaceSection } from '@/components/settings/marketplace-section';
+import { MarketplaceToolsSettings } from '@/components/settings/marketplace-tools-settings';
 
 function SettingsContent() {
   const searchParams = useSearchParams();
@@ -62,6 +63,7 @@ function SettingsContent() {
       {activeSection === 'connections' && <ConnectionsSection />}
       {activeSection === 'deployment' && <DeploymentSection />}
       {activeSection === 'marketplace' && <MarketplaceSection />}
+      {activeSection === 'tool-settings' && <MarketplaceToolsSettings />}
       {activeSection === 'prompts' && <PromptsSection />}
       {activeSection === 'playground' && <PlaygroundSection />}
       {activeSection === 'appearance' && <AppearanceSection />}

@@ -195,14 +195,14 @@ export type DeploymentTarget = 'local' | 'docker' | 'serverless' | 'sandbox';
 /* ------------------------------------------------------------------ */
 
 export interface HubConfig {
-  /** Base URL of the Hub API (e.g., "https://hub.larkup.dev") */
+  /** Base URL of the Hub API (e.g., "https://hub.larkup.de") */
   baseUrl: string;
   /** Optional API key for authenticated requests */
   apiKey?: string;
 }
 
 /** Default Hub API URL. Can be overridden via LARKUP_HUB_URL env var. */
-export const DEFAULT_HUB_URL = process.env.LARKUP_HUB_URL ?? 'https://hub.larkup.dev';
+export const DEFAULT_HUB_URL = process.env.LARKUP_HUB_URL ?? 'https://hub.larkup.de';
 
 /* ------------------------------------------------------------------ */
 /* Storage provider abstraction                                        */
@@ -218,8 +218,12 @@ export interface StorageProvider {
   name: string;
   /** Store a file and return a resolvable URI */
   store(key: string, data: Buffer, mimeType: string): Promise<string>;
+  /** Store an existing local file without buffering it in memory, when supported. */
+  storeFile?(key: string, sourcePath: string, mimeType: string): Promise<string>;
   /** Retrieve a file by its storage URI */
   retrieve(uri: string): Promise<Buffer>;
+  /** Resolve a URI to a local file without buffering it in memory, when supported. */
+  resolvePath?(uri: string): Promise<string | undefined>;
   /** Delete a file by its storage URI */
   delete(uri: string): Promise<void>;
   /** Get storage usage stats */

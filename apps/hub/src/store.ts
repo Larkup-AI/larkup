@@ -13,6 +13,8 @@ import type { ToolDescriptor, ToolCategory, ToolPricing } from './types.js';
  * - Version history
  */
 
+// TODO:: use online db for storage like neno
+
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
@@ -81,18 +83,28 @@ export function seedRegistry(): void {
           label: 'Frame extraction interval (seconds)',
           type: 'text',
           defaultValue: '10',
-          help: 'Extract one keyframe every N seconds from video files.',
+          help: 'Fallback interval used when scene-change detection finds no frames.',
         },
         {
-          key: 'transcriptionProvider',
-          label: 'Transcription method',
+          key: 'audioProvider',
+          label: 'Audio Provider',
           type: 'select',
-          defaultValue: 'api',
-          help: "Use your AI provider's API or local Whisper model.",
+          defaultValue: 'openai',
+          help: 'Provider to use for transcription. Leave empty to use Chat Provider if it supports audio.',
           options: [
-            { label: 'AI Provider API (recommended)', value: 'api' },
+            { label: 'OpenAI', value: 'openai' },
+            { label: 'Google', value: 'google' },
+            { label: 'Groq', value: 'groq' },
+            { label: 'Deepgram', value: 'deepgram' },
+            { label: 'ElevenLabs', value: 'elevenlabs' },
             { label: 'Local Whisper', value: 'local' },
           ],
+        },
+        {
+          key: 'audioApiKey',
+          label: 'Audio API Key',
+          type: 'password',
+          help: 'Optional if covered by your Chat API key. Required otherwise.',
         },
       ],
     },

@@ -54,6 +54,7 @@ Tools install into an **isolated directory** (`.larkup/tools/node_modules/`):
 ```
 
 This design:
+
 - Keeps the user's project `package.json` clean (no pollution)
 - Makes tools portable — copy `.larkup/tools/` to any machine
 - Enables per-agent tool sets (future)
@@ -67,28 +68,28 @@ Every tool must conform to the `ToolDescriptor` interface and ship a `tool.manif
 
 ```typescript
 interface ToolDescriptor {
-  id: string                    // Unique ID: "my-tool" (lowercase, hyphenated)
-  name: string                  // Display name: "My Tool"
-  description: string           // One-line description
-  longDescription?: string      // Detailed description for detail view
-  category: ToolCategory        // "media" | "search" | "analytics" | etc.
-  version: string               // Semver: "0.1.0"
-  pricing: ToolPricing          // "free" | "pro" | "enterprise"
-  emoji?: string                // Emoji icon: "🎬"
-  iconUrl?: string              // Custom image URL
-  icon: string                  // Lucide icon name fallback
-  packageName: string           // npm package: "@larkup/tool-my-tool"
-  installSize: string           // Display size: "~15 MB"
-  systemDeps?: string[]         // System requirements: ["ffmpeg"]
-  author: string                // Publisher name
-  capabilities: string[]        // Feature keys used by core routing
-  configSchema?: ToolConfigField[] // User-configurable options
-  tags?: string[]               // Search tags
-  downloads: number             // Install count (start at 0)
-  repositoryUrl?: string        // GitHub/homepage URL
-  license?: string              // "MIT", "Apache-2.0"
-  updatedAt?: string            // ISO date of last update
-  comingSoon?: boolean          // If true, shown but not installable
+  id: string; // Unique ID: "my-tool" (lowercase, hyphenated)
+  name: string; // Display name: "My Tool"
+  description: string; // One-line description
+  longDescription?: string; // Detailed description for detail view
+  category: ToolCategory; // "media" | "search" | "analytics" | etc.
+  version: string; // Semver: "0.1.0"
+  pricing: ToolPricing; // "free" | "pro" | "enterprise"
+  emoji?: string; // Emoji icon: "🎬"
+  iconUrl?: string; // Custom image URL
+  icon: string; // Lucide icon name fallback
+  packageName: string; // npm package: "@larkup/tool-my-tool"
+  installSize: string; // Display size: "~15 MB"
+  systemDeps?: string[]; // System requirements: ["ffmpeg"]
+  author: string; // Publisher name
+  capabilities: string[]; // Feature keys used by core routing
+  configSchema?: ToolConfigField[]; // User-configurable options
+  tags?: string[]; // Search tags
+  downloads: number; // Install count (start at 0)
+  repositoryUrl?: string; // GitHub/homepage URL
+  license?: string; // "MIT", "Apache-2.0"
+  updatedAt?: string; // ISO date of last update
+  comingSoon?: boolean; // If true, shown but not installable
 }
 ```
 
@@ -150,7 +151,7 @@ Create `packages/tools/my-tool/tool.manifest.json`:
 
 ```json
 {
-  "$schema": "https://hub.larkup.dev/schemas/tool-manifest.v1.json",
+  "$schema": "https://hub.larkup.de/schemas/tool-manifest.v1.json",
   "id": "my-tool",
   "name": "My Tool",
   "description": "Short description of what this tool does.",
@@ -177,10 +178,10 @@ Create `packages/tools/my-tool/src/index.ts`:
 
 ```typescript
 export const TOOL_META = {
-  id: "my-tool",
-  name: "My Tool",
-  version: "0.1.0",
-} as const
+  id: 'my-tool',
+  name: 'My Tool',
+  version: '0.1.0',
+} as const;
 
 // Export your tool's public API
 export async function doSomething(): Promise<void> {
@@ -214,11 +215,11 @@ Create `packages/tools/my-tool/tsconfig.json`:
 In `apps/web/components/settings/marketplace-section.tsx`, add your icon to `ICON_MAP`:
 
 ```typescript
-import { Wrench } from "lucide-react";
+import { Wrench } from 'lucide-react';
 const ICON_MAP: Record<string, LucideIcon> = {
   Film,
   ScanEye,
-  Wrench,  // ← Add your icon
+  Wrench, // ← Add your icon
 };
 ```
 
@@ -232,12 +233,12 @@ cd packages/tools/my-tool && pnpm exec tsc --noEmit
 ### 7. Validate your manifest
 
 ```typescript
-import { validateToolManifest } from "@larkup/marketplace/manifest"
-import manifest from "./tool.manifest.json"
+import { validateToolManifest } from '@larkup/marketplace/manifest';
+import manifest from './tool.manifest.json';
 
-const result = validateToolManifest(manifest)
-if (!result.valid) console.error(result.errors)
-if (result.warnings.length) console.warn(result.warnings)
+const result = validateToolManifest(manifest);
+if (!result.valid) console.error(result.errors);
+if (result.warnings.length) console.warn(result.warnings);
 ```
 
 ## Using a Tool at Runtime
@@ -245,11 +246,11 @@ if (result.warnings.length) console.warn(result.warnings)
 Tools are loaded dynamically via `@larkup/marketplace/loader`:
 
 ```typescript
-import { loadTool } from "@larkup/marketplace/loader"
+import { loadTool } from '@larkup/marketplace/loader';
 
-const myTool = await loadTool<typeof import("@larkup/tool-my-tool")>("my-tool")
+const myTool = await loadTool<typeof import('@larkup/tool-my-tool')>('my-tool');
 if (myTool) {
-  await myTool.doSomething()
+  await myTool.doSomething();
 }
 ```
 
