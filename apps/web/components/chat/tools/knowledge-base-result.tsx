@@ -58,11 +58,12 @@ export function KnowledgeBaseResult({
       return part.input?.query;
     })
     .filter(Boolean);
-  const hasMedia = hits.some((hit) => hit.metadata?.mediaAssetId);
 
+  // Show a live search surface, then return to the compact conversation once
+  // the tool has completed. Results remain available via the trigger button.
   useEffect(() => {
-    if (hasMedia) setOpen(true);
-  }, [hasMedia]);
+    setOpen(isRunning);
+  }, [isRunning]);
 
   return (
     <div className="mb-2 w-full">
@@ -102,8 +103,14 @@ export function KnowledgeBaseResult({
         </button>
       </div>
 
-      {open && hits.length > 0 ? (
+      {open && (isRunning || hits.length > 0) ? (
         <div className="mt-2 flex flex-col gap-px border border-border rounded-xl bg-transparent overflow-hidden">
+          {isRunning && hits.length === 0 ? (
+            <div className="flex items-center gap-2 px-3.5 py-3 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" />
+              Looking through your Knowledge Base…
+            </div>
+          ) : null}
           {hits.slice(0, 3).map((h, i) => (
             <div key={i} className="px-3.5 py-4 border-b border-border/50 last:border-0">
               {/* <p className="mb-3 text-sm leading-relaxed text-foreground">
