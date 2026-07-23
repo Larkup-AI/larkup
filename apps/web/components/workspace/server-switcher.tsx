@@ -1,15 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import {
-  Check,
-  ChevronsUpDown,
-  Pencil,
-  Plus,
-  Server,
-  Trash2,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { Check, ChevronsUpDown, Pencil, Plus, Server, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,21 +10,17 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useWorkspace, type WorkspaceServer } from "./workspace-provider";
-import { ServerFormDialog } from "./server-form-dialog";
-import { DeleteServerDialog } from "./delete-server-dialog";
-import { Separator } from "../ui/separator";
+} from '@/components/ui/dropdown-menu';
+import { useWorkspace, type WorkspaceServer } from './workspace-provider';
+import { ServerFormDialog } from './server-form-dialog';
+import { DeleteServerDialog } from './delete-server-dialog';
+import { Separator } from '../ui/separator';
 
 export function ServerSwitcher() {
   const { servers, activeServer, activateServer } = useWorkspace();
   const [createOpen, setCreateOpen] = useState(false);
-  const [renameTarget, setRenameTarget] = useState<WorkspaceServer | null>(
-    null,
-  );
-  const [deleteTarget, setDeleteTarget] = useState<WorkspaceServer | null>(
-    null,
-  );
+  const [renameTarget, setRenameTarget] = useState<WorkspaceServer | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WorkspaceServer | null>(null);
 
   return (
     <>
@@ -54,7 +42,7 @@ export function ServerSwitcher() {
             </span> */}
             <span className="flex items-center gap-1.5">
               <span className="truncate text-sm font-medium text-foreground">
-                {activeServer?.name ?? "No server"}
+                {activeServer?.name ?? 'No server'}
               </span>
               {activeServer?.running && <RunningDot />}
             </span>
@@ -103,19 +91,13 @@ export function ServerSwitcher() {
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem
-            onClick={() => setCreateOpen(true)}
-            className="gap-2 h-9"
-          >
+          <DropdownMenuItem onClick={() => setCreateOpen(true)} className="gap-2 h-9">
             <Plus className="size-4" />
             New server
           </DropdownMenuItem>
           {/* <DropdownMenuSeparator /> */}
           {activeServer && (
-            <DropdownMenuItem
-              onClick={() => setRenameTarget(activeServer)}
-              className="gap-2 h-9"
-            >
+            <DropdownMenuItem onClick={() => setRenameTarget(activeServer)} className="gap-2 h-9">
               <Pencil className="size-4" />
               Rename current
             </DropdownMenuItem>
@@ -133,11 +115,7 @@ export function ServerSwitcher() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ServerFormDialog
-        mode="create"
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-      />
+      <ServerFormDialog mode="create" open={createOpen} onOpenChange={setCreateOpen} />
       <ServerFormDialog
         mode="rename"
         target={renameTarget}

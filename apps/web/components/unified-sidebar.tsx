@@ -203,7 +203,7 @@ export function UnifiedSidebar() {
                         <span className="relative inline-flex size-full rounded-full bg-green-500 border border-card" />
                       </>
                     ) : (
-                      <span className="relative inline-flex size-full rounded-full bg-red-500 border border-card" />
+                      <span className="relative inline-flex size-full rounded-full bg-gray-500  border border-card" />
                     )}
                   </span>
                 </div>
