@@ -58,8 +58,13 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { base64, prompt } = await req.json();
-    if (!base64) {
+    const { base64, base64Images, prompt } = (await req.json()) as {
+      base64?: string;
+      base64Images?: string[];
+      prompt?: string;
+    };
+    const images = (base64Images?.length ? base64Images : base64 ? [base64] : []).slice(0, 6);
+    if (images.length === 0) {
       return NextResponse.json({ error: 'Missing image data' }, { status: 400 });
     }
 
@@ -80,12 +85,10 @@ export async function POST(req: Request) {
       config.customChatModels,
     ) as any;
 
-    // Ensure data URL is formatted properly
-    const urlFormat = base64.startsWith('data:') ? base64 : `data:image/png;base64,${base64}`;
     const defaultPrompt =
       'Provide a very brief, high-level summary of what this image contains (e.g., "A database ER diagram about films and actors", "A bar chart showing quarterly revenue"). Do NOT extract all text or exhaustively describe relationships. Keep it under 2 sentences.';
 
-    const { text } = await generateText({
+    const { text, usage } = await generateText({
       model,
       messages: [
         {
@@ -95,10 +98,26 @@ export async function POST(req: Request) {
               type: 'text',
               text: prompt || defaultPrompt,
             },
-            { type: 'image', image: urlFormat },
+            ...images.map((image) => ({
+              type: 'image' as const,
+              image: image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`,
+            })),
           ],
         },
       ],
+    });
+
+    const { estimateCost, trackUsageEvent } = await import('@larkup/core/analytics-store');
+    void trackUsageEvent({
+      type: 'media_processing',
+      mediaType: 'image',
+      modelId: modelDesc.id,
+      provider: modelDesc.provider,
+      promptTokens: usage.inputTokens ?? 0,
+      completionTokens: usage.outputTokens ?? 0,
+      totalTokens: usage.totalTokens ?? 0,
+      estimatedCost: estimateCost(modelDesc.id, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
+      timestamp: new Date().toISOString(),
     });
 
     return NextResponse.json({ description: text });

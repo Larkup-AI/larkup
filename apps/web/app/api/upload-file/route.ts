@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').substring(0, 50);
     const filename = `${randomUUID()}-${safeName}`;
 
-    const uploadsDir = path.join(process.cwd(), '../../.larkup/uploads');
+    const uploadsDir = path.join(process.cwd(), '.larkup', 'uploads');
     await fs.mkdir(uploadsDir, { recursive: true });
 
     const filePath = path.join(uploadsDir, filename);

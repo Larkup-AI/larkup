@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         const base64Data = body.metadata.imageBase64.replace(/^data:image\/\w+;base64,/, '');
         const buffer = Buffer.from(base64Data, 'base64');
         const filename = `${randomUUID()}.png`;
-        const uploadsDir = path.join(process.cwd(), '../../.larkup/uploads');
+        const uploadsDir = path.join(process.cwd(), '.larkup', 'uploads');
         await fs.mkdir(uploadsDir, { recursive: true });
         await fs.writeFile(path.join(uploadsDir, filename), buffer);
 
@@ -168,7 +168,7 @@ export async function DELETE(req: Request) {
       } else if (docUrl?.startsWith('/api/uploads/')) {
         const filename = docUrl.split('/api/uploads/')[1]?.split('?')[0];
         if (filename) {
-          const uploadsDir = path.join(process.cwd(), '../../.larkup/uploads');
+          const uploadsDir = path.join(process.cwd(), '.larkup', 'uploads');
           await fs.unlink(path.join(uploadsDir, filename)).catch(() => {});
         }
       }

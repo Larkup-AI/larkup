@@ -17,6 +17,7 @@ import { SandboxManager } from '@larkup/sandbox';
 import { applyFieldEdits, applyContentEdits } from '@larkup/tool-doc-editor';
 import { loadTool } from '@larkup/marketplace/loader';
 import { getInstalledTools } from '@larkup/marketplace/installer';
+import { readDocuments } from '@larkup/core/documents-store';
 
 function documentEditModelOutput({ output }: { output: any }) {
   return {
@@ -45,6 +46,7 @@ function documentEditModelOutput({ output }: { output: any }) {
 export async function queryKnowledgeBase(query: string, topK: number, serverId: string | null) {
   const doRetrieve = async () => {
     const config = await readConfig();
+    const candidateCount = Math.max(topK * 4, 20);
 
     // 1) Try running generated server first
     const server = await refreshServerStatus();
@@ -54,7 +56,7 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
         const res = await fetch(`${server.endpoint}/query`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, topK }),
+          body: JSON.stringify({ query, topK: candidateCount }),
           signal: AbortSignal.timeout(15_000),
         });
         const data = await res.json();
@@ -71,16 +73,7 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
         });
 
         if (res.ok && data.hits) {
-          return {
-            query,
-            hits: (data.hits as any[]).slice(0, topK).map((h: any) => ({
-              title: h.title ?? 'Untitled',
-              url: h.url ?? '',
-              score: Number((h.score ?? 0).toFixed(3)),
-              text: (h.text ?? '').slice(0, 800),
-              metadata: h.metadata,
-            })),
-          };
+          return formatKnowledgeHits(query, data.hits as any[], topK);
         }
       } catch {
         // Fall through to direct retrieval
@@ -95,21 +88,113 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
 
     const vector = await embedQuery(config, query);
     const adapter = await createAdapter(config);
-    const hits = await adapter.query(vector, topK, query);
-
-    return {
-      query,
-      hits: hits.slice(0, topK).map((h) => ({
-        title: h.title ?? 'Untitled',
-        url: h.url ?? '',
-        score: Number((h.score ?? 0).toFixed(3)),
-        text: (h.text ?? '').slice(0, 800),
-        metadata: h.metadata,
-      })),
-    };
+    const hits = await adapter.query(vector, candidateCount, query);
+    return formatKnowledgeHits(query, hits, topK);
   };
 
   return serverId ? runWithServer(serverId, doRetrieve) : doRetrieve();
+}
+
+async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) {
+  const documents = await readDocuments();
+  const documentsById = new Map(documents.map((document) => [document.id, document]));
+  const hydrated = rawHits.map((hit) => {
+    const document = documentsById.get(hit.documentId);
+    return {
+      ...hit,
+      title: hit.title || document?.title || 'Untitled',
+      url: hit.url || document?.url || '',
+      text: hit.text || document?.content || '',
+      metadata: hit.metadata || document?.metadata,
+    };
+  });
+
+  const selected = hydrated
+    .filter((hit) => !hit.metadata?.mediaAssetId || documentsById.has(hit.documentId))
+    .slice(0, topK);
+  const outcomeMediaAssetId = isOutcomeQuery(query)
+    ? selected.find((hit) => hit.metadata?.mediaAssetId)?.metadata.mediaAssetId
+    : undefined;
+  const endingContext = outcomeMediaAssetId
+    ? documents
+        .filter(
+          (document) =>
+            document.status === 'indexed' &&
+            document.metadata?.mediaAssetId === outcomeMediaAssetId,
+        )
+        .sort(
+          (left, right) =>
+            Number(right.metadata?.startSecs ?? 0) - Number(left.metadata?.startSecs ?? 0),
+        )
+        .slice(0, 3)
+        .reverse()
+        .map((document) => ({
+          role: 'ending',
+          title: document.title,
+          url: document.url,
+          text: document.content.slice(0, 1_800),
+          startSecs: document.metadata?.startSecs,
+          endSecs: document.metadata?.endSecs,
+        }))
+    : undefined;
+
+  return {
+    query,
+    hits: selected.map((hit, hitIndex) => {
+      const sequence = Number(hit.metadata?.sequence);
+      const startSecs = Number(hit.metadata?.startSecs);
+      const timelineContext = hit.metadata?.mediaAssetId
+        ? documents
+            .filter((document) => {
+              const candidateSequence = Number(document.metadata?.sequence);
+              const candidateStart = Number(document.metadata?.startSecs);
+              return (
+                document.status === 'indexed' &&
+                document.metadata?.mediaAssetId === hit.metadata.mediaAssetId &&
+                Number.isFinite(sequence) &&
+                Number.isFinite(candidateSequence) &&
+                Math.abs(candidateSequence - sequence) <= 1 &&
+                Number.isFinite(startSecs) &&
+                Math.abs(candidateStart - startSecs) <= 90
+              );
+            })
+            .sort(
+              (left, right) =>
+                Number(left.metadata?.startSecs ?? 0) - Number(right.metadata?.startSecs ?? 0),
+            )
+            .map((document) => ({
+              role:
+                Number(document.metadata?.sequence) < sequence
+                  ? 'before'
+                  : Number(document.metadata?.sequence) > sequence
+                  ? 'after'
+                  : 'matched',
+              title: document.title,
+              url: document.url,
+              text: document.content.slice(0, 1_800),
+              startSecs: document.metadata?.startSecs,
+              endSecs: document.metadata?.endSecs,
+            }))
+        : undefined;
+
+      return {
+        documentId: hit.documentId,
+        title: hit.title ?? 'Untitled',
+        url: hit.url ?? '',
+        score: Number((hit.score ?? 0).toFixed(3)),
+        text: (hit.text ?? '').slice(0, 1_800),
+        metadata: hit.metadata,
+        timelineContext,
+        endingContext: hitIndex === 0 ? endingContext : undefined,
+      };
+    }),
+  };
+}
+
+function isOutcomeQuery(query: string): boolean {
+  return /\b(who won|winner|won|final score|result|beat|defeated)\b|من فاز|مين فاز|الفائز|النتيجة|نتيجة|فاز|كسب/i.test(
+    query,
+  );
 }
 
 export async function getChatTools(context: {
@@ -122,12 +207,12 @@ export async function getChatTools(context: {
   const builtInTools: Record<string, any> = {
     searchKnowledgeBase: tool({
       description:
-        'Search the private RAG knowledge base for relevant documents. Use this for factual questions about the indexed content.',
+        'Search the private RAG knowledge base for relevant documents and time-aligned media evidence. Use this for ALL factual questions, including outcomes, actions, people, spoken content, on-screen text, matches, videos, or specific content mentioned by the user. For media, inspect the returned before/event/after timeline. For winner, result, or outcome questions, you MUST also inspect endingContext before answering because the result is often announced in the final minutes. Cite the timestamp URL that supports the answer. ALWAYS check the knowledge base before claiming information is unavailable.',
       inputSchema: z.object({
         query: z.string().describe('The search query for the knowledge base.'),
       }),
       execute: async ({ query }) => {
-        return queryKnowledgeBase(query, 5, serverId ?? null);
+        return queryKnowledgeBase(query, 8, serverId ?? null);
       },
     }),
 

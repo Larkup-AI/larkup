@@ -83,9 +83,12 @@ export async function POST(request: Request) {
     chatModelId,
     customChatModels,
     customEmbeddings,
+    audioProvider,
+    audioApiKey,
+    audioModelId,
   } = body;
 
-  if (!embeddingProvider && !chatProvider) {
+  if (!embeddingProvider && !chatProvider && !audioProvider) {
     return NextResponse.json({ error: 'No provider fields to verify' }, { status: 400 });
   }
 
@@ -253,6 +256,58 @@ export async function POST(request: Request) {
       }
     } catch (err: any) {
       return NextResponse.json({ error: `Chat Error: ${err.message}` }, { status: 400 });
+    }
+  }
+
+  // ── Verify Audio ────────────────────────────────────────────────────
+  if (audioProvider && audioProvider !== 'local') {
+    try {
+      let url = '';
+      let headers: Record<string, string> = {
+        Authorization: `Bearer ${audioApiKey}`,
+      };
+
+      if (audioProvider === 'openai') {
+        url = 'https://api.openai.com/v1/audio/transcriptions';
+      } else if (audioProvider === 'groq') {
+        url = 'https://api.groq.com/openai/v1/audio/transcriptions';
+      } else if (audioProvider === 'deepgram') {
+        url = 'https://api.deepgram.com/v1/listen';
+        headers = { Authorization: `Token ${audioApiKey}` };
+      } else if (audioProvider === 'assemblyai') {
+        url = 'https://api.assemblyai.com/v2/transcript';
+        headers = { Authorization: audioApiKey };
+      } else if (audioProvider === 'elevenlabs') {
+        url = 'https://api.elevenlabs.io/v1/speech-to-text';
+        headers = { 'xi-api-key': audioApiKey };
+      } else if (audioProvider === 'azure openai') {
+        return NextResponse.json({ success: true }); // Skip verify for now
+      } else if (audioProvider === 'rev.ai') {
+        url = 'https://api.rev.ai/speechtotext/v1/jobs';
+      } else if (audioProvider === 'fal') {
+        return NextResponse.json({ success: true }); // Skip verify for now
+      } else if (audioProvider === 'google') {
+        return NextResponse.json({ success: true }); // Skip verify for now
+      }
+
+      if (url) {
+        const verifyRes = await fetch(url, {
+          method: 'POST',
+          headers,
+        });
+
+        if (verifyRes.status === 401 || verifyRes.status === 403) {
+          return NextResponse.json(
+            { error: `Invalid API Key for ${audioProvider}` },
+            { status: 400 },
+          );
+        }
+      }
+    } catch (err: any) {
+      return NextResponse.json(
+        { error: `Audio verification failed: ${err.message}` },
+        { status: 400 },
+      );
     }
   }
 

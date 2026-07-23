@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    const uploadsDir = path.join(process.cwd(), '../../.larkup/uploads');
+    const uploadsDir = path.join(process.cwd(), '.larkup', 'uploads');
     const filePath = path.join(uploadsDir, filename);
 
     if (!fs.existsSync(filePath)) {

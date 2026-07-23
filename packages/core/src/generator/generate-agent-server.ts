@@ -80,6 +80,7 @@ export async function query(vector, topK) {
     title: row.title,
     url: row.url || undefined,
     documentId: row.documentId,
+    metadata: typeof row.metadata === "string" ? JSON.parse(row.metadata) : row.metadata,
   }))
 }
 
@@ -179,6 +180,7 @@ export async function query(vector, topK) {
       title: meta.title ?? "Untitled",
       url: meta.url || undefined,
       documentId: meta.documentId ?? "",
+      metadata: meta,
     }
   })
 }
@@ -234,6 +236,7 @@ export async function add(docs) {
     id: d.id,
     values: d.vector,
     metadata: {
+      ...(d.metadata ?? {}),
       text: d.text,
       title: d.title,
       url: d.url || "",
@@ -254,6 +257,7 @@ export async function update(id, doc) {
     id,
     values: doc.vector,
     setMetadata: {
+      ...(doc.metadata ?? {}),
       text: doc.text,
       title: doc.title,
       url: doc.url || "",
