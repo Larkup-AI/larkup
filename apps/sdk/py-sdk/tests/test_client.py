@@ -82,3 +82,30 @@ def test_get_document_sync(sync_client):
     assert doc.id == "doc1"
     assert doc.text == "content"
     assert doc.title == "A Title"
+
+@respx.mock
+def test_chat_sync(sync_client):
+    stream = (
+        'event: message\ndata: {"type":"text-delta","text":"Hello "}\n\n'
+        'event: message\ndata: {"type":"text-delta","text":"world"}\n\n'
+        'event: done\ndata: {"type":"done","hits":[]}\n\n'
+    )
+    route = respx.post(f"{BASE_URL}/chat").mock(
+        return_value=Response(200, text=stream, headers={"content-type": "text/event-stream"})
+    )
+
+    assert sync_client.chat_text("hello") == "Hello world"
+    assert route.calls[0].request.headers["authorization"] == "Bearer test-key"
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_chat_async(async_client):
+    stream = (
+        'data: {"type":"text-delta","text":"Async "}\n\n'
+        'data: {"type":"text-delta","text":"chat"}\n\n'
+    )
+    respx.post(f"{BASE_URL}/chat").mock(
+        return_value=Response(200, text=stream, headers={"content-type": "text/event-stream"})
+    )
+
+    assert await async_client.chat_text("hello") == "Async chat"

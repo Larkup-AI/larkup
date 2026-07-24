@@ -1,5 +1,5 @@
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from typing import List, Literal, Optional
+from pydantic import BaseModel
 
 class Document(BaseModel):
     id: str
@@ -42,6 +42,20 @@ class ScrapeResponse(BaseModel):
 class HealthResponse(BaseModel):
     ok: bool
     service: Optional[str] = None
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    topK: Optional[int] = None
+
+class ChatEvent(BaseModel):
+    type: Literal["text-delta", "done", "error"]
+    text: Optional[str] = None
+    hits: Optional[List[QueryHit]] = None
+    error: Optional[str] = None
 
 class LarkupClientOptions(BaseModel):
     base_url: Optional[str] = None

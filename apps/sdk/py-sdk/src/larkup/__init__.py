@@ -9,6 +9,9 @@ from .types import (
     ScrapeResponse,
     HealthResponse,
     LarkupClientOptions,
+    ChatMessage,
+    ChatRequest,
+    ChatEvent,
 )
 
 __all__ = [
@@ -24,4 +27,7 @@ __all__ = [
     "ScrapeResponse",
     "HealthResponse",
     "LarkupClientOptions",
+    "ChatMessage",
+    "ChatRequest",
+    "ChatEvent",
 ]

@@ -1,59 +1,30 @@
 # Larkup JavaScript SDK
 
-The official JavaScript/TypeScript client for the **Larkup** platform. 
+The TypeScript client for a generated Larkup server.
 
-This SDK provides a convenient interface to connect your Node.js or browser applications to a running Larkup server. It abstracts away the API layer so you can focus on building your AI agents and applications.
-
-## Installation
-
-Install the SDK via npm, yarn, or pnpm:
+## Install
 
 ```bash
 npm install @larkup/sdk
 ```
 
-## Quick Start
-
-Initialize the `LarkupClient` with the URL of your running Larkup server. 
+## Use
 
 ```typescript
 import { LarkupClient } from "@larkup/sdk";
 
-// Initialize the client
 const client = new LarkupClient({
-  baseUrl: "http://localhost:4567", // Replace with your deployed server URL
+  baseUrl: "http://localhost:8080",
+  apiKey: process.env.LARKUP_API_KEY,
 });
 
-async function main() {
-  // 1. Query the RAG Pipeline
-  const queryResponse = await client.query({
-    query: "What is Larkup?",
-    topK: 5
-  });
+const result = await client.query("What is Larkup?", 5);
 
-  console.log("Retrieved Documents:", queryResponse.hits);
-
-  // 2. Add Documents to the Pipeline
-  await client.documents.add({
-    content: "Larkup is building a new learning system for the AI Era.",
-    metadata: { source: "manual-entry" }
-  });
-  
-  // 3. Trigger Indexing
-  await client.index();
-  console.log("Documents indexed successfully.");
+for await (const event of client.chat("Summarize the result.")) {
+  if (event.type === "text-delta") process.stdout.write(event.text ?? "");
 }
-
-main();
 ```
 
-## Features
+The client supports health checks, retrieval, document CRUD, scraping, and streaming retrieval-grounded chat.
 
-- **Querying**: Easily execute semantic searches against your vector store.
-- **Data Ingestion**: Add text, URLs, and files programmatically.
-- **Indexing**: Trigger ETL pipelines to chunk and embed documents on the fly.
-- **TypeScript Support**: Full type safety out-of-the-box.
-
-## Documentation
-
-For full API reference and advanced usage, visit the [Larkup Documentation](https://larkup.de/docs).
+See the [TypeScript SDK documentation](https://larkup.de/docs/sdk/typescript) for the complete guide.

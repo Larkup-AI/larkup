@@ -6,6 +6,8 @@ import {
   PaginatedDocuments,
   ScrapeResponse,
   HealthResponse,
+  ChatEvent,
+  ChatRequest,
 } from "./types";
 
 export class LarkupClient {
@@ -138,5 +140,66 @@ export class LarkupClient {
       method: "POST",
       body: JSON.stringify({ url }),
     });
+  }
+
+  /** Stream a retrieval-grounded chat response from the deployed server. */
+  async *chat(request: ChatRequest | string): AsyncGenerator<ChatEvent> {
+    const body: ChatRequest =
+      typeof request === "string"
+        ? { messages: [{ role: "user", content: request }] }
+        : request;
+    const headers = new Headers({ "Content-Type": "application/json" });
+    if (this.apiKey) headers.set("Authorization", `Bearer ${this.apiKey}`);
+
+    const response = await fetch(`${this.baseUrl}/chat`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      let message = response.statusText;
+      try {
+        message = (await response.json()).error || message;
+      } catch {}
+      throw new Error(`Larkup API Error (${response.status}): ${message}`);
+    }
+    if (!response.body) return;
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary >= 0) {
+        const frame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        boundary = buffer.indexOf("\n\n");
+        const data = frame
+          .split("\n")
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trim())
+          .join("\n");
+        if (!data) continue;
+        try {
+          const event = JSON.parse(data) as ChatEvent | string;
+          yield typeof event === "string" ? { type: "text-delta", text: event } : event;
+        } catch {
+          yield { type: "text-delta", text: data };
+        }
+      }
+      if (done) break;
+    }
+  }
+
+  /** Collect a streamed chat response into a single string. */
+  async chatText(request: ChatRequest | string): Promise<string> {
+    let text = "";
+    for await (const event of this.chat(request)) {
+      if (event.type === "error") throw new Error(event.error || "Chat request failed.");
+      text += event.text || "";
+    }
+    return text;
   }
 }

@@ -54,3 +54,20 @@ export interface HealthResponse {
   ok: boolean;
   service?: string;
 }
+
+export interface ChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export interface ChatRequest {
+  messages: ChatMessage[];
+  topK?: number;
+}
+
+export interface ChatEvent {
+  type: "text-delta" | "done" | "error";
+  text?: string;
+  hits?: QueryHit[];
+  error?: string;
+}

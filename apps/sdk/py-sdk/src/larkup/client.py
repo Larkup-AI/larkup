@@ -1,7 +1,10 @@
 import os
+import json
 import httpx
-from typing import Optional, Union, Dict, Any
+from typing import AsyncIterator, Iterator, Optional, Union, Dict, Any
 from .types import (
+    ChatEvent,
+    ChatRequest,
     Document,
     PaginatedDocuments,
     QueryRequest,
@@ -105,6 +108,38 @@ class LarkupClient:
         data = self._request("POST", "/scrape", json={"url": url})
         return ScrapeResponse(**data)
 
+    def chat(self, request: Union[ChatRequest, str]) -> Iterator[ChatEvent]:
+        """Stream a retrieval-grounded chat response."""
+        payload = (
+            {"messages": [{"role": "user", "content": request}]}
+            if isinstance(request, str)
+            else request.model_dump(exclude_none=True)
+        )
+        with self._client.stream(
+            "POST",
+            "/chat",
+            headers=self._get_headers(),
+            json=payload,
+        ) as response:
+            if not response.is_success:
+                response.read()
+            self._handle_error(response)
+            for line in response.iter_lines():
+                if not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data:
+                    yield ChatEvent(**json.loads(data))
+
+    def chat_text(self, request: Union[ChatRequest, str]) -> str:
+        """Collect a streamed chat response into a string."""
+        output = ""
+        for event in self.chat(request):
+            if event.type == "error":
+                raise LarkupError(event.error or "Chat request failed")
+            output += event.text or ""
+        return output
+
     def close(self):
         """Close the underlying HTTP client"""
         self._client.close()
@@ -202,6 +237,38 @@ class AsyncLarkupClient:
         """Scrape a URL and add it to the corpus"""
         data = await self._request("POST", "/scrape", json={"url": url})
         return ScrapeResponse(**data)
+
+    async def chat(self, request: Union[ChatRequest, str]) -> AsyncIterator[ChatEvent]:
+        """Stream a retrieval-grounded chat response."""
+        payload = (
+            {"messages": [{"role": "user", "content": request}]}
+            if isinstance(request, str)
+            else request.model_dump(exclude_none=True)
+        )
+        async with self._client.stream(
+            "POST",
+            "/chat",
+            headers=self._get_headers(),
+            json=payload,
+        ) as response:
+            if not response.is_success:
+                await response.aread()
+            self._handle_error(response)
+            async for line in response.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data:
+                    yield ChatEvent(**json.loads(data))
+
+    async def chat_text(self, request: Union[ChatRequest, str]) -> str:
+        """Collect a streamed chat response into a string."""
+        output = ""
+        async for event in self.chat(request):
+            if event.type == "error":
+                raise LarkupError(event.error or "Chat request failed")
+            output += event.text or ""
+        return output
 
     async def close(self):
         """Close the underlying HTTP client"""

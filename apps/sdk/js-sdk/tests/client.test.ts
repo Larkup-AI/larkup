@@ -18,6 +18,21 @@ function err(status: number, body: unknown) {
   };
 }
 
+function sse(chunks: string[]) {
+  const encoder = new TextEncoder();
+  return {
+    ok: true,
+    status: 200,
+    statusText: "OK",
+    body: new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+        controller.close();
+      },
+    }),
+  };
+}
+
 describe("LarkupClient", () => {
   let client: LarkupClient;
 
@@ -79,6 +94,39 @@ describe("LarkupClient", () => {
     await client.query({ query: "test", topK: 10 });
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body).toEqual({ query: "test", topK: 10 });
+  });
+
+  it("chat() parses split SSE frames and sends authentication", async () => {
+    fetchMock.mockResolvedValueOnce(
+      sse([
+        'event: message\ndata: {"type":"text-delta","text":"Hel',
+        'lo"}\n\nevent: done\ndata: {"type":"done","hits":[]}\n\n',
+      ]),
+    );
+
+    const events = [];
+    for await (const event of client.chat("What is Larkup?")) events.push(event);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://test.local:8080/chat");
+    expect((init.headers as Headers).get("Authorization")).toBe("Bearer test-key-123");
+    expect(JSON.parse(init.body)).toEqual({
+      messages: [{ role: "user", content: "What is Larkup?" }],
+    });
+    expect(events).toEqual([
+      { type: "text-delta", text: "Hello" },
+      { type: "done", hits: [] },
+    ]);
+  });
+
+  it("chatText() collects text deltas", async () => {
+    fetchMock.mockResolvedValueOnce(
+      sse([
+        'data: {"type":"text-delta","text":"Hello "}\n\n',
+        'data: {"type":"text-delta","text":"world"}\n\n',
+      ]),
+    );
+    await expect(client.chatText("hello")).resolves.toBe("Hello world");
   });
 
   // ── List Documents ──────────────────────────────────────────────────────
