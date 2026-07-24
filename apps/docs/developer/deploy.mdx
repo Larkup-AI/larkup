@@ -251,6 +251,11 @@ Regardless of your deployment target, ensure the following variables are configu
 | `SERVER_API_KEY` | Recommended | Secures your deployed RAG endpoints with Bearer auth |
 | `EMBEDDING_API_KEY` | ✅ Yes | API key used to embed incoming queries |
 | `LANCEDB_TABLE` | Optional | Vector table name (default: `documents`) |
+| `LANCEDB_S3_URI` | Optional | S3-compatible URI for persistent LanceDB storage, e.g. `s3://bucket/larkup/server` |
+| `AWS_ENDPOINT` | Optional | S3-compatible endpoint; required for Cloudflare R2 |
+| `AWS_REGION` | Optional | Bucket region; use `auto` for Cloudflare R2 |
+| `AWS_ACCESS_KEY_ID` | Optional | Object-store access key, restricted to the LanceDB bucket/prefix |
+| `AWS_SECRET_ACCESS_KEY` | Optional | Object-store secret access key |
 | `LANCEDB_URI` | Optional | LanceDB Cloud URI (for cloud vector storage mode) |
 | `LANCEDB_API_KEY` | Optional | LanceDB Cloud API key |
 

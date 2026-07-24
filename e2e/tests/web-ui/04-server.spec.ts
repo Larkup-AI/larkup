@@ -17,6 +17,76 @@ test.describe.serial('Server Page', () => {
     await expect(page.getByText('Local Server').first()).toBeVisible({ timeout: 60_000 });
   });
 
+  test('cloud deployments link directly to their API reference', async ({ page }) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.evaluate(() => {
+      localStorage.setItem('rag_server_api_key', 'sk-cloud-api-key-test');
+      localStorage.setItem('larkup_api_key_version_default', '1');
+      localStorage.setItem(
+        'larkup_deployments_default',
+        JSON.stringify([
+          {
+            id: 'vercel:api-reference-test',
+            provider: 'vercel',
+            project: 'api-reference-test',
+            url: 'https://api-reference-test-abc123.vercel.app/',
+            status: 'ready',
+            apiKeyVersion: 0,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ]),
+      );
+    });
+    await page.reload();
+
+    const referenceLink = page
+      .getByRole('link', { name: 'Open API reference for api-reference-test' })
+      .first();
+    await expect(referenceLink).toHaveAttribute(
+      'href',
+      'https://api-reference-test-abc123.vercel.app/reference',
+    );
+    await expect(page.getByText('Key redeploy required')).toBeVisible();
+
+    const copyApiKey = page.getByRole('button', { name: 'Copy cloud API key' }).first();
+    await copyApiKey.hover();
+    await expect(page.getByText('Copy local key — redeploy to apply it')).toBeVisible();
+    await copyApiKey.click();
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe('sk-cloud-api-key-test');
+
+    await page.getByRole('button', { name: 'Generate a new API key' }).click();
+    await expect(page.getByRole('heading', { name: 'Deploy this new API key?' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Update & deploy to Vercel' })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await page.evaluate(() => {
+      localStorage.removeItem('larkup_deployments_default');
+      localStorage.removeItem('larkup_api_key_version_default');
+      localStorage.removeItem('rag_server_api_key');
+    });
+  });
+
+  test('Vercel deployment exposes environment configuration in the deploy sheet', async ({
+    page,
+  }) => {
+    await page.route(/\/api\/config\?serverId=/, async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ config: { vectorStore: 'pinecone', storeConfig: {} } }),
+      });
+    });
+
+    await page.getByRole('button', { name: 'Deploy' }).first().click();
+    await page.getByText('Vercel', { exact: true }).first().click();
+
+    await expect(page.getByRole('heading', { name: 'Deploy to Vercel' })).toBeVisible();
+    await expect(page.getByText('Environment', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Configure/ })).toBeVisible();
+  });
+
   test('launch RAG server', async ({ page }) => {
     test.setTimeout(120_000);
 

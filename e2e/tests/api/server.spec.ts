@@ -13,8 +13,17 @@ test.describe('Server API (/api/server)', () => {
     expect(Array.isArray(body.server.files)).toBe(true);
     expect(body.server.files.length).toBeGreaterThan(0);
     expect(body.server.files.map((file: { path: string }) => file.path)).toEqual(
-      expect.arrayContaining(['chat.mjs', 'widget.js', 'chat-ui.html']),
+      expect.arrayContaining(['server.mjs', 'vercel.json', 'package.json']),
     );
+    const serverFile = body.server.files.find(
+      (file: { path: string }) => file.path === 'server.mjs',
+    );
+    expect(serverFile?.contents).toContain('Location: "/reference"');
+    expect(serverFile?.contents).toContain('--scalar-color-accent: #000000');
+    expect(serverFile?.contents).toContain('url.pathname === "/query"');
+    expect(serverFile?.contents).toContain('url.pathname === "/documents"');
+    expect(serverFile?.contents).toContain('url.pathname === "/scrape"');
+    expect(serverFile?.contents).toContain('url.pathname === "/corpus"');
     console.log(
       `  ✓ Server generated: ${body.server.files.length} files, serverId=${body.serverId}`,
     );

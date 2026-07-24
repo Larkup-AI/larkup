@@ -85,7 +85,11 @@ When you launch your server, Larkup creates an optimized backend output director
 
 ## Deploying to serverless
 
-Local LanceDB is ideal for development and a VPS with a persistent disk. It is not durable on Vercel or other serverless platforms. Before deploying there, switch **Settings → Storage** to LanceDB Cloud or another cloud vector store and re-index your local source documents. Vercel Blob is suitable for original files and media; use a vector database for retrieval.
+Local LanceDB is ideal for development and a VPS with a persistent disk. It is not durable on Vercel or other serverless platforms. Before deploying there, switch **Settings → Storage** to **LanceDB → S3-compatible (Vercel / R2 / S3)** and re-index your local source documents. This stores LanceDB table files in your own S3-compatible bucket, so no LanceDB Cloud account is required.
+
+For Cloudflare R2, create a private bucket and an Object Read & Write token restricted to that bucket. Use `s3://<bucket>/larkup/<server-name>` as the database URI, `https://<account-id>.r2.cloudflarestorage.com` as the endpoint, and `auto` as the region. AWS S3 works with the same mode: leave the endpoint blank and use the bucket's AWS region. The deployed Vercel server receives these credentials as encrypted project environment variables.
+
+Vercel Blob is suitable for original files and media; use S3-compatible object storage for the mutable LanceDB table files.
 
 After deployment, copy the widget snippet from **Settings → Larkup Server** to add the chat UI to a website.
 
