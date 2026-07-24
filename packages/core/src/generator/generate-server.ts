@@ -1,6 +1,12 @@
 import type { RagConfig } from '../types';
 import { getVectorStore } from '@larkup/vector-stores/registry';
 import { getEmbeddingModel } from '../embeddings/registry';
+import {
+  addChatProviderDependency,
+  generateChatModule,
+  resolveChatModel,
+  resolveChatProvider,
+} from './chat-module';
 
 export interface GeneratedFile {
   path: string;
@@ -354,6 +360,7 @@ function serverSource(config: RagConfig): string {
   return `import { createServer } from "node:http"
 import { embedQuery } from "./embed.mjs"
 import * as store from "./store.mjs"
+import { handleChat } from "./chat.mjs"
 import fs from "node:fs"
 import path from "node:path"
 import * as cheerio from "cheerio"
@@ -370,7 +377,7 @@ function send(res, status, body) {
   res.writeHead(status, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
   })
   res.end(json)
@@ -506,6 +513,10 @@ const server = createServer(async (req, res) => {
     } catch (err) {
       return send(res, 500, { error: String(err?.message || err) })
     }
+  }
+
+  if (req.method === "POST" && url.pathname === "/chat") {
+    return handleChat(req, res)
   }
 
   if (req.method === "GET" && url.pathname === "/documents") {
@@ -701,6 +712,43 @@ const server = createServer(async (req, res) => {
               content: { "application/json": { schema: { type: "object", properties: { query: { type: "string" }, topK: { type: "number" } } } } }
             },
             responses: { "200": { description: "Successful response" } }
+          }
+        },
+        "/chat": {
+          post: {
+            summary: "Stream a retrieval-grounded chat response",
+            security: [{ bearerAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["messages"],
+                    properties: {
+                      messages: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          required: ["role", "content"],
+                          properties: {
+                            role: { type: "string", enum: ["user", "assistant", "system"] },
+                            content: { type: "string" }
+                          }
+                        }
+                      },
+                      topK: { type: "integer", minimum: 1 }
+                    }
+                  }
+                }
+              }
+            },
+            responses: {
+              "200": {
+                description: "Server-sent events containing text-delta and done events",
+                content: { "text/event-stream": {} }
+              }
+            }
           }
         },
         "/documents": {
@@ -1082,6 +1130,7 @@ vercel deploy
 - \`GET  /health\`           → \`{ ok: true }\`
 - \`GET  /reference\`        → Scalar API docs UI
 - \`POST /query\`            → \`{ query, hits: [{ id, score, title, url, text, documentId }] }\`
+- \`POST /chat\`             → SSE stream of retrieval-grounded assistant text
 - \`GET  /documents\`        → list all documents (paginated)
 - \`GET  /documents/:id\`    → get a single document
 - \`POST /documents\`        → add a document
@@ -1101,7 +1150,7 @@ export function generateServer(config: RagConfig): GeneratedServer {
     config.vectorStore === 'lancedb' && (config.storeConfig.mode ?? 'local') === 'local';
 
   const dependencies: Record<string, string> = {
-    ai: '^3.0.0',
+    ai: '^6.0.197',
     cheerio: '^1.0.0',
     ...store.serverDependencies,
   };
@@ -1126,6 +1175,9 @@ export function generateServer(config: RagConfig): GeneratedServer {
   } else {
     dependencies['@ai-sdk/openai'] = 'latest';
   }
+  const chatProvider = resolveChatProvider(config);
+  const chatModel = resolveChatModel(config, chatProvider);
+  addChatProviderDependency(dependencies, chatProvider);
 
   const envVars: GeneratedServer['envVars'] = [
     {
@@ -1148,7 +1200,25 @@ export function generateServer(config: RagConfig): GeneratedServer {
       required: false,
       help: `Default number of documents to retrieve (default ${config.topK}).`,
     },
+    {
+      key: 'CHAT_API_KEY',
+      required: true,
+      help: 'API key used by the streaming /chat endpoint.',
+    },
+    {
+      key: 'CHAT_MODEL',
+      required: false,
+      help: `Chat model override (default ${chatModel}).`,
+    },
   ];
+
+  if (chatProvider === 'custom') {
+    envVars.push({
+      key: 'CHAT_BASE_URL',
+      required: true,
+      help: 'OpenAI-compatible base URL used by the chat endpoint.',
+    });
+  }
 
   if (config.vectorStore === 'pinecone') {
     envVars.push(
@@ -1243,7 +1313,7 @@ export function generateServer(config: RagConfig): GeneratedServer {
     type: 'module',
     description: `Lightweight RAG server (${store.label}) generated by larkup`,
     scripts: {
-      start: 'node server.mjs',
+      start: 'node --env-file=.env server.mjs',
       demo: 'node demo.mjs',
     },
     dependencies,
@@ -1254,6 +1324,19 @@ export function generateServer(config: RagConfig): GeneratedServer {
     .map((e) => {
       let val = '';
       if (e.key === 'EMBEDDING_API_KEY') val = config.embeddingApiKey || '';
+      if (e.key === 'CHAT_API_KEY') {
+        const modelName = config.chatModelId?.replace(/^custom:/, '') || '';
+        const customKey = config.customChatModels?.find(
+          (model) => model.modelName === modelName,
+        )?.apiKey;
+        val = config.chatApiKey || customKey || config.embeddingApiKey || '';
+      }
+      if (e.key === 'CHAT_MODEL') val = chatModel;
+      if (e.key === 'CHAT_BASE_URL') {
+        const modelName = config.chatModelId?.replace(/^custom:/, '') || '';
+        val =
+          config.customChatModels?.find((model) => model.modelName === modelName)?.baseUrl || '';
+      }
       if (e.key === 'PINECONE_API_KEY') val = config.storeConfig.apiKey || '';
       if (e.key === 'PINECONE_INDEX') val = config.storeConfig.indexName || '';
       if (e.key === 'PINECONE_NAMESPACE') val = config.storeConfig.namespace || '';
@@ -1272,6 +1355,7 @@ export function generateServer(config: RagConfig): GeneratedServer {
   const files: GeneratedFile[] = [
     { path: 'package.json', contents: JSON.stringify(pkg, null, 2) + '\n' },
     { path: 'server.mjs', contents: serverSource(config) },
+    { path: 'chat.mjs', contents: generateChatModule(config) },
     { path: 'embed.mjs', contents: embedSource(config) },
     {
       path: 'store.mjs',

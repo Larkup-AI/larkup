@@ -73,6 +73,11 @@ function serialize<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
+async function serializeWorkspace<T>(fn: (workspace: Workspace) => Promise<T>): Promise<T> {
+  await getWorkspace();
+  return serialize(async () => fn((await readRaw()) ?? EMPTY));
+}
+
 /* ------------------------------- path utils ------------------------------ */
 
 export function serverDir(id: string) {
@@ -270,8 +275,7 @@ function defaultConfigFor(
 }
 
 export function createServer(name: string): Promise<{ workspace: Workspace; server: ServerMeta }> {
-  return serialize(async () => {
-    const ws = await getWorkspace();
+  return serializeWorkspace(async (ws) => {
     const id = randomUUID();
     const now = new Date().toISOString();
     const meta: ServerMeta = {
@@ -313,8 +317,7 @@ export function createServer(name: string): Promise<{ workspace: Workspace; serv
 }
 
 export function renameServer(id: string, name: string): Promise<Workspace> {
-  return serialize(async () => {
-    const ws = await getWorkspace();
+  return serializeWorkspace(async (ws) => {
     const servers = ws.servers.map((s) =>
       s.id === id ? { ...s, name: name.trim() || s.name, updatedAt: new Date().toISOString() } : s,
     );
@@ -323,23 +326,20 @@ export function renameServer(id: string, name: string): Promise<Workspace> {
 }
 
 export function setActiveServer(id: string): Promise<Workspace> {
-  return serialize(async () => {
-    const ws = await getWorkspace();
+  return serializeWorkspace(async (ws) => {
     if (!ws.servers.some((s) => s.id === id)) return ws;
     return writeRaw({ ...ws, activeServerId: id });
   });
 }
 
 export function setUsername(username: string): Promise<Workspace> {
-  return serialize(async () => {
-    const ws = await getWorkspace();
+  return serializeWorkspace(async (ws) => {
     return writeRaw({ ...ws, username: username.trim() || null });
   });
 }
 
 export function setMode(mode: WorkspaceMode): Promise<Workspace> {
-  return serialize(async () => {
-    const ws = await getWorkspace();
+  return serializeWorkspace(async (ws) => {
     return writeRaw({ ...ws, mode });
   });
 }
@@ -349,8 +349,7 @@ export function setMode(mode: WorkspaceMode): Promise<Workspace> {
  * running instance first (see the /api/servers route).
  */
 export function deleteServer(id: string): Promise<Workspace> {
-  return serialize(async () => {
-    const ws = await getWorkspace();
+  return serializeWorkspace(async (ws) => {
     const servers = ws.servers.filter((s) => s.id !== id);
     const activeServerId = ws.activeServerId === id ? servers[0]?.id ?? null : ws.activeServerId;
     await fs.rm(serverDir(id), { recursive: true, force: true });

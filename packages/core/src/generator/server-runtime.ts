@@ -4,6 +4,7 @@ import { spawn, exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { RagConfig } from '../types';
 import { generateServer } from './generate-server';
+import { resolveChatModel } from './chat-module';
 import { generateAgentServer } from './generate-agent-server';
 import { getActiveServer, getDataDir, requireDataDir } from '../workspace';
 
@@ -196,7 +197,20 @@ export async function startServer(
       EMBEDDING_API_KEY:
         config.embeddingApiKey || process.env.EMBEDDING_API_KEY || process.env.OPENAI_API_KEY || '',
       CHAT_API_KEY:
-        config.chatApiKey || process.env.CHAT_API_KEY || process.env.OPENAI_API_KEY || '',
+        config.chatApiKey ||
+        config.customChatModels?.find(
+          (model) => model.modelName === config.chatModelId?.replace(/^custom:/, ''),
+        )?.apiKey ||
+        process.env.CHAT_API_KEY ||
+        process.env.OPENAI_API_KEY ||
+        '',
+      CHAT_MODEL: process.env.CHAT_MODEL || resolveChatModel(config),
+      CHAT_BASE_URL:
+        config.customChatModels?.find(
+          (model) => model.modelName === config.chatModelId?.replace(/^custom:/, ''),
+        )?.baseUrl ||
+        process.env.CHAT_BASE_URL ||
+        '',
       OPENAI_API_KEY:
         config.embeddingApiKey || config.chatApiKey || process.env.OPENAI_API_KEY || '',
       ANTHROPIC_API_KEY:

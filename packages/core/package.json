@@ -20,6 +20,7 @@
     "./indexing/embedder": "./src/indexing/embedder.ts",
     "./indexing/chunker": "./src/indexing/chunker.ts",
     "./generator/generate-server": "./src/generator/generate-server.ts",
+    "./generator/chat-module": "./src/generator/chat-module.ts",
     "./generator/generate-agent-server": "./src/generator/generate-agent-server.ts",
     "./generator/server-runtime": "./src/generator/server-runtime.ts",
     "./chat-models/registry": "./src/chat-models/registry.ts",
