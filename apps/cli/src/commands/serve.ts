@@ -48,9 +48,9 @@ export async function serveCommand(options: { server?: string }) {
     }
 
     log.success(`Serving ${log.fmt.bold(config.projectName)} on http://localhost:${server.port}`);
-    log.dim('  POST /query  ·  GET /health  ·  Ctrl+C to stop');
+    log.dim('  POST /query  ·  POST /chat  ·  GET /health  ·  Ctrl+C to stop');
 
-    const child = spawn('node', ['server.mjs'], {
+    const child = spawn('node', ['--env-file=.env', 'server.mjs'], {
       cwd: dir,
       stdio: 'inherit',
       env,

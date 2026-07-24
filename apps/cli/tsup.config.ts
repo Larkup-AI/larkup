@@ -3,7 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: ["src/index.ts"],
   format: ["esm"],
-  noExternal: ["@larkup/core", "@larkup/vector-stores"],
+  noExternal: ["@larkup/core", "@larkup/marketplace", "@larkup/vector-stores"],
   external: [
     "@lancedb/lancedb",
     "@pinecone-database/pinecone",

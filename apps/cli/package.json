@@ -27,6 +27,7 @@
     "@clack/prompts": "^0.10.1",
     "@lancedb/lancedb": "^0.30.0",
     "@larkup/core": "workspace:*",
+    "@larkup/marketplace": "workspace:*",
     "@larkup/vector-stores": "workspace:*",
     "@pinecone-database/pinecone": "^7.2.0",
     "ai": "^6.0.197",

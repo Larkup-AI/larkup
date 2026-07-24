@@ -16,30 +16,38 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-export async function checkUpdate(): Promise<void> {
+export function isVersionNewer(candidate: string, current: string) {
+  return compareVersions(candidate, current) > 0;
+}
+
+export async function getLatestVersion(): Promise<string | undefined> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1500);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1500);
-
-    const res = await fetch(VERSION_CHECK_URL, {
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (!res.ok) return;
-
+    const res = await fetch(VERSION_CHECK_URL, { signal: controller.signal });
+    if (!res.ok) return undefined;
     const data = (await res.json()) as { version?: string };
+    return data.version;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function checkUpdate(): Promise<void> {
+  if (process.env.NODE_ENV === "test") return;
+
+  try {
+    const version = await getLatestVersion();
     const currentVersion = pkg.version;
 
-    if (data.version && compareVersions(data.version, currentVersion) > 0) {
+    if (version && isVersionNewer(version, currentVersion)) {
       console.log("");
       log.info(`╭──────────────────────────────────────────────╮`);
       log.info(
-        `│  Update available: ${currentVersion} → ${data.version}${" ".repeat(25 - currentVersion.length - data.version.length)}│`,
+        `│  Update available: ${currentVersion} → ${version}${" ".repeat(Math.max(1, 25 - currentVersion.length - version.length))}│`,
       );
       log.info(
-        `│  Run: ${log.fmt.cyan("npm install -g @larkup/cli")}             │`,
+        `│  Run: ${log.fmt.cyan("larkup update")}                         │`,
       );
       log.info(`╰──────────────────────────────────────────────╯`);
       console.log("");

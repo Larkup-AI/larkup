@@ -8,6 +8,9 @@ import { createAdapter } from "@larkup/vector-stores/factory";
 import { embedQuery } from "@larkup/core/indexing/embedder";
 import { getActiveServer } from "@larkup/core/workspace";
 import { getDefaultChatModel, getChatModel } from "@larkup/core/chat-models/registry";
+import { getAllModels } from "@larkup/core/models-cache";
+import { toChatDescriptor } from "@larkup/core/chat-models/registry";
+import { estimateCost, trackUsageEvent } from "@larkup/core/analytics-store";
 
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -15,6 +18,8 @@ import { createCohere } from "@ai-sdk/cohere";
 import { createMistral } from "@ai-sdk/mistral";
 import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGateway } from "@ai-sdk/gateway";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import type { CustomModelConfig } from "@larkup/core/types";
 
 import { log } from "../ui/logger";
 import { inServerScope, requireActive } from "../lib/scope";
@@ -32,7 +37,12 @@ Guidelines:
 - For casual conversation, respond naturally without using the tool.
 `;
 
-function createChatModel(provider: string, modelId: string, apiKey?: string) {
+function createChatModel(
+  provider: string,
+  modelId: string,
+  apiKey?: string,
+  customModels: CustomModelConfig[] = [],
+) {
   const modelName = modelId.includes("/")
     ? modelId.split("/").slice(1).join("/")
     : modelId;
@@ -43,6 +53,16 @@ function createChatModel(provider: string, modelId: string, apiKey?: string) {
     case "mistral": return createMistral({ apiKey })(modelName);
     case "deepseek": return createDeepSeek({ apiKey })(modelName);
     case "vercel_ai_gateway": return createGateway({ apiKey })(modelId);
+    case "custom": {
+      const customName = modelId.replace(/^custom:/, "");
+      const custom = customModels.find((model) => model.modelName === customName);
+      if (!custom) throw new Error(`Custom chat model "${customName}" is not configured.`);
+      return createOpenAICompatible({
+        name: "larkup-custom",
+        baseURL: custom.baseUrl,
+        apiKey: custom.apiKey || apiKey,
+      }).chatModel(customName);
+    }
     case "openai":
     default: return createOpenAI({ apiKey })(modelName);
   }
@@ -51,7 +71,6 @@ function createChatModel(provider: string, modelId: string, apiKey?: string) {
 async function queryKnowledgeBase(query: string, topK: number) {
   const config = await readConfig();
 
-  // 1) Try running generated server first
   const server = await refreshServerStatus();
   if (server.running) {
     try {
@@ -66,11 +85,9 @@ async function queryKnowledgeBase(query: string, topK: number) {
         return { query, hits: data.hits };
       }
     } catch {
-      // Fall through to direct retrieval
     }
   }
 
-  // 2) Direct retrieval
   const run = await readRun();
   if (!run || run.status !== "completed" || (run.totalChunks ?? 0) === 0) {
     return { query, hits: [] };
@@ -87,15 +104,18 @@ export async function chatCommand(options: { server?: string; model?: string }) 
   await inServerScope(options.server, async () => {
     const server = await requireActive();
     const config = await readConfig();
-    const provider = config.embeddingProvider;
+    const provider = config.chatProvider || config.embeddingProvider;
+    const chatModels = (await getAllModels())
+      .filter((model) => model.type === "language")
+      .map(toChatDescriptor);
 
     const chatModelId =
       options.model ||
       config.chatModelId ||
-      getDefaultChatModel(provider)?.id ||
+      getDefaultChatModel(chatModels, provider)?.id ||
       "openai/gpt-4o-mini";
 
-    const descriptor = getChatModel(chatModelId);
+    const descriptor = getChatModel(chatModels, chatModelId);
     const resolvedProvider = descriptor?.provider || provider;
     
     await ensureApiKey(config, "chat");
@@ -103,7 +123,12 @@ export async function chatCommand(options: { server?: string; model?: string }) 
     log.info(log.fmt.cyan(`Starting chat session... (Type 'exit' to quit)`));
     log.dim(`Server: ${server.name} | Model: ${chatModelId}`);
 
-    const aiModel = createChatModel(resolvedProvider, chatModelId, config.chatApiKey || config.embeddingApiKey);
+    const aiModel = createChatModel(
+      resolvedProvider,
+      chatModelId,
+      config.chatApiKey || config.embeddingApiKey,
+      config.customChatModels,
+    );
     const messages: any[] = [];
 
     while (true) {
@@ -153,12 +178,29 @@ export async function chatCommand(options: { server?: string; model?: string }) 
           process.stdout.write(log.fmt.green(chunk));
           fullResponse += chunk;
         }
+        const usage = await result.usage;
+        void trackUsageEvent({
+          type: "chat",
+          modelId: chatModelId,
+          provider: resolvedProvider,
+          promptTokens: usage.inputTokens ?? 0,
+          completionTokens: usage.outputTokens ?? 0,
+          totalTokens: usage.totalTokens ?? 0,
+          estimatedCost: estimateCost(
+            chatModelId,
+            usage.inputTokens ?? 0,
+            usage.outputTokens ?? 0,
+          ),
+          timestamp: new Date().toISOString(),
+        });
         process.stdout.write("\n\n");
 
         messages.push({ role: "assistant", content: fullResponse });
-      } catch (e: any) {
-        log.error(`\nChat error: ${e.message}`);
-        messages.pop(); // remove failed user message
+      } catch (error) {
+        messages.pop();
+        log.warn(
+          `\nChat error: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   });
