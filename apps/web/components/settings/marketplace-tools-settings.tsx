@@ -267,7 +267,7 @@ export function MarketplaceToolsSettings() {
                       </div>
                       {schema.type === 'select' ? (
                         <Select
-                          value={value || undefined}
+                          value={value || ''}
                           onValueChange={(v) => {
                             if (v === 'local') {
                               toast('Coming Soon', {

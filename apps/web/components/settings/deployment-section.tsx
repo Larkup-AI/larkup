@@ -1,19 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Share2,
-  Globe,
-  Shield,
-  Paintbrush,
-  Play,
-  Square,
-  Code,
-  ExternalLink,
-  Check,
-  Copy,
-  DatabaseIcon,
-} from 'lucide-react';
+import { Play, Square, Code, ExternalLink, Check, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
@@ -156,7 +144,10 @@ export function DeploymentSection() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Deployment Type</Label>
-              <Select value={config.type} onValueChange={(val: any) => saveConfig({ type: val })}>
+              <Select
+                value={config.type || ''}
+                onValueChange={(val: any) => saveConfig({ type: val })}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -192,7 +183,7 @@ export function DeploymentSection() {
             <div className="space-y-2">
               <Label>Auth Mode</Label>
               <Select
-                value={config.authMode}
+                value={config.authMode || ''}
                 onValueChange={(val: any) => saveConfig({ authMode: val })}
               >
                 <SelectTrigger>
@@ -259,7 +250,7 @@ export function DeploymentSection() {
                 <div className="space-y-2">
                   <Label>Position</Label>
                   <Select
-                    value={config.widgetStyle.position}
+                    value={config.widgetStyle.position || ''}
                     onValueChange={(val: any) =>
                       saveConfig({ widgetStyle: { ...config.widgetStyle, position: val } })
                     }

@@ -4,6 +4,7 @@ import { corpusStats } from '@larkup/core/documents-store';
 import { isRunning, readRun } from '@larkup/core/index-store';
 import { createRun, runIndexer } from '@larkup/core/indexing/indexer';
 import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
+import { runWithServer } from '@larkup/core/workspace';
 import type { RagConfig } from '@larkup/core/types';
 
 export const dynamic = 'force-dynamic';
@@ -45,7 +46,16 @@ function assessReadiness(config: RagConfig, docCount: number) {
   return { ready: blockers.length === 0, blockers };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const serverId = new URL(request.url).searchParams.get('serverId');
+  return withServer(serverId, getIndexStatus);
+}
+
+async function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
+  return serverId ? runWithServer(serverId, fn) : fn();
+}
+
+async function getIndexStatus() {
   const [config, stats, run] = await Promise.all([readConfig(), corpusStats(), readRun()]);
   const { ready, blockers } = assessReadiness(config, stats.docCount);
 

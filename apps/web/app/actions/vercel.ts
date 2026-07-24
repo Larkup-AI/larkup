@@ -9,6 +9,22 @@ const VERCEL_API = 'https://api.vercel.com';
 interface VercelProject {
   id: string;
   name: string;
+  /** Domains currently assigned to the project, including production aliases. */
+  alias?: Array<
+    | string
+    | {
+        domain?: string;
+        alias?: string;
+        target?: string;
+        environment?: string;
+        redirect?: string | null;
+      }
+  >;
+  targets?: {
+    production?: {
+      alias?: string[];
+    };
+  };
   link?: {
     type: string;
     repo?: string;
@@ -19,6 +35,21 @@ interface VercelProject {
   };
 }
 
+interface VercelProjectDomain {
+  name: string;
+  redirect?: string | null;
+  /** Domains assigned to preview branches must not be used as the API endpoint. */
+  gitBranch?: string | null;
+}
+
+interface VercelProjectAlias {
+  domain?: string;
+  alias?: string;
+  target?: string;
+  environment?: string;
+  redirect?: string | null;
+}
+
 interface VercelDeployment {
   id: string;
   uid: string;
@@ -26,6 +57,29 @@ interface VercelDeployment {
   url: string;
   readyState: string;
   target?: string;
+  /** Production aliases assigned by Vercel once the deployment is ready. */
+  alias?: string[];
+  /** Kept for compatibility with older Vercel API responses. */
+  aliases?: string[];
+}
+
+type DeploymentStatus = 'queued' | 'building' | 'ready' | 'error' | 'unknown';
+
+function normalizeDeploymentStatus(status?: string): DeploymentStatus {
+  switch (status?.toUpperCase()) {
+    case 'QUEUED':
+    case 'INITIALIZING':
+      return 'queued';
+    case 'BUILDING':
+      return 'building';
+    case 'READY':
+      return 'ready';
+    case 'ERROR':
+    case 'CANCELED':
+      return 'error';
+    default:
+      return 'unknown';
+  }
 }
 
 async function vercelFetch(path: string, token: string, options: RequestInit = {}) {
@@ -132,6 +186,102 @@ async function triggerDeploymentWithFiles(
   return data as VercelDeployment;
 }
 
+function asHttpsUrl(hostname?: string) {
+  if (!hostname) return undefined;
+  return hostname.startsWith('http') ? hostname.replace(/\/$/, '') : `https://${hostname}`;
+}
+
+function hostnameFromAlias(alias: string | VercelProjectAlias) {
+  return typeof alias === 'string' ? alias : alias.domain ?? alias.alias;
+}
+
+function pickProductionHostname(hostnames: string[]) {
+  // The project-level `*.vercel.app` hostname is stable. Deployment hostnames
+  // contain a generated hash and can be covered by Deployment Protection.
+  return hostnames.find((hostname) => hostname.endsWith('.vercel.app')) ?? hostnames[0];
+}
+
+/** Return a production project hostname that is never a deployment URL. */
+async function getProjectProductionUrl(token: string, project: VercelProject) {
+  // Project domains are the authoritative source for the stable default
+  // hostname (for example, demo4-taupe.vercel.app). Check these first so a
+  // generated deployment alias can never win over the public project domain.
+  try {
+    const data = await vercelFetch(`/v9/projects/${encodeURIComponent(project.id)}/domains`, token);
+    const domains = (data.domains ?? []) as VercelProjectDomain[];
+    const productionDomains = domains
+      .filter((domain) => !domain.redirect && !domain.gitBranch)
+      .map((domain) => domain.name);
+    const productionHostname = pickProductionHostname(productionDomains);
+    if (productionHostname) return asHttpsUrl(productionHostname);
+  } catch {
+    // Fall back to aliases returned with the project below.
+  }
+
+  const configuredAliases = [
+    ...(project.alias ?? []),
+    ...(project.targets?.production?.alias ?? []),
+  ]
+    .filter((alias) => typeof alias === 'string' || !alias.redirect)
+    .map(hostnameFromAlias)
+    .filter((hostname): hostname is string => Boolean(hostname));
+  const configuredUrl = pickProductionHostname(configuredAliases);
+  if (configuredUrl) return asHttpsUrl(configuredUrl);
+  return undefined;
+}
+
+/**
+ * Resolve the public URL Vercel assigned to a deployment.
+ *
+ * A project name is not a deployment URL: Vercel may add a suffix to the
+ * alias (for example, `demo3-zeta-one.vercel.app`). The deployment response
+ * can also contain the immutable, hash-suffixed deployment hostname, so use
+ * Vercel's deployment-alias endpoint as the source of truth. Fall back to the
+ * response and then the immutable URL while an alias is still being assigned.
+ */
+async function getDeploymentPublicUrl(
+  token: string,
+  deployment?: VercelDeployment,
+  project?: VercelProject,
+) {
+  if (!deployment) return undefined;
+
+  // The project response identifies the stable production domain (for example
+  // `demo3-zeta-one.vercel.app`). Deployment URLs are intentionally unique
+  // and contain a hash, so they must not be displayed as the cloud endpoint.
+  const projectUrl = project ? await getProjectProductionUrl(token, project) : undefined;
+  if (projectUrl) return projectUrl;
+
+  // This endpoint lists the aliases currently assigned to this deployment,
+  // including the stable production `*.vercel.app` alias. Do not use
+  // `deployment.url` until this endpoint has no aliases: it is the generated,
+  // immutable deployment URL rather than the production URL.
+  try {
+    const data = await vercelFetch(`/v2/deployments/${deployment.id}/aliases`, token);
+    const aliases = Array.isArray(data.aliases) ? data.aliases : [];
+    const hostnames: string[] = aliases
+      .map((alias: string | { alias?: string; domain?: string }) =>
+        typeof alias === 'string' ? alias : alias.alias ?? alias.domain,
+      )
+      .filter((alias: string | undefined): alias is string => Boolean(alias));
+    const vercelAlias = hostnames.find((alias: string) => alias.endsWith('.vercel.app'));
+    if (vercelAlias) return asHttpsUrl(vercelAlias);
+    if (hostnames[0]) return asHttpsUrl(hostnames[0]);
+  } catch {
+    // Deployments do not have aliases while queued; use Vercel's returned URL
+    // until a subsequent status refresh can replace it.
+  }
+
+  // Some create-deployment responses include aliases before the aliases
+  // endpoint becomes consistent. Retain this as a fallback only.
+  const responseAliases = deployment.alias ?? deployment.aliases ?? [];
+  const responseAlias = responseAliases.find((alias: string) => alias.endsWith('.vercel.app'));
+  if (responseAlias) return asHttpsUrl(responseAlias);
+  if (responseAliases[0]) return asHttpsUrl(responseAliases[0]);
+
+  return asHttpsUrl(deployment.url);
+}
+
 export async function getServerEnvRequirements(serverId: string) {
   let activeId = serverId;
   if (activeId === 'default') {
@@ -173,13 +323,19 @@ export async function getServerEnvRequirements(serverId: string) {
     if (storeConfig.sparseIndexName)
       storeDefaults['PINECONE_SPARSE_INDEX'] = storeConfig.sparseIndexName;
   } else {
+    if (storeConfig.mode) storeDefaults['LANCEDB_MODE'] = storeConfig.mode;
     if (storeConfig.tableName) storeDefaults['LANCEDB_TABLE'] = storeConfig.tableName;
     if (storeConfig.uri) storeDefaults['LANCEDB_URI'] = storeConfig.uri;
     if (storeConfig.apiKey) storeDefaults['LANCEDB_API_KEY'] = storeConfig.apiKey;
+    if (storeConfig.s3Uri) storeDefaults['LANCEDB_S3_URI'] = storeConfig.s3Uri;
+    if (storeConfig.s3Endpoint) storeDefaults['AWS_ENDPOINT'] = storeConfig.s3Endpoint;
+    if (storeConfig.s3Region) storeDefaults['AWS_REGION'] = storeConfig.s3Region;
+    if (storeConfig.s3AccessKeyId) storeDefaults['AWS_ACCESS_KEY_ID'] = storeConfig.s3AccessKeyId;
+    if (storeConfig.s3SecretAccessKey)
+      storeDefaults['AWS_SECRET_ACCESS_KEY'] = storeConfig.s3SecretAccessKey;
   }
 
-  // SERVER_API_KEY, PORT, LANCEDB_PATH, LANCEDB_MODE are handled internally
-  // and intentionally omitted here.
+  // SERVER_API_KEY, PORT, and LANCEDB_PATH are handled internally.
   const envVarDefs: { key: string; required: boolean; help: string }[] = [
     {
       key: 'EMBEDDING_API_KEY',
@@ -225,10 +381,24 @@ export async function getServerEnvRequirements(serverId: string) {
     // lancedb
     envVarDefs.push(
       {
+        key: 'LANCEDB_MODE',
+        required: false,
+        help: "'local', 's3', or 'cloud'. Set automatically from Storage settings.",
+      },
+      {
         key: 'LANCEDB_TABLE',
         required: false,
         help: "Table name holding the embedded chunks (default 'documents').",
       },
+      { key: 'LANCEDB_S3_URI', required: false, help: 'S3-compatible database URI.' },
+      {
+        key: 'AWS_ENDPOINT',
+        required: false,
+        help: 'S3-compatible endpoint (e.g. Cloudflare R2).',
+      },
+      { key: 'AWS_REGION', required: false, help: 'S3 region (use auto for Cloudflare R2).' },
+      { key: 'AWS_ACCESS_KEY_ID', required: false, help: 'S3-compatible access key ID.' },
+      { key: 'AWS_SECRET_ACCESS_KEY', required: false, help: 'S3-compatible secret access key.' },
       { key: 'LANCEDB_URI', required: false, help: 'LanceDB Cloud database URI (cloud mode).' },
       { key: 'LANCEDB_API_KEY', required: false, help: 'LanceDB Cloud API key (cloud mode).' },
     );
@@ -349,17 +519,18 @@ export async function deployToVercel(
       return { success: false, error: 'Configuration not found. Please save your settings first.' };
     }
 
-    const isLanceLocal = config.vectorStore === 'lancedb' && config.storeConfig?.mode !== 'cloud';
+    const isLanceLocal =
+      config.vectorStore === 'lancedb' && (config.storeConfig?.mode ?? 'local') === 'local';
     if (isLanceLocal) {
       return {
         success: false,
-        error:
-          'Local LanceDB uses a filesystem and cannot be deployed safely to Vercel. Switch Storage to LanceDB Cloud or another cloud vector store, then re-index before deploying.',
+        code: 'cloud_vector_store_required',
+        error: 'A cloud vector store is required for this deployment.',
       };
     }
 
-    const { generateAgentServer } = await import('@larkup/core/generator/generate-agent-server');
-    const generated = generateAgentServer(config);
+    const { generateServer } = await import('@larkup/core/generator/generate-server');
+    const generated = generateServer(config);
 
     const files = generated.files.map((f) => ({
       file: f.path,
@@ -376,12 +547,14 @@ export async function deployToVercel(
 
     const deployRes = await triggerDeploymentWithFiles(token, project, files);
 
-    const url = `https://${project.name}.vercel.app`;
+    const url = await getDeploymentPublicUrl(token, deployRes, project);
 
     return {
       success: true,
-      url,
+      url: url ?? `https://${deployRes.url}`,
+      projectName: project.name,
       deploymentId: deployRes?.id,
+      status: normalizeDeploymentStatus(deployRes?.readyState),
       projectCreated: wasNew,
     };
   } catch (error: any) {
@@ -390,5 +563,28 @@ export async function deployToVercel(
       success: false,
       error: error.message || 'Failed to trigger deployment on Vercel.',
     };
+  }
+}
+
+/** Poll the latest production deployment so the UI can reconcile optimistic state. */
+export async function getVercelDeploymentStatus(token: string, projectIdOrName: string) {
+  if (!token || !projectIdOrName) return { status: 'unknown' as const, hasProductionAlias: false };
+
+  try {
+    const project = await getProject(token, projectIdOrName);
+    if (!project) return { status: 'unknown' as const, hasProductionAlias: false };
+    const data = await vercelFetch(
+      `/v6/deployments?projectId=${encodeURIComponent(project.id)}&target=production&limit=1`,
+      token,
+    );
+    const deployment = data.deployments?.[0] as VercelDeployment | undefined;
+    const productionUrl = await getProjectProductionUrl(token, project);
+    return {
+      status: normalizeDeploymentStatus(deployment?.readyState),
+      url: productionUrl ?? (await getDeploymentPublicUrl(token, deployment, project)),
+      hasProductionAlias: Boolean(productionUrl),
+    };
+  } catch {
+    return { status: 'unknown' as const, hasProductionAlias: false };
   }
 }

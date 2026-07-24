@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import JSZip from 'jszip';
 import { readConfig } from '@larkup/core/config-store';
-import { generateAgentServer } from '@larkup/core/generator/generate-agent-server';
+import { generateServer } from '@larkup/core/generator/generate-server';
 import { getActiveServer } from '@larkup/core/workspace';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(req: Request) {
   const config = await readConfig();
-  const server = generateAgentServer(config);
+  const server = generateServer(config);
   const activeServer = await getActiveServer();
   const serverId = activeServer?.id ?? 'default';
 

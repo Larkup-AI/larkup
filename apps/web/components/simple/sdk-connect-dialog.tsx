@@ -88,7 +88,13 @@ console.log(text);`,
   };
 }
 
-export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
+export function SdkConnectDialog({
+  serverUrl,
+  disabled = false,
+}: {
+  serverUrl: string;
+  disabled?: boolean;
+}) {
   const [activeTab, setActiveTab] = useState<TabId>('python');
   const [copied, setCopied] = useState(false);
 
@@ -105,7 +111,7 @@ export function SdkConnectDialog({ serverUrl }: { serverUrl: string }) {
     <Dialog>
       <DialogTrigger
         render={
-          <Button variant="outline" className="gap-2">
+          <Button size={'sm'} variant="outline" className="gap-2 h-8" disabled={disabled}>
             <Code2 className="size-4" />
             Connect to Server SDK
           </Button>

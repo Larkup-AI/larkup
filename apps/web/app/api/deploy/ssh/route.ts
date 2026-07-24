@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
 
         const envLines = Object.entries(envVars).map(([k, v]) => `${k}=${v}`);
         const isLanceLocal =
-          config.vectorStore === 'lancedb' && config.storeConfig?.mode !== 'cloud';
+          config.vectorStore === 'lancedb' && (config.storeConfig?.mode ?? 'local') === 'local';
         if (isLanceLocal) {
           envLines.push('LANCEDB_PATH=./.larkup/lancedb');
         }
