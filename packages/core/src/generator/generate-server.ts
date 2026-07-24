@@ -35,10 +35,11 @@ const DEFAULT_DB_PATH = IS_SERVERLESS ? "/tmp/lancedb" : "./.larkup/lancedb"
 const DB_PATH = process.env.LANCEDB_PATH || DEFAULT_DB_PATH
 const URI = process.env.LANCEDB_URI || ""
 const API_KEY = process.env.LANCEDB_API_KEY || ""
+const S3_URI = process.env.LANCEDB_S3_URI || ""
 const TABLE = process.env.LANCEDB_TABLE || "documents"
 
-if (IS_SERVERLESS && MODE !== "cloud") {
-  console.warn("[LanceDB] Running on serverless — using /tmp/lancedb. Data will NOT persist between invocations. Use LanceDB Cloud for production.")
+if (IS_SERVERLESS && MODE === "local") {
+  console.warn("[LanceDB] Running on serverless — using /tmp/lancedb. Data will NOT persist between invocations. Use S3-compatible storage or LanceDB Cloud for production.")
 }
 
 let _conn = null
@@ -51,6 +52,11 @@ async function getConn() {
       throw new Error("LanceDB Cloud needs LANCEDB_URI and LANCEDB_API_KEY.")
     }
     _conn = await lancedb.connect(URI, { apiKey: API_KEY })
+  } else if (MODE === "s3") {
+    if (!S3_URI) {
+      throw new Error("S3-compatible LanceDB needs LANCEDB_S3_URI.")
+    }
+    _conn = await lancedb.connect(S3_URI)
   } else {
     const abs = path.isAbsolute(DB_PATH) ? DB_PATH : path.join(process.cwd(), DB_PATH)
     _conn = await lancedb.connect(abs)
@@ -423,6 +429,9 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && url.pathname === "/") {
+    res.writeHead(302, { Location: "/reference", "Cache-Control": "no-store" })
+    return res.end()
+
     res.writeHead(200, { "Content-Type": "text/html" })
     return res.end(\`<!DOCTYPE html>
 <html lang="en">
@@ -848,12 +857,34 @@ const server = createServer(async (req, res) => {
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <link rel="icon" href="/favicon2.ico" type="image/x-icon" />
+          <style>
+            :root {
+              --scalar-color-1: #000000;
+              --scalar-color-2: #333333;
+              --scalar-color-3: #666666;
+              --scalar-color-accent: #000000;
+              --scalar-background-1: #ffffff;
+              --scalar-background-2: #fafafa;
+              --scalar-background-3: #f5f5f5;
+              --scalar-background-accent: #f0f0f0;
+            }
+            .dark-mode {
+              --scalar-color-1: #ffffff;
+              --scalar-color-2: #cccccc;
+              --scalar-color-3: #999999;
+              --scalar-color-accent: #ffffff;
+              --scalar-background-1: #000000;
+              --scalar-background-2: #111111;
+              --scalar-background-3: #222222;
+              --scalar-background-accent: #333333;
+            }
+          </style>
         </head>
         <body>
           <script id="api-reference" data-url="/openapi.json"></script>
           <script>
             const configuration = {
-              "theme": "kepler",
+              "theme": "default",
               "hideClientButton": false,
               "showSidebar": true,
               "showDeveloperTools": "localhost",
@@ -1066,7 +1097,8 @@ vercel deploy
 export function generateServer(config: RagConfig): GeneratedServer {
   const store = getVectorStore(config.vectorStore);
   const model = getEmbeddingModel(config.embeddingModelId);
-  const usesLocalLance = config.vectorStore === 'lancedb' && config.storeConfig.mode !== 'cloud';
+  const usesLocalLance =
+    config.vectorStore === 'lancedb' && (config.storeConfig.mode ?? 'local') === 'local';
 
   const dependencies: Record<string, string> = {
     ai: '^3.0.0',
@@ -1147,7 +1179,7 @@ export function generateServer(config: RagConfig): GeneratedServer {
       {
         key: 'LANCEDB_MODE',
         required: false,
-        help: "'local' (on-disk) or 'cloud' (default 'local').",
+        help: "'local' (on-disk), 's3' (S3-compatible), or 'cloud' (default 'local').",
       },
       {
         key: 'LANCEDB_PATH',
@@ -1158,6 +1190,31 @@ export function generateServer(config: RagConfig): GeneratedServer {
         key: 'LANCEDB_TABLE',
         required: false,
         help: "Table name holding the embedded chunks (default 'documents').",
+      },
+      {
+        key: 'LANCEDB_S3_URI',
+        required: false,
+        help: 'S3-compatible LanceDB URI (e.g. s3://bucket/prefix).',
+      },
+      {
+        key: 'AWS_ENDPOINT',
+        required: false,
+        help: 'S3-compatible endpoint (required for Cloudflare R2).',
+      },
+      {
+        key: 'AWS_REGION',
+        required: false,
+        help: 'S3 region (use auto for Cloudflare R2).',
+      },
+      {
+        key: 'AWS_ACCESS_KEY_ID',
+        required: false,
+        help: 'S3-compatible access key ID.',
+      },
+      {
+        key: 'AWS_SECRET_ACCESS_KEY',
+        required: false,
+        help: 'S3-compatible secret access key.',
       },
       {
         key: 'LANCEDB_URI',
@@ -1200,8 +1257,14 @@ export function generateServer(config: RagConfig): GeneratedServer {
       if (e.key === 'PINECONE_API_KEY') val = config.storeConfig.apiKey || '';
       if (e.key === 'PINECONE_INDEX') val = config.storeConfig.indexName || '';
       if (e.key === 'PINECONE_NAMESPACE') val = config.storeConfig.namespace || '';
+      if (e.key === 'LANCEDB_MODE') val = config.storeConfig.mode || 'local';
       if (e.key === 'LANCEDB_URI') val = config.storeConfig.uri || '';
       if (e.key === 'LANCEDB_API_KEY') val = config.storeConfig.apiKey || '';
+      if (e.key === 'LANCEDB_S3_URI') val = config.storeConfig.s3Uri || '';
+      if (e.key === 'AWS_ENDPOINT') val = config.storeConfig.s3Endpoint || '';
+      if (e.key === 'AWS_REGION') val = config.storeConfig.s3Region || '';
+      if (e.key === 'AWS_ACCESS_KEY_ID') val = config.storeConfig.s3AccessKeyId || '';
+      if (e.key === 'AWS_SECRET_ACCESS_KEY') val = config.storeConfig.s3SecretAccessKey || '';
       return `${e.key}=${val}`;
     })
     .join('\n');

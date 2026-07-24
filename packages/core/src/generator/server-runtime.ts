@@ -217,6 +217,11 @@ export async function startServer(
       LANCEDB_PATH: absDb,
       LANCEDB_URI: config.storeConfig.uri || '',
       LANCEDB_API_KEY: config.storeConfig.apiKey || '',
+      LANCEDB_S3_URI: config.storeConfig.s3Uri || '',
+      AWS_ENDPOINT: config.storeConfig.s3Endpoint || '',
+      AWS_REGION: config.storeConfig.s3Region || '',
+      AWS_ACCESS_KEY_ID: config.storeConfig.s3AccessKeyId || '',
+      AWS_SECRET_ACCESS_KEY: config.storeConfig.s3SecretAccessKey || '',
       LANCEDB_TABLE: config.storeConfig.tableName || 'documents',
     },
   });
@@ -358,6 +363,11 @@ export async function startAgentServer(
       LANCEDB_PATH: absDb,
       LANCEDB_URI: config.storeConfig.uri || '',
       LANCEDB_API_KEY: config.storeConfig.apiKey || '',
+      LANCEDB_S3_URI: config.storeConfig.s3Uri || '',
+      AWS_ENDPOINT: config.storeConfig.s3Endpoint || '',
+      AWS_REGION: config.storeConfig.s3Region || '',
+      AWS_ACCESS_KEY_ID: config.storeConfig.s3AccessKeyId || '',
+      AWS_SECRET_ACCESS_KEY: config.storeConfig.s3SecretAccessKey || '',
       LANCEDB_TABLE: config.storeConfig.tableName || 'documents',
     },
   });

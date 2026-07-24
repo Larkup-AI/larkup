@@ -35,10 +35,11 @@ const DEFAULT_DB_PATH = IS_SERVERLESS ? "/tmp/lancedb" : "./.larkup/lancedb"
 const DB_PATH = process.env.LANCEDB_PATH || DEFAULT_DB_PATH
 const URI = process.env.LANCEDB_URI || ""
 const API_KEY = process.env.LANCEDB_API_KEY || ""
+const S3_URI = process.env.LANCEDB_S3_URI || ""
 const TABLE = process.env.LANCEDB_TABLE || "documents"
 
-if (IS_SERVERLESS && MODE !== "cloud") {
-  console.warn("[LanceDB] Running on serverless — using /tmp/lancedb. Data will NOT persist between invocations. Use LanceDB Cloud for production.")
+if (IS_SERVERLESS && MODE === "local") {
+  console.warn("[LanceDB] Running on serverless — using /tmp/lancedb. Data will NOT persist between invocations. Use S3-compatible storage or LanceDB Cloud for production.")
 }
 
 let _conn = null
@@ -51,6 +52,11 @@ async function getConn() {
       throw new Error("LanceDB Cloud needs LANCEDB_URI and LANCEDB_API_KEY.")
     }
     _conn = await lancedb.connect(URI, { apiKey: API_KEY })
+  } else if (MODE === "s3") {
+    if (!S3_URI) {
+      throw new Error("S3-compatible LanceDB needs LANCEDB_S3_URI.")
+    }
+    _conn = await lancedb.connect(S3_URI)
   } else {
     const abs = path.isAbsolute(DB_PATH) ? DB_PATH : path.join(process.cwd(), DB_PATH)
     _conn = await lancedb.connect(abs)
@@ -499,89 +505,144 @@ export function embedWidget(options = {}) {
 \`;`;
 }
 
-function chatUiSource(config: any) {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${config.projectName} Agent</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
-    #chat-log { flex: 1; overflow-y: auto; margin-bottom: 20px; border: 1px solid #ccc; padding: 10px; border-radius: 8px; }
-    .msg { margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; max-width: 80%; }
-    .user { background: #000; color: #fff; align-self: flex-end; margin-left: auto; }
-    .ai { background: #f0f0f0; color: #000; }
-    form { display: flex; gap: 10px; }
-    input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-    button { padding: 10px 20px; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
-  </style>
-</head>
-<body>
-  <div id="chat-log"></div>
-  <form id="chat-form">
-    <input type="text" id="input" placeholder="${
-      config.deployment?.widgetStyle?.placeholder || 'Type a message...'
-    }" required />
-    <button type="submit">Send</button>
-  </form>
-  <script>
-    const log = document.getElementById('chat-log');
-    const form = document.getElementById('chat-form');
-    const input = document.getElementById('input');
-    const messages = [];
-    
-    function appendMsg(role, content) {
-      const d = document.createElement('div');
-      d.className = 'msg ' + role;
-      d.textContent = content;
-      log.appendChild(d);
-      log.scrollTop = log.scrollHeight;
-    }
+function openapiSource(config: any) {
+  return JSON.stringify(
+    {
+      openapi: '3.1.0',
+      info: {
+        title: `${config.projectName} Agent API`,
+        version: '1.0.0',
+        description: 'Agent API for chat and authentication.',
+      },
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+          },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+      paths: {
+        '/health': {
+          get: {
+            summary: 'Health check',
+            responses: {
+              '200': { description: 'OK' },
+            },
+          },
+        },
+        '/auth/verify': {
+          post: {
+            summary: 'Verify join code',
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      code: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              '200': { description: 'Verified' },
+              '401': { description: 'Invalid join code' },
+            },
+          },
+        },
+        '/chat': {
+          post: {
+            summary: 'Stream chat',
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      messages: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            role: { type: 'string', enum: ['user', 'assistant', 'system'] },
+                            content: { type: 'string' },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              '200': {
+                description: 'Event stream of AI response',
+                content: { 'text/event-stream': {} },
+              },
+            },
+          },
+        },
+      },
+    },
+    null,
+    2,
+  );
+}
 
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const text = input.value;
-      input.value = '';
-      appendMsg('user', text);
-      messages.push({ role: 'user', content: text });
-      
-      const res = await fetch('/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages })
-      });
-      
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      
-      const d = document.createElement('div');
-      d.className = 'msg ai';
-      log.appendChild(d);
-      
-      let aiText = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              aiText += data;
-              d.textContent = aiText;
-              log.scrollTop = log.scrollHeight;
-            } catch(e) {}
+function referenceSource() {
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <title>API Reference</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --scalar-color-1: #000000;
+        --scalar-color-2: #333333;
+        --scalar-color-3: #666666;
+        --scalar-color-accent: #000000;
+        --scalar-background-1: #ffffff;
+        --scalar-background-2: #fafafa;
+        --scalar-background-3: #f5f5f5;
+        --scalar-background-accent: #f0f0f0;
+      }
+      .dark-mode {
+        --scalar-color-1: #ffffff;
+        --scalar-color-2: #cccccc;
+        --scalar-color-3: #999999;
+        --scalar-color-accent: #ffffff;
+        --scalar-background-1: #000000;
+        --scalar-background-2: #111111;
+        --scalar-background-3: #222222;
+        --scalar-background-accent: #333333;
+      }
+    </style>
+  </head>
+  <body>
+    <script id="api-reference" data-url="/openapi.json"></script>
+    <script>
+      const configuration = {
+        "theme": "default",
+        "hideClientButton": false,
+        "showSidebar": true,
+        "hideModels": false,
+        "hideDownloadButton": false,
+        "authentication": {
+          "preferredSecurityScheme": "bearerAuth",
+          "http": {
+            "bearer": { "token": "" }
           }
         }
-      }
-      messages.push({ role: 'assistant', content: aiText });
-    };
-  </script>
-</body>
-</html>
-`;
+      };
+      document.getElementById('api-reference').dataset.configuration = JSON.stringify(configuration);
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  </body>
+</html>`;
 }
 
 function serverSource(config: RagConfig): string {
@@ -616,9 +677,14 @@ const server = createServer(async (req, res) => {
     return res.end(WIDGET_JS)
   }
   
-  if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/chat-ui")) {
+  if (req.method === "GET" && url.pathname === "/") {
     res.writeHead(200, { "Content-Type": "text/html" })
-    return res.end(fs.readFileSync(path.join(process.cwd(), "chat-ui.html")))
+    return res.end(fs.readFileSync(path.join(process.cwd(), "index.html")))
+  }
+  
+  if (req.method === "GET" && url.pathname === "/openapi.json") {
+    res.writeHead(200, { "Content-Type": "application/json" })
+    return res.end(fs.readFileSync(path.join(process.cwd(), "openapi.json")))
   }
   
   if (req.method === "POST" && url.pathname === "/auth/verify") {
@@ -796,12 +862,14 @@ vercel deploy
 export function generateAgentServer(config: RagConfig): GeneratedServer {
   const store = getVectorStore(config.vectorStore);
   const model = getEmbeddingModel(config.embeddingModelId);
-  const usesLocalLance = config.vectorStore === 'lancedb' && config.storeConfig.mode !== 'cloud';
+  const usesLocalLance =
+    config.vectorStore === 'lancedb' && (config.storeConfig.mode ?? 'local') === 'local';
 
   const dependencies: Record<string, string> = {
     ai: '^6.0.197',
     zod: '^3.23.0',
     cheerio: '^1.0.0',
+    cookie: '^0.6.0',
     '@ai-sdk/openai': '^3.0.68',
     ...store.serverDependencies,
   };
@@ -879,7 +947,7 @@ export function generateAgentServer(config: RagConfig): GeneratedServer {
       {
         key: 'LANCEDB_MODE',
         required: false,
-        help: "'local' (on-disk) or 'cloud' (default 'local').",
+        help: "'local' (on-disk), 's3' (S3-compatible), or 'cloud' (default 'local').",
       },
       {
         key: 'LANCEDB_PATH',
@@ -890,6 +958,31 @@ export function generateAgentServer(config: RagConfig): GeneratedServer {
         key: 'LANCEDB_TABLE',
         required: false,
         help: "Table name holding the embedded chunks (default 'documents').",
+      },
+      {
+        key: 'LANCEDB_S3_URI',
+        required: false,
+        help: 'S3-compatible LanceDB URI (e.g. s3://bucket/prefix).',
+      },
+      {
+        key: 'AWS_ENDPOINT',
+        required: false,
+        help: 'S3-compatible endpoint (required for Cloudflare R2).',
+      },
+      {
+        key: 'AWS_REGION',
+        required: false,
+        help: 'S3 region (use auto for Cloudflare R2).',
+      },
+      {
+        key: 'AWS_ACCESS_KEY_ID',
+        required: false,
+        help: 'S3-compatible access key ID.',
+      },
+      {
+        key: 'AWS_SECRET_ACCESS_KEY',
+        required: false,
+        help: 'S3-compatible secret access key.',
       },
       {
         key: 'LANCEDB_URI',
@@ -935,8 +1028,14 @@ export function generateAgentServer(config: RagConfig): GeneratedServer {
       if (e.key === 'PINECONE_API_KEY') val = config.storeConfig.apiKey || '';
       if (e.key === 'PINECONE_INDEX') val = config.storeConfig.indexName || '';
       if (e.key === 'PINECONE_NAMESPACE') val = config.storeConfig.namespace || '';
+      if (e.key === 'LANCEDB_MODE') val = config.storeConfig.mode || 'local';
       if (e.key === 'LANCEDB_URI') val = config.storeConfig.uri || '';
       if (e.key === 'LANCEDB_API_KEY') val = config.storeConfig.apiKey || '';
+      if (e.key === 'LANCEDB_S3_URI') val = config.storeConfig.s3Uri || '';
+      if (e.key === 'AWS_ENDPOINT') val = config.storeConfig.s3Endpoint || '';
+      if (e.key === 'AWS_REGION') val = config.storeConfig.s3Region || '';
+      if (e.key === 'AWS_ACCESS_KEY_ID') val = config.storeConfig.s3AccessKeyId || '';
+      if (e.key === 'AWS_SECRET_ACCESS_KEY') val = config.storeConfig.s3SecretAccessKey || '';
       return `${e.key}=${val}`;
     })
     .join('\n');
@@ -947,7 +1046,8 @@ export function generateAgentServer(config: RagConfig): GeneratedServer {
     { path: 'chat.mjs', contents: chatSource(config) },
     { path: 'auth.mjs', contents: authSource(config) },
     { path: 'widget.js', contents: widgetSource(config) },
-    { path: 'chat-ui.html', contents: chatUiSource(config) },
+    { path: 'index.html', contents: referenceSource() },
+    { path: 'openapi.json', contents: openapiSource(config) },
     { path: 'embed.mjs', contents: embedSource(config) },
     {
       path: 'store.mjs',
