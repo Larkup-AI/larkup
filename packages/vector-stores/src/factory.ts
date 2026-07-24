@@ -63,6 +63,11 @@ export async function createAdapter(
         dbPath: overrides.dbPath,
         uri: overrides.uri,
         apiKey: overrides.apiKey,
+        s3Uri: overrides.s3Uri,
+        s3Endpoint: overrides.s3Endpoint,
+        s3Region: overrides.s3Region,
+        s3AccessKeyId: overrides.s3AccessKeyId,
+        s3SecretAccessKey: overrides.s3SecretAccessKey,
         tableName: overrides.tableName,
       });
     }

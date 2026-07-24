@@ -4,7 +4,8 @@ import * as lancedb from '@lancedb/lancedb';
 import type { QueryHit, VectorRecord, VectorStoreAdapter } from './base';
 
 /**
- * LanceDB adapter — embedded/on-disk for local dev, or LanceDB Cloud.
+ * LanceDB adapter — embedded/on-disk for local dev, LanceDB Cloud, or an
+ * S3-compatible object store (including Cloudflare R2).
  *
  * The table schema is inferred from the first batch of rows we add, so `init`
  * is a no-op connect; the table is (re)created lazily on `reset`/first upsert.
@@ -15,6 +16,11 @@ interface LanceConfig {
   dbPath?: string;
   uri?: string;
   apiKey?: string;
+  s3Uri?: string;
+  s3Endpoint?: string;
+  s3Region?: string;
+  s3AccessKeyId?: string;
+  s3SecretAccessKey?: string;
   tableName?: string;
 }
 
@@ -50,6 +56,25 @@ export class LanceDBAdapter implements VectorStoreAdapter {
       }
       this.conn = await lancedb.connect(this.config.uri, {
         apiKey: this.config.apiKey,
+      });
+    } else if (this.config.mode === 's3') {
+      if (!this.config.s3Uri || !this.config.s3AccessKeyId || !this.config.s3SecretAccessKey) {
+        throw new Error(
+          'S3-compatible LanceDB requires a URI, access key ID, and secret access key.',
+        );
+      }
+      if (!this.config.s3Uri.startsWith('s3://')) {
+        throw new Error(
+          "S3-compatible LanceDB URI must start with 's3://' (e.g. s3://my-bucket/lancedb).",
+        );
+      }
+      this.conn = await lancedb.connect(this.config.s3Uri, {
+        storageOptions: {
+          aws_access_key_id: this.config.s3AccessKeyId,
+          aws_secret_access_key: this.config.s3SecretAccessKey,
+          ...(this.config.s3Endpoint ? { aws_endpoint: this.config.s3Endpoint } : {}),
+          ...(this.config.s3Region ? { aws_region: this.config.s3Region } : {}),
+        },
       });
     } else {
       const dir = this.config.dbPath?.trim() || './.larkup/lancedb';
@@ -176,7 +201,8 @@ export class LanceDBAdapter implements VectorStoreAdapter {
         await this.connect();
         return;
       } catch (err: any) {
-        throw new Error(`Failed to connect to local LanceDB: ${err.message}`);
+        const label = this.config.mode === 's3' ? 'S3-compatible LanceDB' : 'local LanceDB';
+        throw new Error(`Failed to connect to ${label}: ${err.message}`);
       }
     }
 

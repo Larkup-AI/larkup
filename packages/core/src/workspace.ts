@@ -162,7 +162,7 @@ async function migrateOrInit(): Promise<Workspace> {
     const cfgPath = path.join(dir, 'config.json');
     const cfg = JSON.parse(await fs.readFile(cfgPath, 'utf8')) as RagConfig;
     if (cfg.projectName) name = cfg.projectName;
-    if (cfg.vectorStore === 'lancedb' && cfg.storeConfig?.mode !== 'cloud') {
+    if (cfg.vectorStore === 'lancedb' && (cfg.storeConfig?.mode ?? 'local') === 'local') {
       cfg.storeConfig = {
         ...cfg.storeConfig,
         dbPath: relServerPath(id, 'lancedb'),

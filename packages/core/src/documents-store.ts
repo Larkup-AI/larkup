@@ -1,8 +1,8 @@
-import { promises as fs } from "node:fs"
-import path from "node:path"
-import { randomUUID } from "node:crypto"
-import type { DocumentSource, SourceDocument } from "./types"
-import { getDataDir, requireDataDir } from "./workspace"
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import type { DocumentSource, SourceDocument } from './types';
+import { getDataDir, requireDataDir } from './workspace';
 
 /**
  * File-backed corpus store, scoped to the active server.
@@ -13,70 +13,70 @@ import { getDataDir, requireDataDir } from "./workspace"
  * clobbering each other.
  */
 
-let writeChain: Promise<unknown> = Promise.resolve()
+let writeChain: Promise<unknown> = Promise.resolve();
 function serialize<T>(fn: () => Promise<T>): Promise<T> {
-  const run = writeChain.then(fn, fn)
-  writeChain = run.catch(() => {})
-  return run
+  const run = writeChain.then(fn, fn);
+  writeChain = run.catch(() => {});
+  return run;
 }
 
 async function docsPath(create: boolean): Promise<string | null> {
-  const dir = create ? await requireDataDir() : await getDataDir()
-  if (!dir) return null
-  return path.join(dir, "documents.json")
+  const dir = create ? await requireDataDir() : await getDataDir();
+  if (!dir) return null;
+  return path.join(dir, 'documents.json');
 }
 
 export async function readDocuments(): Promise<SourceDocument[]> {
-  const file = await docsPath(false)
-  if (!file) return []
+  const file = await docsPath(false);
+  if (!file) return [];
   try {
-    const raw = await fs.readFile(file, "utf8")
-    return JSON.parse(raw) as SourceDocument[]
+    const raw = await fs.readFile(file, 'utf8');
+    return JSON.parse(raw) as SourceDocument[];
   } catch {
-    return []
+    return [];
   }
 }
 
 async function writeAll(docs: SourceDocument[]) {
-  const file = await docsPath(true)
-  if (!file) return
-  await fs.writeFile(file, JSON.stringify(docs, null, 2), "utf8")
+  const file = await docsPath(true);
+  if (!file) return;
+  await fs.writeFile(file, JSON.stringify(docs, null, 2), 'utf8');
 }
 
 export interface NewDocumentInput {
-  title: string
-  content: string
-  source: DocumentSource
-  url?: string
-  jobId?: string
-  metadata?: Record<string, any>
+  title: string;
+  content: string;
+  source: DocumentSource;
+  url?: string;
+  jobId?: string;
+  metadata?: Record<string, any>;
 }
 
 function normalize(input: NewDocumentInput): SourceDocument {
-  const content = input.content.trim()
+  const content = input.content.trim();
   return {
     id: randomUUID(),
-    title: input.title.trim() || "Untitled",
+    title: input.title.trim() || 'Untitled',
     url: input.url,
     source: input.source,
     content,
     charCount: content.length,
     jobId: input.jobId,
     metadata: input.metadata,
-    status: "unindexed",
+    status: 'unindexed',
     createdAt: new Date().toISOString(),
-  }
+  };
 }
 
 /** Append one document. Returns the stored record. */
 export function addDocument(input: NewDocumentInput) {
   return serialize(async () => {
-    const docs = await readDocuments()
-    const doc = normalize(input)
-    docs.push(doc)
-    await writeAll(docs)
-    return doc
-  })
+    const docs = await readDocuments();
+    const doc = normalize(input);
+    docs.push(doc);
+    await writeAll(docs);
+    return doc;
+  });
 }
 
 /**
@@ -84,28 +84,21 @@ export function addDocument(input: NewDocumentInput) {
  * for the same job (Firecrawl returns the full set on each status poll).
  * Returns the number of NEW documents actually added.
  */
-export function addCrawledDocuments(
-  jobId: string,
-  incoming: NewDocumentInput[],
-): Promise<number> {
+export function addCrawledDocuments(jobId: string, incoming: NewDocumentInput[]): Promise<number> {
   return serialize(async () => {
-    const docs = await readDocuments()
-    const seen = new Set(
-      docs
-        .filter((d) => d.url)
-        .map((d) => d.url as string),
-    )
-    let added = 0
+    const docs = await readDocuments();
+    const seen = new Set(docs.filter((d) => d.url).map((d) => d.url as string));
+    let added = 0;
     for (const input of incoming) {
-      if (input.url && seen.has(input.url)) continue
-      if (!input.content.trim()) continue
-      docs.push(normalize({ ...input, jobId }))
-      if (input.url) seen.add(input.url)
-      added++
+      if (input.url && seen.has(input.url)) continue;
+      if (!input.content.trim()) continue;
+      docs.push(normalize({ ...input, jobId }));
+      if (input.url) seen.add(input.url);
+      added++;
     }
-    if (added > 0) await writeAll(docs)
-    return added
-  })
+    if (added > 0) await writeAll(docs);
+    return added;
+  });
 }
 
 /** Edit a document's title / content / url in place. Returns the updated doc. */
@@ -114,78 +107,94 @@ export function updateDocument(
   patch: { title?: string; content?: string; url?: string; metadata?: Record<string, any> },
 ): Promise<SourceDocument | undefined> {
   return serialize(async () => {
-    const docs = await readDocuments()
-    const idx = docs.findIndex((d) => d.id === id)
-    if (idx < 0) return undefined
-    const current = docs[idx]
-    const content =
-      patch.content !== undefined ? patch.content.trim() : current.content
+    const docs = await readDocuments();
+    const idx = docs.findIndex((d) => d.id === id);
+    if (idx < 0) return undefined;
+    const current = docs[idx];
+    const content = patch.content !== undefined ? patch.content.trim() : current.content;
     const next: SourceDocument = {
       ...current,
-      title:
-        patch.title !== undefined
-          ? patch.title.trim() || "Untitled"
-          : current.title,
+      title: patch.title !== undefined ? patch.title.trim() || 'Untitled' : current.title,
       content,
       charCount: content.length,
       url: patch.url !== undefined ? patch.url || undefined : current.url,
       metadata: patch.metadata !== undefined ? patch.metadata : current.metadata,
-      status: "unindexed",
-    }
-    docs[idx] = next
-    await writeAll(docs)
-    return next
-  })
+      status: 'unindexed',
+    };
+    docs[idx] = next;
+    await writeAll(docs);
+    return next;
+  });
 }
 
 export function deleteDocument(id: string) {
   return serialize(async () => {
-    const docs = await readDocuments()
-    await writeAll(docs.filter((d) => d.id !== id))
-  })
+    const docs = await readDocuments();
+    await writeAll(docs.filter((d) => d.id !== id));
+  });
 }
 
 export function deleteDocuments(ids: string[]) {
   return serialize(async () => {
-    const docs = await readDocuments()
-    const idSet = new Set(ids)
-    await writeAll(docs.filter((d) => !idSet.has(d.id)))
-  })
+    const docs = await readDocuments();
+    const idSet = new Set(ids);
+    await writeAll(docs.filter((d) => !idSet.has(d.id)));
+  });
 }
 
 export function clearDocuments() {
   return serialize(async () => {
-    await writeAll([])
-  })
+    await writeAll([]);
+  });
 }
 
-export function updateDocumentsStatus(ids: string[], status: "indexed" | "unindexed") {
+/**
+ * Replace a project's corpus with a copy of existing source documents.
+ *
+ * This deliberately preserves the source content but discards index state: a
+ * vector index is tied to the database and embedding configuration that wrote
+ * it, so copied documents must always be indexed again in their destination.
+ */
+export function replaceDocuments(documents: SourceDocument[]) {
   return serialize(async () => {
-    const docs = await readDocuments()
-    const idSet = new Set(ids)
-    let changed = false
+    const now = new Date().toISOString();
+    await writeAll(
+      documents.map((document) => ({
+        ...document,
+        status: 'unindexed' as const,
+        createdAt: document.createdAt || now,
+      })),
+    );
+  });
+}
+
+export function updateDocumentsStatus(ids: string[], status: 'indexed' | 'unindexed') {
+  return serialize(async () => {
+    const docs = await readDocuments();
+    const idSet = new Set(ids);
+    let changed = false;
     for (const d of docs) {
       if (idSet.has(d.id)) {
-        d.status = status
-        changed = true
+        d.status = status;
+        changed = true;
       }
     }
-    if (changed) await writeAll(docs)
-  })
+    if (changed) await writeAll(docs);
+  });
 }
 
 /** Lightweight corpus stats for the Index stage + headers. */
 export async function corpusStats() {
-  const docs = await readDocuments()
-  const chars = docs.reduce((sum, d) => sum + d.charCount, 0)
+  const docs = await readDocuments();
+  const chars = docs.reduce((sum, d) => sum + d.charCount, 0);
   return {
     docCount: docs.length,
     charCount: chars,
     bySource: docs.reduce<Record<string, number>>((acc, d) => {
-      acc[d.source] = (acc[d.source] ?? 0) + 1
-      return acc
+      acc[d.source] = (acc[d.source] ?? 0) + 1;
+      return acc;
     }, {}),
-  }
+  };
 }
 
 /**
@@ -204,47 +213,45 @@ export function addTabularDocuments(
   columnNames: string[],
   options?: {
     /** Column to use for document titles (default: first text column) */
-    titleColumn?: string
+    titleColumn?: string;
     /** Columns to include in document content (default: all) */
-    contentColumns?: string[]
+    contentColumns?: string[];
     /** Separator between column values (default: " | ") */
-    separator?: string
+    separator?: string;
   },
 ): Promise<number> {
   return serialize(async () => {
-    const docs = await readDocuments()
-    const sep = options?.separator ?? " | "
-    const contentCols = options?.contentColumns ?? columnNames
-    const titleCol = options?.titleColumn ?? columnNames[0]
-    let added = 0
+    const docs = await readDocuments();
+    const sep = options?.separator ?? ' | ';
+    const contentCols = options?.contentColumns ?? columnNames;
+    const titleCol = options?.titleColumn ?? columnNames[0];
+    let added = 0;
 
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i]
+      const row = rows[i];
 
       // Build structured text content
       const content = contentCols
         .map((col) => {
-          const val = row[col]
-          if (val === null || val === undefined || val === "") return null
-          return `${col}: ${val}`
+          const val = row[col];
+          if (val === null || val === undefined || val === '') return null;
+          return `${col}: ${val}`;
         })
         .filter(Boolean)
-        .join(sep)
+        .join(sep);
 
-      if (!content.trim()) continue
+      if (!content.trim()) continue;
 
       const title =
-        titleCol && row[titleCol]
-          ? String(row[titleCol])
-          : `${fileName} — Row ${i + 1}`
+        titleCol && row[titleCol] ? String(row[titleCol]) : `${fileName} — Row ${i + 1}`;
 
       const doc: SourceDocument = {
         id: randomUUID(),
         title,
-        source: "tabular",
+        source: 'tabular',
         content,
         charCount: content.length,
-        status: "unindexed",
+        status: 'unindexed',
         metadata: {
           _tabular: {
             datasetId,
@@ -254,14 +261,13 @@ export function addTabularDocuments(
           _fileName: fileName,
         },
         createdAt: new Date().toISOString(),
-      }
+      };
 
-      docs.push(doc)
-      added++
+      docs.push(doc);
+      added++;
     }
 
-    if (added > 0) await writeAll(docs)
-    return added
-  })
+    if (added > 0) await writeAll(docs);
+    return added;
+  });
 }
-
