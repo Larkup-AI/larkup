@@ -9,6 +9,25 @@ Larkup generates a fully self-contained Node.js server with zero bloat. Because 
   Every generated server ships with a `vercel.json` for Vercel and a `Dockerfile` for VPS / container deployments out of the box. No extra configuration needed.
 </Info>
 
+## Deploy from the CLI
+
+Generate a portable artifact for Docker, Vercel, or another Node.js host:
+
+```bash
+larkup deploy docker --out ./deployment
+larkup deploy vercel --out ./deployment
+```
+
+Start locally or generate the extendable agent target:
+
+```bash
+larkup deploy local
+larkup deploy agent
+larkup deploy agent --start
+```
+
+Run `larkup test --endpoint <url>` after deployment to verify the server health endpoint.
+
 ---
 
 ## Choose Your Deployment Target

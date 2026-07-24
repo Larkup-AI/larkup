@@ -1,17 +1,11 @@
 ---
 title: "CLI Reference"
-description: "Control your pipeline from the terminal."
+description: "Build, index, test, and deploy Larkup servers from the terminal."
 ---
 
-Everything you can do in the Web UI, you can do directly from your terminal. Whether you prefer clicking through a visual interface or automating workflows with bash scripts, Larkup has you covered.
-
-<Tip>
-  Prefer a visual interface? Most users should start with the [Web UI Quickstart](/guide/quickstart) instead.
-</Tip>
+The CLI manages the same server workspaces used by the Web UI. Commands operate on the active server unless you pass `--server <id>`.
 
 ## Installation
-
-Install the CLI globally using your preferred package manager:
 
 <CodeGroup>
 
@@ -19,66 +13,142 @@ Install the CLI globally using your preferred package manager:
 npm install -g @larkup/cli
 ```
 
-```bash yarn
-yarn global add @larkup/cli
-```
-
 ```bash pnpm
 pnpm add -g @larkup/cli
 ```
 
-</CodeGroup>
-
-Alternatively, you can use it without installation via `npx`:
-
-```bash
+```bash npx
 npx @larkup/cli <command>
 ```
 
-## Running a Full RAG Server from Local Files
+</CodeGroup>
 
-If you have a local directory of markdown files or PDFs, you can ingest them, index them, and run a complete standalone RAG server using *only* the CLI.
-
-Here is the complete end-to-end workflow:
+## Local folder to running server
 
 ```bash
-# 1. Initialize a new workspace
-larkup init "my-local-knowledgebase"
-
-# 2. Ingest local files (repeat as needed, or script a loop)
-larkup add-doc --file ./docs/manual.md --title "User Manual"
-larkup add-doc --file ./docs/api.md --title "API Reference"
-
-# 3. Execute the chunking and embedding pipeline (streams progress)
-larkup index
-
-# 4. Generate the deployable RAG server to disk
-larkup generate --out ./my-rag-server
-
-# 5. Serve the generated backend in the foreground
+larkup init "product-docs"
+larkup index ./knowledge
+larkup generate
 larkup serve
 ```
 
-In another terminal window, you can instantly test queries against your new server:
+`index` recursively loads supported text and source-code files, then streams chunking and embedding progress. It skips `.git`, `.larkup`, `node_modules`, `dist`, and `build` directories.
+
+Use `--no-run` when you want to load files without rebuilding the vector index:
+
 ```bash
-larkup query "How do I authenticate with the API?" --topK 3
+larkup index ./docs ./src --no-run
+larkup index --incremental
 ```
 
-## Core Commands Reference
+## Media
 
-Once installed, you can use the `larkup` (or `rag`) command.
+Images, audio, and video can be added directly:
+
+```bash
+larkup media ./demo.mp4
+larkup index ./media
+```
+
+Image metadata is added to the corpus. Audio and video speech is transcribed into a timestamped, searchable document. Media processing status is streamed in the terminal and persisted to the workspace.
+
+Audio and video processing requires the Video & Audio marketplace tool:
+
+```bash
+larkup marketplace install video-audio
+larkup media ./interview.mp3
+```
+
+Configure the tool's transcription provider and API key in the Web UI before processing audio or video. Pass `--no-index` to process media without rebuilding the index.
+
+## Chat and retrieval
+
+```bash
+larkup query "How do I authenticate?" --topK 3
+larkup chat
+larkup chat --model openai/gpt-4o-mini
+```
+
+`query` prints retrieved chunks. `chat` opens an interactive, retrieval-grounded conversation and streams the answer as it is generated.
+
+Generated servers also expose `POST /query` and the streaming `POST /chat` endpoint, so the same features are available through the TypeScript and Python SDKs.
+
+## Corpus documents
+
+```bash
+larkup documents
+larkup documents show <document-id>
+larkup documents update <document-id> --file ./revised.md
+larkup documents remove <document-id>
+larkup documents export --format jsonl --out ./corpus.jsonl
+```
+
+`docs` is a shorter alias for `documents`. Updating a document marks it unindexed; run `larkup index --incremental` afterward.
+
+## Marketplace Hub
+
+```bash
+larkup marketplace
+larkup marketplace info video-audio
+larkup marketplace install video-audio
+larkup marketplace uninstall video-audio
+```
+
+`market` is a shorter alias for `marketplace`. The catalog combines local tool manifests with the remote Marketplace Hub and retains an offline fallback catalog.
+
+## Generate, test, and deploy
+
+```bash
+larkup generate --out ./my-rag-server
+larkup test
+larkup test --connection
+larkup test --endpoint https://rag.example.com --api-key "$LARKUP_API_KEY"
+larkup deploy docker --out ./deployment
+```
+
+Deployment targets:
+
+| Target | Behavior |
+| --- | --- |
+| `docker` | Generate or export the Docker-ready server. This is the default. |
+| `vercel` | Generate or export the Vercel-ready server. |
+| `export` | Copy the portable server artifact to `--out`. |
+| `local` | Generate and start the standard server in the background. |
+| `agent` | Generate the extendable agent server, or start it with `--start`. |
+
+The standard generated server includes retrieval, document APIs, scraping, corpus export, and streaming chat. The agent target remains useful when you need the portable agent manifest and widget surface.
+
+## Browser and updates
+
+```bash
+larkup open
+larkup open api
+larkup open https://rag.example.com/reference
+larkup update --check
+larkup update
+```
+
+`open` opens the Web UI by default. `open api` opens the active server's API reference. `update --check` only reports whether a newer CLI exists; `update` installs it globally.
+
+## Command reference
 
 | Command | Description |
 | --- | --- |
-| `larkup init [name]` | Create a new RAG server workspace and make it active. |
-| `larkup servers` | List all servers (`●` marks the active one). |
-| `larkup use <id\|name>` | Switch the active server workspace. |
-| `larkup config` | Show the active server's configuration and status. |
-| `larkup add-doc --file <path>` | Add a document from a local file. |
-| `larkup add-doc --text "<text>"`| Add a document from inline text (optional `--title`, `--url`). |
-| `larkup index` | Execute the chunking and embedding pipeline. |
-| `larkup generate [--out <dir>]`| Emit the deployable RAG server to disk. |
-| `larkup serve` | Run the generated server locally in the foreground. |
-| `larkup query "<question>"` | Retrieve the top-k chunks (`--topK <n>` optional). |
-| `larkup chat` | Chat with your knowledge base in the terminal (`--model <id>` optional). |
-| `larkup settings` | Configure CLI settings (e.g., chat models). |
+| `larkup init [name]` | Create and activate a server workspace. |
+| `larkup servers` | List server workspaces. |
+| `larkup use <id>` | Switch the active server. |
+| `larkup config` | Show configuration and status. |
+| `larkup add-doc` | Add a file or inline text with optional source URL metadata. |
+| `larkup documents` | List, show, update, remove, or export corpus documents. |
+| `larkup index [sources...]` | Load files or folders and build the index. |
+| `larkup media [sources...]` | Process image, audio, or video files. |
+| `larkup query <question>` | Retrieve the most relevant chunks. |
+| `larkup chat` | Start a streaming terminal chat. |
+| `larkup generate` | Emit a portable standard server. |
+| `larkup serve` | Run the standard server in the foreground. |
+| `larkup marketplace` | List, inspect, install, or uninstall tools. |
+| `larkup deploy [target]` | Prepare or start a deployment target. |
+| `larkup test` | Validate configuration, storage, or an endpoint. |
+| `larkup open [target]` | Open the Web UI, API reference, or URL. |
+| `larkup update` | Check for or install a CLI update. |
+| `larkup settings` | Configure terminal chat models. |

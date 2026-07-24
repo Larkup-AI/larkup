@@ -61,6 +61,27 @@ for (const hit of results.hits) {
 }
 ```
 
+### Streaming Chat
+
+Use `chat()` when you want to render tokens as they arrive:
+
+```typescript
+for await (const event of client.chat({
+  messages: [{ role: "user", content: "Summarize the deployment guide." }],
+  topK: 4,
+})) {
+  if (event.type === "text-delta") {
+    process.stdout.write(event.text ?? "");
+  }
+}
+```
+
+Use `chatText()` when you only need the completed answer:
+
+```typescript
+const answer = await client.chatText("What does the API key protect?");
+```
+
 ## Integrations
 
 For connecting to the Vercel AI SDK or LangChain.js, see the dedicated [Vercel AI SDK Integration](/sdk/integrations/ai-sdk) and [LangChain Integration](/sdk/integrations/langchain) guides.

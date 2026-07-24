@@ -63,6 +63,27 @@ for hit in results.hits:
     print(f"Score: {hit.score} | Text: {hit.text}")
 ```
 
+### Streaming Chat
+
+```python
+for event in client.chat("Summarize the deployment guide."):
+    if event.type == "text-delta":
+        print(event.text or "", end="", flush=True)
+
+answer = client.chat_text("What does the API key protect?")
+```
+
+The asynchronous client provides matching `chat()` and `chat_text()` methods:
+
+```python
+from larkup import AsyncLarkupClient
+
+async with AsyncLarkupClient(options) as client:
+    async for event in client.chat("What is Larkup?"):
+        if event.type == "text-delta":
+            print(event.text or "", end="")
+```
+
 ## Integrations
 
 For connecting to LangChain Python, see the dedicated [LangChain Integration](/sdk/integrations/langchain) guide.

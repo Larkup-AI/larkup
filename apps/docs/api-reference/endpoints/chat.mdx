@@ -1,0 +1,52 @@
+---
+title: "Stream Chat"
+api: "POST /chat"
+description: "Stream a retrieval-grounded chat response."
+---
+
+The generated server embeds the latest user message, retrieves relevant chunks, and supplies them to the configured chat model. The response uses Server-Sent Events.
+
+### Body
+
+<ParamField body="messages" type="array" required>
+  Conversation messages with a `role` of `user`, `assistant`, or `system` and a string `content`.
+</ParamField>
+
+<ParamField body="topK" type="number">
+  Maximum number of context chunks to retrieve. Defaults to the server's `TOP_K` value.
+</ParamField>
+
+### Events
+
+Each SSE frame contains a JSON object in its `data` field.
+
+| Type | Fields | Description |
+| --- | --- | --- |
+| `text-delta` | `text` | The next generated text fragment. |
+| `done` | `hits` | Generation completed, with the retrieved context chunks. |
+| `error` | `error` | The stream failed after it started. |
+
+```bash
+curl --no-buffer http://localhost:8080/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $LARKUP_API_KEY" \
+  -d '{
+    "messages": [
+      { "role": "user", "content": "How do I configure authentication?" }
+    ],
+    "topK": 4
+  }'
+```
+
+```text
+event: message
+data: {"type":"text-delta","text":"Configure "}
+
+event: message
+data: {"type":"text-delta","text":"SERVER_API_KEY."}
+
+event: done
+data: {"type":"done","hits":[...]}
+```
+
+Set `CHAT_API_KEY` and, optionally, `CHAT_MODEL` in the generated server environment. Custom OpenAI-compatible models also use `CHAT_BASE_URL`.
