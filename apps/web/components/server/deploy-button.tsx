@@ -84,7 +84,7 @@ export function DeployButton({
             <Button
               variant="default"
               size="default"
-              className={`${compact ? 'h-8' : 'h-9'} w-[130px] justify-start gap-1 rounded-md`}
+              className={`${compact ? 'h-8' : 'h-9'} w-32.5 justify-start gap-1 rounded-md`}
             />
           }
         >
@@ -96,7 +96,7 @@ export function DeployButton({
             <ChevronDown />
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[200px]">
+        <DropdownMenuContent align="end" className="w-50">
           <DropdownMenuItem onClick={() => handleOpenDeploy('vercel')}>
             <p className="flex items-center">
               <img src="/vercel.svg" className="size-4 mr-2" alt="Vercel" />
@@ -114,7 +114,7 @@ export function DeployButton({
               <img src="/icons/azure.svg" className="size-4 mr-2" alt="Azure" />
               Azure
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[240px]">
+            <DropdownMenuSubContent className="w-60">
               <DropdownMenuItem
                 disabled
                 className="h-auto"
@@ -149,7 +149,7 @@ export function DeployButton({
               <img src="/icons/aws.svg" className="size-4 mr-2" alt="AWS" />
               AWS
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[240px]">
+            <DropdownMenuSubContent className="w-60">
               <DropdownMenuItem
                 disabled
                 className="h-auto"
@@ -184,7 +184,7 @@ export function DeployButton({
               <img src="/icons/gcp.svg" className="size-4 mr-2" alt="GCP" />
               GCP
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[240px]">
+            <DropdownMenuSubContent className="w-60">
               <DropdownMenuItem
                 disabled
                 className="h-auto"
@@ -219,7 +219,7 @@ export function DeployButton({
               <img src="/icons/digital-ocean.webp" className="size-4 mr-2" alt="DigitalOcean" />
               DigitalOcean
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-[240px]">
+            <DropdownMenuSubContent className="w-60">
               <DropdownMenuItem
                 disabled
                 className="h-auto"

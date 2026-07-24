@@ -632,7 +632,7 @@ export function DeploySheet({ open, onOpenChange, target, serverId }: DeployShee
           if (!isDeploying) onOpenChange(v);
         }}
       >
-        <SheetContent className="flex flex-col h-full max-w-[90%]! w-[750px]! overflow-y-auto p-0 border-l">
+        <SheetContent className="flex flex-col h-full max-w-[90%]! w-187.5! overflow-y-auto p-0 border-l">
           <div className="p-6 pb-0 space-y-1">
             <SheetHeader className="text-left">
               <SheetTitle>
@@ -698,7 +698,7 @@ export function DeploySheet({ open, onOpenChange, target, serverId }: DeployShee
                       value={storeId}
                       onValueChange={(value) => changeStore(value as VectorStoreId)}
                     >
-                      <SelectTrigger className="w-[200px] bg-background">
+                      <SelectTrigger className="w-50 bg-background">
                         <span className="flex items-center gap-2.5">
                           {STORE_META[storeId] && (
                             <ProviderIcon
@@ -938,7 +938,7 @@ export function DeploySheet({ open, onOpenChange, target, serverId }: DeployShee
                     </div>
                     {sshAuthType === 'key' ? (
                       <textarea
-                        className="min-h-[120px] rounded-md border bg-transparent px-3 py-2 text-sm font-mono"
+                        className="min-h-30 rounded-md border bg-transparent px-3 py-2 text-sm font-mono"
                         value={sshKeyOrPassword}
                         onChange={(e) => setSshKeyOrPassword(e.target.value)}
                       />
@@ -963,7 +963,7 @@ export function DeploySheet({ open, onOpenChange, target, serverId }: DeployShee
               )}
 
               {isDeploying && sshLogs.length > 0 && (
-                <div className="bg-black text-[#00ff00] font-mono text-[10px] p-3 rounded-md h-[200px] overflow-y-auto break-all whitespace-pre-wrap flex flex-col-reverse">
+                <div className="bg-black text-[#00ff00] font-mono text-[10px] p-3 rounded-md h-50 overflow-y-auto break-all whitespace-pre-wrap flex flex-col-reverse">
                   <div>
                     {sshLogs.map((log, i) => (
                       <div key={i}>{log}</div>

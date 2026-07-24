@@ -724,7 +724,7 @@ export function ServerSection() {
                             </Button>
                           }
                         />
-                        <DropdownMenuContent align="end" className={'w-[150px]'}>
+                        <DropdownMenuContent align="end" className={'w-37.5'}>
                           {deployment.provider === 'vercel' && (
                             <DropdownMenuItem
                               onClick={() => {
