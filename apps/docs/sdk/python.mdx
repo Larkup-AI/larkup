@@ -1,7 +1,7 @@
 ---
-title: "Python"
-description: "How to install and use the Larkup Python SDK."
-icon: "python"
+title: 'Python'
+description: 'How to install and use the Larkup Python SDK.'
+icon: 'python'
 ---
 
 ## Installation
@@ -27,11 +27,13 @@ Import the client and initialize it. The client will automatically fall back to 
 Both synchronous and asynchronous clients are available.
 
 ```python
+import os
+
 from larkup import LarkupClient, LarkupClientOptions
 
 options = LarkupClientOptions(
-    base_url="http://localhost:8080",
-    api_key="your-api-key"
+    base_url=os.getenv("LARKUP_API_URL"),
+    api_key=os.getenv("LARKUP_API_KEY")
 )
 
 client = LarkupClient(options)
@@ -53,6 +55,27 @@ doc = Document(
 response = client.add_document(doc)
 print("Document added:", response["success"])
 ```
+
+`add_document()` embeds and stores the document immediately. No second index call is required.
+
+### Bulk Indexing with Progress
+
+```python
+documents = [
+    Document(title="Guide", text="Deployment guide content"),
+    Document(title="FAQ", text="Frequently asked questions"),
+]
+
+for progress in client.index_documents(
+    documents,
+    mode="parallel",
+    concurrency=4,
+    continue_on_error=True,
+):
+    print(progress.percent, progress.succeeded, progress.failed)
+```
+
+Use `mode="sequential"` for strict request ordering or rate-limited embedding providers. Parallel mode controls client request scheduling only; the server retains its configured index type, vector store, embedding model, and chunking strategy.
 
 ### Querying
 
@@ -82,6 +105,64 @@ async with AsyncLarkupClient(options) as client:
     async for event in client.chat("What is Larkup?"):
         if event.type == "text-delta":
             print(event.text or "", end="")
+```
+
+The asynchronous client also exposes `index_documents()` as an async iterator.
+
+### Corpus Inspection and Export
+
+```python
+from larkup import CorpusFilter, CorpusRequest
+
+summary = client.corpus_summary()
+corpus = client.corpus(
+    CorpusRequest(
+        filter=CorpusFilter(titleContains="deployment"),
+        limit=50,
+        includeContent=True,
+    )
+)
+jsonl = client.export_corpus("jsonl")
+```
+
+### Marketplace Hub
+
+```python
+from larkup import LarkupHubClient
+
+with LarkupHubClient() as hub:
+    tools = hub.list_tools(category="media", search="video")
+    tool = hub.get_tool("video-audio")
+```
+
+The matching `AsyncLarkupHubClient` supports asynchronous applications. Tool installation changes the Larkup host and therefore remains a CLI operation:
+
+```bash
+larkup marketplace install video-audio
+```
+
+## API Coverage
+
+| SDK method                                | RAG server operation                  |
+| ----------------------------------------- | ------------------------------------- |
+| `health()`                                | `GET /health`                         |
+| `open_api()`                              | `GET /openapi.json`                   |
+| `query()`                                 | `POST /query`                         |
+| `chat()` / `chat_text()`                  | `POST /chat`                          |
+| `list_documents()` / `get_document()`     | `GET /documents`                      |
+| `add_document()` / `index_documents()`    | `POST /documents`                     |
+| `update_document()` / `delete_document()` | `PUT` / `DELETE /documents/:id`       |
+| `scrape()`                                | `POST /scrape`                        |
+| `corpus_summary()` / `corpus()`           | `GET /corpus/summary`, `POST /corpus` |
+| `export_corpus()`                         | `POST /corpus/export`                 |
+
+## Local Demo
+
+The repository includes a complete demo configured for `http://localhost:8091`:
+
+```bash
+cd apps/sdk/py-sdk
+uv run python examples/rag_server.py
 ```
 
 ## Integrations

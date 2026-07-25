@@ -4,4 +4,4 @@
 '@larkup/sdk': minor
 ---
 
-Add folder and media indexing, corpus management, Marketplace Hub operations, deployment and update commands, browser opening, CLI validation, and streaming chat support in generated servers and SDKs.
+Add folder and media indexing, corpus management, Marketplace Hub operations, deployment and update commands, browser opening, CLI validation, streaming chat, complete RAG endpoint coverage, bulk SDK indexing progress, and typed Hub discovery.

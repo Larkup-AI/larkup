@@ -75,10 +75,16 @@ Once installed, you can use the `larkup` (or `rag`) command.
 | `larkup use <id\|name>` | Switch the active server workspace. |
 | `larkup config` | Show the active server's configuration and status. |
 | `larkup add-doc --file <path>` | Add a document from a local file. |
-| `larkup add-doc --text "<text>"`| Add a document from inline text (optional `--title`, `--url`). |
+| `larkup documents [action] [id]`| Manage documents in the current workspace. |
+| `larkup media [sources...]` | Add and process media files (audio/video). |
 | `larkup index` | Execute the chunking and embedding pipeline. |
 | `larkup generate [--out <dir>]`| Emit the deployable RAG server to disk. |
 | `larkup serve` | Run the generated server locally in the foreground. |
 | `larkup query "<question>"` | Retrieve the top-k chunks (`--topK <n>` optional). |
 | `larkup chat` | Chat with your knowledge base in the terminal (`--model <id>` optional). |
 | `larkup settings` | Configure CLI settings (e.g., chat models). |
+| `larkup marketplace [action]`| Manage marketplace tools and integrations. |
+| `larkup deploy [target]` | Deploy your generated RAG server to the cloud. |
+| `larkup test` | Run RAG pipeline tests. |
+| `larkup update` | Check for and install CLI updates. |
+| `larkup open [target]` | Open the Web UI or API reference in your browser. |

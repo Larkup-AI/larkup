@@ -1,16 +1,25 @@
 ---
-title: "Overview"
-description: "Programmatically interact with the Larkup API."
-icon: "code"
+title: 'Overview'
+description: 'Programmatically interact with the Larkup API.'
+icon: 'code'
 ---
 
-Larkup provides official SDKs to interact with the API seamlessly from your preferred language. Our SDKs provide full type safety and straightforward interfaces to ingest documents, execute queries, and manage your vector knowledge base.
+Larkup provides official TypeScript and Python SDKs for deployed RAG servers. Both clients cover health checks, OpenAPI discovery, retrieval, streaming chat, document ingestion, corpus inspection, and export.
 
 <Note>
-  Once you set up your RAG server, you can choose to fully run it locally or
-  deploy it to the cloud like Vercel. After you have your server URL and API
-  key, you can easily connect to it using our SDKs.
+  Once you set up your RAG server, you can choose to fully run it locally or deploy it to the cloud
+  like Vercel. After you have your server URL and API key, you can easily connect to it using our
+  SDKs.
 </Note>
+
+The SDK separates two services:
+
+| Client            | Connects to                | Purpose                                       |
+| ----------------- | -------------------------- | --------------------------------------------- |
+| `LarkupClient`    | Your generated RAG server  | Query, chat, ingest, inspect, and export data |
+| `LarkupHubClient` | The Larkup Marketplace Hub | Discover tools and inspect their capabilities |
+
+Marketplace installation changes files on the machine running Larkup. Use `larkup marketplace install <tool-id>` for installation rather than the remote RAG client.
 
 Choose an SDK below to get started:
 

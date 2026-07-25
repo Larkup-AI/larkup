@@ -16,9 +16,15 @@ The **Add Data** tab is your starting point for loading content into the pipelin
 
 ### Video and audio indexing
 
-Before an upload or URL import starts, Larkup shows the detected duration, expected processing time, and estimated transcription cost. API transcription currently uses Whisper at an estimated **$0.006/minute**; local Whisper has no API charge. Vision-model pricing for video scenes depends on the configured model.
+Before an upload or URL import starts, Larkup shows the detected duration, expected processing time, and estimated transcription cost. Transcription and vision pricing depend on the providers selected in **Settings → Marketplace Tools** and **Settings → Models**; local Whisper has no API charge.
 
-Video indexing analyzes consecutive keyframes as chronological sequences, extracts actions and on-screen text, and aligns that visual evidence with timestamped speech in one-minute multimodal timeline segments. Audio indexing also links neighboring transcript segments. Long recordings use bounded scene sampling and API concurrency, while the Media panel shows live extraction, vision, transcription, and embedding progress. Completed assets are already embedded and searchable—no separate index build is required.
+Video indexing combines adaptive scene sampling, a reserved dense ending pass, chronological visual analysis, OCR, and timestamped speech. It stores a concise whole-video summary plus independent timestamped evidence sections, so chat can connect people and events while still retrieving the exact ending, decision, winner, or score. Short edited videos use fine-grained windows; multi-hour camera and screen recordings use sparse seeked anchors and lightweight keyframe change detection to avoid repeatedly analyzing unchanged frames.
+
+The explicitly configured Audio Provider handles speech-to-text—there is no silent OpenAI fallback. Deepgram uses Nova-3 and accepts an **Audio language** code such as `ar` or `ar-EG`; with **Auto**, Larkup uses known source-caption language, infers Arabic from an Arabic media title, and otherwise asks Deepgram to detect a supported language. Manual YouTube captions can be used directly. Automatic captions remain a fallback and do not silently bypass the configured provider.
+
+The Media panel persists separate live stages for download, extraction, transcription, visual analysis, note synthesis, and search indexing. Parallel transcription and visual work show their own counts, and embedding reports real processed/total chunks. Completed assets are already embedded and searchable—no separate index build is required.
+
+Use **View Uploads → Re-index** to rebuild an existing video or audio asset after changing its provider, language, or analysis settings.
 
 Search retrieves more semantic candidates for media and expands a matching moment with its immediately preceding and following timeline segments. This gives the answering agent enough before → event → after context for questions about outcomes, actions, or a specific scene in a multi-hour recording.
 
