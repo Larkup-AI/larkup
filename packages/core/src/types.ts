@@ -293,6 +293,36 @@ export type MediaType = 'image' | 'video' | 'audio';
 
 export type MediaProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+/** Durable stages used by the media ingestion pipeline. */
+export type MediaPipelineStage =
+  | 'download'
+  | 'extract'
+  | 'transcribe'
+  | 'vision'
+  | 'synthesize'
+  | 'index';
+
+export type MediaProcessingStepStatus = 'waiting' | 'running' | 'completed' | 'skipped' | 'failed';
+
+/**
+ * Progress for one media pipeline stage.
+ *
+ * Counts are useful for concrete work such as frames, chunks, or bytes, while
+ * `percent` supports providers that only expose a normalized estimate.
+ */
+export interface MediaProcessingStep {
+  stage: MediaPipelineStage;
+  status: MediaProcessingStepStatus;
+  percent?: number;
+  current?: number;
+  total?: number;
+  unit?: string;
+  message?: string;
+  startedAt?: string;
+  updatedAt: string;
+  finishedAt?: string;
+}
+
 /**
  * A media file in the corpus. Images, video, and audio are stored as
  * MediaAssets and processed into SourceDocuments (via captioning /
@@ -319,10 +349,20 @@ export interface MediaAsset {
   processingError?: string;
   processingProgress?: number;
   processingMessage?: string;
+  /** Durable, independently updated progress for each pipeline stage. */
+  processingSteps?: MediaProcessingStep[];
+  /** Monotonic revision for streaming clients to reject stale snapshots. */
+  processingRevision?: number;
+  /** Last durable worker heartbeat for stale-job recovery. */
+  processingHeartbeatAt?: string;
   /** Generated caption or transcript summary */
   caption?: string;
   /** IDs of SourceDocuments generated from this asset */
   documentIds: string[];
+  /** New evidence generation being built; retained so failed/crashed work can be cleaned safely. */
+  pendingDocumentIds?: string[];
+  /** Previous evidence awaiting vector/source cleanup after an atomic publication switch. */
+  supersededDocumentIds?: string[];
   createdAt: string;
   updatedAt: string;
 }

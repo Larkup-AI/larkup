@@ -224,6 +224,10 @@ export async function getDataDir(): Promise<string | null> {
 export async function requireDataDir(): Promise<string> {
   const dir = await getDataDir();
   if (dir) return dir;
+  const scopedServerId = als.getStore()?.serverId;
+  if (scopedServerId) {
+    throw new Error(`Server "${scopedServerId}" no longer exists.`);
+  }
   const { server } = await createServer('My RAG server');
   return serverDir(server.id);
 }

@@ -186,15 +186,23 @@ async function fetchYouTubeTranscript(url: string): Promise<TranscriptionResult 
     subtitles?: Record<string, SubtitleFormat[]>;
     automatic_captions?: Record<string, SubtitleFormat[]>;
   };
-  const selected =
-    selectSubtitleTrack(data.subtitles, data.language) ??
-    selectSubtitleTrack(data.automatic_captions, data.language);
+  const manualTrack = selectSubtitleTrack(data.subtitles, data.language);
+  const selected = manualTrack ?? selectSubtitleTrack(data.automatic_captions, data.language);
   if (!selected) return undefined;
 
   const response = await fetch(selected.url);
   if (!response.ok) throw new Error(`YouTube captions download failed (${response.status})`);
   const transcript = parseYouTubeJson3Transcript(await response.json(), data.duration ?? 0);
-  return transcript.chunks.length > 0 ? transcript : undefined;
+  return transcript.chunks.length > 0
+    ? {
+        ...transcript,
+        language: selected.language,
+        origin: {
+          kind: manualTrack ? 'youtube-manual' : 'youtube-auto',
+          language: selected.language,
+        },
+      }
+    : undefined;
 }
 
 interface SubtitleFormat {
@@ -205,7 +213,7 @@ interface SubtitleFormat {
 function selectSubtitleTrack(
   tracks: Record<string, SubtitleFormat[]> | undefined,
   language: string | undefined,
-): { url: string } | undefined {
+): { url: string; language: string } | undefined {
   if (!tracks) return undefined;
   const languages = Object.keys(tracks).filter((key) => key !== 'live_chat');
   const baseLanguage = language?.split('-')[0];
@@ -220,7 +228,7 @@ function selectSubtitleTrack(
 
   for (const key of [...new Set(preferredLanguages)]) {
     const format = tracks[key]?.find((candidate) => candidate.ext === 'json3' && candidate.url);
-    if (format?.url) return { url: format.url };
+    if (format?.url) return { url: format.url, language: key.replace(/-orig$/, '') };
   }
   return undefined;
 }

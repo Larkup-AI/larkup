@@ -9,19 +9,29 @@ export {
   processVideo,
   extractFrames,
   extractSceneFrames,
+  createVideoSamplingPlan,
+  createEndingSamplingPlan,
   buildMultimodalSegments,
 } from './video-processor.js';
-export { processAudio, transcribeAudio } from './audio-processor.js';
+export {
+  buildDeepgramTranscriptionUrl,
+  inferLanguageHintFromText,
+  processAudio,
+  transcribeAudio,
+} from './audio-processor.js';
 export { importMediaUrl, inspectMediaUrl, parseYouTubeJson3Transcript } from './url-importer.js';
 export type {
   MultimodalSegment,
   TimedText,
+  EndingSamplingPlan,
+  VideoSamplingPlan,
   VideoProcessOptions,
   VideoProcessResult,
 } from './video-processor.js';
 export type {
   TranscriptChunk,
   TranscriptionOptions,
+  TranscriptionOrigin,
   TranscriptionResult,
 } from './audio-processor.js';
 export type { ImportedMedia, MediaType, UrlImportOptions, UrlInspection } from './url-importer.js';

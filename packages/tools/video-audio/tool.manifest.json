@@ -31,7 +31,7 @@
       "label": "Frame extraction interval (seconds)",
       "type": "text",
       "defaultValue": "10",
-      "help": "Fallback interval used when scene-change detection finds no frames."
+      "help": "Baseline cadence for duration-aware coverage frames; scene changes and a reserved ending pass are added separately."
     },
     {
       "key": "audioProvider",
@@ -40,13 +40,18 @@
       "help": "Choose the provider that should transcribe both audio files and video audio tracks.",
       "options": [
         { "label": "OpenAI", "value": "openai" },
-        { "label": "Google", "value": "google" },
         { "label": "Groq", "value": "groq" },
         { "label": "Deepgram", "value": "deepgram" },
         { "label": "ElevenLabs", "value": "elevenlabs" },
-        { "label": "Local Whisper", "value": "local" },
-        { "label": "Vercel AI Gateway", "value": "vercel_ai_gateway" }
+        { "label": "Local Whisper", "value": "local" }
       ]
+    },
+    {
+      "key": "audioLanguage",
+      "label": "Transcription language",
+      "type": "text",
+      "defaultValue": "auto",
+      "help": "Use auto to infer Arabic from the media title and use provider detection otherwise. Enter a language code such as ar, ar-EG, en, or de to override it."
     },
     {
       "key": "audioApiKey",

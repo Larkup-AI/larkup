@@ -2,8 +2,7 @@
  * Audio processing pipeline.
  *
  * Transcription strategies:
- * 1. AI Provider API (default) — uses the configured chat provider's
- *    speech-to-text endpoint (e.g., OpenAI Whisper API)
+ * 1. Explicitly selected Audio Provider API (OpenAI, Groq, Deepgram, or ElevenLabs)
  * 2. Local Whisper.cpp — fully offline via nodejs-whisper (optional)
  *
  * The transcription is split into timestamped chunks for granular
@@ -16,6 +15,12 @@ export interface TranscriptChunk {
   endSecs: number;
 }
 
+export interface TranscriptionOrigin {
+  kind: 'youtube-manual' | 'youtube-auto' | 'provider-stt' | 'local-stt';
+  provider?: string;
+  language?: string;
+}
+
 export interface TranscriptionResult {
   /** Full transcript text */
   fullText: string;
@@ -25,6 +30,8 @@ export interface TranscriptionResult {
   language?: string;
   /** Duration of the audio in seconds */
   durationSecs: number;
+  /** How the transcript was produced, so callers can judge source authority. */
+  origin?: TranscriptionOrigin;
 }
 
 export interface TranscriptionOptions {
@@ -36,6 +43,61 @@ export interface TranscriptionOptions {
   chunkDurationSecs?: number;
   /** Language hint (e.g., "en", "de") */
   language?: string;
+  /** Short context such as the media title, used to preserve names and infer Arabic. */
+  context?: string;
+  /** Reports completed transcription work and its current unit. */
+  onProgress?: (
+    current: number,
+    total: number,
+    message: string,
+    unit?: string,
+  ) => void | Promise<void>;
+}
+
+const DEEPGRAM_TRANSCRIPTION_URL = 'https://api.deepgram.com/v1/listen';
+const AUTO_LANGUAGE = 'auto';
+
+/**
+ * Infer only languages that cannot reliably use Deepgram's automatic language
+ * detection. Other text intentionally returns undefined so the provider can
+ * perform its own detection.
+ */
+export function inferLanguageHintFromText(text?: string): string | undefined {
+  if (!text) return undefined;
+  const letters = text.match(/\p{Letter}/gu) ?? [];
+  if (letters.length === 0) return undefined;
+
+  const arabicLetters = text.match(/\p{Script=Arabic}/gu)?.length ?? 0;
+  return arabicLetters >= 2 && arabicLetters / letters.length >= 0.2 ? 'ar' : undefined;
+}
+
+/**
+ * Build the Deepgram request URL without reading environment or provider state,
+ * making provider routing and language behavior straightforward to test.
+ */
+export function buildDeepgramTranscriptionUrl(
+  options: Pick<TranscriptionOptions, 'language' | 'context'> = {},
+): string {
+  const configuredLanguage = normalizeLanguage(options.language);
+  const language = configuredLanguage ?? inferLanguageHintFromText(options.context);
+  const url = new URL(DEEPGRAM_TRANSCRIPTION_URL);
+
+  url.searchParams.set('model', language ? 'nova-3' : 'nova-3-general');
+  url.searchParams.set('smart_format', 'true');
+  url.searchParams.set('punctuate', 'true');
+  url.searchParams.set('diarize', 'false');
+
+  if (language) {
+    url.searchParams.set('language', language);
+  } else {
+    url.searchParams.set('detect_language', 'true');
+  }
+
+  for (const keyterm of extractContextKeyterms(options.context)) {
+    url.searchParams.append('keyterm', keyterm);
+  }
+
+  return url.toString();
 }
 
 /**
@@ -45,12 +107,22 @@ export async function transcribeAudio(
   audioPath: string,
   options: TranscriptionOptions = {},
 ): Promise<TranscriptionResult> {
-  const provider = options.provider ?? 'openai';
+  const provider = requireTranscriptionProvider(options);
+  await reportProgress(
+    options,
+    0,
+    1,
+    `Transcribing with ${formatProviderName(provider)}...`,
+    'request',
+  );
 
-  if (provider === 'local') {
-    return transcribeLocal(audioPath, options);
-  }
-  return transcribeViaApi(audioPath, options);
+  const result =
+    provider === 'local'
+      ? await transcribeLocal(audioPath, options)
+      : await transcribeViaApi(audioPath, options);
+
+  await reportProgress(options, 1, 1, 'Transcription complete.', 'request');
+  return result;
 }
 
 /**
@@ -60,7 +132,8 @@ export async function processAudio(
   audioPath: string,
   options: TranscriptionOptions = {},
 ): Promise<TranscriptionResult> {
-  if ((options.provider ?? 'openai') !== 'local') {
+  const provider = requireTranscriptionProvider(options);
+  if (provider !== 'local') {
     const { promises: fs } = await import('node:fs');
     const stat = await fs.stat(audioPath);
     const durationSecs = await probeAudioDuration(audioPath);
@@ -82,12 +155,31 @@ async function transcribeLongAudio(
   const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'larkup-transcription-'));
 
   try {
-    const parts = await splitAudio(audioPath, outputDir, 10 * 60);
+    await reportProgress(options, 0, 100, 'Preparing long audio for transcription...', '%');
+    const parts = await splitAudio(audioPath, outputDir, 10 * 60, (progress) =>
+      reportProgress(
+        options,
+        Math.round(progress * 20),
+        100,
+        `Preparing long audio (${Math.round(progress * 100)}%)...`,
+        '%',
+      ),
+    );
     if (parts.length === 0) throw new Error('Audio splitting produced no transcription chunks.');
+    let completedParts = 0;
+    let progressQueue = Promise.resolve();
+    const queueProgress = (current: number, message: string) => {
+      progressQueue = progressQueue.then(() =>
+        reportProgress(options, Math.round(20 + (current / parts.length) * 80), 100, message, '%'),
+      );
+      return progressQueue;
+    };
+
+    await queueProgress(0, `Transcribing 0 of ${parts.length} audio parts...`);
     const results = await mapWithConcurrency(parts, 2, async (part, index) => {
       const result = await transcribeViaApi(part, options);
       const offset = index * 10 * 60;
-      return {
+      const adjustedResult = {
         ...result,
         chunks: result.chunks.map((chunk) => ({
           ...chunk,
@@ -95,7 +187,14 @@ async function transcribeLongAudio(
           endSecs: chunk.endSecs + offset,
         })),
       };
+      completedParts += 1;
+      await queueProgress(
+        completedParts,
+        `Transcribed ${completedParts} of ${parts.length} audio parts.`,
+      );
+      return adjustedResult;
     });
+    await progressQueue;
 
     return {
       fullText: results
@@ -105,6 +204,7 @@ async function transcribeLongAudio(
       chunks: results.flatMap((result) => result.chunks),
       language: results.find((result) => result.language)?.language,
       durationSecs: durationSecs || results.reduce((sum, result) => sum + result.durationSecs, 0),
+      origin: results.find((result) => result.origin)?.origin,
     };
   } finally {
     await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {});
@@ -124,7 +224,7 @@ async function transcribeViaApi(
   const path = await import('node:path');
   const fileName = path.basename(audioPath);
 
-  const provider = options.provider || 'openai';
+  const provider = requireTranscriptionProvider(options);
   const apiKey = options.apiKey;
 
   if (!apiKey) {
@@ -145,9 +245,7 @@ async function transcribeViaApi(
 
   // 1. Handle Deepgram Native API
   if (provider === 'deepgram') {
-    const dgUrl = `https://api.deepgram.com/v1/listen?smart_format=true&punctuate=true&diarize=false${
-      options.language ? `&language=${options.language}` : ''
-    }`;
+    const dgUrl = buildDeepgramTranscriptionUrl(options);
     const res = await fetch(dgUrl, {
       method: 'POST',
       headers: {
@@ -163,9 +261,17 @@ async function transcribeViaApi(
     }
 
     const data = await res.json();
-    const alt = data.results?.channels?.[0]?.alternatives?.[0];
+    const channel = data.results?.channels?.[0];
+    const alt = channel?.alternatives?.[0];
     const text = alt?.transcript || '';
     const words = alt?.words || [];
+    const requestedLanguage =
+      normalizeLanguage(options.language) ?? inferLanguageHintFromText(options.context);
+    const detectedLanguage =
+      channel?.detected_language ??
+      alt?.languages?.[0] ??
+      data.metadata?.language ??
+      requestedLanguage;
 
     const chunks: TranscriptChunk[] = [];
     let currentText = '';
@@ -191,10 +297,13 @@ async function transcribeViaApi(
       chunks.push({ text: currentText.trim(), startSecs: chunkStart, endSecs: chunkEnd });
     }
 
+    const language = typeof detectedLanguage === 'string' ? detectedLanguage : undefined;
     return {
       fullText: text,
       chunks,
+      language,
       durationSecs: data.metadata?.duration ?? 0,
+      origin: { kind: 'provider-stt', provider, language },
     };
   }
 
@@ -211,17 +320,22 @@ async function transcribeViaApi(
 
   const formData = new FormData();
   formData.append('file', new Blob([audioBuffer]), fileName);
+  const language = normalizeLanguage(options.language);
 
   if (provider !== 'elevenlabs') {
     formData.append('model', model);
     formData.append('response_format', 'verbose_json');
     formData.append('timestamp_granularities[]', 'segment');
-    if (options.language) {
-      formData.append('language', options.language);
+    if (language) {
+      formData.append('language', language);
+    }
+    const context = normalizeContext(options.context);
+    if (context) {
+      formData.append('prompt', context);
     }
   } else {
     formData.append('model_id', 'scribe_v2');
-    if (options.language) formData.append('language_code', options.language);
+    if (language) formData.append('language_code', language);
   }
 
   const res = await fetch(url, {
@@ -266,7 +380,13 @@ async function transcribeViaApi(
     return {
       fullText: data.text,
       chunks,
+      language: data.language_code ?? language,
       durationSecs: words[words.length - 1]?.end ?? 0,
+      origin: {
+        kind: 'provider-stt',
+        provider,
+        language: data.language_code ?? language,
+      },
     };
   }
 
@@ -279,6 +399,11 @@ async function transcribeViaApi(
     chunks,
     language: data.language,
     durationSecs: data.duration ?? 0,
+    origin: {
+      kind: 'provider-stt',
+      provider,
+      language: data.language ?? language,
+    },
   };
 }
 
@@ -312,7 +437,7 @@ async function transcribeLocal(
       outputInCsv: false,
       translateToEnglish: false,
       wordTimestamps: true,
-      language: options.language ?? 'auto',
+      language: normalizeLanguage(options.language) ?? AUTO_LANGUAGE,
     },
   });
 
@@ -325,7 +450,13 @@ async function transcribeLocal(
   return {
     fullText,
     chunks,
+    language: normalizeLanguage(options.language),
     durationSecs: 0, // Not available from basic whisper output
+    origin: {
+      kind: 'local-stt',
+      provider: 'local',
+      language: normalizeLanguage(options.language),
+    },
   };
 }
 
@@ -405,6 +536,65 @@ function contentTypeForFile(fileName: string): string {
   return 'audio/mpeg';
 }
 
+function normalizeLanguage(language?: string): string | undefined {
+  const normalized = language?.trim();
+  return !normalized || normalized.toLowerCase() === AUTO_LANGUAGE ? undefined : normalized;
+}
+
+function normalizeContext(context?: string): string | undefined {
+  const normalized = context?.replace(/\s+/g, ' ').trim();
+  return normalized ? normalized.slice(0, 500) : undefined;
+}
+
+function extractContextKeyterms(context?: string): string[] {
+  const normalized = normalizeContext(context);
+  if (!normalized) return [];
+
+  const candidates =
+    normalized
+      .replace(/https?:\/\/\S+/gi, ' ')
+      .match(/[\p{Letter}\p{Number}][\p{Letter}\p{Mark}\p{Number}'’_-]{2,}/gu) ?? [];
+  const unique = new Map<string, string>();
+  for (const candidate of candidates) {
+    const key = candidate.toLocaleLowerCase();
+    if (!unique.has(key)) unique.set(key, candidate.slice(0, 48));
+    if (unique.size >= 12) break;
+  }
+  return [...unique.values()];
+}
+
+async function reportProgress(
+  options: TranscriptionOptions,
+  current: number,
+  total: number,
+  message: string,
+  unit?: string,
+): Promise<void> {
+  try {
+    await options.onProgress?.(current, total, message, unit);
+  } catch {
+    // Progress persistence must not invalidate an otherwise valid transcript.
+  }
+}
+
+function requireTranscriptionProvider(options: TranscriptionOptions): string {
+  const provider = options.provider?.trim();
+  if (!provider) {
+    throw new Error(
+      'An Audio Provider is required for transcription. Choose one in Marketplace Tool Settings; transcription never falls back to OpenAI.',
+    );
+  }
+  return provider;
+}
+
+function formatProviderName(provider: string): string {
+  return provider
+    .split(/[_-]/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
+}
+
 async function importFfmpeg() {
   return import('fluent-ffmpeg');
 }
@@ -423,6 +613,7 @@ async function splitAudio(
   audioPath: string,
   outputDir: string,
   segmentSecs: number,
+  onProgress?: (progress: number) => void | Promise<void>,
 ): Promise<string[]> {
   const ffmpeg = await importFfmpeg();
   const path = await import('node:path');
@@ -440,6 +631,11 @@ async function splitAudio(
       .format('segment')
       .outputOptions([`-segment_time ${segmentSecs}`, '-reset_timestamps 1'])
       .output(pattern)
+      .on('progress', (progress: { percent?: number }) => {
+        if (typeof progress.percent === 'number') {
+          void onProgress?.(Math.max(0, Math.min(1, progress.percent / 100)));
+        }
+      })
       .on('end', () => resolve())
       .on('error', reject)
       .run();

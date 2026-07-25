@@ -31,19 +31,36 @@ export async function readDocuments(): Promise<SourceDocument[]> {
   if (!file) return [];
   try {
     const raw = await fs.readFile(file, 'utf8');
-    return JSON.parse(raw) as SourceDocument[];
-  } catch {
-    return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      throw new Error(`Invalid document store at ${file}: expected a JSON array.`);
+    }
+    return parsed as SourceDocument[];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') return [];
+    throw error;
   }
 }
 
 async function writeAll(docs: SourceDocument[]) {
   const file = await docsPath(true);
   if (!file) return;
-  await fs.writeFile(file, JSON.stringify(docs, null, 2), 'utf8');
+  const temporaryFile = path.join(
+    path.dirname(file),
+    `.${path.basename(file)}.${process.pid}.${randomUUID()}.tmp`,
+  );
+  try {
+    await fs.writeFile(temporaryFile, JSON.stringify(docs, null, 2), 'utf8');
+    await fs.rename(temporaryFile, file);
+  } catch (error) {
+    await fs.unlink(temporaryFile).catch(() => {});
+    throw error;
+  }
 }
 
 export interface NewDocumentInput {
+  /** Optional caller-generated ID for journaling a multi-store publication. */
+  id?: string;
   title: string;
   content: string;
   source: DocumentSource;
@@ -55,7 +72,7 @@ export interface NewDocumentInput {
 function normalize(input: NewDocumentInput): SourceDocument {
   const content = input.content.trim();
   return {
-    id: randomUUID(),
+    id: input.id ?? randomUUID(),
     title: input.title.trim() || 'Untitled',
     url: input.url,
     source: input.source,
@@ -76,6 +93,24 @@ export function addDocument(input: NewDocumentInput) {
     docs.push(doc);
     await writeAll(docs);
     return doc;
+  });
+}
+
+/**
+ * Append a batch of documents with one read/write cycle.
+ *
+ * Media timelines commonly produce many timestamped documents at once; this
+ * avoids repeatedly parsing and rewriting the complete corpus for every
+ * segment while preserving the input order in the returned records.
+ */
+export function addDocuments(inputs: NewDocumentInput[]): Promise<SourceDocument[]> {
+  return serialize(async () => {
+    if (inputs.length === 0) return [];
+    const docs = await readDocuments();
+    const added = inputs.map(normalize);
+    docs.push(...added);
+    await writeAll(docs);
+    return added;
   });
 }
 

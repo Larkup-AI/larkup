@@ -45,6 +45,32 @@ export interface VideoProcessOptions {
   onProgress?: (progress: number) => void;
 }
 
+export interface VideoSamplingPlan {
+  /** Normalized video duration used to calculate the plan. */
+  durationSecs: number;
+  /** Hard ceiling for all extracted frames combined. */
+  maxFrames: number;
+  /** Cadence used for uniformly distributed coverage frames. */
+  periodicIntervalSecs: number;
+  /** Maximum number of uniformly distributed coverage frames. */
+  periodicFrameCount: number;
+  /** Maximum number of additional scene-change frames. */
+  sceneFrameCount: number;
+  /** Frames reserved for a denser look at the end of the recording. */
+  endingFrameCount: number;
+  /** Minimum time between selected scene changes. */
+  minimumSceneGapSecs: number;
+  /** Maximum periodic + scene + ending frames before de-duplication. */
+  estimatedFrameCount: number;
+}
+
+export interface EndingSamplingPlan {
+  startSecs: number;
+  intervalSecs: number;
+  frameCount: number;
+  timestamps: number[];
+}
+
 export interface TimedText {
   text: string;
   startSecs: number;
@@ -118,6 +144,139 @@ function formatTimestamp(seconds: number): string {
 }
 
 /**
+ * Create a bounded frame-sampling plan without treating maxFrames as a quota.
+ *
+ * Edited videos receive frequent anchors and scene-change coverage. As duration
+ * grows, the anchor cadence widens so multi-hour camera and screen recordings
+ * remain searchable without generating hundreds of near-identical frames.
+ */
+export function createVideoSamplingPlan(
+  durationSecs: number,
+  configuredInterval = 30,
+  maxFrames = 100,
+): VideoSamplingPlan {
+  const duration = Number.isFinite(durationSecs) ? Math.max(0, durationSecs) : 0;
+  const hardLimit = Number.isFinite(maxFrames) ? Math.max(1, Math.floor(maxFrames)) : 100;
+  const requestedInterval =
+    Number.isFinite(configuredInterval) && configuredInterval > 0 ? configuredInterval : 30;
+
+  let periodicFloorSecs: number;
+  let sceneCadenceSecs: number;
+  if (duration <= 15 * 60) {
+    periodicFloorSecs = 15;
+    sceneCadenceSecs = 15;
+  } else if (duration <= 60 * 60) {
+    periodicFloorSecs = 30;
+    sceneCadenceSecs = 30;
+  } else if (duration <= 4 * 60 * 60) {
+    periodicFloorSecs = 2 * 60;
+    sceneCadenceSecs = 2 * 60;
+  } else if (duration <= 12 * 60 * 60) {
+    periodicFloorSecs = 10 * 60;
+    sceneCadenceSecs = 5 * 60;
+  } else {
+    periodicFloorSecs = 15 * 60;
+    sceneCadenceSecs = 10 * 60;
+  }
+
+  const preferredInterval = Math.max(requestedInterval, periodicFloorSecs);
+  const desiredPeriodicCount = Math.max(1, Math.ceil(duration / preferredInterval));
+  const desiredSceneCount = duration > 0 ? Math.max(1, Math.ceil(duration / sceneCadenceSecs)) : 0;
+  const desiredTotal = desiredPeriodicCount + desiredSceneCount;
+  const desiredEndingCount =
+    duration >= 60 ? Math.ceil(Math.min(90, duration) / (duration <= 2 * 60 * 60 ? 5 : 15)) : 0;
+  const endingFrameCount =
+    desiredEndingCount > 0
+      ? Math.min(
+          desiredEndingCount,
+          hardLimit === 1 ? 1 : Math.max(1, Math.min(hardLimit - 1, Math.floor(hardLimit * 0.2))),
+        )
+      : 0;
+  const coverageLimit = Math.max(0, hardLimit - endingFrameCount);
+
+  let periodicFrameCount: number;
+  let sceneFrameCount: number;
+  if (coverageLimit === 0) {
+    periodicFrameCount = 0;
+    sceneFrameCount = 0;
+  } else if (desiredTotal <= coverageLimit) {
+    periodicFrameCount = desiredPeriodicCount;
+    sceneFrameCount = desiredSceneCount;
+  } else if (coverageLimit === 1 || desiredSceneCount === 0) {
+    periodicFrameCount = 1;
+    sceneFrameCount = 0;
+  } else {
+    // Preserve both uniform and change-based evidence when the natural plan
+    // exceeds the hard limit, in proportion to the useful frames each needs.
+    periodicFrameCount = Math.max(
+      1,
+      Math.min(
+        coverageLimit - 1,
+        Math.round((coverageLimit * desiredPeriodicCount) / desiredTotal),
+      ),
+    );
+    sceneFrameCount = coverageLimit - periodicFrameCount;
+  }
+
+  const periodicIntervalSecs =
+    periodicFrameCount > 0 && periodicFrameCount < desiredPeriodicCount && duration > 0
+      ? Math.max(preferredInterval, duration / periodicFrameCount)
+      : preferredInterval;
+  const minimumSceneGapSecs =
+    sceneFrameCount > 0 ? Math.max(1, periodicIntervalSecs / 2, duration / sceneFrameCount) : 0;
+
+  return {
+    durationSecs: duration,
+    maxFrames: hardLimit,
+    periodicIntervalSecs,
+    periodicFrameCount,
+    sceneFrameCount,
+    endingFrameCount,
+    minimumSceneGapSecs,
+    estimatedFrameCount: periodicFrameCount + sceneFrameCount + endingFrameCount,
+  };
+}
+
+/** Densely sample the ending where final results and decisions commonly appear. */
+export function createEndingSamplingPlan(
+  durationSecs: number,
+  maxAdditionalFrames: number,
+): EndingSamplingPlan {
+  const duration = Number.isFinite(durationSecs) ? Math.max(0, durationSecs) : 0;
+  const capacity = Number.isFinite(maxAdditionalFrames)
+    ? Math.max(0, Math.floor(maxAdditionalFrames))
+    : 0;
+  if (duration < 60 || capacity === 0) {
+    return {
+      startSecs: Math.max(0, duration - 90),
+      intervalSecs: 5,
+      frameCount: 0,
+      timestamps: [],
+    };
+  }
+  const windowSecs = Math.min(90, duration);
+  const preferredIntervalSecs = duration <= 2 * 60 * 60 ? 5 : 15;
+  const desiredFrameCount = Math.ceil(windowSecs / preferredIntervalSecs);
+  const frameCount = Math.min(capacity, desiredFrameCount);
+  const windowStart = Math.max(0, duration - windowSecs);
+  const endSecs = Math.max(windowStart, duration - Math.min(1, preferredIntervalSecs));
+  const hasFullCadence = frameCount === desiredFrameCount;
+  const startSecs =
+    frameCount === 1 ? Math.max(windowStart, duration - preferredIntervalSecs) : windowStart;
+  const intervalSecs = hasFullCadence
+    ? preferredIntervalSecs
+    : frameCount > 1
+    ? Math.max(1, (endSecs - startSecs) / (frameCount - 1))
+    : preferredIntervalSecs;
+  return {
+    startSecs,
+    intervalSecs,
+    frameCount,
+    timestamps: Array.from({ length: frameCount }, (_, index) => startSecs + index * intervalSecs),
+  };
+}
+
+/**
  * Process a video file: extract audio and keyframes.
  */
 export async function processVideo(
@@ -139,7 +298,9 @@ export async function processVideo(
   let audioProgress = options.skipAudioExtraction ? 1 : 0;
   let frameProgress = 0;
   const reportExtractionProgress = () => {
-    options.onProgress?.((audioProgress + frameProgress) / 2);
+    options.onProgress?.(
+      options.skipAudioExtraction ? frameProgress : (audioProgress + frameProgress) / 2,
+    );
   };
 
   // Cameras and screen recordings do not always have an audio stream. Visual
@@ -150,7 +311,11 @@ export async function processVideo(
         audioProgress = Math.max(audioProgress, progress);
         reportExtractionProgress();
       })
-        .then(() => audioPath)
+        .then(() => {
+          audioProgress = 1;
+          reportExtractionProgress();
+          return audioPath;
+        })
         .catch(() => {
           // Videos without an audio stream remain valid visual-indexing input.
           audioProgress = 1;
@@ -198,39 +363,106 @@ export async function extractSceneFrames(
   const ffmpeg = await importFfmpeg();
   await fs.mkdir(options.outputDir, { recursive: true });
   const duration = options.durationSecs || (await probeVideo(ffmpeg, videoPath)).durationSecs;
-  const maxFrames = Math.max(1, options.maxFrames);
-  const periodicBudget = Math.max(1, Math.ceil(maxFrames * 0.75));
-  const sceneBudget = Math.max(0, maxFrames - periodicBudget);
-  const effectiveInterval = Math.max(options.intervalSecs ?? 10, duration / periodicBudget);
+  const plan = createVideoSamplingPlan(duration, options.intervalSecs, options.maxFrames);
+  const totalPlannedWork = Math.max(1, plan.estimatedFrameCount);
+  const periodicWeight = plan.periodicFrameCount / totalPlannedWork;
+  const sceneWeight = plan.sceneFrameCount / totalPlannedWork;
+  const endingWeight = plan.endingFrameCount / totalPlannedWork;
+  let reportedProgress = 0;
+  const reportProgress = (progress: number) => {
+    reportedProgress = Math.max(reportedProgress, Math.max(0, Math.min(1, progress)));
+    options.onProgress?.(reportedProgress);
+  };
+  const addEndingEvidence = async (
+    frames: { path: string; timestampSecs: number }[],
+  ): Promise<{ path: string; timestampSecs: number }[]> => {
+    const remaining = Math.max(0, plan.maxFrames - frames.length);
+    const endingPlan = createEndingSamplingPlan(
+      duration,
+      Math.min(remaining, plan.endingFrameCount),
+    );
+    if (endingPlan.frameCount === 0) {
+      reportProgress(1);
+      return frames.slice(0, plan.maxFrames);
+    }
 
-  // Reserve most of the budget for evenly distributed frames. This guarantees
-  // that a multi-hour static camera, slide deck, or dashboard is represented
-  // from beginning to end instead of only near its first scene change.
-  const periodicFrames = await extractFrames(videoPath, {
-    outputDir: options.outputDir,
-    intervalSecs: effectiveInterval,
-    maxFrames: periodicBudget,
-    durationSecs: duration,
-    threads: options.threads,
-    onProgress: (progress) => options.onProgress?.(progress * 0.7),
-  });
-  if (sceneBudget === 0) return periodicFrames;
+    // Outcomes, decisions, and final scoreboard animations often change several
+    // times within a few seconds. A short ending burst complements the sparse
+    // whole-video plan without turning the frame ceiling into a quota.
+    const endingFrames = await extractFrames(videoPath, {
+      outputDir: path.join(options.outputDir, 'ending'),
+      intervalSecs: endingPlan.intervalSecs,
+      maxFrames: endingPlan.frameCount,
+      durationSecs: duration,
+      startSecs: endingPlan.startSecs,
+      threads: options.threads,
+      onProgress: (progress) =>
+        reportProgress(periodicWeight + sceneWeight + progress * endingWeight),
+    });
+    const merged = [...frames, ...endingFrames].sort(
+      (left, right) => left.timestampSecs - right.timestampSecs,
+    );
+    const result = merged
+      .filter(
+        (frame, index) =>
+          index === 0 || Math.abs(frame.timestampSecs - merged[index - 1].timestampSecs) >= 1,
+      )
+      .slice(0, plan.maxFrames);
+    reportProgress(1);
+    return result;
+  };
+
+  // Uniform frames guarantee beginning-to-end coverage, while the independent
+  // scene pass captures meaningful changes between those anchors.
+  const periodicFrames =
+    plan.periodicFrameCount === 0
+      ? []
+      : duration >= 2 * 60 * 60
+      ? await extractFramesAtTimestamps(
+          ffmpeg,
+          videoPath,
+          Array.from({ length: plan.periodicFrameCount }, (_, index) =>
+            Math.min(Math.max(0, duration - 1), index * plan.periodicIntervalSecs),
+          ),
+          {
+            outputDir: options.outputDir,
+            threads: options.threads,
+            onProgress: (progress) => reportProgress(progress * periodicWeight),
+          },
+        )
+      : await extractFrames(videoPath, {
+          outputDir: options.outputDir,
+          intervalSecs: plan.periodicIntervalSecs,
+          maxFrames: plan.periodicFrameCount,
+          durationSecs: duration,
+          threads: options.threads,
+          onProgress: (progress) => reportProgress(progress * periodicWeight),
+        });
+  if (plan.sceneFrameCount === 0) return addEndingEvidence(periodicFrames);
 
   const threshold = options.sceneThreshold ?? 0.3;
-  const minSceneGap = Math.max(1, Math.min(effectiveInterval / 2, duration / sceneBudget));
   const sceneDir = path.join(options.outputDir, 'scenes');
   await fs.mkdir(sceneDir, { recursive: true });
   const pattern = path.join(sceneDir, 'scene_%04d.jpg');
   let timestamps: number[] = [];
-  await new Promise<void>((resolve, reject) => {
-    ffmpeg
-      .default(videoPath)
+  await new Promise<void>((resolve) => {
+    const command = ffmpeg.default(videoPath);
+    const isLongRecording = duration >= 2 * 60 * 60;
+    if (isLongRecording) {
+      // Long surveillance/screen recordings are commonly mostly static. Decode
+      // keyframes only and score changes at a smaller resolution so an 8-hour
+      // input does not perform full-resolution scene math on every source frame.
+      command.inputOptions(['-skip_frame nokey']);
+    }
+    command
       .videoFilters(
-        `select='gt(scene,${threshold})*if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${minSceneGap}))',showinfo,scale=640:-1`,
+        isLongRecording
+          ? `scale='min(640,iw)':-2,select='gt(scene,${threshold})*if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${plan.minimumSceneGapSecs}))',showinfo`
+          : `select='gt(scene,${threshold})*if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${plan.minimumSceneGapSecs}))',showinfo,scale='min(1280,iw)':-2`,
       )
       .outputOptions([
         '-vsync vfr',
-        `-frames:v ${sceneBudget}`,
+        `-frames:v ${plan.sceneFrameCount}`,
         ...(options.threads ? [`-threads ${options.threads}`] : []),
       ])
       .output(pattern)
@@ -240,15 +472,24 @@ export async function extractSceneFrames(
       })
       .on('progress', (progress: { percent?: number }) => {
         if (typeof progress.percent === 'number') {
-          options.onProgress?.(0.7 + Math.min(1, progress.percent / 100) * 0.3);
+          reportProgress(periodicWeight + Math.min(1, progress.percent / 100) * sceneWeight);
         }
       })
       .on('end', () => resolve())
-      .on('error', reject)
+      .on('error', () => {
+        // Scene detection is supplementary. Some ffmpeg versions report an
+        // encoder error when the selector legitimately emits zero frames.
+        // Uniform coverage frames must still make the video indexable.
+        resolve();
+      })
       .run();
   });
-  const files = (await fs.readdir(sceneDir)).filter((name) => /^scene_\d+\.jpg$/.test(name)).sort();
-  if (!files.length) return periodicFrames;
+  reportProgress(periodicWeight + sceneWeight);
+  const files = (await fs.readdir(sceneDir))
+    .filter((name) => /^scene_\d+\.jpg$/.test(name))
+    .sort()
+    .slice(0, plan.sceneFrameCount);
+  if (!files.length) return addEndingEvidence(periodicFrames);
   timestamps = timestamps.slice(-files.length);
   const sceneFrames = files.map((name, index) => ({
     path: path.join(sceneDir, name),
@@ -258,10 +499,63 @@ export async function extractSceneFrames(
   const merged = [...periodicFrames, ...sceneFrames].sort(
     (left, right) => left.timestampSecs - right.timestampSecs,
   );
-  return merged.filter(
+  const deduplicated = merged.filter(
     (frame, index) =>
       index === 0 || Math.abs(frame.timestampSecs - merged[index - 1].timestampSecs) >= 1,
   );
+  return addEndingEvidence(deduplicated);
+}
+
+/**
+ * Use input seeking for sparse anchors in multi-hour media. This avoids decoding
+ * the entire recording once merely to retain a few dozen periodic frames.
+ */
+async function extractFramesAtTimestamps(
+  ffmpeg: Awaited<ReturnType<typeof importFfmpeg>>,
+  videoPath: string,
+  timestamps: number[],
+  options: {
+    outputDir: string;
+    threads?: number;
+    onProgress?: (progress: number) => void;
+  },
+): Promise<{ path: string; timestampSecs: number }[]> {
+  await fs.mkdir(options.outputDir, { recursive: true });
+  const results = new Array<{ path: string; timestampSecs: number }>(timestamps.length);
+  let cursor = 0;
+  let completed = 0;
+
+  await Promise.all(
+    Array.from({ length: Math.min(2, timestamps.length) }, async () => {
+      while (cursor < timestamps.length) {
+        const index = cursor++;
+        const timestampSecs = timestamps[index];
+        const outputPath = path.join(
+          options.outputDir,
+          `frame_${String(index + 1).padStart(4, '0')}.jpg`,
+        );
+        await new Promise<void>((resolve, reject) => {
+          ffmpeg
+            .default(videoPath)
+            .seekInput(timestampSecs)
+            .videoFilters(`scale='min(1280,iw)':-2`)
+            .outputOptions([
+              '-frames:v 1',
+              ...(options.threads ? [`-threads ${options.threads}`] : []),
+            ])
+            .output(outputPath)
+            .on('end', () => resolve())
+            .on('error', (error: Error) => reject(error))
+            .run();
+        });
+        results[index] = { path: outputPath, timestampSecs };
+        completed += 1;
+        options.onProgress?.(completed / timestamps.length);
+      }
+    }),
+  );
+
+  return results;
 }
 
 /**
@@ -274,6 +568,8 @@ export async function extractFrames(
     intervalSecs: number;
     maxFrames: number;
     durationSecs?: number;
+    /** Optional range start, used for denser ending/outcome evidence. */
+    startSecs?: number;
     threads?: number;
     onProgress?: (progress: number) => void;
   },
@@ -288,16 +584,22 @@ export async function extractFrames(
     duration = meta.durationSecs;
   }
 
+  const startSecs = Math.max(0, Math.min(options.startSecs ?? 0, duration));
+  const rangeDuration = Math.max(0, duration - startSecs);
   const frameCount = Math.max(
     1,
-    Math.min(Math.ceil(duration / options.intervalSecs), options.maxFrames),
+    Math.min(Math.ceil(rangeDuration / options.intervalSecs), options.maxFrames),
   );
   const pattern = path.join(options.outputDir, 'frame_%04d.jpg');
   await new Promise<void>((resolve, reject) => {
-    ffmpeg
-      .default(videoPath)
-      .videoFilters(`fps=1/${options.intervalSecs},scale=640:-1`)
+    const command = ffmpeg.default(videoPath);
+    if (startSecs > 0) command.seekInput(startSecs);
+    command
+      .videoFilters(
+        `select='if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${options.intervalSecs}))',scale='min(1280,iw)':-2`,
+      )
       .outputOptions([
+        '-vsync vfr',
         `-frames:v ${frameCount}`,
         ...(options.threads ? [`-threads ${options.threads}`] : []),
       ])
@@ -317,7 +619,7 @@ export async function extractFrames(
     .slice(0, frameCount);
   return files.map((name, index) => ({
     path: path.join(options.outputDir, name),
-    timestampSecs: index * options.intervalSecs,
+    timestampSecs: startSecs + index * options.intervalSecs,
   }));
 }
 
