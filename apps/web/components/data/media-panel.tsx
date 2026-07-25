@@ -41,6 +41,17 @@ import {
 /* ------------------------------------------------------------------ */
 
 type MediaSubTab = 'images' | 'video' | 'audio';
+type MediaPipelineStage = 'download' | 'extract' | 'transcribe' | 'vision' | 'synthesize' | 'index';
+
+interface MediaProcessingStep {
+  stage: MediaPipelineStage;
+  status: 'waiting' | 'running' | 'completed' | 'skipped' | 'failed';
+  percent?: number;
+  current?: number;
+  total?: number;
+  unit?: string;
+  message?: string;
+}
 
 interface MediaAsset {
   id: string;
@@ -54,6 +65,8 @@ interface MediaAsset {
   processingError?: string;
   processingMessage?: string;
   processingProgress?: number;
+  processingSteps?: MediaProcessingStep[];
+  processingRevision?: number;
   caption?: string;
   documentIds: string[];
   createdAt: string;
@@ -101,6 +114,14 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+function mediaAssetUrl(assetId: string, serverId?: string, thumbnail = false): string {
+  const query = new URLSearchParams();
+  if (thumbnail) query.set('thumb', 'true');
+  if (serverId) query.set('serverId', serverId);
+  const suffix = query.toString();
+  return `/api/media/${assetId}${suffix ? `?${suffix}` : ''}`;
+}
+
 function getMediaType(file: File): 'image' | 'video' | 'audio' | null {
   if (file.type.startsWith('image/')) return 'image';
   if (file.type.startsWith('video/')) return 'video';
@@ -110,10 +131,12 @@ function getMediaType(file: File): 'image' | 'video' | 'audio' | null {
 
 function estimateMedia(durationSecs: number, isVideo: boolean) {
   const minutes = durationSecs / 60;
+  const visualWindowSecs =
+    durationSecs >= 4 * 60 * 60 ? 15 * 60 : durationSecs > 60 * 60 ? 5 * 60 : 60;
   return {
     transcriptionCost: minutes * 0.006,
     processingMinutes: Math.max(1, Math.ceil(minutes * (isVideo ? 0.35 : 0.2))),
-    visualScenes: isVideo ? Math.min(600, Math.max(1, Math.ceil(durationSecs / 60))) : 0,
+    visualScenes: isVideo ? Math.max(1, Math.ceil(durationSecs / visualWindowSecs)) : 0,
   };
 }
 
@@ -174,12 +197,16 @@ export function MediaPanel({
   const [activeTab, setActiveTab] = useState<MediaSubTab>('images');
   const mediaType = TAB_TO_TYPE[activeTab];
   const previousStatusesRef = useRef<Map<string, MediaAsset['processingStatus']> | null>(null);
+  const { activeServer } = useWorkspace();
+  const serverId = activeServer?.id;
+  const serverQuery = serverId ? `&serverId=${encodeURIComponent(serverId)}` : '';
 
-  const { data, mutate, isLoading } = useSWR(`/api/media?type=${mediaType}`, fetcher);
+  const { data, mutate, isLoading } = useSWR(`/api/media?type=${mediaType}${serverQuery}`, fetcher);
 
   useEffect(() => {
     previousStatusesRef.current = null;
-    const stream = new EventSource(`/api/media/stream?type=${mediaType}`);
+    const stream = new EventSource(`/api/media/stream?type=${mediaType}${serverQuery}`);
+    let fallbackTimer: ReturnType<typeof setInterval> | undefined;
     const handleUpdate = (event: MessageEvent<string>) => {
       try {
         const nextData = JSON.parse(event.data) as MediaApiResponse;
@@ -208,17 +235,24 @@ export function MediaPanel({
       }
     };
 
+    stream.onopen = () => {
+      if (fallbackTimer) clearInterval(fallbackTimer);
+      fallbackTimer = undefined;
+    };
+    stream.onerror = () => {
+      void mutate();
+      fallbackTimer ??= setInterval(() => void mutate(), 5_000);
+    };
     stream.addEventListener('media-update', handleUpdate);
     return () => {
+      if (fallbackTimer) clearInterval(fallbackTimer);
       stream.removeEventListener('media-update', handleUpdate);
       stream.close();
     };
-  }, [mediaType, mutate, onIndexed]);
+  }, [mediaType, mutate, onIndexed, serverQuery]);
 
   const { data: toolsData, mutate: mutateTools } = useSWR('/api/marketplace', toolFetcher);
 
-  const { activeServer } = useWorkspace();
-  const serverId = activeServer?.id;
   const configUrl = serverId
     ? `/api/config?serverId=${encodeURIComponent(serverId)}`
     : '/api/config';
@@ -309,6 +343,7 @@ export function MediaPanel({
           assets={assets}
           isLoading={isLoading}
           storageUsedBytes={data?.storage?.usedBytes ?? 0}
+          serverId={serverId}
           onMutate={() => mutate()}
           onUploadComplete={() => {
             mutate();
@@ -429,6 +464,7 @@ function MediaContent({
   assets,
   isLoading,
   storageUsedBytes,
+  serverId,
   onMutate,
   onUploadComplete,
 }: {
@@ -437,6 +473,7 @@ function MediaContent({
   assets: MediaAsset[];
   isLoading: boolean;
   storageUsedBytes: number;
+  serverId?: string;
   onMutate: () => void | Promise<unknown>;
   onUploadComplete: () => void;
 }) {
@@ -470,6 +507,9 @@ function MediaContent({
   const [checkingUrls, setCheckingUrls] = useState(false);
   const [importingUrls, setImportingUrls] = useState(false);
   const [importMode, setImportMode] = useState<'upload' | 'url'>('upload');
+  const mediaApiUrl = serverId
+    ? `/api/media?serverId=${encodeURIComponent(serverId)}`
+    : '/api/media';
 
   const accept = SUB_TABS.find((t) => t.id === tab)?.accept ?? '*/*';
 
@@ -526,7 +566,7 @@ function MediaContent({
       const res = await fetch('/api/media/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assetIds: batch }),
+        body: JSON.stringify({ assetIds: batch, serverId }),
       });
 
       if (!res.ok) {
@@ -555,7 +595,7 @@ function MediaContent({
     if (urls.length === 0) return;
     setCheckingUrls(true);
     try {
-      const res = await fetch('/api/media', {
+      const res = await fetch(mediaApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ urls, estimateOnly: true, mediaType }),
@@ -575,7 +615,7 @@ function MediaContent({
     if (urls.length === 0 || !remoteEstimates) return;
     setImportingUrls(true);
     try {
-      const res = await fetch('/api/media', {
+      const res = await fetch(mediaApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ urls, mediaType }),
@@ -614,7 +654,7 @@ function MediaContent({
         const formData = new FormData();
         batch.forEach((item) => formData.append('file', item.file));
 
-        const res = await fetch('/api/media', {
+        const res = await fetch(mediaApiUrl, {
           method: 'POST',
           body: formData,
         });
@@ -658,11 +698,17 @@ function MediaContent({
 
   async function handleDelete(assetId: string) {
     try {
-      await fetch(`/api/media?id=${assetId}`, { method: 'DELETE' });
+      const query = new URLSearchParams({ id: assetId });
+      if (serverId) query.set('serverId', serverId);
+      const response = await fetch(`/api/media?${query.toString()}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || 'Failed to delete media.');
+      }
       toast.success('File removed');
       onMutate();
-    } catch {
-      toast.error('Failed to delete');
+    } catch (error) {
+      showErrorToast(error);
     }
   }
 
@@ -1090,7 +1136,7 @@ function MediaContent({
                 </DialogHeader>
                 <div className="flex-1 overflow-y-auto px-6 py-4">
                   {mediaType === 'image' ? (
-                    <ImageGallery assets={assets} onDelete={handleDelete} />
+                    <ImageGallery assets={assets} onDelete={handleDelete} serverId={serverId} />
                   ) : (
                     <FileList
                       assets={assets}
@@ -1135,9 +1181,11 @@ function MediaContent({
 function ImageGallery({
   assets,
   onDelete,
+  serverId,
 }: {
   assets: MediaAsset[];
   onDelete: (id: string) => void;
+  serverId?: string;
 }) {
   const [visibleCount, setVisibleCount] = useState(12);
   const [expandedAsset, setExpandedAsset] = useState<MediaAsset | null>(null);
@@ -1155,13 +1203,13 @@ function ImageGallery({
             className="group relative aspect-2/1 sm:aspect-21/9 rounded-xl overflow-hidden bg-muted/30 border border-border/50 cursor-pointer"
           >
             <img
-              src={`/api/media/${asset.id}?thumb=true`}
+              src={mediaAssetUrl(asset.id, serverId, true)}
               alt={asset.fileName}
               className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
               onError={(e) => {
                 // Fallback to original if no thumbnail
-                (e.target as HTMLImageElement).src = `/api/media/${asset.id}`;
+                (e.target as HTMLImageElement).src = mediaAssetUrl(asset.id, serverId);
               }}
             />
 
@@ -1200,16 +1248,19 @@ function ImageGallery({
 
             {/* Hover actions */}
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(asset.id);
-                }}
-                className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto hover:bg-black/70"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
+              {!isActiveJob(asset) ? (
+                <button
+                  type="button"
+                  aria-label={`Delete ${asset.fileName}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(asset.id);
+                  }}
+                  className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto hover:bg-black/70"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              ) : null}
             </div>
           </div>
         ))}
@@ -1235,7 +1286,7 @@ function ImageGallery({
         >
           <div className="relative max-w-full max-h-full">
             <img
-              src={`/api/media/${expandedAsset.id}`}
+              src={mediaAssetUrl(expandedAsset.id, serverId)}
               alt={expandedAsset.fileName}
               className="max-w-full max-h-[90vh] rounded-lg object-contain"
               onClick={(e) => e.stopPropagation()} // Prevent click from closing immediately
@@ -1319,14 +1370,27 @@ function FileList({
                 Retry
               </Button>
             ) : null}
-            <button
-              type="button"
-              aria-label={`Delete ${asset.fileName}`}
-              onClick={() => onDelete(asset.id)}
-              className="text-red-500 p-1.5 rounded cursor-pointer hover:text-red-600 transition-all"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
+            {asset.processingStatus === 'completed' ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px] text-muted-foreground"
+                onClick={() => onProcess(asset.id)}
+              >
+                Re-index
+              </Button>
+            ) : null}
+            {!isActiveJob(asset) ? (
+              <button
+                type="button"
+                aria-label={`Delete ${asset.fileName}`}
+                onClick={() => onDelete(asset.id)}
+                className="text-red-500 p-1.5 rounded cursor-pointer hover:text-red-600 transition-all"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            ) : null}
           </div>
         </div>
       ))}
@@ -1395,6 +1459,70 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
   );
 }
 
+const MEDIA_STAGE_LABELS: Record<MediaPipelineStage, string> = {
+  download: 'Download',
+  extract: 'Extract',
+  transcribe: 'Transcribe',
+  vision: 'Visual analysis',
+  synthesize: 'Connect notes',
+  index: 'Search index',
+};
+
+function ProcessingStageRow({ step }: { step: MediaProcessingStep }) {
+  const isRunning = step.status === 'running';
+  const isDone = step.status === 'completed';
+  const isFailed = step.status === 'failed';
+  const count =
+    step.current !== undefined && step.total !== undefined && step.total > 0
+      ? step.unit === '%'
+        ? `${Math.round(Math.min(step.current, step.total))}%`
+        : `${Math.min(step.current, step.total)} / ${step.total}${step.unit ? ` ${step.unit}` : ''}`
+      : step.percent !== undefined && isRunning
+      ? `${Math.round(step.percent)}%`
+      : step.status === 'skipped'
+      ? 'Not needed'
+      : isDone
+      ? 'Done'
+      : 'Waiting';
+
+  return (
+    <div
+      className={cn(
+        'min-w-0 rounded-md border px-2 py-1.5',
+        isRunning
+          ? 'border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/25'
+          : isFailed
+          ? 'border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20'
+          : 'border-border/60 bg-muted/15',
+      )}
+      title={step.message}
+    >
+      <div className="flex items-center gap-1.5">
+        {isRunning ? (
+          <Loader2 className="size-3 shrink-0 animate-spin text-blue-600 dark:text-blue-400" />
+        ) : isDone ? (
+          <Check className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        ) : isFailed ? (
+          <AlertCircle className="size-3 shrink-0 text-red-500" />
+        ) : (
+          <Clock className="size-3 shrink-0 text-muted-foreground/60" />
+        )}
+        <span className="truncate text-[10px] font-medium text-foreground">
+          {MEDIA_STAGE_LABELS[step.stage]}
+        </span>
+      </div>
+      <p
+        className={cn(
+          'mt-0.5 truncate pl-[18px] text-[9px] tabular-nums',
+          isRunning ? 'text-blue-700 dark:text-blue-300' : 'text-muted-foreground',
+        )}
+      >
+        {count}
+      </p>
+    </div>
+  );
+}
+
 function ActiveIndexingList({ assets }: { assets: MediaAsset[] }) {
   return (
     <section
@@ -1442,6 +1570,13 @@ function ActiveIndexingList({ assets }: { assets: MediaAsset[] }) {
                   INDEXING_PROGRESS_CLASS,
                 )}
               />
+              {asset.processingSteps?.length ? (
+                <div className="grid grid-cols-2 gap-1.5 pt-1 sm:grid-cols-3">
+                  {asset.processingSteps.map((step) => (
+                    <ProcessingStageRow key={step.stage} step={step} />
+                  ))}
+                </div>
+              ) : null}
             </div>
           );
         })}

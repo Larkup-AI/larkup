@@ -18,6 +18,8 @@ import { applyFieldEdits, applyContentEdits } from '@larkup/tool-doc-editor';
 import { loadTool } from '@larkup/marketplace/loader';
 import { getInstalledTools } from '@larkup/marketplace/installer';
 import { readDocuments } from '@larkup/core/documents-store';
+import { readMediaAssets } from '@larkup/core/media-store';
+import { queryAwareExcerpt } from '@/lib/media-knowledge';
 
 function documentEditModelOutput({ output }: { output: any }) {
   return {
@@ -96,8 +98,9 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
 }
 
 async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) {
-  const documents = await readDocuments();
+  const [documents, mediaAssets] = await Promise.all([readDocuments(), readMediaAssets()]);
   const documentsById = new Map(documents.map((document) => [document.id, document]));
+  const activeMediaDocumentIds = new Set(mediaAssets.flatMap((asset) => asset.documentIds));
   const hydrated = rawHits.map((hit) => {
     const document = documentsById.get(hit.documentId);
     return {
@@ -105,37 +108,116 @@ async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) 
       title: hit.title || document?.title || 'Untitled',
       url: hit.url || document?.url || '',
       text: hit.text || document?.content || '',
-      metadata: hit.metadata || document?.metadata,
+      metadata: { ...document?.metadata, ...hit.metadata },
     };
   });
 
-  const selected = hydrated
-    .filter((hit) => !hit.metadata?.mediaAssetId || documentsById.has(hit.documentId))
-    .slice(0, topK);
-  const outcomeMediaAssetId = isOutcomeQuery(query)
-    ? selected.find((hit) => hit.metadata?.mediaAssetId)?.metadata.mediaAssetId
-    : undefined;
-  const endingContext = outcomeMediaAssetId
-    ? documents
-        .filter(
-          (document) =>
-            document.status === 'indexed' &&
-            document.metadata?.mediaAssetId === outcomeMediaAssetId,
-        )
-        .sort(
-          (left, right) =>
-            Number(right.metadata?.startSecs ?? 0) - Number(left.metadata?.startSecs ?? 0),
-        )
-        .slice(0, 3)
-        .reverse()
-        .map((document) => ({
+  const selected: any[] = [];
+  const hitsPerDocument = new Map<string, number>();
+  for (const hit of hydrated) {
+    if (
+      hit.metadata?.mediaAssetId &&
+      (!documentsById.has(hit.documentId) || !activeMediaDocumentIds.has(hit.documentId))
+    ) {
+      continue;
+    }
+    const seen = hitsPerDocument.get(hit.documentId) ?? 0;
+    const isTimestampedMedia =
+      hit.metadata?.isMediaSummary === true ||
+      hit.metadata?.contentKind === 'multimodal-segment' ||
+      hit.metadata?.contentKind === 'audio-transcript-segment';
+    // One strong hit per timestamped evidence document leaves room for other
+    // moments instead of returning eight chunks from the same summary.
+    if (seen >= (isTimestampedMedia ? 1 : 3)) continue;
+    selected.push(hit);
+    hitsPerDocument.set(hit.documentId, seen + 1);
+    if (selected.length >= topK) break;
+  }
+  const primaryMediaAssetId = selected.find((hit) => hit.metadata?.mediaAssetId)?.metadata
+    .mediaAssetId;
+  const mediaDocuments = primaryMediaAssetId
+    ? documents.filter(
+        (document) =>
+          document.status === 'indexed' &&
+          document.metadata?.mediaAssetId === primaryMediaAssetId &&
+          activeMediaDocumentIds.has(document.id),
+      )
+    : [];
+  const timestampedDocuments = mediaDocuments
+    .filter((document) => Number.isFinite(Number(document.metadata?.endSecs)))
+    .sort(
+      (left, right) => Number(left.metadata?.endSecs ?? 0) - Number(right.metadata?.endSecs ?? 0),
+    );
+  const mediaDuration = Math.max(
+    0,
+    ...timestampedDocuments.map((document) =>
+      Number(document.metadata?.durationSecs ?? document.metadata?.endSecs ?? 0),
+    ),
+  );
+  const trailingHorizonSecs = Math.max(10 * 60, Math.min(30 * 60, mediaDuration * 0.2));
+  const trailingDocuments = timestampedDocuments.filter(
+    (document) => Number(document.metadata?.endSecs ?? 0) >= mediaDuration - trailingHorizonSecs,
+  );
+  const signaledEndingDocuments = isOutcomeQuery(query)
+    ? trailingDocuments.filter((document) => isOutcomeEvidence(document.content)).slice(-2)
+    : [];
+  const timestampedEnding = [
+    ...new Map(
+      [...signaledEndingDocuments, ...trailingDocuments.slice(-4)].map((document) => [
+        document.id,
+        document,
+      ]),
+    ).values(),
+  ].sort(
+    (left, right) => Number(left.metadata?.endSecs ?? 0) - Number(right.metadata?.endSecs ?? 0),
+  );
+  const mediaSummary = mediaDocuments.find(
+    (document) => document.metadata?.isMediaSummary === true,
+  );
+  const legacyWholeTimeline =
+    timestampedEnding.length === 0
+      ? mediaDocuments.find((document) => document.metadata?.contentKind === 'multimodal-timeline')
+      : undefined;
+  // A compact ending context is returned for every primary media match. This
+  // avoids depending on a brittle English/Arabic keyword gate for formulations
+  // such as "which team became champion?" or equivalent questions in any language.
+  const endingContext = primaryMediaAssetId
+    ? [
+        ...(mediaSummary
+          ? [
+              {
+                role: 'summary',
+                title: mediaSummary.title,
+                url: mediaSummary.url,
+                text: queryAwareExcerpt(mediaSummary.content, query, 6_000),
+                startSecs: undefined,
+                endSecs: undefined,
+              },
+            ]
+          : []),
+        ...timestampedEnding.map((document) => ({
           role: 'ending',
           title: document.title,
           url: document.url,
-          text: document.content.slice(0, 1_800),
+          text: queryAwareExcerpt(document.content, query, 3_200, true),
           startSecs: document.metadata?.startSecs,
           endSecs: document.metadata?.endSecs,
-        }))
+        })),
+        ...(legacyWholeTimeline
+          ? [
+              {
+                role: 'ending',
+                title: legacyWholeTimeline.title,
+                url: legacyWholeTimeline.url,
+                // Legacy media was one giant document. Its ending is the tail,
+                // never the beginning.
+                text: queryAwareExcerpt(legacyWholeTimeline.content, query, 4_000, true),
+                startSecs: undefined,
+                endSecs: legacyWholeTimeline.metadata?.durationSecs,
+              },
+            ]
+          : []),
+      ]
     : undefined;
 
   return {
@@ -150,12 +232,22 @@ async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) 
               const candidateStart = Number(document.metadata?.startSecs);
               return (
                 document.status === 'indexed' &&
+                activeMediaDocumentIds.has(document.id) &&
                 document.metadata?.mediaAssetId === hit.metadata.mediaAssetId &&
                 Number.isFinite(sequence) &&
                 Number.isFinite(candidateSequence) &&
                 Math.abs(candidateSequence - sequence) <= 1 &&
-                Number.isFinite(startSecs) &&
-                Math.abs(candidateStart - startSecs) <= 90
+                // Sequence is the authoritative adjacency marker. Fixed
+                // 90-second distance broke wider adaptive windows used for
+                // multi-hour camera and screen recordings.
+                (!Number.isFinite(startSecs) ||
+                  !Number.isFinite(candidateStart) ||
+                  Math.abs(candidateStart - startSecs) <=
+                    Math.max(
+                      90,
+                      Number(hit.metadata?.endSecs ?? startSecs) - startSecs,
+                      Number(document.metadata?.endSecs ?? candidateStart) - candidateStart,
+                    ))
               );
             })
             .sort(
@@ -171,7 +263,7 @@ async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) 
                   : 'matched',
               title: document.title,
               url: document.url,
-              text: document.content.slice(0, 1_800),
+              text: queryAwareExcerpt(document.content, query, 3_200),
               startSecs: document.metadata?.startSecs,
               endSecs: document.metadata?.endSecs,
             }))
@@ -182,7 +274,7 @@ async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) 
         title: hit.title ?? 'Untitled',
         url: hit.url ?? '',
         score: Number((hit.score ?? 0).toFixed(3)),
-        text: (hit.text ?? '').slice(0, 1_800),
+        text: queryAwareExcerpt(hit.text ?? '', query, 4_000),
         metadata: hit.metadata,
         timelineContext,
         endingContext: hitIndex === 0 ? endingContext : undefined,
@@ -192,8 +284,14 @@ async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) 
 }
 
 function isOutcomeQuery(query: string): boolean {
-  return /\b(who won|winner|won|final score|result|beat|defeated)\b|من فاز|مين فاز|الفائز|النتيجة|نتيجة|فاز|كسب/i.test(
+  return /\b(who won|winner|won|final score|scoreline|result|beat|defeated|victor|champion|took (?:the )?(?:game|match|round))\b|من فاز|مين فاز|الفائز|النتيجة|نتيجة|فاز|كسب|البطل|حسم|انتصر/i.test(
     query,
+  );
+}
+
+function isOutcomeEvidence(text: string): boolean {
+  return /\b(winner|won|final score|total score|scoreline|champion|victor|defeated|beat)\b|الفائز|النتيجة|فاز|كسب|البطل|حسم|انتصر/i.test(
+    text,
   );
 }
 

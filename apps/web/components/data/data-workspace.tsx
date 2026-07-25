@@ -221,13 +221,13 @@ export function DataWorkspace() {
   };
 
   const handleMediaIndexed = useCallback(() => {
-    // A media asset only emits this after its timeline has been embedded. Fetch
-    // immediately, then take the user to the now-populated Knowledge Base.
+    // Refresh the corpus without pulling the user away from the live media
+    // workspace; they can inspect another job or open the Knowledge Base when
+    // they are ready.
     void mutateDocuments();
     void mutateIndex();
-    setActiveTab('corpus');
     toast.success('Media indexed and added to your Knowledge Base.');
-  }, [mutateDocuments, mutateIndex, setActiveTab]);
+  }, [mutateDocuments, mutateIndex]);
 
   return (
     <div className="px-6 md:px-8">

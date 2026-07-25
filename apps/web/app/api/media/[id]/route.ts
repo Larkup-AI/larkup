@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getMediaAsset, updateMediaAsset } from '@larkup/core/media-store';
 import { createStorageProvider } from '@larkup/marketplace/storage';
+import { runWithServer } from '@larkup/core/workspace';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** GET → serve a media file or its thumbnail. */
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
+  return withRequestServer(req, () => serveMedia(req, context));
+}
+
+async function serveMedia(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const url = new URL(_req.url);
   const wantThumb = url.searchParams.get('thumb') === 'true';
@@ -78,7 +83,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 /** PATCH → update media asset metadata. */
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: Request, context: { params: Promise<{ id: string }> }) {
+  return withRequestServer(req, () => patchMedia(req, context));
+}
+
+async function patchMedia(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
     const body = await req.json();
@@ -91,4 +100,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const message = err instanceof Error ? err.message : 'Update failed.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function withRequestServer<T>(req: Request, fn: () => T): T {
+  const serverId = new URL(req.url).searchParams.get('serverId');
+  return serverId ? runWithServer(serverId, fn) : fn();
 }

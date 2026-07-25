@@ -14,12 +14,17 @@ import { deleteDocuments } from '@larkup/core/documents-store';
 import { readConfig } from '@larkup/core/config-store';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import type { MediaType } from '@larkup/core/types';
+import { runWithServer } from '@larkup/core/workspace';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** GET → list media assets, optionally filtered by type. */
 export async function GET(req: Request) {
+  return withRequestServer(req, () => listMedia(req));
+}
+
+async function listMedia(req: Request) {
   const url = new URL(req.url);
   const typeFilter = url.searchParams.get('type') as MediaType | null;
 
@@ -48,6 +53,10 @@ export async function GET(req: Request) {
  * Accepts multipart/form-data with one or more "file" fields.
  */
 export async function POST(req: Request) {
+  return withRequestServer(req, () => saveMedia(req));
+}
+
+async function saveMedia(req: Request) {
   try {
     if (req.headers.get('content-type')?.includes('application/json')) {
       return await importRemoteMedia(req);
@@ -161,6 +170,10 @@ async function importRemoteMedia(req: Request) {
 
 /** DELETE → remove media assets. ?id=X or ?ids=X,Y */
 export async function DELETE(req: Request) {
+  return withRequestServer(req, () => removeMedia(req));
+}
+
+async function removeMedia(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
   const ids = url.searchParams.get('ids');
@@ -171,20 +184,46 @@ export async function DELETE(req: Request) {
     const { getMediaAsset } = await import('@larkup/core/media-store');
     const asset = await getMediaAsset(id);
     if (asset) {
-      await deleteMediaDocuments(asset.documentIds);
+      if (
+        asset.processingStatus === 'processing' ||
+        (asset.processingStatus === 'pending' &&
+          asset.processingMessage === 'Queued for background processing...')
+      ) {
+        return NextResponse.json(
+          { error: 'Wait for media indexing to finish before deleting this file.' },
+          { status: 409 },
+        );
+      }
+      const documentIds = allMediaDocumentIds(asset);
+      await deleteMediaDocuments(documentIds);
       await storage.delete(asset.storageUri).catch(() => {});
       if (asset.thumbnailUri) await storage.delete(asset.thumbnailUri).catch(() => {});
-      await deleteDocuments(asset.documentIds);
+      await deleteDocuments(documentIds);
     }
     await deleteMediaAsset(id);
   } else if (ids) {
     const idList = ids.split(',');
     const assets = await readMediaAssets();
-    for (const asset of assets.filter((a) => idList.includes(a.id))) {
-      await deleteMediaDocuments(asset.documentIds);
+    const selectedAssets = assets.filter((asset) => idList.includes(asset.id));
+    if (
+      selectedAssets.some(
+        (asset) =>
+          asset.processingStatus === 'processing' ||
+          (asset.processingStatus === 'pending' &&
+            asset.processingMessage === 'Queued for background processing...'),
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'Wait for all selected media indexing jobs to finish before deleting them.' },
+        { status: 409 },
+      );
+    }
+    for (const asset of selectedAssets) {
+      const documentIds = allMediaDocumentIds(asset);
+      await deleteMediaDocuments(documentIds);
       await storage.delete(asset.storageUri).catch(() => {});
       if (asset.thumbnailUri) await storage.delete(asset.thumbnailUri).catch(() => {});
-      await deleteDocuments(asset.documentIds);
+      await deleteDocuments(documentIds);
     }
     await deleteMediaAssets(idList);
   }
@@ -192,10 +231,29 @@ export async function DELETE(req: Request) {
   return NextResponse.json({ ok: true });
 }
 
+function withRequestServer<T>(req: Request, fn: () => T): T {
+  const serverId = new URL(req.url).searchParams.get('serverId');
+  return serverId ? runWithServer(serverId, fn) : fn();
+}
+
 async function deleteMediaDocuments(documentIds: string[]): Promise<void> {
   if (documentIds.length === 0) return;
   const adapter = await createAdapter(await readConfig());
   await adapter.deleteByDocumentIds(documentIds);
+}
+
+function allMediaDocumentIds(asset: {
+  documentIds: string[];
+  pendingDocumentIds?: string[];
+  supersededDocumentIds?: string[];
+}): string[] {
+  return [
+    ...new Set([
+      ...asset.documentIds,
+      ...(asset.pendingDocumentIds ?? []),
+      ...(asset.supersededDocumentIds ?? []),
+    ]),
+  ];
 }
 
 /* ------------------------------------------------------------------ */

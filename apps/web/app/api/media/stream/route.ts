@@ -1,23 +1,35 @@
-import { mediaStats, readMediaAssets, recoverStaleMediaAssets } from '@larkup/core/media-store';
+import { readMediaAssets, recoverStaleMediaAssets } from '@larkup/core/media-store';
 import { createStorageProvider } from '@larkup/marketplace/storage';
 import type { MediaType } from '@larkup/core/types';
+import { runWithServer } from '@larkup/core/workspace';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const encoder = new TextEncoder();
 
-async function snapshot(typeFilter: MediaType | null) {
-  const [assets, stats] = await Promise.all([readMediaAssets(), mediaStats()]);
+async function snapshot(
+  typeFilter: MediaType | null,
+  storageSnapshot: { usedBytes: number; fileCount: number },
+) {
+  const assets = await readMediaAssets();
   const filtered = typeFilter ? assets.filter((asset) => asset.type === typeFilter) : assets;
   filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  const storage = createStorageProvider();
-  const storageStats = await storage.stats();
+  const stats = {
+    total: assets.length,
+    byType: { image: 0, video: 0, audio: 0 },
+    byStatus: { pending: 0, processing: 0, completed: 0, failed: 0 },
+    totalBytes: 0,
+  };
+  for (const asset of assets) {
+    stats.byType[asset.type]++;
+    stats.byStatus[asset.processingStatus]++;
+    stats.totalBytes += asset.fileSize;
+  }
   return {
     assets: filtered,
     stats,
-    storage: { usedBytes: storageStats.usedBytes, fileCount: storageStats.fileCount },
+    storage: storageSnapshot,
   };
 }
 
@@ -29,10 +41,12 @@ async function snapshot(typeFilter: MediaType | null) {
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const type = url.searchParams.get('type');
+  const serverId = url.searchParams.get('serverId');
   const typeFilter: MediaType | null =
     type === 'image' || type === 'video' || type === 'audio' ? type : null;
+  const scoped = <T>(fn: () => T): T => (serverId ? runWithServer(serverId, fn) : fn());
 
-  await recoverStaleMediaAssets();
+  await scoped(() => recoverStaleMediaAssets());
 
   let interval: ReturnType<typeof setInterval> | undefined;
   let keepAlive: ReturnType<typeof setInterval> | undefined;
@@ -40,14 +54,36 @@ export async function GET(req: Request) {
     async start(controller) {
       let lastPayload = '';
       let checking = false;
+      let storageSnapshot = { usedBytes: 0, fileCount: 0 };
+      let storageCheckedAt = 0;
       const publish = async () => {
         if (checking) return;
         checking = true;
         try {
-          const payload = JSON.stringify(await snapshot(typeFilter));
+          if (Date.now() - storageCheckedAt > 30_000) {
+            try {
+              const storageStats = await scoped(() => createStorageProvider().stats());
+              storageSnapshot = {
+                usedBytes: storageStats.usedBytes,
+                fileCount: storageStats.fileCount,
+              };
+            } catch {
+              // Progress remains streamable even if a remote storage provider
+              // cannot calculate aggregate usage at this moment.
+            }
+            storageCheckedAt = Date.now();
+          }
+          const nextSnapshot = await scoped(() => snapshot(typeFilter, storageSnapshot));
+          const payload = JSON.stringify(nextSnapshot);
           if (payload !== lastPayload) {
             lastPayload = payload;
-            controller.enqueue(encoder.encode(`event: media-update\ndata: ${payload}\n\n`));
+            const revision = Math.max(
+              0,
+              ...nextSnapshot.assets.map((asset) => asset.processingRevision ?? 0),
+            );
+            controller.enqueue(
+              encoder.encode(`id: ${revision}\nevent: media-update\ndata: ${payload}\n\n`),
+            );
           }
         } catch {
           // Keep the connection open; the next change check can recover.

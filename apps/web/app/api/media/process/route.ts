@@ -1,12 +1,27 @@
 import { NextResponse } from 'next/server';
-import { claimMediaAsset, updateMediaAsset, readMediaAssets } from '@larkup/core/media-store';
-import { addDocument, deleteDocuments } from '@larkup/core/documents-store';
+import { randomUUID } from 'node:crypto';
+import {
+  claimMediaAsset,
+  updateMediaAsset,
+  updateMediaStage,
+  readMediaAssets,
+  type MediaProcessingStepPatch,
+} from '@larkup/core/media-store';
+import { addDocument, addDocuments, deleteDocuments } from '@larkup/core/documents-store';
 import { getInstalledTool, isToolInstalled } from '@larkup/marketplace/installer';
 import { loadTool } from '@larkup/marketplace/loader';
 import { createStorageProvider } from '@larkup/marketplace/storage';
 import { readConfig } from '@larkup/core/config-store';
-import type { MediaAsset } from '@larkup/core/types';
+import type { MediaAsset, MediaPipelineStage } from '@larkup/core/types';
+import { runWithServer } from '@larkup/core/workspace';
 import { getConcurrencyLimits } from '@/lib/os-concurrency';
+import {
+  buildMediaDocumentInputs,
+  createFallbackMediaSummary,
+  createMediaKnowledgeSummary,
+  formatTime,
+  type MediaEvidenceSegment,
+} from '@/lib/media-knowledge';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,10 +30,12 @@ export const dynamic = 'force-dynamic';
 // from launching several memory-heavy FFmpeg jobs at once.
 let mediaProcessingChain: Promise<void> = Promise.resolve();
 
+type StageReporter = (stage: MediaPipelineStage, patch: MediaProcessingStepPatch) => Promise<void>;
+
 /**
  * POST → trigger media processing for one or more assets.
  *
- * Body: { assetIds: string[] }
+ * Body: { assetIds: string[], serverId?: string }
  *
  * Processing is claimed atomically and continues in the background while the
  * client polls persisted asset progress.
@@ -27,11 +44,27 @@ let mediaProcessingChain: Promise<void> = Promise.resolve();
  */
 export async function POST(req: Request) {
   try {
-    const { assetIds } = (await req.json()) as { assetIds: string[] };
+    const { assetIds, serverId } = (await req.json()) as {
+      assetIds: string[];
+      serverId?: string;
+    };
     if (!assetIds?.length) {
       return NextResponse.json({ error: 'assetIds required' }, { status: 400 });
     }
+    const enqueue = () => enqueueMediaProcessing(req.url, assetIds, serverId);
+    return serverId ? await runWithServer(serverId, enqueue) : await enqueue();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to trigger processing';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
 
+async function enqueueMediaProcessing(
+  reqUrl: string,
+  assetIds: string[],
+  serverId?: string,
+): Promise<NextResponse> {
+  try {
     const assets = await readMediaAssets();
     const matchingAssets = assets.filter((asset) => assetIds.includes(asset.id));
     const claimedAssets = await Promise.all(
@@ -39,6 +72,7 @@ export async function POST(req: Request) {
     );
     const toProcess = claimedAssets.filter((asset): asset is MediaAsset => Boolean(asset));
     const sourceTranscripts = new Map<string, any>();
+    const queuedAssetIds = new Set(toProcess.map((asset) => asset.id));
 
     if (toProcess.length === 0) {
       return NextResponse.json(
@@ -51,41 +85,70 @@ export async function POST(req: Request) {
       );
     }
 
-    const reqUrl = req.url;
+    const touchQueuedAssets = async () => {
+      const processingHeartbeatAt = new Date().toISOString();
+      await Promise.all(
+        [...queuedAssetIds].map((id) =>
+          updateMediaAsset(id, { processingHeartbeatAt }).catch(() => undefined),
+        ),
+      );
+    };
+    const queuedHeartbeat = setInterval(() => {
+      const touch = () => touchQueuedAssets();
+      void (serverId ? runWithServer(serverId, touch) : touch()).catch(() => {});
+    }, 60_000);
 
     // Run processing in the background
-    const job = mediaProcessingChain.then(async () => {
+    const runJob = async () => {
       for (const initialAsset of toProcess) {
+        queuedAssetIds.delete(initialAsset.id);
         let currentAsset = initialAsset;
         let heartbeat: ReturnType<typeof setInterval> | undefined;
-        let lastProgressUpdate = 0;
-        let lastProgressMessage = '';
-        const setProgress = async (msg: string, progress?: number) => {
+        const activeStages = new Set<MediaPipelineStage>();
+        const lastStageUpdates = new Map<MediaPipelineStage, number>();
+        const reportStage: StageReporter = async (stage, patch) => {
           const now = Date.now();
-          // FFmpeg can emit dozens of progress events per second. Persist enough
-          // updates for a responsive UI without turning progress into disk churn.
-          if (msg === lastProgressMessage && now - lastProgressUpdate < 750) return;
-          lastProgressUpdate = now;
-          lastProgressMessage = msg;
-          await updateMediaAsset(currentAsset.id, {
-            processingMessage: msg,
-            processingProgress: progress,
-          });
+          const isTerminal =
+            patch.status === 'completed' || patch.status === 'skipped' || patch.status === 'failed';
+          // FFmpeg and providers can report many events per second. Each stage
+          // keeps its own throttle so parallel transcription and vision never
+          // overwrite or suppress one another.
+          if (
+            !isTerminal &&
+            patch.status === 'running' &&
+            now - (lastStageUpdates.get(stage) ?? 0) < 600
+          ) {
+            return;
+          }
+          lastStageUpdates.set(stage, now);
+          if (patch.status === 'running') activeStages.add(stage);
+          if (isTerminal) activeStages.delete(stage);
+          await updateMediaStage(currentAsset.id, stage, patch);
         };
 
         try {
-          await updateMediaAsset(currentAsset.id, {
+          const startedAsset = await updateMediaAsset(currentAsset.id, {
             processingStatus: 'processing',
             processingError: undefined,
             processingMessage: 'Starting process...',
             processingProgress: 2,
           });
+          if (!startedAsset) {
+            throw new Error('Media asset was removed before processing started.');
+          }
+          currentAsset = startedAsset;
           heartbeat = setInterval(() => {
-            void updateMediaAsset(currentAsset.id, {}).catch(() => {});
+            void updateMediaAsset(currentAsset.id, {
+              processingHeartbeatAt: new Date().toISOString(),
+            }).catch(() => {});
           }, 60_000);
 
           if (currentAsset.storageUri.startsWith('pending://') && currentAsset.originalUrl) {
-            await setProgress('Downloading from URL...', 5);
+            await reportStage('download', {
+              status: 'running',
+              percent: 0,
+              message: 'Downloading media from URL...',
+            });
             const { addMediaAssets } = await import('@larkup/core/media-store');
             const tool = await loadTool<any>('video-audio');
             if (!tool || !tool.importMediaUrl)
@@ -129,10 +192,13 @@ export async function POST(req: Request) {
               currentAsset =
                 (await updateMediaAsset(currentAsset.id, {
                   fileName: firstEntry.title || path.basename(firstEntry.path),
+                  mimeType,
                   ...storedFirstEntry,
-                  processingMessage: 'Download complete...',
-                  processingProgress: 12,
                 })) || currentAsset;
+              await reportStage('download', {
+                status: 'completed',
+                message: 'Download complete.',
+              });
               if (firstEntry.sourceTranscript?.chunks?.length) {
                 sourceTranscripts.set(currentAsset.id, firstEntry.sourceTranscript);
               }
@@ -157,21 +223,32 @@ export async function POST(req: Request) {
                   });
                 }
                 const extraAssets = await addMediaAssets(newInputs);
-                extraAssets.forEach((extraAsset, index) => {
-                  const transcript = entries[index + 1]?.sourceTranscript;
+                const claimedExtraAssets = (
+                  await Promise.all(extraAssets.map((extraAsset) => claimMediaAsset(extraAsset.id)))
+                ).filter((extraAsset): extraAsset is MediaAsset => Boolean(extraAsset));
+                claimedExtraAssets.forEach((extraAsset) => {
+                  const sourceIndex = extraAssets.findIndex(
+                    (candidate) => candidate.id === extraAsset.id,
+                  );
+                  const transcript = entries[sourceIndex + 1]?.sourceTranscript;
                   if (transcript?.chunks?.length) sourceTranscripts.set(extraAsset.id, transcript);
+                  queuedAssetIds.add(extraAsset.id);
                 });
                 // Push them to the queue to be processed in this loop
-                toProcess.push(...extraAssets);
+                toProcess.push(...claimedExtraAssets);
               }
             } finally {
               await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
             }
+          } else {
+            await reportStage('download', {
+              status: 'skipped',
+              message: 'Using uploaded media.',
+            });
           }
 
           if (currentAsset.type === 'image') {
-            await setProgress(`Processing image: ${currentAsset.fileName}`, 20);
-            await processImageAsset(currentAsset, reqUrl);
+            await processImageAsset(currentAsset, reqUrl, reportStage, serverId);
           } else if (currentAsset.type === 'video' || currentAsset.type === 'audio') {
             const installed = await isToolInstalled('video-audio');
             if (!installed) {
@@ -182,14 +259,23 @@ export async function POST(req: Request) {
             await processMediaWithTool(
               currentAsset,
               reqUrl,
-              setProgress,
+              reportStage,
               sourceTranscripts.get(currentAsset.id),
+              serverId,
             );
           } else {
             throw new Error('Unsupported media type');
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Processing failed';
+          await Promise.all(
+            [...activeStages].map((stage) =>
+              updateMediaStage(currentAsset.id, stage, {
+                status: 'failed',
+                message,
+              }),
+            ),
+          );
           await updateMediaAsset(currentAsset.id, {
             processingStatus: 'failed',
             processingError: message,
@@ -200,7 +286,10 @@ export async function POST(req: Request) {
           if (heartbeat) clearInterval(heartbeat);
         }
       }
-    });
+    };
+    const job = mediaProcessingChain
+      .then(() => (serverId ? runWithServer(serverId, runJob) : runJob()))
+      .finally(() => clearInterval(queuedHeartbeat));
     mediaProcessingChain = job.catch((error) => console.error('Media worker failed:', error));
 
     return NextResponse.json(
@@ -217,15 +306,31 @@ export async function POST(req: Request) {
 /* Image processing (built-in, no tool needed)                         */
 /* ------------------------------------------------------------------ */
 
-async function processImageAsset(asset: MediaAsset, reqUrl: string): Promise<void> {
+async function processImageAsset(
+  asset: MediaAsset,
+  reqUrl: string,
+  reportStage: StageReporter,
+  serverId?: string,
+): Promise<void> {
+  await cleanupIncompleteMediaPublication(asset);
   let caption = `Image: ${asset.fileName}`;
+  await Promise.all([
+    reportStage('extract', { status: 'skipped', message: 'No extraction needed.' }),
+    reportStage('transcribe', { status: 'skipped', message: 'No audio track.' }),
+    reportStage('synthesize', { status: 'skipped', message: 'Caption is the media note.' }),
+  ]);
+  await reportStage('vision', {
+    status: 'running',
+    percent: 0,
+    message: `Understanding image: ${asset.fileName}`,
+  });
 
   try {
     const storage = createStorageProvider();
     const fileData = await storage.retrieve(asset.storageUri);
     const base64 = fileData.toString('base64');
 
-    const descRes = await fetch(new URL('/api/describe-image', reqUrl).toString(), {
+    const descRes = await fetch(scopedApiUrl('/api/describe-image', reqUrl, serverId), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ base64 }),
@@ -240,42 +345,71 @@ async function processImageAsset(asset: MediaAsset, reqUrl: string): Promise<voi
   } catch (err) {
     console.error('Failed to describe image asset:', err);
   }
-
-  const doc = await addDocument({
-    title: asset.fileName,
-    content: caption,
-    source: 'media',
-    url: `/api/media/${asset.id}`,
-    metadata: {
-      mediaAssetId: asset.id,
-      mediaType: 'image',
-      fileName: asset.fileName,
-      mimeType: asset.mimeType,
-      fileSize: asset.fileSize,
-      dimensions: asset.dimensions,
-      images: [
-        {
-          imageUrl: `/api/media/${asset.id}`,
-          pageNumber: 1,
-          index: 0,
-        },
-      ],
-    },
+  await reportStage('vision', {
+    status: 'completed',
+    message: 'Image understanding complete.',
   });
 
+  const documentId = randomUUID();
+  let indexAttempted = false;
   try {
-    await ensureSearchable();
-    await updateMediaAsset(asset.id, {
+    if (!(await updateMediaAsset(asset.id, { pendingDocumentIds: [documentId] }))) {
+      throw new Error('Media asset was removed before its evidence could be published.');
+    }
+    const doc = await addDocument({
+      id: documentId,
+      title: asset.fileName,
+      content: caption,
+      source: 'media',
+      url: `/api/media/${asset.id}`,
+      metadata: {
+        mediaAssetId: asset.id,
+        mediaType: 'image',
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+        fileSize: asset.fileSize,
+        dimensions: asset.dimensions,
+        images: [
+          {
+            imageUrl: `/api/media/${asset.id}`,
+            pageNumber: 1,
+            index: 0,
+          },
+        ],
+      },
+    });
+    await reportStage('index', {
+      status: 'running',
+      percent: 0,
+      message: 'Building the searchable index...',
+    });
+    indexAttempted = true;
+    await ensureSearchable((current, total, message) =>
+      reportStage('index', { status: 'running', current, total, unit: 'chunks', message }),
+    );
+    await reportStage('index', {
+      status: 'completed',
+      message: 'Image is searchable.',
+    });
+    const publishedAsset = await updateMediaAsset(asset.id, {
       processingStatus: 'completed',
       processingProgress: 100,
       processingMessage: undefined,
       caption,
       documentIds: [doc.id],
+      pendingDocumentIds: [],
+      supersededDocumentIds: asset.documentIds,
     });
-    await cleanupReplacedDocuments(asset.documentIds);
+    if (!publishedAsset) {
+      throw new Error('Media asset was removed before indexing completed.');
+    }
+    if (await cleanupDocumentRecords(asset.documentIds)) {
+      await updateMediaAsset(asset.id, { supersededDocumentIds: [] }).catch((error) =>
+        console.error('Failed to clear superseded image document IDs:', error),
+      );
+    }
   } catch (error) {
-    await deleteIndexedDocuments([doc.id]).catch(() => {});
-    await deleteDocuments([doc.id]);
+    await rollbackPendingDocuments(asset.id, [documentId], indexAttempted);
     throw error;
   }
 }
@@ -287,13 +421,21 @@ async function processImageAsset(asset: MediaAsset, reqUrl: string): Promise<voi
 async function processMediaWithTool(
   asset: MediaAsset,
   reqUrl: string,
-  onProgress?: (msg: string, progress?: number) => void,
-  sourceTranscript?: { chunks: any[]; fullText: string; durationSecs: number },
+  reportStage: StageReporter,
+  sourceTranscript?: {
+    chunks: any[];
+    fullText: string;
+    durationSecs: number;
+    language?: string;
+    origin?: { kind?: string; provider?: string; language?: string };
+  },
+  serverId?: string,
 ): Promise<void> {
   const tool = await loadTool<any>('video-audio');
   if (!tool) {
     throw new Error('Failed to load Video & Audio tool');
   }
+  await cleanupIncompleteMediaPublication(asset);
 
   const storage = createStorageProvider();
 
@@ -312,6 +454,7 @@ async function processMediaWithTool(
   }
   const documentIds: string[] = [];
   let published = false;
+  let indexAttempted = false;
 
   try {
     const installedTool = await getInstalledTool('video-audio');
@@ -331,79 +474,207 @@ async function processMediaWithTool(
     }
     const frameIntervalSecs = Math.max(5, Number(installedTool?.config?.frameInterval ?? 30) || 30);
     const language =
-      typeof toolConfig.audioLanguage === 'string' ? toolConfig.audioLanguage : undefined;
+      typeof toolConfig.audioLanguage === 'string' ? toolConfig.audioLanguage : 'auto';
+    const effectiveLanguage =
+      language.trim().toLowerCase() === 'auto' && sourceTranscript?.language
+        ? sourceTranscript.language
+        : language;
     const localUrl = `/api/media/${asset.id}`;
 
     const limits = getConcurrencyLimits();
 
     if (asset.type === 'video' && tool.processVideo) {
-      onProgress?.(`Extracting keyframes and audio (Threads: ${limits.ffmpegThreads})...`, 15);
+      const sourceKind = sourceTranscript?.origin?.kind;
+      const hasManualSourceTranscript =
+        Boolean(sourceTranscript?.chunks?.length) && sourceKind !== 'youtube-auto';
+      await reportStage('extract', {
+        status: 'running',
+        percent: 0,
+        message: `Extracting adaptive frames and audio (${limits.ffmpegThreads} FFmpeg threads)...`,
+      });
       const result = await tool.processVideo(tmpFile, {
         outputDir: tmpDir,
         frameIntervalSecs,
-        // The previous fixed cap of 40 left multi-hour videos almost entirely
-        // unseen. Scene detection keeps this bounded while preserving coverage.
         maxFrames: 600,
         threads: limits.ffmpegThreads,
         parallelExtraction: limits.canParallelizeFfmpeg,
-        skipAudioExtraction: Boolean(sourceTranscript?.chunks.length),
+        // Manual captions can be authoritative. Automatic captions remain a
+        // fallback and must not silently bypass the configured audio provider.
+        skipAudioExtraction: hasManualSourceTranscript,
         onProgress: (value: number) => {
-          void onProgress?.(
-            `Extracting keyframes and audio (${Math.round(value)}%)...`,
-            15 + Math.round(Math.max(0, Math.min(1, value)) * 10),
-          );
+          void reportStage('extract', {
+            status: 'running',
+            percent: Math.round(Math.max(0, Math.min(1, value)) * 100),
+            message: `Extracting adaptive frames and audio (${Math.round(value * 100)}%)...`,
+          }).catch(() => {});
         },
       });
+      await reportStage('extract', {
+        status: 'completed',
+        current: result.frames.length,
+        total: result.frames.length,
+        unit: 'frames',
+        message: `Extracted ${result.frames.length} adaptive frames and the audio track.`,
+      });
 
-      let transcriptPromise: Promise<any | null> = Promise.resolve(sourceTranscript ?? null);
+      let transcriptPromise: Promise<any | null> = Promise.resolve(
+        hasManualSourceTranscript ? sourceTranscript : null,
+      );
 
       // Process audio transcript
-      if (!sourceTranscript && result.audioPath && tool.processAudio) {
+      if (hasManualSourceTranscript) {
+        await reportStage('transcribe', {
+          status: 'completed',
+          current: sourceTranscript?.chunks.length,
+          total: sourceTranscript?.chunks.length,
+          unit: 'caption sections',
+          message: 'Using timestamped manual source captions.',
+        });
+      } else if (result.audioPath && tool.processAudio) {
         transcriptPromise = (async () => {
-          onProgress?.(`Transcribing with ${formatProviderName(provider)}...`, 25);
-          return await tool.processAudio(result.audioPath, { provider, apiKey, language });
+          await reportStage('transcribe', {
+            status: 'running',
+            percent: 0,
+            message: `Transcribing with ${formatProviderName(provider)}...`,
+          });
+          try {
+            const providerTranscript = await tool.processAudio(result.audioPath, {
+              provider,
+              apiKey,
+              language: effectiveLanguage,
+              context: asset.fileName,
+              onProgress: (current: number, total: number, message: string, unit?: string) => {
+                void reportStage('transcribe', {
+                  status: 'running',
+                  current,
+                  total,
+                  unit: unit || 'audio parts',
+                  message:
+                    message ||
+                    `Transcribing part ${Math.min(
+                      current,
+                      total,
+                    )} of ${total} with ${formatProviderName(provider)}...`,
+                }).catch(() => {});
+              },
+            });
+            await reportStage('transcribe', {
+              status: 'completed',
+              message: `Transcription complete with ${formatProviderName(provider)} (${
+                providerTranscript.chunks?.length ?? 0
+              } timestamped sections).`,
+            });
+            return providerTranscript;
+          } catch (error) {
+            if (sourceKind === 'youtube-auto' && sourceTranscript?.chunks?.length) {
+              console.warn(
+                `Configured ${formatProviderName(
+                  provider,
+                )} transcription failed; using YouTube automatic captions as fallback.`,
+                error,
+              );
+              await reportStage('transcribe', {
+                status: 'completed',
+                message: `Provider transcription failed; using ${sourceTranscript.chunks.length} YouTube automatic-caption sections as fallback.`,
+              });
+              return sourceTranscript;
+            }
+            throw error;
+          }
         })();
+      } else if (sourceTranscript?.chunks?.length) {
+        await reportStage('transcribe', {
+          status: 'completed',
+          current: sourceTranscript.chunks.length,
+          total: sourceTranscript.chunks.length,
+          unit: 'caption sections',
+          message: 'Using source captions because the video has no extractable audio track.',
+        });
+        transcriptPromise = Promise.resolve(sourceTranscript);
+      } else {
+        await reportStage('transcribe', {
+          status: 'skipped',
+          message: 'No audio track or source captions were available.',
+        });
       }
 
       // Analyze consecutive frames together so the vision model can infer
       // actions, transitions, and persistent on-screen text rather than seeing
       // every frame as an unrelated image.
       const scenePromise = (async () => {
-        onProgress?.('Linking consecutive frames into visual sequences...', 30);
         const extractedFrames = result.frames as { path: string; timestampSecs: number }[];
-        const frameGroups = groupFramesByWindow(extractedFrames, 60, 4);
+        const analysisWindowSecs = visualAnalysisWindow(result.meta.durationSecs);
+        const frameGroups = groupFramesByWindow(extractedFrames, analysisWindowSecs, 6);
+        if (frameGroups.length === 0) {
+          await reportStage('vision', {
+            status: 'skipped',
+            message: 'No readable video frames were extracted.',
+          });
+          return [];
+        }
+        await reportStage('vision', {
+          status: 'running',
+          current: 0,
+          total: frameGroups.length,
+          unit: 'sequences',
+          message: `Understanding 0 of ${frameGroups.length} visual sequences...`,
+        });
         let analyzed = 0;
-        return await mapConcurrent(
+        const descriptions = await mapConcurrent(
           frameGroups,
           limits.apiConcurrency,
           async (frames: { path: string; timestampSecs: number }[]) => {
             const base64Images = await Promise.all(
               frames.map(async (frame) => (await fs.readFile(frame.path)).toString('base64')),
             );
-            const startSecs = Math.floor(frames[0].timestampSecs / 60) * 60;
-            const endSecs = Math.min(startSecs + 60, result.meta.durationSecs);
+            const startSecs = frames[0].timestampSecs;
+            const endSecs = Math.min(
+              result.meta.durationSecs,
+              Math.max(startSecs + 1, frames.at(-1)!.timestampSecs + frameIntervalSecs),
+            );
             const timestamps = frames.map((frame) => formatTime(frame.timestampSecs)).join(', ');
             const descRes = await fetchWithRetry(
-              new URL('/api/describe-image', reqUrl).toString(),
+              scopedApiUrl('/api/describe-image', reqUrl, serverId),
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   base64Images,
-                  prompt: `These images are chronological video frames at ${timestamps}. Describe the sequence as one timeline for semantic search. Identify people when visually supported; explain actions, interactions, state changes, results or winners, important objects, and all meaningful readable on-screen text/OCR. Distinguish what persists from what changes. Be factual and concise (maximum 6 sentences).`,
+                  prompt: `These are chronological frames from "${asset.fileName}" at ${timestamps}.
+Write one evidence note for this time range. Track people, actions, interactions, state changes,
+important objects, and exact meaningful on-screen text. Perform careful OCR, including Arabic and
+other right-to-left text without reversing labels. For scoreboards or result animations, compare
+frames in timestamp order and report the latest visible score as the current/final state; associate
+each number with the correct nearby team/person label. Record a winner or result only when visually
+supported. Omit boilerplate about facts that are not shown. Be factual, information-dense, and
+concise.`,
                 }),
               },
             );
             analyzed++;
             const progressStep = Math.max(1, Math.ceil(frameGroups.length / 100));
             if (analyzed % progressStep === 0 || analyzed === frameGroups.length) {
-              onProgress?.(
-                `Understanding visual sequence ${analyzed} of ${frameGroups.length}...`,
-                30 + Math.round((analyzed / Math.max(frameGroups.length, 1)) * 35),
-              );
+              void reportStage('vision', {
+                status: 'running',
+                current: analyzed,
+                total: frameGroups.length,
+                unit: 'sequences',
+                message: `Understanding visual sequence ${analyzed} of ${frameGroups.length}...`,
+              }).catch(() => {});
             }
             if (!descRes.ok) {
-              throw new Error(`Visual sequence analysis failed (${descRes.status}).`);
+              let detail = '';
+              try {
+                const errorBody = (await descRes.json()) as { error?: string };
+                detail = errorBody.error?.trim() || '';
+              } catch {
+                // Keep the status-only fallback for non-JSON failures.
+              }
+              throw new Error(
+                `Visual sequence analysis failed (${descRes.status})${
+                  detail ? `: ${detail}` : '.'
+                }`,
+              );
             }
             const { description } = (await descRes.json()) as { description?: string };
             return description
@@ -411,10 +682,17 @@ async function processMediaWithTool(
               : null;
           },
         );
+        await reportStage('vision', {
+          status: 'completed',
+          current: frameGroups.length,
+          total: frameGroups.length,
+          unit: 'sequences',
+          message: `Understood ${frameGroups.length} visual sequences with OCR.`,
+        });
+        return descriptions;
       })();
 
       const [transcript, sceneDescriptions] = await Promise.all([transcriptPromise, scenePromise]);
-      onProgress?.('Aligning speech, actions, OCR, and neighboring frames...', 68);
 
       const validScenes = sceneDescriptions.filter(
         (scene): scene is NonNullable<typeof scene> => scene !== null,
@@ -423,102 +701,254 @@ async function processMediaWithTool(
         transcript?.chunks ?? [],
         validScenes,
         result.meta.durationSecs,
-        60,
-      );
+        visualAnalysisWindow(result.meta.durationSecs),
+      ) as MediaEvidenceSegment[];
 
       if (segments.length === 0) {
         throw new Error('No searchable speech or visual evidence was produced from this video.');
       }
 
-      onProgress?.('Saving the searchable video timeline...', 75);
-      const document = await addDocument({
-        title: asset.fileName,
-        content: buildMediaTimeline('Video', asset.fileName, segments),
-        source: 'media',
-        url: localUrl,
-        metadata: {
-          mediaAssetId: asset.id,
-          mediaType: 'video',
-          fileName: asset.fileName,
-          mediaUrl: localUrl,
-          originalUrl: asset.originalUrl,
-          durationSecs: result.meta.durationSecs,
-          contentKind: 'multimodal-timeline',
-          segmentCount: segments.length,
-          transcriptSource: sourceTranscript ? 'source-captions' : 'speech-to-text',
-        },
+      await reportStage('synthesize', {
+        status: 'running',
+        percent: 0,
+        message: 'Creating human-style notes across the complete video...',
       });
-      documentIds.push(document.id);
+      let summary: string;
+      try {
+        summary = await createMediaKnowledgeSummary({
+          title: asset.fileName,
+          mediaType: 'video',
+          durationSecs: result.meta.durationSecs,
+          segments,
+          config: globalConfig,
+          onProgress: (completed, total, message) =>
+            reportStage('synthesize', {
+              status: 'running',
+              current: completed,
+              total,
+              unit: 'note passes',
+              message,
+            }),
+        });
+        await reportStage('synthesize', {
+          status: 'completed',
+          message: 'Connected the complete timeline into searchable notes.',
+        });
+      } catch (error) {
+        console.error('Video evidence synthesis failed; preserving timestamped evidence:', error);
+        summary = createFallbackMediaSummary(asset.fileName, 'video', segments);
+        await reportStage('synthesize', {
+          status: 'completed',
+          message: 'Saved timeline notes; the optional consolidation pass was unavailable.',
+        });
+      }
 
-      onProgress?.('Preparing the video for semantic search...', 85);
-      await ensureSearchable(onProgress, provider);
-      await updateMediaAsset(asset.id, {
+      const transcriptSource = transcript?.origin?.kind || 'provider-stt';
+      const documentInputs = buildMediaDocumentInputs({
+        assetId: asset.id,
+        title: asset.fileName,
+        mediaType: 'video',
+        localUrl,
+        originalUrl: asset.originalUrl,
+        durationSecs: result.meta.durationSecs,
+        summary,
+        segments,
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+        transcriptSource,
+        transcriptProvider: transcript?.origin?.provider || provider,
+        transcriptLanguage: transcript?.language,
+      }).map((input) => ({ ...input, id: randomUUID() }));
+      documentIds.push(...documentInputs.map((input) => input.id));
+      if (!(await updateMediaAsset(asset.id, { pendingDocumentIds: documentIds }))) {
+        throw new Error('Media asset was removed before its evidence could be published.');
+      }
+      const documents = await addDocuments(documentInputs);
+
+      await reportStage('index', {
+        status: 'running',
+        percent: 0,
+        message: `Indexing ${documents.length} media documents...`,
+      });
+      indexAttempted = true;
+      await ensureSearchable(
+        (current, total, message) =>
+          reportStage('index', {
+            status: 'running',
+            current,
+            total,
+            unit: 'chunks',
+            message,
+          }),
+        provider,
+      );
+      await reportStage('index', {
+        status: 'completed',
+        message: 'Video timeline and notes are searchable.',
+      });
+      const publishedAsset = await updateMediaAsset(asset.id, {
         processingStatus: 'completed',
-        caption: `Video: ${result.meta.durationSecs.toFixed(0)}s, ${
-          result.frames.length
-        } frames extracted`,
+        caption: summary.slice(0, 600),
         durationSecs: result.meta.durationSecs,
         dimensions: { width: result.meta.width, height: result.meta.height },
         documentIds,
+        pendingDocumentIds: [],
+        supersededDocumentIds: asset.documentIds,
         processingProgress: 100,
         processingMessage: undefined,
       });
+      if (!publishedAsset) {
+        throw new Error('Media asset was removed before indexing completed.');
+      }
       published = true;
-      await cleanupReplacedDocuments(asset.documentIds);
+      if (await cleanupDocumentRecords(asset.documentIds)) {
+        await updateMediaAsset(asset.id, { supersededDocumentIds: [] }).catch((error) =>
+          console.error('Failed to clear superseded video document IDs:', error),
+        );
+      }
       await trackMediaProcessing('video', result.meta.durationSecs, result.frames.length, provider);
     } else if (asset.type === 'audio' && tool.processAudio) {
-      onProgress?.(`Transcribing with ${formatProviderName(provider)}...`, 20);
-      const transcript = await tool.processAudio(tmpFile, { provider, apiKey, language });
+      await Promise.all([
+        reportStage('extract', { status: 'skipped', message: 'No video frames to extract.' }),
+        reportStage('vision', { status: 'skipped', message: 'Audio-only media.' }),
+      ]);
+      await reportStage('transcribe', {
+        status: 'running',
+        percent: 0,
+        message: `Transcribing with ${formatProviderName(provider)}...`,
+      });
+      const transcript = await tool.processAudio(tmpFile, {
+        provider,
+        apiKey,
+        language: effectiveLanguage,
+        context: asset.fileName,
+        onProgress: (current: number, total: number, message: string, unit?: string) =>
+          reportStage('transcribe', {
+            status: 'running',
+            current,
+            total,
+            unit: unit || 'audio parts',
+            message:
+              message || `Transcribing audio part ${Math.min(current, total)} of ${total}...`,
+          }),
+      });
+      await reportStage('transcribe', {
+        status: 'completed',
+        message: `Transcription complete with ${formatProviderName(provider)} (${
+          transcript.chunks.length
+        } timestamped sections).`,
+      });
       const segments = tool.buildMultimodalSegments(
         transcript.chunks,
         [],
         transcript.durationSecs,
         60,
-      );
-      onProgress?.('Linking neighboring transcript segments...', 70);
+      ) as MediaEvidenceSegment[];
       if (segments.length === 0) {
         throw new Error('The transcription completed without searchable speech.');
       }
 
-      onProgress?.('Saving the searchable audio transcript...', 80);
-      const document = await addDocument({
-        title: asset.fileName,
-        content: buildMediaTimeline('Audio', asset.fileName, segments),
-        source: 'media',
-        url: localUrl,
-        metadata: {
-          mediaAssetId: asset.id,
-          mediaType: 'audio',
-          fileName: asset.fileName,
-          mediaUrl: localUrl,
-          originalUrl: asset.originalUrl,
-          durationSecs: transcript.durationSecs,
-          contentKind: 'audio-transcript',
-          segmentCount: segments.length,
-        },
+      await reportStage('synthesize', {
+        status: 'running',
+        percent: 0,
+        message: 'Creating human-style notes across the complete recording...',
       });
-      documentIds.push(document.id);
+      let summary: string;
+      try {
+        summary = await createMediaKnowledgeSummary({
+          title: asset.fileName,
+          mediaType: 'audio',
+          durationSecs: transcript.durationSecs,
+          segments,
+          config: globalConfig,
+          onProgress: (completed, total, message) =>
+            reportStage('synthesize', {
+              status: 'running',
+              current: completed,
+              total,
+              unit: 'note passes',
+              message,
+            }),
+        });
+        await reportStage('synthesize', {
+          status: 'completed',
+          message: 'Connected the complete transcript into searchable notes.',
+        });
+      } catch (error) {
+        console.error('Audio evidence synthesis failed; preserving timestamped evidence:', error);
+        summary = createFallbackMediaSummary(asset.fileName, 'audio', segments);
+        await reportStage('synthesize', {
+          status: 'completed',
+          message: 'Saved timeline notes; the optional consolidation pass was unavailable.',
+        });
+      }
 
-      onProgress?.('Preparing the audio for semantic search...', 85);
-      await ensureSearchable(onProgress, provider);
-      await updateMediaAsset(asset.id, {
+      const documentInputs = buildMediaDocumentInputs({
+        assetId: asset.id,
+        title: asset.fileName,
+        mediaType: 'audio',
+        localUrl,
+        originalUrl: asset.originalUrl,
+        durationSecs: transcript.durationSecs,
+        summary,
+        segments,
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+        transcriptSource: transcript?.origin?.kind || 'provider-stt',
+        transcriptProvider: transcript?.origin?.provider || provider,
+        transcriptLanguage: transcript.language,
+      }).map((input) => ({ ...input, id: randomUUID() }));
+      documentIds.push(...documentInputs.map((input) => input.id));
+      if (!(await updateMediaAsset(asset.id, { pendingDocumentIds: documentIds }))) {
+        throw new Error('Media asset was removed before its evidence could be published.');
+      }
+      const documents = await addDocuments(documentInputs);
+
+      await reportStage('index', {
+        status: 'running',
+        percent: 0,
+        message: `Indexing ${documents.length} media documents...`,
+      });
+      indexAttempted = true;
+      await ensureSearchable(
+        (current, total, message) =>
+          reportStage('index', {
+            status: 'running',
+            current,
+            total,
+            unit: 'chunks',
+            message,
+          }),
+        provider,
+      );
+      await reportStage('index', {
+        status: 'completed',
+        message: 'Audio transcript and notes are searchable.',
+      });
+      const publishedAsset = await updateMediaAsset(asset.id, {
         processingStatus: 'completed',
-        caption: `Audio: ${transcript.durationSecs.toFixed(0)}s, ${
-          transcript.chunks.length
-        } segments`,
+        caption: summary.slice(0, 600),
         durationSecs: transcript.durationSecs,
         documentIds,
+        pendingDocumentIds: [],
+        supersededDocumentIds: asset.documentIds,
         processingProgress: 100,
         processingMessage: undefined,
       });
+      if (!publishedAsset) {
+        throw new Error('Media asset was removed before indexing completed.');
+      }
       published = true;
-      await cleanupReplacedDocuments(asset.documentIds);
+      if (await cleanupDocumentRecords(asset.documentIds)) {
+        await updateMediaAsset(asset.id, { supersededDocumentIds: [] }).catch((error) =>
+          console.error('Failed to clear superseded audio document IDs:', error),
+        );
+      }
       await trackMediaProcessing('audio', transcript.durationSecs, 0, provider);
     }
   } catch (error) {
     if (!published) {
-      await deleteIndexedDocuments(documentIds).catch(() => {});
-      await deleteDocuments(documentIds);
+      await rollbackPendingDocuments(asset.id, documentIds, indexAttempted);
     }
     throw error;
   } finally {
@@ -527,24 +957,16 @@ async function processMediaWithTool(
   }
 }
 
-function formatTime(secs: number): string {
-  const m = Math.floor(secs / 60);
-  const s = Math.floor(secs % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
+function visualAnalysisWindow(durationSecs: number): number {
+  if (durationSecs >= 4 * 60 * 60) return 15 * 60;
+  if (durationSecs > 60 * 60) return 5 * 60;
+  return 60;
 }
 
-function buildMediaTimeline(
-  mediaLabel: 'Video' | 'Audio',
-  fileName: string,
-  segments: Array<{ text: string; startSecs: number; endSecs: number }>,
-): string {
-  return [
-    `${mediaLabel}: ${fileName}`,
-    ...segments.map(
-      (segment) =>
-        `## ${formatTime(segment.startSecs)} – ${formatTime(segment.endSecs)}\n${segment.text}`,
-    ),
-  ].join('\n\n');
+function scopedApiUrl(pathname: string, requestUrl: string, serverId?: string): string {
+  const url = new URL(pathname, requestUrl);
+  if (serverId) url.searchParams.set('serverId', serverId);
+  return url.toString();
 }
 
 async function mapConcurrent<T, R>(
@@ -592,7 +1014,7 @@ function groupFramesByWindow<T extends { timestampSecs: number }>(
 let indexChain: Promise<void> = Promise.resolve();
 
 function ensureSearchable(
-  onProgress?: (msg: string, progress?: number) => void,
+  onProgress?: (current: number, total: number, message: string) => void | Promise<void>,
   transcriptionProvider?: string,
 ): Promise<void> {
   const run = indexChain.then(async () => {
@@ -601,12 +1023,15 @@ function ensureSearchable(
     const { isRunning, readRun } = await import('@larkup/core/index-store');
 
     while (await isRunning()) {
-      onProgress?.('Waiting for the active search-index job...', 88);
+      await onProgress?.(0, 0, 'Waiting for the active search-index job...');
       await new Promise((resolve) => setTimeout(resolve, 1_000));
     }
 
     const documents = await readDocuments();
-    if (!documents.some((document) => document.status !== 'indexed')) return;
+    if (!documents.some((document) => document.status !== 'indexed')) {
+      await onProgress?.(1, 1, 'Media is already searchable.');
+      return;
+    }
 
     const config = await readConfig();
     const previousRun = await readRun();
@@ -617,17 +1042,45 @@ function ensureSearchable(
       } catch (error) {
         if (!(error instanceof Error) || !error.message.includes('already in progress'))
           throw error;
-        onProgress?.('Waiting for the active search-index job...', 88);
+        await onProgress?.(0, 0, 'Waiting for the active search-index job...');
         await new Promise((resolve) => setTimeout(resolve, 1_000));
       }
     }
-    onProgress?.(
+    await onProgress?.(
+      0,
+      0,
       `Building the searchable index with ${
         config.embeddingModelId || config.embeddingProvider
       }...`,
-      90,
     );
-    await runIndexer(nextRun.id, config, previousRun?.status === 'completed' ? previousRun : null);
+    let indexingFinished = false;
+    const indexing = runIndexer(
+      nextRun.id,
+      config,
+      previousRun?.status === 'completed' ? previousRun : null,
+    ).finally(() => {
+      indexingFinished = true;
+    });
+    while (!indexingFinished) {
+      const activeRun = await readRun();
+      if (activeRun?.id === nextRun.id) {
+        const total = activeRun.totalChunks ?? 0;
+        const current = activeRun.processedChunks ?? 0;
+        const phase =
+          activeRun.status === 'chunking'
+            ? 'Preparing searchable chunks'
+            : activeRun.status === 'upserting'
+            ? 'Saving vectors'
+            : 'Embedding media evidence';
+        await onProgress?.(
+          current,
+          total,
+          total > 0 ? `${phase}: ${current} of ${total} chunks...` : `${phase}...`,
+        );
+      }
+      await Promise.race([indexing, new Promise<void>((resolve) => setTimeout(resolve, 750))]);
+    }
+    await indexing;
 
     const completedRun = await readRun();
     if (completedRun?.id !== nextRun.id || completedRun.status !== 'completed') {
@@ -637,7 +1090,11 @@ function ensureSearchable(
         transcriptionProvider,
       );
     }
-    onProgress?.('Media is searchable.', 99);
+    await onProgress?.(
+      completedRun.processedChunks,
+      completedRun.totalChunks,
+      `Media is searchable (${completedRun.processedChunks} chunks).`,
+    );
   });
 
   indexChain = run.catch(() => {});
@@ -674,13 +1131,54 @@ async function deleteIndexedDocuments(documentIds: string[]): Promise<void> {
   await adapter.deleteByDocumentIds(documentIds);
 }
 
-async function cleanupReplacedDocuments(documentIds: string[]): Promise<void> {
-  if (documentIds.length === 0) return;
+async function cleanupDocumentRecords(documentIds: string[]): Promise<boolean> {
+  if (documentIds.length === 0) return true;
   try {
     await deleteIndexedDocuments(documentIds);
     await deleteDocuments(documentIds);
+    return true;
   } catch (error) {
-    console.error('Failed to remove replaced media documents:', error);
+    console.error('Failed to remove tracked media documents:', error);
+    return false;
+  }
+}
+
+async function cleanupIncompleteMediaPublication(asset: MediaAsset): Promise<void> {
+  const trackedIds = [
+    ...new Set([...(asset.pendingDocumentIds ?? []), ...(asset.supersededDocumentIds ?? [])]),
+  ];
+  if (trackedIds.length === 0) return;
+  if (!(await cleanupDocumentRecords(trackedIds))) {
+    throw new Error(
+      'A previous media-index generation still needs cleanup. Restore the vector-store connection and retry.',
+    );
+  }
+  await updateMediaAsset(asset.id, {
+    pendingDocumentIds: [],
+    supersededDocumentIds: [],
+  });
+}
+
+async function rollbackPendingDocuments(
+  assetId: string,
+  documentIds: string[],
+  indexAttempted: boolean,
+): Promise<void> {
+  if (documentIds.length === 0) return;
+  if (!indexAttempted) {
+    await deleteDocuments(documentIds).catch((error) =>
+      console.error('Failed to remove unpublished media documents:', error),
+    );
+    await updateMediaAsset(assetId, { pendingDocumentIds: [] }).catch(() => {});
+    return;
+  }
+
+  if (await cleanupDocumentRecords(documentIds)) {
+    await updateMediaAsset(assetId, { pendingDocumentIds: [] }).catch(() => {});
+  } else {
+    // Keep the IDs durably attached to the asset. A retry or deletion can then
+    // remove partial vectors before publishing a new generation.
+    await updateMediaAsset(assetId, { pendingDocumentIds: documentIds }).catch(() => {});
   }
 }
 
