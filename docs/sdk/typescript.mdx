@@ -1,7 +1,7 @@
 ---
-title: "TypeScript"
-description: "How to install and use the Larkup TypeScript SDK."
-icon: "js"
+title: 'TypeScript'
+description: 'How to install and use the Larkup TypeScript SDK.'
+icon: 'js'
 ---
 
 ## Installation
@@ -29,13 +29,15 @@ pnpm add @larkup/sdk
 Import and initialize the client. It automatically picks up the `LARKUP_API_URL` and `LARKUP_API_KEY` from your environment.
 
 ```typescript
-import { LarkupClient } from "@larkup/sdk";
+import { LarkupClient } from '@larkup/sdk';
 
 const client = new LarkupClient({
-  baseUrl: "http://localhost:8080",
-  apiKey: "your-api-key",
+  baseUrl: process.env.LARKUP_API_URL,
+  apiKey: process.env.LARKUP_API_KEY,
 });
 ```
+
+The base URL defaults to `http://localhost:8080`. When constructor values are omitted, the client reads `LARKUP_API_URL` and `LARKUP_API_KEY`.
 
 ## Basic Usage
 
@@ -43,22 +45,122 @@ const client = new LarkupClient({
 
 ```typescript
 const response = await client.addDocument({
-  id: "doc-1",
-  text: "Larkup is a flexible, high-performance RAG pipeline.",
-  title: "Introduction",
+  id: 'doc-1',
+  text: 'Larkup is a flexible, high-performance RAG pipeline.',
+  title: 'Introduction',
 });
 
-console.log("Document added:", response.success);
+console.log('Document added:', response.success);
 ```
+
+`addDocument()` embeds and stores the document immediately. No second index call is required.
+
+### Bulk Indexing with Progress
+
+`indexDocuments()` accepts sequential and parallel scheduling. It yields a progress event after every server response and a final completion event.
+
+```typescript
+const documents = [
+  { title: 'Guide', text: 'Deployment guide content' },
+  { title: 'FAQ', text: 'Frequently asked questions' },
+];
+
+for await (const progress of client.indexDocuments(documents, {
+  mode: 'parallel',
+  concurrency: 4,
+  continueOnError: true,
+})) {
+  console.log(progress.percent, progress.succeeded, progress.failed);
+}
+```
+
+Use `mode: "sequential"` when request order matters or the embedding provider has a strict rate limit. Parallel mode only controls client request scheduling; the server's semantic, hybrid, vector-store, embedding, and chunking configuration remains authoritative.
 
 ### Querying
 
 ```typescript
-const results = await client.query("What is Larkup?", 5);
+const results = await client.query('What is Larkup?', 5);
 
 for (const hit of results.hits) {
   console.log(`Score: ${hit.score} | Text: ${hit.text}`);
 }
+```
+
+### Streaming Chat
+
+Use `chat()` when you want to render tokens as they arrive:
+
+```typescript
+for await (const event of client.chat({
+  messages: [{ role: 'user', content: 'Summarize the deployment guide.' }],
+  topK: 4,
+})) {
+  if (event.type === 'text-delta') {
+    process.stdout.write(event.text ?? '');
+  }
+}
+```
+
+Use `chatText()` when you only need the completed answer:
+
+```typescript
+const answer = await client.chatText('What does the API key protect?');
+```
+
+### Corpus Inspection and Export
+
+```typescript
+const summary = await client.corpusSummary();
+
+const corpus = await client.corpus({
+  filter: { titleContains: 'deployment' },
+  limit: 50,
+  includeContent: true,
+});
+
+const jsonl = await client.exportCorpus('jsonl');
+```
+
+### Marketplace Hub
+
+Tool discovery uses a separate Hub client because Marketplace installation is a local CLI/control-plane operation.
+
+```typescript
+import { LarkupHubClient } from '@larkup/sdk';
+
+const hub = new LarkupHubClient();
+const tools = await hub.listTools({ category: 'media', search: 'video' });
+const tool = await hub.getTool('video-audio');
+```
+
+Install a discovered tool on the Larkup host:
+
+```bash
+larkup marketplace install video-audio
+```
+
+## API Coverage
+
+| SDK method                              | RAG server operation                  |
+| --------------------------------------- | ------------------------------------- |
+| `health()`                              | `GET /health`                         |
+| `openApi()`                             | `GET /openapi.json`                   |
+| `query()`                               | `POST /query`                         |
+| `chat()` / `chatText()`                 | `POST /chat`                          |
+| `listDocuments()` / `getDocument()`     | `GET /documents`                      |
+| `addDocument()` / `indexDocuments()`    | `POST /documents`                     |
+| `updateDocument()` / `deleteDocument()` | `PUT` / `DELETE /documents/:id`       |
+| `scrape()`                              | `POST /scrape`                        |
+| `corpusSummary()` / `corpus()`          | `GET /corpus/summary`, `POST /corpus` |
+| `exportCorpus()`                        | `POST /corpus/export`                 |
+
+## Local Demo
+
+The repository includes a complete demo configured for `http://localhost:8091`:
+
+```bash
+pnpm --filter @larkup/sdk build
+pnpm --filter @larkup/sdk exec tsx examples/rag-server.ts
 ```
 
 ## Integrations
