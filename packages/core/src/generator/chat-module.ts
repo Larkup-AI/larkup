@@ -1,5 +1,17 @@
 import type { RagConfig } from '../types';
 
+export const AI_SDK_VERSION = '^6.0.197';
+
+export const AI_SDK_PROVIDER_VERSIONS: Record<string, string> = {
+  '@ai-sdk/cohere': '^3.0.39',
+  '@ai-sdk/deepseek': '^2.0.39',
+  '@ai-sdk/gateway': '^3.0.133',
+  '@ai-sdk/google': '^3.0.83',
+  '@ai-sdk/mistral': '^3.0.40',
+  '@ai-sdk/openai': '^3.0.68',
+  '@ai-sdk/openai-compatible': '^2.0.51',
+};
+
 function providerSource(provider: string, customBaseUrl = '') {
   switch (provider) {
     case 'google':
@@ -193,5 +205,6 @@ export function addChatProviderDependency(
     vercel_ai_gateway: '@ai-sdk/gateway',
     openai: '@ai-sdk/openai',
   };
-  dependencies[packageByProvider[provider || 'openai'] || '@ai-sdk/openai'] = 'latest';
+  const packageName = packageByProvider[provider || 'openai'] || '@ai-sdk/openai';
+  dependencies[packageName] = AI_SDK_PROVIDER_VERSIONS[packageName];
 }

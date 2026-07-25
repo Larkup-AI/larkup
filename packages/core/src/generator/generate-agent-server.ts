@@ -1,6 +1,7 @@
 import type { RagConfig } from '../types';
 import { getVectorStore } from '@larkup/vector-stores/registry';
 import { getEmbeddingModel } from '../embeddings/registry';
+import { AI_SDK_PROVIDER_VERSIONS, AI_SDK_VERSION } from './chat-module';
 
 export interface GeneratedFile {
   path: string;
@@ -866,33 +867,34 @@ export function generateAgentServer(config: RagConfig): GeneratedServer {
     config.vectorStore === 'lancedb' && (config.storeConfig.mode ?? 'local') === 'local';
 
   const dependencies: Record<string, string> = {
-    ai: '^6.0.197',
+    ai: AI_SDK_VERSION,
     zod: '^3.23.0',
     cheerio: '^1.0.0',
     cookie: '^0.6.0',
-    '@ai-sdk/openai': '^3.0.68',
+    '@ai-sdk/openai': AI_SDK_PROVIDER_VERSIONS['@ai-sdk/openai'],
     ...store.serverDependencies,
   };
 
   if (config.embeddingModelId.startsWith('custom:')) {
-    dependencies['@ai-sdk/openai-compatible'] = 'latest';
+    dependencies['@ai-sdk/openai-compatible'] =
+      AI_SDK_PROVIDER_VERSIONS['@ai-sdk/openai-compatible'];
   } else if (config.embeddingProvider === 'deepseek') {
-    dependencies['@ai-sdk/deepseek'] = 'latest';
+    dependencies['@ai-sdk/deepseek'] = AI_SDK_PROVIDER_VERSIONS['@ai-sdk/deepseek'];
   } else if (config.embeddingProvider === 'google') {
-    dependencies['@ai-sdk/google'] = 'latest';
+    dependencies['@ai-sdk/google'] = AI_SDK_PROVIDER_VERSIONS['@ai-sdk/google'];
   } else if (config.embeddingProvider === 'cohere') {
-    dependencies['@ai-sdk/cohere'] = 'latest';
+    dependencies['@ai-sdk/cohere'] = AI_SDK_PROVIDER_VERSIONS['@ai-sdk/cohere'];
   } else if (config.embeddingProvider === 'mistral') {
-    dependencies['@ai-sdk/mistral'] = 'latest';
+    dependencies['@ai-sdk/mistral'] = AI_SDK_PROVIDER_VERSIONS['@ai-sdk/mistral'];
   } else if (config.embeddingProvider === 'vercel_ai_gateway') {
-    dependencies['@ai-sdk/gateway'] = 'latest';
+    dependencies['@ai-sdk/gateway'] = AI_SDK_PROVIDER_VERSIONS['@ai-sdk/gateway'];
   } else if (config.embeddingProvider === 'jina') {
     // Actually, Jina uses openai compatible or an explicit jina one? There's no @ai-sdk/jina in the standard set, but let's assume openai or openai-compatible
     // Wait, the embedSource didn't have 'jina' branch. It falls back to `createOpenAI` in `embedSource`!
     // Let's just fallback to openai.
-    dependencies['@ai-sdk/openai'] = 'latest';
+    dependencies['@ai-sdk/openai'] = AI_SDK_PROVIDER_VERSIONS['@ai-sdk/openai'];
   } else {
-    dependencies['@ai-sdk/openai'] = 'latest';
+    dependencies['@ai-sdk/openai'] = AI_SDK_PROVIDER_VERSIONS['@ai-sdk/openai'];
   }
 
   const envVars: GeneratedServer['envVars'] = [
