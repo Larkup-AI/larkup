@@ -1,19 +1,29 @@
-import pytest
 import respx
+import pytest
+import pytest_asyncio
 from httpx import Response
-from larkup import LarkupClient, AsyncLarkupClient, Document, LarkupClientOptions
+from larkup import (
+    AsyncLarkupClient,
+    CorpusFilter,
+    CorpusRequest,
+    Document,
+    LarkupClient,
+    LarkupClientOptions,
+)
 
 BASE_URL = "http://localhost:8080"
 
 @pytest.fixture
 def sync_client():
     options = LarkupClientOptions(base_url=BASE_URL, api_key="test-key")
-    return LarkupClient(options)
+    with LarkupClient(options) as client:
+        yield client
 
-@pytest.fixture
-def async_client():
+@pytest_asyncio.fixture
+async def async_client():
     options = LarkupClientOptions(base_url=BASE_URL, api_key="test-key")
-    return AsyncLarkupClient(options)
+    async with AsyncLarkupClient(options) as client:
+        yield client
 
 @respx.mock
 def test_health_sync(sync_client):
@@ -109,3 +119,106 @@ async def test_chat_async(async_client):
     )
 
     assert await async_client.chat_text("hello") == "Async chat"
+
+
+@respx.mock
+def test_corpus_operations_sync(sync_client):
+    respx.get(f"{BASE_URL}/corpus/summary").mock(
+        return_value=Response(
+            200,
+            json={
+                "totalDocuments": 3,
+                "bySource": {"upload": 3},
+                "byStatus": {"indexed": 3},
+                "totalCharacters": 120,
+            },
+        )
+    )
+    corpus_route = respx.post(f"{BASE_URL}/corpus").mock(
+        return_value=Response(
+            200,
+            json={"documents": [], "total": 0, "page": 1, "limit": 10},
+        )
+    )
+    respx.post(f"{BASE_URL}/corpus/export").mock(
+        return_value=Response(200, text='{"id":"doc-1"}\n')
+    )
+
+    assert sync_client.corpus_summary().totalDocuments == 3
+    response = sync_client.corpus(
+        CorpusRequest(
+            filter=CorpusFilter(titleContains="guide"),
+            limit=10,
+            includeContent=True,
+        )
+    )
+    assert response.total == 0
+    assert b'"titleContains":"guide"' in corpus_route.calls[0].request.content
+    assert sync_client.export_corpus("jsonl") == '{"id":"doc-1"}\n'
+
+
+@respx.mock
+def test_index_documents_streams_progress(sync_client):
+    route = respx.post(f"{BASE_URL}/documents").mock(
+        side_effect=[
+            Response(200, json={"success": True, "id": "one"}),
+            Response(200, json={"success": True, "id": "two"}),
+        ]
+    )
+
+    events = list(
+        sync_client.index_documents(
+            [Document(text="one"), Document(text="two")],
+            mode="parallel",
+            concurrency=2,
+        )
+    )
+
+    assert route.call_count == 2
+    assert len(events) == 3
+    assert events[-1].type == "complete"
+    assert events[-1].succeeded == 2
+
+
+@respx.mock
+def test_index_documents_can_continue_after_error(sync_client):
+    respx.post(f"{BASE_URL}/documents").mock(
+        side_effect=[
+            Response(429, json={"error": "Rate limited"}),
+            Response(200, json={"success": True, "id": "two"}),
+        ]
+    )
+
+    events = list(
+        sync_client.index_documents(
+            [Document(text="one"), Document(text="two")],
+            mode="parallel",
+            concurrency=2,
+            continue_on_error=True,
+        )
+    )
+
+    assert events[-1].succeeded == 1
+    assert events[-1].failed == 1
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_index_documents_async(async_client):
+    respx.post(f"{BASE_URL}/documents").mock(
+        side_effect=[
+            Response(200, json={"success": True, "id": "one"}),
+            Response(200, json={"success": True, "id": "two"}),
+        ]
+    )
+    events = [
+        event
+        async for event in async_client.index_documents(
+            [Document(text="one"), Document(text="two")],
+            mode="parallel",
+            concurrency=2,
+        )
+    ]
+
+    assert events[-1].type == "complete"
+    assert events[-1].completed == 2

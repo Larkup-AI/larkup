@@ -53,8 +53,8 @@ export function seedRegistry(): void {
       description: 'Index video and audio files with transcription and frame analysis.',
       longDescription:
         'Process video and audio files for your knowledge base. ' +
-        'Extracts audio transcripts using AI speech-to-text, captures keyframes from video, ' +
-        'and generates scene descriptions using vision models. Supports YouTube URLs, ' +
+        'Creates multilingual transcripts, adaptive visual/OCR evidence, timestamped sections, ' +
+        'and whole-media notes. Supports YouTube URLs, ' +
         'direct file upload, and bulk processing. Requires ffmpeg on your system.',
       category: 'media',
       version: '0.1.0',
@@ -83,17 +83,15 @@ export function seedRegistry(): void {
           label: 'Frame extraction interval (seconds)',
           type: 'text',
           defaultValue: '10',
-          help: 'Fallback interval used when scene-change detection finds no frames.',
+          help: 'Baseline cadence for duration-aware coverage frames; scene changes and a reserved ending pass are added separately.',
         },
         {
           key: 'audioProvider',
           label: 'Audio Provider',
           type: 'select',
-          defaultValue: 'openai',
-          help: 'Provider to use for transcription. Leave empty to use Chat Provider if it supports audio.',
+          help: 'Choose the provider used only for audio and video transcription.',
           options: [
             { label: 'OpenAI', value: 'openai' },
-            { label: 'Google', value: 'google' },
             { label: 'Groq', value: 'groq' },
             { label: 'Deepgram', value: 'deepgram' },
             { label: 'ElevenLabs', value: 'elevenlabs' },
@@ -101,10 +99,17 @@ export function seedRegistry(): void {
           ],
         },
         {
+          key: 'audioLanguage',
+          label: 'Transcription language',
+          type: 'text',
+          defaultValue: 'auto',
+          help: 'Use auto to infer Arabic from the media title and use provider detection otherwise. Enter a language code such as ar, ar-EG, en, or de to override it.',
+        },
+        {
           key: 'audioApiKey',
           label: 'Audio API Key',
           type: 'password',
-          help: 'Optional if covered by your Chat API key. Required otherwise.',
+          help: 'Required for the selected audio provider and kept separate from the chat model key.',
         },
       ],
     },

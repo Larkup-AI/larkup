@@ -1,2 +1,3 @@
-export * from "./types";
-export { LarkupClient } from "./client";
+export * from './types';
+export { LarkupApiError, LarkupClient } from './client';
+export { LarkupHubClient } from './hub';

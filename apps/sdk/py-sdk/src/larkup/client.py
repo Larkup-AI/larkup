@@ -1,112 +1,229 @@
-import os
+import asyncio
 import json
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, AsyncIterator, Dict, Iterator, Literal, Optional, Sequence, Union
+from urllib.parse import quote
+
 import httpx
-from typing import AsyncIterator, Iterator, Optional, Union, Dict, Any
+
 from .types import (
     ChatEvent,
     ChatRequest,
+    CorpusRequest,
+    CorpusResponse,
+    CorpusSummary,
     Document,
+    HealthResponse,
+    IndexProgressEvent,
+    LarkupClientOptions,
     PaginatedDocuments,
     QueryRequest,
     QueryResponse,
     ScrapeResponse,
-    HealthResponse,
-    LarkupClientOptions,
 )
+
 
 class LarkupError(Exception):
     def __init__(self, message: str, status_code: Optional[int] = None):
         super().__init__(message)
         self.status_code = status_code
 
+
+def _handle_error(response: httpx.Response) -> None:
+    if response.is_success:
+        return
+    message = response.reason_phrase
+    try:
+        body = response.json()
+        if isinstance(body, dict):
+            message = body.get("error") or message
+    except Exception:
+        pass
+    raise LarkupError(
+        f"Larkup API Error ({response.status_code}): {message}",
+        response.status_code,
+    )
+
+
+def _progress(
+    *,
+    completed: int,
+    total: int,
+    succeeded: int,
+    failed: int,
+    document: Optional[Document] = None,
+    result: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+) -> IndexProgressEvent:
+    return IndexProgressEvent(
+        type="progress",
+        completed=completed,
+        total=total,
+        succeeded=succeeded,
+        failed=failed,
+        percent=100 if total == 0 else round(completed / total * 100),
+        document=document,
+        id=result.get("id") if result else None,
+        error=error,
+    )
+
+
 class LarkupClient:
-    """Synchronous client for Larkup API."""
-    
+    """Synchronous client for a deployed Larkup RAG server."""
+
     def __init__(self, options: Optional[LarkupClientOptions] = None):
         options = options or LarkupClientOptions()
-        
         base_url = options.base_url or os.getenv("LARKUP_API_URL", "http://localhost:8080")
         self.base_url = base_url.rstrip("/")
         self.api_key = options.api_key or os.getenv("LARKUP_API_KEY")
         self._client = httpx.Client(base_url=self.base_url)
 
-    def _get_headers(self) -> Dict[str, str]:
-        headers = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        return headers
+    def _headers(self) -> Dict[str, str]:
+        return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
 
-    def _handle_error(self, response: httpx.Response):
-        if not response.is_success:
-            error_msg = response.reason_phrase
-            try:
-                err_body = response.json()
-                if isinstance(err_body, dict) and "error" in err_body:
-                    error_msg = err_body["error"]
-            except Exception:
-                pass
-            raise LarkupError(f"Larkup API Error ({response.status_code}): {error_msg}", response.status_code)
-
-    def _request(self, method: str, path: str, **kwargs) -> Any:
-        headers = self._get_headers()
-        if "headers" in kwargs:
-            headers.update(kwargs.pop("headers"))
-            
+    def _response(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        headers = self._headers()
+        headers.update(kwargs.pop("headers", {}))
         response = self._client.request(method, path, headers=headers, **kwargs)
-        self._handle_error(response)
-        return response.json()
+        _handle_error(response)
+        return response
+
+    def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+        return self._response(method, path, **kwargs).json()
 
     def health(self) -> HealthResponse:
-        """Health check"""
-        data = self._request("GET", "/health")
-        return HealthResponse(**data)
+        """Return server health and service name."""
+        return HealthResponse(**self._request("GET", "/health"))
 
-    def query(self, request: Union[QueryRequest, str], top_k: Optional[int] = None) -> QueryResponse:
-        """Query the RAG knowledge base"""
-        if isinstance(request, str):
-            request_data = QueryRequest(query=request, topK=top_k)
-        else:
-            request_data = request
-            
-        data = self._request("POST", "/query", json=request_data.model_dump(exclude_none=True))
+    def open_api(self) -> Dict[str, Any]:
+        """Return the generated OpenAPI schema."""
+        return self._request("GET", "/openapi.json")
+
+    def query(
+        self,
+        request: Union[QueryRequest, str],
+        top_k: Optional[int] = None,
+    ) -> QueryResponse:
+        """Run semantic retrieval against the configured index."""
+        payload = (
+            QueryRequest(query=request, topK=top_k)
+            if isinstance(request, str)
+            else request
+        )
+        data = self._request(
+            "POST",
+            "/query",
+            json=payload.model_dump(exclude_none=True),
+        )
         return QueryResponse(**data)
 
     def list_documents(self, page: int = 1, limit: int = 20) -> PaginatedDocuments:
-        """List documents with pagination"""
+        """List indexed document chunks with pagination."""
         data = self._request("GET", "/documents", params={"page": page, "limit": limit})
         return PaginatedDocuments(**data)
 
     def get_document(self, id: str) -> Document:
-        """Get a specific document by ID"""
-        data = self._request("GET", f"/documents/{id}")
-        return Document(**data)
+        """Return one indexed document chunk."""
+        return Document(**self._request("GET", f"/documents/{quote(id, safe='')}"))
 
     def add_document(self, document: Document) -> Dict[str, Any]:
-        """Add a new document to the vector store"""
-        # We allow 'id' in Document to be optionally ignored by the server, 
-        # but to mirror JS we just send it as dict.
-        payload = document.model_dump(exclude_none=True)
-        if "id" in payload and not payload["id"]:
-            del payload["id"]
-            
-        data = self._request("POST", "/documents", json=payload)
+        """Embed and store one document."""
+        data = self._request(
+            "POST",
+            "/documents",
+            json=document.model_dump(exclude_none=True),
+        )
         return data
 
     def update_document(self, id: str, document: Document) -> Dict[str, Any]:
-        """Update an existing document"""
-        payload = document.model_dump(exclude_none=True)
-        data = self._request("PUT", f"/documents/{id}", json=payload)
+        """Re-embed and replace one document."""
+        data = self._request(
+            "PUT",
+            f"/documents/{quote(id, safe='')}",
+            json=document.model_dump(exclude_none=True, exclude={"id"}),
+        )
         return data
 
     def delete_document(self, id: str) -> Dict[str, Any]:
-        """Delete a document"""
-        data = self._request("DELETE", f"/documents/{id}")
-        return data
+        """Remove one document from the index."""
+        return self._request("DELETE", f"/documents/{quote(id, safe='')}")
 
     def scrape(self, url: str) -> ScrapeResponse:
-        """Scrape a URL and add it to the corpus"""
-        data = self._request("POST", "/scrape", json={"url": url})
-        return ScrapeResponse(**data)
+        """Scrape a URL and index its text chunks."""
+        return ScrapeResponse(**self._request("POST", "/scrape", json={"url": url}))
+
+    def corpus_summary(self) -> CorpusSummary:
+        """Return aggregate corpus statistics."""
+        return CorpusSummary(**self._request("GET", "/corpus/summary"))
+
+    def corpus(self, request: Optional[CorpusRequest] = None) -> CorpusResponse:
+        """Return a filtered window of the indexed corpus."""
+        payload = (request or CorpusRequest()).model_dump(exclude_none=True)
+        return CorpusResponse(**self._request("POST", "/corpus", json=payload))
+
+    def export_corpus(self, format: Literal["csv", "jsonl"] = "csv") -> str:
+        """Export the indexed corpus as CSV or JSONL text."""
+        return self._response(
+            "POST",
+            "/corpus/export",
+            json={"format": format},
+        ).text
+
+    def index_documents(
+        self,
+        documents: Sequence[Document],
+        *,
+        mode: Literal["sequential", "parallel"] = "sequential",
+        concurrency: int = 4,
+        continue_on_error: bool = False,
+    ) -> Iterator[IndexProgressEvent]:
+        """Stream progress while documents are embedded and stored."""
+        total = len(documents)
+        completed = succeeded = failed = 0
+
+        if mode not in ("sequential", "parallel"):
+            raise ValueError("mode must be 'sequential' or 'parallel'")
+
+        workers = 1 if mode == "sequential" else max(1, min(concurrency, max(total, 1)))
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(self.add_document, document): document
+                for document in documents
+            }
+            for future in as_completed(futures):
+                document = futures[future]
+                completed += 1
+                result = None
+                error = None
+                try:
+                    result = future.result()
+                    succeeded += 1
+                except Exception as exc:
+                    failed += 1
+                    error = str(exc)
+
+                yield _progress(
+                    completed=completed,
+                    total=total,
+                    succeeded=succeeded,
+                    failed=failed,
+                    document=document,
+                    result=result,
+                    error=error,
+                )
+
+                if error and not continue_on_error:
+                    raise LarkupError(error)
+
+        yield IndexProgressEvent(
+            type="complete",
+            completed=completed,
+            total=total,
+            succeeded=succeeded,
+            failed=failed,
+            percent=100,
+        )
 
     def chat(self, request: Union[ChatRequest, str]) -> Iterator[ChatEvent]:
         """Stream a retrieval-grounded chat response."""
@@ -118,21 +235,20 @@ class LarkupClient:
         with self._client.stream(
             "POST",
             "/chat",
-            headers=self._get_headers(),
+            headers=self._headers(),
             json=payload,
         ) as response:
             if not response.is_success:
                 response.read()
-            self._handle_error(response)
+            _handle_error(response)
             for line in response.iter_lines():
-                if not line.startswith("data:"):
-                    continue
-                data = line[5:].strip()
-                if data:
-                    yield ChatEvent(**json.loads(data))
+                if line.startswith("data:"):
+                    data = line[5:].strip()
+                    if data:
+                        yield ChatEvent(**json.loads(data))
 
     def chat_text(self, request: Union[ChatRequest, str]) -> str:
-        """Collect a streamed chat response into a string."""
+        """Collect a streamed chat response into one string."""
         output = ""
         for event in self.chat(request):
             if event.type == "error":
@@ -140,8 +256,8 @@ class LarkupClient:
             output += event.text or ""
         return output
 
-    def close(self):
-        """Close the underlying HTTP client"""
+    def close(self) -> None:
+        """Close the underlying HTTP client."""
         self._client.close()
 
     def __enter__(self):
@@ -152,91 +268,178 @@ class LarkupClient:
 
 
 class AsyncLarkupClient:
-    """Asynchronous client for Larkup API."""
-    
+    """Asynchronous client for a deployed Larkup RAG server."""
+
     def __init__(self, options: Optional[LarkupClientOptions] = None):
         options = options or LarkupClientOptions()
-        
         base_url = options.base_url or os.getenv("LARKUP_API_URL", "http://localhost:8080")
         self.base_url = base_url.rstrip("/")
         self.api_key = options.api_key or os.getenv("LARKUP_API_KEY")
         self._client = httpx.AsyncClient(base_url=self.base_url)
 
-    def _get_headers(self) -> Dict[str, str]:
-        headers = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        return headers
+    def _headers(self) -> Dict[str, str]:
+        return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
 
-    def _handle_error(self, response: httpx.Response):
-        if not response.is_success:
-            error_msg = response.reason_phrase
-            try:
-                err_body = response.json()
-                if isinstance(err_body, dict) and "error" in err_body:
-                    error_msg = err_body["error"]
-            except Exception:
-                pass
-            raise LarkupError(f"Larkup API Error ({response.status_code}): {error_msg}", response.status_code)
-
-    async def _request(self, method: str, path: str, **kwargs) -> Any:
-        headers = self._get_headers()
-        if "headers" in kwargs:
-            headers.update(kwargs.pop("headers"))
-            
+    async def _response(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        headers = self._headers()
+        headers.update(kwargs.pop("headers", {}))
         response = await self._client.request(method, path, headers=headers, **kwargs)
-        self._handle_error(response)
-        return response.json()
+        _handle_error(response)
+        return response
+
+    async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+        return (await self._response(method, path, **kwargs)).json()
 
     async def health(self) -> HealthResponse:
-        """Health check"""
-        data = await self._request("GET", "/health")
-        return HealthResponse(**data)
+        """Return server health and service name."""
+        return HealthResponse(**await self._request("GET", "/health"))
 
-    async def query(self, request: Union[QueryRequest, str], top_k: Optional[int] = None) -> QueryResponse:
-        """Query the RAG knowledge base"""
-        if isinstance(request, str):
-            request_data = QueryRequest(query=request, topK=top_k)
-        else:
-            request_data = request
-            
-        data = await self._request("POST", "/query", json=request_data.model_dump(exclude_none=True))
+    async def open_api(self) -> Dict[str, Any]:
+        """Return the generated OpenAPI schema."""
+        return await self._request("GET", "/openapi.json")
+
+    async def query(
+        self,
+        request: Union[QueryRequest, str],
+        top_k: Optional[int] = None,
+    ) -> QueryResponse:
+        """Run semantic retrieval against the configured index."""
+        payload = (
+            QueryRequest(query=request, topK=top_k)
+            if isinstance(request, str)
+            else request
+        )
+        data = await self._request(
+            "POST",
+            "/query",
+            json=payload.model_dump(exclude_none=True),
+        )
         return QueryResponse(**data)
 
     async def list_documents(self, page: int = 1, limit: int = 20) -> PaginatedDocuments:
-        """List documents with pagination"""
-        data = await self._request("GET", "/documents", params={"page": page, "limit": limit})
+        """List indexed document chunks with pagination."""
+        data = await self._request(
+            "GET",
+            "/documents",
+            params={"page": page, "limit": limit},
+        )
         return PaginatedDocuments(**data)
 
     async def get_document(self, id: str) -> Document:
-        """Get a specific document by ID"""
-        data = await self._request("GET", f"/documents/{id}")
-        return Document(**data)
+        """Return one indexed document chunk."""
+        return Document(
+            **await self._request("GET", f"/documents/{quote(id, safe='')}")
+        )
 
     async def add_document(self, document: Document) -> Dict[str, Any]:
-        """Add a new document to the vector store"""
-        payload = document.model_dump(exclude_none=True)
-        if "id" in payload and not payload["id"]:
-            del payload["id"]
-            
-        data = await self._request("POST", "/documents", json=payload)
+        """Embed and store one document."""
+        data = await self._request(
+            "POST",
+            "/documents",
+            json=document.model_dump(exclude_none=True),
+        )
         return data
 
     async def update_document(self, id: str, document: Document) -> Dict[str, Any]:
-        """Update an existing document"""
-        payload = document.model_dump(exclude_none=True)
-        data = await self._request("PUT", f"/documents/{id}", json=payload)
+        """Re-embed and replace one document."""
+        data = await self._request(
+            "PUT",
+            f"/documents/{quote(id, safe='')}",
+            json=document.model_dump(exclude_none=True, exclude={"id"}),
+        )
         return data
 
     async def delete_document(self, id: str) -> Dict[str, Any]:
-        """Delete a document"""
-        data = await self._request("DELETE", f"/documents/{id}")
+        """Remove one document from the index."""
+        data = await self._request("DELETE", f"/documents/{quote(id, safe='')}")
         return data
 
     async def scrape(self, url: str) -> ScrapeResponse:
-        """Scrape a URL and add it to the corpus"""
-        data = await self._request("POST", "/scrape", json={"url": url})
-        return ScrapeResponse(**data)
+        """Scrape a URL and index its text chunks."""
+        return ScrapeResponse(
+            **await self._request("POST", "/scrape", json={"url": url})
+        )
+
+    async def corpus_summary(self) -> CorpusSummary:
+        """Return aggregate corpus statistics."""
+        return CorpusSummary(**await self._request("GET", "/corpus/summary"))
+
+    async def corpus(self, request: Optional[CorpusRequest] = None) -> CorpusResponse:
+        """Return a filtered window of the indexed corpus."""
+        payload = (request or CorpusRequest()).model_dump(exclude_none=True)
+        return CorpusResponse(**await self._request("POST", "/corpus", json=payload))
+
+    async def export_corpus(self, format: Literal["csv", "jsonl"] = "csv") -> str:
+        """Export the indexed corpus as CSV or JSONL text."""
+        response = await self._response(
+            "POST",
+            "/corpus/export",
+            json={"format": format},
+        )
+        return response.text
+
+    async def index_documents(
+        self,
+        documents: Sequence[Document],
+        *,
+        mode: Literal["sequential", "parallel"] = "sequential",
+        concurrency: int = 4,
+        continue_on_error: bool = False,
+    ) -> AsyncIterator[IndexProgressEvent]:
+        """Stream progress while documents are embedded and stored."""
+        if mode not in ("sequential", "parallel"):
+            raise ValueError("mode must be 'sequential' or 'parallel'")
+
+        total = len(documents)
+        limit = 1 if mode == "sequential" else max(1, min(concurrency, max(total, 1)))
+        pending: Dict[asyncio.Task[Dict[str, Any]], Document] = {}
+        cursor = completed = succeeded = failed = 0
+
+        while cursor < total or pending:
+            while cursor < total and len(pending) < limit:
+                document = documents[cursor]
+                pending[asyncio.create_task(self.add_document(document))] = document
+                cursor += 1
+
+            done, _ = await asyncio.wait(
+                pending,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in done:
+                document = pending.pop(task)
+                completed += 1
+                result = None
+                error = None
+                try:
+                    result = task.result()
+                    succeeded += 1
+                except Exception as exc:
+                    failed += 1
+                    error = str(exc)
+
+                yield _progress(
+                    completed=completed,
+                    total=total,
+                    succeeded=succeeded,
+                    failed=failed,
+                    document=document,
+                    result=result,
+                    error=error,
+                )
+
+                if error and not continue_on_error:
+                    for queued in pending:
+                        queued.cancel()
+                    raise LarkupError(error)
+
+        yield IndexProgressEvent(
+            type="complete",
+            completed=completed,
+            total=total,
+            succeeded=succeeded,
+            failed=failed,
+            percent=100,
+        )
 
     async def chat(self, request: Union[ChatRequest, str]) -> AsyncIterator[ChatEvent]:
         """Stream a retrieval-grounded chat response."""
@@ -248,21 +451,20 @@ class AsyncLarkupClient:
         async with self._client.stream(
             "POST",
             "/chat",
-            headers=self._get_headers(),
+            headers=self._headers(),
             json=payload,
         ) as response:
             if not response.is_success:
                 await response.aread()
-            self._handle_error(response)
+            _handle_error(response)
             async for line in response.aiter_lines():
-                if not line.startswith("data:"):
-                    continue
-                data = line[5:].strip()
-                if data:
-                    yield ChatEvent(**json.loads(data))
+                if line.startswith("data:"):
+                    data = line[5:].strip()
+                    if data:
+                        yield ChatEvent(**json.loads(data))
 
     async def chat_text(self, request: Union[ChatRequest, str]) -> str:
-        """Collect a streamed chat response into a string."""
+        """Collect a streamed chat response into one string."""
         output = ""
         async for event in self.chat(request):
             if event.type == "error":
@@ -270,8 +472,8 @@ class AsyncLarkupClient:
             output += event.text or ""
         return output
 
-    async def close(self):
-        """Close the underlying HTTP client"""
+    async def close(self) -> None:
+        """Close the underlying HTTP client."""
         await self._client.aclose()
 
     async def __aenter__(self):
