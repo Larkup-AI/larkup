@@ -1,4 +1,40 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+interface LocalServerState {
+  running: boolean;
+  port: number;
+}
+
+async function readLocalServerState(page: Page): Promise<LocalServerState> {
+  const response = await page.request.get('/api/server/local');
+  expect(response.ok()).toBe(true);
+  const body = (await response.json()) as { state: LocalServerState };
+  return body.state;
+}
+
+async function ensureLocalServerState(page: Page, shouldRun: boolean): Promise<LocalServerState> {
+  const buttonName = shouldRun ? 'Launch server' : 'Stop server';
+  const deadline = Date.now() + 60_000;
+
+  while (Date.now() < deadline) {
+    const state = await readLocalServerState(page);
+    if (state.running === shouldRun) return state;
+
+    const control = page.getByRole('button', { name: buttonName, exact: true });
+    if (
+      (await control.isVisible({ timeout: 1_000 }).catch(() => false)) &&
+      (await control.isEnabled())
+    ) {
+      // Status hydration can replace the control between discovery and click.
+      // A short retry loop follows the API state instead of holding a stale node.
+      await control.click({ timeout: 3_000 }).catch(() => undefined);
+    }
+
+    await page.waitForTimeout(500);
+  }
+
+  throw new Error(`Local server did not become ${shouldRun ? 'running' : 'stopped'} within 60s`);
+}
 
 test.describe.serial('Server Page', () => {
   test.beforeEach(async ({ page }) => {
@@ -19,11 +55,15 @@ test.describe.serial('Server Page', () => {
 
   test('cloud deployments link directly to their API reference', async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
+      const res = await fetch('/api/servers');
+      const data = await res.json();
+      const serverId = data.activeServerId || 'default';
+
       localStorage.setItem('rag_server_api_key', 'sk-cloud-api-key-test');
-      localStorage.setItem('larkup_api_key_version_default', '1');
+      localStorage.setItem(`larkup_api_key_version_${serverId}`, '1');
       localStorage.setItem(
-        'larkup_deployments_default',
+        `larkup_deployments_${serverId}`,
         JSON.stringify([
           {
             id: 'vercel:api-reference-test',
@@ -62,9 +102,12 @@ test.describe.serial('Server Page', () => {
     await expect(page.getByRole('button', { name: 'Update & deploy to Vercel' })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
 
-    await page.evaluate(() => {
-      localStorage.removeItem('larkup_deployments_default');
-      localStorage.removeItem('larkup_api_key_version_default');
+    await page.evaluate(async () => {
+      const res = await fetch('/api/servers');
+      const data = await res.json();
+      const serverId = data.activeServerId || 'default';
+      localStorage.removeItem(`larkup_deployments_${serverId}`);
+      localStorage.removeItem(`larkup_api_key_version_${serverId}`);
       localStorage.removeItem('rag_server_api_key');
     });
   });
@@ -83,97 +126,58 @@ test.describe.serial('Server Page', () => {
     await page.getByText('Vercel', { exact: true }).first().click();
 
     await expect(page.getByRole('heading', { name: 'Deploy to Vercel' })).toBeVisible();
-    await expect(page.getByText('Environment', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Configure/ })).toBeVisible();
+    await page.getByRole('tab', { name: 'General' }).click();
+    await expect(page.getByText('Environment Variables')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Deploy' }).last()).toBeVisible();
   });
 
   test('launch RAG server', async ({ page }) => {
     test.setTimeout(120_000);
 
-    // Find and click the launch button
-    const launchBtn = page.getByRole('button', { name: /Launch server|Start/i }).first();
+    const state = await ensureLocalServerState(page, true);
+    const runningIndicator = page.getByText(`running on :${state.port}`, { exact: true });
 
-    try {
-      await expect(launchBtn).toBeVisible({ timeout: 60_000 });
-      await launchBtn.click();
-      await page.waitForTimeout(5_000);
-
-      // Wait for server to start — look for running indicator
-      const runningIndicator = page.getByText(/running on :/i).first();
-      await expect(runningIndicator).toBeVisible({ timeout: 60_000 });
-
-      console.log('  ✓ RAG server launched successfully');
-
-      // Verify the endpoint URL is shown
-      const endpointLink = page.getByRole('link', { name: /http:\/\/localhost:\d+/ }).first();
-      if (await endpointLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        const endpointUrl = await endpointLink.textContent();
-        console.log(`  ✓ Endpoint URL visible: ${endpointUrl}`);
-      }
-
-      // Verify API reference link
-      const apiRefLink = page.getByText('Open API Reference').first();
-      if (await apiRefLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        console.log('  ✓ API Reference link visible');
-      }
-
-      // Verify the curl command is shown
-      const curlCmd = page.getByText('curl').first();
-      if (await curlCmd.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        console.log('  ✓ Example curl command visible');
-      }
-    } catch {
-      console.warn('  ⚠ Launch button not found');
-    }
+    await expect(runningIndicator).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Connect to Server SDK' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Try it (cURL)' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'API reference', exact: true })).toHaveAttribute(
+      'href',
+      `http://localhost:${state.port}/reference`,
+    );
   });
 
   test('stop RAG server', async ({ page }) => {
-    test.setTimeout(30_000);
+    test.setTimeout(90_000);
 
-    const stopBtn = page.getByRole('button', { name: /Stop server|Stop/i }).first();
-
-    if (await stopBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await stopBtn.click();
-      await page.waitForTimeout(3_000);
-
-      // Verify it stopped
-      const launchBtn = page.getByRole('button', { name: /Launch server|Start/i }).first();
-      await expect(launchBtn).toBeVisible({ timeout: 60_000 });
-      console.log('  ✓ RAG server stopped');
-    } else {
-      console.log('  ℹ Server not running — skipping stop test');
-    }
+    await ensureLocalServerState(page, false);
+    await expect(page.getByRole('button', { name: 'Launch server', exact: true })).toBeVisible();
+    await expect(page.getByText('stopped', { exact: true })).toBeVisible();
   });
 
   test('JS SDK connection test (via curl)', async ({ page }) => {
     test.setTimeout(60_000);
 
-    // Re-launch if not running
-    const launchBtn = page.getByRole('button', { name: /Launch server|Start/i }).first();
-    if (await launchBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await launchBtn.click();
-      await page.waitForTimeout(10_000);
+    const state = await ensureLocalServerState(page, true);
+    await expect(page.getByText(`running on :${state.port}`, { exact: true })).toBeVisible();
+
+    const fetchUrl = `http://127.0.0.1:${state.port}`;
+    let healthOk = false;
+    for (let i = 0; i < 5; i++) {
+      try {
+        const response = await fetch(`${fetchUrl}/health`);
+        const data = await response.json();
+        healthOk = data.ok === true || response.ok;
+      } catch (error) {
+        console.error(
+          `Fetch error (attempt ${i + 1}):`,
+          error instanceof Error ? error.message : error,
+        );
+      }
+
+      if (healthOk) break;
+      await page.waitForTimeout(2_000);
     }
 
-    // Verify server is reachable via direct fetch
-    const runningIndicator = page.getByText(/running on :/i).first();
-    if (await runningIndicator.isVisible({ timeout: 30_000 }).catch(() => false)) {
-      const endpointLink = page.getByRole('link', { name: /http:\/\/localhost:\d+/ }).first();
-      const endpoint = await endpointLink.textContent();
-
-      // Test the RAG server directly via Node.js fetch (simulating SDK/curl)
-      const healthOk = await (async (url) => {
-        try {
-          const res = await fetch(`${url}/health`);
-          const data = await res.json();
-          return data.ok === true || res.ok;
-        } catch (e) {
-          console.error('Fetch error:', e);
-          return false;
-        }
-      })(endpoint?.trim() || '');
-      expect(healthOk).toBe(true);
-      console.log(`  ✓ RAG server health check passed via browser against ${endpoint}`);
-    }
+    expect(healthOk).toBe(true);
   });
 });

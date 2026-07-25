@@ -3,64 +3,60 @@ import { test, expect } from '@playwright/test';
 test.describe('Settings Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/settings');
-    await page.waitForSelector('text=Settings', { timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'General', exact: true })).toBeVisible({
+      timeout: 60_000,
+    });
   });
 
   test('settings page loads with correct heading', async ({ page }) => {
-    await expect(page.getByText('Settings').first()).toBeVisible();
+    await expect(page).toHaveURL(/\/settings/);
+    await expect(page.getByText('Workspace and integration settings.')).toBeVisible();
   });
 
   test('server section is accessible', async ({ page }) => {
-    const serverLink = page.getByText('Server', { exact: true }).first();
-    if (await serverLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await serverLink.click();
-      await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Larkup Server', exact: true }).click();
 
-      await expect(page.getByText('Launch, manage, and connect').first()).toBeVisible({
-        timeout: 10_000,
-      });
-      console.log('  ✓ Server section loaded');
-    }
+    await expect(page.getByRole('heading', { name: 'Server', exact: true })).toBeVisible();
+    await expect(
+      page.getByText('Test locally, then deploy one retrieval and chat server anywhere.'),
+    ).toBeVisible();
   });
 
   test('marketplace section is accessible', async ({ page }) => {
-    const marketplaceLink = page.getByText('Marketplace', { exact: true }).first();
-    if (await marketplaceLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await marketplaceLink.click();
-      await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
 
-      await expect(page.getByText('Extend Larkup with optional tools').first()).toBeVisible({
-        timeout: 10_000,
-      });
-      console.log('  ✓ Marketplace section loaded');
-    }
+    await expect(page.getByRole('heading', { name: 'Marketplace', exact: true })).toBeVisible();
+    await expect(page.getByText('Extend Larkup with optional tools').first()).toBeVisible();
   });
 
   test('connections section is accessible', async ({ page }) => {
-    const connectionsLink = page.getByText('Connections', { exact: true }).first();
-    if (await connectionsLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await connectionsLink.click();
-      await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Connections', exact: true }).click();
 
-      // Just verify the section loaded without errors
-      console.log('  ✓ Connections section loaded');
-    }
+    await expect(page.getByRole('heading', { name: 'Connections', exact: true })).toBeVisible();
   });
 
-  test('analytics section is accessible', async ({ page }) => {
-    const analyticsLink = page.getByText('Analytics', { exact: true }).first();
-    if (await analyticsLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await analyticsLink.click();
-      await page.waitForTimeout(500);
+  test('all settings navigation sections render their content', async ({ page }) => {
+    const sections = [
+      ['AI Models', 'AI Models'],
+      ['Storage', 'Storage'],
+      ['Agent Customization', 'Agent Customization'],
+      ['Playground', 'Playground'],
+      ['Appearance', 'Appearance'],
+    ] as const;
 
-      console.log('  ✓ Analytics section loaded');
+    for (const [navigationName, headingName] of sections) {
+      await page.getByRole('button', { name: navigationName, exact: true }).click();
+      await expect(page.getByRole('heading', { name: headingName, exact: true })).toBeVisible();
     }
   });
 
   test('search provider verification', async ({ page }) => {
-    // Intercept the /api/search/verify endpoint to return success
+    const verificationRequests: Array<{ provider?: string; apiKey?: string }> = [];
+
     await page.route('/api/search/verify', async (route) => {
-      const body = JSON.parse(route.request().postData() || '{}');
+      const body = route.request().postDataJSON() as { provider?: string; apiKey?: string };
+      verificationRequests.push(body);
+
       if (body.provider && body.apiKey) {
         await route.fulfill({
           status: 200,
@@ -76,51 +72,54 @@ test.describe('Settings Page', () => {
       }
     });
 
-    const generalLink = page.getByText('General', { exact: true }).first();
-    if (await generalLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await generalLink.click();
-      await page.waitForTimeout(500);
+    const webSearchCard = page.locator('[data-slot="card"]', { hasText: 'Web Search' }).first();
+    const providerSelect = webSearchCard.getByRole('combobox');
+    const providers = [
+      {
+        option: 'Serper',
+        provider: 'serper',
+        placeholder: 'Your Serper API Key',
+        apiKey: 'dummy-serper-key',
+      },
+      {
+        option: 'Tavily',
+        provider: 'tavily',
+        placeholder: 'Your Tavily API Key',
+        apiKey: 'dummy-tavily-key',
+      },
+      {
+        option: 'Brave',
+        provider: 'brave',
+        placeholder: 'Your Brave API Key',
+        apiKey: 'dummy-brave-key',
+      },
+      {
+        option: 'Bing (via SerpApi)',
+        provider: 'bing',
+        placeholder: 'Your SerpApi API Key',
+        apiKey: 'dummy-bing-key',
+      },
+      {
+        option: 'Exa',
+        provider: 'exa',
+        placeholder: 'Your Exa API Key',
+        apiKey: 'dummy-exa-key',
+      },
+    ] as const;
 
-      // Verify the web search provider select exists
-      const providerSelect = page.getByRole('combobox').first();
-      if (await providerSelect.isVisible()) {
-        await providerSelect.click();
+    await expect(providerSelect).toBeVisible();
 
-        // Select Brave
-        const braveOption = page.getByText('Brave', { exact: true }).first();
-        if (await braveOption.isVisible()) {
-          await braveOption.click();
+    for (const provider of providers) {
+      await providerSelect.click();
+      await page.getByRole('option').filter({ hasText: provider.option }).click();
+      await webSearchCard.getByPlaceholder(provider.placeholder).fill(provider.apiKey);
+      await webSearchCard.getByRole('button', { name: 'Verify', exact: true }).click();
+      await expect(webSearchCard.getByText('✓ Verified')).toBeVisible();
 
-          // Enter dummy API key
-          const apiKeyInput = page.getByPlaceholder('Your Brave API Key').first();
-          await apiKeyInput.fill('dummy-brave-key');
-
-          // Click Verify
-          const verifyBtn = page.getByRole('button', { name: 'Verify' }).first();
-          await verifyBtn.click();
-
-          // Check if verification succeeded
-          await expect(page.getByText('✓ Verified')).toBeVisible({ timeout: 5_000 });
-        }
-
-        // Test Exa
-        await providerSelect.click();
-        const exaOption = page.getByText('Exa', { exact: true }).first();
-        if (await exaOption.isVisible()) {
-          await exaOption.click();
-
-          // Enter dummy API key
-          const exaKeyInput = page.getByPlaceholder('Your Exa API Key').first();
-          await exaKeyInput.fill('dummy-exa-key');
-
-          // Click Verify
-          const verifyBtn = page.getByRole('button', { name: 'Verify' }).first();
-          await verifyBtn.click();
-
-          // Check if verification succeeded
-          await expect(page.getByText('✓ Verified')).toBeVisible({ timeout: 5_000 });
-        }
-      }
+      expect(verificationRequests.at(-1)).toEqual({
+        provider: provider.provider,
+        apiKey: provider.apiKey,
+      });
     }
   });
 
@@ -208,7 +207,7 @@ test.describe('Settings Page', () => {
         }
 
         // Test Groq
-        await providerSelect.click();
+        await providerSelect.click({ force: true });
         const groqOption = page.getByRole('option', { name: 'Groq', exact: true }).first();
         if (await groqOption.isVisible()) {
           await groqOption.click();

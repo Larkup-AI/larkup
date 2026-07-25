@@ -1,162 +1,137 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { LarkupClient } from '../../../apps/sdk/js-sdk/src/index';
 
-/**
- * JS SDK E2E tests — these test the actual @larkup/sdk SDK
- * against the running RAG server on port 8080.
- *
- * Prerequisites: RAG server must be launched first (via Server page or API).
- */
 const WEB_API = 'http://localhost:4567';
-let RAG_SERVER = 'http://localhost:8080';
+let ragServer = 'http://localhost:8080';
+let client: LarkupClient;
 
-test.describe('JS SDK — @larkup/sdk', () => {
-  // Ensure server is running before SDK tests
+test.describe.serial('JavaScript SDK', () => {
   test.beforeAll(async ({ request }) => {
-    // Launch server via Web UI API
-    const statusRes = await request.get(`${WEB_API}/api/server/local`);
-    const { state } = await statusRes.json();
+    const gatewayApiKey = process.env.AI_GATEWAY_APIKEY?.trim();
+    const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
+    const apiKey = gatewayApiKey || openaiApiKey;
+    expect(apiKey, 'AI_GATEWAY_APIKEY or OPENAI_API_KEY is required for SDK E2E').toBeTruthy();
 
-    if (state.endpoint) {
-      RAG_SERVER = state.endpoint;
-    }
-
-    if (!state.running) {
-      console.log('  Starting RAG server for SDK tests...');
-      const startRes = await request.post(`${WEB_API}/api/server/local`, {
-        data: { action: 'start' },
-        timeout: 180_000,
-      });
-      const startBody = await startRes.json();
-      if (startBody.state?.endpoint) {
-        RAG_SERVER = startBody.state.endpoint;
-      }
-
-      // Wait for server to become ready (up to 180 seconds for npm install in CI)
-      let ready = false;
-      for (let i = 0; i < 90; i++) {
-        await new Promise((r) => setTimeout(r, 2_000));
-        try {
-          const res = await fetch(`${RAG_SERVER}/health`, {
-            signal: AbortSignal.timeout(3_000),
-          });
-          if (res.ok) {
-            ready = true;
-            break;
-          }
-        } catch {}
-      }
-      if (!ready) {
-        console.warn('  ⚠ RAG server failed to start — SDK tests may fail');
-      }
-    }
-  });
-
-  test('health check — GET /health', async () => {
-    const res = await fetch(`${RAG_SERVER}/health`, {
-      signal: AbortSignal.timeout(10_000),
+    const configResponse = await request.get(`${WEB_API}/api/config`);
+    const { config } = await configResponse.json();
+    const provider = gatewayApiKey ? 'vercel_ai_gateway' : 'openai';
+    const updateResponse = await request.put(`${WEB_API}/api/config`, {
+      data: {
+        ...config,
+        embeddingProvider: provider,
+        chatProvider: provider,
+        embeddingApiKey: apiKey,
+        chatApiKey: apiKey,
+      },
     });
-    expect(res.ok).toBe(true);
-    const body = await res.json();
-    expect(body.ok).toBe(true);
-    console.log('  ✓ SDK health check passed');
+    expect(updateResponse.ok()).toBe(true);
+
+    // Always regenerate the local server from the known SDK fixture config.
+    await request.post(`${WEB_API}/api/server/local`, {
+      data: { action: 'stop' },
+    });
+    const startResponse = await request.post(`${WEB_API}/api/server/local`, {
+      data: { action: 'start' },
+      timeout: 180_000,
+    });
+    const startBody = await startResponse.json();
+    expect(startBody.state?.running, startBody.state?.lastError).toBe(true);
+    if (startBody.state?.endpoint) ragServer = startBody.state.endpoint;
+
+    let ready = false;
+    for (let attempt = 0; attempt < 90; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      try {
+        const response = await fetch(`${ragServer}/health`, {
+          signal: AbortSignal.timeout(3_000),
+        });
+        if (response.ok) {
+          ready = true;
+          break;
+        }
+      } catch {}
+    }
+    expect(ready).toBe(true);
+
+    client = new LarkupClient({
+      baseUrl: ragServer,
+      apiKey: process.env.LARKUP_API_KEY,
+    });
   });
 
-  test('query — POST /query', async () => {
+  test('health and OpenAPI discovery', async () => {
+    const health = await client.health();
+    const schema = await client.openApi();
+
+    expect(health.ok).toBe(true);
+    expect(schema.openapi).toBe('3.1.0');
+  });
+
+  test('query', async () => {
     test.setTimeout(60_000);
+    const result = await client.query('What is Larkup?', 3);
 
-    const res = await fetch(`${RAG_SERVER}/query`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: 'What is Larkup?', topK: 3 }),
-      signal: AbortSignal.timeout(30_000),
-    });
-
-    expect(res.ok).toBe(true);
-    const body = await res.json();
-    expect(body).toHaveProperty('query');
-    expect(body).toHaveProperty('hits');
-    expect(Array.isArray(body.hits)).toBe(true);
-    console.log(`  ✓ Query returned ${body.hits.length} hits`);
-
-    if (body.hits.length > 0) {
-      expect(body.hits[0]).toHaveProperty('score');
-      expect(body.hits[0]).toHaveProperty('text');
+    expect(result.query).toBe('What is Larkup?');
+    expect(Array.isArray(result.hits)).toBe(true);
+    if (result.hits.length > 0) {
+      expect(result.hits[0]).toHaveProperty('score');
+      expect(result.hits[0]).toHaveProperty('text');
     }
   });
 
-  test('list documents — GET /documents', async () => {
-    const res = await fetch(`${RAG_SERVER}/documents?page=1&limit=5`, {
-      signal: AbortSignal.timeout(10_000),
-    });
+  test('document indexing progress and cleanup', async () => {
+    test.setTimeout(60_000);
+    const ids: string[] = [];
+    const events = [];
 
-    const body = await res.json();
-    if (!res.ok) {
-      console.log('GET /documents failed:', res.status, body.error);
-    }
-    expect(res.ok).toBe(true);
-    expect(body).toHaveProperty('documents');
-    expect(Array.isArray(body.documents)).toBe(true);
-    console.log(`  ✓ Listed ${body.documents.length} documents`);
-  });
+    try {
+      for await (const event of client.indexDocuments(
+        [
+          { text: 'SDK E2E first document', title: 'SDK E2E One' },
+          { text: 'SDK E2E second document', title: 'SDK E2E Two' },
+        ],
+        { mode: 'parallel', concurrency: 2 },
+      )) {
+        events.push(event);
+        if (event.id) ids.push(event.id);
+      }
 
-  test('add document — POST /documents', async () => {
-    const res = await fetch(`${RAG_SERVER}/documents`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: 'SDK E2E test document content',
-        title: 'SDK Test Doc',
-      }),
-      signal: AbortSignal.timeout(10_000),
-    });
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      console.log('POST /documents failed:', res.status, body.error);
-    }
-    expect(res.ok).toBe(true);
-    const body = await res.json();
-    expect(body).toHaveProperty('success');
-    expect(body.success).toBe(true);
-    expect(body).toHaveProperty('id');
-    console.log(`  ✓ Document added via SDK: id=${body.id}`);
-
-    // Cleanup
-    if (body.id) {
-      await fetch(`${RAG_SERVER}/documents/${body.id}`, {
-        method: 'DELETE',
-        signal: AbortSignal.timeout(5_000),
-      }).catch(() => {});
+      expect(events.at(-1)).toMatchObject({
+        type: 'complete',
+        completed: 2,
+        succeeded: 2,
+      });
+      const documents = await client.listDocuments(1, 5);
+      expect(Array.isArray(documents.documents)).toBe(true);
+    } finally {
+      await Promise.all(ids.map((id) => client.deleteDocument(id)));
     }
   });
 
-  test('scrape URL — POST /scrape', async () => {
+  test('corpus inspection and export', async () => {
+    const summary = await client.corpusSummary();
+    const corpus = await client.corpus({ limit: 5, includeContent: true });
+    const jsonl = await client.exportCorpus('jsonl');
+
+    expect(summary.totalDocuments).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray(corpus.documents)).toBe(true);
+    expect(typeof jsonl).toBe('string');
+  });
+
+  test('scrape request shape', async () => {
     test.setTimeout(30_000);
-
-    const res = await fetch(`${RAG_SERVER}/scrape`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: 'https://example.com' }),
-      signal: AbortSignal.timeout(20_000),
-    });
-
-    // Scrape may fail if firecrawl not configured — that's acceptable
-    if (res.ok) {
-      const body = await res.json();
-      console.log(`  ✓ Scrape response: success=${body.success}`);
-    } else {
-      const body = await res.json().catch(() => ({}));
-      console.log(
-        `  ℹ Scrape returned ${res.status} (expected if no scraper configured): ${
-          body.error ?? ''
-        }`,
-      );
+    try {
+      const result = await client.scrape('https://example.com');
+      expect(result.success).toBe(true);
+      if (result.documentId) {
+        const page = await client.listDocuments(1, 100);
+        const ids = page.documents
+          .filter((document) => document.documentId === result.documentId)
+          .map((document) => document.id);
+        await Promise.all(ids.map((id) => client.deleteDocument(id)));
+      }
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
     }
-  });
-
-  // Cleanup — stop server after SDK tests
-  test.afterAll(async ({ request }) => {
-    // Don't stop — other tests may need it
-    console.log('  ℹ RAG server left running for subsequent tests');
   });
 });

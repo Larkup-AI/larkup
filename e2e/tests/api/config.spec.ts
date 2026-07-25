@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { env, hasEnv, ENV_KEYS } from '../../utils/env-loader';
 
-test.describe('Config API (/api/config)', () => {
+test.describe.serial('Config API (/api/config)', () => {
   test('GET /api/config returns current configuration', async ({ request }) => {
     const res = await request.get('/api/config');
     expect(res.status()).toBe(200);
@@ -21,11 +21,17 @@ test.describe('Config API (/api/config)', () => {
     );
   });
 
-  test('PUT /api/config sets API key', async ({ request }) => {
-    test.skip(!hasEnv(ENV_KEYS.OPENAI_API_KEY), 'OPENAI_API_KEY not set');
+  test('PUT /api/config sets embedding credentials', async ({ request }) => {
+    const useGateway = hasEnv(ENV_KEYS.AI_GATEWAY_APIKEY);
+    test.skip(
+      !useGateway && !hasEnv(ENV_KEYS.OPENAI_API_KEY),
+      'AI_GATEWAY_APIKEY or OPENAI_API_KEY not set',
+    );
 
     const getRes = await request.get('/api/config');
     const { config: current } = await getRes.json();
+    const provider = useGateway ? 'vercel_ai_gateway' : 'openai';
+    const apiKey = env(useGateway ? ENV_KEYS.AI_GATEWAY_APIKEY : ENV_KEYS.OPENAI_API_KEY);
 
     const res = await request.put('/api/config', {
       data: {
@@ -34,10 +40,10 @@ test.describe('Config API (/api/config)', () => {
           ...current.storeConfig,
           tableName: current.storeConfig?.tableName || 'documents',
         },
-        embeddingProvider: 'openai',
-        chatProvider: 'openai',
-        embeddingApiKey: env(ENV_KEYS.OPENAI_API_KEY),
-        chatApiKey: env(ENV_KEYS.OPENAI_API_KEY),
+        embeddingProvider: provider,
+        chatProvider: provider,
+        embeddingApiKey: apiKey,
+        chatApiKey: apiKey,
         firecrawlApiKey: hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY)
           ? env(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY)
           : undefined,

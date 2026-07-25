@@ -332,4 +332,107 @@ test.describe.serial('Data Page', () => {
 
     await expect(page.getByLabel('Preview preview.wav')).toBeVisible();
   });
+
+  test('media indexing shows independent live pipeline stage counts', async ({ page }) => {
+    const updatedAt = new Date().toISOString();
+    const mediaPayload = {
+      assets: [
+        {
+          id: 'live-video-progress',
+          type: 'video',
+          fileName: 'arabic-match.mp4',
+          mimeType: 'video/mp4',
+          storageUri: 'local://videos/arabic-match.mp4',
+          fileSize: 10_000,
+          processingStatus: 'processing',
+          processingMessage: 'Understanding visual sequence 18 of 43...',
+          processingProgress: 47,
+          processingRevision: 12,
+          processingSteps: [
+            { stage: 'download', status: 'completed', percent: 100, updatedAt },
+            {
+              stage: 'extract',
+              status: 'completed',
+              percent: 100,
+              current: 216,
+              total: 216,
+              unit: 'frames',
+              updatedAt,
+            },
+            {
+              stage: 'transcribe',
+              status: 'running',
+              current: 2,
+              total: 5,
+              unit: 'audio parts',
+              message: 'Transcribing audio part 2 of 5...',
+              updatedAt,
+            },
+            {
+              stage: 'vision',
+              status: 'running',
+              current: 18,
+              total: 43,
+              unit: 'sequences',
+              message: 'Understanding visual sequence 18 of 43...',
+              updatedAt,
+            },
+            { stage: 'synthesize', status: 'waiting', updatedAt },
+            { stage: 'index', status: 'waiting', updatedAt },
+          ],
+          documentIds: [],
+          createdAt: updatedAt,
+          updatedAt,
+        },
+      ],
+      stats: {
+        total: 1,
+        byType: { image: 0, video: 1, audio: 0 },
+        byStatus: { pending: 0, processing: 1, completed: 0, failed: 0 },
+        totalBytes: 10_000,
+      },
+      storage: { usedBytes: 10_000, fileCount: 1 },
+    };
+
+    await page.route('**/api/marketplace', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          tools: [
+            {
+              id: 'video-audio',
+              name: 'Video & Audio',
+              status: 'installed',
+              configSchema: [],
+            },
+          ],
+        }),
+      });
+    });
+    await page.route('**/api/media?type=**', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(mediaPayload),
+      });
+    });
+    await page.route('**/api/media/stream?**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        },
+        body: `event: media-update\ndata: ${JSON.stringify(mediaPayload)}\n\n`,
+      });
+    });
+
+    await page.goto('/data?tab=add&subtab=media');
+    await page.getByRole('button', { name: /^Video/ }).click();
+
+    await expect(page.getByText('Indexing 1 file')).toBeVisible();
+    await expect(page.getByText('2 / 5 audio parts')).toBeVisible();
+    await expect(page.getByText('18 / 43 sequences')).toBeVisible();
+    await expect(page.getByText('Connect notes')).toBeVisible();
+    await expect(page.getByText('Search index')).toBeVisible();
+  });
 });

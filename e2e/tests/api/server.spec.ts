@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Server API (/api/server)', () => {
+test.describe.serial('Server API (/api/server)', () => {
   test('GET /api/server/generate — returns generated server manifest', async ({ request }) => {
     const res = await request.get('/api/server/generate');
     expect(res.status()).toBe(200);
@@ -24,6 +24,28 @@ test.describe('Server API (/api/server)', () => {
     expect(serverFile?.contents).toContain('url.pathname === "/documents"');
     expect(serverFile?.contents).toContain('url.pathname === "/scrape"');
     expect(serverFile?.contents).toContain('url.pathname === "/corpus"');
+    const packageFile = body.server.files.find(
+      (file: { path: string }) => file.path === 'package.json',
+    );
+    const generatedPackage = JSON.parse(packageFile.contents) as {
+      dependencies: Record<string, string>;
+    };
+    expect(generatedPackage.dependencies.ai).toBe('^6.0.197');
+    expect(Object.values(generatedPackage.dependencies)).not.toContain('latest');
+    const providerVersions: Record<string, string> = {
+      '@ai-sdk/cohere': '^3.0.39',
+      '@ai-sdk/deepseek': '^2.0.39',
+      '@ai-sdk/gateway': '^3.0.133',
+      '@ai-sdk/google': '^3.0.83',
+      '@ai-sdk/mistral': '^3.0.40',
+      '@ai-sdk/openai': '^3.0.68',
+      '@ai-sdk/openai-compatible': '^2.0.51',
+    };
+    for (const [packageName, version] of Object.entries(generatedPackage.dependencies)) {
+      if (packageName.startsWith('@ai-sdk/')) {
+        expect(version).toBe(providerVersions[packageName]);
+      }
+    }
     console.log(
       `  ✓ Server generated: ${body.server.files.length} files, serverId=${body.serverId}`,
     );

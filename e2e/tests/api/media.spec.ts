@@ -68,6 +68,36 @@ test.describe('Media API (/api/media)', () => {
     expect((await response.json()).error).toContain('between 1 and 10');
   });
 
+  test('refuses deletion while a media worker owns the asset', async ({ request }) => {
+    const upload = await request.post('/api/media', {
+      multipart: {
+        file: {
+          name: `e2e-active-${Date.now()}.wav`,
+          mimeType: 'audio/wav',
+          buffer: createSilentWav(),
+        },
+      },
+    });
+    expect(upload.status()).toBe(201);
+    const activeAssetId = (await upload.json()).assets[0].id as string;
+
+    try {
+      const claimed = await request.patch(`/api/media/${activeAssetId}`, {
+        data: { processingStatus: 'processing', processingMessage: 'Transcribing...' },
+      });
+      expect(claimed.ok()).toBe(true);
+
+      const blocked = await request.delete(`/api/media?id=${activeAssetId}`);
+      expect(blocked.status()).toBe(409);
+      expect((await blocked.json()).error).toContain('finish');
+    } finally {
+      await request.patch(`/api/media/${activeAssetId}`, {
+        data: { processingStatus: 'failed', processingMessage: '' },
+      });
+      await request.delete(`/api/media?id=${activeAssetId}`).catch(() => {});
+    }
+  });
+
   test.afterAll(async ({ request }) => {
     if (assetId) await request.delete(`/api/media?id=${assetId}`).catch(() => {});
   });
