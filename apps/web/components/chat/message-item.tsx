@@ -405,6 +405,28 @@ function renderToolPart(
         );
       }
 
+      case 'presentMedia': {
+        if (
+          !output?.success ||
+          !output.assetId ||
+          !['image', 'video', 'audio'].includes(output.mediaType)
+        ) {
+          return null;
+        }
+        return (
+          <ChatMediaPreview
+            key={index}
+            assetId={output.assetId}
+            mediaType={output.mediaType}
+            fileName={output.fileName}
+            mediaUrl={output.mediaUrl}
+            sourceUrl={output.sourceUrl}
+            startSecs={output.startSecs}
+            endSecs={output.endSecs}
+          />
+        );
+      }
+
       default:
         // Generic fallback for any other tools (like marketplace tools) to prevent them from disappearing
         return (
@@ -430,11 +452,13 @@ export function MessageItem({
   isLast,
   isStreaming,
   addToolResult,
+  serverId,
 }: {
   message: UIMessage;
   isLast?: boolean;
   isStreaming?: boolean;
   addToolResult?: Function;
+  serverId?: string | null;
 }) {
   const isUser = message.role === 'user';
   let updateFromToolResult: ((result: any) => void) | undefined;
@@ -740,7 +764,10 @@ export function MessageItem({
   };
 
   const vizParts = toolParts.filter(isVizPart);
-  const nonVizToolParts = toolParts.filter((p: any) => !isVizPart(p));
+  const mediaToolParts = toolParts.filter((p: any) => getToolInfo(p).toolName === 'presentMedia');
+  const nonVizToolParts = toolParts.filter(
+    (p: any) => !isVizPart(p) && getToolInfo(p).toolName !== 'presentMedia',
+  );
 
   // Build tabs if we have multiple visualizations
   const vizTabs =
@@ -844,6 +871,11 @@ export function MessageItem({
                 assetId={ref.assetId}
                 mediaType={ref.type}
                 fileName={ref.extra}
+                mediaUrl={
+                  serverId
+                    ? `/api/media/${ref.assetId}?serverId=${encodeURIComponent(serverId)}`
+                    : undefined
+                }
                 startSecs={ref.startSecs}
                 endSecs={ref.endSecs}
               />
@@ -851,6 +883,13 @@ export function MessageItem({
           </div>
         );
       })}
+
+      {/* One model-selected media citation, kept separate from raw search results. */}
+      {mediaToolParts
+        .filter((p: any) => getToolInfo(p).isCompleted)
+        .map((part: any, i: number) =>
+          renderToolPart(part, i, addToolResult, updateFromToolResult),
+        )}
     </div>
   );
 }

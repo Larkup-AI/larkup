@@ -3,7 +3,6 @@ import { readConfig } from '@larkup/core/config-store';
 import { getModelsByType } from '@larkup/core/models-cache';
 import { toChatDescriptor, getDefaultChatModel } from '@larkup/core/chat-models/registry';
 import { listTabularDatasets } from '@larkup/core/tabular-store';
-import { readDocuments } from '@larkup/core/documents-store';
 
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -63,26 +62,17 @@ function createChatModel(
   }
 }
 
-function latestUserText(messages: UIMessage[]): string {
-  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user') as
-    | (UIMessage & { content?: string })
-    | undefined;
-  if (!lastUserMessage) return '';
-  if (typeof lastUserMessage.content === 'string') return lastUserMessage.content;
-  return (lastUserMessage.parts ?? [])
-    .filter((part: any) => part.type === 'text')
-    .map((part: any) => part.text)
-    .join(' ');
-}
+const SMART_RETRIEVAL_POLICY = `
 
-function isMediaEvidenceRequest(text: string): boolean {
-  // These requests are often phrased without saying "audio file" explicitly
-  // (for example: "say the demo numbers"). If the workspace has indexed media,
-  // retrieve it before allowing the model to give a generic answer.
-  return /\b(audio|voice|recording|podcast|transcript|pronounc\w*|speak\w*|spoken|listen|hear|sound|video|clip|demo|number|said|say)\b/i.test(
-    text,
-  );
-}
+CONVERSATION, RETRIEVAL, AND MEDIA POLICY:
+- Default to a short, direct answer. One to three sentences is usually enough; use structure only when the task is genuinely complex.
+- Do not search for greetings, casual conversation, writing help, brainstorming, explanations you can answer reliably from general knowledge, or questions unrelated to the user's indexed data.
+- Use searchKnowledgeBase only when the answer depends on the user's indexed/private content, an exact source-specific fact, or a topic that plausibly refers to something the user indexed.
+- Search at most once per user request unless the first search is clearly irrelevant. Never repeat a search when a prior tool result in this conversation already contains enough evidence.
+- For a follow-up such as "show me that part", "play the clip", "show the image", or "let me hear it", reuse the mediaAssetId and timestamps already present in the earlier search result and call presentMedia directly. Do not search again just to rediscover the same media.
+- Use presentMedia to embed exactly one best video, image, or audio citation when the user asks to see/hear it or when one compact preview materially supports the answer. Do not present every search result.
+- Keep the written answer minimal around a media citation. Do not print internal media reference markers.
+`;
 
 export async function POST(req: Request) {
   const {
@@ -327,16 +317,12 @@ Available Form Fields (${docFields?.length ?? 0} total):
 ${fieldLines}`;
   }
 
-  const systemPrompt = (config.systemPrompt || DEFAULT_SYSTEM_PROMPT) + tabularContext + docContext;
+  const systemPrompt =
+    (config.systemPrompt || DEFAULT_SYSTEM_PROMPT) +
+    SMART_RETRIEVAL_POLICY +
+    tabularContext +
+    docContext;
   const tools = await getChatTools({ serverId, docSessionId, config });
-  const userText = latestUserText(messagesToProcess);
-  const hasIndexedMedia = (await readDocuments()).some(
-    (document) =>
-      document.source === 'media' &&
-      document.status === 'indexed' &&
-      (document.metadata?.mediaType === 'audio' || document.metadata?.mediaType === 'video'),
-  );
-  const requireMediaSearch = hasIndexedMedia && isMediaEvidenceRequest(userText);
 
   // Debug: log payload sizes to console in development
   if (process.env.NODE_ENV === 'development') {
@@ -352,15 +338,6 @@ ${fieldLines}`;
     messages: await convertToModelMessages(safeMessages, { tools }),
     maxOutputTokens: 8192,
     stopWhen: stepCountIs(8),
-    prepareStep: ({ stepNumber }) => {
-      if (requireMediaSearch && stepNumber === 0) {
-        return {
-          activeTools: ['searchKnowledgeBase'],
-          toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' },
-        };
-      }
-      return undefined;
-    },
     onFinish: async ({ usage, response }) => {
       const { trackUsageEvent, estimateCost } = await import('@larkup/core/analytics-store');
       const u = usage as any;

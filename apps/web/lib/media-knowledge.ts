@@ -220,6 +220,29 @@ export function timestampMediaUrl(url: string, startSecs: number): string {
   return `${url.split('#')[0]}#t=${seconds}`;
 }
 
+export function normalizeMediaCitationRange(
+  mediaType: 'image' | 'video' | 'audio',
+  durationSecs?: number,
+  startSecs?: number,
+  endSecs?: number,
+): { startSecs?: number; endSecs?: number } {
+  if (mediaType === 'image' || startSecs === undefined || !Number.isFinite(startSecs)) {
+    return {};
+  }
+
+  const duration =
+    durationSecs !== undefined && Number.isFinite(durationSecs)
+      ? Math.max(0, durationSecs)
+      : Number.POSITIVE_INFINITY;
+  const start = Math.min(Math.max(0, startSecs), duration);
+  const end =
+    endSecs !== undefined && Number.isFinite(endSecs)
+      ? Math.min(Math.max(start, endSecs), duration)
+      : undefined;
+
+  return { startSecs: start, endSecs: end };
+}
+
 export function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(safeSeconds / 3600);

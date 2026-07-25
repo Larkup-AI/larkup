@@ -965,6 +965,7 @@ function ChatWorkspaceInner() {
                   isLast={idx === messages.length - 1}
                   isStreaming={chatStatus === 'streaming'}
                   addToolResult={addToolResult}
+                  serverId={serverId}
                 />
               ))}
               {chatStatus === 'submitted' ? (

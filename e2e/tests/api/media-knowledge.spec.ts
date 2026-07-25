@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   buildMediaDocumentInputs,
   createFallbackMediaSummary,
+  normalizeMediaCitationRange,
   queryAwareExcerpt,
   timestampMediaUrl,
   type MediaEvidenceSegment,
@@ -88,6 +89,18 @@ test.describe('Media knowledge documents', () => {
   test('creates seekable YouTube and local media URLs', () => {
     expect(timestampMediaUrl('https://youtu.be/match', 125.9)).toContain('t=125s');
     expect(timestampMediaUrl('/api/media/asset-1', 125.9)).toBe('/api/media/asset-1#t=125');
+  });
+
+  test('keeps one playable media citation inside the indexed asset duration', () => {
+    expect(normalizeMediaCitationRange('video', 180, 120, 240)).toEqual({
+      startSecs: 120,
+      endSecs: 180,
+    });
+    expect(normalizeMediaCitationRange('audio', 180, -5, 20)).toEqual({
+      startSecs: 0,
+      endSecs: 20,
+    });
+    expect(normalizeMediaCitationRange('image', undefined, 10, 20)).toEqual({});
   });
 
   test('keeps matched and ending evidence when a document is longer than the response cap', () => {

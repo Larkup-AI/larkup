@@ -19,7 +19,11 @@ import { loadTool } from '@larkup/marketplace/loader';
 import { getInstalledTools } from '@larkup/marketplace/installer';
 import { readDocuments } from '@larkup/core/documents-store';
 import { readMediaAssets } from '@larkup/core/media-store';
-import { queryAwareExcerpt } from '@/lib/media-knowledge';
+import {
+  normalizeMediaCitationRange,
+  queryAwareExcerpt,
+  timestampMediaUrl,
+} from '@/lib/media-knowledge';
 
 function documentEditModelOutput({ output }: { output: any }) {
   return {
@@ -305,12 +309,68 @@ export async function getChatTools(context: {
   const builtInTools: Record<string, any> = {
     searchKnowledgeBase: tool({
       description:
-        'Search the private RAG knowledge base for relevant documents and time-aligned media evidence. Use this for ALL factual questions, including outcomes, actions, people, spoken content, on-screen text, matches, videos, or specific content mentioned by the user. For media, inspect the returned before/event/after timeline. For winner, result, or outcome questions, you MUST also inspect endingContext before answering because the result is often announced in the final minutes. CRITICAL: When extracting facts from media notes, you MUST use the exact [HH:MM:SS] timestamps found in the text. Cite the exact timestamp URL that supports the answer. Do NOT guess timestamps. ALWAYS check the knowledge base before claiming information is unavailable.',
+        "Search the user's private RAG knowledge base when their question depends on indexed documents or media and the needed evidence is not already in the conversation. Do not use for general knowledge, casual conversation, writing tasks, or a follow-up that can be answered from an earlier search result. Search once with a focused query. For media, inspect the returned timeline and endingContext when relevant, and reuse exact mediaAssetId/startSecs/endSecs values with presentMedia when a preview is useful. Never guess timestamps.",
       inputSchema: z.object({
         query: z.string().describe('The search query for the knowledge base.'),
       }),
       execute: async ({ query }) => {
-        return queryKnowledgeBase(query, 8, serverId ?? null);
+        return queryKnowledgeBase(query, 5, serverId ?? null);
+      },
+    }),
+
+    presentMedia: tool({
+      description:
+        'Embed one indexed image, video segment, or audio segment as a compact citation in the chat. Use the exact mediaAssetId and timestamps from a current or earlier search result. Call this when the user asks to see, watch, play, or hear the media, or when one preview materially supports the answer. Prefer one best citation and do not call this for every search hit. Do not search again if the needed asset ID is already in the conversation.',
+      inputSchema: z.object({
+        assetId: z.string().describe('Exact mediaAssetId returned by searchKnowledgeBase.'),
+        startSecs: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe('Exact segment start time returned by searchKnowledgeBase.'),
+        endSecs: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe('Exact segment end time returned by searchKnowledgeBase.'),
+      }),
+      execute: async ({ assetId, startSecs, endSecs }) => {
+        const resolvePresentation = async () => {
+          const assets = await readMediaAssets();
+          const asset = assets.find((candidate) => candidate.id === assetId);
+          if (!asset || asset.processingStatus !== 'completed') {
+            return {
+              success: false,
+              error: 'That indexed media asset is no longer available.',
+            };
+          }
+
+          const range = normalizeMediaCitationRange(
+            asset.type,
+            asset.durationSecs,
+            startSecs,
+            endSecs,
+          );
+          const serverQuery = serverId ? `?serverId=${encodeURIComponent(serverId)}` : '';
+          const mediaUrl = `/api/media/${asset.id}${serverQuery}`;
+          const sourceUrl =
+            range.startSecs !== undefined
+              ? timestampMediaUrl(asset.originalUrl || mediaUrl, range.startSecs)
+              : asset.originalUrl || mediaUrl;
+
+          return {
+            success: true,
+            assetId: asset.id,
+            mediaType: asset.type,
+            fileName: asset.fileName,
+            mediaUrl,
+            sourceUrl,
+            startSecs: range.startSecs,
+            endSecs: range.endSecs,
+          };
+        };
+
+        return serverId ? runWithServer(serverId, resolvePresentation) : resolvePresentation();
       },
     }),
 
@@ -902,7 +962,7 @@ export async function getChatTools(context: {
 
     if (
       isEnabled(id) ||
-      ['fillDocumentForm', 'editDocument', 'requestDocumentSignature'].includes(id)
+      ['presentMedia', 'fillDocumentForm', 'editDocument', 'requestDocumentSignature'].includes(id)
     ) {
       finalTools[id] = toolDef;
     }

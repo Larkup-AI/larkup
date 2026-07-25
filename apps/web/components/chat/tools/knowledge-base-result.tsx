@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { ChevronDown, Loader2, Database } from 'lucide-react';
-import { ChatMediaPreview } from '@/components/chat/tools/chat-media-preview';
 
 interface KBHit {
   title: string;
@@ -50,15 +49,6 @@ export function KnowledgeBaseResult({
     // Legacy format
     return part.output?.hits ?? [];
   });
-  const queries = parts
-    .map((part: any) => {
-      if (part.type === 'tool-invocation') {
-        return part.toolInvocation?.args?.query;
-      }
-      return part.input?.query;
-    })
-    .filter(Boolean);
-
   // Show a live search surface, then return to the compact conversation once
   // the tool has completed. Results remain available via the trigger button.
   useEffect(() => {
@@ -84,15 +74,11 @@ export function KnowledgeBaseResult({
             <Database className="h-3.5 w-3.5 shrink-0" />
           )}
           <span className="truncate max-w-[250px] sm:max-w-[400px]">
-            {isRunning
-              ? 'Searching knowledge base…'
-              : queries.length > 0
-              ? `Searched knowledge base for "${queries[0]}"`
-              : 'Searched knowledge base'}
+            {isRunning ? 'Checking knowledge base…' : 'Checked knowledge base'}
           </span>
           {!isRunning && hits.length > 0 ? (
             <span className="shrink-0 text-[10px] bg-secondary text-foreground px-1.5 py-0.5 rounded-full font-medium ml-1">
-              {hits.length} result{hits.length === 1 ? '' : 's'}
+              {hits.length} source{hits.length === 1 ? '' : 's'}
             </span>
           ) : null}
           {!isRunning && hits.length > 0 ? (
@@ -112,24 +98,8 @@ export function KnowledgeBaseResult({
             </div>
           ) : null}
           {hits.slice(0, 3).map((h, i) => (
-            <div key={i} className="px-3.5 py-4 border-b border-border/50 last:border-0">
-              {/* <p className="mb-3 text-sm leading-relaxed text-foreground">
-                {h.text}
-              </p> */}
-
-              {/* Media Preview (fills container) */}
-              {h.metadata?.mediaAssetId && h.metadata.mediaType ? (
-                <ChatMediaPreview
-                  assetId={h.metadata.mediaAssetId}
-                  mediaType={h.metadata.mediaType}
-                  fileName={h.metadata.fileName ?? h.title}
-                  startSecs={h.metadata.startSecs}
-                  endSecs={h.metadata.endSecs}
-                />
-              ) : null}
-
-              {/* Citation details: Underline title, View Source beside it */}
-              <div className="mt-3 flex items-center justify-between gap-2">
+            <div key={i} className="px-3.5 py-3 border-b border-border/50 last:border-0">
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">
                   {h.metadata?.mediaType && (
                     <span className="shrink-0 text-[11px]">
@@ -162,10 +132,4 @@ export function KnowledgeBaseResult({
       ) : null}
     </div>
   );
-}
-
-function formatTimeSecs(secs: number): string {
-  const m = Math.floor(secs / 60);
-  const s = Math.floor(secs % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
 }
