@@ -184,7 +184,7 @@ export function CorpusPanel({
         <div className="flex items-center gap-2">
           {documents.length > 0 && (
             <Select value={sourceFilter} onValueChange={(v: any) => setSourceFilter(v)}>
-              <SelectTrigger className="w-[140px] shadow-none border-border/70 bg-white  h-8 text-xs">
+              <SelectTrigger className="w-35 shadow-none border-border/70 bg-white  h-8 text-xs">
                 <SelectValue placeholder="All Sources" />
               </SelectTrigger>
               <SelectContent>
@@ -248,7 +248,7 @@ export function CorpusPanel({
               <TableHead className="w-20" />
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="bg-white/70">
             {pageDocuments.map((doc) => {
               const meta = SOURCE_META[doc.source as DocumentSource] || {
                 label: doc.source || 'Unknown',
@@ -256,7 +256,7 @@ export function CorpusPanel({
               };
               const Icon = meta.icon;
               return (
-                <TableRow key={doc.id}>
+                <TableRow key={doc.id} className="border-border/50 h-10.5!">
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.has(doc.id)}

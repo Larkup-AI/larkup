@@ -646,7 +646,7 @@ export function ScrapePanel({
                   placeholder='Search keywords, e.g. "RAG pipelines"'
                   value={query}
                   disabled={disabled}
-                  className="pl-9 pr-[88px]"
+                  className="pl-9 pr-22"
                   onChange={(e) => {
                     setQuery(e.target.value);
                     setShowDropdown(true);
@@ -712,7 +712,7 @@ export function ScrapePanel({
                   placeholder="Paste URLs (comma or space separated)"
                   value={manualUrl}
                   disabled={disabled}
-                  className="pl-9 pr-[64px]"
+                  className="pl-9 pr-16"
                   onChange={(e) => setManualUrl(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addManual()}
                 />
@@ -817,7 +817,7 @@ export function ScrapePanel({
               onValueChange={(v) => setScope(v as CrawlScope)}
               disabled={specificUrls || disabled}
             >
-              <SelectTrigger className="w-[160px] bg-white h-8 text-xs">
+              <SelectTrigger className="w-40 bg-white h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -868,7 +868,7 @@ export function ScrapePanel({
                     <Info className="size-3" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="max-w-[200px] text-center">
+                    <p className="max-w-50 text-center">
                       Scrape exact URLs only — no deep crawl or pagination.
                     </p>
                   </TooltipContent>
@@ -916,6 +916,7 @@ export function ScrapePanel({
                   <label
                     className={cn(
                       'flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50',
+                      'bg-white',
                       checked && 'bg-accent/50',
                     )}
                   >

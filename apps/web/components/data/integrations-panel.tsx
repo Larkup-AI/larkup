@@ -253,7 +253,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
                         {integration.category}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[200px]">
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-50">
                       {integration.description}
                     </p>
                   </div>
@@ -262,14 +262,14 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
                 <div className="shrink-0">
                   {integration.available ? (
                     isLoadingStatus ? (
-                      <Button variant="outline" size="sm" className="h-8 w-[84px]" disabled>
+                      <Button variant="outline" size="sm" className="h-8 w-21" disabled>
                         <Loader2 className="size-3.5 animate-spin" />
                       </Button>
-                    ) : isConnected ? (
+                    ) : isConnected || false ? (
                       <Button
                         variant="default"
                         size="sm"
-                        className="h-8 w-[84px]"
+                        className="h-8 w-21"
                         onClick={() => setActiveIntegration(integration.id)}
                       >
                         Configure
@@ -278,7 +278,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 w-[84px]"
+                        className="h-8 w-21 bg-muted/50 hover:bg-muted/80 "
                         onClick={() => {
                           if (integration.id === 'notion') {
                             handleConnectNotion();
@@ -380,7 +380,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
                 <Textarea
                   id="message"
                   placeholder="Tell us which tool you want to connect and how you plan to use it..."
-                  className="resize-none min-h-[120px] max-h-[270px]!"
+                  className="resize-none min-h-30 max-h-67.5!"
                   rows={5}
                   value={requestMessage}
                   onChange={(e) => setRequestMessage(e.target.value)}

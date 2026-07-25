@@ -277,9 +277,9 @@ export function ConnectionsSection() {
               <div className="shrink-0">
                 {isConnected ? (
                   <Button
-                    variant="default"
+                    variant="outline"
                     size="sm"
-                    className="h-8"
+                    className="h-8 hover:bg-muted/80 "
                     onClick={() => handleConfigureClick(conn.id)}
                   >
                     Configure
@@ -443,7 +443,7 @@ export function ConnectionsSection() {
                 <Textarea
                   id="message"
                   placeholder="Tell us which platform you want to connect to your AI server..."
-                  className="resize-none min-h-[120px] max-h-[270px]!"
+                  className="resize-none min-h-30 max-h-67.5!"
                   rows={5}
                   value={requestMessage}
                   onChange={(e) => setRequestMessage(e.target.value)}
