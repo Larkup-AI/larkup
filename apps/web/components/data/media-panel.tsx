@@ -793,7 +793,9 @@ function MediaContent({
         </div>
       )}
 
-      {activeAssets.length > 0 ? <ActiveIndexingList assets={activeAssets} /> : null}
+      {activeAssets.length > 0 ? (
+        <ActiveIndexingList assets={activeAssets} onCancel={handleDelete} />
+      ) : null}
 
       {mediaType !== 'image' && (
         <div className="mt-5 flex items-center gap-4 border-b border-border/40 mb-4 px-2">
@@ -1537,7 +1539,13 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
   );
 }
 
-function ActiveIndexingList({ assets }: { assets: MediaAsset[] }) {
+function ActiveIndexingList({
+  assets,
+  onCancel,
+}: {
+  assets: MediaAsset[];
+  onCancel: (id: string) => void;
+}) {
   return (
     <section
       aria-live="polite"
@@ -1559,17 +1567,27 @@ function ActiveIndexingList({ assets }: { assets: MediaAsset[] }) {
           return (
             <div
               key={asset.id}
-              className="space-y-2 rounded-lg border border-transparent bg-background/40 p-2.5"
+              className="space-y-2 rounded-lg border border-transparent bg-background/40 p-2.5 relative group"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 pr-6">
                   <p className="truncate text-[11px] font-medium text-foreground">
                     {asset.fileName}
                   </p>
                 </div>
-                <span className="shrink-0 text-[10px] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                  {Math.round(progress)}%
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 text-[10px] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {Math.round(progress)}%
+                  </span>
+                  <button
+                    type="button"
+                    title="Cancel Indexing"
+                    onClick={() => onCancel(asset.id)}
+                    className="p-1 -mr-1 rounded-full text-muted-foreground hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 transition-colors"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
               </div>
               <Progress
                 value={progress}

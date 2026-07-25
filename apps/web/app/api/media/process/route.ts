@@ -123,7 +123,10 @@ async function enqueueMediaProcessing(
           lastStageUpdates.set(stage, now);
           if (patch.status === 'running') activeStages.add(stage);
           if (isTerminal) activeStages.delete(stage);
-          await updateMediaStage(currentAsset.id, stage, patch);
+          const updated = await updateMediaStage(currentAsset.id, stage, patch);
+          if (!updated) {
+            throw new Error('Media asset was deleted during processing');
+          }
         };
 
         try {

@@ -184,16 +184,6 @@ async function removeMedia(req: Request) {
     const { getMediaAsset } = await import('@larkup/core/media-store');
     const asset = await getMediaAsset(id);
     if (asset) {
-      if (
-        asset.processingStatus === 'processing' ||
-        (asset.processingStatus === 'pending' &&
-          asset.processingMessage === 'Queued for background processing...')
-      ) {
-        return NextResponse.json(
-          { error: 'Wait for media indexing to finish before deleting this file.' },
-          { status: 409 },
-        );
-      }
       const documentIds = allMediaDocumentIds(asset);
       await deleteMediaDocuments(documentIds);
       await storage.delete(asset.storageUri).catch(() => {});
