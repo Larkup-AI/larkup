@@ -1,6 +1,7 @@
 {
   "name": "@larkup/gen",
   "version": "1.0.0",
+  "private": true,
   "description": "Package generators for the monorepo",
   "scripts": {
     "create-package": "tsx ./gen.ts",

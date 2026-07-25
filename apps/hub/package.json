@@ -1,6 +1,7 @@
 {
   "name": "@larkup/hub",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "description": "Larkup Hub — marketplace catalog API, tool registry, and install tracking.",
   "scripts": {
@@ -16,6 +17,6 @@
     "@types/node": "^24",
     "tsx": "^4.7.0",
     "typescript": "5.7.3",
-    "vercel": "latest"
+    "vercel": "56.5.0"
   }
 }

@@ -1,56 +1,54 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-PY_SDK_DIR="$ROOT_DIR/apps/sdk/py-sdk"
-ENV_FILE="$ROOT_DIR/.env.dev"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PY_SDK_DIR="$REPO_ROOT/apps/sdk/py-sdk"
+ENV_FILE="$REPO_ROOT/.env.dev"
 
-echo "========================================="
-echo "  Publishing Python SDK to PyPI          "
-echo "========================================="
+if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]; then
+  echo "Refusing to publish PyPI from a dirty worktree." >&2
+  exit 1
+fi
 
-# Load PyPI token from .env.dev
 if [ -f "$ENV_FILE" ]; then
-    # Source the env file (handles KEY="value" format)
-    set -a
-    source "$ENV_FILE"
-    set +a
-    echo "✅ Loaded credentials from .env.dev"
-else
-    echo "⚠️  No .env.dev found. Checking environment variables..."
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
 fi
 
-if [ -z "$PYPI_TOKEN" ]; then
-    echo "❌ PYPI_TOKEN is not set. Please set it in .env.dev or as an environment variable."
-    exit 1
+if [ -z "${PYPI_TOKEN:-}" ]; then
+  echo "PYPI_TOKEN is not set in the environment or .env.dev." >&2
+  exit 1
 fi
+
+command -v curl >/dev/null 2>&1 || {
+  echo "curl is required." >&2
+  exit 1
+}
+command -v uv >/dev/null 2>&1 || {
+  echo "uv is required." >&2
+  exit 1
+}
 
 cd "$PY_SDK_DIR"
+PKG_NAME="$(sed -n 's/^name = \"\\([^\"]*\\)\"/\\1/p' pyproject.toml)"
+PKG_VERSION="$(sed -n 's/^version = \"\\([^\"]*\\)\"/\\1/p' pyproject.toml)"
 
-# Clean previous builds
-echo ""
-echo "[1/3] Cleaning previous build artifacts..."
-rm -rf dist build
-find . -name '*.egg-info' -type d -exec rm -rf {} + 2>/dev/null || true
-
-# Build the package
-echo "[2/3] Building package..."
-uv build
-
-# Extract name and version from pyproject.toml
-PKG_NAME=$(grep -E '^name\s*=\s*' pyproject.toml | cut -d '"' -f 2 | head -n 1)
-PKG_VERSION=$(grep -E '^version\s*=\s*' pyproject.toml | cut -d '"' -f 2 | head -n 1)
-
-# Check if version exists on PyPI
-if pip index versions "$PKG_NAME" 2>/dev/null | grep -q "$PKG_VERSION"; then
-  echo "⚠️  $PKG_NAME@$PKG_VERSION is already published to PyPI. Skipping."
-else
-  # Publish to PyPI
-  echo "[3/3] Publishing to PyPI..."
-  uv publish --token "$PYPI_TOKEN"
+if curl --fail --silent --show-error \
+  "https://pypi.org/pypi/${PKG_NAME}/${PKG_VERSION}/json" >/dev/null 2>&1; then
+  echo "${PKG_NAME} ${PKG_VERSION} is already published to PyPI; skipping."
+  exit 0
 fi
 
-echo ""
-echo "✅ Successfully published larkup to PyPI!"
-echo "   View at: https://pypi.org/project/larkup/"
+echo "Building ${PKG_NAME} ${PKG_VERSION}..."
+rm -rf "$PY_SDK_DIR/dist" "$PY_SDK_DIR/build"
+find "$PY_SDK_DIR" -maxdepth 1 -name '*.egg-info' -type d -exec rm -rf {} +
+uv build
+
+echo "Publishing ${PKG_NAME} ${PKG_VERSION} to PyPI..."
+uv publish --token "$PYPI_TOKEN"
+
+curl --fail --silent --show-error \
+  "https://pypi.org/pypi/${PKG_NAME}/${PKG_VERSION}/json" >/dev/null
+echo "Verified ${PKG_NAME} ${PKG_VERSION} on PyPI."

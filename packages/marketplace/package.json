@@ -1,6 +1,9 @@
 {
   "name": "@larkup/marketplace",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "exports": {
     "./types": "./src/types.ts",

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Larkup Publishing"
+  short_description: "Release npm packages and Docker images safely"
+  default_prompt: "Use $publishing to validate, version, publish, and verify a Larkup release."

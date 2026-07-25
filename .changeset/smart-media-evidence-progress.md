@@ -2,7 +2,6 @@
 'larkup': patch
 '@larkup/core': patch
 '@larkup/cli': patch
-'@larkup/hub': patch
 '@larkup/marketplace': patch
 '@larkup/tool-video-audio': patch
 ---

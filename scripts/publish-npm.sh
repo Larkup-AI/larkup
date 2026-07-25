@@ -1,80 +1,42 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
 
-echo "========================================="
-echo "  Publishing NPM Packages               "
-echo "========================================="
-
-# Build only publishable packages
-echo ""
-echo "[0/6] Building publishable packages..."
-
-echo "  Building JS SDK..."
-cd "$ROOT_DIR/apps/sdk/js-sdk"
-pnpm build
-
-echo "  Building CLI..."
-cd "$ROOT_DIR/apps/cli"
-pnpm build
-
-echo "  Building Web..."
-cd "$ROOT_DIR/apps/web"
-pnpm build
-
-publish_package() {
-  local dir="$1"
-  cd "$ROOT_DIR/$dir"
-  
-  local pkg_name=$(node -p "require('./package.json').name")
-  local pkg_version=$(node -p "require('./package.json').version")
-  
-  # Try to get the published version from the registry
-  if npm view "$pkg_name@$pkg_version" version &>/dev/null; then
-    echo "⚠️  $pkg_name@$pkg_version is already published. Skipping."
-  else
-    echo "🚀 Publishing $pkg_name@$pkg_version..."
-    pnpm publish --access public --no-git-checks
-    echo "✅ $pkg_name published."
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Required command not found: $1" >&2
+    exit 1
   fi
 }
 
-# --- 1. vector-stores ---
-echo ""
-echo "[1/6] Checking @larkup/vector-stores..."
-publish_package "packages/vector-stores"
+require_clean_tree() {
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "Refusing to publish npm packages from a dirty worktree." >&2
+    echo "Commit the release version changes first." >&2
+    exit 1
+  fi
+}
 
-# --- 2. scraper ---
-echo ""
-echo "[2/6] Checking @larkup/scraper..."
-publish_package "packages/scraper"
+require_command git
+require_command npm
+require_command pnpm
+require_clean_tree
 
-# --- 3. core ---
-echo ""
-echo "[3/6] Checking @larkup/core..."
-publish_package "packages/core"
+echo "Checking npm authentication..."
+NPM_USER="$(npm whoami)"
+echo "Authenticated to npm as ${NPM_USER}."
 
-# --- 4. JS SDK ---
-echo ""
-echo "[4/6] Checking @larkup/sdk..."
-publish_package "apps/sdk/js-sdk"
+echo "Building npm release targets..."
+pnpm --filter @larkup/sandbox build
+pnpm --filter @larkup/tool-doc-editor build
+pnpm --filter @larkup/tool-video-audio build
+pnpm --filter @larkup/sdk build
+pnpm --filter @larkup/cli build
+pnpm --filter larkup build
 
-# --- 5. CLI ---
-echo ""
-echo "[5/6] Checking @larkup/cli..."
-publish_package "apps/cli"
+echo "Publishing versioned workspace packages through Changesets..."
+pnpm changeset publish
 
-# --- 6. Web (larkup) ---
-echo ""
-echo "[6/6] Checking larkup (web)..."
-publish_package "apps/web"
-
-echo ""
-echo "========================================="
-echo "🎉 All NPM packages published!"
-echo "========================================="
-echo "  - @larkup/sdk"
-echo "  - @larkup/cli"
-echo "  - larkup"
+echo "npm publishing completed."

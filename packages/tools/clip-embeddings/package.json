@@ -1,6 +1,7 @@
 {
   "name": "@larkup/tool-clip-embeddings",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "description": "Larkup marketplace tool: CLIP/SigLIP image similarity search (coming soon).",
   "main": "./dist/index.js",

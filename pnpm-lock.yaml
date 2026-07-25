@@ -167,7 +167,7 @@ importers:
         specifier: 5.7.3
         version: 5.7.3
       vercel:
-        specifier: latest
+        specifier: 56.5.0
         version: 56.5.0
 
   apps/larkup-proxy:
@@ -635,7 +635,7 @@ importers:
         specifier: ^0.30.0
         version: 0.30.0(apache-arrow@18.1.0)
       '@larkup/core':
-        specifier: workspace:*
+        specifier: workspace:>=0.1.20 <1.0.0
         version: link:../core
       '@pinecone-database/pinecone':
         specifier: ^7.2.0

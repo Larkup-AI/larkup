@@ -1,6 +1,9 @@
 {
   "name": "@larkup/tool-doc-editor",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "description": "Larkup marketplace tool: AI-powered form filling and document editing.",
   "main": "./dist/index.js",
