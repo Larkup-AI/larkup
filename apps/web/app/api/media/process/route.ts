@@ -1187,12 +1187,19 @@ async function createVectorAdapter(config: Awaited<ReturnType<typeof readConfig>
   return createAdapter(config);
 }
 
-async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  timeoutMs = 90000,
+): Promise<Response> {
   let response: Response | undefined;
   let lastError: unknown;
   for (let attempt = 0; attempt < 4; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      response = await fetch(url, init);
+      response = await fetch(url, { ...init, signal: controller.signal });
+      clearTimeout(timeoutId);
       if (response.ok || (response.status !== 429 && response.status < 500)) return response;
       const retryAfterHeader = response.headers.get('retry-after');
       const retryAfter = retryAfterHeader ? Number(retryAfterHeader) : Number.NaN;
@@ -1204,6 +1211,7 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
         ),
       );
     } catch (error) {
+      clearTimeout(timeoutId);
       lastError = error;
       await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 1_500));
     }

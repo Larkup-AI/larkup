@@ -239,10 +239,7 @@ export async function startServer(
       LANCEDB_TABLE: config.storeConfig.tableName || 'documents',
     },
   });
-  console.log(
-    'Starting child process with OPENAI_API_KEY:',
-    !!(config.embeddingApiKey || config.chatApiKey || process.env.OPENAI_API_KEY),
-  );
+
   child.unref();
   await logFd.close();
 

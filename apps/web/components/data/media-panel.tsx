@@ -200,6 +200,7 @@ export function MediaPanel({
   const { activeServer } = useWorkspace();
   const serverId = activeServer?.id;
   const serverQuery = serverId ? `&serverId=${encodeURIComponent(serverId)}` : '';
+  const router = useRouter();
 
   const { data, mutate, isLoading } = useSWR(`/api/media?type=${mediaType}${serverQuery}`, fetcher);
 
@@ -225,6 +226,32 @@ export function MediaPanel({
               (previousStatus === 'pending' || previousStatus === 'processing')
             ) {
               onIndexed(asset);
+            }
+            if (
+              asset.processingStatus === 'failed' &&
+              (previousStatus === 'pending' || previousStatus === 'processing')
+            ) {
+              const msg = asset.processingMessage || `Failed to index ${asset.fileName}`;
+              if (
+                msg.toLowerCase().includes('api key') ||
+                msg.toLowerCase().includes('configuration') ||
+                msg.toLowerCase().includes('missing provider') ||
+                msg.toLowerCase().includes('choose an audio provider')
+              ) {
+                toast.error(`Indexing failed: ${asset.fileName}`, {
+                  description: msg,
+                  duration: 10000,
+                  action: {
+                    label: 'Go to Settings',
+                    onClick: () => router.push('/settings?section=tool-settings'),
+                  },
+                });
+              } else {
+                toast.error(`Indexing failed: ${asset.fileName}`, {
+                  description: msg,
+                  duration: 8000,
+                });
+              }
             }
           }
         }
@@ -1023,7 +1050,7 @@ function MediaContent({
             </div>
           </div>
 
-          <div className="max-h-[350px] overflow-y-auto pr-1">
+          <div className="max-h-87.5 overflow-y-auto pr-1">
             {/* Grid preview for staged images */}
             {mediaType === 'image' ? (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1418,7 +1445,7 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
       <span className="flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50/50 px-1.5 py-0.5 rounded-sm">
         <Loader2 className="size-2.5 animate-spin shrink-0" />
         <span
-          className="truncate max-w-[120px] sm:max-w-[200px]"
+          className="truncate max-w-30 sm:max-w-50"
           title={asset.processingMessage || 'Processing...'}
         >
           {asset.processingMessage || 'Processing...'}
@@ -1431,7 +1458,7 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
     return (
       <span className="flex items-center gap-1 rounded-sm bg-blue-50/50 px-1.5 py-0.5 text-[10px] text-blue-600">
         <Loader2 className="size-2.5 shrink-0 animate-spin" />
-        <span className="max-w-[120px] truncate sm:max-w-[200px]" title={asset.processingMessage}>
+        <span className="max-w-30 truncate sm:max-w-50" title={asset.processingMessage}>
           {asset.processingMessage}
         </span>
         <span className="tabular-nums">{Math.round(asset.processingProgress ?? 1)}%</span>
@@ -1445,81 +1472,17 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
         title={asset.processingError}
       >
         <AlertCircle className="size-2.5 shrink-0" />
-        <span className="truncate max-w-[120px]">{asset.processingError || 'Failed'}</span>
+        <span className="truncate max-w-30">{asset.processingError || 'Failed'}</span>
       </span>
     );
   }
   return (
     <span className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
       <Clock className="size-2.5 shrink-0" />
-      <span className="truncate max-w-[120px]" title={asset.processingMessage || 'Pending...'}>
+      <span className="truncate max-w-30" title={asset.processingMessage || 'Pending...'}>
         {asset.processingMessage || 'Pending...'}
       </span>
     </span>
-  );
-}
-
-const MEDIA_STAGE_LABELS: Record<MediaPipelineStage, string> = {
-  download: 'Download',
-  extract: 'Extract',
-  transcribe: 'Transcribe',
-  vision: 'Visual analysis',
-  synthesize: 'Connect notes',
-  index: 'Search index',
-};
-
-function ProcessingStageRow({ step }: { step: MediaProcessingStep }) {
-  const isRunning = step.status === 'running';
-  const isDone = step.status === 'completed';
-  const isFailed = step.status === 'failed';
-  const count =
-    step.current !== undefined && step.total !== undefined && step.total > 0
-      ? step.unit === '%'
-        ? `${Math.round(Math.min(step.current, step.total))}%`
-        : `${Math.min(step.current, step.total)} / ${step.total}${step.unit ? ` ${step.unit}` : ''}`
-      : step.percent !== undefined && isRunning
-      ? `${Math.round(step.percent)}%`
-      : step.status === 'skipped'
-      ? 'Not needed'
-      : isDone
-      ? 'Done'
-      : 'Waiting';
-
-  return (
-    <div
-      className={cn(
-        'min-w-0 rounded-md border px-2 py-1.5',
-        isRunning
-          ? 'border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/25'
-          : isFailed
-          ? 'border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20'
-          : 'border-border/60 bg-muted/15',
-      )}
-      title={step.message}
-    >
-      <div className="flex items-center gap-1.5">
-        {isRunning ? (
-          <Loader2 className="size-3 shrink-0 animate-spin text-blue-600 dark:text-blue-400" />
-        ) : isDone ? (
-          <Check className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
-        ) : isFailed ? (
-          <AlertCircle className="size-3 shrink-0 text-red-500" />
-        ) : (
-          <Clock className="size-3 shrink-0 text-muted-foreground/60" />
-        )}
-        <span className="truncate text-[10px] font-medium text-foreground">
-          {MEDIA_STAGE_LABELS[step.stage]}
-        </span>
-      </div>
-      <p
-        className={cn(
-          'mt-0.5 truncate pl-[18px] text-[9px] tabular-nums',
-          isRunning ? 'text-blue-700 dark:text-blue-300' : 'text-muted-foreground',
-        )}
-      >
-        {count}
-      </p>
-    </div>
   );
 }
 
@@ -1528,16 +1491,13 @@ function ActiveIndexingList({ assets }: { assets: MediaAsset[] }) {
     <section
       aria-live="polite"
       aria-label="Active media indexing jobs"
-      className="space-y-3 rounded-xl border border-emerald-200/70 bg-emerald-50/35 p-3 dark:border-emerald-900/70 dark:bg-emerald-950/20"
+      className="space-y-3 rounded-xl border border-emerald-300 bg-emerald-50/20 p-3 dark:border-emerald-700/60 dark:bg-emerald-950/20"
     >
       <div className="flex items-center gap-2">
         <Loader2 className="size-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
         <div className="min-w-0 flex-1">
           <p className="text-[12px] font-medium text-foreground">
             Indexing {assets.length} {assets.length === 1 ? 'file' : 'files'}
-          </p>
-          <p className="text-[10px] text-muted-foreground">
-            Live updates as each indexing stage finishes
           </p>
         </div>
       </div>
@@ -1548,15 +1508,12 @@ function ActiveIndexingList({ assets }: { assets: MediaAsset[] }) {
           return (
             <div
               key={asset.id}
-              className="space-y-1.5 rounded-lg border border-border/70 bg-background/80 p-2.5"
+              className="space-y-2 rounded-lg border border-transparent bg-background/40 p-2.5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-[11px] font-medium text-foreground">
                     {asset.fileName}
-                  </p>
-                  <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                    {asset.processingMessage || 'Preparing media indexing...'}
                   </p>
                 </div>
                 <span className="shrink-0 text-[10px] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
@@ -1570,18 +1527,35 @@ function ActiveIndexingList({ assets }: { assets: MediaAsset[] }) {
                   INDEXING_PROGRESS_CLASS,
                 )}
               />
-              {asset.processingSteps?.length ? (
-                <div className="grid grid-cols-2 gap-1.5 pt-1 sm:grid-cols-3">
-                  {asset.processingSteps.map((step) => (
-                    <ProcessingStageRow key={step.stage} step={step} />
-                  ))}
-                </div>
-              ) : null}
+              <div className="flex items-center gap-1.5">
+                <ElapsedTime startTime={asset.createdAt} />
+                <p className="truncate text-[10px] text-muted-foreground animate-pulse">
+                  {asset.processingMessage || 'Preparing media indexing...'}
+                </p>
+              </div>
             </div>
           );
         })}
       </div>
     </section>
+  );
+}
+
+function ElapsedTime({ startTime }: { startTime: string }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const start = new Date(startTime).getTime();
+    const update = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [startTime]);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  return (
+    <span className="font-mono tabular-nums text-[10px] text-muted-foreground/60">
+      {mins}:{secs.toString().padStart(2, '0')}
+    </span>
   );
 }
 

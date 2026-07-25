@@ -41,6 +41,7 @@ async function describeImage(req: Request) {
 
     const { text, usage } = await generateText({
       model,
+      abortSignal: req.signal,
       messages: [
         {
           role: 'user',
