@@ -1602,11 +1602,63 @@ function ActiveIndexingList({
                   {asset.processingMessage || 'Preparing media indexing...'}
                 </p>
               </div>
+              {asset.processingSteps?.length ? (
+                <PipelineSteps steps={asset.processingSteps} />
+              ) : null}
             </div>
           );
         })}
       </div>
     </section>
+  );
+}
+
+const PIPELINE_STAGE_LABELS: Record<MediaPipelineStage, string> = {
+  download: 'Download media',
+  extract: 'Extract media',
+  transcribe: 'Transcribe audio',
+  vision: 'Understand visuals',
+  synthesize: 'Connect notes',
+  index: 'Search index',
+};
+
+function PipelineSteps({ steps }: { steps: MediaProcessingStep[] }) {
+  return (
+    <div className="grid gap-1 pt-0.5 sm:grid-cols-2 lg:grid-cols-3">
+      {steps.map((step) => {
+        const hasCount = step.current !== undefined && step.total !== undefined;
+        const label = hasCount
+          ? `${step.current} / ${step.total}${step.unit ? ` ${step.unit}` : ''}`
+          : PIPELINE_STAGE_LABELS[step.stage];
+        const isRunning = step.status === 'running';
+        const isComplete = step.status === 'completed' || step.status === 'skipped';
+
+        return (
+          <div
+            key={step.stage}
+            className={cn(
+              'flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[9px]',
+              isRunning
+                ? 'border-emerald-300 bg-emerald-50/70 text-emerald-700 dark:border-emerald-700/70 dark:bg-emerald-950/40 dark:text-emerald-300'
+                : 'border-border/60 bg-background/40 text-muted-foreground',
+            )}
+          >
+            {isRunning ? (
+              <Loader2 className="size-2.5 shrink-0 animate-spin" aria-hidden="true" />
+            ) : isComplete ? (
+              <Check className="size-2.5 shrink-0 text-emerald-600" aria-hidden="true" />
+            ) : step.status === 'failed' ? (
+              <AlertCircle className="size-2.5 shrink-0 text-destructive" aria-hidden="true" />
+            ) : (
+              <Clock className="size-2.5 shrink-0" aria-hidden="true" />
+            )}
+            <span className="truncate tabular-nums" title={step.message || label}>
+              {label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

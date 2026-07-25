@@ -184,6 +184,12 @@ async function removeMedia(req: Request) {
     const { getMediaAsset } = await import('@larkup/core/media-store');
     const asset = await getMediaAsset(id);
     if (asset) {
+      if (isMediaProcessing(asset)) {
+        return NextResponse.json(
+          { error: 'Wait for the media indexing job to finish before deleting it.' },
+          { status: 409 },
+        );
+      }
       const documentIds = allMediaDocumentIds(asset);
       await deleteMediaDocuments(documentIds);
       await storage.delete(asset.storageUri).catch(() => {});
@@ -195,14 +201,7 @@ async function removeMedia(req: Request) {
     const idList = ids.split(',');
     const assets = await readMediaAssets();
     const selectedAssets = assets.filter((asset) => idList.includes(asset.id));
-    if (
-      selectedAssets.some(
-        (asset) =>
-          asset.processingStatus === 'processing' ||
-          (asset.processingStatus === 'pending' &&
-            asset.processingMessage === 'Queued for background processing...'),
-      )
-    ) {
+    if (selectedAssets.some(isMediaProcessing)) {
       return NextResponse.json(
         { error: 'Wait for all selected media indexing jobs to finish before deleting them.' },
         { status: 409 },
@@ -219,6 +218,17 @@ async function removeMedia(req: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+function isMediaProcessing(asset: {
+  processingStatus: string;
+  processingMessage?: string;
+}): boolean {
+  return (
+    asset.processingStatus === 'processing' ||
+    (asset.processingStatus === 'pending' &&
+      asset.processingMessage === 'Queued for background processing...')
+  );
 }
 
 function withRequestServer<T>(req: Request, fn: () => T): T {
