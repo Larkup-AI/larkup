@@ -1,6 +1,10 @@
 .next/dev/
 .next/cache/
 .next/standalone/
+.next/**/*.map
+.next/trace
+.next/trace-build
+.next/turbopack
 .larkup/
 .larkupdb/
 .turbo/
