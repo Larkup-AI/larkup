@@ -48,7 +48,7 @@ from larkup import Document
 
 doc = Document(
     id="doc-1",
-    text="Larkup is a flexible, high-performance RAG pipeline.",
+    text="Larkup is a flexible, high performance RAG pipeline.",
     title="Introduction"
 )
 
@@ -75,7 +75,7 @@ for progress in client.index_documents(
     print(progress.percent, progress.succeeded, progress.failed)
 ```
 
-Use `mode="sequential"` for strict request ordering or rate-limited embedding providers. Parallel mode controls client request scheduling only; the server retains its configured index type, vector store, embedding model, and chunking strategy.
+Use `mode="sequential"` for strict request ordering or embedding providers with strict rate limits. Parallel mode controls client request scheduling only. The server retains its configured index type, vector store, embedding model, and chunking strategy.
 
 ### Querying
 
@@ -158,7 +158,7 @@ larkup marketplace install video-audio
 
 ## Local Demo
 
-The repository includes a complete demo configured for `http://localhost:8091`:
+The repository includes a complete demo configured for `http://localhost:8080`:
 
 ```bash
 cd apps/sdk/py-sdk

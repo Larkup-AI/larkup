@@ -1,0 +1,121 @@
+---
+title: "Connect an AI Agent"
+description: "Connect a running Larkup server to any AI agent using the REST API, TypeScript SDK, or Python SDK."
+---
+
+<Badge color="blue">Developer</Badge>
+
+When you load data and start your server, Larkup exposes a REST API that any agent or application can call. The endpoints are straightforward: send a query string, get back the most relevant chunks from your knowledge base.
+
+## Finding your server URL
+
+Go to **Settings → Larkup Server**. The default local URL is `http://localhost:8080`. Copy the **API key** from the same page. Every request must include it in the `Authorization` header.
+
+<Frame caption="Settings → Larkup Server showing the local URL and API key">
+  <img src="/images/new/server-on.png" alt="Larkup Server settings with running server and API key" />
+</Frame>
+
+The server also ships with an interactive API reference (powered by Scalar). Click **API reference** from that page to explore all endpoints.
+
+<Frame caption="The interactive API reference for a running Larkup server">
+  <img src="/images/new/scalar-api.png" alt="Scalar API reference for the Larkup server" />
+</Frame>
+
+## Connecting with the TypeScript SDK
+
+<CodeGroup>
+
+```typescript AI SDK tool
+import { tool } from "ai";
+import { z } from "zod";
+import { LarkupClient } from "@larkup/sdk";
+
+const client = new LarkupClient({
+  baseUrl: "http://localhost:8080",
+  apiKey: "your-api-key",
+});
+
+export const searchKnowledgeBase = tool({
+  description: "Search the knowledge base for relevant information.",
+  parameters: z.object({ query: z.string() }),
+  execute: async ({ query }) => {
+    const results = await client.query(query, 5);
+    return results.hits.map((hit) => hit.text).join("\n\n");
+  },
+});
+```
+
+```typescript Direct query
+import { LarkupClient } from "@larkup/sdk";
+
+const client = new LarkupClient({
+  baseUrl: "http://localhost:8080",
+  apiKey: "your-api-key",
+});
+
+const results = await client.query("What is the refund policy?", 5);
+
+for (const hit of results.hits) {
+  console.log(hit.text, hit.score);
+}
+```
+
+</CodeGroup>
+
+## Connecting with the Python SDK
+
+```python
+from larkup import LarkupClient, LarkupClientOptions
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.documents import Document
+from pydantic import Field
+from typing import List
+
+class LarkupRetriever(BaseRetriever):
+    client: LarkupClient = Field(
+        default_factory=lambda: LarkupClient(
+            LarkupClientOptions(
+                base_url="http://localhost:8080",
+                api_key="your-api-key"
+            )
+        )
+    )
+
+    def _get_relevant_documents(self, query: str, *, run_manager=None) -> List[Document]:
+        results = self.client.query(query, top_k=5)
+        return [
+            Document(page_content=hit.text, metadata={"score": hit.score})
+            for hit in results.hits
+        ]
+
+retriever = LarkupRetriever()
+docs = retriever.invoke("What are the payment options?")
+```
+
+## Using the REST API directly
+
+If you are not using a Larkup SDK, call the endpoints directly:
+
+```bash
+curl -X POST http://localhost:8080/query \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is the return policy?", "topK": 5}'
+```
+
+For streaming chat responses:
+
+```bash
+curl -X POST http://localhost:8080/chat \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Summarize the Q3 report"}]}'
+```
+
+The full endpoint reference is in the [API Reference](/api-reference/overview) tab.
+
+## Deploying to production
+
+When you are ready to move off localhost, go to **Settings → Larkup Server → Deploy to cloud**. Larkup generates a Vercel deployment with your configuration and API key. The deployed URL works the same way. Replace the local base URL in your SDK or REST calls.
+
+See [Deployment](/developer/deploy) for Docker and VPS options.

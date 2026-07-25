@@ -14,7 +14,7 @@ npm install @larkup/sdk
 import { LarkupClient } from "@larkup/sdk";
 
 const client = new LarkupClient({
-  baseUrl: "http://localhost:8083",
+  baseUrl: "http://localhost:8080",
   apiKey: process.env.LARKUP_API_KEY,
 });
 
@@ -25,8 +25,8 @@ for await (const event of client.chat("Summarize the result.")) {
 }
 ```
 
-The client supports health and OpenAPI discovery, retrieval, document CRUD, sequential or parallel bulk indexing with progress, corpus filtering and export, scraping, and streaming retrieval-grounded chat.
+The client supports health and OpenAPI discovery, retrieval, document CRUD, sequential or parallel bulk indexing with progress, corpus filtering and export, scraping, and streaming chat grounded in retrieved content.
 
-`LarkupHubClient` provides typed Marketplace catalog discovery. Install and uninstall operations remain in the CLI because they modify the local Larkup tool directory.
+`LarkupHubClient` provides typed Marketplace catalog discovery. Install and uninstall operations remain in the CLI because they change the local Larkup tool directory.
 
 See the [TypeScript SDK documentation](https://larkup.de/docs/sdk/typescript) for the complete guide.

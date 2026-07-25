@@ -1,0 +1,53 @@
+---
+title: "Chat with Video"
+description: "Import a video or YouTube URL and ask questions. Larkup returns timestamped answers with an embedded player."
+---
+
+The Video and Audio marketplace tool lets you index a local file, a YouTube video, or an entire playlist, then ask questions about it in Chat. Answers include the exact timestamp and an embedded player that seeks directly to the relevant moment.
+
+## Installing the tool
+
+Go to **Settings → Marketplace** and install **Video & Audio**. You only need to do this once.
+
+<Frame caption="The Marketplace inside Settings">
+  <img src="/images/new/marketplace.png" alt="Marketplace showing Video and Audio tool" />
+</Frame>
+
+Once installed, the **Media** tab appears in the Data page.
+
+## Importing a video
+
+Open **Data → Media**. You can either upload a file from your computer or paste a YouTube URL (single video or playlist, up to 10 URLs at once).
+
+<Frame caption="Importing a YouTube video from the Media tab">
+  <img src="/images/new/upload-video-data-page.png" alt="Media tab with YouTube URL import" />
+</Frame>
+
+Before the import starts, Larkup shows you the detected duration, expected processing time, and estimated API cost. Click **Import** to confirm.
+
+Indexing runs in the background and covers:
+
+- Speech transcription with timestamps
+- Scene sampling and visual analysis
+- OCR on visible text
+- A full video summary plus independent timestamped evidence sections
+
+You can watch download, transcription, visual analysis, and embedding progress in real time in the Media panel.
+
+<Frame caption="Indexing progress for a video">
+  <img src="/images/new/indexing-video-progress.png" alt="Live indexing progress stages for video" />
+</Frame>
+
+## Asking questions
+
+Switch to **Chat**. Ask who said something, what happened at a specific point, or what the outcome was. Larkup retrieves the matching timestamped segments and the answer includes an embedded player positioned at the cited moment.
+
+<Frame caption="Chat answer with an embedded video player and timestamp citation">
+  <img src="/images/new/video-preview-chat-reply.png" alt="Chat reply with embedded video at cited timestamp" />
+</Frame>
+
+For YouTube sources the citation also links directly to the video at the matching timestamp.
+
+<Tip>
+  Need to index a video again after changing your transcription provider or language setting? Go to **Data → Media → View Uploads** and select the indexing action for that asset.
+</Tip>

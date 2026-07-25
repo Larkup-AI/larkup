@@ -6,7 +6,7 @@ description: "Get up and running with Larkup in seconds."
 {/*
 ## Desktop App <Icon icon="desktop" />
 
-The easiest way to use Larkup — download the desktop app and get started with a full graphical interface. No terminal required.
+The easiest way to use Larkup is the desktop app. It provides the full graphical interface with no terminal required.
 
 <CardGroup cols={2}>
   <Card
@@ -51,7 +51,7 @@ The easiest way to use Larkup — download the desktop app and get started with 
 </CardGroup>
 
 <Tip>
-  All desktop downloads are available on the [Download Page](https://larkup.de/download) with architecture-specific options.
+  All desktop downloads are available on the [Download Page](https://larkup.de/download) with options for each architecture.
 </Tip>
 */}
 
@@ -136,9 +136,9 @@ If you see a version number, you're good. Head to the [Quickstart](/guide/quicks
   </Tab>
 </Tabs>
 
-## Self-contained Install
+## Isolated Install
 
-If you prefer an installation that requires no root access and doesn't modify system files, use the self-contained script. This will install its own Node.js and keep everything isolated under `~/.larkup`.
+If you prefer an installation that requires no root access and does not modify system files, use the isolated script. It installs its own Node.js and keeps everything under `~/.larkup`.
 
 ```bash
 curl -fsSL https://larkup.de/install-local.sh | bash
@@ -162,7 +162,7 @@ You can customize the main installation scripts using the following flags:
     # Install a specific version
     curl -fsSL https://larkup.de/install.sh | bash -s -- --version 1.2.0
 
-    # Skip prompts (CI-friendly)
+    # Skip prompts in CI
     curl -fsSL https://larkup.de/install.sh | bash -s -- --no-prompt
 
     # Preview without making changes
@@ -176,7 +176,7 @@ You can customize the main installation scripts using the following flags:
     # Install a specific version
     .\install.ps1 -Version 1.2.0
 
-    # Skip prompts (CI-friendly)
+    # Skip prompts in CI
     .\install.ps1 -NoPrompt
 
     # Preview without making changes
@@ -189,17 +189,16 @@ You can customize the main installation scripts using the following flags:
 
 ## Keeping Up to Date
 
-Larkup will notify you in the web UI when a new version is available — look for the update banner at the top of the page.
+Larkup will notify you in the web UI when a new version is available. Look for the
+update banner at the top of any page, then select **Copy command** and run the copied
+command in your terminal.
 
 <Tabs>
-  <Tab title="Desktop" icon="desktop">
-    The desktop app checks for updates automatically on startup. When a new version is available, you'll see an **"Update Now"** button that downloads and installs the update seamlessly — no manual re-download needed.
-  </Tab>
   <Tab title="Docker" icon="docker">
     Update to the latest version with a single command:
 
     ```bash
-    docker pull aboneda/larkup:latest && docker compose up -d
+    docker compose pull && docker compose up -d
     ```
 
     For **automatic updates**, add [Watchtower](https://containrrr.dev/watchtower/) to your `docker-compose.yml`:
@@ -225,7 +224,7 @@ Larkup will notify you in the web UI when a new version is available — look fo
     Update the CLI to the latest version:
 
     ```bash
-    npm install -g @larkup/cli
+    larkup update
     ```
 
     Or if you used the install script:
@@ -242,6 +241,6 @@ Larkup will notify you in the web UI when a new version is available — look fo
 
 | Requirement | Details |
 | --- | --- |
-| **Node.js** | v20+ (auto-installed if missing) |
+| **Node.js** | v20+ (installed automatically if missing) |
 | **OS** | macOS, Linux, WSL, or Windows |
 | **Architecture** | x64 or ARM64 |

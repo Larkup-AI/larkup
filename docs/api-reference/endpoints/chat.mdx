@@ -1,10 +1,10 @@
 ---
 title: "Stream Chat"
 api: "POST /chat"
-description: "Stream a retrieval-grounded chat response."
+description: "Stream a chat response grounded in retrieved content."
 ---
 
-The generated server embeds the latest user message, retrieves relevant chunks, and supplies them to the configured chat model. The response uses Server-Sent Events.
+The generated server embeds the latest user message, retrieves relevant chunks, and supplies them to the configured chat model. The response uses a server event stream.
 
 ### Body
 
@@ -49,4 +49,4 @@ event: done
 data: {"type":"done","hits":[...]}
 ```
 
-Set `CHAT_API_KEY` and, optionally, `CHAT_MODEL` in the generated server environment. Custom OpenAI-compatible models also use `CHAT_BASE_URL`.
+Set `CHAT_API_KEY` and, optionally, `CHAT_MODEL` in the generated server environment. Custom models that use the OpenAI interface also use `CHAT_BASE_URL`.

@@ -1,8 +1,8 @@
 import { LarkupClient } from '@larkup/sdk';
 
 const client = new LarkupClient({
-  baseUrl: process.env.LARKUP_API_URL ?? 'http://localhost:8091',
-  apiKey: process.env.LARKUP_API_KEY ?? 'sk-1ad8b2881d665aa0eadb66e5c13d74b336bbc8736079b196',
+  baseUrl: process.env.LARKUP_API_URL ?? 'http://localhost:8080',
+  apiKey: process.env.LARKUP_API_KEY ?? 'your-api-key',
 });
 
 const indexedIds: string[] = [];

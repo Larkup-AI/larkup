@@ -43,9 +43,10 @@
           {
             "group": "Use Cases",
             "pages": [
-              "guide/build-rag-server",
-              "guide/data-loading",
-              "guide/instant-chatbot"
+              "guide/video-chat",
+              "guide/document-editor",
+              "guide/data-analysis",
+              "developer/agent-knowledge-base"
             ]
           },
           {
@@ -120,4 +121,3 @@
     }
   }
 }
- 

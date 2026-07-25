@@ -46,7 +46,7 @@ The base URL defaults to `http://localhost:8080`. When constructor values are om
 ```typescript
 const response = await client.addDocument({
   id: 'doc-1',
-  text: 'Larkup is a flexible, high-performance RAG pipeline.',
+  text: 'Larkup is a flexible, high performance RAG pipeline.',
   title: 'Introduction',
 });
 
@@ -74,7 +74,7 @@ for await (const progress of client.indexDocuments(documents, {
 }
 ```
 
-Use `mode: "sequential"` when request order matters or the embedding provider has a strict rate limit. Parallel mode only controls client request scheduling; the server's semantic, hybrid, vector-store, embedding, and chunking configuration remains authoritative.
+Use `mode: "sequential"` when request order matters or the embedding provider has a strict rate limit. Parallel mode only controls client request scheduling. The server's semantic, hybrid, vector store, embedding, and chunking configuration remains authoritative.
 
 ### Querying
 
@@ -123,7 +123,7 @@ const jsonl = await client.exportCorpus('jsonl');
 
 ### Marketplace Hub
 
-Tool discovery uses a separate Hub client because Marketplace installation is a local CLI/control-plane operation.
+Tool discovery uses a separate Hub client because Marketplace installation is a local CLI control operation.
 
 ```typescript
 import { LarkupHubClient } from '@larkup/sdk';
@@ -156,7 +156,7 @@ larkup marketplace install video-audio
 
 ## Local Demo
 
-The repository includes a complete demo configured for `http://localhost:8091`:
+The repository includes a complete demo configured for `http://localhost:8080`:
 
 ```bash
 pnpm --filter @larkup/sdk build

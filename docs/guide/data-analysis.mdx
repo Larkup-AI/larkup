@@ -1,0 +1,41 @@
+---
+title: "Analyze Tabular Data"
+description: "Upload a spreadsheet or CSV and ask analytical questions. Larkup returns charts and summaries directly in Chat."
+---
+
+Larkup understands structured data. Upload an Excel or CSV file and the AI can aggregate rows, compute totals, compare categories, and render the result as a bar chart, line chart, or table inside the Chat conversation.
+
+## Loading the data
+
+Go to **Data → Files** and drag in your `.xlsx`, `.csv`, or `.json` file. Larkup detects the structure automatically. Column types, row count, and the data schema are shown before you confirm.
+
+<Frame caption="A 500-row Excel file staged for upload with column schema preview">
+  <img src="/images/new/upload-excel-data.png" alt="Excel file staged in the Files tab with column types detected" />
+</Frame>
+
+Click **Start Indexing** to begin. Progress is shown in real time.
+
+<Frame caption="Indexing progress for a structured data file">
+  <img src="/images/new/upload-excel-data-progress.png" alt="Indexing progress for Excel upload" />
+</Frame>
+
+## Asking analytical questions
+
+Once indexed, open **Chat** and ask anything about the data:
+
+> "Show revenue by region as a bar chart"
+>
+> "Which sales rep had the highest net revenue in Q1?"
+> "Give me a monthly breakdown of gross sales"
+
+Larkup reads the relevant rows, computes the answer, and renders the chart or table inline.
+
+<Frame caption="A bar chart generated in Chat from a sales dataset">
+  <img src="/images/new/chart-in-chat1.png" alt="Bar chart rendered inline in Chat" />
+</Frame>
+
+<Frame caption="Chart with a later summary and suggestions">
+  <img src="/images/new/chart-in-chat2.png" alt="Detailed chart answer with analysis and later suggestions" />
+</Frame>
+
+Each chart response includes a **Copy Data** button and a **CSV** export so you can take the output into another tool. Later questions build on the previous answer. You can drill down into a specific category, change the chart type, or ask for a written summary without uploading the data again.

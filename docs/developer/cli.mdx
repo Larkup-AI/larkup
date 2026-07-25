@@ -32,7 +32,7 @@ larkup generate
 larkup serve
 ```
 
-`index` recursively loads supported text and source-code files, then streams chunking and embedding progress. It skips `.git`, `.larkup`, `node_modules`, `dist`, and `build` directories.
+`index` recursively loads supported text and source code files, then streams chunking and embedding progress. It skips `.git`, `.larkup`, `node_modules`, `dist`, and `build` directories.
 
 Use `--no-run` when you want to load files without rebuilding the vector index:
 
@@ -69,7 +69,7 @@ larkup chat
 larkup chat --model openai/gpt-4o-mini
 ```
 
-`query` prints retrieved chunks. `chat` opens an interactive, retrieval-grounded conversation and streams the answer as it is generated.
+`query` prints retrieved chunks. `chat` opens an interactive conversation grounded in retrieved content and streams the answer as it is generated.
 
 Generated servers also expose `POST /query` and the streaming `POST /chat` endpoint, so the same features are available through the TypeScript and Python SDKs.
 
@@ -110,8 +110,8 @@ Deployment targets:
 
 | Target | Behavior |
 | --- | --- |
-| `docker` | Generate or export the Docker-ready server. This is the default. |
-| `vercel` | Generate or export the Vercel-ready server. |
+| `docker` | Generate or export a server ready for Docker. This is the default. |
+| `vercel` | Generate or export a server ready for Vercel. |
 | `export` | Copy the portable server artifact to `--out`. |
 | `local` | Generate and start the standard server in the background. |
 | `agent` | Generate the extendable agent server, or start it with `--start`. |

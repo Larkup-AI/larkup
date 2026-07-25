@@ -1,16 +1,16 @@
 ---
 title: "Introduction"
 ---
-{/* <p align="center">
+
+<p align="center">
   <img src="/logo/logo-light2.png" alt="Larkup Logo" width="400" className="block dark:hidden" />
 </p>
 
 <p align="center">
   <img src="/logo/logo-dark2.png" alt="Larkup Logo" width="400" className="hidden dark:block" />
-</p> */}
+</p>
 
-**Larkup** is an open-source toolkit that takes you from zero to a running Retrieval-Augmented Generation (RAG) server in minutes. It eliminates the complexities of manual infrastructure setup, allowing you to easily configure vector stores, chunking strategies, and embedding models through a simple interface, and immediately connect your AI agents.
-
+{/*
 <video
   autoPlay
   muted
@@ -20,65 +20,66 @@ title: "Introduction"
   className="w-full aspect-video rounded-xl border"
   src="https://uj1bbyme8q.ufs.sh/f/33KlxstS2hq81AvbzGE3Pi9VHJzQK5GwvL8RYsucSp1xD0Al"
 ></video>
+*/}
 
-### Who is Larkup for?
+**Larkup** is an open source platform that lets you build a private AI over your own files, websites, databases, and connected tools. Chat with your data, analyze it, or expose it through a live API.
 
-**For Developers & Technical Teams**
-- **Launch a Full RAG Server:** Stop worrying about infrastructure. Go from documents to a deployed RAG API in minutes.
-- **Connect with SDKs:** Integrate powerful search into your applications using our native SDKs.
-- **Agent Integrations:** Seamlessly connect your RAG pipeline to autonomous agents using AI-SDK or LangChain.
-- **Bring Your Own Vector Store:** Use local models for privacy, or connect to OpenAI, LanceDB, Pinecone, Qdrant, and more.
+There is no pipeline to configure before you start. Open the app, provide your API key, load content from the Data page, and start chatting. Indexing, the RAG server, and model selection run behind the scenes.
 
-**For Non-Technical Users & Business Teams**
-- **Instant Chatbot:** Build a chatbot trained on your own data with zero coding required.
-- **Embed Anywhere:** Just provide an API key, instantly chat with your data, and embed the widget on your site.
-- **User-Friendly Interface:** Manage your data sources, vector stores, and chunking strategies all through an intuitive web UI.
+### Who it is for
 
-### How it Works
+**Business users** can load documents, connect tools like Notion or Google Drive, and start asking questions without writing code.
 
-Larkup simplifies the process into 6 core steps:
+**Developers and teams** get a running RAG server with a full REST API, official TypeScript and Python SDKs, and support for AI SDK and LangChain in the same workspace.
+
+### How it works
 
 <Steps>
-  <Step title="Configure">
-    Choose your embedding models and vector store.
+  <Step title="Enter your API key">
+    On first launch you will see an onboarding screen. Paste an OpenAI, Anthropic, or other provider key and Larkup is ready to go.
   </Step>
-  <Step title="Load Data">
-    Ingest data easily from files, URLs, or web scraping.
+  <Step title="Load your data">
+    Go to the **Data** page and pick a source: upload files, scrape a website, paste text, import media, or connect an integration such as Notion, Google Drive, or Slack.
   </Step>
-  <Step title="Index">
-    Automatically chunk and embed your loaded data.
-  </Step>
-  <Step title="Launch">
-    Spin up your RAG server instantly.
-  </Step>
-  <Step title="Demo">
-    Test your retrieval quality using the built-in demo UI.
-  </Step>
-  <Step title="Deploy">
-    Deploy to your favorite cloud platforms (e.g., Vercel, Azure).
+  <Step title="Start chatting">
+    Open the **Chat** page. Larkup indexes your data automatically and grounds every answer in what you loaded. Responses include source citations, embedded video players, inline charts, and more depending on your content.
   </Step>
 </Steps>
 
+## Choose what happens next
+
+<CardGroup cols={2}>
+  <Card title="Connect an AI Agent" icon="plug" href="/developer/agent-knowledge-base">
+    Launch the API server, copy its endpoint and API key, then connect your agent through REST, TypeScript, or Python.
+  </Card>
+
+  <Card title="Use AI Tools" icon="wrench" href="/developer/configuration">
+    Fill and sign documents, analyze tabular data, generate charts, search media, and control which tools your assistant can use.
+  </Card>
+</CardGroup>
+
+{/*
 <Tip>
-  No coding required , use the Web UI. Prefer the terminal? See the [CLI guide](/developer/cli).
+  The RAG server starts automatically when you load data. You do not need to click anything to launch it. Head to **Settings → Larkup Server** to copy the endpoint URL or deploy to Vercel.
 </Tip>
+*/}
 
 ## Get Started
 
 <CardGroup cols={2}>
   <Card title="Quick Start" icon="bolt" href="/guide/quickstart">
-    Get a server running locally in under 5 minutes.
+    Be up and running in three steps.
   </Card>
 
-  <Card title="Instant Chatbot" icon="comment" href="/guide/instant-chatbot">
-    Launch a chatbot connected to your docs with just an API key.
+  <Card title="Chat with Video" icon="video" href="/guide/video-chat">
+    Import a YouTube video and ask questions with timestamped answers.
   </Card>
 
-  <Card title="SDK Integration" icon="code" href="/developer/sdk">
-    Connect your RAG server to your apps using our SDK.
+  <Card title="Analyze Tabular Data" icon="chart-bar" href="/guide/data-analysis">
+    Upload a spreadsheet and get charts and summaries inline in chat.
   </Card>
 
-  <Card title="Agent Frameworks" icon="robot" href="/developer/agents">
-    Use AI-SDK or LangChain to connect RAG to your agents.
+  <Card title="Sign and Fill Documents" icon="file-signature" href="/guide/document-editor">
+    Fill forms, place signatures, preview changes, and export the finished document.
   </Card>
 </CardGroup>

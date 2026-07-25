@@ -1,97 +1,90 @@
 ---
 title: "Configuration Reference"
-description: "Select your RAG strategy, vector stores, and embedding models."
+description: "Configure models, storage, web search, installed tools, and agent access."
 ---
 
-The Configuration stage defines the backbone of your RAG workspace. Before diving into the tools, it's crucial to understand the different retrieval strategies and how to configure them in Larkup.
+Open **Settings** to configure the active Larkup workspace. Changes apply to Chat, indexing, and the generated server.
 
-## Retrieval Strategies
+## AI Models
 
-When configuring your RAG pipeline, you can choose from different retrieval strategies depending on your use case:
+Use **Settings → AI Models** to select the providers and models used for embeddings and chat.
+
+<Frame caption="Embedding and chat model settings">
+  <img src="/images/new/ai-models-settings.png" alt="AI Models settings with embedding and chat providers" />
+</Frame>
+
+### Embedding model
+
+The embedding model turns loaded content and search queries into vectors. Choose a provider, model, and API key, then save the configuration.
+
+### Chat model
+
+The chat model generates answers from retrieved context. It can use the same provider as embeddings or a separate provider and key.
+
+<Note>
+  Changing the embedding model requires indexing existing content again so stored vectors use the same model as future queries.
+</Note>
+
+## Storage and retrieval
+
+Use **Settings → Storage** to choose the indexing strategy and storage engine.
+
+<Frame caption="Indexing strategy and storage engine settings">
+  <img src="/images/new/storage-settings.png" alt="Storage settings with Hybrid retrieval and LanceDB configuration" />
+</Frame>
 
 <AccordionGroup>
   <Accordion title="Semantic Search" icon="brain">
-    **Semantic Search** uses embedding models to understand the *meaning* and *context* of a query, rather than just exact keywords. It is excellent for answering natural language questions where the exact terminology might differ between the user and the documents.
+    Finds content by meaning. This works well when the question and source use different wording.
   </Accordion>
-  <Accordion title="Lexical Search (Keyword)" icon="magnifying-glass">
-    **Lexical Search** (like BM25) relies on exact keyword matching. It is highly effective for finding specific names, IDs, or domain-specific jargon that might be missed by semantic embeddings.
+  <Accordion title="Lexical Search" icon="magnifying-glass">
+    Finds exact terms such as names, product codes, identifiers, and specialized vocabulary.
   </Accordion>
   <Accordion title="Hybrid Search" icon="layer-group">
-    **Hybrid Search** combines both Semantic and Lexical search, often using a cross-encoder to rerank the results. This offers the best of both worlds, ensuring both contextual understanding and keyword accuracy. *(Advanced configuration for Hybrid search can be done via the API).*
+    Combines semantic and lexical retrieval. This is a strong default for mixed business and technical content.
   </Accordion>
 </AccordionGroup>
 
-<Frame>
-  <img src="/images/configuration-page.png" alt="Configuration Setup Page" />
+LanceDB can run from a local path, LanceDB Cloud, or S3 compatible storage. Use local mode for development. Choose a persistent remote mode before deploying a knowledge base to a serverless platform.
+
+## General settings
+
+Use **Settings → General** to name the workspace and configure optional web search.
+
+<Frame caption="Workspace and web search settings">
+  <img src="/images/new/general-settings.png" alt="General settings with workspace name and web search provider" />
 </Frame>
 
-## Embedding Models & API Keys
+Web search can enrich answers with current information. Select a supported provider and store its API key from this page.
 
-Embedding models create the vector representations of your text. Larkup makes it simple to integrate various providers. To use a model, you must configure its provider and supply a valid API Key.
+## Installed tool settings
 
-<AccordionGroup>
-  <Accordion title="OpenAI API Models" icon="bolt">
-    Native support for the latest OpenAI models like `text-embedding-3-small` and `text-embedding-3-large`.
-  </Accordion>
-  <Accordion title="Any OpenAI-Compatible API" icon="code-branch">
-    Easily point Larkup to any third-party or custom endpoint that adheres to the OpenAI API specification (e.g., vLLM, Together AI, Anyscale).
-  </Accordion>
-  <Accordion title="Local / Open-Source Models" icon="server">
-    Run embedding models locally via Hugging Face or Ollama. Perfect for complete privacy and air-gapped deployments.
-  </Accordion>
-</AccordionGroup>
+Marketplace tools can add their own provider and processing settings. Open **Settings → Installed Tools** after installing a tool.
 
-### Setup Your API Key
-
-Click the **Settings** icon next to "Embedding model" to open the Provider Settings modal. Here, you can:
-1. **Select a Provider**: Choose from providers like OpenAI, DeepSeek, Google, Cohere, Mistral, Voyage, or Custom.
-2. **Set the API Key**: Securely input your API key for the chosen provider.
-3. **Test Connection**: Larkup will verify the connection to the provider before saving.
-
-> [!TIP]
-> **Recommended**: We highly recommend using the **Vercel AI Gateway** provider. It acts as a unified proxy, allowing you to seamlessly route requests to multiple AI providers using a single Gateway API key, while providing built-in caching and rate limiting.
-
-<Frame>
-  <img src="/images/configuration/llm-embedding-providers.png" alt="Provider API Key Settings" />
+<Frame caption="Settings for the installed Video and Audio tool">
+  <img src="/images/new/marketplace-tools-settings.png" alt="Installed tool settings for video transcription and frame analysis" />
 </Frame>
 
-## Vector Stores
+For example, the Video and Audio tool lets you choose an audio provider, verify its API key, and control the frame extraction interval.
 
-Larkup abstracts vector store interactions. You can swap providers seamlessly without altering your data or queries.
+## Agent tools
 
-### Default Vector Store
+Use **Settings → Agent Customization** to control which capabilities the assistant can call.
 
-<AccordionGroup>
-  <Accordion title="LanceDB (Default)" icon="database">
-    By default, Larkup comes with **LanceDB**. It is an embedded, ultra-fast vector database that runs locally without any external dependencies. It works right out of the box.
-  </Accordion>
-</AccordionGroup>
-
-### Requires Separate Installation
-
-When integrating external vector stores, ensure their respective dependencies or server instances are running and configured before connecting.
-
-<AccordionGroup>
-  <Accordion title="Pinecone" icon="cloud">
-    A fully managed, cloud-native vector database. Requires you to input your Pinecone API key and environment.
-  </Accordion>
-  <Accordion title="Qdrant" icon="box">
-    A scalable vector search engine. **Installation:** You'll need to run Qdrant via Docker or use Qdrant Cloud before pointing Larkup to your cluster URL.
-  </Accordion>
-  <Accordion title="ChromaDB" icon="cube">
-    An AI-native open-source embedding database. **Installation:** Run the Chroma server locally or use a managed service and configure the URL in Larkup.
-  </Accordion>
-</AccordionGroup>
-
-### Coming Soon
-
-The following vector stores are actively being added to Larkup:
-- **Milvus**
-- **Weaviate**
-- **pgvector (PostgreSQL)**
-
-<Frame>
-  <img src="/images/configuration/vectorstores-providers.png" alt="Vector Stores Selection" />
+<Frame caption="Choose the tools available to the assistant">
+  <img src="/images/new/agent-tools.png" alt="Agent tool controls for search, charts, analysis, forms, and document editing" />
 </Frame>
 
-> **Note:** When generating the final RAG Server, *only the dependencies for the selected vector store* are bundled, keeping your deployment extremely lightweight.
+Available tools can include:
+
+- Semantic search over the knowledge base
+- Tabular data queries and chart generation
+- Python analysis over selected or complete corpus data
+- Form filling
+- Document editing and signing
+
+Only enable tools that the agent needs for its role.
+
+## Server configuration
+
+After configuring models, storage, and tools, open **Settings → Larkup Server** to launch or deploy the API. See [Deploy Your Server](/developer/deploy) for the current workflow.

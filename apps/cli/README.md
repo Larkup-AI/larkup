@@ -1,6 +1,6 @@
 # Larkup CLI
 
-Build, index, test, and deploy Larkup RAG servers from the terminal.
+Load data, build an index, chat, and deploy Larkup RAG servers from the terminal.
 
 ## Install
 
@@ -17,7 +17,14 @@ larkup generate
 larkup serve
 ```
 
-`index` accepts files and folders. It loads supported text and source files, processes supported media, and streams indexing progress.
+`index` accepts individual files or folders, including text, source code, CSV, JSON, PDF, and Word documents. It streams loading and indexing progress.
+
+Use the dedicated media command for images, audio, and video:
+
+```bash
+larkup marketplace install video-audio
+larkup media ./demo.mp4
+```
 
 ## Commands
 
@@ -33,4 +40,4 @@ larkup serve
 - `larkup open [target]` opens the Web UI or API reference.
 - `larkup update` checks for and installs CLI releases.
 
-Run `larkup --help` or see the [CLI documentation](https://larkup.de/docs/developer/cli) for all options.
+Generated servers use `http://localhost:8080` by default. Run `larkup --help` or see the [CLI documentation](https://larkup.de/docs/developer/cli) for all options.

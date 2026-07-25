@@ -4,10 +4,10 @@ from larkup import Document, LarkupClient, LarkupClientOptions
 
 
 options = LarkupClientOptions(
-    base_url=os.getenv("LARKUP_API_URL", "http://localhost:8091"),
+    base_url=os.getenv("LARKUP_API_URL", "http://localhost:8080"),
     api_key=os.getenv(
         "LARKUP_API_KEY",
-        "sk-1ad8b2881d665aa0eadb66e5c13d74b336bbc8736079b196",
+        "your-api-key",
     ),
 )
 

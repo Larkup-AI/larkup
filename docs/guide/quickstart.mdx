@@ -1,157 +1,93 @@
 ---
 title: "Quickstart"
-description: "Build your first pipeline in 5 steps."
+description: "Start your first AI conversation in minutes."
 ---
 
-Get your first workspace and RAG server running. Choose your preferred workflow:
+Larkup gets out of your way. There is no server to configure, no pipeline to build. Three steps and you are chatting with your data.
 
-<Tabs>
-  <Tab title="Web UI" icon="browser">
-    <Steps>
-      <Step title="Create a Workspace">
-        Launch the Web UI and create a workspace to encapsulate your configuration, data, and server.
-      </Step>
+<Steps>
+  <Step title="Enter your API key">
+    When you open Larkup for the first time you will see the onboarding screen. Paste your API key from any supported provider, including OpenAI, Anthropic, Google, and DeepSeek, then click **Save**. The key is stored locally in your browser and used for chat and embedding calls.
 
-      <Step title="Configure">
-        Navigate to the **Configuration** tab. Select a **Vector Store** (e.g., LanceDB) and an **Embedding Model** (e.g., OpenAI).
-        
-        <Frame>
-          <img src="/images/configuration-page.png" alt="Configuration Page" />
+    <Frame caption="Choose a provider and save your API key">
+      <img src="/images/new/onboard.png" alt="Larkup onboarding screen with AI provider settings" />
+    </Frame>
+
+    <Note>
+      You can change your model provider at any time from **Settings → AI Models**.
+    </Note>
+  </Step>
+
+  <Step title="Go to the Data page and load something">
+    Click **Data** in the left sidebar, then choose the source that matches your content.
+
+    <Tabs>
+      <Tab title="Website">
+        Paste a page or domain URL. You can crawl it directly or search for pages by keyword.
+
+        <Frame caption="Add content from a website">
+          <img src="/images/new/data-website-scraper-off.png" alt="Website source options in the Data page" />
         </Frame>
-      </Step>
+      </Tab>
 
-      <Step title="Ingest Data">
-        In the **Data** tab, add documents via file upload, direct text input, or web scraping. These queue up for the ETL process.
+      <Tab title="Integrations">
+        Open **Integrations**, choose Notion or another source, then select **Configure** or **Connect**. After authorization, Larkup adds the selected content to your knowledge base.
 
-        <Frame>
-          <img src="/images/scrape-etl-jobs.png" alt="Data Ingestion" />
+        <Frame caption="Choose Notion or another connected data source">
+          <img src="/images/new/data-integrations-tab.png" alt="Data integrations including Notion, Google Drive, Slack, and Jira" />
         </Frame>
-      </Step>
+      </Tab>
 
-      <Step title="Index">
-        Head to the **Index** tab and click **Run Indexing Job** to chunk your documents and store the vectors.
+      <Tab title="CSV">
+        Open **Files** and upload a CSV or Excel file. Larkup previews the columns and rows before indexing.
 
-        <Frame>
-          <img src="/images/index-page.png" alt="Indexing Data" />
+        <Frame caption="Review structured data before indexing">
+          <img src="/images/new/upload-excel-data.png" alt="CSV and Excel preview in the Files tab" />
         </Frame>
-      </Step>
+      </Tab>
 
-      <Step title="Launch the Server">
-        Go to the **Server** tab and click **Launch Server** to generate an optimized Node.js backend. Test queries instantly in the **Demo** tab!
+      <Tab title="PDF">
+        Open **Files** and drop in a PDF. You can add one file or stage several files together.
 
-        <Frame>
-          <img src="/images/server-page.png" alt="Launch Server" />
+        <Frame caption="Add a PDF from the Files tab">
+          <img src="/images/new/upload-pdf.png" alt="PDF staged for upload in the Data page" />
         </Frame>
+      </Tab>
 
-        View the API schema using the integrated Scalar UI:
-        <Frame>
-          <img src="/images/server-scalar-api.png" alt="Server API Reference" />
+      <Tab title="Video">
+        Open **Media** to upload a video or import a YouTube URL. Review the duration and estimated processing cost before you confirm.
+
+        <Frame caption="Review a YouTube video before import">
+          <img src="/images/new/upload-video-data-page.png" alt="YouTube video ready to import from the Media tab" />
         </Frame>
-      </Step>
-    </Steps>
-  </Tab>
+      </Tab>
+    </Tabs>
 
-  <Tab title="CLI" icon="terminal">
-    <Steps>
-      <Step title="Launch Larkup Studio">
-        If the Larkup Studio is not already running on port 4567, start it:
-        ```bash
-        larkup dev
-        ```
-      </Step>
+    Once you confirm, Larkup indexes the content in the background. You can watch progress in real time. There is no separate indexing step.
 
-      <Step title="Initialize Workspace">
-        Create a new workspace project:
-        ```bash
-        larkup init my-first-server
-        ```
-      </Step>
+    <Frame caption="Indexing progress for a PDF upload">
+      <img src="/images/new/indexing-pdf-progress.png" alt="PDF indexing progress" />
+    </Frame>
+  </Step>
 
-      <Step title="Ingest Data">
-        Add your documents to the project:
-        ```bash
-        larkup add-doc --file ./data/knowledge-base.txt
-        ```
-      </Step>
+  <Step title="Open Chat and start asking">
+    Click **Chat** in the sidebar. Select an LLM from the dropdown at the top and ask anything about your data. Answers are grounded in what you loaded, with source citations shown in the sidebar.
 
-      <Step title="Index">
-        Process, chunk, and index your documents into the vector store:
-        ```bash
-        larkup index
-        ```
-      </Step>
+    <Frame caption="Chat with sources visible in the side panel">
+      <img src="/images/new/chat-sidebar-on.png" alt="Chat page with sources panel open" />
+    </Frame>
+  </Step>
+</Steps>
 
-      <Step title="Launch the Server">
-        Start the RAG server locally:
-        ```bash
-        larkup serve
-        ```
-      </Step>
+## What you can do next
 
-      <Step title="Test Queries">
-        In another terminal window, query your data directly:
-        ```bash
-        larkup query "What is in my knowledge base?"
-        ```
-      </Step>
-    </Steps>
-  </Tab>
-</Tabs>
+Your data is indexed and your server is already running. A few directions to explore:
 
-## Connect Your App
+- [Chat with a video](/guide/video-chat) and get answers with timestamps.
+- [Analyze a spreadsheet](/guide/data-analysis) with charts and summaries in Chat.
+- [Sign or fill a document](/guide/document-editor) with a live preview.
+- [Connect an AI agent](/developer/agent-knowledge-base) through the SDK or REST API.
 
-Once your server is running, connect your AI agents to it using our official SDKs:
-
-<CodeGroup>
-  ```typescript TypeScript (AI-SDK)
-  import { tool } from "ai";
-  import { z } from "zod";
-  import { LarkupClient } from "@larkup/sdk";
-
-  const ragClient = new LarkupClient({
-    baseUrl: "http://localhost:8080",
-    apiKey: "your-api-key",
-  });
-
-  export const ragTool = tool({
-    description: "Search the knowledge base.",
-    parameters: z.object({ query: z.string() }),
-    execute: async ({ query }) => {
-      const results = await ragClient.query(query, 5);
-      return results.hits.map((hit) => hit.text).join("\n\n");
-    },
-  });
-  ```
-
-  ```python Python (LangChain)
-  from typing import List
-  from langchain_core.retrievers import BaseRetriever
-  from langchain_core.documents import Document
-  from pydantic import Field
-  from larkup import LarkupClient, LarkupClientOptions
-
-  class LarkupRetriever(BaseRetriever):
-      client: LarkupClient = Field(
-          default_factory=lambda: LarkupClient(
-              LarkupClientOptions(base_url="http://localhost:8080", api_key="key")
-          )
-      )
-      
-      def _get_relevant_documents(self, query: str, *, run_manager=None) -> List[Document]:
-          results = self.client.query(query, top_k=5)
-          return [
-              Document(page_content=hit.text, metadata={"score": hit.score}) 
-              for hit in results.hits
-          ]
-
-  # Usage:
-  # retriever = LarkupRetriever()
-  # docs = retriever.invoke("Query here")
-  ```
-</CodeGroup>
-
-<br />
-
-**Now explore what you can build:**
-- [Build Your First RAG Server](/guide/build-rag-server)
-- [Launch an Instant Chatbot](/guide/instant-chatbot)
+<Tip>
+  Prefer the terminal? The CLI covers the same workflow. See the [CLI Reference](/developer/cli).
+</Tip>
