@@ -305,7 +305,7 @@ export async function getChatTools(context: {
   const builtInTools: Record<string, any> = {
     searchKnowledgeBase: tool({
       description:
-        'Search the private RAG knowledge base for relevant documents and time-aligned media evidence. Use this for ALL factual questions, including outcomes, actions, people, spoken content, on-screen text, matches, videos, or specific content mentioned by the user. For media, inspect the returned before/event/after timeline. For winner, result, or outcome questions, you MUST also inspect endingContext before answering because the result is often announced in the final minutes. Cite the timestamp URL that supports the answer. ALWAYS check the knowledge base before claiming information is unavailable.',
+        'Search the private RAG knowledge base for relevant documents and time-aligned media evidence. Use this for ALL factual questions, including outcomes, actions, people, spoken content, on-screen text, matches, videos, or specific content mentioned by the user. For media, inspect the returned before/event/after timeline. For winner, result, or outcome questions, you MUST also inspect endingContext before answering because the result is often announced in the final minutes. CRITICAL: When extracting facts from media notes, you MUST use the exact [HH:MM:SS] timestamps found in the text. Cite the exact timestamp URL that supports the answer. Do NOT guess timestamps. ALWAYS check the knowledge base before claiming information is unavailable.',
       inputSchema: z.object({
         query: z.string().describe('The search query for the knowledge base.'),
       }),

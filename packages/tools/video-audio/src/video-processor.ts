@@ -169,14 +169,14 @@ export function createVideoSamplingPlan(
     periodicFloorSecs = 30;
     sceneCadenceSecs = 30;
   } else if (duration <= 4 * 60 * 60) {
+    periodicFloorSecs = 60;
+    sceneCadenceSecs = 60;
+  } else if (duration <= 12 * 60 * 60) {
     periodicFloorSecs = 2 * 60;
     sceneCadenceSecs = 2 * 60;
-  } else if (duration <= 12 * 60 * 60) {
-    periodicFloorSecs = 10 * 60;
-    sceneCadenceSecs = 5 * 60;
   } else {
-    periodicFloorSecs = 15 * 60;
-    sceneCadenceSecs = 10 * 60;
+    periodicFloorSecs = 5 * 60;
+    sceneCadenceSecs = 5 * 60;
   }
 
   const preferredInterval = Math.max(requestedInterval, periodicFloorSecs);

@@ -332,12 +332,7 @@ function buildBatchPrompt(
     options.mediaType
   } titled "${options.title}".
 
-Write compact factual viewing notes that remain useful for later questions. Preserve exact names,
-numbers, scores, decisions, winners, results, actions, and timestamps. Connect pronouns and repeated
-entities when the evidence supports it. Treat later chronological scoreboard/result frames as newer
-than earlier animation states. For Arabic or other right-to-left text, copy the visible spelling and
-do not reverse labels. If evidence conflicts or OCR is genuinely ambiguous, record the conflict
-instead of inventing certainty. Do not add repetitive statements about facts that were not present.
+Write compact factual viewing notes that remain useful for later questions. CRITICAL: Every single factual claim, event, score change, or action MUST be prefixed with its exact [HH:MM:SS-HH:MM:SS] timestamp copied strictly from the evidence chunks below. Do not hallucinate timestamps. Preserve exact names, numbers, scores, decisions, winners, results, actions, and timestamps. Connect pronouns and repeated entities when the evidence supports it. Treat later chronological scoreboard/result frames as newer than earlier animation states. For Arabic or other right-to-left text, copy the visible spelling and do not reverse labels. If evidence conflicts or OCR is genuinely ambiguous, record the conflict instead of inventing certainty. Do not add repetitive statements about facts that were not present.
 
 Evidence:
 ${segments.map(formatSegmentForPrompt).join('\n\n')}`;
@@ -356,12 +351,9 @@ Create a concise, standalone knowledge-base summary with these headings when app
 - High-value timestamp evidence
 - Genuine uncertainties
 
-Adapt to the content: for a match prioritize score changes and the final result; for CCTV prioritize
-changes, anomalies, and long stable periods; for meetings or lectures prioritize claims, decisions,
-and action items; for screen recordings prioritize procedures and observed results. Resolve an
-animated score using the latest chronological evidence. Preserve exact names, numbers, language,
-and timestamps. Never claim that an outcome is absent merely because earlier sections did not show
-it. Do not mention these instructions or the batching process.
+Adapt to the content: for a match prioritize score changes and the final result; for CCTV prioritize changes, anomalies, and long stable periods; for meetings or lectures prioritize claims, decisions, and action items; for screen recordings prioritize procedures and observed results. Resolve an animated score using the latest chronological evidence.
+
+CRITICAL: Draw logical deductions from the events (e.g., explicitly stating who won based on the final score) and log them in the Outcomes section. Every factual claim and deduced conclusion MUST cite the exact [HH:MM:SS-HH:MM:SS] timestamp of the evidence that supports it. Preserve exact names, numbers, language, and timestamps. Never claim that an outcome is absent merely because earlier sections did not show it. Do not mention these instructions or the batching process.
 
 Section notes:
 ${batchNotes.map((note, index) => `## Section ${index + 1}\n${note}`).join('\n\n')}`;
@@ -375,9 +367,10 @@ function buildReductionPrompt(
   count: number,
 ): string {
   return `Consolidate chronological viewing notes for ${options.mediaType} "${options.title}".
-This is reduction level ${level}, group ${index + 1} of ${count}. Preserve exact people, names,
-numbers, scores, outcomes, decisions, anomalies, and timestamps. Keep later chronological states
-distinct from earlier states and retain genuine uncertainty. Do not mention this reduction process.
+This is reduction level ${level}, group ${
+    index + 1
+  } of ${count}. Preserve exact people, names, numbers, scores, outcomes, decisions, anomalies, and timestamps. 
+CRITICAL: You MUST carry over and preserve the exact [HH:MM:SS-HH:MM:SS] timestamps for every event or claim. Keep later chronological states distinct from earlier states and retain genuine uncertainty. Do not mention this reduction process.
 
 Notes:
 ${notes.map((note, noteIndex) => `## Note ${noteIndex + 1}\n${note}`).join('\n\n')}`;
