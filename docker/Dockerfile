@@ -32,7 +32,9 @@ RUN corepack enable pnpm
 COPY --from=deps /app /app
 COPY . .
 
+ARG NEXT_PUBLIC_DOCKER_ENV=true
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_DOCKER_ENV=${NEXT_PUBLIC_DOCKER_ENV}
 
 RUN pnpm --filter larkup build
 RUN pnpm --filter @larkup/tool-video-audio build

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ArrowUpCircle } from 'lucide-react';
+import { ArrowUp, Check, Copy, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 /**
  * UpdateBanner, Universal update notification for all channels.
@@ -29,11 +30,19 @@ function detectChannel(): Channel {
   if (typeof window !== 'undefined' && '__TAURI__' in window) {
     return 'desktop';
   }
-  if (process.env.NEXT_PUBLIC_RUNNING_IN_DOCKER === 'true') {
+  if (
+    process.env.NEXT_PUBLIC_DOCKER_ENV === 'true' ||
+    process.env.NEXT_PUBLIC_RUNNING_IN_DOCKER === 'true'
+  ) {
     return 'docker';
   }
   return 'npm';
 }
+
+const UPDATE_COMMANDS: Record<Exclude<Channel, 'desktop'>, string> = {
+  docker: 'docker compose pull && docker compose up -d',
+  npm: 'larkup update',
+};
 
 function isDismissed(): boolean {
   if (typeof window === 'undefined') return true;
@@ -59,6 +68,7 @@ export function UpdateBanner() {
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const currentVersion = process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0';
   const channel = detectChannel();
@@ -113,42 +123,81 @@ export function UpdateBanner() {
         window.open('https://larkup.de/download', '_blank');
       }
     } else {
-      // Open download page for Docker/npm users
-      window.open('https://larkup.de/download', '_blank');
+      try {
+        await navigator.clipboard.writeText(UPDATE_COMMANDS[channel]);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Could not copy update command:', err);
+      }
     }
   };
 
   if (!visible || !latestVersion) return null;
 
   return (
-    <div className="relative z-50 flex items-center justify-center gap-3 bg-linear-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm text-white ">
-      <ArrowUpCircle className="h-4 w-4 shrink-0" />
-      <span>
-        <span className="font-medium">Larkup v{latestVersion}</span> is available{' '}
-        <span className="opacity-75">(you&apos;re on v{currentVersion})</span>
-      </span>
+    <div
+      role="status"
+      aria-live="polite"
+      className="relative z-50 border-b border-border bg-background px-3 py-2 text-foreground sm:px-4"
+    >
+      <div className="mx-auto flex min-h-7 max-w-screen-2xl items-center gap-2.5">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+          <ArrowUp className="size-3.5" aria-hidden="true" />
+        </span>
 
-      <button
-        onClick={handleUpdate}
-        disabled={updating}
-        className="ml-2 rounded-full bg-white/20 px-3 py-0.5 text-xs font-medium transition-colors hover:bg-white/30 disabled:opacity-50"
-      >
-        {updating ? 'Updating...' : channel === 'desktop' ? 'Update Now' : 'View Details'}
-      </button>
+        <p className="min-w-0 text-xs sm:text-sm">
+          <span className="font-medium">Larkup v{latestVersion} is available.</span>{' '}
+          <span className="hidden text-muted-foreground sm:inline">
+            You&apos;re using v{currentVersion}.
+          </span>
+        </p>
 
-      {channel !== 'desktop' && (
-        <code className="hidden sm:inline rounded bg-white/10 px-2 py-0.5 text-xs font-mono">
-          {channel === 'docker' ? 'docker pull aboneda/larkup:latest' : 'npm i -g @larkup/cli'}
-        </code>
-      )}
+        {channel !== 'desktop' && (
+          <code className="ml-auto hidden max-w-[38rem] truncate rounded-[5px] border border-border bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground lg:block">
+            {UPDATE_COMMANDS[channel]}
+          </code>
+        )}
 
-      <button
-        onClick={handleDismiss}
-        className="ml-auto shrink-0 rounded p-0.5 transition-colors hover:bg-white/20"
-        aria-label="Dismiss update notification"
-      >
-        <X className="h-3.5 w-3.5" />
-      </button>
+        <Button
+          type="button"
+          variant={channel === 'desktop' ? 'default' : 'outline'}
+          size="xs"
+          onClick={handleUpdate}
+          disabled={updating}
+          aria-label={channel === 'desktop' ? 'Update Larkup now' : 'Copy update command'}
+          className={channel === 'desktop' ? 'ml-auto' : 'ml-auto lg:ml-0'}
+        >
+          {channel === 'desktop' ? (
+            updating ? (
+              'Updating...'
+            ) : (
+              'Update now'
+            )
+          ) : copied ? (
+            <>
+              <Check aria-hidden="true" />
+              Copied
+            </>
+          ) : (
+            <>
+              <Copy aria-hidden="true" />
+              Copy command
+            </>
+          )}
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          onClick={handleDismiss}
+          aria-label="Dismiss update notification"
+          title="Remind me tomorrow"
+        >
+          <X aria-hidden="true" />
+        </Button>
+      </div>
     </div>
   );
 }

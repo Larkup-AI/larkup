@@ -67,7 +67,7 @@ export function UnifiedSidebar() {
       <aside
         className={cn(
           'sticky top-0 hidden h-screen shrink-0 flex-col self-start py-4 md:flex transition-all duration-300 ease-in-out',
-          collapsed ? 'w-[72px]' : 'w-[240px]',
+          collapsed ? 'w-18' : 'w-60',
           !navColor ? 'bg-background' : '',
           pageStyle === 'fused' ? 'border-r border-border' : '',
         )}
@@ -149,7 +149,7 @@ export function UnifiedSidebar() {
                       />
                     }
                   >
-                    <Icon className="size-[18px]" strokeWidth={active ? 2.25 : 1.75} />
+                    <Icon className="size-4.5" strokeWidth={active ? 2.25 : 1.75} />
                   </TooltipTrigger>
                   <TooltipContent side="right" sideOffset={10}>
                     {item.label}
@@ -176,7 +176,7 @@ export function UnifiedSidebar() {
                     : 'text-muted-foreground hover:bg-[#EBEBEB] hover:text-foreground',
                 )}
               >
-                <Icon className="size-[18px] shrink-0" strokeWidth={active ? 2.25 : 1.75} />
+                <Icon className="size-4.5 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
                 <span className="truncate">{item.label}</span>
               </Link>
             );

@@ -268,8 +268,8 @@ export function WelcomeScreen() {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-20 -top-20 h-[500px] w-[500px] rounded-full bg-stone-200/40 blur-3xl animate-pulse" />
-        <div className="absolute -bottom-32 -right-32 h-[600px] w-[600px] rounded-full bg-amber-100/30 blur-3xl animate-pulse [animation-delay:1s]" />
+        <div className="absolute -left-20 -top-20 h-125 w-125 rounded-full bg-stone-200/40 blur-3xl animate-pulse" />
+        <div className="absolute -bottom-32 -right-32 h-150 w-150 rounded-full bg-amber-100/30 blur-3xl animate-pulse [animation-delay:1s]" />
       </div>
 
       <div className="relative z-10 flex min-h-full w-full flex-col items-center justify-center px-6 py-12">
