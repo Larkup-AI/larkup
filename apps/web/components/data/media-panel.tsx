@@ -226,6 +226,21 @@ export function MediaPanel({
               (previousStatus === 'pending' || previousStatus === 'processing')
             ) {
               onIndexed(asset);
+              try {
+                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                gain.gain.setValueAtTime(0.05, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.1);
+              } catch (e) {
+                // Ignore audio context errors
+              }
             }
             if (
               asset.processingStatus === 'failed' &&
@@ -1429,8 +1444,42 @@ function FileList({
 /* Status badge                                                        */
 /* ------------------------------------------------------------------ */
 
+function useETA(status: string, progress: number, createdAt: string) {
+  const [eta, setEta] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (status !== 'processing' && status !== 'pending') {
+      setEta(null);
+      return;
+    }
+    const interval = setInterval(() => {
+      if (progress <= 0 || progress >= 100) {
+        setEta(null);
+        return;
+      }
+      const startTime = new Date(createdAt).getTime();
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 5000) return;
+
+      const estimatedTotal = elapsed / (progress / 100);
+      const remaining = estimatedTotal - elapsed;
+      if (remaining <= 0) {
+        setEta(null);
+        return;
+      }
+
+      const secs = Math.floor(remaining / 1000);
+      setEta(secs < 60 ? `${secs}s left` : `${Math.floor(secs / 60)}m left`);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [status, progress, createdAt]);
+
+  return eta;
+}
+
 function StatusBadge({ asset }: { asset: MediaAsset }) {
   const status = asset.processingStatus;
+  const eta = useETA(status, asset.processingProgress ?? 0, asset.createdAt);
 
   if (status === 'completed') {
     return (
@@ -1451,6 +1500,7 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
           {asset.processingMessage || 'Processing...'}
         </span>
         <span className="tabular-nums">{Math.round(asset.processingProgress ?? 0)}%</span>
+        {eta && <span className="text-[9px] text-blue-500/80 ml-0.5">({eta})</span>}
       </span>
     );
   }
@@ -1462,6 +1512,7 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
           {asset.processingMessage}
         </span>
         <span className="tabular-nums">{Math.round(asset.processingProgress ?? 1)}%</span>
+        {eta && <span className="text-[9px] text-blue-500/80 ml-0.5">({eta})</span>}
       </span>
     );
   }
