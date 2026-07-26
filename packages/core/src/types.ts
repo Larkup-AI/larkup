@@ -164,7 +164,7 @@ export interface RagConfig {
 }
 
 export const DEFAULT_CONFIG: RagConfig = {
-  projectName: 'my-rag',
+  projectName: 'my-larkup',
   embeddingProvider: 'openai',
   embeddingApiKey: '',
   embeddingModelId: 'openai/text-embedding-3-small',

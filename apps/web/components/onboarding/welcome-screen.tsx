@@ -137,7 +137,7 @@ export function WelcomeScreen() {
         await setUsername(name.trim());
       }
 
-      await createServer('My Project');
+      await createServer('my-larkup');
 
       await fetch('/api/config', {
         method: 'PUT',
@@ -162,7 +162,7 @@ export function WelcomeScreen() {
       }
 
       // Create a default server so isFirstRun becomes false
-      await createServer('My Project');
+      await createServer('my-larkup');
 
       refresh();
       router.push('/chat');
