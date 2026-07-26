@@ -31,17 +31,17 @@
     "./corpus-retriever": "./src/corpus-retriever.ts"
   },
   "dependencies": {
-    "@ai-sdk/cohere": "^3.0.39",
-    "@ai-sdk/deepseek": "^2.0.39",
-    "@ai-sdk/gateway": "^3.0.133",
-    "@ai-sdk/google": "^3.0.83",
-    "@ai-sdk/mistral": "^3.0.40",
-    "@ai-sdk/openai": "^3.0.68",
-    "@ai-sdk/openai-compatible": "^2.0.51",
+    "@ai-sdk/cohere": "^4.0.12",
+    "@ai-sdk/deepseek": "^3.0.13",
+    "@ai-sdk/gateway": "^4.0.28",
+    "@ai-sdk/google": "^4.0.24",
+    "@ai-sdk/mistral": "^4.0.14",
+    "@ai-sdk/openai": "^4.0.20",
+    "@ai-sdk/openai-compatible": "^3.0.14",
     "@larkup/vector-stores": "workspace:*",
-    "ai": "^6.0.197"
+    "ai": "^7.0.37"
   },
   "devDependencies": {
-    "typescript": "5.7.3"
+    "typescript": "7.0.2"
   }
 }
