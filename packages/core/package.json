@@ -42,6 +42,6 @@
     "ai": "^7.0.37"
   },
   "devDependencies": {
-    "typescript": "7.0.2"
+    "typescript": "5.7.3"
   }
 }
