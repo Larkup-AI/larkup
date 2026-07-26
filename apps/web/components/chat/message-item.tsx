@@ -903,10 +903,14 @@ function renderMarkdown(text: string): string {
 
   let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  // Images
+  // Model-generated image URLs are not reliable and must never become network requests.
+  // Indexed images are displayed only through the verified presentMedia tool result.
   html = html.replace(
-    /!\[(.*?)\]\((.*?)\)/g,
-    '<img src="$2" alt="$1" class="max-w-full rounded-lg my-2 border border-border" loading="lazy" />',
+    /!\[([^\]]*)\]\([^)]*\)/g,
+    (_match, alt) =>
+      `<span class="text-muted-foreground italic">[Image unavailable${
+        alt ? `: ${alt}` : ''
+      }]</span>`,
   );
 
   // Code blocks — styled premium
