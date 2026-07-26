@@ -1,7 +1,24 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import * as lancedb from '@lancedb/lancedb';
 import type { QueryHit, VectorRecord, VectorStoreAdapter } from './base';
+
+type LanceDBModule = typeof import('@lancedb/lancedb');
+type LanceConnection = Awaited<ReturnType<LanceDBModule['connect']>>;
+type LanceTable = Awaited<ReturnType<LanceConnection['openTable']>>;
+
+let lancedbModule: LanceDBModule | null = null;
+
+/**
+ * Keep LanceDB outside Turbopack's server bundle. Its native binding resolves
+ * platform-specific optional packages at runtime, and static bundling turns
+ * the package name into a non-resolvable hashed external module.
+ */
+async function getLanceDB(): Promise<LanceDBModule> {
+  if (!lancedbModule) {
+    lancedbModule = await import(/* turbopackIgnore: true */ '@lancedb/lancedb');
+  }
+  return lancedbModule;
+}
 
 /**
  * LanceDB adapter — embedded/on-disk for local dev, LanceDB Cloud, or an
@@ -37,16 +54,17 @@ interface LanceRow extends Record<string, unknown> {
 }
 
 export class LanceDBAdapter implements VectorStoreAdapter {
-  private conn: lancedb.Connection | null = null;
-  private table: lancedb.Table | null = null;
+  private conn: LanceConnection | null = null;
+  private table: LanceTable | null = null;
   private readonly tableName: string;
 
   constructor(private readonly config: LanceConfig) {
     this.tableName = config.tableName?.trim() || 'documents';
   }
 
-  private async connect(): Promise<lancedb.Connection> {
+  private async connect(): Promise<LanceConnection> {
     if (this.conn) return this.conn;
+    const lancedb = await getLanceDB();
     if (this.config.mode === 'cloud') {
       if (!this.config.uri || !this.config.apiKey) {
         throw new Error('LanceDB Cloud requires both a URI and an API key.');
@@ -208,7 +226,7 @@ export class LanceDBAdapter implements VectorStoreAdapter {
 
     // ── Cloud mode ───────────────────────────────────────────────────────────
     // to force a real authenticated HTTP round-trip.
-    let conn: lancedb.Connection;
+    let conn: LanceConnection;
     try {
       conn = await this.connect();
     } catch (err: any) {
