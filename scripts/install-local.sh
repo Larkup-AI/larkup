@@ -6,7 +6,7 @@ set -euo pipefail
 # Usage: curl -fsSL https://larkup.de/install-local.sh | bash
 
 # ── Config ────────────────────────────────────────────────────
-PACKAGE_NAME="@larkup/cli"
+PACKAGE_NAME="larkup"
 BIN_NAME="larkup"
 NODE_MAJOR=20
 NODE_VERSION="v20.18.0"  # pinned portable Node version
@@ -330,7 +330,7 @@ install_cli() {
 # bundled Node.js to run the CLI. This is what the user calls.
 create_wrapper() {
   local wrapper_path="${LARKUP_BIN}/${BIN_NAME}"
-  local cli_entry="${LARKUP_LIB}/lib/node_modules/${PACKAGE_NAME}/bin/cli.js"
+  local cli_entry="${LARKUP_LIB}/lib/node_modules/${PACKAGE_NAME}/bin/larkup.js"
 
   log_info "Creating wrapper at ${wrapper_path}..."
 
@@ -345,12 +345,13 @@ create_wrapper() {
 # Uses the bundled Node.js to run the Larkup CLI
 LARKUP_ROOT="${LARKUP_PREFIX}"
 NODE_BIN="\${LARKUP_ROOT}/node/bin/node"
-CLI_ENTRY="\${LARKUP_ROOT}/lib/lib/node_modules/${PACKAGE_NAME}/bin/cli.js"
+CLI_ENTRY="\${LARKUP_ROOT}/lib/lib/node_modules/${PACKAGE_NAME}/bin/larkup.js"
 
 # Fallback: if cli.js doesn't exist at the expected path, try to find it
 if [[ ! -f "\${CLI_ENTRY}" ]]; then
   # npm might use a different structure depending on version
   for candidate in \\
+    "\${LARKUP_ROOT}/lib/node_modules/${PACKAGE_NAME}/bin/larkup.js" \\
     "\${LARKUP_ROOT}/lib/node_modules/${PACKAGE_NAME}/bin/cli.js" \\
     "\${LARKUP_ROOT}/lib/lib/node_modules/${PACKAGE_NAME}/dist/cli.js" \\
     "\${LARKUP_ROOT}/lib/node_modules/${PACKAGE_NAME}/dist/cli.js"; do

@@ -18,7 +18,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 # ── Config ────────────────────────────────────────────────────
-$PackageName = "@larkup/cli"
+$PackageName = "larkup"
 $BinName     = "larkup"
 $MinNodeMajor = 18
 $NodeSetupMajor = 20
@@ -40,7 +40,7 @@ function Stop-Installer {
 
 # ── Logging ───────────────────────────────────────────────────
 function Write-Step   { param([string]$Msg) Write-Host "==> " -ForegroundColor Blue -NoNewline; Write-Host $Msg }
-function Write-Ok     { param([string]$Msg) Write-Host " ✓  " -ForegroundColor Green -NoNewline; Write-Host $Msg }
+function Write-Ok     { param([string]$Msg) Write-Host " ✓  " -ForegroundColor DarkYellow -NoNewline; Write-Host $Msg }
 function Write-Warn   { param([string]$Msg) Write-Host " !  " -ForegroundColor Yellow -NoNewline; Write-Host $Msg }
 function Write-Err    { param([string]$Msg) Write-Host " ✗  " -ForegroundColor Red -NoNewline; Write-Host $Msg }
 function Write-Dry    { param([string]$Msg) Write-Host "[dry-run] " -ForegroundColor Yellow -NoNewline; Write-Host $Msg }

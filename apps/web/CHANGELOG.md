@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.22
+
+### Patch Changes
+
+- Make `larkup dev` start and open the main Larkup web application on port 4567.
+
 ## 0.1.21
 
 ### Patch Changes

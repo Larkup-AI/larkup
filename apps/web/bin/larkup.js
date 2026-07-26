@@ -1,28 +1,56 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const packageDir = path.resolve(__dirname, "..");
-const nextBin = path.join(packageDir, "node_modules", ".bin", "next");
+const packageDir = path.resolve(__dirname, '..');
+const nextBin = path.join(packageDir, 'node_modules', '.bin', 'next');
+const pkg = JSON.parse(readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
 
 const args = process.argv.slice(2);
 const command = args[0];
 
-if (command === "start") {
-  const port = process.env.PORT || "4567";
-  console.log(`Starting Larkup Studio on port ${port}...`);
-  const result = spawnSync(nextBin, ["start", "-p", port], {
+if (command === '--version' || command === '-v') {
+  console.log(pkg.version);
+} else if (command === 'dev' || command === 'start') {
+  const port = process.env.PORT || '4567';
+  const url = `http://localhost:${port}`;
+  console.log(`\x1b[38;2;223;156;32mStarting Larkup…\x1b[0m`);
+  const child = spawn(nextBin, ['start', '-p', port], {
     cwd: packageDir,
-    stdio: "inherit",
+    stdio: 'inherit',
   });
-  if (result.error) {
-    console.error("Failed to start server:", result.error.message);
+
+  child.once('error', (error) => {
+    console.error('Failed to start Larkup:', error.message);
     process.exit(1);
-  }
-  process.exit(result.status ?? 0);
+  });
+  child.once('exit', (code) => process.exit(code ?? 0));
+
+  void openWhenReady(url);
 } else {
-  console.error("Usage: larkup start");
+  console.error('Usage: larkup dev');
   process.exit(1);
+}
+
+async function openWhenReady(url) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      await fetch(url);
+      const [command, args] = openCommandForPlatform(url);
+      const browser = spawn(command, args, { detached: true, stdio: 'ignore' });
+      browser.unref();
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+}
+
+function openCommandForPlatform(url) {
+  if (process.platform === 'darwin') return ['open', [url]];
+  if (process.platform === 'win32') return ['cmd', ['/c', 'start', '', url]];
+  return ['xdg-open', [url]];
 }
