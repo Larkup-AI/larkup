@@ -1,5 +1,11 @@
 # @larkup/sandbox
 
+## 0.1.2
+
+### Patch Changes
+
+- fix: lazy-import dockerode to prevent Turbopack hash mangling at runtime
+
 ## 0.1.1
 
 ### Patch Changes

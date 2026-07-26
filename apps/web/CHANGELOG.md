@@ -1,5 +1,14 @@
 # larkup
 
+## 0.1.25
+
+### Patch Changes
+
+- fix: lazy-import dockerode to prevent Turbopack hash mangling at runtime
+- Updated dependencies
+  - @larkup/sandbox@0.1.2
+  - @larkup/tool-doc-editor@0.2.1
+
 ## 0.1.24
 
 ### Patch Changes
