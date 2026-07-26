@@ -1,5 +1,15 @@
 # larkup
 
+## 0.1.28
+
+### Patch Changes
+
+- c769d08: Retry marketplace installs against the latest published package when a stale catalog version is unavailable, and improve server and analytics UI behavior.
+- Updated dependencies [c769d08]
+  - @larkup/marketplace@0.1.4
+  - @larkup/tool-doc-editor@0.2.3
+  - @larkup/tool-video-audio@0.2.1
+
 ## 0.1.27
 
 ### Patch Changes
