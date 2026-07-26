@@ -1,5 +1,12 @@
 # @larkup/core
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [08e7029]
+  - @larkup/vector-stores@0.1.22
+
 ## 0.2.0
 
 ### Minor Changes
