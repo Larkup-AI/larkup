@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.24
+
+### Patch Changes
+
+- f1ed7b1: fix: update install script UX and fix dockerode bundling bug
+
 ## 0.1.23
 
 ### Patch Changes
