@@ -304,6 +304,12 @@ export function MediaPanel({
   const videoAudioTool = toolsData?.tools?.find((t: any) => t.id === 'video-audio');
   const isToolInstalled = videoAudioTool?.status === 'installed';
   const enabledTools = configData?.config?.enabledTools;
+  const videoAudioConfig = configData?.config?.toolConfigs?.['video-audio'] ?? {};
+  const audioProvider =
+    typeof videoAudioConfig.audioProvider === 'string' ? videoAudioConfig.audioProvider : '';
+  const audioApiKey =
+    typeof videoAudioConfig.audioApiKey === 'string' ? videoAudioConfig.audioApiKey : '';
+  const audioConfigured = Boolean(audioProvider && (audioProvider === 'local' || audioApiKey));
   const isToolEnabled = enabledTools
     ? enabledTools.length === 0 || enabledTools.includes('video-audio')
     : true;
@@ -391,6 +397,8 @@ export function MediaPanel({
             mutate();
             onAdded();
           }}
+          audioConfigured={audioConfigured}
+          onConfigureAudio={() => router.push('/settings?section=tool-settings')}
         />
       )}
     </div>
@@ -428,7 +436,13 @@ function InstallPrompt({
         const err = await res.json();
         throw new Error(err.error || 'Install failed');
       }
-      toast.success('Tool installed successfully');
+      toast.success('Video & Audio installed', {
+        description: 'Choose an audio provider before indexing video or audio.',
+        action: {
+          label: 'Set up audio',
+          onClick: () => window.location.assign('/settings?section=tool-settings'),
+        },
+      });
       onInstallComplete();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to install tool');
@@ -509,6 +523,8 @@ function MediaContent({
   serverId,
   onMutate,
   onUploadComplete,
+  audioConfigured,
+  onConfigureAudio,
 }: {
   mediaType: 'image' | 'video' | 'audio';
   tab: MediaSubTab;
@@ -518,6 +534,8 @@ function MediaContent({
   serverId?: string;
   onMutate: () => void | Promise<unknown>;
   onUploadComplete: () => void;
+  audioConfigured: boolean;
+  onConfigureAudio: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -587,7 +605,8 @@ function MediaContent({
     if (
       msg.toLowerCase().includes('api key') ||
       msg.toLowerCase().includes('configuration') ||
-      msg.toLowerCase().includes('missing provider')
+      msg.toLowerCase().includes('missing provider') ||
+      msg.toLowerCase().includes('choose an audio provider')
     ) {
       toast.error(msg, {
         duration: 10000,
@@ -599,6 +618,16 @@ function MediaContent({
     } else {
       toast.error(msg);
     }
+  }
+
+  function ensureAudioConfiguration(): boolean {
+    if (mediaType === 'image' || audioConfigured) return true;
+    toast.error('Set up an audio provider to index video or audio.', {
+      description: 'Select a provider and add its API key in Installed Tools.',
+      duration: 10_000,
+      action: { label: 'Set up audio', onClick: onConfigureAudio },
+    });
+    return false;
   }
 
   async function processAssets(assetIds: string[]) {
@@ -635,6 +664,7 @@ function MediaContent({
   async function reviewRemoteEstimate() {
     const urls = parsedUrls();
     if (urls.length === 0) return;
+    if (!ensureAudioConfiguration()) return;
     setCheckingUrls(true);
     try {
       const res = await fetch(mediaApiUrl, {
@@ -655,6 +685,7 @@ function MediaContent({
   async function importRemoteUrls() {
     const urls = parsedUrls();
     if (urls.length === 0 || !remoteEstimates) return;
+    if (!ensureAudioConfiguration()) return;
     setImportingUrls(true);
     try {
       const res = await fetch(mediaApiUrl, {
@@ -681,6 +712,7 @@ function MediaContent({
 
   async function uploadAll() {
     if (staged.length === 0) return;
+    if (!ensureAudioConfiguration()) return;
     setUploading(true);
 
     const BATCH_SIZE = 5;

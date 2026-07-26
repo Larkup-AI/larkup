@@ -1,4 +1,6 @@
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { InstalledTool } from './types';
 import { getInstalledTool } from './tool-installer';
 
@@ -37,7 +39,7 @@ export async function loadTool<T = any>(toolId: string): Promise<T | null> {
 
   try {
     // Determine what to import
-    const importPath = resolveImportPath(installed);
+    const importPath = await resolveImportPath(installed);
     const mod = await import(/* webpackIgnore: true */ importPath);
     moduleCache.set(toolId, mod);
     return mod as T;
@@ -54,7 +56,7 @@ export async function loadTool<T = any>(toolId: string): Promise<T | null> {
  * - `registry` (npm): import from the isolated node_modules via absolute path
  * - `sandbox`: import from the sandbox tool path
  */
-function resolveImportPath(installed: InstalledTool): string {
+async function resolveImportPath(installed: InstalledTool): Promise<string> {
   switch (installed.source) {
     case 'local':
       // In monorepo, the package name resolves via pnpm workspace linking
@@ -62,13 +64,31 @@ function resolveImportPath(installed: InstalledTool): string {
 
     case 'registry':
     case 'sandbox':
-      // Use the absolute resolved path from the isolated install
-      return installed.resolvedPath;
+      // Node ESM cannot import a package directory by absolute path. Resolve
+      // the package's declared ESM entry so isolated marketplace installs work
+      // the same way as a normal package-name import.
+      return resolvePackageEntry(installed.resolvedPath);
 
     default:
       // Fallback: try package name (backwards compat)
       return installed.packageName;
   }
+}
+
+async function resolvePackageEntry(packageDir: string): Promise<string> {
+  const manifestPath = path.join(packageDir, 'package.json');
+  const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+    exports?: string | { '.': string | { import?: string; default?: string } };
+    main?: string;
+  };
+  const rootExport =
+    typeof manifest.exports === 'object' ? manifest.exports['.'] : manifest.exports;
+  const entry =
+    (typeof rootExport === 'object' ? rootExport.import ?? rootExport.default : rootExport) ??
+    manifest.main ??
+    'index.js';
+
+  return pathToFileURL(path.resolve(packageDir, entry)).href;
 }
 
 /**

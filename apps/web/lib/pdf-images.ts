@@ -10,6 +10,22 @@ export async function extractImagesFromPDF(
   const numPages = pdf.numPages;
   const images: { base64: string; pageNumber: number; index: number }[] = [];
 
+  let imageIndex = 0;
+  const toDataUrl = (source: HTMLCanvasElement) => {
+    // Embedded PDF artwork can be several thousand pixels wide. Vision models
+    // do not need the raw print-resolution asset and sending it makes PDF
+    // ingestion slow and unreliable. Preserve diagrams while bounding input.
+    const maxDimension = 1_600;
+    const scale = Math.min(1, maxDimension / Math.max(source.width, source.height));
+    if (scale === 1) return source.toDataURL('image/jpeg', 0.86);
+
+    const resized = document.createElement('canvas');
+    resized.width = Math.max(1, Math.round(source.width * scale));
+    resized.height = Math.max(1, Math.round(source.height * scale));
+    resized.getContext('2d')?.drawImage(source, 0, 0, resized.width, resized.height);
+    return resized.toDataURL('image/jpeg', 0.86);
+  };
+
   for (let i = 1; i <= numPages; i++) {
     try {
       const page = await pdf.getPage(i);
@@ -25,7 +41,6 @@ export async function extractImagesFromPDF(
         }
       }
 
-      let imgIndex = 0;
       for (const objId of imageOps) {
         try {
           const img = await new Promise<any>((resolve) => {
@@ -43,9 +58,9 @@ export async function extractImagesFromPDF(
             if (ctx) {
               ctx.drawImage(img.bitmap, 0, 0);
               images.push({
-                base64: canvas.toDataURL('image/png'),
+                base64: toDataUrl(canvas),
                 pageNumber: i,
-                index: imgIndex++,
+                index: imageIndex++,
               });
             }
           } else if (img && img.data && img.width && img.height) {
@@ -61,9 +76,9 @@ export async function extractImagesFromPDF(
               );
               ctx.putImageData(imageData, 0, 0);
               images.push({
-                base64: canvas.toDataURL('image/png'),
+                base64: toDataUrl(canvas),
                 pageNumber: i,
-                index: imgIndex++,
+                index: imageIndex++,
               });
             }
           }
