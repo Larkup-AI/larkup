@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.23
+
+### Patch Changes
+
+- Use `my-larkup` as the initial project name in the web onboarding flow.
+
 ## 0.1.22
 
 ### Patch Changes

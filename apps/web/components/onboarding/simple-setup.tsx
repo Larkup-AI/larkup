@@ -211,7 +211,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
     setBusy(true);
     try {
       // Create a default server
-      const server = await createServer('my-rag');
+      const server = await createServer('my-larkup');
 
       // Build config
       const isCloud = connectionMode === 'cloud';
@@ -220,7 +220,7 @@ export function SimpleSetup({ onBack }: SimpleSetupProps) {
         : `custom:${embeddingModelName}`;
 
       const configBody: Record<string, unknown> = {
-        projectName: 'my-rag',
+        projectName: 'my-larkup',
         embeddingProvider: isCloud ? provider : 'custom',
         embeddingApiKey: isCloud ? apiKey : '',
         embeddingModelId,
