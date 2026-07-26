@@ -67,8 +67,7 @@ Create and run a generated server:
 ```bash
 larkup init product-docs
 larkup index ./knowledge
-larkup generate
-larkup serve
+larkup dev
 ```
 
 You can also use `larkup query`, `larkup chat`, `larkup documents`, `larkup media`, and `larkup marketplace` from the terminal. See the [CLI reference](https://larkup.de/docs/developer/cli) for every command.

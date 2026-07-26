@@ -26,9 +26,10 @@ TMPFILES=()
 # ── Colors (auto-disabled outside TTY) ────────────────────────
 if [[ -t 1 ]]; then
   BOLD='\033[1m' DIM='\033[2m' NC='\033[0m'
-  GREEN='\033[0;32m' YELLOW='\033[1;33m' BLUE='\033[0;34m' RED='\033[0;31m' BLACK='\033[0;30m'
+  OCHRE='\033[38;2;223;156;32m' # Lark bird brand color: #df9c20
+  GREEN='\033[0;32m' YELLOW='\033[1;33m' BLUE='\033[0;34m' RED='\033[0;31m'
 else
-  BOLD='' DIM='' NC='' GREEN='' YELLOW='' BLUE='' RED='' BLACK=''
+  BOLD='' DIM='' NC='' OCHRE='' GREEN='' YELLOW='' BLUE='' RED=''
 fi
 
 # ── Logging ───────────────────────────────────────────────────
@@ -441,7 +442,7 @@ verify_setup() {
 
 # ── Banner ────────────────────────────────────────────────────
 show_banner() {
-  echo -e "${BLACK}"
+  echo -e "${OCHRE}"
   cat <<'BANNER'
    __               __
   / /   ____ ______/ /____  ______
@@ -464,9 +465,7 @@ show_summary() {
   echo -e "  ${DIM}Wrapper:${NC}  ${LARKUP_BIN}/${BIN_NAME}"
   echo ""
   echo -e "${BOLD}Get started:${NC}"
-  echo -e "  ${GREEN}${BIN_NAME} init my-rag-server${NC}"
-  echo -e "  ${GREEN}cd my-rag-server${NC}"
-  echo -e "  ${GREEN}${BIN_NAME} dev${NC}"
+  echo -e "  ${OCHRE}${BIN_NAME} dev${NC}"
   echo ""
   echo -e "  ${DIM}Docs:   https://larkup.de/docs${NC}"
   echo -e "  ${DIM}Issues: https://github.com/Larkup-AI/larkup/issues${NC}"

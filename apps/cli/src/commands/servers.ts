@@ -4,7 +4,7 @@ import { log } from '../ui/logger';
 export async function listServersCommand() {
   const ws = await getWorkspace();
   if (ws.servers.length === 0) {
-    log.dim('No servers yet. Create one with: larkup init "my-rag"');
+    log.dim('No servers yet. Create one with: larkup dev');
     return;
   }
 

@@ -512,9 +512,7 @@ BANNER
 show_next_steps() {
   echo ""
   echo -e "${BOLD}Get started:${NC}"
-  echo -e "  ${GREEN}larkup init my-rag-server${NC}"
-  echo -e "  ${GREEN}cd my-rag-server${NC}"
-  echo -e "  ${GREEN}larkup dev${NC}"
+  echo -e "  ${OCHRE}larkup dev${NC}"
   echo ""
   echo -e "  ${DIM}Docs:   https://larkup.de/docs${NC}"
   echo -e "  ${DIM}Issues: https://github.com/Larkup-AI/larkup/issues${NC}"

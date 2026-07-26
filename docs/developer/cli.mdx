@@ -23,13 +23,19 @@ npx @larkup/cli <command>
 
 </CodeGroup>
 
-## Local folder to running server
+## Start a local server
 
 ```bash
-larkup init "product-docs"
+larkup dev
+```
+
+The first run asks for a project name, using `my-larkup` when you press Enter, then creates the workspace and starts its local server. Later, `larkup dev` starts the active workspace again. Create another workspace explicitly with `larkup dev product-docs`.
+
+## Add data and rebuild the server
+
+```bash
 larkup index ./knowledge
-larkup generate
-larkup serve
+larkup dev
 ```
 
 `index` recursively loads supported text and source code files, then streams chunking and embedding progress. It skips `.git`, `.larkup`, `node_modules`, `dist`, and `build` directories.
@@ -99,7 +105,7 @@ larkup marketplace uninstall video-audio
 ## Generate, test, and deploy
 
 ```bash
-larkup generate --out ./my-rag-server
+larkup generate --out ./my-larkup-server
 larkup test
 larkup test --connection
 larkup test --endpoint https://rag.example.com --api-key "$LARKUP_API_KEY"
@@ -134,6 +140,7 @@ larkup update
 
 | Command | Description |
 | --- | --- |
+| `larkup dev [name]` | First run: create a workspace and run its local server. Later: run the active workspace. Pass a name to create another workspace. |
 | `larkup init [name]` | Create and activate a server workspace. |
 | `larkup servers` | List server workspaces. |
 | `larkup use <id>` | Switch the active server. |

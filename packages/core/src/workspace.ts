@@ -228,7 +228,7 @@ export async function requireDataDir(): Promise<string> {
   if (scopedServerId) {
     throw new Error(`Server "${scopedServerId}" no longer exists.`);
   }
-  const { server } = await createServer('My RAG server');
+  const { server } = await createServer('my-larkup');
   return serverDir(server.id);
 }
 
@@ -266,7 +266,7 @@ function defaultConfigFor(
         .toLowerCase()
         .trim()
         .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '') || 'my-rag',
+        .replace(/^-+|-+$/g, '') || 'my-larkup',
     storeConfig: { mode: 'local', dbPath: relServerPath(id, 'lancedb') },
     embeddingApiKey: prevConfig.embeddingApiKey ?? DEFAULT_CONFIG.embeddingApiKey,
     customEmbeddings: prevConfig.customEmbeddings ?? DEFAULT_CONFIG.customEmbeddings,
