@@ -25,7 +25,15 @@ TMPFILES=()
 # ── Colors (auto-disabled outside TTY) ────────────────────────
 if [[ -t 1 ]]; then
   BOLD='\033[1m' DIM='\033[2m' NC='\033[0m'
-  OCHRE='\033[38;2;223;156;32m' # Lark bird brand color: #df9c20
+  
+  if [[ "${COLORTERM:-}" == "truecolor" || "${COLORTERM:-}" == "24bit" ]]; then
+    OCHRE='\033[38;2;223;156;32m' # Lark bird brand color: #df9c20
+  elif [[ $(tput colors 2>/dev/null || echo 0) -ge 256 ]]; then
+    OCHRE='\033[38;5;172m'
+  else
+    OCHRE='\033[0;32m' # Final fallback to green
+  fi
+  
   GREEN='\033[0;32m' YELLOW='\033[1;33m' BLUE='\033[0;34m' RED='\033[0;31m'
 else
   BOLD='' DIM='' NC='' OCHRE='' GREEN='' YELLOW='' BLUE='' RED=''
@@ -430,7 +438,26 @@ install_larkup() {
   local install_log
   install_log="$(new_tmp_file)"
 
-  if npm install -g --no-fund --no-audit "$spec" >"$install_log" 2>&1; then
+  # Run npm install in background for spinner
+  npm install -g --no-fund --no-audit "$spec" >"$install_log" 2>&1 &
+  local npm_pid=$!
+
+  local chars="/-\\|"
+  local start_time=$SECONDS
+  while kill -0 $npm_pid 2>/dev/null; do
+    local elapsed=$((SECONDS - start_time))
+    for (( i=0; i<${#chars}; i++ )); do
+      if ! kill -0 $npm_pid 2>/dev/null; then break 2; fi
+      echo -en "\r${BLUE}==> ${NC}Installing ${BOLD}${spec}${NC}... [${elapsed}s] ${chars:$i:1} "
+      sleep 0.1
+    done
+  done
+  echo -en "\r\033[K" # Clear line
+  
+  wait $npm_pid
+  local exit_code=$?
+
+  if [[ $exit_code -eq 0 ]]; then
     [[ "$is_upgrade" == "1" ]] && log_success "Larkup upgraded!" || log_success "Larkup installed!"
     return 0
   fi
@@ -537,6 +564,18 @@ main() {
   verify_install
   show_next_steps
   log_success "Done! 🚀"
+
+  if [[ "$DRY_RUN" != "1" ]]; then
+    echo ""
+    log_info "Starting Larkup..."
+    if [[ -t 0 ]]; then
+      exec "$BIN_NAME" dev
+    elif [[ -r /dev/tty ]]; then
+      exec "$BIN_NAME" dev < /dev/tty
+    else
+      log_warn "Cannot auto-start Larkup without a terminal. Run 'larkup dev' manually."
+    fi
+  fi
 }
 
 main "$@"
