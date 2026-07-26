@@ -226,7 +226,7 @@ async function execInstall(
   version: string,
   target: DeploymentTarget,
   onProgress?: (message: string) => void,
-): Promise<string> {
+): Promise<{ resolvedPath: string; version: string }> {
   const toolsDir = getToolsDir();
 
   switch (target) {
@@ -235,22 +235,39 @@ async function execInstall(
       // Initialize the isolated tools directory
       await ensureToolsPackageJson();
 
-      const installCmd = `npm install ${packageName}@${version} --prefix "${toolsDir}" --save --no-audit --no-fund`;
-      onProgress?.(`Running: npm install ${packageName}@${version}`);
-
-      try {
-        const { stdout, stderr } = await execAsync(installCmd, {
+      const install = async (specifier: string) => {
+        const installCmd = `npm install ${specifier} --prefix "${toolsDir}" --save --no-audit --no-fund`;
+        onProgress?.(`Running: npm install ${specifier}`);
+        const { stderr } = await execAsync(installCmd, {
           cwd: toolsDir,
           timeout: 120_000, // 2 minute timeout
           env: { ...process.env, NODE_ENV: 'production' },
         });
-
         if (stderr && !stderr.includes('npm warn')) {
           console.warn(`[marketplace] Install stderr: ${stderr}`);
         }
+      };
+
+      try {
+        await install(`${packageName}@${version}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Install command failed';
-        throw new Error(`Failed to install ${packageName}: ${message}`);
+        if (!message.includes('ETARGET') && !message.includes('No matching version found')) {
+          throw new Error(`Failed to install ${packageName}: ${message}`);
+        }
+
+        // Hub entries can be cached longer than npm releases. Recover from an
+        // obsolete catalog version rather than leaving the marketplace unusable.
+        onProgress?.(
+          `Catalog version ${version} is unavailable; installing the latest published version…`,
+        );
+        try {
+          await install(`${packageName}@latest`);
+        } catch (latestErr) {
+          const latestMessage =
+            latestErr instanceof Error ? latestErr.message : 'Install command failed';
+          throw new Error(`Failed to install ${packageName}: ${latestMessage}`);
+        }
       }
 
       // Resolve the actual module path
@@ -263,7 +280,10 @@ async function execInstall(
         );
       }
 
-      return resolvedPath;
+      const packageJson = JSON.parse(
+        await fs.readFile(path.join(resolvedPath, 'package.json'), 'utf8'),
+      ) as { version?: string };
+      return { resolvedPath, version: packageJson.version ?? version };
     }
 
     case 'serverless': {
@@ -282,7 +302,7 @@ async function execInstall(
       await fs.writeFile(pendingPath, JSON.stringify(pending, null, 2), 'utf8');
 
       // Return the expected path (will be available after redeploy)
-      return path.join(toolsDir, 'node_modules', packageName);
+      return { resolvedPath: path.join(toolsDir, 'node_modules', packageName), version };
     }
 
     case 'sandbox': {
@@ -291,7 +311,7 @@ async function execInstall(
       await ensureToolsPackageJson();
       const installCmd = `npm install ${packageName}@${version} --prefix "${toolsDir}" --save --no-audit --no-fund`;
       await execAsync(installCmd, { cwd: toolsDir, timeout: 120_000 });
-      return path.join(toolsDir, 'node_modules', packageName);
+      return { resolvedPath: path.join(toolsDir, 'node_modules', packageName), version };
     }
 
     default:
@@ -374,6 +394,7 @@ export async function installTool(
     const isWorkspace = await isWorkspaceTool(descriptor.packageName);
     const target = detectDeploymentTarget();
     let resolvedPath: string;
+    let installedVersion = descriptor.version;
     let source: ToolSource;
 
     if (isWorkspace) {
@@ -394,9 +415,14 @@ export async function installTool(
     } else {
       // Remote install — download from npm into isolated directory
       report('downloading', 30, `Downloading ${descriptor.packageName}@${descriptor.version}…`);
-      resolvedPath = await execInstall(descriptor.packageName, descriptor.version, target, (msg) =>
-        report('downloading', 50, msg),
+      const installed = await execInstall(
+        descriptor.packageName,
+        descriptor.version,
+        target,
+        (msg) => report('downloading', 50, msg),
       );
+      resolvedPath = installed.resolvedPath;
+      installedVersion = installed.version;
       source = target === 'sandbox' ? 'sandbox' : 'registry';
       report('installing', 70, 'Package installed.');
     }
@@ -409,7 +435,7 @@ export async function installTool(
 
     const entry: InstalledTool = {
       id: toolId,
-      version: descriptor.version,
+      version: installedVersion,
       installedAt: new Date().toISOString(),
       packageName: descriptor.packageName,
       resolvedPath,
