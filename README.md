@@ -20,7 +20,7 @@ Larkup brings files, websites, text, structured data, and media into one searcha
 ```bash
 docker run -d -p 4567:4567 \
   -e OPENAI_API_KEY=your_key \
-  ghcr.io/larkup-ai/larkup:latest
+  aboneda/larkup:latest
 ```
 
 Or use Docker Compose:
