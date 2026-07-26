@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import useSWR from 'swr';
+import { useRouter } from 'next/navigation';
 import {
   Download,
   Trash2,
@@ -88,6 +89,7 @@ const fetcher = (url: string) =>
   fetch(url).then((r) => r.json() as Promise<{ tools: MarketplaceTool[] }>);
 
 export function MarketplaceSection() {
+  const router = useRouter();
   const { data, isLoading, mutate } = useSWR('/api/marketplace', fetcher);
   const [installing, setInstalling] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,7 +106,17 @@ export function MarketplaceSection() {
           const err = await res.json();
           throw new Error(err.error || 'Install failed');
         }
-        toast.success('Tool installed successfully');
+        if (toolId === 'video-audio') {
+          toast.success('Video & Audio installed', {
+            description: 'Choose an audio provider before you index media.',
+            action: {
+              label: 'Set up audio',
+              onClick: () => router.push('/settings?section=tool-settings'),
+            },
+          });
+        } else {
+          toast.success('Tool installed successfully');
+        }
         mutate();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to install tool');
@@ -112,7 +124,7 @@ export function MarketplaceSection() {
         setInstalling(null);
       }
     },
-    [mutate],
+    [mutate, router],
   );
 
   const handleUninstall = useCallback(

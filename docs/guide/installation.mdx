@@ -107,10 +107,10 @@ If you see a version number, you're good. Head to the [Quickstart](/guide/quicks
     The Docker image runs the Larkup web app only. It needs one port — `4567` — and does not expose generated RAG servers.
 
     ```bash
-    docker run --platform linux/amd64 -d --name larkup -p 4567:4567 aboneda/larkup:latest
+    docker run --platform linux/amd64 -d --name larkup -p 4567:4567 -v larkup-data:/app/.larkup aboneda/larkup:latest
     ```
 
-    Then open `http://localhost:4567` (on macOS, run `open http://localhost:4567`; on Linux, run `xdg-open http://localhost:4567`). A container cannot open a browser on the host by itself.
+    The `larkup-data` volume keeps your configuration, knowledge base, uploaded files, and Marketplace tool installs when the container is recreated. Then open `http://localhost:4567` (on macOS, run `open http://localhost:4567`; on Linux, run `xdg-open http://localhost:4567`). A container cannot open a browser on the host by itself.
   </Tab>
   <Tab title="npm" icon="npm">
     If you already have Node.js installed:

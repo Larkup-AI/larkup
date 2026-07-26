@@ -147,8 +147,15 @@ export async function checkSystemDeps(toolId: string): Promise<string[]> {
   const descriptor = await getToolById(toolId);
   if (!descriptor?.systemDeps?.length) return [];
 
+  const target = detectDeploymentTarget();
+
   const missing: string[] = [];
   for (const dep of descriptor.systemDeps) {
+    // A container cannot normally talk to the host Docker daemon. Do not block
+    // installation of tools that use Docker only for optional capabilities
+    // (for example DOCX/PPTX editing); those capabilities report their own
+    // actionable error when actually used.
+    if (target === 'docker' && dep === 'docker') continue;
     try {
       await execAsync(`which ${dep}`);
     } catch {
@@ -492,6 +499,8 @@ export async function uninstallTool(toolId: string): Promise<void> {
 
   // Refresh registry cache
   invalidateRegistryCache();
+  const { unloadTool } = await import('./tool-loader');
+  unloadTool(toolId);
 }
 
 export async function updateToolConfig(toolId: string, config: Record<string, any>): Promise<void> {

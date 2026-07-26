@@ -314,7 +314,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
 
                   const res = await fetch(img.base64);
                   const blob = await res.blob();
-                  const file = new File([blob], `image-${img.index}.png`, { type: 'image/png' });
+                  const file = new File([blob], `image-${img.index}.jpg`, { type: 'image/jpeg' });
 
                   const formData = new FormData();
                   formData.append('file', file);
@@ -386,6 +386,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                       imageUrl: img.imageUrl,
                       pageNumber: img.pageNumber,
                       index: img.index,
+                      description: img.description,
                     })),
                   }
                 : undefined,

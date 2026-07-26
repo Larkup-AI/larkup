@@ -47,7 +47,6 @@ ARG YT_DLP_VERSION=2026.07.04
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV LARKUP_BUNDLED_TOOLS=video-audio
 
 # FFmpeg/ffprobe are the only native media-processing dependency. Use yt-dlp's
 # pinned standalone binary so YouTube support does not pull in a Python runtime.
@@ -82,10 +81,6 @@ RUN npm install --no-save @lancedb/lancedb@0.31.0 fluent-ffmpeg@2.1.3 && \
     chown -R nextjs:nodejs node_modules/@lancedb node_modules/apache-arrow node_modules/reflect-metadata && \
     mkdir -p /app/.larkup /app/.tmp && \
     chown -R nextjs:nodejs /app/.larkup /app/.tmp
-
-# The marketplace loader imports bundled tools dynamically, so Next's static
-# tracing cannot discover them. Copy it after npm install so npm cannot prune it.
-COPY --from=builder --chown=nextjs:nodejs /app/packages/tools/video-audio ./node_modules/@larkup/tool-video-audio
 
 VOLUME ["/app/.larkup"]
 

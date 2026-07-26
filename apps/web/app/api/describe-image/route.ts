@@ -50,10 +50,18 @@ async function describeImage(req: Request) {
               type: 'text',
               text: prompt || defaultPrompt,
             },
-            ...images.map((image) => ({
-              type: 'image' as const,
-              image: image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`,
-            })),
+            ...images.map((image) => {
+              const data = image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`;
+              const mediaType = data.match(/^data:([^;,]+)/)?.[1] || 'image/jpeg';
+              return {
+                // AI SDK 6 uses file parts for every binary attachment. The
+                // legacy `image` part emits a deprecation warning on every
+                // PDF/image analysis request.
+                type: 'file' as const,
+                mediaType,
+                data,
+              };
+            }),
           ],
         },
       ],
