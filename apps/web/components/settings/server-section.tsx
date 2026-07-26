@@ -758,9 +758,9 @@ export function ServerSection() {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col  border border-border rounded-md items-center px-4 py-6 justify-center gap-2 mt-5">
-            <div className="bg-white p-1 border border-border rounded-md">
-              <ServerIcon className="size-5" />
+          <div className="flex flex-col   rounded-md items-center px-4 py-6 justify-center gap-2 mt-5">
+            <div className="bg-white p-1.5 border border-border rounded-md">
+              <ServerIcon className="size-4.5" />
             </div>
             <p className=" rounded-lg text-sm text-muted-foreground text-center mx-auto">
               No cloud deployments yet. Deploy to a provider above to add one here.

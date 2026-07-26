@@ -229,6 +229,11 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     restart: unless-stopped
 
   rabbitmq:
@@ -247,6 +252,11 @@ services:
   redis:
     image: redis:alpine
     command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
     restart: unless-stopped
 
   playwright-service:
@@ -258,10 +268,12 @@ ${pwEnv}
   api:
     image: ${IMAGE}
     depends_on:
-      - db
-      - rabbitmq
-      - redis
-      - playwright-service
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "${port}:3002"
     environment:
@@ -326,7 +338,7 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
   const isDockerContainer = existsSync('/.dockerenv');
   const host = isDockerContainer ? 'host.docker.internal' : 'localhost';
   const endpoint = `http://${host}:${port}`;
-  const healthy = await waitForHealth(endpoint, 60_000);
+  const healthy = await waitForHealth(endpoint, 90_000);
 
   return writeState({
     running: healthy,
@@ -430,8 +442,7 @@ export async function connectDockerSibling(): Promise<LocalFirecrawlState> {
     return writeState({
       ...EMPTY,
       running: false,
-      lastError:
-        'Firecrawl sibling service is not running. Restart with: docker compose --profile crawler up',
+      lastError: 'The web crawler service is not available in this Docker deployment.',
     });
   }
   const apiKey = `fc-docker-${randomUUID()}`;

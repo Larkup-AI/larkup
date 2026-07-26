@@ -41,7 +41,7 @@ async function resolveEndpoint(): Promise<Endpoint> {
       return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: 'local' };
     }
     throw new FirecrawlError(
-      'Local Firecrawl is selected but not running. Launch a local instance from the UI.',
+      'The selected web crawler is not running. Choose a crawler provider in Settings.',
       401,
     );
   }
@@ -50,10 +50,7 @@ async function resolveEndpoint(): Promise<Endpoint> {
   const key = config.firecrawlApiKey;
   if (key) return { base: CLOUD_BASE, key, mode: 'cloud' };
 
-  throw new FirecrawlError(
-    'Cloud Firecrawl is selected but no API key is configured. Set FIRECRAWL_API_KEY in Settings.',
-    401,
-  );
+  throw new FirecrawlError('The cloud web crawler needs an API key. Add it in Settings.', 401);
 }
 
 /**

@@ -247,8 +247,22 @@ async function execInstall(
         onProgress?.(`Running: npm install ${specifier}`);
         const { stderr } = await execAsync(installCmd, {
           cwd: toolsDir,
-          timeout: 120_000, // 2 minute timeout
-          env: { ...process.env, NODE_ENV: 'production' },
+          // Native tool dependencies can take longer under Docker Desktop's
+          // amd64 emulation. Let the request finish instead of reporting a
+          // misleading connection error part way through installation.
+          timeout: target === 'docker' ? 300_000 : 120_000,
+          env: {
+            ...process.env,
+            NODE_ENV: 'production',
+            // The Docker image runs as an unprivileged user. Keep npm's cache
+            // beside the isolated install so a named .larkup volume is always
+            // writable and installing a Marketplace tool does not fail before
+            // it reaches the registry.
+            HOME:
+              process.env.HOME && process.env.HOME !== '/nonexistent' ? process.env.HOME : toolsDir,
+            npm_config_cache: path.join(toolsDir, '.npm-cache'),
+            npm_config_update_notifier: 'false',
+          },
         });
         if (stderr && !stderr.includes('npm warn')) {
           console.warn(`[marketplace] Install stderr: ${stderr}`);

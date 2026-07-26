@@ -100,6 +100,21 @@ async function writeState(state: LocalServerState) {
   return state;
 }
 
+/** Keep generated local servers on the same per-workspace LanceDB table as the app. */
+async function withActiveVectorTable(config: RagConfig): Promise<RagConfig> {
+  const server = await getActiveServer();
+  if (!server || (config.vectorStore && config.vectorStore !== 'lancedb')) return config;
+
+  const safeId = server.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return {
+    ...config,
+    storeConfig: {
+      ...config.storeConfig,
+      tableName: `documents_${safeId}`,
+    },
+  };
+}
+
 /** Is a pid still alive? */
 function pidAlive(pid?: number): boolean {
   if (!pid) return false;
@@ -113,7 +128,7 @@ function pidAlive(pid?: number): boolean {
 
 /** Write the generated server files to disk (always refreshes the output). */
 export async function emitToDisk(config: RagConfig): Promise<string> {
-  const server = generateServer(config);
+  const server = generateServer(await withActiveVectorTable(config));
   const dir = await outDir(true);
   if (!dir) throw new Error('No active server to emit to.');
   await fs.mkdir(dir, { recursive: true });
@@ -160,7 +175,8 @@ export async function startServer(
   }
   await killPort(port);
 
-  const dir = await emitToDisk(config);
+  const runtimeConfig = await withActiveVectorTable(config);
+  const dir = await emitToDisk(runtimeConfig);
 
   // Install minimal deps (idempotent).
   try {
@@ -178,7 +194,7 @@ export async function startServer(
     return writeState({ ...emptyState(port), lastError: message });
   }
 
-  const dbPath = config.storeConfig.dbPath || './.larkup/lancedb';
+  const dbPath = runtimeConfig.storeConfig.dbPath || './.larkup/lancedb';
   const absDb = path.isAbsolute(dbPath) ? dbPath : path.join(process.cwd(), dbPath);
 
   const logPath = path.join(dir, 'server.log');
@@ -192,51 +208,63 @@ export async function startServer(
     env: {
       ...process.env,
       PORT: String(port),
-      TOP_K: String(config.topK),
+      TOP_K: String(runtimeConfig.topK),
       SERVER_API_KEY: serverApiKey || '',
       EMBEDDING_API_KEY:
-        config.embeddingApiKey || process.env.EMBEDDING_API_KEY || process.env.OPENAI_API_KEY || '',
+        runtimeConfig.embeddingApiKey ||
+        process.env.EMBEDDING_API_KEY ||
+        process.env.OPENAI_API_KEY ||
+        '',
       CHAT_API_KEY:
-        config.chatApiKey ||
-        config.customChatModels?.find(
-          (model) => model.modelName === config.chatModelId?.replace(/^custom:/, ''),
+        runtimeConfig.chatApiKey ||
+        runtimeConfig.customChatModels?.find(
+          (model) => model.modelName === runtimeConfig.chatModelId?.replace(/^custom:/, ''),
         )?.apiKey ||
         process.env.CHAT_API_KEY ||
         process.env.OPENAI_API_KEY ||
         '',
-      CHAT_MODEL: process.env.CHAT_MODEL || resolveChatModel(config),
+      CHAT_MODEL: process.env.CHAT_MODEL || resolveChatModel(runtimeConfig),
       CHAT_BASE_URL:
-        config.customChatModels?.find(
-          (model) => model.modelName === config.chatModelId?.replace(/^custom:/, ''),
+        runtimeConfig.customChatModels?.find(
+          (model) => model.modelName === runtimeConfig.chatModelId?.replace(/^custom:/, ''),
         )?.baseUrl ||
         process.env.CHAT_BASE_URL ||
         '',
       OPENAI_API_KEY:
-        config.embeddingApiKey || config.chatApiKey || process.env.OPENAI_API_KEY || '',
+        runtimeConfig.embeddingApiKey ||
+        runtimeConfig.chatApiKey ||
+        process.env.OPENAI_API_KEY ||
+        '',
       ANTHROPIC_API_KEY:
-        config.chatApiKey || config.embeddingApiKey || process.env.ANTHROPIC_API_KEY || '',
+        runtimeConfig.chatApiKey ||
+        runtimeConfig.embeddingApiKey ||
+        process.env.ANTHROPIC_API_KEY ||
+        '',
       COHERE_API_KEY:
-        config.embeddingApiKey || config.chatApiKey || process.env.COHERE_API_KEY || '',
+        runtimeConfig.embeddingApiKey ||
+        runtimeConfig.chatApiKey ||
+        process.env.COHERE_API_KEY ||
+        '',
       GOOGLE_GENERATIVE_AI_API_KEY:
-        config.embeddingApiKey ||
-        config.chatApiKey ||
+        runtimeConfig.embeddingApiKey ||
+        runtimeConfig.chatApiKey ||
         process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
         '',
-      PINECONE_API_KEY: config.storeConfig.apiKey || '',
-      PINECONE_INDEX: config.storeConfig.indexName || '',
-      PINECONE_NAMESPACE: config.storeConfig.namespace || '',
-      PINECONE_SPARSE_MODEL: config.storeConfig.sparseModel || '',
-      PINECONE_SPARSE_INDEX: config.storeConfig.sparseIndexName || '',
-      LANCEDB_MODE: config.storeConfig.mode || 'local',
+      PINECONE_API_KEY: runtimeConfig.storeConfig.apiKey || '',
+      PINECONE_INDEX: runtimeConfig.storeConfig.indexName || '',
+      PINECONE_NAMESPACE: runtimeConfig.storeConfig.namespace || '',
+      PINECONE_SPARSE_MODEL: runtimeConfig.storeConfig.sparseModel || '',
+      PINECONE_SPARSE_INDEX: runtimeConfig.storeConfig.sparseIndexName || '',
+      LANCEDB_MODE: runtimeConfig.storeConfig.mode || 'local',
       LANCEDB_PATH: absDb,
-      LANCEDB_URI: config.storeConfig.uri || '',
-      LANCEDB_API_KEY: config.storeConfig.apiKey || '',
-      LANCEDB_S3_URI: config.storeConfig.s3Uri || '',
-      AWS_ENDPOINT: config.storeConfig.s3Endpoint || '',
-      AWS_REGION: config.storeConfig.s3Region || '',
-      AWS_ACCESS_KEY_ID: config.storeConfig.s3AccessKeyId || '',
-      AWS_SECRET_ACCESS_KEY: config.storeConfig.s3SecretAccessKey || '',
-      LANCEDB_TABLE: config.storeConfig.tableName || 'documents',
+      LANCEDB_URI: runtimeConfig.storeConfig.uri || '',
+      LANCEDB_API_KEY: runtimeConfig.storeConfig.apiKey || '',
+      LANCEDB_S3_URI: runtimeConfig.storeConfig.s3Uri || '',
+      AWS_ENDPOINT: runtimeConfig.storeConfig.s3Endpoint || '',
+      AWS_REGION: runtimeConfig.storeConfig.s3Region || '',
+      AWS_ACCESS_KEY_ID: runtimeConfig.storeConfig.s3AccessKeyId || '',
+      AWS_SECRET_ACCESS_KEY: runtimeConfig.storeConfig.s3SecretAccessKey || '',
+      LANCEDB_TABLE: runtimeConfig.storeConfig.tableName || 'documents',
     },
   });
 

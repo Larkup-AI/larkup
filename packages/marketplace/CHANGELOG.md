@@ -1,5 +1,13 @@
 # @larkup/marketplace
 
+## 0.1.6
+
+### Patch Changes
+
+- Fix Docker data persistence, Marketplace installs, crawler readiness, and workspace-aware RAG retrieval.
+- Updated dependencies
+  - @larkup/core@0.2.3
+
 ## 0.1.5
 
 ### Patch Changes

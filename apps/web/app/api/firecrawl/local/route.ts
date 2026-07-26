@@ -34,7 +34,7 @@ export async function GET() {
         compose: sibling.available,
         message: sibling.available
           ? 'Crawler service is running.'
-          : 'Crawler service is not running. Restart with: docker compose --profile crawler up',
+          : 'Crawler service is not available for this Docker installation.',
       },
       runtimeEnv,
     });

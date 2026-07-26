@@ -9,6 +9,7 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 /** GET → get tool details. */
 export async function GET(_req: Request, { params }: { params: Promise<{ toolId: string }> }) {

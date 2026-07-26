@@ -1,5 +1,13 @@
 # @larkup/scraper
 
+## 0.1.24
+
+### Patch Changes
+
+- Fix Docker data persistence, Marketplace installs, crawler readiness, and workspace-aware RAG retrieval.
+- Updated dependencies
+  - @larkup/core@0.2.3
+
 ## 0.1.23
 
 ### Patch Changes
