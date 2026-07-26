@@ -167,13 +167,6 @@ export function AnalyticsDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <TabsList className="inline-flex bg-white/70 dark:bg-muted/70 h-9 items-center justify-center rounded-lg border border-border p-0.5 text-muted-foreground">
             <TabsTrigger
-              value="overview"
-              className="inline-flex items-center h-9 justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
-            >
-              <Activity className="size-3.5 mr-1.5" />
-              Server Traffic
-            </TabsTrigger>
-            <TabsTrigger
               value="indexing"
               className="inline-flex items-center h-9 justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
             >
@@ -186,6 +179,13 @@ export function AnalyticsDashboard() {
             >
               <MessageSquare className="size-3.5 mr-1.5" />
               Chat Usage
+            </TabsTrigger>
+            <TabsTrigger
+              value="overview"
+              className="inline-flex items-center h-9 justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
+            >
+              <Activity className="size-3.5 mr-1.5" />
+              Server Traffic
             </TabsTrigger>
           </TabsList>
           <div className="flex items-center">

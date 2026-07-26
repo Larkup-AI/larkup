@@ -432,18 +432,18 @@ export function ServerSection() {
                     </div>
                   </DialogContent>
                 </Dialog>
-                <a
-                  href={apiReferenceUrl(state.endpoint)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={cn(
-                    buttonVariants({ variant: 'outline', size: 'sm' }),
-                    'h-8 gap-1.5 text-xs',
-                  )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy === 'start' || !state.running}
+                  render={
+                    <a href={apiReferenceUrl(state.endpoint)} target="_blank" rel="noreferrer" />
+                  }
+                  className="h-8 gap-1.5 text-xs"
                 >
                   <ExternalLink className="size-3" />
                   API reference
-                </a>
+                </Button>
               </div>
               <Button
                 size="sm"
