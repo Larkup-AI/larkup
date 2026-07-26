@@ -1,5 +1,17 @@
 # larkup
 
+## 0.1.27
+
+### Patch Changes
+
+- 6241db2: Prevent chat responses from rendering unverified image URLs and clarify the single-port Docker web app launch.
+- Updated dependencies [6241db2]
+  - @larkup/core@0.2.2
+  - @larkup/marketplace@0.1.3
+  - @larkup/scraper@0.1.23
+  - @larkup/tool-doc-editor@0.2.3
+  - @larkup/tool-video-audio@0.2.1
+
 ## 0.1.26
 
 ### Patch Changes

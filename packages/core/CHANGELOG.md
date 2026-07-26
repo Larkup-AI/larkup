@@ -1,5 +1,11 @@
 # @larkup/core
 
+## 0.2.2
+
+### Patch Changes
+
+- 6241db2: Prevent chat responses from rendering unverified image URLs and clarify the single-port Docker web app launch.
+
 ## 0.2.1
 
 ### Patch Changes
