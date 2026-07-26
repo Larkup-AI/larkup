@@ -5,7 +5,7 @@
   "description": "Index video and audio files with transcription and frame analysis.",
   "longDescription": "Process long video and audio files for your knowledge base. Splits oversized Whisper uploads, captures scene-change-aware frames in a bounded pass, and supports local files, bounded direct URL downloads, and YouTube videos/playlists. Requires ffmpeg; yt-dlp is only required for YouTube URLs.",
   "category": "media",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "pricing": "free",
   "emoji": "🎬",
   "icon": "Film",

@@ -57,7 +57,7 @@ export function seedRegistry(): void {
         'and whole-media notes. Supports YouTube URLs, ' +
         'direct file upload, and bulk processing. Requires ffmpeg on your system.',
       category: 'media',
-      version: '0.1.0',
+      version: '0.2.0',
       pricing: 'free',
       emoji: '🎬',
       icon: 'Film',
@@ -147,7 +147,7 @@ export function seedRegistry(): void {
         'Supports PDF form fields (AcroForm), DOCX paragraphs/tables, PPTX slide text, and plain text editing. ' +
         'Uses pdf-lib (native) for PDF and the Docker sandbox for DOCX/PPTX via python-docx/python-pptx.',
       category: 'utility',
-      version: '0.1.0',
+      version: '0.2.1',
       pricing: 'free',
       emoji: '📝',
       icon: 'FileEdit',
