@@ -77,7 +77,7 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 WEB_VERSION="$(node -p "require('./apps/web/package.json').version")"
-PYPI_VERSION="$(sed -n 's/^version = \"\\([^\"]*\\)\"/\\1/p' apps/sdk/py-sdk/pyproject.toml)"
+PYPI_VERSION="$(sed -n 's/^version = "\([^"]*\)"/\1/p' apps/sdk/py-sdk/pyproject.toml)"
 
 if [ "$PUBLISH_PYPI" = true ] && [ "$WEB_VERSION" != "$PYPI_VERSION" ]; then
   echo "Version mismatch: larkup npm is ${WEB_VERSION}, Python SDK is ${PYPI_VERSION}." >&2
