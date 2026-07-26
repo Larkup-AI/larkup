@@ -1,5 +1,11 @@
 # @larkup/cli
 
+## 0.2.1
+
+### Patch Changes
+
+- 48922c0: Add `larkup dev` as the guided one-command path for creating and running a local server.
+
 ## 0.2.0
 
 ### Minor Changes
