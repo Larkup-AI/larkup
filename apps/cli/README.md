@@ -13,8 +13,7 @@ npm install -g @larkup/cli
 ```bash
 larkup init product-docs
 larkup index ./knowledge
-larkup generate
-larkup serve
+larkup dev
 ```
 
 `index` accepts individual files or folders, including text, source code, CSV, JSON, PDF, and Word documents. It streams loading and indexing progress.
@@ -29,6 +28,7 @@ larkup media ./demo.mp4
 ## Commands
 
 - `larkup index [sources...]` loads sources and builds the index.
+- `larkup dev [name]` creates a workspace (default: `my-larkup`) and runs its local server.
 - `larkup documents` manages and exports corpus documents.
 - `larkup media [sources...]` processes image, audio, and video files.
 - `larkup serve` runs the generated server.

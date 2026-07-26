@@ -465,9 +465,7 @@ function Show-Banner {
 function Show-NextSteps {
     Write-Host ""
     Write-Host "Get started:" -ForegroundColor White
-    Write-Host "  larkup init my-rag-server" -ForegroundColor Green
-    Write-Host "  cd my-rag-server" -ForegroundColor Green
-    Write-Host "  larkup dev" -ForegroundColor Green
+    Write-Host "  larkup dev" -ForegroundColor DarkYellow
     Write-Host ""
     Write-Host "  Docs:   https://larkup.de/docs" -ForegroundColor DarkGray
     Write-Host "  Issues: https://github.com/Larkup-AI/larkup/issues" -ForegroundColor DarkGray

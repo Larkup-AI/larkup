@@ -1,5 +1,5 @@
-import { getActiveServer, runWithServer, type ServerMeta } from "@larkup/core/workspace";
-import { log } from "../ui/logger";
+import { getActiveServer, runWithServer, type ServerMeta } from '@larkup/core/workspace';
+import { log } from '../ui/logger';
 
 /** Run a body either in the active-server scope or a specific server id. */
 export async function inServerScope<T>(
@@ -18,7 +18,7 @@ export async function inServerScope<T>(
 export async function requireActive(): Promise<ServerMeta> {
   const server = await getActiveServer();
   if (!server) {
-    log.error('No active server. Create one first with: larkup init "my-rag"');
+    log.error('No active server. Start one with: larkup dev');
   }
   return server as ServerMeta;
 }

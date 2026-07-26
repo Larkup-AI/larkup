@@ -8,6 +8,7 @@ import { checkUpdate } from "./updater";
 
 // Commands
 import { initCommand } from "./commands/init";
+import { devCommand } from "./commands/dev";
 import { listServersCommand, useServerCommand } from "./commands/servers";
 import { configCommand } from "./commands/config";
 import { addDocCommand } from "./commands/add-doc";
@@ -39,6 +40,14 @@ program
     prompts.intro(log.fmt.bold("larkup init"));
     await initCommand(name);
     prompts.outro("Done!");
+  });
+
+program
+  .command("dev [name]")
+  .description("Create a workspace and run its server locally")
+  .action(async (name) => {
+    prompts.intro(log.fmt.ochre("larkup dev"));
+    await devCommand(name);
   });
 
 program

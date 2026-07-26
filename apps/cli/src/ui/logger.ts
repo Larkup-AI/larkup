@@ -1,24 +1,24 @@
-import chalk from "chalk";
+import chalk from 'chalk';
 
 /**
  * Consistent logging utilities for the CLI.
  */
 export const log = {
   /** Standard info message (default color) */
-  info: (msg: string) => process.stdout.write(msg + "\n"),
+  info: (msg: string) => process.stdout.write(msg + '\n'),
   /** Success message (green) */
-  success: (msg: string) => process.stdout.write(chalk.green(`✓ ${msg}`) + "\n"),
+  success: (msg: string) => process.stdout.write(chalk.green(`✓ ${msg}`) + '\n'),
   /** Error message (red) and exit */
   error: (msg: string): never => {
-    process.stderr.write(chalk.red(`✗ ${msg}`) + "\n");
+    process.stderr.write(chalk.red(`✗ ${msg}`) + '\n');
     process.exit(1);
   },
   /** Warning message (yellow) */
-  warn: (msg: string) => process.stdout.write(chalk.yellow(`! ${msg}`) + "\n"),
+  warn: (msg: string) => process.stdout.write(chalk.yellow(`! ${msg}`) + '\n'),
   /** Dimmed/secondary text */
-  dim: (msg: string) => process.stdout.write(chalk.dim(msg) + "\n"),
+  dim: (msg: string) => process.stdout.write(chalk.dim(msg) + '\n'),
   /** Emphasized text block */
-  bold: (msg: string) => process.stdout.write(chalk.bold(msg) + "\n"),
+  bold: (msg: string) => process.stdout.write(chalk.bold(msg) + '\n'),
   /** Inline formatting helpers */
   fmt: {
     dim: chalk.dim,
@@ -27,5 +27,6 @@ export const log = {
     red: chalk.red,
     cyan: chalk.cyan,
     yellow: chalk.yellow,
+    ochre: (msg: string) => chalk.rgb(223, 156, 32)(msg),
   },
 };
