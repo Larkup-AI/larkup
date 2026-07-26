@@ -1,5 +1,15 @@
 # larkup
 
+## 0.1.29
+
+### Patch Changes
+
+- 19767f8: Fix isolated Marketplace tool loading in Docker, improve Video & Audio setup guidance, and reliably index PDF images.
+- Updated dependencies [19767f8]
+  - @larkup/marketplace@0.1.5
+  - @larkup/tool-doc-editor@0.2.3
+  - @larkup/tool-video-audio@0.2.1
+
 ## 0.1.28
 
 ### Patch Changes
