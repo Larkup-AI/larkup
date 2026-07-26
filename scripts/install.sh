@@ -5,7 +5,7 @@ set -euo pipefail
 # Usage: curl -fsSL https://larkup.de/install.sh | bash
 
 # ── Config ────────────────────────────────────────────────────
-PACKAGE_NAME="@larkup/cli"
+PACKAGE_NAME="larkup"
 BIN_NAME="larkup"
 MIN_NODE_MAJOR=18
 NODEJS_SETUP_MAJOR=20
@@ -33,7 +33,7 @@ fi
 
 # ── Logging ───────────────────────────────────────────────────
 log_info()    { echo -e "${BLUE}==> ${NC}${1}"; }
-log_success() { echo -e "${GREEN} ✓  ${NC}${1}"; }
+log_success() { echo -e "${OCHRE} ✓  ${NC}${1}"; }
 log_warn()    { echo -e "${YELLOW} !  ${NC}${1}"; }
 log_error()   { echo -e "${RED} ✗  ${NC}${1}" >&2; }
 log_debug()   { [[ "$VERBOSE" == "1" ]] && echo -e "${DIM}[debug] ${1}${NC}" || true; }

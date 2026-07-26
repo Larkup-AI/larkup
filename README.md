@@ -48,7 +48,7 @@ Open [http://localhost:4567](http://localhost:4567) after Larkup starts.
 2. Open **Data** and add a website, integration, CSV, PDF, or video.
 3. Open **Chat** and ask a question about the indexed content.
 
-Larkup runs indexing in the background and starts the local RAG server for the workspace.
+Larkup opens its local web app at `http://localhost:4567`. Start generated servers from the app when you need an API endpoint.
 
 <img src="./docs/images/new/chat-sidebar-on.png" alt="Larkup Chat with the sources panel open" width="900" />
 
@@ -59,14 +59,12 @@ See the [Quickstart guide](https://larkup.de/docs/guide/quickstart) for screensh
 Install the CLI:
 
 ```bash
-npm install -g @larkup/cli
+npm install -g larkup
 ```
 
-Create and run a generated server:
+Start the Larkup web app:
 
 ```bash
-larkup init product-docs
-larkup index ./knowledge
 larkup dev
 ```
 

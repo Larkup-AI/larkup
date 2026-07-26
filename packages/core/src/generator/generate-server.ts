@@ -447,7 +447,7 @@ const server = createServer(async (req, res) => {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>\${${JSON.stringify(config.projectName)}} — RAG Server</title>
+  <title>\${${JSON.stringify(config.projectName)}} — Larkup Server</title>
   <link rel="icon" href="/favicon2.ico" type="image/x-icon" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -482,7 +482,7 @@ const server = createServer(async (req, res) => {
   <div class="container">
     <div class="badge"><span class="dot"></span> Server Online</div>
     <h1>\${${JSON.stringify(config.projectName)}}</h1>
-    <p class="subtitle">Your RAG retrieval server is live and ready to accept queries.<br/>Powered by <strong style="color:#000000">Larkup</strong></p>
+    <p class="subtitle">Your Larkup Server is ready.<br/>Powered by <strong style="color:#df9c20">Larkup</strong></p>
     <div class="actions">
       <a href="/reference" class="btn btn-primary">
         <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -988,9 +988,7 @@ const server = createServer(async (req, res) => {
   return send(res, 404, { error: "Not found" })
 })
 
-server.listen(PORT, () => {
-  console.log(\`[${config.projectName}] RAG server listening on :\${PORT}\`)
-})
+server.listen(PORT)
 `;
 }
 
