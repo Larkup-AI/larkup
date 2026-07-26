@@ -1,5 +1,18 @@
 # larkup
 
+## 0.1.26
+
+### Patch Changes
+
+- 08e7029: Fix LanceDB native-module loading in packaged Larkup installations, align marketplace catalog versions with published tools, and make clearing a knowledge base discoverable.
+- Updated dependencies [08e7029]
+  - @larkup/vector-stores@0.1.22
+  - @larkup/marketplace@0.1.2
+  - @larkup/tool-doc-editor@0.2.2
+  - @larkup/tool-video-audio@0.2.1
+  - @larkup/core@0.2.1
+  - @larkup/scraper@0.1.22
+
 ## 0.1.25
 
 ### Patch Changes
