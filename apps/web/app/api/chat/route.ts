@@ -114,12 +114,6 @@ export async function POST(req: Request) {
     provider === 'vercel_ai_gateway' ? 'vercel_ai_gateway' : modelProvider || provider;
 
   const apiKey = config.chatApiKey || config.embeddingApiKey || undefined;
-  console.log(
-    'Using API Key for chat:',
-    apiKey ? `${apiKey.substring(0, 10)}...` : 'NONE',
-    'Provider:',
-    resolvedProvider,
-  );
   const model = createChatModel(
     resolvedProvider,
     chatModelId,
@@ -327,9 +321,6 @@ ${fieldLines}`;
   // Debug: log payload sizes to console in development
   if (process.env.NODE_ENV === 'development') {
     const stringifiedMsgs = JSON.stringify(safeMessages);
-    console.log(
-      `[chat] Payload size — System Prompt: ${systemPrompt.length} chars, safeMessages: ${stringifiedMsgs.length} chars`,
-    );
   }
 
   const result = streamText({
