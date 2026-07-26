@@ -11,6 +11,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGateway } from '@ai-sdk/gateway';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
+import { formatErrorMessage } from '@/lib/error-formatter';
 
 export const runtime = 'nodejs';
 
@@ -178,13 +179,10 @@ export async function POST(request: Request) {
           );
         }
 
-        return NextResponse.json(
-          { error: `Embedding verification failed: ${msg}` },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: formatErrorMessage(err) }, { status: 400 });
       }
     } catch (err: any) {
-      return NextResponse.json({ error: `Embedding Error: ${err.message}` }, { status: 400 });
+      return NextResponse.json({ error: formatErrorMessage(err) }, { status: 400 });
     }
   }
 
@@ -252,10 +250,10 @@ export async function POST(request: Request) {
           );
         }
 
-        return NextResponse.json({ error: `Chat verification failed: ${msg}` }, { status: 400 });
+        return NextResponse.json({ error: formatErrorMessage(err) }, { status: 400 });
       }
     } catch (err: any) {
-      return NextResponse.json({ error: `Chat Error: ${err.message}` }, { status: 400 });
+      return NextResponse.json({ error: formatErrorMessage(err) }, { status: 400 });
     }
   }
 

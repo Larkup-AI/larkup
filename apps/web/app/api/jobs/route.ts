@@ -23,8 +23,7 @@ export async function POST(req: Request) {
   if (!(await isFirecrawlConfigured())) {
     return NextResponse.json(
       {
-        error:
-          'No Firecrawl available. Launch a local instance or set FIRECRAWL_API_KEY to run scraping jobs.',
+        error: 'No web crawler is available. Choose and configure a crawler provider in Settings.',
       },
       { status: 401 },
     );

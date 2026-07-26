@@ -36,6 +36,7 @@ import { GenericAlert } from '@/components/alerts/generic-alert';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import useSWR from 'swr';
+import { useRouter } from 'next/navigation';
 import type { RagConfig } from '@larkup/core/types';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
@@ -85,6 +86,7 @@ export function ScrapePanel({
   onStarted: () => void;
   crawlerControl?: React.ReactNode;
 }) {
+  const router = useRouter();
   const {
     query,
     setQuery,
@@ -123,6 +125,15 @@ export function ScrapePanel({
   const [showDropdown, setShowDropdown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  function showCrawlerSettings() {
+    toast.error('Web crawler is not available. Choose a crawler provider in Settings.', {
+      action: {
+        label: 'Open settings',
+        onClick: () => router.push('/settings?section=general#web-crawler'),
+      },
+    });
+  }
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -222,7 +233,12 @@ export function ScrapePanel({
         fetchProviderTotalCount(q, activeProvider);
       }
     } catch (err) {
-      toast.error(formatErrorMessage(err));
+      const message = formatErrorMessage(err);
+      if (/crawler|firecrawl|not running|api key/i.test(message)) {
+        showCrawlerSettings();
+      } else {
+        toast.error(message);
+      }
     }
   }
 

@@ -201,7 +201,7 @@ export function GeneralSection() {
       </div>
 
       {/* Username */}
-      <Card className="">
+      <Card id="web-crawler" className="">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Your Name</CardTitle>
           <CardDescription className="text-xs">Displayed in the workspace header.</CardDescription>
@@ -427,7 +427,7 @@ export function GeneralSection() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Web Scraper</CardTitle>
           <CardDescription className="text-xs">
-            Select your web crawler provider (Local or Cloud).
+            Choose the web crawler used to search and import websites.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -442,30 +442,35 @@ export function GeneralSection() {
             >
               <SelectTrigger className="w-full">
                 <div className="flex items-center gap-2">
-                  <Image src="/icons/firecrawl.png" alt="Firecrawl" width={16} height={16} />
+                  <Image src="/icons/firecrawl.png" alt="Web crawler" width={16} height={16} />
                   <span>
                     {form.webCrawlerProvider === 'cloud'
-                      ? 'Firecrawl (Cloud)'
-                      : 'Local (Firecrawl)'}
+                      ? 'Cloud web crawler'
+                      : 'Local web crawler'}
                   </span>
                 </div>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="local">
                   <div className="flex items-center gap-2">
-                    <Image src="/icons/firecrawl.png" alt="Local Crawler" width={16} height={16} />
-                    <span>Local (Firecrawl)</span>
+                    <Image
+                      src="/icons/firecrawl.png"
+                      alt="Local web crawler"
+                      width={16}
+                      height={16}
+                    />
+                    <span>Local web crawler</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="cloud">
                   <div className="flex items-center gap-2">
                     <Image
                       src="/icons/firecrawl.png"
-                      alt="Firecrawl Cloud"
+                      alt="Cloud web crawler"
                       width={16}
                       height={16}
                     />
-                    <span>Firecrawl (Cloud)</span>
+                    <span>Cloud web crawler</span>
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -475,7 +480,7 @@ export function GeneralSection() {
           {form.webCrawlerProvider === 'cloud' && (
             <div className="space-y-1.5 pt-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs">Firecrawl API Key (Cloud)</Label>
+                <Label className="text-xs">Web crawler API key</Label>
                 {verifyCrawlerStatus.status === 'success' && (
                   <span className="text-[10px] text-green-500 font-medium">✓ Verified</span>
                 )}

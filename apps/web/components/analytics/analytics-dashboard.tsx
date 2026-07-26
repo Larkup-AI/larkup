@@ -74,7 +74,7 @@ function formatCost(cost: number): string {
 }
 
 export function AnalyticsDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('indexing');
   const [timeframe, setTimeframe] = useState('14d');
 
   const {

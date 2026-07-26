@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, Loader2, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { ArrowRight, Loader2, ChevronDown, ChevronUp, Pencil, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useWorkspace } from '@/components/workspace/workspace-provider';
@@ -42,6 +42,8 @@ export function WelcomeScreen() {
   // UI state
   const [saving, setSaving] = useState(false);
   const [showSeparateChat, setShowSeparateChat] = useState(false);
+  const [showEmbeddingApiKey, setShowEmbeddingApiKey] = useState(false);
+  const [showChatApiKey, setShowChatApiKey] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState<'embedding' | 'chat' | null>(null);
 
   const isCustomEmbedding = embeddingProvider === 'custom';
@@ -326,13 +328,27 @@ export function WelcomeScreen() {
                     </span>
                   )}
                 </label>
-                <Input
-                  type="password"
-                  value={embeddingApiKey}
-                  onChange={(e) => setEmbeddingApiKey(e.target.value)}
-                  placeholder="sk-..."
-                  className="bg-background/50"
-                />
+                <div className="relative">
+                  <Input
+                    type={showEmbeddingApiKey ? 'text' : 'password'}
+                    value={embeddingApiKey}
+                    onChange={(e) => setEmbeddingApiKey(e.target.value)}
+                    placeholder="sk-..."
+                    className="bg-background/50 pr-10"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showEmbeddingApiKey ? 'Hide API key' : 'Show API key'}
+                    onClick={() => setShowEmbeddingApiKey((visible) => !visible)}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  >
+                    {showEmbeddingApiKey ? (
+                      <EyeOff className="size-4" />
+                    ) : (
+                      <Eye className="size-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -368,13 +384,27 @@ export function WelcomeScreen() {
                 {!isCustomChat && (
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground">Chat API Key</label>
-                    <Input
-                      type="password"
-                      value={chatApiKey}
-                      onChange={(e) => setChatApiKey(e.target.value)}
-                      placeholder="sk-..."
-                      className="bg-background/50"
-                    />
+                    <div className="relative">
+                      <Input
+                        type={showChatApiKey ? 'text' : 'password'}
+                        value={chatApiKey}
+                        onChange={(e) => setChatApiKey(e.target.value)}
+                        placeholder="sk-..."
+                        className="bg-background/50 pr-10"
+                      />
+                      <button
+                        type="button"
+                        aria-label={showChatApiKey ? 'Hide chat API key' : 'Show chat API key'}
+                        onClick={() => setShowChatApiKey((visible) => !visible)}
+                        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                      >
+                        {showChatApiKey ? (
+                          <EyeOff className="size-4" />
+                        ) : (
+                          <Eye className="size-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

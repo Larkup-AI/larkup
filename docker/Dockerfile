@@ -65,7 +65,7 @@ RUN apt-get update && \
     echo "$YT_DLP_SHA256  /usr/local/bin/yt-dlp" | sha256sum -c - && \
     chmod 0755 /usr/local/bin/yt-dlp
 
-ENV TMPDIR=/app/.tmp
+ENV TMPDIR=/app/apps/web/.tmp
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -79,14 +79,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 # Install LanceDB native binding directly for the target platform.
 RUN npm install --no-save @lancedb/lancedb@0.31.0 fluent-ffmpeg@2.1.3 && \
     chown -R nextjs:nodejs node_modules/@lancedb node_modules/apache-arrow node_modules/reflect-metadata && \
-    mkdir -p /app/.larkup /app/.tmp && \
-    chown -R nextjs:nodejs /app/.larkup /app/.tmp
+    mkdir -p /app/apps/web/.larkup /app/apps/web/.tmp && \
+    chown -R nextjs:nodejs /app/apps/web/.larkup /app/apps/web/.tmp
 
-VOLUME ["/app/.larkup"]
+VOLUME ["/app/apps/web/.larkup"]
 
 USER nextjs
 
-EXPOSE 4567
+EXPOSE 4567 8080
 
 ENV PORT=4567
 

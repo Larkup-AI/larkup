@@ -9,11 +9,13 @@ services:
     restart: unless-stopped
     ports:
       - "4567:4567"
+      # Generated local RAG servers use the first workspace port (8080).
+      - "8080:8080"
     volumes:
       # Complete durable application state: media, corpus, config, tools, and LanceDB.
-      - larkup_data:/app/.larkup
+      - larkup_data:/app/apps/web/.larkup
       # Disposable working space for extracted audio and video frames.
-      - media_tmp:/app/.tmp
+      - media_tmp:/app/apps/web/.tmp
     environment:
       # Node.js Configuration
       NODE_ENV: production
@@ -23,7 +25,7 @@ services:
       # Application Configuration
       PORT: 4567
       HOSTNAME: 0.0.0.0
-      TMPDIR: /app/.tmp
+      TMPDIR: /app/apps/web/.tmp
       NEXT_PUBLIC_DOCKER_ENV: true
       DOCKER_ENV: true
 
@@ -63,6 +65,11 @@ services:
     image: redis:7-alpine
     profiles: ["crawler"]
     command: redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
     restart: unless-stopped
     networks:
       - app_network
@@ -76,6 +83,11 @@ services:
       POSTGRES_DB: firecrawl
     volumes:
       - crawler_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crawler -d firecrawl"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     restart: unless-stopped
     networks:
       - app_network
@@ -113,10 +125,12 @@ services:
     image: ghcr.io/firecrawl/firecrawl:latest
     profiles: ["crawler"]
     depends_on:
-      - crawler-db
-      - crawler-rabbitmq
-      - crawler-redis
-      - crawler-playwright
+      crawler-db:
+        condition: service_healthy
+      crawler-rabbitmq:
+        condition: service_healthy
+      crawler-redis:
+        condition: service_healthy
     environment:
       PORT: "3002"
       HOST: "0.0.0.0"

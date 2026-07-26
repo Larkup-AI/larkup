@@ -78,7 +78,11 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
           timestamp: new Date().toISOString(),
         });
 
-        if (res.ok && data.hits) {
+        // Generated servers from an older configuration can point at a
+        // different local table than the active workspace. An empty response
+        // must not hide the workspace index: fall back to direct retrieval,
+        // which resolves the active server's table consistently.
+        if (res.ok && Array.isArray(data.hits) && data.hits.length > 0) {
           return formatKnowledgeHits(query, data.hits as any[], topK);
         }
       } catch {
