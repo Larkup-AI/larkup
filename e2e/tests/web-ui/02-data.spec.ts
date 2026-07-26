@@ -231,6 +231,13 @@ test.describe.serial('Data Page', () => {
     console.log(`  📄 Documents visible in corpus: ${count}`);
   });
 
+  test('corpus exposes a clear-all reset action', async ({ page }) => {
+    const kbTab = page.getByText('Knowledge Base', { exact: true }).first();
+    await kbTab.click();
+
+    await expect(page.getByRole('button', { name: 'Clear all files' })).toBeVisible();
+  });
+
   test('delete a document from corpus', async ({ page }) => {
     // Switch to Knowledge Base tab
     const kbTab = page.getByText('Knowledge Base', { exact: true }).first();

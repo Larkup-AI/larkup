@@ -211,11 +211,12 @@ export function CorpusPanel({
           <Button
             size="sm"
             variant="destructive"
-            className="h-8.5 border border-border text-xs text-muted-foreground hover:text-destructive"
+            className="h-8 border border-border text-xs"
             onClick={() => setDeleteTask({ type: 'all' })}
+            disabled={isIndexing}
           >
             <Trash2 className="size-3.5" />
-            {/* Clear corpus */}
+            Clear all files
           </Button>
         </div>
       </div>
@@ -419,7 +420,7 @@ export function CorpusPanel({
         }
         description={
           deleteTask?.type === 'all' ? (
-            'Are you sure you want to delete all documents in the corpus? This action cannot be undone.'
+            'Delete every uploaded file and document from this knowledge base? This also clears the vector index and cannot be undone.'
           ) : deleteTask?.type === 'selected' ? (
             `Are you sure you want to delete ${selectedIds.size} selected documents?`
           ) : (
