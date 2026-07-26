@@ -6,7 +6,6 @@
  * generated files, then auto-removes the container.
  */
 
-import Docker from 'dockerode';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -25,10 +24,13 @@ const OUTPUT_DIR = '/sandbox/output';
 const INPUT_DIR = '/sandbox/input';
 const DOCKERFILE_DIR = path.join(import.meta.dirname ?? __dirname, '..');
 
-let dockerInstance: Docker | null = null;
+let dockerInstance: any | null = null;
 
-function getDocker(): Docker {
+async function getDocker(): Promise<any> {
   if (!dockerInstance) {
+    // Dynamic import prevents Turbopack from statically bundling dockerode
+    // and mangling its module name with a hash suffix.
+    const { default: Docker } = await import(/* turbopackIgnore: true */ 'dockerode');
     dockerInstance = new Docker();
   }
   return dockerInstance;
@@ -39,7 +41,7 @@ function getDocker(): Docker {
 /* ------------------------------------------------------------------ */
 
 export async function checkDockerHealth(): Promise<SandboxHealthCheck> {
-  const docker = getDocker();
+  const docker = await getDocker();
   try {
     const info = await docker.version();
     const images = await docker.listImages({
@@ -65,7 +67,7 @@ export async function checkDockerHealth(): Promise<SandboxHealthCheck> {
 /* ------------------------------------------------------------------ */
 
 export async function buildSandboxImage(onProgress?: (msg: string) => void): Promise<void> {
-  const docker = getDocker();
+  const docker = await getDocker();
   const dockerfilePath = path.join(DOCKERFILE_DIR, 'Dockerfile');
 
   // Check if Dockerfile exists in the package
@@ -105,7 +107,7 @@ export async function buildSandboxImage(onProgress?: (msg: string) => void): Pro
 }
 
 export async function ensureImage(): Promise<boolean> {
-  const docker = getDocker();
+  const docker = await getDocker();
   const images = await docker.listImages({
     filters: { reference: [SANDBOX_IMAGE] },
   });
@@ -279,7 +281,7 @@ export async function executeInDocker(
   request: ExecutionRequest,
   config: DockerConfig,
 ): Promise<ExecutionResult> {
-  const docker = getDocker();
+  const docker = await getDocker();
   const startTime = Date.now();
 
   // Create a temporary directory for input files
@@ -319,7 +321,7 @@ export async function executeInDocker(
 
   const timeout = request.timeout ?? config.timeoutMs;
 
-  let container: Docker.Container | null = null;
+  let container: any | null = null;
   try {
     container = await docker.createContainer({
       Image: config.imageName,
