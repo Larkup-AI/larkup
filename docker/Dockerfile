@@ -78,7 +78,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
 # Install LanceDB native binding directly for the target platform.
-RUN npm install --no-save @lancedb/lancedb@0.30.0 fluent-ffmpeg@2.1.3 && \
+RUN npm install --no-save @lancedb/lancedb@0.31.0 fluent-ffmpeg@2.1.3 && \
     chown -R nextjs:nodejs node_modules/@lancedb node_modules/apache-arrow node_modules/reflect-metadata && \
     mkdir -p /app/.larkup /app/.tmp && \
     chown -R nextjs:nodejs /app/.larkup /app/.tmp
