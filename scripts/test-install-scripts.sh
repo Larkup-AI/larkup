@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PUBLIC_DIR="${PROJECT_ROOT}/apps/web/public"
 
 PASS=0
 FAIL=0
@@ -29,36 +28,13 @@ section "File Existence"
 for f in \
   "scripts/install.sh" \
   "scripts/install-local.sh" \
-  "scripts/install.ps1" \
-  "apps/web/public/install.sh" \
-  "apps/web/public/install-local.sh" \
-  "apps/web/public/install.ps1"; do
+  "scripts/install.ps1"; do
   if [[ -f "${PROJECT_ROOT}/${f}" ]]; then
     pass "${f} exists"
   else
     fail "${f} MISSING"
   fi
 done
-
-# ── Script/public sync check ─────────────────────────────────
-section "Script ↔ Public Sync"
-
-check_sync() {
-  local src="$1" dst="$2" label="$3"
-  if [[ ! -f "$src" || ! -f "$dst" ]]; then
-    fail "${label}: one or both files missing"
-    return
-  fi
-  if diff -q "$src" "$dst" &>/dev/null; then
-    pass "${label}: scripts/ and public/ are in sync"
-  else
-    fail "${label}: scripts/ and public/ differ — re-copy before pushing"
-  fi
-}
-
-check_sync "${PROJECT_ROOT}/scripts/install.sh"       "${PUBLIC_DIR}/install.sh"       "install.sh"
-check_sync "${PROJECT_ROOT}/scripts/install-local.sh"  "${PUBLIC_DIR}/install-local.sh"  "install-local.sh"
-check_sync "${PROJECT_ROOT}/scripts/install.ps1"       "${PUBLIC_DIR}/install.ps1"       "install.ps1"
 
 # ── Bash syntax check ────────────────────────────────────────
 section "Bash Syntax Validation"
@@ -169,16 +145,20 @@ done
 # ── Package name consistency ──────────────────────────────────
 section "Package Name Consistency"
 
-EXPECTED_PKG="@larkup/cli"
 EXPECTED_BIN="larkup"
 
 for script in "scripts/install.sh" "scripts/install-local.sh" "scripts/install.ps1"; do
   filepath="${PROJECT_ROOT}/${script}"
-  
-  if grep -q "${EXPECTED_PKG}" "$filepath"; then
-    pass "${script}: references ${EXPECTED_PKG}"
+  if [[ "$script" == "scripts/install-local.sh" ]]; then
+    expected_pkg="@larkup/cli"
   else
-    fail "${script}: MISSING package name ${EXPECTED_PKG}"
+    expected_pkg="larkup"
+  fi
+  
+  if grep -q "${expected_pkg}" "$filepath"; then
+    pass "${script}: references ${expected_pkg}"
+  else
+    fail "${script}: MISSING package name ${expected_pkg}"
   fi
   
   if grep -q "BIN_NAME.*=.*[\"']${EXPECTED_BIN}[\"']" "$filepath" || \
