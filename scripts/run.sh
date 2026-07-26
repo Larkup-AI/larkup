@@ -19,6 +19,6 @@ fi
 echo "Building and starting containers using $DOCKER_COMPOSE_CMD..."
 $DOCKER_COMPOSE_CMD -f docker/docker-compose.dev.yml up --build -d
 
-echo "✅ Containers started successfully! The app is running on http://localhost:3000"
+echo "✅ Containers started successfully! The app is running on http://localhost:4567"
 echo "To view logs, run: $DOCKER_COMPOSE_CMD -f docker/docker-compose.dev.yml logs -f web"
 echo "To stop the app, run: $DOCKER_COMPOSE_CMD -f docker/docker-compose.dev.yml down"
