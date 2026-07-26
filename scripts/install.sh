@@ -25,9 +25,10 @@ TMPFILES=()
 # ── Colors (auto-disabled outside TTY) ────────────────────────
 if [[ -t 1 ]]; then
   BOLD='\033[1m' DIM='\033[2m' NC='\033[0m'
-  GREEN='\033[0;32m' YELLOW='\033[1;33m' BLUE='\033[0;34m' RED='\033[0;31m' BLACK='\033[0;30m'
+  OCHRE='\033[38;2;223;156;32m' # Lark bird brand color: #df9c20
+  GREEN='\033[0;32m' YELLOW='\033[1;33m' BLUE='\033[0;34m' RED='\033[0;31m'
 else
-  BOLD='' DIM='' NC='' GREEN='' YELLOW='' BLUE='' RED='' BLACK=''
+  BOLD='' DIM='' NC='' OCHRE='' GREEN='' YELLOW='' BLUE='' RED=''
 fi
 
 # ── Logging ───────────────────────────────────────────────────
@@ -189,7 +190,9 @@ identify_system() {
   esac
 
   log_success "Detected: ${BOLD}${DETECTED_OS}${NC} (${DETECTED_ARCH})"
-  [[ "$DETECTED_OS" == "wsl" ]] && log_info "Running inside WSL — using Linux install path"
+  if [[ "$DETECTED_OS" == "wsl" ]]; then
+    log_info "Running inside WSL — using Linux install path"
+  fi
 }
 
 # ── Node.js version check ────────────────────────────────────
@@ -493,7 +496,7 @@ verify_install() {
 
 # ── Banner ────────────────────────────────────────────────────
 show_banner() {
-  echo -e "${BLACK}"
+  echo -e "${OCHRE}"
   cat <<'BANNER'
    __               __
   / /   ____ ______/ /____  ______

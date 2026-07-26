@@ -274,8 +274,11 @@ fi
 # ── Dry-run smoke test (install.sh) ──────────────────────────
 section "Dry-Run Smoke Test (install.sh)"
 
-dry_run_output=$(bash "${PROJECT_ROOT}/scripts/install.sh" --dry-run --no-prompt 2>&1) || true
-dry_exit=$?
+if dry_run_output=$(bash "${PROJECT_ROOT}/scripts/install.sh" --dry-run --no-prompt 2>&1); then
+  dry_exit=0
+else
+  dry_exit=$?
+fi
 
 if [[ $dry_exit -eq 0 ]]; then
   pass "install.sh --dry-run exits cleanly (code 0)"
@@ -298,8 +301,11 @@ fi
 # ── Dry-run smoke test (install-local.sh) ─────────────────────
 section "Dry-Run Smoke Test (install-local.sh)"
 
-dry_run_output2=$(bash "${PROJECT_ROOT}/scripts/install-local.sh" --dry-run --no-prompt 2>&1) || true
-dry_exit2=$?
+if dry_run_output2=$(bash "${PROJECT_ROOT}/scripts/install-local.sh" --dry-run --no-prompt 2>&1); then
+  dry_exit2=0
+else
+  dry_exit2=$?
+fi
 
 if [[ $dry_exit2 -eq 0 ]]; then
   pass "install-local.sh --dry-run exits cleanly (code 0)"
