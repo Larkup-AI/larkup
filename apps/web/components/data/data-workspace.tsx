@@ -220,6 +220,22 @@ export function DataWorkspace() {
     setActiveTab('corpus');
   };
 
+  const handleScrapeStarted = useCallback(
+    (job: CrawlJob) => {
+      // Make the queued job visible immediately. Revalidation then advances it
+      // through the normal status endpoint without asking the user to reload.
+      void jobsQuery.mutate(
+        (current) => ({
+          jobs: [job, ...(current?.jobs ?? []).filter((existing) => existing.id !== job.id)],
+          configured: current?.configured ?? true,
+        }),
+        { revalidate: true },
+      );
+      setShowJobsDrawer(true);
+    },
+    [jobsQuery],
+  );
+
   const handleMediaIndexed = useCallback(() => {
     // Refresh the corpus without pulling the user away from the live media
     // workspace; they can inspect another job or open the Knowledge Base when
@@ -459,10 +475,7 @@ export function DataWorkspace() {
                 <div className="w-full flex flex-col gap-8 animate-in fade-in duration-200">
                   <div>
                     <ScrapePanel
-                      onStarted={() => {
-                        handleDataAdded();
-                        setShowJobsDrawer(true);
-                      }}
+                      onStarted={handleScrapeStarted}
                       crawlerControl={<FirecrawlNotice cloudConfigured={configured} />}
                     />
                   </div>

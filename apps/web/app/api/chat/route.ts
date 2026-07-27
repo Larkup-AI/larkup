@@ -82,11 +82,30 @@ RETRIEVAL RULES:
 
 IMAGE AND MEDIA RULES:
 - NEVER output raw markdown image syntax like ![alt](url). The chat UI blocks these and shows "[Image unavailable]". Instead, always use the presentMedia tool to display images, videos, or audio from indexed content.
-- When search results contain metadata.images or a mediaAssetId referencing an image, use presentMedia with the exact assetId to embed the image in the chat. This is the ONLY way images can appear in the conversation.
+- When search results contain images[].imageUrl (an image extracted from a PDF), use presentMedia with that exact imageUrl. When they contain a mediaAssetId, use presentMedia with the exact assetId. This is the ONLY way indexed images can appear in the conversation.
 - For a follow-up such as "show me that part", "play the clip", "show the image", or "let me hear it", reuse the mediaAssetId and timestamps already present in the earlier search result and call presentMedia directly. Do not search again just to rediscover the same media.
 - Use presentMedia to embed exactly one best video, image, or audio citation when the user asks to see/hear it or when one compact preview materially supports the answer. Do not present every search result.
 - Keep the written answer minimal around a media citation. Do not print internal media reference markers.
 `;
+
+function latestUserText(messages: UIMessage[]): string {
+  const message = [...messages].reverse().find((candidate) => candidate.role === 'user') as any;
+  if (!message) return '';
+  if (typeof message.content === 'string') return message.content;
+  if (Array.isArray(message.parts)) {
+    return message.parts
+      .filter((part: any) => part.type === 'text' && typeof part.text === 'string')
+      .map((part: any) => part.text)
+      .join(' ');
+  }
+  return '';
+}
+
+function requiresKnowledgeBaseSearch(text: string): boolean {
+  return /\b(my|our|we|i|database|db|document|file|diagram|image|picture|upload(?:ed)?|knowledge base|corpus)\b|\bwhat is my\b/i.test(
+    text,
+  );
+}
 
 export async function POST(req: Request) {
   const {
@@ -327,9 +346,15 @@ ${fieldLines}`;
   const systemPrompt =
     (config.systemPrompt || DEFAULT_SYSTEM_PROMPT) +
     SMART_RETRIEVAL_POLICY +
+    (config.webSearchEnabled
+      ? '\nWEB SEARCH IS ENABLED: For a public, current, or external factual question, you MUST call webSearch after any required knowledge-base search. Do not tell the user to check the web yourself when this tool is available.\n'
+      : '') +
     tabularContext +
     docContext;
   const tools = await getChatTools({ serverId, docSessionId, config });
+  const forceKnowledgeBaseSearch =
+    requiresKnowledgeBaseSearch(latestUserText(messagesToProcess)) &&
+    Boolean(tools.searchKnowledgeBase);
 
   // Debug: log payload sizes to console in development
   if (process.env.NODE_ENV === 'development') {
@@ -342,6 +367,9 @@ ${fieldLines}`;
     messages: await convertToModelMessages(safeMessages, { tools }),
     maxOutputTokens: 8192,
     stopWhen: stepCountIs(8),
+    toolChoice: forceKnowledgeBaseSearch
+      ? { type: 'tool', toolName: 'searchKnowledgeBase' }
+      : 'auto',
     onFinish: async ({ usage, response }) => {
       const { trackUsageEvent, estimateCost } = await import('@larkup/core/analytics-store');
       const u = usage as any;

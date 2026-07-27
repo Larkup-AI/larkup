@@ -94,9 +94,14 @@ export function FirecrawlNotice({
           toast.success('Web crawler is running', {
             description: 'Web scraping is now active.',
           });
+        } else if (runtimeEnv === 'docker') {
+          toast.error('Crawler service is not part of this container', {
+            description:
+              'Start Larkup with the optional crawler profile in docker-compose, or add a Firecrawl API key in Settings.',
+          });
         } else {
           toast.warning('Web crawler is starting', {
-            description: 'It may take a moment to become available. Try again shortly.',
+            description: 'It may take a moment to become available.',
           });
         }
       } else {
@@ -143,7 +148,11 @@ export function FirecrawlNotice({
           ) : (
             <img src="/icons/firecrawl2.png" alt="" className="size-3 object-contain" />
           )}
-          {runtimeEnv === 'docker' && dockerReady ? 'Connect Crawler' : 'Launch Crawler'}
+          {runtimeEnv === 'docker'
+            ? dockerReady
+              ? 'Connect Crawler'
+              : 'Crawler Setup'
+            : 'Launch Crawler'}
         </Button>
       )}
     </div>
