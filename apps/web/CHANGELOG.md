@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.34
+
+### Patch Changes
+
+- c9724ff: Ship Next.js browser assets inside the standalone runtime so curl and npm installations load the UI instead of returning static-asset 404s.
+
 ## 0.1.33
 
 ### Patch Changes
