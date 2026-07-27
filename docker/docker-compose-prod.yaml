@@ -13,9 +13,9 @@ services:
       - "8080:8080"
     volumes:
       # Complete durable application state: media, corpus, config, tools, and LanceDB.
-      - larkup_data:/app/apps/web/.larkup
+      - larkup_data:/app/.larkup
       # Disposable working space for extracted audio and video frames.
-      - media_tmp:/app/apps/web/.tmp
+      - media_tmp:/app/.tmp
     environment:
       # Node.js Configuration
       NODE_ENV: production
@@ -25,7 +25,7 @@ services:
       # Application Configuration
       PORT: 4567
       HOSTNAME: 0.0.0.0
-      TMPDIR: /app/apps/web/.tmp
+      TMPDIR: /app/.tmp
       NEXT_PUBLIC_DOCKER_ENV: true
       DOCKER_ENV: true
 

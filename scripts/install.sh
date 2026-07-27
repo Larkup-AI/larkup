@@ -7,8 +7,8 @@ set -euo pipefail
 # ── Config ────────────────────────────────────────────────────
 PACKAGE_NAME="larkup"
 BIN_NAME="larkup"
-MIN_NODE_MAJOR=18
-NODEJS_SETUP_MAJOR=20
+MIN_NODE_MAJOR=22
+NODEJS_SETUP_MAJOR=22
 
 # ── Flags ─────────────────────────────────────────────────────
 DRY_RUN=0
@@ -217,9 +217,9 @@ get_node_semver() {
 }
 
 check_node() {
-  log_info "Checking for Node.js (>= v${MIN_NODE_MAJOR})..."
+  log_info "Checking for Node.js (>= v${MIN_NODE_MAJOR}) and npm..."
 
-  if command -v node &>/dev/null; then
+  if command -v node &>/dev/null && command -v npm &>/dev/null; then
     local components major
     if components="$(get_node_semver)"; then
       read -r major _ _ <<< "$components"
@@ -235,13 +235,13 @@ check_node() {
       log_warn "Could not parse Node.js version."
     fi
   else
-    log_warn "Node.js is not installed."
+    log_warn "Node.js or npm is not installed or not in PATH."
   fi
 
   if confirm "Install Node.js v${NODEJS_SETUP_MAJOR}.x automatically?"; then
     install_node
   else
-    log_error "Node.js v${MIN_NODE_MAJOR}+ is required. Install: https://nodejs.org/"
+    log_error "Node.js v${MIN_NODE_MAJOR}+ and npm are required. Install: https://nodejs.org/"
     exit 1
   fi
 }
@@ -313,10 +313,7 @@ install_node() {
   log_success "Node.js $(node -v) installed"
 }
 
-# ── npm prefix setup (avoids sudo npm install -g) ─────────────
-# Running `sudo npm install -g` creates root-owned files in npm's
-# cache that break future installs. Instead, redirect npm's global
-# prefix to a user-writable directory.
+
 resolve_npm_bin() {
   local prefix
   prefix="$(npm config get prefix 2>/dev/null || echo "")"
@@ -328,10 +325,22 @@ configure_npm_globals() {
   current_bin="$(resolve_npm_bin)"
   log_debug "Current npm global bin: ${current_bin:-<unknown>}"
 
+  local npm_root
+  npm_root="$(npm root -g 2>/dev/null || true)"
+  local root_writable=0
+
+  if [[ -n "$npm_root" ]]; then
+    if [[ -d "$npm_root" && -w "$npm_root" ]]; then
+      root_writable=1
+    elif [[ ! -d "$npm_root" && -w "$(dirname "$npm_root")" ]]; then
+      root_writable=1
+    fi
+  fi
+
   # Already writable? Use as-is.
-  if [[ -n "$current_bin" ]] && [[ -w "$current_bin" ]] 2>/dev/null; then
+  if [[ -n "$current_bin" ]] && [[ -w "$current_bin" ]] && [[ "$root_writable" == "1" ]]; then
     NPM_GLOBAL_BIN="$current_bin"
-    log_debug "npm global bin is writable"
+    log_debug "npm global bin and root are writable"
     return 0
   fi
 
