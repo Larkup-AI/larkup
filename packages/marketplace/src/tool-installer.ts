@@ -14,6 +14,16 @@ import { getToolById, invalidateRegistryCache } from './tool-registry';
 
 const execAsync = promisify(execCb);
 
+// npm mutates a shared node_modules tree. Serializing those mutations prevents
+// double-clicks or concurrent API requests from colliding during npm's rename
+// phase (the source of the ENOTEMPTY failures seen in installed applications).
+let packageMutationChain: Promise<unknown> = Promise.resolve();
+function serializePackageMutation<T>(fn: () => Promise<T>): Promise<T> {
+  const run = packageMutationChain.then(fn, fn);
+  packageMutationChain = run.catch(() => {});
+  return run;
+}
+
 /**
  * Tool installer — manages installing / uninstalling marketplace tools.
  *
@@ -96,7 +106,10 @@ async function writeManifest(manifest: InstalledToolsManifest) {
 export async function getInstalledTools(): Promise<InstalledTool[]> {
   const manifest = await readManifest();
   const tools = [...manifest.tools];
-  const bundledIds = (process.env.LARKUP_BUNDLED_TOOLS ?? '')
+  // The desktop/web distribution already ships these first-party packages as
+  // direct dependencies. Treat them as available immediately rather than
+  // downloading a second copy into the isolated tools folder.
+  const bundledIds = (process.env.LARKUP_BUNDLED_TOOLS ?? 'doc-editor,video-audio')
     .split(',')
     .map((id) => id.trim())
     .filter(Boolean);
@@ -229,6 +242,17 @@ async function ensureToolsPackageJson(): Promise<void> {
  * Execute the actual package install into the isolated tools directory.
  */
 async function execInstall(
+  packageName: string,
+  version: string,
+  target: DeploymentTarget,
+  onProgress?: (message: string) => void,
+): Promise<{ resolvedPath: string; version: string }> {
+  return serializePackageMutation(() =>
+    execInstallUnlocked(packageName, version, target, onProgress),
+  );
+}
+
+async function execInstallUnlocked(
   packageName: string,
   version: string,
   target: DeploymentTarget,

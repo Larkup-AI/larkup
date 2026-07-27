@@ -3,6 +3,15 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadTool, unloadTool } from '../../../packages/marketplace/src/tool-loader';
+import { getInstalledTools } from '../../../packages/marketplace/src/tool-installer';
+
+test('first-party tools bundled with Larkup are ready without a second npm install', async () => {
+  const tools = await getInstalledTools();
+  const bundled = new Map(tools.map((tool) => [tool.id, tool]));
+
+  expect(bundled.get('doc-editor')?.source).toBe('local');
+  expect(bundled.get('video-audio')?.source).toBe('local');
+});
 
 test('loads an isolated ESM marketplace package through its exported entry point', async () => {
   const originalCwd = process.cwd();
