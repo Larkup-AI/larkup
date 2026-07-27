@@ -3,14 +3,54 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadTool, unloadTool } from '../../../packages/marketplace/src/tool-loader';
-import { getInstalledTools } from '../../../packages/marketplace/src/tool-installer';
+import {
+  getInstalledTools,
+  isToolInstalled,
+  uninstallTool,
+} from '../../../packages/marketplace/src/tool-installer';
 
-test('first-party tools bundled with Larkup are ready without a second npm install', async () => {
-  const tools = await getInstalledTools();
-  const bundled = new Map(tools.map((tool) => [tool.id, tool]));
+test('bundled first-party tools are not marked installed until the user installs them', async () => {
+  const originalCwd = process.cwd();
+  const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-marketplace-empty-'));
+  try {
+    process.chdir(workspace);
+    await expect(getInstalledTools()).resolves.toEqual([]);
+  } finally {
+    process.chdir(originalCwd);
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
 
-  expect(bundled.get('doc-editor')?.source).toBe('local');
-  expect(bundled.get('video-audio')?.source).toBe('local');
+test('uninstall removes the persisted Marketplace state immediately', async () => {
+  const originalCwd = process.cwd();
+  const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-marketplace-uninstall-'));
+  try {
+    await mkdir(path.join(workspace, '.larkup', 'tools'), { recursive: true });
+    await writeFile(
+      path.join(workspace, '.larkup', 'tools', 'installed.json'),
+      JSON.stringify({
+        tools: [
+          {
+            id: 'video-audio',
+            version: '0.2.0',
+            installedAt: new Date().toISOString(),
+            packageName: '@larkup/tool-video-audio',
+            resolvedPath: '@larkup/tool-video-audio',
+            source: 'local',
+            config: {},
+          },
+        ],
+        downloadCounts: {},
+      }),
+    );
+    process.chdir(workspace);
+    await expect(isToolInstalled('video-audio')).resolves.toBe(true);
+    await uninstallTool('video-audio');
+    await expect(isToolInstalled('video-audio')).resolves.toBe(false);
+  } finally {
+    process.chdir(originalCwd);
+    await rm(workspace, { recursive: true, force: true });
+  }
 });
 
 test('loads an isolated ESM marketplace package through its exported entry point', async () => {

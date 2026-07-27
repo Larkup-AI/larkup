@@ -33,7 +33,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
  * Web-crawler launcher notice.
  *
  * Adapts to the runtime environment:
- * - **Web / Desktop**: lets the user spin up a self-hosted crawler via Docker.
+ * - **Web / Desktop**: starts Larkup's built-in crawler (no Docker required).
  * - **Docker**: detects a sibling crawler service on the Docker network.
  *
  * The API key (cloud) option is managed in Settings — this component only
@@ -59,7 +59,7 @@ export function FirecrawlNotice({
   const runtimeEnv = data?.runtimeEnv ?? 'web';
   const running = state?.running ?? false;
   const dockerReady = docker?.compose ?? false;
-  const hasError = !cloudConfigured && (!dockerReady || !!state?.lastError);
+  const hasError = !cloudConfigured && (!running || !!state?.lastError);
 
   useEffect(() => {
     if (!isLoading) {
@@ -76,7 +76,7 @@ export function FirecrawlNotice({
           description:
             runtimeEnv === 'docker'
               ? 'Checking if the crawler service is available on the network.'
-              : 'Pulling images and starting containers. This can take a minute on first run.',
+              : 'Starting Larkup’s built-in crawler. No Docker setup is required.',
         },
       );
     }
@@ -100,8 +100,8 @@ export function FirecrawlNotice({
               'Start Larkup with the optional crawler profile in docker-compose, or add a Firecrawl API key in Settings.',
           });
         } else {
-          toast.warning('Web crawler is starting', {
-            description: 'It may take a moment to become available.',
+          toast.success('Web crawler is ready', {
+            description: 'You can now scrape websites without Docker.',
           });
         }
       } else {

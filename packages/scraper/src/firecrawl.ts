@@ -1,6 +1,12 @@
 import type { SearchResultItem } from '@larkup/core/types';
 import { readConfig } from '@larkup/core/config-store';
 import { readLocalState } from './local-runtime';
+import {
+  cancelNativeCrawl,
+  getNativeCrawlStatus,
+  nativeScrapePage,
+  startNativeCrawl,
+} from './native-crawler';
 
 /**
  * Minimal, dependency-free Firecrawl v1 client.
@@ -27,7 +33,7 @@ export class FirecrawlError extends Error {
 interface Endpoint {
   base: string;
   key: string;
-  mode: 'local' | 'cloud';
+  mode: 'local' | 'cloud' | 'native';
 }
 
 /** Resolve which Firecrawl to talk to based on config. */
@@ -38,6 +44,9 @@ async function resolveEndpoint(): Promise<Endpoint> {
   if (provider === 'local') {
     const local = await readLocalState();
     if (local.running && local.apiKey) {
+      if (local.mode === 'native' || local.endpoint.startsWith('native://')) {
+        return { base: local.endpoint, key: local.apiKey, mode: 'native' };
+      }
       return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: 'local' };
     }
     throw new FirecrawlError(
@@ -163,6 +172,11 @@ const STEALTH_OPTIONS = {
 };
 
 export async function scrapePage(url: string): Promise<ScrapedPage> {
+  const endpoint = await resolveEndpoint();
+  if (endpoint.mode === 'native') {
+    const page = await nativeScrapePage(url);
+    return { url: page.url, title: page.title, markdown: page.markdown };
+  }
   const json = await call<FcScrapeResponse>('/scrape', {
     method: 'POST',
     body: JSON.stringify({
@@ -188,6 +202,8 @@ interface FcCrawlStartResponse {
 
 /** Kick off an async crawl of an entire site. Returns the Firecrawl job id. */
 export async function startCrawl(url: string, limit: number): Promise<string> {
+  const endpoint = await resolveEndpoint();
+  if (endpoint.mode === 'native') return startNativeCrawl(url, limit);
   const json = await call<FcCrawlStartResponse>('/crawl', {
     method: 'POST',
     body: JSON.stringify({
@@ -232,6 +248,9 @@ interface FcCrawlStatusResponse {
  * pull freshly-scraped pages incrementally as a long crawl progresses.
  */
 export async function getCrawlStatus(idOrCursor: string, isCursor = false): Promise<CrawlStatus> {
+  if (!isCursor && idOrCursor.startsWith('native-')) {
+    return getNativeCrawlStatus(idOrCursor);
+  }
   const json = isCursor
     ? await callAbsolute<FcCrawlStatusResponse>(idOrCursor)
     : await call<FcCrawlStatusResponse>(`/crawl/${idOrCursor}`, {
@@ -252,6 +271,10 @@ export async function getCrawlStatus(idOrCursor: string, isCursor = false): Prom
 
 /** Cancel a running crawl on Firecrawl's side (best-effort). */
 export async function cancelCrawl(id: string): Promise<void> {
+  if (id.startsWith('native-')) {
+    await cancelNativeCrawl(id);
+    return;
+  }
   try {
     await call(`/crawl/${id}`, { method: 'DELETE' });
   } catch {

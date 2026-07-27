@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { readConfig } from '@larkup/core/config-store';
 
 /**
- * Manages a LOCAL, self-hosted Firecrawl instance via Docker.
+ * Manages the local crawler runtime.
  *
  * Self-hosted Firecrawl runs with DB auth disabled, so no real API key is
  * required — any bearer token is accepted. We still generate one automatically
@@ -15,8 +15,8 @@ import { readConfig } from '@larkup/core/config-store';
  * toolkit so web scraping works against localhost without the user touching
  * env vars.
  *
- * State lives in `.larkup/firecrawl-local.json`. The scraper client reads
- * it to decide whether to talk to the local instance or the Firecrawl cloud.
+ * Regular installations use Larkup's built-in HTTP crawler and never require
+ * Docker. Docker remains an optional Firecrawl sibling for container installs.
  */
 
 const execAsync = promisify(exec);
@@ -101,6 +101,8 @@ export interface LocalFirecrawlState {
   port: number;
   /** docker compose project name */
   project: string;
+  /** `native` is the dependency-free crawler shipped with Larkup. */
+  mode?: 'native' | 'firecrawl';
   startedAt?: string;
   lastError?: string;
 }
@@ -111,6 +113,7 @@ const EMPTY: LocalFirecrawlState = {
   apiKey: '',
   port: DEFAULT_PORT,
   project: CONTAINER_PREFIX,
+  mode: 'native',
 };
 
 /* ----------------------------- state io ----------------------------- */
@@ -286,6 +289,22 @@ ${apiEnv}
 
 /** Launch (or re-attach to) a local Firecrawl via docker compose. */
 export async function startLocal(): Promise<LocalFirecrawlState> {
+  // The normal CLI/curl/desktop install must work on a computer without
+  // Docker. Starting the built-in crawler is instantaneous; actual crawling
+  // happens on demand in the app process.
+  if (!isInsideDocker()) {
+    return writeState({
+      running: true,
+      endpoint: 'native://larkup-crawler',
+      apiKey: 'native',
+      port: 0,
+      project: 'native',
+      mode: 'native',
+      startedAt: new Date().toISOString(),
+      lastError: undefined,
+    });
+  }
+
   const avail = await checkDocker();
   if (!avail.compose) {
     return writeState({
@@ -346,6 +365,7 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
     apiKey,
     port,
     project: CONTAINER_PREFIX,
+    mode: 'firecrawl',
     startedAt: new Date().toISOString(),
     lastError: healthy
       ? undefined
@@ -355,8 +375,11 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
 
 /** Stop and remove the local Firecrawl containers. */
 export async function stopLocal(): Promise<LocalFirecrawlState> {
-  const { compose } = await resolveDocker();
   const prev = await readLocalState();
+  if (prev.mode === 'native') {
+    return writeState({ ...prev, running: false, startedAt: undefined });
+  }
+  const { compose } = await resolveDocker();
   if (compose) {
     try {
       await runCmd(`${compose} -p ${CONTAINER_PREFIX} -f "${COMPOSE_PATH}" down`, 60_000);
@@ -370,6 +393,7 @@ export async function stopLocal(): Promise<LocalFirecrawlState> {
 /** Re-check whether the local instance is actually responding. */
 export async function refreshLocalStatus(): Promise<LocalFirecrawlState> {
   const state = await readLocalState();
+  if (state.mode === 'native') return state;
   if (!state.startedAt) return state;
   const healthy = await isHealthy(state.endpoint);
   if (healthy !== state.running) {
@@ -452,6 +476,7 @@ export async function connectDockerSibling(): Promise<LocalFirecrawlState> {
     apiKey,
     port: DEFAULT_PORT,
     project: 'docker-sibling',
+    mode: 'firecrawl',
     startedAt: new Date().toISOString(),
   });
 }
