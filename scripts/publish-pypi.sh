@@ -32,8 +32,8 @@ command -v uv >/dev/null 2>&1 || {
 }
 
 cd "$PY_SDK_DIR"
-PKG_NAME="$(sed -n 's/^name = \"\\([^\"]*\\)\"/\\1/p' pyproject.toml)"
-PKG_VERSION="$(sed -n 's/^version = \"\\([^\"]*\\)\"/\\1/p' pyproject.toml)"
+PKG_NAME="$(sed -n 's/^name = "\([^"]*\)"/\1/p' pyproject.toml)"
+PKG_VERSION="$(sed -n 's/^version = "\([^"]*\)"/\1/p' pyproject.toml)"
 
 if curl --fail --silent --show-error \
   "https://pypi.org/pypi/${PKG_NAME}/${PKG_VERSION}/json" >/dev/null 2>&1; then
