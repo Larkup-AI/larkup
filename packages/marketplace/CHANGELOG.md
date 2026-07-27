@@ -1,5 +1,11 @@
 # @larkup/marketplace
 
+## 0.1.8
+
+### Patch Changes
+
+- 592c637: Fix standalone startup and Docker runtime compatibility, make bundled marketplace tools ready immediately, and improve ingestion, chat retrieval, media preview, and analytics feedback.
+
 ## 0.1.7
 
 ### Patch Changes
