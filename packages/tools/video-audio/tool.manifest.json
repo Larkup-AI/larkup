@@ -22,7 +22,7 @@
   ],
   "tags": ["transcription", "ffmpeg", "video", "audio", "whisper"],
   "downloads": 0,
-  "repositoryUrl": "https://github.com/Larkup-AI/larkup-rag",
+  "repositoryUrl": "https://github.com/Larkup-AI/larkup",
   "license": "Apache-2.0",
   "updatedAt": "2026-07-20",
   "configSchema": [

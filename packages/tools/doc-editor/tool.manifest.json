@@ -16,7 +16,7 @@
   "capabilities": ["document-editing", "form-filling", "document-preview"],
   "tags": ["pdf", "docx", "pptx", "form", "canvas", "editor", "fill"],
   "downloads": 0,
-  "repositoryUrl": "https://github.com/Larkup-AI/larkup-rag",
+  "repositoryUrl": "https://github.com/Larkup-AI/larkup",
   "license": "Apache-2.0",
   "updatedAt": "2026-07-20"
 }

@@ -1,6 +1,6 @@
 {
   "name": "@larkup/tool-doc-editor",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "publishConfig": {
     "access": "public"
   },
@@ -62,7 +62,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Larkup-AI/larkup-rag",
+    "url": "https://github.com/Larkup-AI/larkup",
     "directory": "packages/tools/doc-editor"
   }
 }

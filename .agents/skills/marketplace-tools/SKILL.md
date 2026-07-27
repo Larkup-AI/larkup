@@ -139,7 +139,7 @@ Create `packages/tools/my-tool/package.json`:
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Larkup-AI/larkup-rag",
+    "url": "https://github.com/Larkup-AI/larkup",
     "directory": "packages/tools/my-tool"
   }
 }
