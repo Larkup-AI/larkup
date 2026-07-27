@@ -67,14 +67,17 @@ export async function POST(req: Request) {
 
   if (runtimeEnv === 'docker') {
     if (action === 'start') {
-      const state = await connectDockerSibling();
+      let state = await connectDockerSibling();
+      if (!state.running) {
+        state = await startLocal();
+      }
       const { apiKey, ...safe } = state;
       return NextResponse.json({ state: { ...safe, hasKey: Boolean(apiKey) } });
     } else {
-      const state = await readLocalState();
+      const state = await stopLocal();
       const { apiKey, ...safe } = state;
       return NextResponse.json({
-        state: { ...safe, running: false, hasKey: Boolean(apiKey) },
+        state: { ...safe, hasKey: Boolean(apiKey) },
       });
     }
   }

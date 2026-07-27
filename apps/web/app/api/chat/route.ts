@@ -65,11 +65,24 @@ function createChatModel(
 const SMART_RETRIEVAL_POLICY = `
 
 CONVERSATION, RETRIEVAL, AND MEDIA POLICY:
+
+TOOL PRIORITY (strict order):
+1. searchKnowledgeBase — ALWAYS try this FIRST when the question may relate to the user's indexed data. This includes any question mentioning "I", "my", "our", "the document", "the file", "the diagram", "the image", "show me", or referencing specific topics the user has likely indexed.
+2. Web search (if enabled) — Use ONLY if searchKnowledgeBase returned zero relevant hits AND the question is factual and benefits from web results.
+3. Other tools (tabular queries, analysis, etc.) — Use when the question specifically requires them.
+4. General knowledge — Answer from your training data ONLY for general knowledge questions clearly unrelated to the user's data.
+5. If no tool yields relevant results AND you cannot answer reliably from general knowledge, respond honestly: "I could not find relevant information in your knowledge base or available sources."
+
+RETRIEVAL RULES:
 - Default to a short, direct answer. One to three sentences is usually enough; use structure only when the task is genuinely complex.
 - Do not search for greetings, casual conversation, writing help, brainstorming, explanations you can answer reliably from general knowledge, or questions unrelated to the user's indexed data.
 - Use searchKnowledgeBase only when the answer depends on the user's indexed/private content, an exact source-specific fact, or a topic that plausibly refers to something the user indexed.
 - Treat questions about the user or their materials as knowledge-base questions: phrases such as "I", "my", "our", "you have", "the database", "the document", "the file", or "the diagram" require searchKnowledgeBase before answering whenever indexed content may contain the answer.
 - Search at most once per user request unless the first search is clearly irrelevant. Never repeat a search when a prior tool result in this conversation already contains enough evidence.
+
+IMAGE AND MEDIA RULES:
+- NEVER output raw markdown image syntax like ![alt](url). The chat UI blocks these and shows "[Image unavailable]". Instead, always use the presentMedia tool to display images, videos, or audio from indexed content.
+- When search results contain metadata.images or a mediaAssetId referencing an image, use presentMedia with the exact assetId to embed the image in the chat. This is the ONLY way images can appear in the conversation.
 - For a follow-up such as "show me that part", "play the clip", "show the image", or "let me hear it", reuse the mediaAssetId and timestamps already present in the earlier search result and call presentMedia directly. Do not search again just to rediscover the same media.
 - Use presentMedia to embed exactly one best video, image, or audio citation when the user asks to see/hear it or when one compact preview materially supports the answer. Do not present every search result.
 - Keep the written answer minimal around a media citation. Do not print internal media reference markers.
@@ -177,7 +190,6 @@ export async function POST(req: Request) {
         });
     }
 
-    // Clean parts (AI SDK v5 UIMessage format) — strip heavy data from tool results and file parts
     if (Array.isArray(anyM.parts)) {
       anyM.parts = anyM.parts.map((part: any) => {
         // Tool invocation parts — strip heavy results

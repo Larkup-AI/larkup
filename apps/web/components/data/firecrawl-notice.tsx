@@ -133,10 +133,6 @@ export function FirecrawlNotice({
         <Button
           variant="outline"
           onClick={() => {
-            if (runtimeEnv === 'docker' && !dockerReady) {
-              router.push('/settings?section=general#web-crawler');
-              return;
-            }
             control('start');
           }}
           disabled={busy !== null || isLoading}
@@ -147,11 +143,7 @@ export function FirecrawlNotice({
           ) : (
             <img src="/icons/firecrawl2.png" alt="" className="size-3 object-contain" />
           )}
-          {runtimeEnv === 'docker' && !dockerReady
-            ? 'Crawler settings'
-            : runtimeEnv === 'docker'
-            ? 'Connect Crawler'
-            : 'Launch Crawler'}
+          {runtimeEnv === 'docker' && dockerReady ? 'Connect Crawler' : 'Launch Crawler'}
         </Button>
       )}
     </div>

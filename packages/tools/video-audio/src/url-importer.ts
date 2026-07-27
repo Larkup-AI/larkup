@@ -344,7 +344,10 @@ function mimeFromExtension(ext: string): string | undefined {
 }
 function runYtDlp(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn('yt-dlp', args, { shell: false });
+    // Ensure yt-dlp can find Node.js as a JS runtime (required inside Docker
+    // containers that ship node but not deno).
+    const fullArgs = ['--js-runtimes', 'nodejs:node', ...args];
+    const child = spawn('yt-dlp', fullArgs, { shell: false });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (data) => {

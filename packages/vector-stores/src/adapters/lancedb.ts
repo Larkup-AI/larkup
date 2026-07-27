@@ -158,7 +158,7 @@ export class LanceDBAdapter implements VectorStoreAdapter {
       source: r.source,
       documentId: r.documentId,
       chunkIndex: r.chunkIndex,
-      metadata: r.metadata ? JSON.stringify(r.metadata) : undefined,
+      metadata: JSON.stringify(r.metadata ?? {}),
     };
   }
 

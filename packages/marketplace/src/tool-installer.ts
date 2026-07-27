@@ -243,7 +243,7 @@ async function execInstall(
       await ensureToolsPackageJson();
 
       const install = async (specifier: string) => {
-        const installCmd = `npm install ${specifier} --prefix "${toolsDir}" --save --no-audit --no-fund`;
+        const installCmd = `npm install ${specifier} --prefix "${toolsDir}" --save --no-audit --no-fund --prefer-offline`;
         onProgress?.(`Running: npm install ${specifier}`);
         const { stderr } = await execAsync(installCmd, {
           cwd: toolsDir,
