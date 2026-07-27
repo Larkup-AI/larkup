@@ -43,7 +43,17 @@ if (command === '--version' || command === '-v') {
 async function openWhenReady(url) {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     try {
-      await fetch(url);
+      // A standalone Next server can accept the root redirect a few moments
+      // before its client route manifests are ready. Opening the browser at
+      // that point leaves the UI on its full-screen loading state (or can
+      // produce a transient 500). Wait for the route the user will see and
+      // the data request that removes that loading state instead.
+      const [page, workspace] = await Promise.all([
+        fetch(new URL('/chat', url)),
+        fetch(new URL('/api/servers', url)),
+      ]);
+      if (!page.ok || !workspace.ok) throw new Error('Application is not ready');
+
       const [command, args] = openCommandForPlatform(url);
       const browser = spawn(command, args, { detached: true, stdio: 'ignore' });
       browser.unref();
