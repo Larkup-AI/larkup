@@ -283,6 +283,11 @@ async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) 
         url: hit.url ?? '',
         score: Number((hit.score ?? 0).toFixed(3)),
         text: queryAwareExcerpt(hit.text ?? '', query, 4_000),
+        // PDF extraction stores its verified upload URLs on the source
+        // document, rather than creating media-library assets. Expose those
+        // URLs explicitly so the presentation tool can validate and render
+        // them in chat.
+        images: hit.metadata?.images,
         metadata: hit.metadata,
         timelineContext,
         endingContext: hitIndex === 0 ? endingContext : undefined,
@@ -324,9 +329,18 @@ export async function getChatTools(context: {
 
     presentMedia: tool({
       description:
-        'Embed one indexed image, video segment, or audio segment as a compact citation in the chat. Use the exact mediaAssetId and timestamps from a current or earlier search result. Call this when the user asks to see, watch, play, or hear the media, or when one preview materially supports the answer. Prefer one best citation and do not call this for every search hit. Do not search again if the needed asset ID is already in the conversation.',
+        'Embed one indexed image, video segment, or audio segment as a compact citation in the chat. Use the exact mediaAssetId for Media-library assets, or the exact images[].imageUrl returned by searchKnowledgeBase for an image extracted from a PDF. Call this when the user asks to see, watch, play, or hear the media. Prefer one best citation and do not call this for every search hit.',
       inputSchema: z.object({
-        assetId: z.string().describe('Exact mediaAssetId returned by searchKnowledgeBase.'),
+        assetId: z
+          .string()
+          .optional()
+          .describe('Exact mediaAssetId returned by searchKnowledgeBase.'),
+        imageUrl: z
+          .string()
+          .optional()
+          .describe(
+            'Exact images[].imageUrl returned by searchKnowledgeBase for an extracted PDF image.',
+          ),
         startSecs: z
           .number()
           .nonnegative()
@@ -338,8 +352,39 @@ export async function getChatTools(context: {
           .optional()
           .describe('Exact segment end time returned by searchKnowledgeBase.'),
       }),
-      execute: async ({ assetId, startSecs, endSecs }) => {
+      execute: async ({ assetId, imageUrl, startSecs, endSecs }) => {
         const resolvePresentation = async () => {
+          if (imageUrl) {
+            const documents = await readDocuments();
+            const source = documents.find(
+              (document) =>
+                Array.isArray(document.metadata?.images) &&
+                document.metadata.images.some((image: any) => image?.imageUrl === imageUrl),
+            );
+            const image = source?.metadata?.images?.find(
+              (candidate: any) => candidate?.imageUrl === imageUrl,
+            );
+            if (!image) {
+              return {
+                success: false,
+                error: 'That extracted document image is no longer available.',
+              };
+            }
+            return {
+              success: true,
+              // The preview uses mediaUrl when supplied; this stable sentinel
+              // only satisfies its shared media citation shape.
+              assetId: `document-image-${image.index ?? 0}`,
+              mediaType: 'image' as const,
+              fileName: `${source?.title ?? 'Document'} — Image ${(image.index ?? 0) + 1}`,
+              mediaUrl: imageUrl,
+              sourceUrl: source?.url || imageUrl,
+            };
+          }
+
+          if (!assetId) {
+            return { success: false, error: 'Choose a media asset or extracted document image.' };
+          }
           const assets = await readMediaAssets();
           const asset = assets.find((candidate) => candidate.id === assetId);
           if (!asset || asset.processingStatus !== 'completed') {

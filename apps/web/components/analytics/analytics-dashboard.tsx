@@ -61,7 +61,9 @@ function padTimeSeries<T extends { date: string }>(
 }
 
 function formatTokens(num: number): string {
-  return (num / 1000000).toFixed(2) + 'M';
+  if (num < 1_000) return num.toLocaleString();
+  if (num < 1_000_000) return `${(num / 1_000).toFixed(num < 10_000 ? 1 : 0)}K`;
+  return `${(num / 1_000_000).toFixed(2)}M`;
 }
 
 function formatCost(cost: number): string {

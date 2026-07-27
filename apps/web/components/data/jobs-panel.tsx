@@ -229,6 +229,9 @@ export function JobsPanel({ jobs, onChanged }: { jobs: CrawlJob[]; onChanged: ()
 
               const domainTargets = job.targets.filter((t) => t.scope === 'domain').length;
               const denom = domainTargets > 0 ? domainTargets * job.pageLimit : job.targets.length;
+              const pagesLabel = active
+                ? `${job.pagesCrawled} / ${denom}`
+                : `${job.pagesCrawled} page${job.pagesCrawled === 1 ? '' : 's'} collected`;
 
               return (
                 <tr
@@ -261,9 +264,7 @@ export function JobsPanel({ jobs, onChanged }: { jobs: CrawlJob[]; onChanged: ()
 
                   {/* Pages crawled + progress */}
                   <td className="py-2 pr-3 text-right tabular-nums">
-                    <span className="text-green-700">
-                      {job.pagesCrawled} / {denom}
-                    </span>
+                    <span className="text-green-700">{pagesLabel}</span>
                     {active && (
                       <div className="mt-1 h-0.5 w-full rounded-full bg-muted overflow-hidden">
                         <div

@@ -44,7 +44,7 @@ function SettingsContent() {
     } else if (currentSection && currentSection !== activeSection) {
       setActiveSection(currentSection as SettingsSection);
     }
-  }, [searchParams, activeSection, pathname, router]);
+  }, [searchParams, pathname, router]);
 
   const handleSectionChange = (newSection: SettingsSection) => {
     setActiveSection(newSection);

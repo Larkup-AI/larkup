@@ -67,10 +67,10 @@ export async function POST(req: Request) {
 
   if (runtimeEnv === 'docker') {
     if (action === 'start') {
-      let state = await connectDockerSibling();
-      if (!state.running) {
-        state = await startLocal();
-      }
+      // A `docker run` container cannot create sibling containers: it has no
+      // Docker daemon or Compose plugin. Only attach to a crawler started with
+      // the optional compose profile.
+      const state = await connectDockerSibling();
       const { apiKey, ...safe } = state;
       return NextResponse.json({ state: { ...safe, hasKey: Boolean(apiKey) } });
     } else {

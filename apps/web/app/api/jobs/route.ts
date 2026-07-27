@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { readJobs, saveJob } from '@larkup/core/jobs-store';
-import { syncJob } from '@larkup/scraper/job-runner';
 import { isFirecrawlConfigured } from '@larkup/scraper/firecrawl';
 import { readDocuments } from '@larkup/core/documents-store';
 import type { CrawlJob, CrawlScope, CrawlTarget } from '@larkup/core/types';
@@ -108,6 +107,8 @@ export async function POST(req: Request) {
   };
 
   await saveJob(job);
-  const advanced = await syncJob(job.id);
-  return NextResponse.json({ job: advanced ?? job }, { status: 201 });
+  // Job advancement happens through the existing status polling endpoint. Do
+  // not wait for a crawler request here: a slow site used to leave the Start
+  // button feeling unresponsive and hid the newly queued job from the UI.
+  return NextResponse.json({ job }, { status: 201 });
 }

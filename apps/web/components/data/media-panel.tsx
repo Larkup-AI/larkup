@@ -1634,6 +1634,9 @@ function ActiveIndexingList({
                   {asset.processingMessage || 'Preparing media indexing...'}
                 </p>
               </div>
+              {/* {asset.processingSteps?.length ? (
+                <PipelineSteps steps={asset.processingSteps} />
+              ) : null} */}
             </div>
           );
         })}

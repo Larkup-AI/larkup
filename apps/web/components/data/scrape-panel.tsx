@@ -16,7 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useScrapeStore, type SearchState } from '@/store/scrape-store';
-import type { CrawlScope, SearchResultItem } from '@larkup/core/types';
+import type { CrawlJob, CrawlScope, SearchResultItem } from '@larkup/core/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -83,7 +83,7 @@ export function ScrapePanel({
   crawlerControl,
 }: {
   disabled?: boolean;
-  onStarted: () => void;
+  onStarted: (job: CrawlJob) => void;
   crawlerControl?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -397,7 +397,7 @@ export function ScrapePanel({
             queries.map((q) => searchGeneric(q, activeProvider, 1, queries.length > 1, false)),
           );
         } catch (err) {
-          toast.error(`${activeProvider} search failed. Falling back to local crawler...`);
+          toast.info(`${activeProvider} search failed. Falling back to local crawler...`);
           await Promise.all(queries.map((q) => searchFirecrawl(q, queries.length > 1)));
         }
       }
@@ -594,7 +594,7 @@ export function ScrapePanel({
       });
 
       setSelected({});
-      onStarted();
+      onStarted(data.job as CrawlJob);
     } catch (err) {
       toast.error(formatErrorMessage(err));
     } finally {

@@ -107,7 +107,7 @@ export function IndexWorkspace({
     );
   }
 
-  const { run, ready, blockers, docCount, charCount, unindexedCount, config } = data;
+  const { run, ready, blockers, unindexedCount } = data;
   const running = Boolean(run && ACTIVE.includes(run.status));
 
   async function build(incremental = false) {
@@ -172,6 +172,12 @@ export function IndexWorkspace({
       )}
 
       <RunCard run={run} running={running} />
+
+      {ready && !run && (
+        <p className="text-sm text-muted-foreground">
+          Your documents will be prepared for fast, accurate answers. This usually takes a moment.
+        </p>
+      )}
 
       {/* Pre-indexing warning — only shown before the very first run */}
       {/* {ready && !run && (
@@ -313,9 +319,9 @@ function ConfigSummary({
 
 const STATUS_COPY: Record<IndexRun['status'], { label: string; phase?: string }> = {
   idle: { label: 'Idle' },
-  chunking: { label: 'Chunking', phase: 'Splitting documents into chunks' },
-  embedding: { label: 'Embedding', phase: 'Generating vector embeddings' },
-  upserting: { label: 'Storing', phase: 'Writing vectors to the store' },
+  chunking: { label: 'Preparing your documents', phase: 'Getting your knowledge ready…' },
+  embedding: { label: 'Indexing your knowledge', phase: 'Making your content searchable…' },
+  upserting: { label: 'Finishing up', phase: 'Saving your searchable knowledge…' },
   completed: { label: 'Completed' },
   failed: { label: 'Failed' },
 };
@@ -346,40 +352,16 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
         </CardTitle>
         <StatusBadge status={run.status} />
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{copy.phase ?? 'Done'}</span>
-            <span className="font-mono tabular-nums">
-              {run.processedChunks.toLocaleString()}
-              {run.totalChunks > 0 && ` / ${run.totalChunks.toLocaleString()}`} chunks
-            </span>
+            <span className="font-mono tabular-nums text-muted-foreground">{pct}%</span>
           </div>
           <Progress value={pct} className="**:data-[slot=progress-indicator]:bg-green-600" />
         </div>
-
-        <dl className="grid grid-cols-2 gap-4 pt-1 sm:grid-cols-4">
-          <Stat label="Documents" value={run.docCount.toLocaleString()} />
-          <Stat label="Chunks" value={run.totalChunks.toLocaleString()} />
-          <Stat label="Dimensions" value={run.dimensions ? run.dimensions.toLocaleString() : '—'} />
-          <Stat
-            label="Duration"
-            value={
-              run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : running ? 'running…' : '—'
-            }
-          />
-        </dl>
       </CardContent>
     </Card>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="font-mono text-sm tabular-nums">{value}</dd>
-    </div>
   );
 }
 
