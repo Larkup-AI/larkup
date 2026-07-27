@@ -2,11 +2,11 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageDir = path.resolve(__dirname, '..');
-const nextBin = path.join(packageDir, 'node_modules', '.bin', 'next');
+const standaloneServer = path.join(packageDir, '.next', 'standalone', 'apps', 'web', 'server.js');
 const pkg = JSON.parse(readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
 
 const args = process.argv.slice(2);
@@ -18,9 +18,14 @@ if (command === '--version' || command === '-v') {
   const port = process.env.PORT || '4567';
   const url = `http://localhost:${port}`;
   console.log(`\x1b[38;2;223;156;32mStarting Larkup…\x1b[0m`);
-  const child = spawn(nextBin, ['start', '-p', port], {
+  if (!existsSync(standaloneServer)) {
+    console.error('Larkup is missing its production server. Reinstall the package and try again.');
+    process.exit(1);
+  }
+  const child = spawn(process.execPath, [standaloneServer], {
     cwd: packageDir,
     stdio: 'inherit',
+    env: { ...process.env, PORT: port },
   });
 
   child.once('error', (error) => {

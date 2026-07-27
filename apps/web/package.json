@@ -9,7 +9,7 @@
     "dev": "next dev -p 4567",
     "build": "next build",
     "postbuild": "find .next/standalone -type l ! -exec test -e {} \\; -delete 2>/dev/null || true",
-    "start": "next start -p 4567",
+    "start": "node .next/standalone/apps/web/server.js",
     "lint": "echo \"No lint configured\""
   },
   "dependencies": {

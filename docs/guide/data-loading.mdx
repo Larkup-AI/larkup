@@ -60,7 +60,15 @@ Larkup supports both **local** and **cloud** scraping. You can configure everyth
 
 ### Local Firecrawl
 
-Click **Launch Web Crawler** in the Add Data tab to spin up a local Firecrawl instance inside Docker. A bearer token is generated automatically, so you can start scraping immediately with zero signup.
+Click **Launch Web Crawler** in the Add Data tab to connect to the optional local Firecrawl stack. A bearer token is generated automatically, so you can start scraping immediately with zero signup.
+
+The standalone `docker run` image contains only Larkup, so it cannot launch sibling Docker services by itself. To use local crawling with Docker, start the crawler profile from the repository:
+
+```bash
+docker compose -f docker/docker-compose-prod.yaml --profile crawler up -d
+```
+
+Alternatively, configure a Firecrawl cloud API key in Settings.
 
 ### Cloud API Keys
 
