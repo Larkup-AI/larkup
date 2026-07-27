@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev -p 4567",
     "build": "next build",
-    "postbuild": "find .next/standalone -type l ! -exec test -e {} \\; -delete 2>/dev/null || true",
+    "postbuild": "find .next/standalone -type l ! -exec test -e {} \\; -delete 2>/dev/null || true; mkdir -p .next/standalone/apps/web/.next/static; cp -R .next/static/. .next/standalone/apps/web/.next/static/",
     "start": "node .next/standalone/apps/web/server.js",
     "lint": "echo \"No lint configured\""
   },

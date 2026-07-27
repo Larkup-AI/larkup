@@ -117,6 +117,17 @@ test.describe('Installation Methods', () => {
         const exists = fs.existsSync(path.join(REPO_ROOT, out));
         console.log(`  ${exists ? '✓' : '✗'} ${out}`);
       }
+
+      // The npm launcher starts the nested Next standalone server. Its browser
+      // chunks must be copied into that server's .next directory, not only
+      // left at apps/web/.next/static, or every client asset returns 404.
+      const standaloneChunks = path.join(
+        REPO_ROOT,
+        'apps/web/.next/standalone/apps/web/.next/static/chunks',
+      );
+      expect(fs.existsSync(standaloneChunks)).toBe(true);
+      expect(fs.readdirSync(standaloneChunks).length).toBeGreaterThan(0);
+      console.log('  ✓ standalone runtime includes browser assets');
     } catch (err: any) {
       console.warn(`  ⚠ Build failed: ${err.message?.substring(0, 200)}`);
     }
