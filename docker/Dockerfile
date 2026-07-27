@@ -36,8 +36,10 @@ ARG NEXT_PUBLIC_DOCKER_ENV=true
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_DOCKER_ENV=${NEXT_PUBLIC_DOCKER_ENV}
 
-RUN pnpm --filter larkup build
+RUN pnpm --filter @larkup/sandbox build
+RUN pnpm --filter @larkup/tool-doc-editor build
 RUN pnpm --filter @larkup/tool-video-audio build
+RUN pnpm --filter larkup build
 
 FROM base AS runner
 WORKDIR /app
