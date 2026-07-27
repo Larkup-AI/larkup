@@ -313,7 +313,7 @@ export async function getChatTools(context: {
   const builtInTools: Record<string, any> = {
     searchKnowledgeBase: tool({
       description:
-        "Search the user's private RAG knowledge base when their question depends on indexed documents or media and the needed evidence is not already in the conversation. Do not use for general knowledge, casual conversation, writing tasks, or a follow-up that can be answered from an earlier search result. Search once with a focused query. For media, inspect the returned timeline and endingContext when relevant, and reuse exact mediaAssetId/startSecs/endSecs values with presentMedia when a preview is useful. Never guess timestamps.",
+        "HIGHEST PRIORITY TOOL — Search the user's private RAG knowledge base. ALWAYS use this FIRST before webSearch or any other tool when the question may relate to the user's indexed data. This includes questions about documents, files, images, diagrams, videos, or anything the user may have uploaded. Do not use for general knowledge, casual conversation, or writing tasks. Search once with a focused query. For media, inspect the returned timeline and endingContext, and reuse exact mediaAssetId/startSecs/endSecs values with presentMedia when a preview is useful. Never guess timestamps.",
       inputSchema: z.object({
         query: z.string().describe('The search query for the knowledge base.'),
       }),
@@ -891,7 +891,7 @@ export async function getChatTools(context: {
 
     webSearch: tool({
       description:
-        'Search the public internet for current information, news, or facts that are not available in the local knowledge base.',
+        "Search the public internet for current information, news, or facts. IMPORTANT: Only use this AFTER searchKnowledgeBase has been tried first and returned no relevant results. Never use webSearch as a first resort — the user's indexed knowledge base always takes priority. Use webSearch for questions about current events, public facts, or topics clearly outside the user's indexed data.",
       inputSchema: z.object({
         query: z.string().describe('The search query.'),
       }),
