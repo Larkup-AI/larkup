@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.33
+
+### Patch Changes
+
+- f1bb8e2: Wait for the chat page and workspace API to be ready before `larkup dev` opens the browser, avoiding the standalone startup loading screen.
+
 ## 0.1.32
 
 ### Patch Changes
