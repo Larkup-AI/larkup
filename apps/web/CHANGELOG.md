@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.36
+
+### Patch Changes
+
+- 9dd3603: Build workspace tool dependencies before the web app in Docker images.
+
 ## 0.1.35
 
 ### Patch Changes
