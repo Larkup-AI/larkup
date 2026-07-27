@@ -1,5 +1,15 @@
 # larkup
 
+## 0.1.32
+
+### Patch Changes
+
+- 592c637: Fix standalone startup and Docker runtime compatibility, make bundled marketplace tools ready immediately, and improve ingestion, chat retrieval, media preview, and analytics feedback.
+- Updated dependencies [592c637]
+  - @larkup/marketplace@0.1.8
+  - @larkup/tool-doc-editor@0.2.5
+  - @larkup/tool-video-audio@0.2.2
+
 ## 0.1.31
 
 ### Patch Changes
