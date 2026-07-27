@@ -1,5 +1,11 @@
 # @larkup/scraper
 
+## 0.1.26
+
+### Patch Changes
+
+- 5ba20af: Make the local crawler work without Docker, make Marketplace installs opt-in and removable, and bound RAG retrieval tool loops and context growth.
+
 ## 0.1.25
 
 ### Patch Changes
