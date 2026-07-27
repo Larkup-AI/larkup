@@ -15,7 +15,7 @@
   "capabilities": ["clip-embeddings", "image-similarity"],
   "tags": ["clip", "siglip", "image-search", "visual-similarity"],
   "downloads": 0,
-  "repositoryUrl": "https://github.com/Larkup-AI/larkup-rag",
+  "repositoryUrl": "https://github.com/Larkup-AI/larkup",
   "license": "Apache-2.0",
   "updatedAt": "2026-07-20",
   "comingSoon": true

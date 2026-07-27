@@ -1,5 +1,14 @@
 # @larkup/cli
 
+## 0.2.7
+
+### Patch Changes
+
+- Updated dependencies [197c629]
+  - @larkup/vector-stores@0.1.23
+  - @larkup/marketplace@0.1.7
+  - @larkup/core@0.2.4
+
 ## 0.2.6
 
 ### Patch Changes
