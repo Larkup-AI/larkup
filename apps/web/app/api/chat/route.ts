@@ -78,7 +78,7 @@ RETRIEVAL RULES:
 - Do not search for greetings, casual conversation, writing help, brainstorming, explanations you can answer reliably from general knowledge, or questions unrelated to the user's indexed data.
 - Use searchKnowledgeBase only when the answer depends on the user's indexed/private content, an exact source-specific fact, or a topic that plausibly refers to something the user indexed.
 - Treat questions about the user or their materials as knowledge-base questions: phrases such as "I", "my", "our", "you have", "the database", "the document", "the file", or "the diagram" require searchKnowledgeBase before answering whenever indexed content may contain the answer.
-- Search at most once per user request unless the first search is clearly irrelevant. Never repeat a search when a prior tool result in this conversation already contains enough evidence.
+- Search at most once per user request. Never repeat a search when a prior tool result in this conversation already contains enough evidence. If the results do not answer the question, say so plainly instead of making more searches or guessing.
 
 IMAGE AND MEDIA RULES:
 - NEVER output raw markdown image syntax like ![alt](url). The chat UI blocks these and shows "[Image unavailable]". Instead, always use the presentMedia tool to display images, videos, or audio from indexed content.
@@ -178,6 +178,26 @@ export async function POST(req: Request) {
         }
       }
       if (typeof resultObj !== 'object' || resultObj === null) return result;
+      // Keep previous retrieval evidence available for follow-up questions,
+      // while preventing several full five-chunk search responses from taking
+      // over the model context on a long conversation.
+      if (toolName === 'searchKnowledgeBase' && Array.isArray(resultObj.hits)) {
+        const compact = {
+          ...resultObj,
+          hits: resultObj.hits.map((hit: any) => ({
+            documentId: hit.documentId,
+            title: hit.title,
+            url: hit.url,
+            score: hit.score,
+            text: typeof hit.text === 'string' ? hit.text.slice(0, 1_000) : hit.text,
+            images: hit.images,
+            metadata: hit.metadata,
+            timelineContext: hit.timelineContext,
+            endingContext: hit.endingContext,
+          })),
+        };
+        return isString ? JSON.stringify(compact) : compact;
+      }
       const isDocTool =
         toolName &&
         ['fillDocumentForm', 'editDocument', 'requestDocumentSignature'].includes(toolName);
@@ -365,11 +385,23 @@ ${fieldLines}`;
     model,
     system: systemPrompt,
     messages: await convertToModelMessages(safeMessages, { tools }),
-    maxOutputTokens: 8192,
-    stopWhen: stepCountIs(8),
-    toolChoice: forceKnowledgeBaseSearch
-      ? { type: 'tool', toolName: 'searchKnowledgeBase' }
-      : 'auto',
+    maxOutputTokens: 4096,
+    // Five steps covers the only useful multi-step case (retrieve, optionally
+    // present one media item, then answer) without allowing a tool loop to
+    // burn the context window and end with no response.
+    stopWhen: stepCountIs(5),
+    toolChoice: 'auto',
+    prepareStep: ({ stepNumber }) => {
+      if (forceKnowledgeBaseSearch && stepNumber === 0) {
+        return { toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' } };
+      }
+      // A retrieval is deliberately one-shot per turn. This is applied at the
+      // runtime level rather than relying only on the model prompt.
+      if (forceKnowledgeBaseSearch) {
+        return { activeTools: Object.keys(tools).filter((name) => name !== 'searchKnowledgeBase') };
+      }
+      return undefined;
+    },
     onFinish: async ({ usage, response }) => {
       const { trackUsageEvent, estimateCost } = await import('@larkup/core/analytics-store');
       const u = usage as any;

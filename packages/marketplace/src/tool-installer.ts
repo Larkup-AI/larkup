@@ -105,31 +105,11 @@ async function writeManifest(manifest: InstalledToolsManifest) {
 
 export async function getInstalledTools(): Promise<InstalledTool[]> {
   const manifest = await readManifest();
-  const tools = [...manifest.tools];
-  // The desktop/web distribution already ships these first-party packages as
-  // direct dependencies. Treat them as available immediately rather than
-  // downloading a second copy into the isolated tools folder.
-  const bundledIds = (process.env.LARKUP_BUNDLED_TOOLS ?? 'doc-editor,video-audio')
-    .split(',')
-    .map((id) => id.trim())
-    .filter(Boolean);
-
-  for (const toolId of bundledIds) {
-    if (tools.some((tool) => tool.id === toolId)) continue;
-    const descriptor = await getToolById(toolId);
-    if (!descriptor) continue;
-    tools.push({
-      id: toolId,
-      version: descriptor.version,
-      installedAt: 'bundled',
-      packageName: descriptor.packageName,
-      resolvedPath: descriptor.packageName,
-      source: 'local',
-      config: buildDefaultConfig(descriptor),
-    });
-  }
-
-  return tools;
+  // A package being bundled with the application only makes it *available* to
+  // install. It must not silently enable an optional capability or make the
+  // Marketplace claim it was installed. The manifest is the single source of
+  // truth, which also makes uninstall immediately reflect in the UI.
+  return [...manifest.tools];
 }
 
 export async function isToolInstalled(toolId: string): Promise<boolean> {
