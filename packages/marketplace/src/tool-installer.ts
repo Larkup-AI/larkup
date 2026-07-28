@@ -360,13 +360,11 @@ async function resolveManifest(toolId: string): Promise<ToolDescriptor> {
  */
 async function isWorkspaceTool(packageName: string): Promise<boolean> {
   try {
-    // Check if this package exists in the pnpm workspace
-    const { stdout } = await execAsync(`pnpm ls -r --depth -1 --json 2>/dev/null || true`, {
-      cwd: process.cwd(),
-      timeout: 10_000,
-    });
-    const data = JSON.parse(stdout || '[]');
-    return Array.isArray(data) && data.some((pkg: any) => pkg.name === packageName);
+    // Resolving a bundled package is instant. Running `pnpm ls -r` here made
+    // a small first-party tool installation wait on a full workspace scan (or
+    // a missing pnpm binary) on every end-user machine.
+    require.resolve(packageName, { paths: [process.cwd()] });
+    return true;
   } catch {
     return false;
   }
@@ -408,7 +406,7 @@ export async function installTool(
 
     // 2. Check system dependencies
     report('checking-deps', 15, 'Checking system dependencies…');
-    const missing = await checkSystemDeps(toolId);
+    const missing = (await checkSystemDeps(toolId)).filter((dependency) => dependency !== 'docker');
     if (missing.length > 0) {
       const msg = `Missing system dependencies: ${missing.join(', ')}. Please install them first.`;
       report('failed', 0, msg);

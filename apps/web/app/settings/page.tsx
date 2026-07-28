@@ -44,14 +44,13 @@ function SettingsContent() {
     } else if (currentSection && currentSection !== activeSection) {
       setActiveSection(currentSection as SettingsSection);
     }
-  }, [searchParams, pathname, router]);
+  }, [searchParams, pathname, router, activeSection]);
 
   const handleSectionChange = (newSection: SettingsSection) => {
     setActiveSection(newSection);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('ai-models');
-    params.set('section', newSection);
-    router.replace(`${pathname}?${params.toString()}`);
+    // A settings item is a destination, not a filter. Rebuild the query so a
+    // stale deep-link such as `section=tool-settings` cannot linger in the URL.
+    router.replace(`${pathname}?section=${newSection}`, { scroll: false });
   };
 
   return (

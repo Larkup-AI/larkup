@@ -25,6 +25,8 @@ export interface UrlImportOptions {
   maxBytes?: number;
   /** Maximum YouTube playlist entries (default: 10). */
   playlistMax?: number;
+  /** Surface download activity to the lightweight media job status. */
+  onProgress?: (progress: { percent?: number; message: string }) => void;
 }
 export interface UrlInspection {
   originalUrl: string;
@@ -97,20 +99,31 @@ export async function importMediaUrl(
     const template = path.join(options.outputDir, '%(title).120B [%(id)s].%(ext)s');
     const print =
       '{"path":%(filepath)j,"title":%(title)j,"originalUrl":%(webpage_url)j,"ext":%(ext)j}';
-    const output = await runYtDlp([
-      '--no-progress',
-      '--playlist-end',
-      String(options.playlistMax ?? 10),
-      '--format',
-      'bestvideo[height<=480]+bestaudio/best[height<=480]/best',
-      '--merge-output-format',
-      'mp4',
-      '-o',
-      template,
-      '--print',
-      `after_move:${print}`,
-      url,
-    ]);
+    const output = await runYtDlp(
+      [
+        '--no-playlist',
+        '--playlist-end',
+        String(options.playlistMax ?? 10),
+        '--socket-timeout',
+        '20',
+        '--retries',
+        '2',
+        '--fragment-retries',
+        '2',
+        '--concurrent-fragments',
+        '4',
+        '--format',
+        'best[height<=360]/bestvideo[height<=360]+bestaudio/best',
+        '--merge-output-format',
+        'mp4',
+        '-o',
+        template,
+        '--print',
+        `after_move:${print}`,
+        url,
+      ],
+      options.onProgress,
+    );
     const imported = output
       .split('\n')
       .filter(Boolean)
@@ -342,7 +355,10 @@ function mimeFromExtension(ext: string): string | undefined {
     } as Record<string, string>
   )[ext.toLowerCase()];
 }
-function runYtDlp(args: string[]): Promise<string> {
+function runYtDlp(
+  args: string[],
+  onProgress?: (progress: { percent?: number; message: string }) => void,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     // Ensure yt-dlp can find Node.js as a JS runtime (required inside Docker
     // containers that ship node but not deno).
@@ -350,11 +366,24 @@ function runYtDlp(args: string[]): Promise<string> {
     const child = spawn('yt-dlp', fullArgs, { shell: false });
     let stdout = '';
     let stderr = '';
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, 120_000);
     child.stdout.on('data', (data) => {
       stdout += String(data);
     });
     child.stderr.on('data', (data) => {
-      stderr += String(data);
+      const text = String(data);
+      stderr += text;
+      const percent = text.match(/(\d+(?:\.\d+)?)%/);
+      if (percent) {
+        onProgress?.({
+          percent: Math.min(99, Math.max(1, Math.round(Number(percent[1])))),
+          message: `Downloading video… ${percent[1]}%`,
+        });
+      }
     });
     (child as any).on('error', (error: NodeJS.ErrnoException) =>
       reject(
@@ -365,10 +394,16 @@ function runYtDlp(args: string[]): Promise<string> {
           : error,
       ),
     );
-    (child as any).on('close', (code: number | null) =>
-      code === 0
-        ? resolve(stdout.trim())
-        : reject(new Error(`yt-dlp failed (${code}): ${stderr.trim()}`)),
-    );
+    (child as any).on('close', (code: number | null) => {
+      clearTimeout(timeout);
+      if (code === 0) return resolve(stdout.trim());
+      if (timedOut)
+        return reject(
+          new Error(
+            'Video download timed out after 2 minutes. Try a shorter video or a direct media link.',
+          ),
+        );
+      return reject(new Error(`yt-dlp failed (${code}): ${stderr.trim()}`));
+    });
   });
 }

@@ -119,6 +119,27 @@ export function JobsPanel({ jobs, onChanged }: { jobs: CrawlJob[]; onChanged: ()
     setSelected(next);
   }
 
+  async function copyFailedUrls(urls: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(urls);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = urls;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand('copy');
+        textarea.remove();
+        if (!copied) throw new Error('The browser denied clipboard access.');
+      }
+      toast.success('Copied failed URLs to clipboard');
+    } catch {
+      toast.error('Could not copy URLs. Select them manually and try again.');
+    }
+  }
+
   async function executeCancel(id: string) {
     setCancelling(true);
     try {
@@ -316,8 +337,7 @@ export function JobsPanel({ jobs, onChanged }: { jobs: CrawlJob[]; onChanged: ()
                               .filter((t) => t.status === 'failed')
                               .map((t) => t.url)
                               .join('\n');
-                            navigator.clipboard.writeText(failedUrls);
-                            toast.success('Copied failed URLs to clipboard');
+                            void copyFailedUrls(failedUrls);
                           }}
                           className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
                           title="Copy failed URLs"

@@ -36,13 +36,22 @@ export function PromptsSection() {
     if (data?.config) {
       setForm({
         ...data.config,
-        systemPrompt: data.config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
+        // The generated prompt (tools, retrieval policy, and safety rules) is
+        // an implementation detail. This editor contains only the user's
+        // optional addition, so first use starts with a clean canvas.
+        systemPrompt:
+          data.config.systemPrompt && data.config.systemPrompt !== DEFAULT_SYSTEM_PROMPT
+            ? data.config.systemPrompt
+            : '',
       });
     }
   }, [data]);
 
   const dirty =
-    (form.systemPrompt || '') !== (data?.config?.systemPrompt || '') ||
+    (form.systemPrompt || '') !==
+      (data?.config?.systemPrompt === DEFAULT_SYSTEM_PROMPT
+        ? ''
+        : data?.config?.systemPrompt || '') ||
     JSON.stringify(form.enabledTools || []) !== JSON.stringify(data?.config?.enabledTools || []);
 
   async function handleSave() {
@@ -92,7 +101,8 @@ export function PromptsSection() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">System Prompt</CardTitle>
           <CardDescription className="text-xs">
-            Override the default instructions given to the AI. Leave blank for the default behavior.
+            Add your own instructions. Larkup keeps its generated tool and retrieval instructions
+            separate and combines them automatically.
           </CardDescription>
         </CardHeader>
         <CardContent>

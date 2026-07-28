@@ -530,12 +530,19 @@ function ChatWorkspaceInner() {
     const config = configData?.config;
     if (!config) return;
 
-    const isTavily = config.webSearchProvider === 'tavily' || !config.webSearchProvider;
-    const hasKey = isTavily ? !!config.tavilyApiKey : !!config.serperApiKey; // Server uses its own or serper, fallback to check serper or just assume server doesn't need one if it's configured. Let's just check tavily if tavily.
+    const provider = config.webSearchProvider || 'tavily';
+    const apiKeys: Record<string, string | undefined> = {
+      tavily: config.tavilyApiKey,
+      serper: config.serperApiKey,
+      google: config.serperApiKey,
+      brave: config.braveApiKey,
+      bing: config.bingApiKey,
+      exa: config.exaApiKey,
+    };
 
-    if (isTavily && !config.tavilyApiKey && !config.serperApiKey) {
+    if (provider !== 'local' && !apiKeys[provider]) {
       toast.error('Web Search API key is missing. Please configure it in Settings.');
-      router.push('/settings');
+      router.push('/settings?section=general');
       return;
     }
 

@@ -20,6 +20,12 @@ export interface NativePage {
   links?: string[];
 }
 
+export interface NativeSearchResult {
+  url: string;
+  title: string;
+  description?: string;
+}
+
 interface NativeCrawl {
   id: string;
   origin: string;
@@ -79,6 +85,103 @@ function toText(html: string): string {
 function pageTitle(html: string, fallback: string): string {
   const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   return match ? decodeHtml(match[1].replace(/<[^>]+>/g, ' ').trim()) || fallback : fallback;
+}
+
+function htmlText(value: string): string {
+  return decodeHtml(value.replace(/<[^>]+>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function nativeSearchUrl(value: string): string | null {
+  try {
+    const url = new URL(decodeHtml(value));
+    return canonicalUrl(url.searchParams.get('uddg') || url.toString());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * API-key-free public web search for the native crawler. It intentionally
+ * lives next to the crawler instead of pretending that `native://` is a
+ * Firecrawl HTTP endpoint. This keeps curl installs fully usable without
+ * Docker or a separate search-service account.
+ */
+export async function nativeSearchWeb(query: string, limit = 10): Promise<NativeSearchResult[]> {
+  const resultLimit = Math.max(1, Math.min(limit, 25));
+  const headers = {
+    'User-Agent': USER_AGENT,
+    Accept: 'text/html,application/xhtml+xml',
+    'Accept-Language': 'en-US,en;q=0.9',
+  };
+
+  // Keep the native path independent of a cloud key. Public search pages can
+  // occasionally rate-limit a shared IP, so use a second source instead of
+  // turning a temporary upstream limit into a misleading "Network error".
+  try {
+    const response = await fetch(
+      `https://search.brave.com/search?q=${encodeURIComponent(query)}&source=web`,
+      { headers, redirect: 'follow', signal: AbortSignal.timeout(20_000) },
+    );
+    if (response.ok) {
+      const results = parseBraveSearchResults(await response.text(), resultLimit);
+      if (results.length) return results;
+    }
+  } catch {
+    // Continue to the fallback below.
+  }
+
+  const fallback = await fetch(
+    `https://www.bing.com/search?format=rss&q=${encodeURIComponent(query)}`,
+    {
+      headers: { ...headers, Accept: 'application/rss+xml,application/xml,text/xml' },
+      signal: AbortSignal.timeout(20_000),
+    },
+  );
+  if (!fallback.ok) throw new Error(`Built-in web search returned ${fallback.status}.`);
+  const results = parseBingRssResults(await fallback.text(), resultLimit);
+  if (!results.length) throw new Error('Built-in web search returned no usable results.');
+  return results;
+}
+
+function parseBraveSearchResults(html: string, limit: number): NativeSearchResult[] {
+  const results: NativeSearchResult[] = [];
+  const seen = new Set<string>();
+  // Brave's server-rendered result anchors are intentionally simple and do
+  // not require a browser, JavaScript runtime, Docker, or an API key.
+  for (const link of html.matchAll(
+    /<a\b[^>]*href=["']([^"']+)["'][^>]*class=["'][^"']*\bl1\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi,
+  )) {
+    const url = nativeSearchUrl(link[1]);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    const titleAttribute = link[2].match(/\btitle=["']([^"']+)["']/i);
+    results.push({ url, title: htmlText(titleAttribute?.[1] || link[2]) || url });
+    if (results.length >= limit) break;
+  }
+  return results;
+}
+
+function xmlTag(xml: string, tag: string): string | undefined {
+  return xml.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'))?.[1];
+}
+
+function parseBingRssResults(xml: string, limit: number): NativeSearchResult[] {
+  const results: NativeSearchResult[] = [];
+  const seen = new Set<string>();
+  for (const item of xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
+    const url = nativeSearchUrl(xmlTag(item[1], 'link') ?? '');
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    results.push({
+      url,
+      title: htmlText(xmlTag(item[1], 'title') ?? url),
+      description: htmlText(xmlTag(item[1], 'description') ?? '') || undefined,
+    });
+    if (results.length >= limit) break;
+  }
+  return results;
 }
 
 function canonicalUrl(value: string): string | null {
