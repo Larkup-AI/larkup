@@ -166,15 +166,21 @@ async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) 
   const trailingDocuments = timestampedDocuments.filter(
     (document) => Number(document.metadata?.endSecs ?? 0) >= mediaDuration - trailingHorizonSecs,
   );
+  // Result announcements can occur shortly before the literal final minutes
+  // (for example during a trophy or score recap). Preserve the latest explicit
+  // outcome evidence from the whole indexed timeline, not only the trailing
+  // window returned by a semantic match.
+  const timelineOutcomeDocuments = isOutcomeQuery(query)
+    ? timestampedDocuments.filter((document) => isOutcomeEvidence(document.content)).slice(-3)
+    : [];
   const signaledEndingDocuments = isOutcomeQuery(query)
     ? trailingDocuments.filter((document) => isOutcomeEvidence(document.content)).slice(-2)
     : [];
   const timestampedEnding = [
     ...new Map(
-      [...signaledEndingDocuments, ...trailingDocuments.slice(-4)].map((document) => [
-        document.id,
-        document,
-      ]),
+      [...timelineOutcomeDocuments, ...signaledEndingDocuments, ...trailingDocuments.slice(-4)].map(
+        (document) => [document.id, document],
+      ),
     ).values(),
   ].sort(
     (left, right) => Number(left.metadata?.endSecs ?? 0) - Number(right.metadata?.endSecs ?? 0),
@@ -287,7 +293,18 @@ async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) 
         // document, rather than creating media-library assets. Expose those
         // URLs explicitly so the presentation tool can validate and render
         // them in chat.
-        images: hit.metadata?.images,
+        images:
+          hit.metadata?.images ??
+          (hit.metadata?.isImage && hit.metadata?.imageUrl
+            ? [
+                {
+                  imageUrl: hit.metadata.imageUrl,
+                  pageNumber: hit.metadata.pageNumber,
+                  index: hit.metadata.index,
+                  description: hit.metadata.description,
+                },
+              ]
+            : undefined),
         metadata: hit.metadata,
         timelineContext,
         endingContext: hitIndex === 0 ? endingContext : undefined,
@@ -312,13 +329,15 @@ export async function getChatTools(context: {
   serverId?: string;
   docSessionId?: string;
   config?: any;
+  /** Public origin of the incoming chat request, used for local media URLs. */
+  origin?: string;
 }) {
   const { serverId, docSessionId, config } = context;
 
   const builtInTools: Record<string, any> = {
     searchKnowledgeBase: tool({
       description:
-        "HIGHEST PRIORITY TOOL — Search the user's private RAG knowledge base. ALWAYS use this FIRST before webSearch or any other tool when the question may relate to the user's indexed data. This includes questions about documents, files, images, diagrams, videos, or anything the user may have uploaded. Do not use for general knowledge, casual conversation, or writing tasks. Search once with a focused query. For media, inspect the returned timeline and endingContext, and reuse exact mediaAssetId/startSecs/endSecs values with presentMedia when a preview is useful. Never guess timestamps.",
+        "HIGHEST PRIORITY TOOL — Search the user's private RAG knowledge base. ALWAYS use this FIRST before webSearch or any other tool when the question may relate to the user's indexed data. This includes questions about documents, files, images, diagrams, videos, or anything the user may have uploaded. Do not use for general knowledge, casual conversation, or writing tasks. Search once with a focused query. If it returns no relevant evidence or an error and the question asks for public/current information, webSearch is available once as a fallback. For media, inspect the returned timeline and endingContext, and reuse exact mediaAssetId/startSecs/endSecs values with presentMedia when a preview is useful. Never guess timestamps.",
       inputSchema: z.object({
         query: z.string().describe('The search query for the knowledge base.'),
       }),
@@ -620,7 +639,10 @@ export async function getChatTools(context: {
           // Fetch the image to base64
           // Handle both absolute URLs and relative local uploads
           const fetchUrl = imageUrl.startsWith('/')
-            ? `http://127.0.0.1:${process.env.PORT || 3000}${imageUrl}`
+            ? new URL(
+                imageUrl,
+                context.origin ?? `http://127.0.0.1:${process.env.PORT || 3000}`,
+              ).toString()
             : imageUrl;
           const res = await fetch(fetchUrl);
           if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
@@ -631,7 +653,10 @@ export async function getChatTools(context: {
 
           // Post to our describe-image endpoint which handles model setup
           const descRes = await fetch(
-            `http://127.0.0.1:${process.env.PORT || 3000}/api/describe-image`,
+            new URL(
+              '/api/describe-image',
+              context.origin ?? `http://127.0.0.1:${process.env.PORT || 3000}`,
+            ).toString(),
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -936,11 +961,35 @@ export async function getChatTools(context: {
 
     webSearch: tool({
       description:
-        "Search the public internet for current information, news, or facts. IMPORTANT: Only use this AFTER searchKnowledgeBase has been tried first and returned no relevant results. Never use webSearch as a first resort — the user's indexed knowledge base always takes priority. Use webSearch for questions about current events, public facts, or topics clearly outside the user's indexed data.",
+        'Search the public internet for current information, news, or facts. Use it first for clearly current/public requests, or once after an irrelevant local search. If it fails or returns no useful results, searchKnowledgeBase is available once as a fallback. Never repeat either search tool in the same turn.',
       inputSchema: z.object({
         query: z.string().describe('The search query.'),
       }),
       execute: async ({ query }) => {
+        const knowledgeBaseFallback = async (error: string) => {
+          try {
+            const knowledge = await queryKnowledgeBase(query, 5, serverId ?? null);
+            return {
+              error,
+              results: [],
+              fallback: {
+                source: 'knowledge-base',
+                attemptedBecause: 'Public web search failed or returned no results.',
+                ...knowledge,
+              },
+            };
+          } catch (fallbackError: any) {
+            return {
+              error,
+              results: [],
+              fallback: {
+                source: 'knowledge-base',
+                error: fallbackError?.message || 'Knowledge-base fallback failed.',
+                hits: [],
+              },
+            };
+          }
+        };
         const provider = config?.webSearchProvider || 'tavily';
         const req = new Request('http://localhost/api/search', {
           method: 'POST',
@@ -980,11 +1029,14 @@ export async function getChatTools(context: {
 
           if (res.status >= 400) {
             const err = await res.json();
-            return { error: err.error || 'Search failed', results: [] };
+            return knowledgeBaseFallback(err.error || 'Search failed');
           }
 
           const data = await res.json();
           const items = data.items || data.results || [];
+          if (items.length === 0) {
+            return knowledgeBaseFallback('Public search returned no results.');
+          }
           return {
             results: items.slice(0, 10).map((i: any) => ({
               title: i.title,
@@ -993,7 +1045,7 @@ export async function getChatTools(context: {
             })),
           };
         } catch (e: any) {
-          return { error: e.message || 'Search failed', results: [] };
+          return knowledgeBaseFallback(e.message || 'Search failed');
         }
       },
     }),
@@ -1016,6 +1068,9 @@ export async function getChatTools(context: {
         // Keeping it available prevents an enabled web-search configuration
         // from silently removing the user's local knowledge base.
         'searchKnowledgeBase',
+        // PDF/image hits can require one visual pass after retrieval. This is
+        // available only to a follow-up tool step, never auto-run on chat.
+        'analyzeImageDeeply',
         'presentMedia',
         'fillDocumentForm',
         'editDocument',

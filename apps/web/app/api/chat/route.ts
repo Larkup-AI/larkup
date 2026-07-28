@@ -16,6 +16,11 @@ import type { CustomModelConfig } from '@larkup/core/types';
 import { DEFAULT_SYSTEM_PROMPT } from '@larkup/core/types';
 
 import { getChatTools } from './tools';
+import {
+  requiresCurrentWebSearch,
+  requiresKnowledgeBaseSearch,
+  retrievalToolsForStep,
+} from '@/lib/retrieval-routing';
 
 export const maxDuration = 60;
 
@@ -66,7 +71,7 @@ const SMART_RETRIEVAL_POLICY = `
 
 TOOL RULES:
 1. searchKnowledgeBase → Use FIRST when the question is about the user's indexed data (documents, files, images, videos, diagrams, anything they uploaded).
-2. webSearch → Use ONLY after searchKnowledgeBase returned nothing relevant AND the question needs current/public facts.
+2. webSearch → Use for clearly current/public facts. If a prior local search was not relevant or failed, use it as the one permitted fallback. If web search fails, use the knowledge base as the one permitted fallback.
 3. Other tools → Use when the question specifically requires them.
 4. General knowledge → Answer directly for common knowledge unrelated to the user's data.
 5. If nothing helps, say so honestly.
@@ -75,6 +80,8 @@ DO:
 - Keep answers short and direct. 1–3 sentences unless the task is complex.
 - Search at most ONCE per tool per turn. Never repeat the same search.
 - For questions about the user's own facts or preferences (for example, "what is my favourite fruit?"), searchKnowledgeBase is required before answering.
+- If a knowledge-base result contains PDF images and the question asks what is shown, named, counted, or connected in that visual, call analyzeImageDeeply before answering. Call presentMedia when the user asks to see the image.
+- For an indexed video outcome question, inspect endingContext before saying that a winner or final score is unavailable. Use only explicitly supported evidence.
 - Use presentMedia to show images/videos/audio from indexed content.
 - For follow-ups like "show me that", reuse the mediaAssetId from earlier results — do not search again.
 
@@ -101,37 +108,6 @@ function latestUserText(messages: UIMessage[]): string {
       .join(' ');
   }
   return '';
-}
-
-/** Only force KB search when the user explicitly refers to their own data.
- * Matches "my document", "our files", "the uploaded image" etc. but NOT
- * generic uses like "I want to know", "can you tell me", "I think". */
-function requiresKnowledgeBaseSearch(text: string): boolean {
-  // Skip generic conversational patterns
-  if (/^(hi|hello|hey|thanks|thank you|ok|sure|yes|no|please|help)\b/i.test(text.trim())) {
-    return false;
-  }
-  // Match possessive references to user data
-  return (
-    /\b(my|our)\s+(favo(?:u)?rite|preference|choice|answer|name|result|score|winner)\b/i.test(
-      text,
-    ) ||
-    /\b(?:what|which|who|where|when|how)\b[\s\S]{0,80}\b(my|our)\b/i.test(text) ||
-    /\b(my|our)\s+(document|file|data|image|picture|diagram|video|audio|upload|corpus|knowledge|database|db|pdf|report|spreadsheet|presentation)/i.test(
-      text,
-    ) ||
-    /\b(the|this|that)\s+(document|file|diagram|image|picture|upload|pdf|report)/i.test(text) ||
-    /\b(uploaded?|indexed|scraped|knowledge base|corpus)\b/i.test(text) ||
-    /\bshow\s+me\b/i.test(text)
-  );
-}
-
-/** Questions whose answer is inherently time-sensitive should not rely on the
- * model's training snapshot when Web Search is available. */
-function requiresCurrentWebSearch(text: string): boolean {
-  return /\b(who won|winner|final score|match result|latest|current|today|yesterday|breaking news|weather|stock price|exchange rate|election result|schedule)\b/i.test(
-    text,
-  );
 }
 
 export async function POST(req: Request) {
@@ -401,7 +377,12 @@ ${fieldLines}`;
       : '') +
     tabularContext +
     docContext;
-  const tools = await getChatTools({ serverId, docSessionId, config });
+  const tools = await getChatTools({
+    serverId,
+    docSessionId,
+    config,
+    origin: new URL(req.url).origin,
+  });
   const userText = latestUserText(messagesToProcess);
   const forceKnowledgeBaseSearch =
     requiresKnowledgeBaseSearch(userText) && Boolean(tools.searchKnowledgeBase);
@@ -420,38 +401,16 @@ ${fieldLines}`;
     system: systemPrompt,
     messages: await convertToModelMessages(safeMessages, { tools }),
     maxOutputTokens: 4096,
-    // Three steps: retrieve → optionally present media → answer.
+    // Three steps: retrieve → optionally inspect/present media → answer.
     stopWhen: stepCountIs(3),
     toolChoice: 'auto',
-    prepareStep: ({ stepNumber }) => {
-      // Step 0: force KB search if needed
-      if (forceKnowledgeBaseSearch && stepNumber === 0) {
-        return { toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' } };
-      }
-      // For questions about the user's data, let the model evaluate the KB
-      // result before falling back to the web. Forcing both tools used to make
-      // enabled web search override a perfectly relevant local answer.
-      if (forceWebSearch && !forceKnowledgeBaseSearch && stepNumber === 0) {
-        return { toolChoice: { type: 'tool', toolName: 'webSearch' } };
-      }
-      // After a forced tool, and after the optional KB → web fallback, remove
-      // search tools. This guarantees one concise search surface rather than
-      // a chain of near-identical web queries.
-      if (stepNumber >= 2) {
-        return {
-          activeTools: Object.keys(tools).filter(
-            (name) => name !== 'webSearch' && name !== 'searchKnowledgeBase',
-          ),
-        };
-      }
-      if (forceKnowledgeBaseSearch && stepNumber >= 1) {
-        return { activeTools: Object.keys(tools).filter((name) => name !== 'searchKnowledgeBase') };
-      }
-      if (forceWebSearch && stepNumber >= 1) {
-        return { activeTools: Object.keys(tools).filter((name) => name !== 'webSearch') };
-      }
-      return undefined;
-    },
+    prepareStep: ({ stepNumber }) =>
+      retrievalToolsForStep({
+        stepNumber,
+        forceKnowledgeBaseSearch,
+        forceWebSearch: forceWebSearch && !forceKnowledgeBaseSearch,
+        toolNames: Object.keys(tools),
+      }),
     onFinish: async ({ usage, response }) => {
       const { trackUsageEvent, estimateCost } = await import('@larkup/core/analytics-store');
       const u = usage as any;

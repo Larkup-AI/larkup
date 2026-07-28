@@ -219,7 +219,10 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
             format: 'plain',
             rawContent: text,
             fileObject: file,
-            indexImages: !text || text.trim().length === 0,
+            // PDF diagrams are often embedded alongside ordinary text. Keep
+            // visual indexing on by default, with the existing per-file toggle
+            // available for users who only want text extraction.
+            indexImages: true,
           });
         } else {
           const content = await file.text();
@@ -572,7 +575,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
               </button>
             </div>
           </div>
-          <ul className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
+          <ul className="space-y-1.5 max-h-87.5 overflow-y-auto pr-1">
             {staged.map((f) => (
               <li
                 key={f.id}
@@ -782,7 +785,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                       <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
                         Selected columns will be combined to form the searchable content.
                       </p>
-                      <div className="max-h-[120px] overflow-y-auto space-y-2 pr-2">
+                      <div className="max-h-30 overflow-y-auto space-y-2 pr-2">
                         {editingFile.keys?.map((k) => {
                           const isSelected = editingFile.contentKeys?.includes(k);
                           return (
@@ -871,7 +874,7 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                       <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
                         These columns will be stored as searchable metadata.
                       </p>
-                      <div className="max-h-[120px] overflow-y-auto space-y-2 pr-2">
+                      <div className="max-h-30 overflow-y-auto space-y-2 pr-2">
                         {editingFile.keys?.map((k) => {
                           const isSelected = editingFile.metadataKeys?.includes(k);
                           const disabled = k === editingFile.titleKey;

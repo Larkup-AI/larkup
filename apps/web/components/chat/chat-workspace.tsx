@@ -107,7 +107,7 @@ function AttachmentCard({
       <div className="size-7 shrink-0 rounded-md overflow-hidden bg-background border border-border/90 flex items-center justify-center p-1">
         <img src={iconPath} alt={file.name} className="w-full h-full object-contain" />
       </div>
-      <div className="flex flex-col justify-center max-w-[120px]">
+      <div className="flex flex-col justify-center max-w-30">
         <span className="text-xs font-medium truncate text-foreground">{file.name}</span>
         <span className="text-[10px] text-muted-foreground">
           {(file.size / 1024).toFixed(0)} KB
@@ -684,7 +684,7 @@ function ChatWorkspaceInner() {
               <button
                 type="button"
                 onClick={() => setShowModelSelect((o) => !o)}
-                className="flex w-[300px] justify-between items-center gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-3 py-1.5 text-xs text-foreground transition hover:bg-muted"
+                className="flex w-75 justify-between items-center gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-3 py-1.5 text-xs text-foreground transition hover:bg-muted"
               >
                 <span className="flex items-center gap-2 truncate">
                   {selectedModelData && (
@@ -709,7 +709,7 @@ function ChatWorkspaceInner() {
               {showModelSelect && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowModelSelect(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-1 w-[300px] rounded-lg border border-border bg-card ">
+                  <div className="absolute right-0 top-full z-50 mt-1 w-75 rounded-lg border border-border bg-card ">
                     {/* Search input */}
                     <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                       <Search className="size-3.5 shrink-0 text-muted-foreground" />
@@ -815,7 +815,7 @@ function ChatWorkspaceInner() {
                           type="button"
                           className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                         >
-                          <History className="h-[16px] w-[16px]" />
+                          <History className="h-4 w-4" />
                         </button>
                       }
                     />
@@ -823,7 +823,7 @@ function ChatWorkspaceInner() {
                 />
                 <TooltipContent>Chat History</TooltipContent>
               </Tooltip>
-              <SheetContent side="left" className="w-[300px] sm:w-[350px] p-0 flex flex-col">
+              <SheetContent side="left" className="w-75 sm:w-87.5 p-0 flex flex-col">
                 <SheetHeader className="p-4 border-b">
                   <SheetTitle className="text-sm font-semibold">Chat History</SheetTitle>
                 </SheetHeader>
@@ -890,7 +890,7 @@ function ChatWorkspaceInner() {
                     onClick={newChat}
                     className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                   >
-                    <SquarePen className="h-[16px] w-[16px]" />
+                    <SquarePen className="h-4 w-4" />
                   </button>
                 }
               />
@@ -1016,7 +1016,7 @@ function ChatWorkspaceInner() {
                       type="button"
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                     >
-                      <Plus className="h-[18px] w-[18px]" />
+                      <Plus className="h-4.5 w-4.5" />
                     </button>
                   }
                 />
@@ -1143,7 +1143,7 @@ function ChatWorkspaceInner() {
                   rows={1}
                   disabled={!ready}
                   placeholder="How can I help you…"
-                  className="max-h-48 min-h-[44px] w-full resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:hidden disabled:opacity-50"
+                  className="max-h-48 min-h-11 w-full resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:hidden disabled:opacity-50"
                 />
               </div>
 
@@ -1153,9 +1153,9 @@ function ChatWorkspaceInner() {
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
               >
                 {isBusy || isDocLoading ? (
-                  <Loader2 className="h-[18px] w-[18px] animate-spin" />
+                  <Loader2 className="h-4.5 w-4.5 animate-spin" />
                 ) : (
-                  <ArrowUp className="h-[18px] w-[18px]" />
+                  <ArrowUp className="h-4.5 w-4.5" />
                 )}
               </button>
             </div>

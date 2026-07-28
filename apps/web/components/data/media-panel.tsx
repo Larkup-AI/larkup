@@ -731,8 +731,7 @@ function MediaContent({
       if (!res.ok) throw new Error(data.error ?? 'Media import failed');
       const ids = (data.assets as MediaAsset[]).map((asset) => asset.id);
       toast.success(`${mediaType === 'video' ? 'Video' : 'Audio'} import started`, {
-        description:
-          'Queued for download and indexing. Live progress will appear once the source starts responding; you can safely leave in the meantime.',
+        description: 'Queued for download and indexing. You can safely leave in the meantime.',
         duration: 8_000,
       });
       await processAssets(ids);

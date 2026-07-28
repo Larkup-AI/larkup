@@ -3,7 +3,12 @@ import * as pdfjsLib from 'pdfjs-dist';
 export async function extractImagesFromPDF(
   file: File,
 ): Promise<{ base64: string; pageNumber: number; index: number }[]> {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.mjs`;
+  // Keep extraction self-contained. The previous CDN worker could fail behind
+  // a firewall or offline, silently leaving PDFs with no indexed visuals.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+  ).toString();
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
@@ -30,6 +35,7 @@ export async function extractImagesFromPDF(
     try {
       const page = await pdf.getPage(i);
       const opList = await page.getOperatorList();
+      const pageStartCount = images.length;
 
       const imageOps = [];
       for (let j = 0; j < opList.fnArray.length; j++) {
@@ -84,6 +90,29 @@ export async function extractImagesFromPDF(
           }
         } catch (err) {
           console.error(`Error extracting image ${objId} on page ${i}`, err);
+        }
+      }
+
+      // Diagrams and slides in PDFs are commonly vector artwork, not embedded
+      // bitmap objects. When image indexing is explicitly enabled, render such
+      // a page as one bounded visual so its labels and structure remain
+      // available to the vision model and to chat previews.
+      if (images.length === pageStartCount) {
+        try {
+          const viewport = page.getViewport({ scale: 1 });
+          const maxDimension = 1_600;
+          const scale = Math.min(1, maxDimension / Math.max(viewport.width, viewport.height));
+          const renderedViewport = page.getViewport({ scale: Math.max(scale, 0.1) });
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(renderedViewport.width));
+          canvas.height = Math.max(1, Math.round(renderedViewport.height));
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            await page.render({ canvas, viewport: renderedViewport }).promise;
+            images.push({ base64: toDataUrl(canvas), pageNumber: i, index: imageIndex++ });
+          }
+        } catch (err) {
+          console.error(`Error rendering PDF page ${i} for visual indexing`, err);
         }
       }
     } catch (err) {
