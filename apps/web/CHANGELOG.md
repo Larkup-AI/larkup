@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.38
+
+### Patch Changes
+
+- Fix 10 production issues: SSE controller-closed error, cleaner system prompt, smarter KB search, one-shot web search, corpus refresh after scrape, minimal KB loading UI, settings sidebar navigation, force-delete processing media, playlist confirmation, image preview in chat, marketplace install progress toast.
+
 ## 0.1.37
 
 ### Patch Changes
