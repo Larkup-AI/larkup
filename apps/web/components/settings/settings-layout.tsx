@@ -10,7 +10,6 @@ import {
   Database,
   Plug,
   Store,
-  Share2,
   type LucideIcon,
   Grid2X2Plus,
 } from 'lucide-react';
@@ -82,7 +81,7 @@ export function SettingsLayout({ activeSection, onSectionChange, children }: Set
 
   return (
     <div className="flex h-full w-full flex-1 min-h-0 bg-transparent">
-      <nav className="hidden md:flex w-[240px] shrink-0 flex-col overflow-y-auto h-full bg-transparent border-r border-border/40">
+      <nav className="hidden md:flex w-60 shrink-0 flex-col overflow-y-auto h-full bg-transparent border-r border-border/40">
         <div className="flex flex-col gap-6 py-6 px-4">
           {SECTION_GROUPS.map((group) => (
             <div key={group.label}>

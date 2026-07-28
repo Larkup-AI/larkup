@@ -35,8 +35,19 @@ if (command === '--version' || command === '-v') {
   child.once('exit', (code) => process.exit(code ?? 0));
 
   void openWhenReady(url);
+} else if (command === 'update') {
+  console.log('\x1b[38;2;223;156;32mUpdating Larkup…\x1b[0m');
+  const child = spawn('npm', ['install', '-g', 'larkup@latest'], { stdio: 'inherit' });
+  child.once('error', (error) => {
+    console.error('Failed to update Larkup:', error.message);
+    process.exit(1);
+  });
+  child.once('exit', (code) => {
+    if (code === 0) console.log('Larkup is up to date. Restart it to use the new version.');
+    process.exit(code ?? 0);
+  });
 } else {
-  console.error('Usage: larkup dev');
+  console.error('Usage: larkup <dev|start|update>');
   process.exit(1);
 }
 

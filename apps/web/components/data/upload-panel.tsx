@@ -181,7 +181,6 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                 indexAsTabular: true,
               });
             } else {
-              // fallback to plain
               next.push({
                 id,
                 name: file.name,

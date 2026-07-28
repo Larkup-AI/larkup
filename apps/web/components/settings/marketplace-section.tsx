@@ -99,7 +99,7 @@ export function MarketplaceSection() {
     async (toolId: string) => {
       setInstalling(toolId);
       const toastId = toast.loading('Downloading and installing tool…', {
-        description: 'This may take a moment on first install.',
+        description: 'This may take a minute on first install.',
       });
       try {
         const res = await fetch(`/api/marketplace/${toolId}`, {

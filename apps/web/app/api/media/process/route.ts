@@ -44,10 +44,26 @@ type StageReporter = (stage: MediaPipelineStage, patch: MediaProcessingStepPatch
  */
 export async function POST(req: Request) {
   try {
-    const { assetIds, serverId } = (await req.json()) as {
+    const { assetIds, serverId, action, assetId } = (await req.json()) as {
       assetIds: string[];
       serverId?: string;
+      action?: 'pause' | 'resume';
+      assetId?: string;
     };
+    if (action && assetId) {
+      const update = async () => {
+        const asset = await updateMediaAsset(assetId, {
+          processingPaused: action === 'pause',
+          processingMessage:
+            action === 'pause'
+              ? 'Paused — resume when you are ready.'
+              : 'Resuming media indexing...',
+        });
+        if (!asset) return NextResponse.json({ error: 'Media asset not found.' }, { status: 404 });
+        return NextResponse.json({ asset });
+      };
+      return serverId ? await runWithServer(serverId, update) : await update();
+    }
     if (!assetIds?.length) {
       return NextResponse.json({ error: 'assetIds required' }, { status: 400 });
     }
@@ -106,7 +122,23 @@ async function enqueueMediaProcessing(
         let heartbeat: ReturnType<typeof setInterval> | undefined;
         const activeStages = new Set<MediaPipelineStage>();
         const lastStageUpdates = new Map<MediaPipelineStage, number>();
+        const waitUntilResumed = async () => {
+          while (true) {
+            const latest = (await readMediaAssets()).find((asset) => asset.id === currentAsset.id);
+            if (!latest) throw new Error('Media asset was deleted during processing');
+            if (!latest.processingPaused) {
+              currentAsset = latest;
+              return;
+            }
+            await updateMediaAsset(currentAsset.id, {
+              processingHeartbeatAt: new Date().toISOString(),
+              processingMessage: 'Paused — resume when you are ready.',
+            });
+            await new Promise((resolve) => setTimeout(resolve, 750));
+          }
+        };
         const reportStage: StageReporter = async (stage, patch) => {
+          await waitUntilResumed();
           const now = Date.now();
           const isTerminal =
             patch.status === 'completed' || patch.status === 'skipped' || patch.status === 'failed';
@@ -130,6 +162,7 @@ async function enqueueMediaProcessing(
         };
 
         try {
+          await waitUntilResumed();
           const startedAsset = await updateMediaAsset(currentAsset.id, {
             processingStatus: 'processing',
             processingError: undefined,
