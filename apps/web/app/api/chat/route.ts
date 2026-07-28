@@ -64,28 +64,24 @@ function createChatModel(
 
 const SMART_RETRIEVAL_POLICY = `
 
-CONVERSATION, RETRIEVAL, AND MEDIA POLICY:
+TOOL RULES:
+1. searchKnowledgeBase → Use FIRST when the question is about the user's indexed data (documents, files, images, videos, diagrams, anything they uploaded).
+2. webSearch → Use ONLY after searchKnowledgeBase returned nothing relevant AND the question needs current/public facts.
+3. Other tools → Use when the question specifically requires them.
+4. General knowledge → Answer directly for common knowledge unrelated to the user's data.
+5. If nothing helps, say so honestly.
 
-TOOL PRIORITY (strict order):
-1. searchKnowledgeBase — ALWAYS try this FIRST when the question may relate to the user's indexed data. This includes any question mentioning "I", "my", "our", "the document", "the file", "the diagram", "the image", "show me", or referencing specific topics the user has likely indexed.
-2. Web search (if enabled) — Use ONLY if searchKnowledgeBase returned zero relevant hits AND the question is factual and benefits from web results.
-3. Other tools (tabular queries, analysis, etc.) — Use when the question specifically requires them.
-4. General knowledge — Answer from your training data ONLY for general knowledge questions clearly unrelated to the user's data.
-5. If no tool yields relevant results AND you cannot answer reliably from general knowledge, respond honestly: "I could not find relevant information in your knowledge base or available sources."
+DO:
+- Keep answers short and direct. 1–3 sentences unless the task is complex.
+- Search at most ONCE per tool per turn. Never repeat the same search.
+- Use presentMedia to show images/videos/audio from indexed content.
+- For follow-ups like "show me that", reuse the mediaAssetId from earlier results — do not search again.
 
-RETRIEVAL RULES:
-- Default to a short, direct answer. One to three sentences is usually enough; use structure only when the task is genuinely complex.
-- Do not search for greetings, casual conversation, writing help, brainstorming, explanations you can answer reliably from general knowledge, or questions unrelated to the user's indexed data.
-- Use searchKnowledgeBase only when the answer depends on the user's indexed/private content, an exact source-specific fact, or a topic that plausibly refers to something the user indexed.
-- Treat questions about the user or their materials as knowledge-base questions: phrases such as "I", "my", "our", "you have", "the database", "the document", "the file", or "the diagram" require searchKnowledgeBase before answering whenever indexed content may contain the answer.
-- Search at most once per user request. Never repeat a search when a prior tool result in this conversation already contains enough evidence. If the results do not answer the question, say so plainly instead of making more searches or guessing.
-
-IMAGE AND MEDIA RULES:
-- NEVER output raw markdown image syntax like ![alt](url). The chat UI blocks these and shows "[Image unavailable]". Instead, always use the presentMedia tool to display images, videos, or audio from indexed content.
-- When search results contain images[].imageUrl (an image extracted from a PDF), use presentMedia with that exact imageUrl. When they contain a mediaAssetId, use presentMedia with the exact assetId. This is the ONLY way indexed images can appear in the conversation.
-- For a follow-up such as "show me that part", "play the clip", "show the image", or "let me hear it", reuse the mediaAssetId and timestamps already present in the earlier search result and call presentMedia directly. Do not search again just to rediscover the same media.
-- Use presentMedia to embed exactly one best video, image, or audio citation when the user asks to see/hear it or when one compact preview materially supports the answer. Do not present every search result.
-- Keep the written answer minimal around a media citation. Do not print internal media reference markers.
+DO NOT:
+- Search for greetings, casual chat, writing help, or general knowledge you already know.
+- Output markdown images like ![alt](url) — the UI blocks them. Always use presentMedia instead.
+- Present every search result. Pick the single best one.
+- Guess or fabricate when results are insufficient.
 `;
 
 function latestUserText(messages: UIMessage[]): string {
@@ -101,16 +97,29 @@ function latestUserText(messages: UIMessage[]): string {
   return '';
 }
 
+/** Only force KB search when the user explicitly refers to their own data.
+ * Matches "my document", "our files", "the uploaded image" etc. but NOT
+ * generic uses like "I want to know", "can you tell me", "I think". */
 function requiresKnowledgeBaseSearch(text: string): boolean {
-  return /\b(my|our|we|i|database|db|document|file|diagram|image|picture|upload(?:ed)?|knowledge base|corpus)\b|\bwhat is my\b/i.test(
-    text,
+  // Skip generic conversational patterns
+  if (/^(hi|hello|hey|thanks|thank you|ok|sure|yes|no|please|help)\b/i.test(text.trim())) {
+    return false;
+  }
+  // Match possessive references to user data
+  return (
+    /\b(my|our)\s+(document|file|data|image|picture|diagram|video|audio|upload|corpus|knowledge|database|db|pdf|report|spreadsheet|presentation)/i.test(
+      text,
+    ) ||
+    /\b(the|this|that)\s+(document|file|diagram|image|picture|upload|pdf|report)/i.test(text) ||
+    /\b(uploaded?|indexed|scraped|knowledge base|corpus)\b/i.test(text) ||
+    /\bshow\s+me\b/i.test(text)
   );
 }
 
 /** Questions whose answer is inherently time-sensitive should not rely on the
  * model's training snapshot when Web Search is available. */
 function requiresCurrentWebSearch(text: string): boolean {
-  return /\b(who won|winner|score|match|game|latest|current|today|yesterday|news|weather|stock|share price|exchange rate|election|president|ceo|schedule)\b/i.test(
+  return /\b(who won|winner|final score|match result|latest|current|today|yesterday|breaking news|weather|stock price|exchange rate|election result|schedule)\b/i.test(
     text,
   );
 }
@@ -378,7 +387,7 @@ ${fieldLines}`;
       : '') +
     SMART_RETRIEVAL_POLICY +
     (config.webSearchEnabled
-      ? '\nWEB SEARCH IS ENABLED: For a public, current, or external factual question, you MUST call webSearch after any required knowledge-base search. Do not tell the user to check the web yourself when this tool is available.\n'
+      ? '\nWeb search is available. Use it for current events or public facts not in the knowledge base.\n'
       : '') +
     tabularContext +
     docContext;
@@ -401,22 +410,24 @@ ${fieldLines}`;
     system: systemPrompt,
     messages: await convertToModelMessages(safeMessages, { tools }),
     maxOutputTokens: 4096,
-    // Five steps covers the only useful multi-step case (retrieve, optionally
-    // present one media item, then answer) without allowing a tool loop to
-    // burn the context window and end with no response.
-    stopWhen: stepCountIs(5),
+    // Three steps: retrieve → optionally present media → answer.
+    stopWhen: stepCountIs(3),
     toolChoice: 'auto',
     prepareStep: ({ stepNumber }) => {
+      // Step 0: force KB search if needed
       if (forceKnowledgeBaseSearch && stepNumber === 0) {
         return { toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' } };
       }
+      // Step 1 (or 0 if no KB): force web search if needed
       if (forceWebSearch && (!forceKnowledgeBaseSearch || stepNumber === 1)) {
         return { toolChoice: { type: 'tool', toolName: 'webSearch' } };
       }
-      // A retrieval is deliberately one-shot per turn. This is applied at the
-      // runtime level rather than relying only on the model prompt.
-      if (forceKnowledgeBaseSearch) {
-        return { activeTools: Object.keys(tools).filter((name) => name !== 'searchKnowledgeBase') };
+      // After forced tools, remove them so the model cannot loop on them.
+      const usedTools: string[] = [];
+      if (forceKnowledgeBaseSearch) usedTools.push('searchKnowledgeBase');
+      if (forceWebSearch) usedTools.push('webSearch');
+      if (usedTools.length > 0) {
+        return { activeTools: Object.keys(tools).filter((name) => !usedTools.includes(name)) };
       }
       return undefined;
     },
