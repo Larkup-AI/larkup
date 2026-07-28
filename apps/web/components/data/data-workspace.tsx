@@ -160,6 +160,14 @@ export function DataWorkspace() {
   const configured = jobsQuery.data?.configured ?? true;
   const hasActive = jobs.some((j) => j.status === 'running' || j.status === 'queued');
 
+  const docsQuery = useSWR<DocsResponse>('/api/documents', fetcher, {
+    refreshInterval: hasActive ? 5000 : 0,
+  });
+  const { mutate: mutateDocuments } = docsQuery;
+  const documents = docsQuery.data?.documents ?? [];
+  const stats = docsQuery.data?.stats;
+  const docCount = stats?.docCount ?? 0;
+
   useEffect(() => {
     const prevJobs = prevJobsRef.current;
     if (prevJobs.length > 0 && jobs.length > 0) {
@@ -181,14 +189,6 @@ export function DataWorkspace() {
     }
     prevJobsRef.current = jobs;
   }, [jobs, mutateDocuments]);
-
-  const docsQuery = useSWR<DocsResponse>('/api/documents', fetcher, {
-    refreshInterval: hasActive ? 5000 : 0,
-  });
-  const { mutate: mutateDocuments } = docsQuery;
-  const documents = docsQuery.data?.documents ?? [];
-  const stats = docsQuery.data?.stats;
-  const docCount = stats?.docCount ?? 0;
 
   const indexQuery = useSWR<{
     unindexedCount: number;
