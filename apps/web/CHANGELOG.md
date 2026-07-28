@@ -1,5 +1,16 @@
 # larkup
 
+## 0.1.37
+
+### Patch Changes
+
+- c1b12cb: Restore reliable no-Docker local crawler search with a resilient public-search fallback, make current-event chat questions use enabled web search, speed up first-party tool installation, and improve media URL progress handling. Simplify settings and prompt UX, and make failed-crawl URL copying reliable.
+- Updated dependencies [c1b12cb]
+  - @larkup/scraper@0.1.27
+  - @larkup/marketplace@0.1.10
+  - @larkup/tool-video-audio@0.2.3
+  - @larkup/tool-doc-editor@0.2.5
+
 ## 0.1.36
 
 ### Patch Changes

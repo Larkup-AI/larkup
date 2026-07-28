@@ -1,5 +1,11 @@
 # @larkup/scraper
 
+## 0.1.27
+
+### Patch Changes
+
+- c1b12cb: Restore reliable no-Docker local crawler search with a resilient public-search fallback, make current-event chat questions use enabled web search, speed up first-party tool installation, and improve media URL progress handling. Simplify settings and prompt UX, and make failed-crawl URL copying reliable.
+
 ## 0.1.26
 
 ### Patch Changes
