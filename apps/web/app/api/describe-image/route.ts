@@ -4,6 +4,7 @@ import { readConfig } from '@larkup/core/config-store';
 import { getModelsByType } from '@larkup/core/models-cache';
 import { runWithServer } from '@larkup/core/workspace';
 import { createChatModel, resolveConfiguredChatModel } from '@/lib/chat-model-provider';
+import { createImageDescriptionSignal, isImageDescriptionAbort } from '@/lib/image-description';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,7 +42,10 @@ async function describeImage(req: Request) {
 
     const { text, usage } = await generateText({
       model,
-      abortSignal: req.signal,
+      // Do not use req.signal here. Media jobs and PDF uploads can retry or
+      // complete their outer request while the vision provider is backing off,
+      // which used to abort the AI SDK retry delay with "Delay was aborted".
+      abortSignal: createImageDescriptionSignal(),
       messages: [
         {
           role: 'user',
@@ -86,6 +90,13 @@ async function describeImage(req: Request) {
 
     return NextResponse.json({ description: text });
   } catch (err: any) {
+    if (isImageDescriptionAbort(err)) {
+      console.warn('Image description timed out before the vision provider responded.');
+      return NextResponse.json(
+        { error: 'Image description timed out. The image can be retried.' },
+        { status: 504 },
+      );
+    }
     console.error('Image description failed:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
