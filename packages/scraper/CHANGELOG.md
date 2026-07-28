@@ -1,5 +1,11 @@
 # @larkup/scraper
 
+## 0.1.29
+
+### Patch Changes
+
+- 0ff7dec: Stabilize native crawl state, prioritise local knowledge retrieval, and improve media-import progress and source-download recovery.
+
 ## 0.1.28
 
 ### Patch Changes
