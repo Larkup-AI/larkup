@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.43
+
+### Patch Changes
+
+- 80f79b0: Prevent image-description retries from being cancelled by outer request aborts.
+
 ## 0.1.42
 
 ### Patch Changes
