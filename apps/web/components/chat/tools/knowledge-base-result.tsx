@@ -73,7 +73,7 @@ export function KnowledgeBaseResult({
           ) : (
             <Database className="h-3.5 w-3.5 shrink-0" />
           )}
-          <span className="truncate max-w-[250px] sm:max-w-[400px]">
+          <span className="truncate max-w-62.5 sm:max-w-100">
             {isRunning ? 'Checking knowledge base…' : 'Checked knowledge base'}
           </span>
           {!isRunning && hits.length > 0 ? (
@@ -92,9 +92,8 @@ export function KnowledgeBaseResult({
       {open && (isRunning || hits.length > 0) ? (
         <div className="mt-2 flex flex-col gap-px border border-border rounded-xl bg-transparent overflow-hidden">
           {isRunning && hits.length === 0 ? (
-            <div className="flex items-center gap-2 px-3.5 py-3 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
-              Looking through your Knowledge Base…
+            <div className="flex items-center gap-2 px-3.5 py-2.5">
+              <Loader2 className="size-3 animate-spin text-muted-foreground" />
             </div>
           ) : null}
           {hits.slice(0, 3).map((h, i) => (

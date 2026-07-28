@@ -172,11 +172,15 @@ export function DataWorkspace() {
       );
 
       if (justCompleted.length > 0) {
-        toast.success('Indexing completed.');
+        toast.success('Scraping completed.');
+        // Refresh the corpus immediately so new documents appear.
+        mutateDocuments();
+        // Documents may still be flushing — re-fetch after a short delay.
+        setTimeout(() => mutateDocuments(), 2500);
       }
     }
     prevJobsRef.current = jobs;
-  }, [jobs]);
+  }, [jobs, mutateDocuments]);
 
   const docsQuery = useSWR<DocsResponse>('/api/documents', fetcher, {
     refreshInterval: hasActive ? 5000 : 0,
