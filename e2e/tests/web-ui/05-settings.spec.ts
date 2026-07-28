@@ -47,6 +47,17 @@ test.describe('Settings Page', () => {
     for (const [navigationName, headingName] of sections) {
       await page.getByRole('button', { name: navigationName, exact: true }).click();
       await expect(page.getByRole('heading', { name: headingName, exact: true })).toBeVisible();
+      await expect(page).toHaveURL(
+        new RegExp(
+          `section=${encodeURIComponent(
+            navigationName === 'AI Models'
+              ? 'models'
+              : navigationName === 'Agent Customization'
+              ? 'prompts'
+              : navigationName.toLowerCase(),
+          )}`,
+        ),
+      );
     }
   });
 

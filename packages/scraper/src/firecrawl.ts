@@ -4,6 +4,7 @@ import { readLocalState } from './local-runtime';
 import {
   cancelNativeCrawl,
   getNativeCrawlStatus,
+  nativeSearchWeb,
   nativeScrapePage,
   startNativeCrawl,
 } from './native-crawler';
@@ -131,6 +132,8 @@ interface FcSearchResponse {
 }
 
 export async function searchWeb(query: string, limit = 10): Promise<SearchResultItem[]> {
+  const endpoint = await resolveEndpoint();
+  if (endpoint.mode === 'native') return nativeSearchWeb(query, limit);
   const json = await call<FcSearchResponse>('/search', {
     method: 'POST',
     body: JSON.stringify({ query, limit }),

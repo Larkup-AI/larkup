@@ -107,6 +107,14 @@ function requiresKnowledgeBaseSearch(text: string): boolean {
   );
 }
 
+/** Questions whose answer is inherently time-sensitive should not rely on the
+ * model's training snapshot when Web Search is available. */
+function requiresCurrentWebSearch(text: string): boolean {
+  return /\b(who won|winner|score|match|game|latest|current|today|yesterday|news|weather|stock|share price|exchange rate|election|president|ceo|schedule)\b/i.test(
+    text,
+  );
+}
+
 export async function POST(req: Request) {
   const {
     messages,
@@ -364,7 +372,10 @@ ${fieldLines}`;
   }
 
   const systemPrompt =
-    (config.systemPrompt || DEFAULT_SYSTEM_PROMPT) +
+    DEFAULT_SYSTEM_PROMPT +
+    (config.systemPrompt && config.systemPrompt !== DEFAULT_SYSTEM_PROMPT
+      ? `\n\nUSER INSTRUCTIONS:\n${config.systemPrompt}`
+      : '') +
     SMART_RETRIEVAL_POLICY +
     (config.webSearchEnabled
       ? '\nWEB SEARCH IS ENABLED: For a public, current, or external factual question, you MUST call webSearch after any required knowledge-base search. Do not tell the user to check the web yourself when this tool is available.\n'
@@ -375,6 +386,10 @@ ${fieldLines}`;
   const forceKnowledgeBaseSearch =
     requiresKnowledgeBaseSearch(latestUserText(messagesToProcess)) &&
     Boolean(tools.searchKnowledgeBase);
+  const forceWebSearch =
+    config.webSearchEnabled === true &&
+    requiresCurrentWebSearch(latestUserText(messagesToProcess)) &&
+    Boolean(tools.webSearch);
 
   // Debug: log payload sizes to console in development
   if (process.env.NODE_ENV === 'development') {
@@ -394,6 +409,9 @@ ${fieldLines}`;
     prepareStep: ({ stepNumber }) => {
       if (forceKnowledgeBaseSearch && stepNumber === 0) {
         return { toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' } };
+      }
+      if (forceWebSearch && (!forceKnowledgeBaseSearch || stepNumber === 1)) {
+        return { toolChoice: { type: 'tool', toolName: 'webSearch' } };
       }
       // A retrieval is deliberately one-shot per turn. This is applied at the
       // runtime level rather than relying only on the model prompt.

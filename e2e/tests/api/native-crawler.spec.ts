@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { readLocalState, startLocal, stopLocal } from '../../../packages/scraper/src/local-runtime';
-import { isFirecrawlConfigured } from '../../../packages/scraper/src/firecrawl';
+import { isFirecrawlConfigured, searchWeb } from '../../../packages/scraper/src/firecrawl';
 
 test('curl-style local install starts the built-in crawler without Docker', async () => {
   const originalCwd = process.cwd();
@@ -20,6 +20,60 @@ test('curl-style local install starts the built-in crawler without Docker', asyn
     await stopLocal();
     await expect(readLocalState()).resolves.toMatchObject({ running: false, mode: 'native' });
   } finally {
+    process.chdir(originalCwd);
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test('native crawler search returns public result URLs without Docker or an API key', async () => {
+  const originalCwd = process.cwd();
+  const originalFetch = globalThis.fetch;
+  const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-native-search-'));
+  try {
+    process.chdir(workspace);
+    await startLocal();
+    globalThis.fetch = (async () =>
+      new Response(
+        '<a href="https://example.com/result" class="search-link l1"><div class="title" title="Example result">Example result</div></a>',
+        { status: 200, headers: { 'content-type': 'text/html' } },
+      )) as typeof fetch;
+
+    await expect(searchWeb('example query', 5)).resolves.toEqual([
+      { url: 'https://example.com/result', title: 'Example result' },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.chdir(originalCwd);
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test('native crawler search falls back when its primary public source is rate-limited', async () => {
+  const originalCwd = process.cwd();
+  const originalFetch = globalThis.fetch;
+  const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-native-search-fallback-'));
+  try {
+    process.chdir(workspace);
+    await startLocal();
+    let requestCount = 0;
+    globalThis.fetch = (async () => {
+      requestCount++;
+      if (requestCount === 1) return new Response('', { status: 429 });
+      return new Response(
+        '<rss><channel><item><title>Fallback result</title><link>https://example.com/fallback</link><description>Fallback description</description></item></channel></rss>',
+        { status: 200, headers: { 'content-type': 'application/rss+xml' } },
+      );
+    }) as typeof fetch;
+
+    await expect(searchWeb('example query', 5)).resolves.toEqual([
+      {
+        url: 'https://example.com/fallback',
+        title: 'Fallback result',
+        description: 'Fallback description',
+      },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
     process.chdir(originalCwd);
     await rm(workspace, { recursive: true, force: true });
   }

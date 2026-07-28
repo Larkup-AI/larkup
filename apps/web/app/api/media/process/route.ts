@@ -165,6 +165,12 @@ async function enqueueMediaProcessing(
               const entries = await tool.importMediaUrl(currentAsset.originalUrl, {
                 outputDir: tmpDir,
                 playlistMax: 10, // max items
+                onProgress: ({ percent, message }: { percent?: number; message: string }) =>
+                  reportStage('download', {
+                    status: 'running',
+                    percent,
+                    message,
+                  }),
               });
 
               if (!entries || entries.length === 0) {

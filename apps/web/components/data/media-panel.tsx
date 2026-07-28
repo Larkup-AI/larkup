@@ -1233,7 +1233,7 @@ function MediaContent({
       ) : null}
 
       {/* Storage warning */}
-      {storageUsedBytes > 1024 * 1024 * 1024 && (
+      {/* {storageUsedBytes > 1024 * 1024 * 1024 && (
         <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3">
           <AlertCircle className="size-4 mt-0.5 shrink-0 text-amber-600" />
           <div>
@@ -1245,7 +1245,7 @@ function MediaContent({
             </p>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
@@ -1634,9 +1634,9 @@ function ActiveIndexingList({
                   {asset.processingMessage || 'Preparing media indexing...'}
                 </p>
               </div>
-              {asset.processingSteps?.length ? (
+              {/* {asset.processingSteps?.length ? (
                 <PipelineSteps steps={asset.processingSteps} />
-              ) : null}
+              ) : null} */}
             </div>
           );
         })}
@@ -1671,7 +1671,7 @@ function PipelineSteps({ steps }: { steps: MediaProcessingStep[] }) {
             className={cn(
               'flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[9px]',
               isRunning
-                ? 'border-emerald-300 bg-emerald-50/70 text-emerald-700 dark:border-emerald-700/70 dark:bg-emerald-950/40 dark:text-emerald-300'
+                ? 'border-emerald-500 bg-emerald-50/70 text-emerald-700 dark:border-emerald-700/70 dark:bg-emerald-950/40 dark:text-emerald-300'
                 : 'border-border/60 bg-background/40 text-muted-foreground',
             )}
           >
