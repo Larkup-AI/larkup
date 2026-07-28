@@ -1,5 +1,11 @@
 # @larkup/core
 
+## 0.2.6
+
+### Patch Changes
+
+- Improve smart RAG and web fallback, PDF visual retrieval, and resilient video indexing.
+
 ## 0.2.5
 
 ### Patch Changes
