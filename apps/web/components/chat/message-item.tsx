@@ -382,7 +382,7 @@ function renderToolPart(
           <div key={index} className="mb-2 w-full">
             <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
               <Globe className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate max-w-[250px] sm:max-w-[400px]">
+              <span className="truncate max-w-62.5 sm:max-w-100">
                 Searched web for "{input?.query}"
               </span>
               <span className="shrink-0 text-[10px] bg-secondary text-foreground px-1.5 py-0.5 rounded-full font-medium ml-1">
@@ -395,12 +395,24 @@ function renderToolPart(
 
       case 'analyzeImageDeeply': {
         if (output.error) return null;
+        const imageUrl = input?.imageUrl as string | undefined;
         return (
           <div key={index} className="mb-2 w-full">
             <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
               <Sparkles className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate max-w-[250px] sm:max-w-[400px]">Analyzed image</span>
+              <span className="truncate max-w-62.5 sm:max-w-100">Analyzed image</span>
             </div>
+            {imageUrl ? (
+              <div className="mt-1.5 max-w-xs">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl}
+                  alt="Analyzed image"
+                  className="rounded-lg border border-border/50 object-cover max-h-48 w-auto"
+                  loading="lazy"
+                />
+              </div>
+            ) : null}
           </div>
         );
       }
@@ -433,7 +445,7 @@ function renderToolPart(
           <div key={index} className="mb-2 w-full">
             <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
               <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate max-w-[250px] sm:max-w-[400px]">Used {toolName}</span>
+              <span className="truncate max-w-62.5 sm:max-w-100">Used {toolName}</span>
             </div>
           </div>
         );
@@ -714,7 +726,7 @@ export function MessageItem({
                     <div className="size-7 shrink-0 rounded-md overflow-hidden bg-background border border-border/90 flex items-center justify-center p-1">
                       <img src={iconPath} alt={nameStr} className="w-full h-full object-contain" />
                     </div>
-                    <div className="flex flex-col justify-center max-w-[150px]">
+                    <div className="flex flex-col justify-center max-w-37.5">
                       <span className="text-xs font-medium truncate text-foreground">
                         {nameStr}
                       </span>
@@ -932,10 +944,10 @@ function renderMarkdown(text: string): string {
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => {
     const lowerUrl = url.toLowerCase();
     if (lowerUrl.match(/\.(mp4|webm|ogg)$/) || lowerUrl.includes('video')) {
-      return `<video src="${url}" controls preload="metadata" class="max-w-[360px] w-full rounded-lg my-2 border border-border bg-card"></video>`;
+      return `<video src="${url}" controls preload="metadata" class="max-w-90 w-full rounded-lg my-2 border border-border bg-card"></video>`;
     }
     if (lowerUrl.match(/\.(mp3|wav|m4a|oga)$/) || lowerUrl.includes('audio')) {
-      return `<audio src="${url}" controls preload="metadata" class="max-w-[320px] w-full my-2"></audio>`;
+      return `<audio src="${url}" controls preload="metadata" class="max-w-80 w-full my-2"></audio>`;
     }
     return `<a href="${url}" target="_blank" rel="noreferrer" class="msg-link">${label}</a>`;
   });

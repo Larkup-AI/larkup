@@ -98,6 +98,9 @@ export function MarketplaceSection() {
   const handleInstall = useCallback(
     async (toolId: string) => {
       setInstalling(toolId);
+      const toastId = toast.loading('Downloading and installing tool…', {
+        description: 'This may take a moment on first install.',
+      });
       try {
         const res = await fetch(`/api/marketplace/${toolId}`, {
           method: 'POST',
@@ -106,6 +109,7 @@ export function MarketplaceSection() {
           const err = await res.json();
           throw new Error(err.error || 'Install failed');
         }
+        toast.dismiss(toastId);
         if (toolId === 'video-audio') {
           toast.success('Video & Audio installed', {
             description: 'Choose an audio provider before you index media.',
@@ -119,6 +123,7 @@ export function MarketplaceSection() {
         }
         mutate();
       } catch (err) {
+        toast.dismiss(toastId);
         toast.error(err instanceof Error ? err.message : 'Failed to install tool');
       } finally {
         setInstalling(null);
