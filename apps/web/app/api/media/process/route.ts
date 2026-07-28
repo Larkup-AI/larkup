@@ -646,7 +646,9 @@ async function processMediaWithTool(
       const scenePromise = (async () => {
         const extractedFrames = result.frames as { path: string; timestampSecs: number }[];
         const analysisWindowSecs = visualAnalysisWindow(result.meta.durationSecs);
-        const frameGroups = groupFramesByWindow(extractedFrames, analysisWindowSecs, 6);
+        // Chronological batches preserve visual context while keeping a
+        // long recording within a practical vision-request budget.
+        const frameGroups = groupFramesByWindow(extractedFrames, analysisWindowSecs, 12);
         if (frameGroups.length === 0) {
           await reportStage('vision', {
             status: 'skipped',
@@ -662,10 +664,37 @@ async function processMediaWithTool(
           message: `Understanding 0 of ${frameGroups.length} visual sequences...`,
         });
         let analyzed = 0;
+        let skipped = 0;
+        let visionThrottled = false;
+        let lastVisionRequestAt = 0;
+        const visionProvider = globalConfig.chatProvider || globalConfig.embeddingProvider;
+        // Providers commonly rate-limit visual generation much more tightly
+        // than text generation. Serializing and pacing Google requests avoids
+        // turning a temporary 429 into a failed video index.
+        const visionConcurrency = visionProvider === 'google' ? 1 : limits.apiConcurrency;
+        const visionMinIntervalMs = visionProvider === 'google' ? 4_250 : 0;
+        const recordProgress = () => {
+          analyzed++;
+          const progressStep = Math.max(1, Math.ceil(frameGroups.length / 100));
+          if (analyzed % progressStep === 0 || analyzed === frameGroups.length) {
+            void reportStage('vision', {
+              status: 'running',
+              current: analyzed,
+              total: frameGroups.length,
+              unit: 'sequences',
+              message: `Understanding visual sequence ${analyzed} of ${frameGroups.length}...`,
+            }).catch(() => {});
+          }
+        };
         const descriptions = await mapConcurrent(
           frameGroups,
-          limits.apiConcurrency,
+          visionConcurrency,
           async (frames: { path: string; timestampSecs: number }[]) => {
+            if (visionThrottled) {
+              skipped++;
+              recordProgress();
+              return null;
+            }
             const base64Images = await Promise.all(
               frames.map(async (frame) => (await fs.readFile(frame.path)).toString('base64')),
             );
@@ -675,14 +704,20 @@ async function processMediaWithTool(
               Math.max(startSecs + 1, frames.at(-1)!.timestampSecs + frameIntervalSecs),
             );
             const timestamps = frames.map((frame) => formatTime(frame.timestampSecs)).join(', ');
-            const descRes = await fetchWithRetry(
-              scopedApiUrl('/api/describe-image', reqUrl, serverId),
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  base64Images,
-                  prompt: `These are chronological frames from "${asset.fileName}" at ${timestamps}.
+            if (visionMinIntervalMs > 0) {
+              const remaining = visionMinIntervalMs - (Date.now() - lastVisionRequestAt);
+              if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+            }
+            lastVisionRequestAt = Date.now();
+            try {
+              const descRes = await fetchWithRetry(
+                scopedApiUrl('/api/describe-image', reqUrl, serverId),
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    base64Images,
+                    prompt: `These are chronological frames from "${asset.fileName}" at ${timestamps}.
 Write one evidence note for this time range. Track people, actions, interactions, state changes,
 important objects, and exact meaningful on-screen text. Perform careful OCR, including Arabic and
 other right-to-left text without reversing labels. For scoreboards or result animations, compare
@@ -690,38 +725,44 @@ frames in timestamp order and report the latest visible score as the current/fin
 each number with the correct nearby team/person label. Record a winner or result only when visually
 supported. Omit boilerplate about facts that are not shown. Be factual, information-dense, and
 concise.`,
-                }),
-              },
-            );
-            analyzed++;
-            const progressStep = Math.max(1, Math.ceil(frameGroups.length / 100));
-            if (analyzed % progressStep === 0 || analyzed === frameGroups.length) {
-              void reportStage('vision', {
-                status: 'running',
-                current: analyzed,
-                total: frameGroups.length,
-                unit: 'sequences',
-                message: `Understanding visual sequence ${analyzed} of ${frameGroups.length}...`,
-              }).catch(() => {});
-            }
-            if (!descRes.ok) {
-              let detail = '';
-              try {
-                const errorBody = (await descRes.json()) as { error?: string };
-                detail = errorBody.error?.trim() || '';
-              } catch {
-                // Keep the status-only fallback for non-JSON failures.
-              }
-              throw new Error(
-                `Visual sequence analysis failed (${descRes.status})${
-                  detail ? `: ${detail}` : '.'
-                }`,
+                  }),
+                },
               );
+              if (!descRes.ok) {
+                let detail = '';
+                try {
+                  const errorBody = (await descRes.json()) as { error?: string };
+                  detail = errorBody.error?.trim() || '';
+                } catch {
+                  // Keep the status-only fallback for non-JSON failures.
+                }
+                if (/quota|rate limit|resource_exhausted|too many requests/i.test(detail)) {
+                  visionThrottled = true;
+                }
+                skipped++;
+                console.warn(
+                  `Visual sequence ${formatTime(startSecs)}–${formatTime(endSecs)} was skipped: ${
+                    detail || `HTTP ${descRes.status}`
+                  }`,
+                );
+                return null;
+              }
+              const { description } = (await descRes.json()) as { description?: string };
+              return description
+                ? { text: description, startSecs, endSecs: Math.max(startSecs + 1, endSecs) }
+                : null;
+            } catch (error) {
+              skipped++;
+              console.warn(
+                `Visual sequence ${formatTime(startSecs)}–${formatTime(
+                  endSecs,
+                )} failed; preserving the remaining transcript evidence.`,
+                error,
+              );
+              return null;
+            } finally {
+              recordProgress();
             }
-            const { description } = (await descRes.json()) as { description?: string };
-            return description
-              ? { text: description, startSecs, endSecs: Math.max(startSecs + 1, endSecs) }
-              : null;
           },
         );
         await reportStage('vision', {
@@ -729,7 +770,12 @@ concise.`,
           current: frameGroups.length,
           total: frameGroups.length,
           unit: 'sequences',
-          message: `Understood ${frameGroups.length} visual sequences with OCR.`,
+          message:
+            skipped > 0
+              ? `Understood ${
+                  frameGroups.length - skipped
+                } visual sequences; ${skipped} were skipped while the vision provider was unavailable. Speech evidence remains searchable.`
+              : `Understood ${frameGroups.length} visual sequences with OCR.`,
         });
         return descriptions;
       })();
@@ -1002,6 +1048,8 @@ concise.`,
 function visualAnalysisWindow(durationSecs: number): number {
   if (durationSecs >= 4 * 60 * 60) return 15 * 60;
   if (durationSecs > 60 * 60) return 5 * 60;
+  if (durationSecs > 30 * 60) return 3 * 60;
+  if (durationSecs > 10 * 60) return 2 * 60;
   return 60;
 }
 

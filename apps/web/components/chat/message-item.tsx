@@ -538,13 +538,9 @@ export function MessageItem({
     const editor = useDocEditor();
     updateFromToolResult = editor.updateFromToolResult;
     openCanvas = editor.openCanvas;
-  } catch {
-    // Not wrapped in DocEditorProvider in some contexts
-  }
+  } catch {}
 
   const anyMessage = message as any;
-
-  // Stabilize the parts array to prevent re-renders from creating new array refs each time
   const parts: any[] = useMemo(() => {
     const p: any[] = message.parts ? [...message.parts] : [];
     if (anyMessage.toolInvocations && Array.isArray(anyMessage.toolInvocations)) {
@@ -563,11 +559,8 @@ export function MessageItem({
     return p;
   }, [message.parts, anyMessage.toolInvocations]);
 
-  // Track which tool call IDs have already been applied to prevent re-application
   const appliedToolCallsRef = useRef<Set<string>>(new Set());
 
-  // Effect to apply document edits to the Canvas context
-  // Uses a stable fingerprint to avoid re-triggering on every render
   const docToolFingerprint = useMemo(() => {
     if (!isLast) return '';
     return parts
