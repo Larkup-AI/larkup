@@ -1,5 +1,11 @@
 # @larkup/tool-video-audio
 
+## 0.2.4
+
+### Patch Changes
+
+- 0ff7dec: Stabilize native crawl state, prioritise local knowledge retrieval, and improve media-import progress and source-download recovery.
+
 ## 0.2.3
 
 ### Patch Changes

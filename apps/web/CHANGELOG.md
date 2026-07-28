@@ -1,5 +1,14 @@
 # larkup
 
+## 0.1.41
+
+### Patch Changes
+
+- 0ff7dec: Stabilize native crawl state, prioritise local knowledge retrieval, and improve media-import progress and source-download recovery.
+- Updated dependencies [0ff7dec]
+  - @larkup/scraper@0.1.29
+  - @larkup/tool-video-audio@0.2.4
+
 ## 0.1.40
 
 ### Patch Changes
