@@ -1,5 +1,11 @@
 # @larkup/core
 
+## 0.2.5
+
+### Patch Changes
+
+- 2a0a7e2: Improve automatic indexing and media processing controls, make settings navigation resilient to slow tool loading, and keep knowledge-base retrieval ahead of web search.
+
 ## 0.2.4
 
 ### Patch Changes
