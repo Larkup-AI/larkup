@@ -1,5 +1,17 @@
 # larkup
 
+## 0.1.42
+
+### Patch Changes
+
+- Improve smart RAG and web fallback, PDF visual retrieval, and resilient video indexing.
+- Updated dependencies
+  - @larkup/core@0.2.6
+  - @larkup/marketplace@0.1.12
+  - @larkup/scraper@0.1.30
+  - @larkup/tool-doc-editor@0.2.7
+  - @larkup/tool-video-audio@0.2.4
+
 ## 0.1.41
 
 ### Patch Changes
