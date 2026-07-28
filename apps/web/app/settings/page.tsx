@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { SettingsLayout, type SettingsSection } from '@/components/settings/settings-layout';
 import { GeneralSection } from '@/components/settings/general-section';
@@ -20,36 +20,28 @@ function SettingsContent() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const getInitialSection = (): SettingsSection => {
+  const resolveSection = (): SettingsSection => {
     if (searchParams.has('ai-models')) return 'models';
     const section = searchParams.get('section') as SettingsSection;
     if (section) return section;
     return 'general';
   };
 
-  const [activeSection, setActiveSection] = useState<SettingsSection>(getInitialSection());
+  // Always derive the active section from the URL — this ensures navigating
+  // away and back never leaves the sidebar stuck on a stale section.
+  const activeSection = resolveSection();
 
   useEffect(() => {
-    const currentSection = searchParams.get('section');
-    const hasAiModels = searchParams.has('ai-models');
-
-    if (hasAiModels) {
+    // Normalize legacy `?ai-models` param to `?section=models`
+    if (searchParams.has('ai-models')) {
       const params = new URLSearchParams(searchParams.toString());
       params.delete('ai-models');
       params.set('section', 'models');
       router.replace(`${pathname}?${params.toString()}`);
-      if (activeSection !== 'models') {
-        setActiveSection('models');
-      }
-    } else if (currentSection && currentSection !== activeSection) {
-      setActiveSection(currentSection as SettingsSection);
     }
-  }, [searchParams, pathname, router, activeSection]);
+  }, [searchParams, pathname, router]);
 
   const handleSectionChange = (newSection: SettingsSection) => {
-    setActiveSection(newSection);
-    // A settings item is a destination, not a filter. Rebuild the query so a
-    // stale deep-link such as `section=tool-settings` cannot linger in the URL.
     router.replace(`${pathname}?section=${newSection}`, { scroll: false });
   };
 
