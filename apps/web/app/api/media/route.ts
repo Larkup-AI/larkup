@@ -177,6 +177,7 @@ async function removeMedia(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
   const ids = url.searchParams.get('ids');
+  const force = url.searchParams.get('force') === 'true';
 
   const storage = createStorageProvider();
 
@@ -184,7 +185,7 @@ async function removeMedia(req: Request) {
     const { getMediaAsset } = await import('@larkup/core/media-store');
     const asset = await getMediaAsset(id);
     if (asset) {
-      if (isMediaProcessing(asset)) {
+      if (!force && isMediaProcessing(asset)) {
         return NextResponse.json(
           { error: 'Wait for the media indexing job to finish before deleting it.' },
           { status: 409 },
@@ -201,7 +202,7 @@ async function removeMedia(req: Request) {
     const idList = ids.split(',');
     const assets = await readMediaAssets();
     const selectedAssets = assets.filter((asset) => idList.includes(asset.id));
-    if (selectedAssets.some(isMediaProcessing)) {
+    if (!force && selectedAssets.some(isMediaProcessing)) {
       return NextResponse.json(
         { error: 'Wait for all selected media indexing jobs to finish before deleting them.' },
         { status: 409 },

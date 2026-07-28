@@ -428,6 +428,9 @@ function InstallPrompt({
 
   const handleInstall = async () => {
     setInstalling(true);
+    const toastId = toast.loading('Downloading and installing tool…', {
+      description: 'This may take a moment on first install.',
+    });
     try {
       const res = await fetch(`/api/marketplace/${toolId}`, {
         method: 'POST',
@@ -436,6 +439,7 @@ function InstallPrompt({
         const err = await res.json();
         throw new Error(err.error || 'Install failed');
       }
+      toast.dismiss(toastId);
       toast.success('Video & Audio installed', {
         description: 'Choose an audio provider before indexing video or audio.',
         action: {
@@ -445,6 +449,7 @@ function InstallPrompt({
       });
       onInstallComplete();
     } catch (err) {
+      toast.dismiss(toastId);
       toast.error(err instanceof Error ? err.message : 'Failed to install tool');
     } finally {
       setInstalling(false);
@@ -772,7 +777,7 @@ function MediaContent({
 
   async function handleDelete(assetId: string) {
     try {
-      const query = new URLSearchParams({ id: assetId });
+      const query = new URLSearchParams({ id: assetId, force: 'true' });
       if (serverId) query.set('serverId', serverId);
       const response = await fetch(`/api/media?${query.toString()}`, { method: 'DELETE' });
       if (!response.ok) {
@@ -912,93 +917,114 @@ function MediaContent({
             {mediaType === 'video' ? ', YouTube videos, or playlists' : ''}. Add up to 10 URLs
             separated by commas.
           </p>
-          {remoteEstimates ? (
-            <div className="mt-4 flex flex-col gap-4 border-t border-border/70 pt-4">
-              <div className="grid gap-2 sm:grid-cols-3">
-                <EstimateMetric
-                  label="Media"
-                  value={`${remoteEstimates.reduce(
-                    (sum: any, item: any) => sum + (item.entryCount ?? 1),
-                    0,
-                  )} item(s) · ${
-                    remoteDuration ? formatDuration(remoteDuration) : 'duration unavailable'
-                  }`}
-                />
-                <EstimateMetric
-                  label="Expected time"
-                  value={
-                    remoteDuration
-                      ? `~${remoteEstimate.processingMinutes} min`
-                      : 'Calculated during import'
-                  }
-                />
-                <EstimateMetric
-                  label="Estimated API cost"
-                  value={
-                    remoteDuration
-                      ? `~$${remoteEstimate.transcriptionCost.toFixed(2)} +`
-                      : 'Model-dependent'
-                  }
-                />
-              </div>
+          {remoteEstimates
+            ? (() => {
+                const totalEntries = remoteEstimates.reduce(
+                  (sum: number, item: any) => sum + (item.entryCount ?? 1),
+                  0,
+                );
+                const isPlaylist = totalEntries > 1;
+                return (
+                  <div className="mt-4 flex flex-col gap-4 border-t border-border/70 pt-4">
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <EstimateMetric
+                        label="Media"
+                        value={`${totalEntries} item(s) · ${
+                          remoteDuration ? formatDuration(remoteDuration) : 'duration unavailable'
+                        }`}
+                      />
+                      <EstimateMetric
+                        label="Expected time"
+                        value={
+                          remoteDuration
+                            ? `~${remoteEstimate.processingMinutes} min`
+                            : 'Calculated during import'
+                        }
+                      />
+                      <EstimateMetric
+                        label="Estimated API cost"
+                        value={
+                          remoteDuration
+                            ? `~$${remoteEstimate.transcriptionCost.toFixed(2)} +`
+                            : 'Model-dependent'
+                        }
+                      />
+                    </div>
 
-              {(mediaType === 'audio'
-                ? remoteEstimates.slice(0, 1)
-                : remoteEstimates.filter((est: any) => est.mediaType === 'video').slice(0, 1)
-              ).map((est: any, i: number) => {
-                if (mediaType === 'audio') {
-                  return (
-                    <div key={i} className="rounded-xl border border-border/70 bg-muted/20 p-3">
-                      <p className="mb-2 truncate text-[11px] font-medium text-foreground">
-                        Preview before importing
-                      </p>
-                      <audio
-                        controls
-                        preload="metadata"
-                        src={est.originalUrl}
-                        className="h-9 w-full"
-                      />
-                    </div>
-                  );
-                }
-                let embedUrl = est.originalUrl;
-                if (est.isYouTube) {
-                  try {
-                    const u = new URL(est.originalUrl);
-                    const v = u.hostname.includes('youtu.be')
-                      ? u.pathname.slice(1)
-                      : u.searchParams.get('v');
-                    embedUrl = `https://www.youtube.com/embed/${v}`;
-                  } catch (e) {
-                    // ignore
-                  }
-                  return (
-                    <div
-                      key={i}
-                      className="relative w-full overflow-hidden rounded-xl aspect-video shadow-md border border-border/50 ring-1 ring-border/20 bg-black"
-                    >
-                      <iframe
-                        src={embedUrl}
-                        className="absolute inset-0 w-full h-full"
-                        frameBorder="0"
-                        allowFullScreen
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      />
-                    </div>
-                  );
-                } else {
-                  return (
-                    <video
-                      key={i}
-                      src={embedUrl}
-                      controls
-                      className="w-full max-w-sm rounded-md aspect-video bg-muted object-cover shadow-sm border border-border"
-                    />
-                  );
-                }
-              })}
-            </div>
-          ) : null}
+                    {isPlaylist ? (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 dark:border-amber-800/50 dark:bg-amber-950/30 px-3 py-2.5">
+                        <AlertCircle className="size-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                        <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                          <span className="font-medium">Playlist detected</span> — this will
+                          download and index{' '}
+                          <span className="font-semibold">{totalEntries} items</span> (max 10). Each
+                          item is transcribed and analyzed separately.
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {(mediaType === 'audio'
+                      ? remoteEstimates.slice(0, 1)
+                      : remoteEstimates.filter((est: any) => est.mediaType === 'video').slice(0, 1)
+                    ).map((est: any, i: number) => {
+                      if (mediaType === 'audio') {
+                        return (
+                          <div
+                            key={i}
+                            className="rounded-xl border border-border/70 bg-muted/20 p-3"
+                          >
+                            <p className="mb-2 truncate text-[11px] font-medium text-foreground">
+                              Preview before importing
+                            </p>
+                            <audio
+                              controls
+                              preload="metadata"
+                              src={est.originalUrl}
+                              className="h-9 w-full"
+                            />
+                          </div>
+                        );
+                      }
+                      let embedUrl = est.originalUrl;
+                      if (est.isYouTube) {
+                        try {
+                          const u = new URL(est.originalUrl);
+                          const v = u.hostname.includes('youtu.be')
+                            ? u.pathname.slice(1)
+                            : u.searchParams.get('v');
+                          embedUrl = `https://www.youtube.com/embed/${v}`;
+                        } catch (e) {
+                          // ignore
+                        }
+                        return (
+                          <div
+                            key={i}
+                            className="relative w-full overflow-hidden rounded-xl aspect-video shadow-md border border-border/50 ring-1 ring-border/20 bg-black"
+                          >
+                            <iframe
+                              src={embedUrl}
+                              className="absolute inset-0 w-full h-full"
+                              frameBorder="0"
+                              allowFullScreen
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            />
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <video
+                            key={i}
+                            src={embedUrl}
+                            controls
+                            className="w-full max-w-sm rounded-md aspect-video bg-muted object-cover shadow-sm border border-border"
+                          />
+                        );
+                      }
+                    })}
+                  </div>
+                );
+              })()
+            : null}
         </div>
       ) : (
         <div
@@ -1582,7 +1608,7 @@ function ActiveIndexingList({
     <section
       aria-live="polite"
       aria-label="Active media indexing jobs"
-      className="space-y-3 rounded-xl border border-emerald-300 bg-emerald-50/20 p-3 dark:border-emerald-700/60 dark:bg-emerald-950/20"
+      className="space-y-3 rounded-xl border border-emerald-500 bg-emerald-50/20 p-3 dark:border-emerald-700/60 dark:bg-emerald-950/20"
     >
       <div className="flex items-center gap-2">
         <Loader2 className="size-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
