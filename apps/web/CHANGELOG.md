@@ -1,5 +1,17 @@
 # larkup
 
+## 0.1.40
+
+### Patch Changes
+
+- 2a0a7e2: Improve automatic indexing and media processing controls, make settings navigation resilient to slow tool loading, and keep knowledge-base retrieval ahead of web search.
+- Updated dependencies [2a0a7e2]
+  - @larkup/core@0.2.5
+  - @larkup/marketplace@0.1.11
+  - @larkup/scraper@0.1.28
+  - @larkup/tool-doc-editor@0.2.6
+  - @larkup/tool-video-audio@0.2.3
+
 ## 0.1.39
 
 ### Patch Changes
