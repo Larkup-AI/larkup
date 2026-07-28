@@ -1011,7 +1011,16 @@ export async function getChatTools(context: {
 
     if (
       isEnabled(id) ||
-      ['presentMedia', 'fillDocumentForm', 'editDocument', 'requestDocumentSignature'].includes(id)
+      [
+        // Retrieval is core chat behavior, not an optional marketplace action.
+        // Keeping it available prevents an enabled web-search configuration
+        // from silently removing the user's local knowledge base.
+        'searchKnowledgeBase',
+        'presentMedia',
+        'fillDocumentForm',
+        'editDocument',
+        'requestDocumentSignature',
+      ].includes(id)
     ) {
       finalTools[id] = toolDef;
     }

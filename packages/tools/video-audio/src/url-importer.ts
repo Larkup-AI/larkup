@@ -99,31 +99,53 @@ export async function importMediaUrl(
     const template = path.join(options.outputDir, '%(title).120B [%(id)s].%(ext)s');
     const print =
       '{"path":%(filepath)j,"title":%(title)j,"originalUrl":%(webpage_url)j,"ext":%(ext)j}';
-    const output = await runYtDlp(
-      [
-        '--no-playlist',
-        '--playlist-end',
-        String(options.playlistMax ?? 10),
-        '--socket-timeout',
-        '20',
-        '--retries',
-        '2',
-        '--fragment-retries',
-        '2',
-        '--concurrent-fragments',
-        '4',
-        '--format',
-        'best[height<=360]/bestvideo[height<=360]+bestaudio/best',
-        '--merge-output-format',
-        'mp4',
-        '-o',
-        template,
-        '--print',
-        `after_move:${print}`,
-        url,
-      ],
-      options.onProgress,
-    );
+    const commonArgs = [
+      '--no-playlist',
+      '--playlist-end',
+      String(options.playlistMax ?? 10),
+      '--socket-timeout',
+      '20',
+      '--retries',
+      '2',
+      '--fragment-retries',
+      '2',
+      '--format',
+      'best[height<=360]/bestvideo[height<=360]+bestaudio/best',
+      '--merge-output-format',
+      'mp4',
+      '-o',
+      template,
+      '--print',
+      `after_move:${print}`,
+    ];
+    let output: string;
+    try {
+      output = await runYtDlp(
+        [...commonArgs, '--concurrent-fragments', '4', url],
+        options.onProgress,
+      );
+    } catch (error) {
+      if (!isVideoHostForbidden(error)) throw error;
+      // Video hosts occasionally reject a freshly-issued media URL. Re-extract
+      // it with a conservative one-fragment retry before failing the asset.
+      options.onProgress?.({ message: 'Source rejected the download; refreshing the video link…' });
+      try {
+        output = await runYtDlp(
+          [
+            ...commonArgs,
+            '--force-ipv4',
+            '--extractor-retries',
+            '3',
+            '--concurrent-fragments',
+            '1',
+            url,
+          ],
+          options.onProgress,
+        );
+      } catch (retryError) {
+        throw friendlyVideoDownloadError(retryError);
+      }
+    }
     const imported = output
       .split('\n')
       .filter(Boolean)
@@ -184,6 +206,20 @@ export async function importMediaUrl(
       mediaType: mediaTypeFromMime(mimeType),
     },
   ];
+}
+
+function isVideoHostForbidden(error: unknown): boolean {
+  return error instanceof Error && /\b(?:403|forbidden)\b/i.test(error.message);
+}
+
+/** Keep upstream yt-dlp output out of the end-user status while retaining a useful cause. */
+function friendlyVideoDownloadError(error: unknown): Error {
+  if (isVideoHostForbidden(error)) {
+    return new Error(
+      'The video host refused this download (HTTP 403) after a safe retry. This is a temporary source restriction, not a problem with your existing index. Try again later, or upload the original video file directly.',
+    );
+  }
+  return error instanceof Error ? error : new Error('Video download failed. Please try again.');
 }
 
 /**

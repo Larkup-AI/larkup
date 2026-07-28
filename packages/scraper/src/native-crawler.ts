@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
  * JavaScript-only and bot-protected sites can still use Firecrawl Cloud.
  */
 const DATA_DIR = path.join(process.cwd(), '.larkup');
+const CRAWLS_DIR = path.join(DATA_DIR, 'native-crawls');
 const STATE_PATH = path.join(DATA_DIR, 'native-crawls.json');
 const USER_AGENT = 'LarkupCrawler/1.0 (+https://larkup.de)';
 const MAX_HTML_BYTES = 2_000_000;
@@ -45,9 +46,27 @@ async function readCrawls(): Promise<Record<string, NativeCrawl>> {
   }
 }
 
-async function writeCrawls(crawls: Record<string, NativeCrawl>) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(STATE_PATH, JSON.stringify(crawls, null, 2), 'utf8');
+function crawlPath(id: string) {
+  return path.join(CRAWLS_DIR, `${id}.json`);
+}
+
+/**
+ * Persist each crawl separately. The old single JSON file made two jobs that
+ * started at the same time race to overwrite one another, leaving the UI with
+ * a valid job id but no crawl state to poll.
+ */
+async function readCrawl(id: string): Promise<NativeCrawl | undefined> {
+  try {
+    return JSON.parse(await fs.readFile(crawlPath(id), 'utf8')) as NativeCrawl;
+  } catch {
+    // Keep already-started crawls from older releases usable after upgrading.
+    return (await readCrawls())[id];
+  }
+}
+
+async function writeCrawl(crawl: NativeCrawl): Promise<void> {
+  await fs.mkdir(CRAWLS_DIR, { recursive: true });
+  await fs.writeFile(crawlPath(crawl.id), JSON.stringify(crawl, null, 2), 'utf8');
 }
 
 function decodeHtml(value: string): string {
@@ -231,8 +250,7 @@ export async function startNativeCrawl(url: string, limit: number): Promise<stri
   const startUrl = canonicalUrl(url);
   if (!startUrl) throw new Error('A valid http or https URL is required.');
   const id = `native-${randomUUID()}`;
-  const crawls = await readCrawls();
-  crawls[id] = {
+  await writeCrawl({
     id,
     origin: new URL(startUrl).origin,
     limit: Math.max(1, limit),
@@ -240,8 +258,7 @@ export async function startNativeCrawl(url: string, limit: number): Promise<stri
     visited: [],
     pages: [],
     delivered: 0,
-  };
-  await writeCrawls(crawls);
+  });
   return id;
 }
 
@@ -251,8 +268,7 @@ export async function getNativeCrawlStatus(id: string): Promise<{
   completed: number;
   pages: NativePage[];
 }> {
-  const crawls = await readCrawls();
-  const crawl = crawls[id];
+  const crawl = await readCrawl(id);
   if (!crawl) throw new Error('Native crawl was not found.');
   if (crawl.cancelled) {
     return { state: 'cancelled', total: crawl.limit, completed: crawl.pages.length, pages: [] };
@@ -282,7 +298,7 @@ export async function getNativeCrawlStatus(id: string): Promise<{
   const newPages = crawl.pages.slice(crawl.delivered).map(({ links: _links, ...page }) => page);
   crawl.delivered = crawl.pages.length;
   const finished = !crawl.queue.length || crawl.pages.length >= crawl.limit;
-  await writeCrawls(crawls);
+  await writeCrawl(crawl);
   return {
     state: finished ? 'completed' : 'scraping',
     total: crawl.limit,
@@ -292,8 +308,8 @@ export async function getNativeCrawlStatus(id: string): Promise<{
 }
 
 export async function cancelNativeCrawl(id: string): Promise<void> {
-  const crawls = await readCrawls();
-  if (!crawls[id]) return;
-  crawls[id].cancelled = true;
-  await writeCrawls(crawls);
+  const crawl = await readCrawl(id);
+  if (!crawl) return;
+  crawl.cancelled = true;
+  await writeCrawl(crawl);
 }
