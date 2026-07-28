@@ -365,7 +365,6 @@ export async function queryTabular(query: TabularQueryRequest): Promise<TabularQ
           const rowDate = parseDate(val);
           const filterDate = parseDate(filter.value);
           if (isNaN(rowDate) || isNaN(filterDate)) {
-            // Fallback to string comparison for unparseable dates
             return filter.op === 'eq'
               ? String(val) === String(filter.value)
               : filter.op === 'neq'

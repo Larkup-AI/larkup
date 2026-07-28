@@ -144,19 +144,13 @@ export async function applyFieldEdits(sessionId: string, edits: FieldEdit[]): Pr
     let resultBuffer: Buffer;
     let updatedFields: string[] = [];
 
-    // Map field IDs to actual field names for native PDF filling and sandbox scripts.
-    // The LLM sends field IDs like "pdf_field_0"; we resolve them to the actual PDF field names.
-    // If the ID doesn't match any field, try matching by name directly (case-insensitive).
     const resolvedEdits = edits.map((edit) => {
-      // Primary: look up by ID
       let field = session.parsed.fields.find((f) => f.id === edit.fieldId);
       if (!field) {
-        // Fallback: match by name (case-insensitive, trimmed)
         const needle = edit.fieldId.trim().toLowerCase();
         field = session.parsed.fields.find((f) => f.name.trim().toLowerCase() === needle);
       }
       if (!field) {
-        // Fallback: match by partial name containment
         const needle = edit.fieldId.trim().toLowerCase();
         field = session.parsed.fields.find(
           (f) =>
@@ -575,26 +569,18 @@ export async function applySignature(sessionId: string, data: SignatureData): Pr
 
       if (data.detectedContext) {
         try {
-          // Use sandbox PyPDF to find text coordinates on this page
           const coords = await findTextPositionOnPage(buffer, pageIndex, data.detectedContext);
           if (coords) {
-            // Place signature right below the detected text line
             resolvedX = coords.x;
-            // coords.y is the bottom of the text in PDF coordinate system
-            // Place signature just below (subtract a small offset for spacing)
             resolvedY = coords.y - 10;
           }
-        } catch {
-          // Fallback to UI-provided coordinates
-        }
+        } catch {}
       }
 
-      // Fall back to user-specified percentages
       if (resolvedX === null || resolvedY === null) {
         const xPct = data.x ?? 50;
         const yPct = data.y ?? 50;
         resolvedX = (xPct / 100) * width;
-        // Invert Y: UI treats y=0 as top, PDF treats y=0 as bottom
         resolvedY = height - (yPct / 100) * height;
       }
 

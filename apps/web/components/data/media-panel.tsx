@@ -19,6 +19,8 @@ import {
   Store,
   Link2,
   Sparkles,
+  Pause,
+  Play,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -35,6 +37,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -64,6 +76,7 @@ interface MediaAsset {
   processingStatus: 'pending' | 'processing' | 'completed' | 'failed';
   processingError?: string;
   processingMessage?: string;
+  processingPaused?: boolean;
   processingProgress?: number;
   processingSteps?: MediaProcessingStep[];
   processingRevision?: number;
@@ -571,6 +584,8 @@ function MediaContent({
   const [remoteEstimates, setRemoteEstimates] = useState<RemoteEstimate[] | null>(null);
   const [checkingUrls, setCheckingUrls] = useState(false);
   const [importingUrls, setImportingUrls] = useState(false);
+  const [playlistAlertOpen, setPlaylistAlertOpen] = useState(false);
+  const [assetToRemove, setAssetToRemove] = useState<MediaAsset | null>(null);
   const [importMode, setImportMode] = useState<'upload' | 'url'>('upload');
   const mediaApiUrl = serverId
     ? `/api/media?serverId=${encodeURIComponent(serverId)}`
@@ -687,10 +702,24 @@ function MediaContent({
     }
   }
 
-  async function importRemoteUrls() {
-    const urls = parsedUrls();
+  async function importRemoteUrls(ignorePlaylist = false) {
+    let urls = parsedUrls();
     if (urls.length === 0 || !remoteEstimates) return;
     if (!ensureAudioConfiguration()) return;
+
+    if (ignorePlaylist) {
+      urls = urls.map((url) => {
+        try {
+          const u = new URL(url);
+          if (u.hostname.includes('youtube.com')) {
+            u.searchParams.delete('list');
+            return u.toString();
+          }
+        } catch {}
+        return url;
+      });
+    }
+
     setImportingUrls(true);
     try {
       const res = await fetch(mediaApiUrl, {
@@ -701,8 +730,17 @@ function MediaContent({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Media import failed');
       const ids = (data.assets as MediaAsset[]).map((asset) => asset.id);
+      toast.success(`${mediaType === 'video' ? 'Video' : 'Audio'} import started`, {
+        description: `Expected time: ${
+          remoteDuration
+            ? `about ${remoteEstimate.processingMinutes} minute${
+                remoteEstimate.processingMinutes === 1 ? '' : 's'
+              }`
+            : 'a few minutes'
+        }. You can safely leave — we will keep indexing it in the background.`,
+        duration: 8_000,
+      });
       await processAssets(ids);
-      toast.success(`${mediaType === 'video' ? 'Video' : 'Audio'} indexing started`);
       setUrlsText('');
       setRemoteEstimates(null);
       setProgress(null);
@@ -757,7 +795,15 @@ function MediaContent({
       }
       const mediaLabel =
         mediaType === 'video' ? 'Video' : mediaType === 'audio' ? 'Audio' : 'Image';
-      toast.success(`${mediaLabel} indexing started`);
+      toast.success(`${mediaLabel} indexing started`, {
+        description:
+          mediaType === 'image'
+            ? 'You can safely leave while we make it searchable.'
+            : `Expected time: about ${stagedEstimate.processingMinutes} minute${
+                stagedEstimate.processingMinutes === 1 ? '' : 's'
+              }. You can safely leave while we index it.`,
+        duration: 8_000,
+      });
       setProgress(null);
 
       staged.forEach((f) => {
@@ -786,6 +832,26 @@ function MediaContent({
       }
       toast.success('File removed');
       onMutate();
+    } catch (error) {
+      showErrorToast(error);
+    }
+  }
+
+  async function togglePause(asset: MediaAsset) {
+    try {
+      const res = await fetch('/api/media/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: asset.processingPaused ? 'resume' : 'pause',
+          assetId: asset.id,
+          serverId,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Could not update media indexing.');
+      toast.success(asset.processingPaused ? 'Media indexing resumed.' : 'Media indexing paused.');
+      await onMutate();
     } catch (error) {
       showErrorToast(error);
     }
@@ -831,7 +897,11 @@ function MediaContent({
       )}
 
       {activeAssets.length > 0 ? (
-        <ActiveIndexingList assets={activeAssets} onCancel={handleDelete} />
+        <ActiveIndexingList
+          assets={activeAssets}
+          onPause={togglePause}
+          onRemove={setAssetToRemove}
+        />
       ) : null}
 
       {mediaType !== 'image' && (
@@ -902,7 +972,18 @@ function MediaContent({
               size="sm"
               className="h-9 text-xs"
               disabled={!remoteEstimates || importingUrls}
-              onClick={importRemoteUrls}
+              onClick={() => {
+                const totalEntries =
+                  remoteEstimates?.reduce(
+                    (sum: number, item: any) => sum + (item.entryCount ?? 1),
+                    0,
+                  ) ?? 0;
+                if (totalEntries > 1) {
+                  setPlaylistAlertOpen(true);
+                } else {
+                  importRemoteUrls();
+                }
+              }}
             >
               {importingUrls ? (
                 <Loader2 className="mr-1.5 size-3 animate-spin" />
@@ -912,6 +993,38 @@ function MediaContent({
               Import
             </Button>
           </div>
+
+          <AlertDialog open={playlistAlertOpen} onOpenChange={setPlaylistAlertOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Playlist Detected</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You entered a URL that points to a playlist. Do you want to download and index the
+                  entire playlist, or just the single video?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setPlaylistAlertOpen(false);
+                    importRemoteUrls(true);
+                  }}
+                >
+                  Single Video
+                </Button>
+                <AlertDialogAction
+                  onClick={() => {
+                    setPlaylistAlertOpen(false);
+                    importRemoteUrls(false);
+                  }}
+                >
+                  Entire Playlist
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <p className="mt-2 pl-1 text-[11px] leading-relaxed text-muted-foreground">
             Direct {mediaType} links
             {mediaType === 'video' ? ', YouTube videos, or playlists' : ''}. Add up to 10 URLs
@@ -951,17 +1064,7 @@ function MediaContent({
                       />
                     </div>
 
-                    {isPlaylist ? (
-                      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 dark:border-amber-800/50 dark:bg-amber-950/30 px-3 py-2.5">
-                        <AlertCircle className="size-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-                        <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-                          <span className="font-medium">Playlist detected</span> — this will
-                          download and index{' '}
-                          <span className="font-semibold">{totalEntries} items</span> (max 10). Each
-                          item is transcribed and analyzed separately.
-                        </p>
-                      </div>
-                    ) : null}
+                    {/* Playlist warning moved to AlertDialog */}
 
                     {(mediaType === 'audio'
                       ? remoteEstimates.slice(0, 1)
@@ -1238,12 +1341,20 @@ function MediaContent({
                 </DialogHeader>
                 <div className="flex-1 overflow-y-auto px-6 py-4">
                   {mediaType === 'image' ? (
-                    <ImageGallery assets={assets} onDelete={handleDelete} serverId={serverId} />
+                    <ImageGallery
+                      assets={assets}
+                      onDelete={(id) =>
+                        setAssetToRemove(assets.find((asset) => asset.id === id) ?? null)
+                      }
+                      serverId={serverId}
+                    />
                   ) : (
                     <FileList
                       assets={assets}
                       mediaType={mediaType}
-                      onDelete={handleDelete}
+                      onDelete={(id) =>
+                        setAssetToRemove(assets.find((asset) => asset.id === id) ?? null)
+                      }
                       onProcess={handleRetry}
                     />
                   )}
@@ -1257,6 +1368,34 @@ function MediaContent({
           <p className="text-[13px] text-muted-foreground">No {mediaType} files yet</p>
         </div>
       ) : null}
+
+      <AlertDialog
+        open={Boolean(assetToRemove)}
+        onOpenChange={(open) => !open && setAssetToRemove(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this {assetToRemove?.type ?? 'media'} file?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {assetToRemove && isActiveJob(assetToRemove)
+                ? 'This will stop its indexing job and permanently remove any progress already made.'
+                : 'This permanently removes the file and its searchable data from your knowledge base.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep file</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (assetToRemove) void handleDelete(assetToRemove.id);
+                setAssetToRemove(null);
+              }}
+            >
+              Remove file
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Storage warning */}
       {/* {storageUsedBytes > 1024 * 1024 * 1024 && (
@@ -1310,7 +1449,6 @@ function ImageGallery({
               className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
               onError={(e) => {
-                // Fallback to original if no thumbnail
                 (e.target as HTMLImageElement).src = mediaAssetUrl(asset.id, serverId);
               }}
             />
@@ -1599,10 +1737,12 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
 
 function ActiveIndexingList({
   assets,
-  onCancel,
+  onPause,
+  onRemove,
 }: {
   assets: MediaAsset[];
-  onCancel: (id: string) => void;
+  onPause: (asset: MediaAsset) => void;
+  onRemove: (asset: MediaAsset) => void;
 }) {
   return (
     <section
@@ -1637,10 +1777,30 @@ function ActiveIndexingList({
                   <span className="shrink-0 text-[10px] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
                     {Math.round(progress)}%
                   </span>
+                  {asset.type !== 'image' ? (
+                    <button
+                      type="button"
+                      title={asset.processingPaused ? 'Resume Indexing' : 'Pause Indexing'}
+                      aria-label={
+                        asset.processingPaused
+                          ? `Resume ${asset.fileName}`
+                          : `Pause ${asset.fileName}`
+                      }
+                      onClick={() => onPause(asset)}
+                      className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      {asset.processingPaused ? (
+                        <Play className="size-3" />
+                      ) : (
+                        <Pause className="size-3" />
+                      )}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
-                    title="Cancel Indexing"
-                    onClick={() => onCancel(asset.id)}
+                    title="Remove file"
+                    aria-label={`Remove ${asset.fileName}`}
+                    onClick={() => onRemove(asset)}
                     className="p-1 -mr-1 rounded-full text-muted-foreground hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 transition-colors"
                   >
                     <X className="size-3" />
@@ -1657,7 +1817,9 @@ function ActiveIndexingList({
               <div className="flex items-center gap-1.5">
                 <ElapsedTime startTime={asset.createdAt} />
                 <p className="truncate text-[10px] text-muted-foreground animate-pulse">
-                  {asset.processingMessage || 'Preparing media indexing...'}
+                  {asset.processingPaused
+                    ? 'Paused — resume when you are ready.'
+                    : asset.processingMessage || 'Preparing media indexing...'}
                 </p>
               </div>
               {/* {asset.processingSteps?.length ? (

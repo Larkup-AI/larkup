@@ -227,6 +227,7 @@ export function updateMediaAsset(
       | 'processingError'
       | 'processingProgress'
       | 'processingMessage'
+      | 'processingPaused'
       | 'processingSteps'
       | 'processingRevision'
       | 'processingHeartbeatAt'

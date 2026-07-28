@@ -29,16 +29,6 @@ interface LocalResponse {
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-/**
- * Web-crawler launcher notice.
- *
- * Adapts to the runtime environment:
- * - **Web / Desktop**: starts Larkup's built-in crawler (no Docker required).
- * - **Docker**: detects a sibling crawler service on the Docker network.
- *
- * The API key (cloud) option is managed in Settings — this component only
- * handles the local/Docker launcher.
- */
 export function FirecrawlNotice({
   cloudConfigured = false,
   onChange,
@@ -76,7 +66,7 @@ export function FirecrawlNotice({
           description:
             runtimeEnv === 'docker'
               ? 'Checking if the crawler service is available on the network.'
-              : 'Starting Larkup’s built-in crawler. No Docker setup is required.',
+              : 'Starting Larkup’s built-in crawler. ',
         },
       );
     }

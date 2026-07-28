@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { SettingsLayout, type SettingsSection } from '@/components/settings/settings-layout';
 import { GeneralSection } from '@/components/settings/general-section';
@@ -27,9 +27,14 @@ function SettingsContent() {
     return 'general';
   };
 
-  // Always derive the active section from the URL — this ensures navigating
-  // away and back never leaves the sidebar stuck on a stale section.
-  const activeSection = resolveSection();
+  // Keep an immediate local selection as well as the URL. A slow Installed
+  // Tools request must never make the rest of the settings navigation feel
+  // frozen while Next finishes a route transition.
+  const [activeSection, setActiveSection] = useState<SettingsSection>(resolveSection);
+
+  useEffect(() => {
+    setActiveSection(resolveSection());
+  }, [searchParams]);
 
   useEffect(() => {
     // Normalize legacy `?ai-models` param to `?section=models`
@@ -42,7 +47,13 @@ function SettingsContent() {
   }, [searchParams, pathname, router]);
 
   const handleSectionChange = (newSection: SettingsSection) => {
-    router.replace(`${pathname}?section=${newSection}`, { scroll: false });
+    setActiveSection(newSection);
+    const nextUrl = `${pathname}?section=${newSection}`;
+    window.history.replaceState(null, '', nextUrl);
+    // Keep Next's route state in sync in the background. The local state above
+    // is intentionally updated first so this remains responsive if a section
+    // has a slow request in flight.
+    router.replace(nextUrl, { scroll: false });
   };
 
   return (

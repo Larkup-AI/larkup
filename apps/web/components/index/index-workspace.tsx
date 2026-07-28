@@ -64,7 +64,8 @@ const ACTIVE: IndexRun['status'][] = ['chunking', 'embedding', 'upserting'];
 export function IndexWorkspace({
   onDone,
   onClose,
-}: { onDone?: () => void; onClose?: () => void } = {}) {
+  automatic = false,
+}: { onDone?: () => void; onClose?: () => void; automatic?: boolean } = {}) {
   const [starting, setStarting] = useState(false);
   const [isIndexing, setIsIndexing] = useState(false);
 
@@ -94,7 +95,21 @@ export function IndexWorkspace({
       setIsIndexing(true);
     } else if (isIndexing && status === 'completed') {
       setIsIndexing(false);
-      toast.success('Indexing completed successfully!');
+      toast.success('Indexing complete — your data is ready to use.');
+      try {
+        const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.frequency.setValueAtTime(880, context.currentTime);
+        gain.gain.setValueAtTime(0.04, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.12);
+        oscillator.start();
+        oscillator.stop(context.currentTime + 0.12);
+      } catch {
+        // Browsers may block notification sounds until a user gesture.
+      }
       onClose?.();
     }
   }, [data?.run?.status, isIndexing, onClose]);
@@ -215,29 +230,37 @@ export function IndexWorkspace({
         </Alert>
       )} */}
 
-      <div className="flex w-full items-center justify-between pt-4 mt-2">
-        <Button onClick={() => onClose?.()} size="lg" variant="outline">
-          Cancel
-        </Button>
-        <Button
-          onClick={() => build(run?.status === 'completed')}
-          disabled={
-            !ready || running || starting || (run?.status === 'completed' && unindexedCount === 0)
-          }
-          size="lg"
-        >
-          {running || starting ? (
-            <Loader2 className="size-4 animate-spin mr-2" />
-          ) : (
-            <Play className="size-4 mr-2" />
-          )}
-          {running
-            ? 'Indexing…'
-            : run?.status === 'completed'
-            ? `Index new documents (${unindexedCount})`
-            : `Start indexing (${unindexedCount})`}
-        </Button>
-      </div>
+      {automatic ? (
+        <div className="flex justify-end pt-2">
+          <Button onClick={() => onClose?.()} variant="outline">
+            Continue working
+          </Button>
+        </div>
+      ) : (
+        <div className="flex w-full items-center justify-between pt-4 mt-2">
+          <Button onClick={() => onClose?.()} size="lg" variant="outline">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => build(run?.status === 'completed')}
+            disabled={
+              !ready || running || starting || (run?.status === 'completed' && unindexedCount === 0)
+            }
+            size="lg"
+          >
+            {running || starting ? (
+              <Loader2 className="size-4 animate-spin mr-2" />
+            ) : (
+              <Play className="size-4 mr-2" />
+            )}
+            {running
+              ? 'Indexing…'
+              : run?.status === 'completed'
+              ? `Index new documents (${unindexedCount})`
+              : `Start indexing (${unindexedCount})`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

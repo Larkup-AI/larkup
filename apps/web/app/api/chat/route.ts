@@ -107,6 +107,9 @@ function requiresKnowledgeBaseSearch(text: string): boolean {
   }
   // Match possessive references to user data
   return (
+    /\b(my|our)\s+(favo(?:u)?rite|preference|choice|answer|name|result|score|winner)\b/i.test(
+      text,
+    ) ||
     /\b(my|our)\s+(document|file|data|image|picture|diagram|video|audio|upload|corpus|knowledge|database|db|pdf|report|spreadsheet|presentation)/i.test(
       text,
     ) ||
@@ -392,12 +395,12 @@ ${fieldLines}`;
     tabularContext +
     docContext;
   const tools = await getChatTools({ serverId, docSessionId, config });
+  const userText = latestUserText(messagesToProcess);
   const forceKnowledgeBaseSearch =
-    requiresKnowledgeBaseSearch(latestUserText(messagesToProcess)) &&
-    Boolean(tools.searchKnowledgeBase);
+    requiresKnowledgeBaseSearch(userText) && Boolean(tools.searchKnowledgeBase);
   const forceWebSearch =
     config.webSearchEnabled === true &&
-    requiresCurrentWebSearch(latestUserText(messagesToProcess)) &&
+    requiresCurrentWebSearch(userText) &&
     Boolean(tools.webSearch);
 
   // Debug: log payload sizes to console in development
@@ -418,16 +421,27 @@ ${fieldLines}`;
       if (forceKnowledgeBaseSearch && stepNumber === 0) {
         return { toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' } };
       }
-      // Step 1 (or 0 if no KB): force web search if needed
-      if (forceWebSearch && (!forceKnowledgeBaseSearch || stepNumber === 1)) {
+      // For questions about the user's data, let the model evaluate the KB
+      // result before falling back to the web. Forcing both tools used to make
+      // enabled web search override a perfectly relevant local answer.
+      if (forceWebSearch && !forceKnowledgeBaseSearch && stepNumber === 0) {
         return { toolChoice: { type: 'tool', toolName: 'webSearch' } };
       }
-      // After forced tools, remove them so the model cannot loop on them.
-      const usedTools: string[] = [];
-      if (forceKnowledgeBaseSearch) usedTools.push('searchKnowledgeBase');
-      if (forceWebSearch) usedTools.push('webSearch');
-      if (usedTools.length > 0) {
-        return { activeTools: Object.keys(tools).filter((name) => !usedTools.includes(name)) };
+      // After a forced tool, and after the optional KB → web fallback, remove
+      // search tools. This guarantees one concise search surface rather than
+      // a chain of near-identical web queries.
+      if (stepNumber >= 2) {
+        return {
+          activeTools: Object.keys(tools).filter(
+            (name) => name !== 'webSearch' && name !== 'searchKnowledgeBase',
+          ),
+        };
+      }
+      if (forceKnowledgeBaseSearch && stepNumber >= 1) {
+        return { activeTools: Object.keys(tools).filter((name) => name !== 'searchKnowledgeBase') };
+      }
+      if (forceWebSearch && stepNumber >= 1) {
+        return { activeTools: Object.keys(tools).filter((name) => name !== 'webSearch') };
       }
       return undefined;
     },

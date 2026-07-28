@@ -35,6 +35,20 @@ test.describe('Settings Page', () => {
     await expect(page.getByRole('heading', { name: 'Connections', exact: true })).toBeVisible();
   });
 
+  test('navigation stays responsive while Installed Tools is loading', async ({ page }) => {
+    await page.route('/api/marketplace', async () => {
+      // Deliberately leave the request pending: this reproduces a slow tools
+      // registry without blocking a click on another settings section.
+      await new Promise(() => {});
+    });
+
+    await page.getByRole('button', { name: 'Installed Tools', exact: true }).click();
+    await page.getByRole('button', { name: 'General', exact: true }).click();
+
+    await expect(page.getByRole('heading', { name: 'General', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/section=general/);
+  });
+
   test('all settings navigation sections render their content', async ({ page }) => {
     const sections = [
       ['AI Models', 'AI Models'],

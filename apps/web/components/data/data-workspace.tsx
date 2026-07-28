@@ -1,23 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useSearchParams, usePathname } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { CrawlJob, SourceDocument, IndexRun } from '@larkup/core/types';
-import {
-  Globe,
-  FileUp,
-  Type,
-  Image,
-  Plug,
-  Briefcase,
-  ChevronDown,
-  Zap,
-  RotateCcw,
-} from 'lucide-react';
+import { Globe, FileUp, Type, Image, Plug, Briefcase, ChevronDown } from 'lucide-react';
 import { ScrapePanel } from '@/components/data/scrape-panel';
 import { PastePanel } from '@/components/data/paste-panel';
 import { UploadPanel } from '@/components/data/upload-panel';
@@ -33,20 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -102,7 +79,6 @@ type SubTabId = (typeof SUB_TABS)[number]['id'];
 
 export function DataWorkspace() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const pathname = usePathname();
 
   const getInitialTab = (): TopTabId => {
@@ -165,30 +141,6 @@ export function DataWorkspace() {
   });
   const { mutate: mutateDocuments } = docsQuery;
   const documents = docsQuery.data?.documents ?? [];
-  const stats = docsQuery.data?.stats;
-  const docCount = stats?.docCount ?? 0;
-
-  useEffect(() => {
-    const prevJobs = prevJobsRef.current;
-    if (prevJobs.length > 0 && jobs.length > 0) {
-      const justCompleted = jobs.filter(
-        (j) =>
-          j.status === 'completed' &&
-          prevJobs.some(
-            (pj) => pj.id === j.id && (pj.status === 'running' || pj.status === 'queued'),
-          ),
-      );
-
-      if (justCompleted.length > 0) {
-        toast.success('Scraping completed.');
-        // Refresh the corpus immediately so new documents appear.
-        mutateDocuments();
-        // Documents may still be flushing — re-fetch after a short delay.
-        setTimeout(() => mutateDocuments(), 2500);
-      }
-    }
-    prevJobsRef.current = jobs;
-  }, [jobs, mutateDocuments]);
 
   const indexQuery = useSWR<{
     unindexedCount: number;
@@ -197,9 +149,7 @@ export function DataWorkspace() {
   }>('/api/index', fetcher, {
     refreshInterval: (d) => (d?.running ? 2000 : 0),
   });
-  const unindexedCount = indexQuery.data?.unindexedCount ?? 0;
   const indexRunning = indexQuery.data?.running ?? false;
-  const hasCompletedIndex = indexQuery.data?.run?.status === 'completed';
   const { mutate: mutateIndex } = indexQuery;
 
   const prevIndexRunning = useRef(indexRunning);
@@ -219,9 +169,54 @@ export function DataWorkspace() {
     mutateGlobal('/api/index');
   };
 
+  const startAutomaticIndex = useCallback(async () => {
+    try {
+      const res = await fetch('/api/index', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incremental: indexQuery.data?.run?.status === 'completed' }),
+      });
+      const body = await res.json();
+      if (res.status === 409) return;
+      if (!res.ok) {
+        toast.error(body.error || 'Your data was added, but indexing could not start.');
+        return;
+      }
+      toast.success('Making your data searchable', {
+        description: 'This continues in the background. You can safely leave this page.',
+        duration: 7_000,
+      });
+      setIndexDialogOpen(true);
+      void indexQuery.mutate();
+    } catch {
+      toast.error('Your data was added, but indexing could not start.');
+    }
+  }, [indexQuery]);
+
+  useEffect(() => {
+    const prevJobs = prevJobsRef.current;
+    if (prevJobs.length > 0 && jobs.length > 0) {
+      const justCompleted = jobs.filter(
+        (j) =>
+          j.status === 'completed' &&
+          prevJobs.some(
+            (pj) => pj.id === j.id && (pj.status === 'running' || pj.status === 'queued'),
+          ),
+      );
+
+      if (justCompleted.length > 0) {
+        toast.success('Scraping completed. Making the new pages searchable…');
+        void mutateDocuments();
+        setTimeout(() => void mutateDocuments(), 2500);
+        void startAutomaticIndex();
+      }
+    }
+    prevJobsRef.current = jobs;
+  }, [jobs, mutateDocuments, startAutomaticIndex]);
+
   const handleDataAdded = () => {
     refreshAll();
-    setActiveTab('corpus');
+    void startAutomaticIndex();
   };
 
   const handleScrapeStarted = useCallback(
@@ -330,79 +325,17 @@ export function DataWorkspace() {
             </button>
           )}
 
-          {hasCompletedIndex && !indexRunning && (
-            <AlertDialog>
-              <AlertDialogTrigger
-                render={
-                  <Button variant="outline" className="h-10 bg-white px-4 text-sm gap-1.5">
-                    <RotateCcw className="size-3.5" />
-                    Re-Index
-                  </Button>
-                }
-              />
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure you want to re-index data?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will rebuild the entire index from scratch. All documents will be
-                    re-processed.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      fetch('/api/index', {
-                        method: 'POST',
-                        body: JSON.stringify({ incremental: false }),
-                        headers: { 'Content-Type': 'application/json' },
-                      }).then(() => {
-                        toast.success('Indexing started.');
-                        setIndexDialogOpen(true);
-                        indexQuery.mutate();
-                      });
-                    }}
-                  >
-                    Continue
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-
+          {/* Indexing begins automatically after data is added. */}
           <Dialog open={indexDialogOpen} onOpenChange={setIndexDialogOpen}>
-            <DialogTrigger
-              render={
-                <Button
-                  variant={indexRunning ? 'success' : 'default'}
-                  disabled={(docCount === 0 || unindexedCount === 0) && !indexRunning}
-                  className="h-10 rounded-md px-4 gap-1.5 text-sm"
-                >
-                  {indexRunning ? (
-                    <>
-                      <span className="relative flex size-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-                        <span className="relative inline-flex size-2 rounded-full bg-white" />
-                      </span>
-                      Indexing…
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="size-3.5" />
-                      {unindexedCount > 0 ? `Start Indexing (${unindexedCount})` : 'Start Indexing'}
-                    </>
-                  )}
-                </Button>
-              }
-            />
-            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto ">
+            <DialogContent className="max-w-lg overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Build Index</DialogTitle>
+                <DialogTitle>Making your data searchable</DialogTitle>
                 <DialogDescription>
-                  Embed your documents into a vector index for semantic search.
+                  This runs safely in the background. You can close this and come back anytime.
                 </DialogDescription>
               </DialogHeader>
               <IndexWorkspace
+                automatic
                 onDone={() => {
                   indexQuery.mutate();
                   setResetKey((k) => k + 1);

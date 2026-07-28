@@ -356,6 +356,8 @@ export interface MediaAsset {
   processingError?: string;
   processingProgress?: number;
   processingMessage?: string;
+  /** A user-requested cooperative pause. Long provider calls pause at their next safe checkpoint. */
+  processingPaused?: boolean;
   /** Durable, independently updated progress for each pipeline stage. */
   processingSteps?: MediaProcessingStep[];
   /** Monotonic revision for streaming clients to reject stale snapshots. */

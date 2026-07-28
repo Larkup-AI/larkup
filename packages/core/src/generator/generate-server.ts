@@ -1169,9 +1169,6 @@ export function generateServer(config: RagConfig): GeneratedServer {
   } else if (config.embeddingProvider === 'vercel_ai_gateway') {
     dependencies['@ai-sdk/gateway'] = AI_SDK_PROVIDER_VERSIONS['@ai-sdk/gateway'];
   } else if (config.embeddingProvider === 'jina') {
-    // Actually, Jina uses openai compatible or an explicit jina one? There's no @ai-sdk/jina in the standard set, but let's assume openai or openai-compatible
-    // Wait, the embedSource didn't have 'jina' branch. It falls back to `createOpenAI` in `embedSource`!
-    // Let's just fallback to openai.
     dependencies['@ai-sdk/openai'] = AI_SDK_PROVIDER_VERSIONS['@ai-sdk/openai'];
   } else {
     dependencies['@ai-sdk/openai'] = AI_SDK_PROVIDER_VERSIONS['@ai-sdk/openai'];

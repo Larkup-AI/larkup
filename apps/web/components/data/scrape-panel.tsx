@@ -397,7 +397,7 @@ export function ScrapePanel({
             queries.map((q) => searchGeneric(q, activeProvider, 1, queries.length > 1, false)),
           );
         } catch (err) {
-          toast.info(`${activeProvider} search failed. Falling back to local crawler...`);
+          toast.info(`using local crawler...`);
           await Promise.all(queries.map((q) => searchFirecrawl(q, queries.length > 1)));
         }
       }

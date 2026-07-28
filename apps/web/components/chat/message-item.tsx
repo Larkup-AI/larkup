@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import { KnowledgeBaseResult } from '@/components/chat/tools/knowledge-base-result';
 import { ChatChart, type ChartConfig } from '@/components/chat/tools/chat-chart';
@@ -15,7 +15,7 @@ import {
   type CorpusDataConfig,
 } from '@/components/chat/tools/corpus-data-result';
 import { ChatSignatureRequest } from '@/components/chat/tools/chat-signature-request';
-import { Sparkles, FileEdit, CheckCircle2, Globe } from 'lucide-react';
+import { Sparkles, FileEdit, CheckCircle2, Globe, ChevronDown } from 'lucide-react';
 import { ChatMediaPreview, parseMediaRefs } from '@/components/chat/tools/chat-media-preview';
 import { useDocEditor } from '@/components/chat/canvas/doc-editor-provider';
 
@@ -455,6 +455,64 @@ function renderToolPart(
   return null;
 }
 
+function WebSearchSummary({ parts }: { parts: any[] }) {
+  const [open, setOpen] = useState(false);
+  const searches = parts.map((part) => {
+    const info = getToolInfo(part);
+    const results = Array.isArray(info.output?.results) ? info.output.results : [];
+    return { query: info.input?.query as string | undefined, results, running: info.isExecuting };
+  });
+  const resultCount = searches.reduce((count, search) => count + search.results.length, 0);
+  const running = searches.some((search) => search.running);
+
+  return (
+    <div className="mb-2 w-full">
+      <button
+        type="button"
+        onClick={() => (resultCount > 0 || searches.length > 1) && setOpen((value) => !value)}
+        className="inline-flex items-center gap-2 rounded-md border border-border/50 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50"
+      >
+        <Globe className="size-3.5 shrink-0" />
+        <span>{running ? 'Searching the web…' : 'Searched the web'}</span>
+        {!running && resultCount > 0 ? (
+          <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+            {resultCount} result{resultCount === 1 ? '' : 's'}
+          </span>
+        ) : null}
+        {!running && (resultCount > 0 || searches.length > 1) ? (
+          <ChevronDown className={`size-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+        ) : null}
+      </button>
+
+      {open ? (
+        <div className="mt-2 max-w-xl overflow-hidden rounded-lg border border-border/60 bg-background text-xs">
+          {searches
+            .flatMap((search) => search.results)
+            .slice(0, 5)
+            .map((result: any, index) => (
+              <a
+                key={`${result.url ?? result.title ?? index}-${index}`}
+                href={result.url}
+                target="_blank"
+                rel="noreferrer"
+                className="block border-b border-border/50 px-3 py-2.5 last:border-0 hover:bg-muted/40"
+              >
+                <span className="block truncate font-medium text-foreground">
+                  {result.title || result.url}
+                </span>
+                {result.snippet ? (
+                  <span className="mt-0.5 block line-clamp-2 text-muted-foreground">
+                    {result.snippet}
+                  </span>
+                ) : null}
+              </a>
+            ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Main message component                                              */
 /* ------------------------------------------------------------------ */
@@ -777,8 +835,12 @@ export function MessageItem({
 
   const vizParts = toolParts.filter(isVizPart);
   const mediaToolParts = toolParts.filter((p: any) => getToolInfo(p).toolName === 'presentMedia');
+  const webSearchParts = toolParts.filter((p: any) => getToolInfo(p).toolName === 'webSearch');
   const nonVizToolParts = toolParts.filter(
-    (p: any) => !isVizPart(p) && getToolInfo(p).toolName !== 'presentMedia',
+    (p: any) =>
+      !isVizPart(p) &&
+      getToolInfo(p).toolName !== 'presentMedia' &&
+      getToolInfo(p).toolName !== 'webSearch',
   );
 
   // Build tabs if we have multiple visualizations
@@ -807,6 +869,9 @@ export function MessageItem({
     <div className="message assistant-message flex flex-col gap-4" data-role="assistant">
       {/* Knowledge base results */}
       {kbParts.length > 0 && <KnowledgeBaseResult parts={kbParts} isShimmering={isShimmering} />}
+
+      {/* All search attempts are intentionally one compact disclosure. */}
+      {webSearchParts.length > 0 && <WebSearchSummary parts={webSearchParts} />}
 
       {/* Non-visualization tool outputs (data tables, sandbox results) */}
       {nonVizToolParts
