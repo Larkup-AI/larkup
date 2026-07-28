@@ -50,14 +50,29 @@ export async function GET(req: Request) {
 
   let interval: ReturnType<typeof setInterval> | undefined;
   let keepAlive: ReturnType<typeof setInterval> | undefined;
+  let closed = false;
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let lastPayload = '';
       let checking = false;
       let storageSnapshot = { usedBytes: 0, fileCount: 0 };
       let storageCheckedAt = 0;
+
+      const safeEnqueue = (data: Uint8Array) => {
+        if (closed) return;
+        try {
+          controller.enqueue(data);
+        } catch {
+          // Controller already closed — client disconnected.
+          closed = true;
+          if (interval) clearInterval(interval);
+          if (keepAlive) clearInterval(keepAlive);
+        }
+      };
+
       const publish = async () => {
-        if (checking) return;
+        if (checking || closed) return;
         checking = true;
         try {
           if (Date.now() - storageCheckedAt > 30_000) {
@@ -81,7 +96,7 @@ export async function GET(req: Request) {
               0,
               ...nextSnapshot.assets.map((asset) => asset.processingRevision ?? 0),
             );
-            controller.enqueue(
+            safeEnqueue(
               encoder.encode(`id: ${revision}\nevent: media-update\ndata: ${payload}\n\n`),
             );
           }
@@ -94,9 +109,10 @@ export async function GET(req: Request) {
 
       await publish();
       interval = setInterval(() => void publish(), 1_000);
-      keepAlive = setInterval(() => controller.enqueue(encoder.encode(': keep-alive\n\n')), 15_000);
+      keepAlive = setInterval(() => safeEnqueue(encoder.encode(': keep-alive\n\n')), 15_000);
     },
     cancel() {
+      closed = true;
       if (interval) clearInterval(interval);
       if (keepAlive) clearInterval(keepAlive);
     },
