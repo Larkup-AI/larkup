@@ -116,6 +116,25 @@ async function advanceDomainTarget(
 
     return { added: totalAdded, target: { ...target, status: state, pagesCrawled } };
   } catch (err) {
+    // Native crawls run without a separate service. If an older release lost
+    // its shared state file (for example when several jobs were launched at
+    // once), keep the durable job alive and create a fresh crawl on its next
+    // status poll instead of presenting a permanent, misleading failure.
+    if (
+      target.firecrawlId?.startsWith('native-') &&
+      err instanceof Error &&
+      err.message === 'Native crawl was not found.'
+    ) {
+      return {
+        added: 0,
+        target: {
+          ...target,
+          firecrawlId: undefined,
+          status: 'running',
+          error: 'Restarting the local crawl…',
+        },
+      };
+    }
     return {
       added: 0,
       target: {

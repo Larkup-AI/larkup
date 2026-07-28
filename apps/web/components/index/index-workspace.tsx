@@ -95,7 +95,7 @@ export function IndexWorkspace({
       setIsIndexing(true);
     } else if (isIndexing && status === 'completed') {
       setIsIndexing(false);
-      toast.success('Indexing complete — your data is ready to use.');
+      toast.success('Indexing complete. Your data is ready to use.');
       try {
         const context = new (window.AudioContext || (window as any).webkitAudioContext)();
         const oscillator = context.createOscillator();

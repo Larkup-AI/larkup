@@ -74,6 +74,7 @@ TOOL RULES:
 DO:
 - Keep answers short and direct. 1–3 sentences unless the task is complex.
 - Search at most ONCE per tool per turn. Never repeat the same search.
+- For questions about the user's own facts or preferences (for example, "what is my favourite fruit?"), searchKnowledgeBase is required before answering.
 - Use presentMedia to show images/videos/audio from indexed content.
 - For follow-ups like "show me that", reuse the mediaAssetId from earlier results — do not search again.
 
@@ -88,8 +89,13 @@ function latestUserText(messages: UIMessage[]): string {
   const message = [...messages].reverse().find((candidate) => candidate.role === 'user') as any;
   if (!message) return '';
   if (typeof message.content === 'string') return message.content;
-  if (Array.isArray(message.parts)) {
-    return message.parts
+  const parts = Array.isArray(message.parts)
+    ? message.parts
+    : Array.isArray(message.content)
+    ? message.content
+    : [];
+  if (parts.length) {
+    return parts
       .filter((part: any) => part.type === 'text' && typeof part.text === 'string')
       .map((part: any) => part.text)
       .join(' ');
@@ -110,6 +116,7 @@ function requiresKnowledgeBaseSearch(text: string): boolean {
     /\b(my|our)\s+(favo(?:u)?rite|preference|choice|answer|name|result|score|winner)\b/i.test(
       text,
     ) ||
+    /\b(?:what|which|who|where|when|how)\b[\s\S]{0,80}\b(my|our)\b/i.test(text) ||
     /\b(my|our)\s+(document|file|data|image|picture|diagram|video|audio|upload|corpus|knowledge|database|db|pdf|report|spreadsheet|presentation)/i.test(
       text,
     ) ||

@@ -576,20 +576,12 @@ export function ScrapePanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Could not start job');
 
-      const { totalPages, estimatedSeconds } = estimateEtlDuration(
-        selectedUrls.length,
-        effectiveScope,
-        specificUrls ? 1 : pageLimit,
-      );
-
-      toast.success('Scraping started, running in background', {
+      toast.success('Scrape queued', {
         description: specificUrls
-          ? `Scraping ${selectedUrls.length} specific URL(s) only, no deep crawl. You can navigate away. Progress is tracked automatically.`
+          ? `We will connect to ${selectedUrls.length} specific URL(s) and show real page progress as each response arrives. You can navigate away.`
           : `${selectedUrls.length} ${
               effectiveScope === 'domain' ? 'domain(s)' : 'page(s)'
-            } · ~${totalPages} pages · ETA ${formatDuration(
-              estimatedSeconds,
-            )}. You can navigate away. Progress is tracked automatically.`,
+            } selected. We will show real page progress as each response arrives; no artificial completion estimate. You can navigate away.`,
         duration: 8000,
       });
 

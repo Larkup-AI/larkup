@@ -66,7 +66,7 @@ export function FirecrawlNotice({
           description:
             runtimeEnv === 'docker'
               ? 'Checking if the crawler service is available on the network.'
-              : 'Starting Larkup’s built-in crawler. ',
+              : 'Preparing Larkup’s built-in crawler and its local job storage.',
         },
       );
     }
@@ -82,7 +82,7 @@ export function FirecrawlNotice({
       if (action === 'start') {
         if (json.state?.running) {
           toast.success('Web crawler is running', {
-            description: 'Web scraping is now active.',
+            description: 'Ready to receive scrape jobs.',
           });
         } else if (runtimeEnv === 'docker') {
           toast.error('Crawler service is not part of this container', {
@@ -91,7 +91,7 @@ export function FirecrawlNotice({
           });
         } else {
           toast.success('Web crawler is ready', {
-            description: 'You can now scrape websites without Docker.',
+            description: 'Ready to receive scrape jobs without Docker.',
           });
         }
       } else {

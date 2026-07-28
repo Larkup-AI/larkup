@@ -731,13 +731,8 @@ function MediaContent({
       if (!res.ok) throw new Error(data.error ?? 'Media import failed');
       const ids = (data.assets as MediaAsset[]).map((asset) => asset.id);
       toast.success(`${mediaType === 'video' ? 'Video' : 'Audio'} import started`, {
-        description: `Expected time: ${
-          remoteDuration
-            ? `about ${remoteEstimate.processingMinutes} minute${
-                remoteEstimate.processingMinutes === 1 ? '' : 's'
-              }`
-            : 'a few minutes'
-        }. You can safely leave — we will keep indexing it in the background.`,
+        description:
+          'Queued for download and indexing. Live progress will appear once the source starts responding; you can safely leave in the meantime.',
         duration: 8_000,
       });
       await processAssets(ids);
@@ -1385,7 +1380,7 @@ function MediaContent({
           <AlertDialogFooter>
             <AlertDialogCancel>Keep file</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-white hover:bg-destructive/90"
               onClick={() => {
                 if (assetToRemove) void handleDelete(assetToRemove.id);
                 setAssetToRemove(null);
