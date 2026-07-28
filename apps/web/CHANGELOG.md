@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.39
+
+### Patch Changes
+
+- Fix TS2448 ReferenceError in data-workspace.tsx caused by docsQuery declaration order
+
 ## 0.1.38
 
 ### Patch Changes
