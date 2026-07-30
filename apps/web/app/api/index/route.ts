@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readConfig } from '@larkup/core/config-store';
-import { corpusStats } from '@larkup/core/documents-store';
+import { corpusStats, readDocuments } from '@larkup/core/documents-store';
 import { isRunning, readRun } from '@larkup/core/index-store';
 import { createRun, runIndexer } from '@larkup/core/indexing/indexer';
 import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
@@ -59,14 +59,10 @@ async function getIndexStatus() {
   const [config, stats, run] = await Promise.all([readConfig(), corpusStats(), readRun()]);
   const { ready, blockers } = assessReadiness(config, stats.docCount);
 
-  let unindexedCount = 0;
-  if (run?.status === 'completed') {
-    const { readDocuments } = await import('@larkup/core/documents-store');
-    const docs = await readDocuments();
-    unindexedCount = docs.filter((d) => d.createdAt > run.startedAt).length;
-  } else {
-    unindexedCount = stats.docCount;
-  }
+  // Document status is committed as each batch reaches the vector store, so
+  // it stays reliable after partial failures and process restarts.
+  const docs = await readDocuments();
+  const unindexedCount = docs.filter((document) => document.status !== 'indexed').length;
 
   return NextResponse.json({
     run,
@@ -104,8 +100,10 @@ export async function POST(req: Request) {
     body = await req.json();
   } catch {}
 
-  const incremental = body.incremental === true;
   const previousRun = await readRun();
+  // A failed run can have a durable partial index. Its retry must continue the
+  // visible unindexed queue instead of resetting successfully stored vectors.
+  const incremental = body.incremental === true && Boolean(previousRun);
 
   const run = await createRun(config);
   void runIndexer(run.id, config, incremental ? previousRun : null);

@@ -80,6 +80,7 @@ export function CorpusPanel({
   const [page, setPage] = useState(0);
 
   const [sourceFilter, setSourceFilter] = useState<DocumentSource | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'indexed' | 'unindexed'>('all');
 
   const groupedDocuments = useMemo(() => {
     const grouped = new Map<string, SourceDocument>();
@@ -111,10 +112,15 @@ export function CorpusPanel({
     );
   }, [documents]);
 
-  const filteredDocuments =
-    sourceFilter === 'all'
-      ? groupedDocuments
-      : groupedDocuments.filter((d) => d.source === sourceFilter);
+  const filteredDocuments = groupedDocuments.filter(
+    (document) =>
+      (sourceFilter === 'all' || document.source === sourceFilter) &&
+      (statusFilter === 'all' || (document.status ?? 'unindexed') === statusFilter),
+  );
+
+  useEffect(() => {
+    setPage(0);
+  }, [sourceFilter, statusFilter]);
 
   const PAGE_SIZE = 10;
   const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / PAGE_SIZE));
@@ -140,7 +146,7 @@ export function CorpusPanel({
   }
   async function delSelected() {
     if (selectedIds.size === 0) return;
-    const toDelete = pageDocuments.filter((d) => selectedIds.has(d.id));
+    const toDelete = groupedDocuments.filter((d) => selectedIds.has(d.id));
     for (const doc of toDelete) {
       if (doc.metadata?.isGroup && doc.metadata?.mediaAssetId) {
         await fetch(`/api/media?id=${doc.metadata.mediaAssetId}`, { method: 'DELETE' });
@@ -199,6 +205,19 @@ export function CorpusPanel({
               </SelectContent>
             </Select>
           )}
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => v && setStatusFilter(v as 'all' | 'indexed' | 'unindexed')}
+          >
+            <SelectTrigger className="w-29 shadow-none border-border/70 bg-white h-8 text-xs">
+              <SelectValue placeholder="All status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All status</SelectItem>
+              <SelectItem value="indexed">Indexed</SelectItem>
+              <SelectItem value="unindexed">Unindexed</SelectItem>
+            </SelectContent>
+          </Select>
           {selectedIds.size > 0 && (
             <Button
               size="sm"
