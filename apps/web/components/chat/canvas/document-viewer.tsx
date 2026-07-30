@@ -119,7 +119,6 @@ export function DocumentViewer() {
               className="mx-auto w-full rounded-lg border border-border/40"
               style={{ height: '80vh', minHeight: '500px' }}
             >
-              {/* Fallback to text rendering if PDF embed fails */}
               {renderTextFallback()}
             </object>
           </div>
@@ -132,7 +131,7 @@ export function DocumentViewer() {
               <FileText className="size-3" />
               Form Fields ({parsedDocument.fields.length})
             </div>
-            <div className="max-h-[200px] overflow-y-auto px-4 pb-3 space-y-2 [&::-webkit-scrollbar]:hidden">
+            <div className="max-h-50 overflow-y-auto px-4 pb-3 space-y-2 [&::-webkit-scrollbar]:hidden">
               {parsedDocument.fields.map((field) => (
                 <DocumentField
                   key={field.id}
@@ -179,7 +178,7 @@ export function DocumentViewer() {
               <FileText className="size-3" />
               Detected Fields ({parsedDocument.fields.length})
             </div>
-            <div className="max-h-[200px] overflow-y-auto px-4 pb-3 space-y-2 [&::-webkit-scrollbar]:hidden">
+            <div className="max-h-50 overflow-y-auto px-4 pb-3 space-y-2 [&::-webkit-scrollbar]:hidden">
               {parsedDocument.fields.map((field) => (
                 <DocumentField
                   key={field.id}
@@ -277,7 +276,7 @@ export function DocumentViewer() {
               <FileText className="size-3" />
               Detected Fields ({parsedDocument.fields.length})
             </div>
-            <div className="max-h-[200px] overflow-y-auto px-4 pb-3 space-y-2 [&::-webkit-scrollbar]:hidden">
+            <div className="max-h-50 overflow-y-auto px-4 pb-3 space-y-2 [&::-webkit-scrollbar]:hidden">
               {parsedDocument.fields.map((field) => (
                 <DocumentField
                   key={field.id}
@@ -296,7 +295,6 @@ export function DocumentViewer() {
     );
   };
 
-  /* ---- Generic / Text Fallback ---- */
   const renderGenericView = () => renderTextFallback();
 
   const renderTextFallback = () => {

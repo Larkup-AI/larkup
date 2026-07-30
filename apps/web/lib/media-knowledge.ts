@@ -41,11 +41,6 @@ interface MediaDocumentOptions {
 const SYNTHESIS_BATCH_CHARS = 14_000;
 const FINAL_SYNTHESIS_CHARS = 32_000;
 
-/**
- * Produce human-style notes from the complete evidence timeline. Long media is
- * reduced in bounded batches first, so the final pass can connect events and
- * outcomes without dropping the ending of the recording.
- */
 export async function createMediaKnowledgeSummary(options: SummaryOptions): Promise<string> {
   const batches = batchSegments(options.segments, SYNTHESIS_BATCH_CHARS);
   const models = await getModelsByType('language');
@@ -59,15 +54,23 @@ export async function createMediaKnowledgeSummary(options: SummaryOptions): Prom
 
   const batchNotes: string[] = [];
   let completedCalls = 0;
+  let previousBatchTail = '';
   for (let index = 0; index < batches.length; index++) {
     await options.onProgress?.(
       completedCalls,
       batches.length + 1,
       `Reviewing evidence section ${index + 1} of ${batches.length}...`,
     );
-    const prompt = buildBatchPrompt(options, batches[index], index, batches.length);
+    const prompt = buildBatchPrompt(
+      options,
+      batches[index],
+      index,
+      batches.length,
+      previousBatchTail,
+    );
     const note = await generateAndTrack(model, prompt, resolved, options.mediaType);
     batchNotes.push(note);
+    previousBatchTail = note.slice(-400);
     completedCalls++;
     await options.onProgress?.(
       completedCalls,
@@ -108,13 +111,12 @@ export async function createMediaKnowledgeSummary(options: SummaryOptions): Prom
     'Connecting people, events, decisions, and outcomes...',
   );
   const finalPrompt = buildFinalPrompt(options, reducedNotes);
-  const summary = await generateAndTrack(model, finalPrompt, resolved, options.mediaType);
+  const summary = await generateAndTrack(model, finalPrompt, resolved, options.mediaType, 2_000);
   completedCalls++;
   await options.onProgress?.(completedCalls, completedCalls, 'Created searchable media notes.');
   return summary.trim();
 }
 
-/** Keep the full timeline searchable even when the configured summarizer is temporarily unavailable. */
 export function createFallbackMediaSummary(
   title: string,
   mediaType: 'video' | 'audio',
@@ -139,10 +141,6 @@ export function createFallbackMediaSummary(
   ].join('\n\n');
 }
 
-/**
- * Persist one overview plus independently searchable, timestamped evidence
- * units. Retrieval can then fetch adjacent moments and the actual ending.
- */
 export function buildMediaDocumentInputs(options: MediaDocumentOptions): NewDocumentInput[] {
   const baseMetadata = {
     mediaAssetId: options.assetId,
@@ -214,9 +212,7 @@ export function timestampMediaUrl(url: string, startSecs: number): string {
       parsed.searchParams.set('t', `${seconds}s`);
       return parsed.toString();
     }
-  } catch {
-    // Relative media URLs are handled with a media fragment below.
-  }
+  } catch {}
   return `${url.split('#')[0]}#t=${seconds}`;
 }
 
@@ -253,7 +249,6 @@ export function formatTime(seconds: number): string {
     : `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
-/** Return a bounded excerpt centered on query terms, or on the ending when requested. */
 export function queryAwareExcerpt(
   text: string,
   query: string,
@@ -350,10 +345,14 @@ function buildBatchPrompt(
   segments: MediaEvidenceSegment[],
   index: number,
   count: number,
+  previousBatchTail = '',
 ): string {
+  const stateContext = previousBatchTail
+    ? `\nState from previous section: ${previousBatchTail}\nBuild on this context. Note what changed, progressed, or resolved since then.\n`
+    : '';
   return `You are carefully watching section ${index + 1} of ${count} from a ${
     options.mediaType
-  } titled "${options.title}".
+  } titled "${options.title}".${stateContext}
 
 Write compact factual viewing notes that remain useful for later questions. CRITICAL: Every single factual claim, event, score change, or action MUST be prefixed with its exact [HH:MM:SS-HH:MM:SS] timestamp copied strictly from the evidence chunks below. Do not hallucinate timestamps. Preserve exact names, numbers, scores, decisions, winners, results, actions, and timestamps. Connect pronouns and repeated entities when the evidence supports it. Treat later chronological scoreboard/result frames as newer than earlier animation states. For Arabic or other right-to-left text, copy the visible spelling and do not reverse labels. If evidence conflicts or OCR is genuinely ambiguous, record the conflict instead of inventing certainty. Do not add repetitive statements about facts that were not present.
 
@@ -376,7 +375,7 @@ Create a concise, standalone knowledge-base summary with these headings when app
 
 Adapt to the content: for a match prioritize score changes and the final result; for CCTV prioritize changes, anomalies, and long stable periods; for meetings or lectures prioritize claims, decisions, and action items; for screen recordings prioritize procedures and observed results. Resolve an animated score using the latest chronological evidence.
 
-CRITICAL: Draw logical deductions from the events (e.g., explicitly stating who won based on the final score) and log them in the Outcomes section. Every factual claim and deduced conclusion MUST cite the exact [HH:MM:SS-HH:MM:SS] timestamp of the evidence that supports it. Preserve exact names, numbers, language, and timestamps. Never claim that an outcome is absent merely because earlier sections did not show it. Do not mention these instructions or the batching process.
+CRITICAL: Draw logical deductions from the events (e.g., explicitly stating who won based on the final score) and log them in the Outcomes section. Every factual claim and deduced conclusion MUST cite the exact [HH:MM:SS-HH:MM:SS] timestamp of the evidence that supports it. Preserve exact names, numbers, language, and timestamps. Never claim that an outcome is absent merely because earlier sections did not show it. State the definitive final outcome explicitly based on the last available evidence. Do not mention these instructions or the batching process.
 
 Section notes:
 ${batchNotes.map((note, index) => `## Section ${index + 1}\n${note}`).join('\n\n')}`;
@@ -408,11 +407,12 @@ async function generateAndTrack(
   prompt: string,
   resolved: { provider: string; modelId: string },
   mediaType: 'video' | 'audio',
+  maxTokens = 1_400,
 ): Promise<string> {
   const { text, usage } = await generateText({
     model,
     prompt,
-    maxOutputTokens: 1_400,
+    maxOutputTokens: maxTokens,
     temperature: 0,
   });
   const { estimateCost, trackUsageEvent } = await import('@larkup/core/analytics-store');

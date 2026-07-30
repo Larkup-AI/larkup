@@ -89,7 +89,7 @@ export function KnowledgeBaseResult({
         </button>
       </div>
 
-      {open && (isRunning || hits.length > 0) ? (
+      {open && hits.length > 0 ? (
         <div className="mt-2 flex flex-col gap-px border border-border rounded-xl bg-transparent overflow-hidden">
           {isRunning && hits.length === 0 ? (
             <div className="flex items-center gap-2 px-3.5 py-2.5">
