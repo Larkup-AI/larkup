@@ -526,7 +526,7 @@ function VideoKnowledgeInspector({
                       {child.charCount.toLocaleString()} chars
                     </span>
                   </div>
-                  <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground font-mono">
+                  <pre className="whitespace-pre-wrap wrap-break-word text-xs leading-relaxed text-foreground font-mono">
                     {child.content}
                   </pre>
                 </div>

@@ -60,3 +60,6 @@ archive/
 dummy/
 apps/api*.log
 *.pid
+
+
+notes.txt
