@@ -1,5 +1,22 @@
 # larkup
 
+## 0.1.45
+
+### Patch Changes
+
+- 8b470e7: fix: add missing apache-arrow dependency and silence docker error spam
+
+  - Added `apache-arrow` as an explicit dependency to satisfy the `@lancedb/lancedb` peer requirement. This fixes the "Cannot find module 'apache-arrow'" error during indexing on fresh installs.
+  - Removed noisy Docker error logs from the scraper local-runtime. Docker is optional and most curl-install users won't have it, so the console.error spam is unnecessary.
+
+- Updated dependencies [8b470e7]
+  - @larkup/vector-stores@0.1.24
+  - @larkup/scraper@0.1.32
+  - @larkup/core@0.3.1
+  - @larkup/marketplace@0.1.14
+  - @larkup/tool-doc-editor@0.2.9
+  - @larkup/tool-video-audio@0.3.0
+
 ## 0.1.44
 
 ### Patch Changes
