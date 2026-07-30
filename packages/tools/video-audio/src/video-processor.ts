@@ -1,23 +1,9 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-/**
- * Video processing pipeline.
- *
- * Uses ffmpeg (via fluent-ffmpeg) to:
- * 1. Extract audio track → send to audio-processor for transcription
- * 2. Extract keyframes at configurable intervals
- * 3. Generate thumbnails for each keyframe
- *
- * The caller (API route) handles Vision LLM captioning of frames.
- */
-
 export interface VideoProcessResult {
-  /** Path to extracted audio file (WAV, 16kHz mono) */
   audioPath?: string;
-  /** Extracted keyframe image paths with timestamps */
   frames: { path: string; timestampSecs: number }[];
-  /** Video metadata */
   meta: {
     durationSecs: number;
     width: number;
@@ -27,40 +13,24 @@ export interface VideoProcessResult {
 }
 
 export interface VideoProcessOptions {
-  /** Output directory for extracted files */
   outputDir: string;
-  /** Extract one frame every N seconds (default: 10) */
   frameIntervalSecs?: number;
-  /** Maximum number of frames to extract (default: 100) */
   maxFrames?: number;
-  /** Scene detection sensitivity (default: 0.3; lower detects more changes) */
   sceneThreshold?: number;
-  /** Maximum number of threads for FFmpeg to use */
   threads?: number;
-  /** Whether to run parallel audio and frame extraction */
   parallelExtraction?: boolean;
-  /** Skip audio extraction when an authoritative source transcript is available. */
   skipAudioExtraction?: boolean;
-  /** Reports actual FFmpeg extraction progress as a value between 0 and 1. */
   onProgress?: (progress: number) => void;
 }
 
 export interface VideoSamplingPlan {
-  /** Normalized video duration used to calculate the plan. */
   durationSecs: number;
-  /** Hard ceiling for all extracted frames combined. */
   maxFrames: number;
-  /** Cadence used for uniformly distributed coverage frames. */
   periodicIntervalSecs: number;
-  /** Maximum number of uniformly distributed coverage frames. */
   periodicFrameCount: number;
-  /** Maximum number of additional scene-change frames. */
   sceneFrameCount: number;
-  /** Frames reserved for a denser look at the end of the recording. */
   endingFrameCount: number;
-  /** Minimum time between selected scene changes. */
   minimumSceneGapSecs: number;
-  /** Maximum periodic + scene + ending frames before de-duplication. */
   estimatedFrameCount: number;
 }
 
@@ -81,13 +51,37 @@ export interface MultimodalSegment extends TimedText {
   transcript: string;
   visualContext: string;
   sequence: number;
+  cumulativeState: string;
 }
 
-/**
- * Fuse speech and visual observations onto one timeline. Each searchable unit
- * contains everything that happened in the same time window instead of an
- * unrelated transcript or frame caption.
- */
+export function extractRunningState(text: string): string {
+  const stateLines: string[] = [];
+  const scorePatterns = [
+    /\b(\d+)\s*[-–:]\s*(\d+)\b/g,
+    /(?:score|نتيجة|الأهداف)[:\s]*(.{5,60})/gi,
+    /(?:leading|winning|ahead|فائز|متقدم|يتقدم)[:\s]*(.{5,40})/gi,
+    /(?:goal|هدف|أحرز|سجل)[:\s]*(.{5,60})/gi,
+  ];
+  for (const pattern of scorePatterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      stateLines.push(match[0].trim());
+    }
+  }
+  const resultPatterns = [
+    /(?:winner|won|champion|beat|defeated|فاز|كسب|البطل|حسم|انتصر)[:\s]*(.{5,60})/gi,
+    /(?:final|result|outcome|النتيجة النهائية)[:\s]*(.{5,60})/gi,
+  ];
+  for (const pattern of resultPatterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      stateLines.push(match[0].trim());
+    }
+  }
+  const unique = [...new Set(stateLines)];
+  return unique.slice(-6).join('; ').slice(-500);
+}
+
 export function buildMultimodalSegments(
   transcript: TimedText[],
   visuals: TimedText[],
@@ -99,6 +93,7 @@ export function buildMultimodalSegments(
 
   const knownEnd = Math.max(durationSecs, ...evidence.map((item) => item.endSecs));
   const segments: MultimodalSegment[] = [];
+  let runningState = '';
 
   for (let startSecs = 0; startSecs < knownEnd; startSecs += targetWindowSecs) {
     const endSecs = Math.min(startSecs + targetWindowSecs, knownEnd);
@@ -117,17 +112,25 @@ export function buildMultimodalSegments(
     const visualContext = [...new Set(seen)].join(' ');
     const parts = [
       `Timeline: ${formatTimestamp(startSecs)}–${formatTimestamp(endSecs)}.`,
+      runningState ? `Running state from earlier: ${runningState}` : '',
       transcriptText ? `Speech: ${transcriptText}` : '',
       visualContext ? `Visual sequence, actions, and on-screen text: ${visualContext}` : '',
     ].filter(Boolean);
 
+    const segmentText = parts.join('\n');
+    const newState = extractRunningState(segmentText);
+    if (newState) {
+      runningState = newState;
+    }
+
     segments.push({
-      text: parts.join('\n'),
+      text: segmentText,
       transcript: transcriptText,
       visualContext,
       startSecs,
       endSecs,
       sequence: Math.floor(startSecs / targetWindowSecs),
+      cumulativeState: runningState,
     });
   }
 
@@ -143,13 +146,6 @@ function formatTimestamp(seconds: number): string {
     : `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
-/**
- * Create a bounded frame-sampling plan without treating maxFrames as a quota.
- *
- * Edited videos receive frequent anchors and scene-change coverage. As duration
- * grows, the anchor cadence widens so multi-hour camera and screen recordings
- * remain searchable without generating hundreds of near-identical frames.
- */
 export function createVideoSamplingPlan(
   durationSecs: number,
   configuredInterval = 30,
@@ -206,8 +202,6 @@ export function createVideoSamplingPlan(
     periodicFrameCount = 1;
     sceneFrameCount = 0;
   } else {
-    // Preserve both uniform and change-based evidence when the natural plan
-    // exceeds the hard limit, in proportion to the useful frames each needs.
     periodicFrameCount = Math.max(
       1,
       Math.min(
@@ -237,7 +231,6 @@ export function createVideoSamplingPlan(
   };
 }
 
-/** Densely sample the ending where final results and decisions commonly appear. */
 export function createEndingSamplingPlan(
   durationSecs: number,
   maxAdditionalFrames: number,
@@ -276,9 +269,6 @@ export function createEndingSamplingPlan(
   };
 }
 
-/**
- * Process a video file: extract audio and keyframes.
- */
 export async function processVideo(
   videoPath: string,
   options: VideoProcessOptions,
@@ -289,7 +279,6 @@ export async function processVideo(
   const framesDir = path.join(options.outputDir, 'frames');
   await fs.mkdir(framesDir, { recursive: true });
 
-  // 1. Probe video metadata
   const meta = await probeVideo(ffmpeg, videoPath);
 
   const audioPath = path.join(options.outputDir, 'audio.wav');
@@ -303,8 +292,6 @@ export async function processVideo(
     );
   };
 
-  // Cameras and screen recordings do not always have an audio stream. Visual
-  // indexing must still succeed for those files.
   const extractAudioPromise = options.skipAudioExtraction
     ? Promise.resolve(undefined)
     : extractAudio(ffmpeg, videoPath, audioPath, options.threads, (progress) => {
@@ -317,7 +304,6 @@ export async function processVideo(
           return audioPath;
         })
         .catch(() => {
-          // Videos without an audio stream remain valid visual-indexing input.
           audioProgress = 1;
           reportExtractionProgress();
           return undefined;
@@ -347,7 +333,6 @@ export async function processVideo(
   return { audioPath: extractedAudioPath, frames, meta };
 }
 
-/** Extract scene-change frames in one ffmpeg process, with adaptive interval fallback. */
 export async function extractSceneFrames(
   videoPath: string,
   options: {
@@ -386,9 +371,6 @@ export async function extractSceneFrames(
       return frames.slice(0, plan.maxFrames);
     }
 
-    // Outcomes, decisions, and final scoreboard animations often change several
-    // times within a few seconds. A short ending burst complements the sparse
-    // whole-video plan without turning the frame ceiling into a quota.
     const endingFrames = await extractFrames(videoPath, {
       outputDir: path.join(options.outputDir, 'ending'),
       intervalSecs: endingPlan.intervalSecs,
@@ -412,8 +394,6 @@ export async function extractSceneFrames(
     return result;
   };
 
-  // Uniform frames guarantee beginning-to-end coverage, while the independent
-  // scene pass captures meaningful changes between those anchors.
   const periodicFrames =
     plan.periodicFrameCount === 0
       ? []
@@ -449,9 +429,6 @@ export async function extractSceneFrames(
     const command = ffmpeg.default(videoPath);
     const isLongRecording = duration >= 2 * 60 * 60;
     if (isLongRecording) {
-      // Long surveillance/screen recordings are commonly mostly static. Decode
-      // keyframes only and score changes at a smaller resolution so an 8-hour
-      // input does not perform full-resolution scene math on every source frame.
       command.inputOptions(['-skip_frame nokey']);
     }
     command
@@ -477,9 +454,6 @@ export async function extractSceneFrames(
       })
       .on('end', () => resolve())
       .on('error', () => {
-        // Scene detection is supplementary. Some ffmpeg versions report an
-        // encoder error when the selector legitimately emits zero frames.
-        // Uniform coverage frames must still make the video indexable.
         resolve();
       })
       .run();
@@ -506,10 +480,6 @@ export async function extractSceneFrames(
   return addEndingEvidence(deduplicated);
 }
 
-/**
- * Use input seeking for sparse anchors in multi-hour media. This avoids decoding
- * the entire recording once merely to retain a few dozen periodic frames.
- */
 async function extractFramesAtTimestamps(
   ffmpeg: Awaited<ReturnType<typeof importFfmpeg>>,
   videoPath: string,
@@ -558,9 +528,6 @@ async function extractFramesAtTimestamps(
   return results;
 }
 
-/**
- * Extract keyframes from a video at regular intervals.
- */
 export async function extractFrames(
   videoPath: string,
   options: {
@@ -568,7 +535,6 @@ export async function extractFrames(
     intervalSecs: number;
     maxFrames: number;
     durationSecs?: number;
-    /** Optional range start, used for denser ending/outcome evidence. */
     startSecs?: number;
     threads?: number;
     onProgress?: (progress: number) => void;
@@ -577,7 +543,6 @@ export async function extractFrames(
   const ffmpeg = await importFfmpeg();
   await fs.mkdir(options.outputDir, { recursive: true });
 
-  // Get duration if not provided
   let duration = options.durationSecs;
   if (!duration) {
     const meta = await probeVideo(ffmpeg, videoPath);
@@ -622,10 +587,6 @@ export async function extractFrames(
     timestampSecs: startSecs + index * options.intervalSecs,
   }));
 }
-
-/* ------------------------------------------------------------------ */
-/* Internal helpers                                                    */
-/* ------------------------------------------------------------------ */
 
 async function importFfmpeg() {
   const mod = await import('fluent-ffmpeg');
