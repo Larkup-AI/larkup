@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { ffprobe, runFfmpeg } from './ffmpeg-spawn';
 
 export interface VideoProcessResult {
   audioPath?: string;
@@ -273,13 +274,11 @@ export async function processVideo(
   videoPath: string,
   options: VideoProcessOptions,
 ): Promise<VideoProcessResult> {
-  const ffmpeg = await importFfmpeg();
-
   await fs.mkdir(options.outputDir, { recursive: true });
   const framesDir = path.join(options.outputDir, 'frames');
   await fs.mkdir(framesDir, { recursive: true });
 
-  const meta = await probeVideo(ffmpeg, videoPath);
+  const meta = await probeVideo(videoPath);
 
   const audioPath = path.join(options.outputDir, 'audio.wav');
   const interval = options.frameIntervalSecs ?? 10;
@@ -294,7 +293,7 @@ export async function processVideo(
 
   const extractAudioPromise = options.skipAudioExtraction
     ? Promise.resolve(undefined)
-    : extractAudio(ffmpeg, videoPath, audioPath, options.threads, (progress) => {
+    : extractAudio(videoPath, audioPath, options.threads, (progress) => {
         audioProgress = Math.max(audioProgress, progress);
         reportExtractionProgress();
       })
@@ -345,9 +344,8 @@ export async function extractSceneFrames(
     onProgress?: (progress: number) => void;
   },
 ): Promise<{ path: string; timestampSecs: number }[]> {
-  const ffmpeg = await importFfmpeg();
   await fs.mkdir(options.outputDir, { recursive: true });
-  const duration = options.durationSecs || (await probeVideo(ffmpeg, videoPath)).durationSecs;
+  const duration = options.durationSecs || (await probeVideo(videoPath)).durationSecs;
   const plan = createVideoSamplingPlan(duration, options.intervalSecs, options.maxFrames);
   const totalPlannedWork = Math.max(1, plan.estimatedFrameCount);
   const periodicWeight = plan.periodicFrameCount / totalPlannedWork;
@@ -399,7 +397,6 @@ export async function extractSceneFrames(
       ? []
       : duration >= 2 * 60 * 60
       ? await extractFramesAtTimestamps(
-          ffmpeg,
           videoPath,
           Array.from({ length: plan.periodicFrameCount }, (_, index) =>
             Math.min(Math.max(0, duration - 1), index * plan.periodicIntervalSecs),
@@ -425,39 +422,38 @@ export async function extractSceneFrames(
   await fs.mkdir(sceneDir, { recursive: true });
   const pattern = path.join(sceneDir, 'scene_%04d.jpg');
   let timestamps: number[] = [];
-  await new Promise<void>((resolve) => {
-    const command = ffmpeg.default(videoPath);
-    const isLongRecording = duration >= 2 * 60 * 60;
-    if (isLongRecording) {
-      command.inputOptions(['-skip_frame nokey']);
-    }
-    command
-      .videoFilters(
-        isLongRecording
-          ? `scale='min(640,iw)':-2,select='gt(scene,${threshold})*if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${plan.minimumSceneGapSecs}))',showinfo`
-          : `select='gt(scene,${threshold})*if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${plan.minimumSceneGapSecs}))',showinfo,scale='min(1280,iw)':-2`,
-      )
-      .outputOptions([
-        '-vsync vfr',
-        `-frames:v ${plan.sceneFrameCount}`,
-        ...(options.threads ? [`-threads ${options.threads}`] : []),
-      ])
-      .output(pattern)
-      .on('stderr', (line: string) => {
+  const isLongRecording = duration >= 2 * 60 * 60;
+  const vf = isLongRecording
+    ? `scale='min(640,iw)':-2,select='gt(scene,${threshold})*if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${plan.minimumSceneGapSecs}))',showinfo`
+    : `select='gt(scene,${threshold})*if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${plan.minimumSceneGapSecs}))',showinfo,scale='min(1280,iw)':-2`;
+  const sceneArgs = [
+    ...(isLongRecording ? ['-skip_frame', 'nokey'] : []),
+    '-i',
+    videoPath,
+    '-vf',
+    vf,
+    '-vsync',
+    'vfr',
+    '-frames:v',
+    String(plan.sceneFrameCount),
+    ...(options.threads ? ['-threads', String(options.threads)] : []),
+    pattern,
+  ];
+  try {
+    await runFfmpeg({
+      args: sceneArgs,
+      durationSecs: duration,
+      onProgress: (percent) => {
+        reportProgress(periodicWeight + percent * sceneWeight);
+      },
+      onStderr: (line) => {
         const match = line.match(/pts_time:([0-9.]+)/);
         if (match) timestamps.push(Number(match[1]));
-      })
-      .on('progress', (progress: { percent?: number }) => {
-        if (typeof progress.percent === 'number') {
-          reportProgress(periodicWeight + Math.min(1, progress.percent / 100) * sceneWeight);
-        }
-      })
-      .on('end', () => resolve())
-      .on('error', () => {
-        resolve();
-      })
-      .run();
-  });
+      },
+    });
+  } catch {
+    // Scene detection may fail on some codecs — continue with periodic frames
+  }
   reportProgress(periodicWeight + sceneWeight);
   const files = (await fs.readdir(sceneDir))
     .filter((name) => /^scene_\d+\.jpg$/.test(name))
@@ -481,7 +477,6 @@ export async function extractSceneFrames(
 }
 
 async function extractFramesAtTimestamps(
-  ffmpeg: Awaited<ReturnType<typeof importFfmpeg>>,
   videoPath: string,
   timestamps: number[],
   options: {
@@ -504,19 +499,19 @@ async function extractFramesAtTimestamps(
           options.outputDir,
           `frame_${String(index + 1).padStart(4, '0')}.jpg`,
         );
-        await new Promise<void>((resolve, reject) => {
-          ffmpeg
-            .default(videoPath)
-            .seekInput(timestampSecs)
-            .videoFilters(`scale='min(1280,iw)':-2`)
-            .outputOptions([
-              '-frames:v 1',
-              ...(options.threads ? [`-threads ${options.threads}`] : []),
-            ])
-            .output(outputPath)
-            .on('end', () => resolve())
-            .on('error', (error: Error) => reject(error))
-            .run();
+        await runFfmpeg({
+          args: [
+            '-ss',
+            String(timestampSecs),
+            '-i',
+            videoPath,
+            '-vf',
+            `scale='min(1280,iw)':-2`,
+            '-frames:v',
+            '1',
+            ...(options.threads ? ['-threads', String(options.threads)] : []),
+            outputPath,
+          ],
         });
         results[index] = { path: outputPath, timestampSecs };
         completed += 1;
@@ -540,12 +535,11 @@ export async function extractFrames(
     onProgress?: (progress: number) => void;
   },
 ): Promise<{ path: string; timestampSecs: number }[]> {
-  const ffmpeg = await importFfmpeg();
   await fs.mkdir(options.outputDir, { recursive: true });
 
   let duration = options.durationSecs;
   if (!duration) {
-    const meta = await probeVideo(ffmpeg, videoPath);
+    const meta = await probeVideo(videoPath);
     duration = meta.durationSecs;
   }
 
@@ -556,27 +550,22 @@ export async function extractFrames(
     Math.min(Math.ceil(rangeDuration / options.intervalSecs), options.maxFrames),
   );
   const pattern = path.join(options.outputDir, 'frame_%04d.jpg');
-  await new Promise<void>((resolve, reject) => {
-    const command = ffmpeg.default(videoPath);
-    if (startSecs > 0) command.seekInput(startSecs);
-    command
-      .videoFilters(
-        `select='if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${options.intervalSecs}))',scale='min(1280,iw)':-2`,
-      )
-      .outputOptions([
-        '-vsync vfr',
-        `-frames:v ${frameCount}`,
-        ...(options.threads ? [`-threads ${options.threads}`] : []),
-      ])
-      .output(pattern)
-      .on('progress', (progress: { percent?: number }) => {
-        if (typeof progress.percent === 'number') {
-          options.onProgress?.(Math.min(1, progress.percent / 100));
-        }
-      })
-      .on('end', () => resolve())
-      .on('error', (err: Error) => reject(err))
-      .run();
+  await runFfmpeg({
+    args: [
+      ...(startSecs > 0 ? ['-ss', String(startSecs)] : []),
+      '-i',
+      videoPath,
+      '-vf',
+      `select='if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${options.intervalSecs}))',scale='min(1280,iw)':-2`,
+      '-vsync',
+      'vfr',
+      '-frames:v',
+      String(frameCount),
+      ...(options.threads ? ['-threads', String(options.threads)] : []),
+      pattern,
+    ],
+    durationSecs: rangeDuration,
+    onProgress: options.onProgress,
   });
   const files = (await fs.readdir(options.outputDir))
     .filter((name) => /^frame_\d+\.jpg$/.test(name))
@@ -588,40 +577,27 @@ export async function extractFrames(
   }));
 }
 
-async function importFfmpeg() {
-  const mod = await import('fluent-ffmpeg');
-  return mod;
-}
-
 function extractAudio(
-  ffmpeg: any,
   videoPath: string,
   outputPath: string,
   threads?: number,
   onProgress?: (progress: number) => void,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let cmd = ffmpeg
-      .default(videoPath)
-      .noVideo()
-      .audioChannels(1)
-      .audioFrequency(16000)
-      .format('wav');
-
-    if (threads) {
-      cmd = cmd.outputOptions([`-threads ${threads}`]);
-    }
-
-    cmd
-      .output(outputPath)
-      .on('progress', (progress: { percent?: number }) => {
-        if (typeof progress.percent === 'number') {
-          onProgress?.(Math.min(1, progress.percent / 100));
-        }
-      })
-      .on('end', () => resolve())
-      .on('error', (err: Error) => reject(err))
-      .run();
+  return runFfmpeg({
+    args: [
+      '-i',
+      videoPath,
+      '-vn',
+      '-ac',
+      '1',
+      '-ar',
+      '16000',
+      '-f',
+      'wav',
+      ...(threads ? ['-threads', String(threads)] : []),
+      outputPath,
+    ],
+    onProgress,
   });
 }
 
@@ -632,17 +608,13 @@ interface VideoMeta {
   codec: string;
 }
 
-function probeVideo(ffmpeg: any, videoPath: string): Promise<VideoMeta> {
-  return new Promise((resolve, reject) => {
-    ffmpeg.default.ffprobe(videoPath, (err: Error | null, data: any) => {
-      if (err) return reject(err);
-      const videoStream = data.streams?.find((s: any) => s.codec_type === 'video');
-      resolve({
-        durationSecs: parseFloat(data.format?.duration ?? '0'),
-        width: videoStream?.width ?? 0,
-        height: videoStream?.height ?? 0,
-        codec: videoStream?.codec_name ?? 'unknown',
-      });
-    });
-  });
+async function probeVideo(videoPath: string): Promise<VideoMeta> {
+  const data = await ffprobe(videoPath);
+  const videoStream = data.streams?.find((s) => s.codec_type === 'video');
+  return {
+    durationSecs: parseFloat(data.format?.duration ?? '0'),
+    width: videoStream?.width ?? 0,
+    height: videoStream?.height ?? 0,
+    codec: videoStream?.codec_name ?? 'unknown',
+  };
 }
