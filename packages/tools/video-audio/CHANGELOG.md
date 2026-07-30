@@ -1,5 +1,13 @@
 # @larkup/tool-video-audio
 
+## 0.3.0
+
+### Minor Changes
+
+- 02fbbba: Added smart video indexing capabilities:
+  - `@larkup/core`: Added `indexingInstructions` and `indexingQuality` to `MediaAsset`.
+  - `@larkup/tool-video-audio`: Implemented running state carry-forward and cumulative state extraction for multimodal segments.
+
 ## 0.2.4
 
 ### Patch Changes
