@@ -1,5 +1,12 @@
 # @larkup/marketplace
 
+## 0.1.13
+
+### Patch Changes
+
+- Updated dependencies [02fbbba]
+  - @larkup/core@0.3.0
+
 ## 0.1.12
 
 ### Patch Changes
