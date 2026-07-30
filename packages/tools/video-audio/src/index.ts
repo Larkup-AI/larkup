@@ -1,10 +1,3 @@
-/**
- * @larkup/tool-video-audio
- *
- * Marketplace tool for indexing video and audio files.
- * Extracts transcripts, keyframes, and scene descriptions.
- */
-
 export {
   processVideo,
   extractFrames,
@@ -12,6 +5,7 @@ export {
   createVideoSamplingPlan,
   createEndingSamplingPlan,
   buildMultimodalSegments,
+  extractRunningState,
 } from './video-processor.js';
 export {
   buildDeepgramTranscriptionUrl,
@@ -36,7 +30,6 @@ export type {
 } from './audio-processor.js';
 export type { ImportedMedia, MediaType, UrlImportOptions, UrlInspection } from './url-importer.js';
 
-/** Tool metadata for the marketplace loader. */
 export const TOOL_META = {
   id: 'video-audio',
   name: 'Video & Audio',
