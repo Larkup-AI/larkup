@@ -174,7 +174,7 @@ export function DataWorkspace() {
       const res = await fetch('/api/index', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ incremental: indexQuery.data?.run?.status === 'completed' }),
+        body: JSON.stringify({ incremental: Boolean(indexQuery.data?.run) }),
       });
       const body = await res.json();
       if (res.status === 409) return;

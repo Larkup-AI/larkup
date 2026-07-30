@@ -180,8 +180,13 @@ export function IndexWorkspace({
         <Alert variant="destructive">
           <AlertTriangle className="size-4" />
           <AlertTitle>Indexing failed</AlertTitle>
-          <AlertDescription className="wrap-break-word">
-            {run.error ?? 'An unknown error occurred during indexing.'}
+          <AlertDescription className="space-y-3 wrap-break-word">
+            <p>{run.error ?? 'An unknown error occurred during indexing.'}</p>
+            {unindexedCount > 0 && (
+              <Button size="sm" variant="outline" onClick={() => build(true)} disabled={starting}>
+                Retry {unindexedCount} unindexed file{unindexedCount === 1 ? '' : 's'}
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -242,7 +247,7 @@ export function IndexWorkspace({
             Cancel
           </Button>
           <Button
-            onClick={() => build(run?.status === 'completed')}
+            onClick={() => build(Boolean(run))}
             disabled={
               !ready || running || starting || (run?.status === 'completed' && unindexedCount === 0)
             }
@@ -255,7 +260,7 @@ export function IndexWorkspace({
             )}
             {running
               ? 'Indexing…'
-              : run?.status === 'completed'
+              : run
               ? `Index new documents (${unindexedCount})`
               : `Start indexing (${unindexedCount})`}
           </Button>

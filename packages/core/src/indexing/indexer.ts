@@ -17,6 +17,36 @@ import type { VectorRecord } from '@larkup/vector-stores/adapter';
  */
 
 const EMBED_BATCH = 64;
+const MAX_RATE_LIMIT_RETRIES = 5;
+
+/** Provider SDKs do not normalize quota failures consistently. Gemini can
+ * return RESOURCE_EXHAUSTED / "Quota exceeded" after its internal retries
+ * without exposing a numeric 429 status. */
+export function isRateLimitError(error: unknown): boolean {
+  const candidate = error as { status?: number; statusCode?: number; message?: unknown } | null;
+  const message = String(candidate?.message ?? error ?? '').toLowerCase();
+  return (
+    candidate?.status === 429 ||
+    candidate?.statusCode === 429 ||
+    /\b429\b|rate[ -]?limit|too many requests|resource_exhausted|quota exceeded|quota.*exceed/.test(
+      message,
+    )
+  );
+}
+
+/** Prefer the provider's explicit retry window and otherwise back off
+ * conservatively. The cap prevents a malformed provider message from parking
+ * an indexing worker indefinitely. */
+export function rateLimitDelayMs(error: unknown, attempt: number): number {
+  const message = String((error as { message?: unknown } | null)?.message ?? error ?? '');
+  const retryMatch = message.match(
+    /(?:retry(?:\s+after|\s+in)?|try again(?:\s+in)?)\s*(\d+(?:\.\d+)?)\s*(?:s|sec(?:ond)?s?)/i,
+  );
+  if (retryMatch) {
+    return Math.min(120_000, Math.max(2_000, Math.ceil(Number(retryMatch[1]) * 1_000)));
+  }
+  return Math.min(60_000, 5_000 * 2 ** (attempt - 1));
+}
 
 /** Create the initial run record and persist it before work begins. */
 export async function createRun(config: RagConfig): Promise<IndexRun> {
@@ -55,9 +85,9 @@ export async function runIndexer(
   try {
     let docs = await readDocuments();
 
-    if (previousRun && previousRun.status === 'completed') {
-      // Status is the durable source of truth. Timestamp filtering can skip
-      // documents produced during a long-running previous index job.
+    if (previousRun) {
+      // Status is the durable source of truth. This also makes a retry after a
+      // partial failure resume only the documents that still need vectors.
       docs = docs.filter((document) => document.status !== 'indexed');
     }
 
@@ -99,6 +129,12 @@ export async function runIndexer(
       return;
     }
     await patchRun({ totalChunks: chunks.length, status: 'embedding' });
+    const chunksPerDocument = new Map<string, number>();
+    const processedPerDocument = new Map<string, number>();
+    const indexedDocumentIds = new Set<string>();
+    for (const chunk of chunks) {
+      chunksPerDocument.set(chunk.documentId, (chunksPerDocument.get(chunk.documentId) ?? 0) + 1);
+    }
 
     // 2) Prepare the store
     const adapter = await createAdapter(config, async (waitSecs, attempt) => {
@@ -136,20 +172,13 @@ export async function runIndexer(
           if (dim) batchDimensions = dim;
           break; // success
         } catch (err: any) {
-          const is429 =
-            err?.status === 429 ||
-            err?.statusCode === 429 ||
-            String(err?.message ?? '').includes('429') ||
-            String(err?.message ?? '').includes('rate limit') ||
-            String(err?.message ?? '')
-              .toLowerCase()
-              .includes('too many requests');
-          if (is429 && attempt <= 3) {
-            const waitSecs = attempt * 10;
+          if (isRateLimitError(err) && attempt <= MAX_RATE_LIMIT_RETRIES) {
+            const waitMs = rateLimitDelayMs(err, attempt);
+            const waitSecs = Math.ceil(waitMs / 1_000);
             await patchRun({
-              warning: `Dense model rate-limited — pausing ${waitSecs}s (retry ${attempt}/${3})…`,
+              warning: `Embedding provider quota reached — pausing ${waitSecs}s (retry ${attempt}/${MAX_RATE_LIMIT_RETRIES})…`,
             });
-            await new Promise((r) => setTimeout(r, waitSecs * 1000));
+            await new Promise((r) => setTimeout(r, waitMs));
             currentDelayMs = Math.max(currentDelayMs, 2000);
             attempt++;
           } else {
@@ -164,6 +193,12 @@ export async function runIndexer(
         await adapter.init(dimensions);
         if (!previousRun) {
           await adapter.reset();
+          // A full rebuild has now removed the old vectors. Reflect that
+          // immediately so an interruption never leaves stale "Indexed" UI.
+          await updateDocumentsStatus(
+            docs.map((document) => document.id),
+            'unindexed',
+          );
         }
         initialized = true;
         await patchRun({ dimensions });
@@ -189,21 +224,13 @@ export async function runIndexer(
           await adapter.upsert(records);
           break; // success
         } catch (err: any) {
-          const is429 =
-            err?.status === 429 ||
-            err?.statusCode === 429 ||
-            String(err?.message ?? '').includes('429') ||
-            String(err?.message ?? '').includes('rate limit') ||
-            String(err?.message ?? '')
-              .toLowerCase()
-              .includes('too many requests') ||
-            String(err?.message ?? '').includes('RESOURCE_EXHAUSTED');
-          if (is429 && upsertAttempt <= 3) {
-            const waitSecs = upsertAttempt * 10;
+          if (isRateLimitError(err) && upsertAttempt <= MAX_RATE_LIMIT_RETRIES) {
+            const waitMs = rateLimitDelayMs(err, upsertAttempt);
+            const waitSecs = Math.ceil(waitMs / 1_000);
             await patchRun({
-              warning: `Vector store rate-limited — pausing ${waitSecs}s (retry ${upsertAttempt}/${3})…`,
+              warning: `Vector store rate-limited — pausing ${waitSecs}s (retry ${upsertAttempt}/${MAX_RATE_LIMIT_RETRIES})…`,
             });
-            await new Promise((r) => setTimeout(r, waitSecs * 1000));
+            await new Promise((r) => setTimeout(r, waitMs));
             currentDelayMs = Math.max(currentDelayMs, 2000);
             upsertAttempt++;
           } else {
@@ -213,7 +240,30 @@ export async function runIndexer(
       }
 
       processed += batch.length;
-      await patchRun({ processedChunks: processed, status: 'embedding', warning: undefined });
+      const completedDocumentIds: string[] = [];
+      for (const chunk of batch) {
+        const completed = (processedPerDocument.get(chunk.documentId) ?? 0) + 1;
+        processedPerDocument.set(chunk.documentId, completed);
+        if (
+          completed === chunksPerDocument.get(chunk.documentId) &&
+          !indexedDocumentIds.has(chunk.documentId)
+        ) {
+          indexedDocumentIds.add(chunk.documentId);
+          completedDocumentIds.push(chunk.documentId);
+        }
+      }
+      // Commit status only after a successful upsert. If a later batch
+      // exhausts quota, completed files remain searchable and the rest stay
+      // visibly retryable.
+      if (completedDocumentIds.length > 0) {
+        await updateDocumentsStatus(completedDocumentIds, 'indexed');
+      }
+      await patchRun({
+        processedChunks: processed,
+        indexedDocumentCount: indexedDocumentIds.size,
+        status: 'embedding',
+        warning: undefined,
+      });
     }
 
     await patchRun({
@@ -223,18 +273,21 @@ export async function runIndexer(
       finishedAt: new Date().toISOString(),
       durationMs: Date.now() - started,
     });
-
-    // Mark processed documents as indexed
-    await updateDocumentsStatus(
-      docs.map((d) => d.id),
-      'indexed',
-    );
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Indexing failed unexpectedly.';
+    const rawMessage = err instanceof Error ? err.message : 'Indexing failed unexpectedly.';
+    const completed = await readDocuments().then(
+      (documents) => documents.filter((document) => document.status === 'indexed').length,
+    );
+    const message = isRateLimitError(err)
+      ? `Embedding quota is still unavailable. ${completed} document${
+          completed === 1 ? '' : 's'
+        } remain indexed; retry the unindexed files when your provider quota resets. ${rawMessage}`
+      : rawMessage;
     await patchStoredRun(
       {
         status: 'failed',
         error: message,
+        indexedDocumentCount: completed,
         finishedAt: new Date().toISOString(),
         durationMs: Date.now() - started,
       },

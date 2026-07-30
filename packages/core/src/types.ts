@@ -446,6 +446,8 @@ export interface IndexRun {
   processedChunks: number;
   /** documents seen */
   docCount: number;
+  /** Documents whose every chunk has reached the vector store. */
+  indexedDocumentCount?: number;
   /** vector dimensions of the embeddings */
   dimensions: number;
   error?: string;
