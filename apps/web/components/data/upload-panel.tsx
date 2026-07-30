@@ -333,7 +333,11 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
                       const descRes = await fetch('/api/describe-image', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ base64: img.base64 }),
+                        body: JSON.stringify({
+                          base64: img.base64,
+                          prompt:
+                            'Create accurate retrieval notes for this PDF visual. Capture the title, every clearly readable heading, label, view name, routine or item name, counts, and parent-child/group relationships. For diagrams, describe connected components and directions. Do not invent unreadable text; say when text is unclear. Use concise labeled bullets so later questions can be answered without re-reading the image.',
+                        }),
                       });
                       if (descRes.ok) {
                         const descData = await descRes.json();

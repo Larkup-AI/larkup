@@ -12,10 +12,8 @@ This tool processes video and audio files for your knowledge base:
 
 ## Requirements
 
-- **ffmpeg** must be installed on your system
-  - macOS: `brew install ffmpeg`
-  - Ubuntu/Debian: `sudo apt install ffmpeg`
-  - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+- **ffmpeg** is bundled automatically with the package on supported platforms.
+  A system `ffmpeg` installation is only used as a fallback for an unsupported platform.
 - **yt-dlp is only required for YouTube URLs** (local files and direct URLs do not require it)
 
 ## How It Works

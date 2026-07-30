@@ -6,6 +6,9 @@
  */
 
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 /* ------------------------------------------------------------------ */
 /* Binary resolution                                                    */
@@ -15,13 +18,13 @@ let _ffmpegPath: string | null = null;
 let _ffprobePath: string | null = null;
 
 /**
- * Resolve the ffmpeg binary path. Prefers the system binary on PATH;
- * falls back to `@ffmpeg-installer/ffmpeg` if installed.
+ * Resolve the ffmpeg binary path. The packaged binary makes the marketplace
+ * tool work on a clean machine; a system installation remains the fallback.
  */
 function resolveFfmpegPath(): string {
   if (_ffmpegPath) return _ffmpegPath;
 
-  // Try @ffmpeg-installer first (bundled binary)
+  // Try the bundled binary first.
   try {
     const installerPath = require.resolve('@ffmpeg-installer/ffmpeg');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -41,7 +44,7 @@ function resolveFfmpegPath(): string {
 function resolveFfprobePath(): string {
   if (_ffprobePath) return _ffprobePath;
 
-  // Try @ffprobe-installer first
+  // Try the bundled binary first.
   try {
     const installerPath = require.resolve('@ffprobe-installer/ffprobe');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
