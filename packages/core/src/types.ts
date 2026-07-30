@@ -330,48 +330,31 @@ export interface MediaProcessingStep {
   finishedAt?: string;
 }
 
-/**
- * A media file in the corpus. Images, video, and audio are stored as
- * MediaAssets and processed into SourceDocuments (via captioning /
- * transcription) for indexing.
- */
 export interface MediaAsset {
   id: string;
   type: MediaType;
   fileName: string;
   mimeType: string;
-  /** Storage URI (e.g. "local://images/abc.png" or future "s3://...") */
   storageUri: string;
   thumbnailUri?: string;
-  /** Original URL if imported from web */
   originalUrl?: string;
-  /** File size in bytes */
   fileSize: number;
-  /** Image/video dimensions */
   dimensions?: { width: number; height: number };
-  /** Video/audio duration in seconds */
   durationSecs?: number;
-  /** Processing status */
   processingStatus: MediaProcessingStatus;
   processingError?: string;
   processingProgress?: number;
   processingMessage?: string;
-  /** A user-requested cooperative pause. Long provider calls pause at their next safe checkpoint. */
   processingPaused?: boolean;
-  /** Durable, independently updated progress for each pipeline stage. */
   processingSteps?: MediaProcessingStep[];
-  /** Monotonic revision for streaming clients to reject stale snapshots. */
   processingRevision?: number;
-  /** Last durable worker heartbeat for stale-job recovery. */
   processingHeartbeatAt?: string;
-  /** Generated caption or transcript summary */
   caption?: string;
-  /** IDs of SourceDocuments generated from this asset */
   documentIds: string[];
-  /** New evidence generation being built; retained so failed/crashed work can be cleaned safely. */
   pendingDocumentIds?: string[];
-  /** Previous evidence awaiting vector/source cleanup after an atomic publication switch. */
   supersededDocumentIds?: string[];
+  indexingInstructions?: string;
+  indexingQuality?: number;
   createdAt: string;
   updatedAt: string;
 }

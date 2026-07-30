@@ -157,6 +157,8 @@ export interface NewMediaAssetInput {
   fileSize: number;
   dimensions?: { width: number; height: number };
   durationSecs?: number;
+  indexingInstructions?: string;
+  indexingQuality?: number;
 }
 
 export function addMediaAsset(input: NewMediaAssetInput): Promise<MediaAsset> {
@@ -174,6 +176,8 @@ export function addMediaAsset(input: NewMediaAssetInput): Promise<MediaAsset> {
       fileSize: input.fileSize,
       dimensions: input.dimensions,
       durationSecs: input.durationSecs,
+      indexingInstructions: input.indexingInstructions,
+      indexingQuality: input.indexingQuality,
       processingStatus: 'pending',
       processingRevision: 0,
       documentIds: [],
@@ -202,6 +206,8 @@ export function addMediaAssets(inputs: NewMediaAssetInput[]): Promise<MediaAsset
       fileSize: input.fileSize,
       dimensions: input.dimensions,
       durationSecs: input.durationSecs,
+      indexingInstructions: input.indexingInstructions,
+      indexingQuality: input.indexingQuality,
       processingStatus: 'pending' as const,
       processingRevision: 0,
       documentIds: [],
