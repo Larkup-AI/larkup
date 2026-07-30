@@ -37,9 +37,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": [
-      "binaries/larkup-server"
-    ],
+    "externalBin": ["binaries/larkup-server"],
     "macOS": {
       "minimumSystemVersion": "10.15"
     },
@@ -55,9 +53,7 @@
     },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIwM0M5QkQ5QjA5NjkwODUKUldTRmtKYXcyWnM4SUtvZlpyVjl2M00rcUVEeTRDb0xYaE5HYjQvM1BHWTkvdEFJU0I0TjJDZisK",
-      "endpoints": [
-        "https://larkup.de/api/tauri-update/{{target}}/{{current_version}}"
-      ]
+      "endpoints": ["https://www.larkup.de/api/tauri-update/{{target}}/{{current_version}}"]
     }
   }
 }

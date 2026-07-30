@@ -4,8 +4,8 @@
     Larkup — Windows/PowerShell Installer
 .DESCRIPTION
     Installs Larkup CLI globally via npm on Windows.
-    Usage: iwr -useb https://larkup.de/install.ps1 | iex
-           powershell -c "& ([scriptblock]::Create((irm https://larkup.de/install.ps1))) -Version 1.2.0 -DryRun"
+    Usage: iwr -useb https://www.larkup.de/install.ps1 | iex
+           powershell -c "& ([scriptblock]::Create((irm https://www.larkup.de/install.ps1))) -Version 1.2.0 -DryRun"
 #>
 param(
     [string]$Version = "latest",
@@ -52,7 +52,7 @@ function Show-Help {
     Write-Host "Larkup — Windows Installer" -ForegroundColor White
     Write-Host ""
     Write-Host "Usage:"
-    Write-Host "  iwr -useb https://larkup.de/install.ps1 | iex"
+    Write-Host "  iwr -useb https://www.larkup.de/install.ps1 | iex"
     Write-Host ""
     Write-Host "Options:"
     Write-Host "  -Version <ver>   Install a specific version (default: latest)"
@@ -62,7 +62,7 @@ function Show-Help {
     Write-Host "  -Help            Show this help message"
     Write-Host ""
     Write-Host "Examples:"
-    Write-Host '  iwr -useb https://larkup.de/install.ps1 | iex'
+    Write-Host '  iwr -useb https://www.larkup.de/install.ps1 | iex'
     Write-Host '  .\install.ps1 -Version 1.2.0 -NoPrompt'
     Write-Host '  .\install.ps1 -DryRun'
     Write-Host ""
@@ -103,7 +103,7 @@ function Confirm-WindowsPlatform {
     # PowerShell Core (v6+) runs on non-Windows too
     if ($PSVersionTable.PSVersion.Major -ge 6 -and -not $IsWindows) {
         Write-Err "This installer is for Windows. Use the bash installer instead:"
-        Write-Err "  curl -fsSL https://larkup.de/install.sh | bash"
+        Write-Err "  curl -fsSL https://www.larkup.de/install.sh | bash"
         Stop-Installer
     }
     $arch = Get-SystemArch
@@ -467,7 +467,7 @@ function Show-NextSteps {
     Write-Host "Get started:" -ForegroundColor White
     Write-Host "  larkup dev" -ForegroundColor DarkYellow
     Write-Host ""
-    Write-Host "  Docs:   https://larkup.de/docs" -ForegroundColor DarkGray
+    Write-Host "  Docs:   https://www.larkup.de/docs" -ForegroundColor DarkGray
     Write-Host "  Issues: https://github.com/Larkup-AI/larkup/issues" -ForegroundColor DarkGray
     Write-Host ""
 }

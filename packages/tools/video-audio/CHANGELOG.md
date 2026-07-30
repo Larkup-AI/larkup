@@ -1,5 +1,11 @@
 # @larkup/tool-video-audio
 
+## 0.3.1
+
+### Patch Changes
+
+- 5da7a99: Replace deprecated fluent-ffmpeg with direct child_process.spawn calls. Eliminates npm deprecation warnings for fluent-ffmpeg and node-domexception. Increases auto-install timeout to 5min for large dependencies like ffmpeg.
+
 ## 0.3.0
 
 ### Minor Changes

@@ -5,7 +5,7 @@
 
 **Open source tools for building a private AI over your own data.**
 
-[Documentation](https://larkup.de/docs) · [GitHub Issues](https://github.com/Larkup-AI/larkup/issues)
+[Documentation](https://www.larkup.de/docs) · [GitHub Issues](https://github.com/Larkup-AI/larkup/issues)
 
 </div>
 
@@ -52,7 +52,7 @@ Larkup opens its local web app at `http://localhost:4567`. Start generated serve
 
 <img src="./docs/images/new/chat-sidebar-on.png" alt="Larkup Chat with the sources panel open" width="900" />
 
-See the [Quickstart guide](https://larkup.de/docs/guide/quickstart) for screenshots of every data source.
+See the [Quickstart guide](https://www.larkup.de/docs/guide/quickstart) for screenshots of every data source.
 
 ## CLI
 
@@ -68,7 +68,7 @@ Start the Larkup web app:
 larkup dev
 ```
 
-You can also use `larkup query`, `larkup chat`, `larkup documents`, `larkup media`, and `larkup marketplace` from the terminal. See the [CLI reference](https://larkup.de/docs/developer/cli) for every command.
+You can also use `larkup query`, `larkup chat`, `larkup documents`, `larkup media`, and `larkup marketplace` from the terminal. See the [CLI reference](https://www.larkup.de/docs/developer/cli) for every command.
 
 ## SDKs
 
@@ -81,17 +81,17 @@ npm install @larkup/sdk
 ```
 
 ```typescript
-import { LarkupClient } from "@larkup/sdk";
+import { LarkupClient } from '@larkup/sdk';
 
 const client = new LarkupClient({
-  baseUrl: "http://localhost:8080",
+  baseUrl: 'http://localhost:8080',
   apiKey: process.env.LARKUP_API_KEY,
 });
 
-const results = await client.query("What is the refund policy?", 5);
+const results = await client.query('What is the refund policy?', 5);
 
-for await (const event of client.chat("Summarize the answer.")) {
-  if (event.type === "text-delta") process.stdout.write(event.text ?? "");
+for await (const event of client.chat('Summarize the answer.')) {
+  if (event.type === 'text-delta') process.stdout.write(event.text ?? '');
 }
 ```
 
@@ -118,19 +118,19 @@ for event in client.chat("Summarize the answer."):
         print(event.text or "", end="", flush=True)
 ```
 
-Read the [TypeScript SDK](https://larkup.de/docs/sdk/typescript), [Python SDK](https://larkup.de/docs/sdk/python), or [API reference](https://larkup.de/docs/api-reference/overview) for the complete interfaces.
+Read the [TypeScript SDK](https://www.larkup.de/docs/sdk/typescript), [Python SDK](https://www.larkup.de/docs/sdk/python), or [API reference](https://www.larkup.de/docs/api-reference/overview) for the complete interfaces.
 
 ## Repository
 
-| Path | Purpose |
-| --- | --- |
-| `apps/web` | Web UI and API routes |
-| `apps/cli` | Command line interface |
-| `apps/sdk/js-sdk` | TypeScript SDK |
-| `apps/sdk/py-sdk` | Python SDK |
-| `apps/desktop` | Desktop application |
-| `packages/core` | Shared configuration and server generation |
-| `docs` | Mintlify documentation |
+| Path              | Purpose                                    |
+| ----------------- | ------------------------------------------ |
+| `apps/web`        | Web UI and API routes                      |
+| `apps/cli`        | Command line interface                     |
+| `apps/sdk/js-sdk` | TypeScript SDK                             |
+| `apps/sdk/py-sdk` | Python SDK                                 |
+| `apps/desktop`    | Desktop application                        |
+| `packages/core`   | Shared configuration and server generation |
+| `docs`            | Mintlify documentation                     |
 
 ## Contributing
 
