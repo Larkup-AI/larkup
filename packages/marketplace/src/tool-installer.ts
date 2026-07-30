@@ -132,6 +132,112 @@ export async function getDownloadCounts(): Promise<Record<string, number>> {
 /* System dependency checks                                            */
 /* ------------------------------------------------------------------ */
 
+/** Known install commands per dependency per platform. */
+const INSTALL_HINTS: Record<string, Record<string, string>> = {
+  ffmpeg: {
+    macos: 'brew install ffmpeg',
+    linux_apt: 'sudo apt-get install -y ffmpeg',
+    linux_dnf: 'sudo dnf install -y ffmpeg',
+    linux_pacman: 'sudo pacman -S --noconfirm ffmpeg',
+    linux_apk: 'sudo apk add --no-cache ffmpeg',
+  },
+};
+
+/**
+ * Detect the current platform for install commands.
+ */
+function detectPlatform(): string {
+  if (process.platform === 'darwin') return 'macos';
+  return 'linux';
+}
+
+/**
+ * Attempt to auto-install a system dependency using the platform package manager.
+ * Returns true if the dependency is available after the attempt.
+ */
+async function tryAutoInstallDep(
+  dep: string,
+  onProgress?: (message: string) => void,
+): Promise<boolean> {
+  const hints = INSTALL_HINTS[dep];
+  if (!hints) return false;
+
+  const platform = detectPlatform();
+  let installCmd: string | undefined;
+
+  if (platform === 'macos') {
+    // Check if Homebrew is available
+    try {
+      await execAsync('which brew');
+      installCmd = hints.macos;
+    } catch {
+      // No brew — cannot auto-install on macOS
+      return false;
+    }
+  } else {
+    // Linux — detect package manager
+    const managers = [
+      { cmd: 'apt-get', key: 'linux_apt' },
+      { cmd: 'dnf', key: 'linux_dnf' },
+      { cmd: 'pacman', key: 'linux_pacman' },
+      { cmd: 'apk', key: 'linux_apk' },
+    ];
+    for (const { cmd, key } of managers) {
+      try {
+        await execAsync(`which ${cmd}`);
+        installCmd = hints[key];
+        break;
+      } catch {
+        // Try next manager
+      }
+    }
+  }
+
+  if (!installCmd) return false;
+
+  onProgress?.(`Auto-installing ${dep}…`);
+  try {
+    await execAsync(installCmd, { timeout: 120_000 });
+  } catch {
+    return false;
+  }
+
+  // Verify the binary is now available
+  try {
+    await execAsync(`which ${dep}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Build a user-friendly error message with platform-specific install instructions.
+ */
+function buildMissingDepsMessage(deps: string[]): string {
+  const platform = detectPlatform();
+  const lines: string[] = [`Missing system dependencies: ${deps.join(', ')}.`];
+
+  for (const dep of deps) {
+    const hints = INSTALL_HINTS[dep];
+    if (!hints) {
+      lines.push(`  • ${dep}: Please install it manually.`);
+      continue;
+    }
+
+    if (platform === 'macos' && hints.macos) {
+      lines.push(`  • ${dep}: Run \`${hints.macos}\``);
+    } else if (platform === 'linux') {
+      const linuxHint = hints.linux_apt || hints.linux_dnf || hints.linux_pacman || hints.linux_apk;
+      if (linuxHint) {
+        lines.push(`  • ${dep}: Run \`${linuxHint}\``);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
 /**
  * Check if system dependencies for a tool are available.
  * Returns list of missing dependencies.
@@ -406,9 +512,25 @@ export async function installTool(
 
     // 2. Check system dependencies
     report('checking-deps', 15, 'Checking system dependencies…');
-    const missing = (await checkSystemDeps(toolId)).filter((dependency) => dependency !== 'docker');
+    let missing = (await checkSystemDeps(toolId)).filter((dependency) => dependency !== 'docker');
+
+    // 2a. Attempt auto-install for known dependencies
     if (missing.length > 0) {
-      const msg = `Missing system dependencies: ${missing.join(', ')}. Please install them first.`;
+      const stillMissing: string[] = [];
+      for (const dep of missing) {
+        report('checking-deps', 18, `Attempting to install ${dep}…`);
+        const installed = await tryAutoInstallDep(dep, (msg) => report('checking-deps', 20, msg));
+        if (installed) {
+          report('checking-deps', 22, `${dep} installed successfully.`);
+        } else {
+          stillMissing.push(dep);
+        }
+      }
+      missing = stillMissing;
+    }
+
+    if (missing.length > 0) {
+      const msg = buildMissingDepsMessage(missing);
       report('failed', 0, msg);
       throw new Error(msg);
     }
