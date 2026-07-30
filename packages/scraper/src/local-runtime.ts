@@ -142,16 +142,15 @@ async function resolveDocker(): Promise<{
 }> {
   try {
     await runCmd('docker --version');
-  } catch (err) {
-    console.error('DOCKER ERR:', err);
+  } catch {
+    // Docker not installed — expected for non-Docker (curl) installs.
     return { docker: false, compose: null };
   }
   try {
     await runCmd('docker compose version');
     return { docker: true, compose: 'docker compose' };
-  } catch (err) {
-    console.error('DOCKER COMPOSE ERR:', err);
-    // fall through
+  } catch {
+    // fall through — try legacy docker-compose
   }
   try {
     await runCmd('docker-compose version');
