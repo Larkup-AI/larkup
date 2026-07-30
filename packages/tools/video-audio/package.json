@@ -25,7 +25,8 @@
     "build": "tsc --outDir dist",
     "type-check": "tsc --noEmit"
   },
-  "dependencies": {
+  "dependencies": {},
+  "optionalDependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "fluent-ffmpeg": "^2.1.3"
   },
