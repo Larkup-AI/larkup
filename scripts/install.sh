@@ -448,7 +448,7 @@ install_larkup() {
   install_log="$(new_tmp_file)"
 
   # Run npm install in background for spinner
-  npm install -g --no-fund --no-audit "$spec" >"$install_log" 2>&1 &
+  npm install -g --no-fund --no-audit --ignore-scripts "$spec" >"$install_log" 2>&1 &
   local npm_pid=$!
 
   local chars="/-\\|"
@@ -476,7 +476,7 @@ install_larkup() {
   if [[ -s "$install_log" ]]; then
     echo ""
     log_warn "Last lines of npm output:"
-    tail -n 20 "$install_log" >&2
+    tail -n 40 "$install_log" >&2
     echo ""
   fi
 
