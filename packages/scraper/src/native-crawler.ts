@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 const DATA_DIR = path.join(process.cwd(), '.larkup');
 const CRAWLS_DIR = path.join(DATA_DIR, 'native-crawls');
 const STATE_PATH = path.join(DATA_DIR, 'native-crawls.json');
-const USER_AGENT = 'LarkupCrawler/1.0 (+https://larkup.de)';
+const USER_AGENT = 'LarkupCrawler/1.0 (+https://www.larkup.de)';
 const MAX_HTML_BYTES = 2_000_000;
 
 export interface NativePage {

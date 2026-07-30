@@ -40,4 +40,4 @@ larkup media ./demo.mp4
 - `larkup open [target]` opens the Web UI or API reference.
 - `larkup update` checks for and installs CLI releases.
 
-Generated servers use `http://localhost:8080` by default. Run `larkup --help` or see the [CLI documentation](https://larkup.de/docs/developer/cli) for all options.
+Generated servers use `http://localhost:8080` by default. Run `larkup --help` or see the [CLI documentation](https://www.larkup.de/docs/developer/cli) for all options.

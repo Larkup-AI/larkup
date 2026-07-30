@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Larkup — Global Installer (macOS / Linux / WSL)
-# Usage: curl -fsSL https://larkup.de/install.sh | bash
+# Usage: curl -fsSL https://www.larkup.de/install.sh | bash
 
 # ── Config ────────────────────────────────────────────────────
 PACKAGE_NAME="larkup"
@@ -138,8 +138,8 @@ show_help() {
 ${BOLD}Larkup — Global Installer${NC}
 
 Usage:
-  curl -fsSL https://larkup.de/install.sh | bash
-  curl -fsSL https://larkup.de/install.sh | bash -s -- [OPTIONS]
+  curl -fsSL https://www.larkup.de/install.sh | bash
+  curl -fsSL https://www.larkup.de/install.sh | bash -s -- [OPTIONS]
 
 Options:
   --version <ver>   Install a specific version (default: latest)
@@ -149,8 +149,8 @@ Options:
   --help            Show this help message
 
 Examples:
-  curl -fsSL https://larkup.de/install.sh | bash -s -- --version 1.2.0 --no-prompt
-  curl -fsSL https://larkup.de/install.sh | bash -s -- --dry-run --verbose
+  curl -fsSL https://www.larkup.de/install.sh | bash -s -- --version 1.2.0 --no-prompt
+  curl -fsSL https://www.larkup.de/install.sh | bash -s -- --dry-run --verbose
 EOF
 }
 
@@ -186,7 +186,7 @@ identify_system() {
       fi ;;
     MINGW*|MSYS*|CYGWIN*)
       log_error "Windows detected. Use the PowerShell installer instead:"
-      log_error "  iwr -useb https://larkup.de/install.ps1 | iex"
+      log_error "  iwr -useb https://www.larkup.de/install.ps1 | iex"
       exit 1 ;;
     *) log_error "Unsupported OS: ${uname_s}"; exit 1 ;;
   esac
@@ -557,7 +557,7 @@ show_next_steps() {
   echo -e "${BOLD}Get started:${NC}"
   echo -e "  ${OCHRE}larkup dev${NC}"
   echo ""
-  echo -e "  ${DIM}Docs:   https://larkup.de/docs${NC}"
+  echo -e "  ${DIM}Docs:   https://www.larkup.de/docs${NC}"
   echo -e "  ${DIM}Issues: https://github.com/Larkup-AI/larkup/issues${NC}"
   echo ""
 }

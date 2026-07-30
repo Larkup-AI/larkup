@@ -1,5 +1,14 @@
 # larkup
 
+## 0.1.47
+
+### Patch Changes
+
+- Updated dependencies [5da7a99]
+  - @larkup/tool-video-audio@0.3.1
+  - @larkup/marketplace@0.1.16
+  - @larkup/tool-doc-editor@0.2.9
+
 ## 0.1.46
 
 ### Patch Changes

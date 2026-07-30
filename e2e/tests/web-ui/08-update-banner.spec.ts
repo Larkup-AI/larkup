@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test.describe('Update banner', () => {
   test('shows the CLI update command and copies it', async ({ context, page }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await page.route('https://larkup.de/api/version', async (route) => {
+    await page.route('https://www.larkup.de/api/version', async (route) => {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({ version: '999.0.0' }),

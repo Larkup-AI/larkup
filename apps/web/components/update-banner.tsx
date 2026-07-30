@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
  * UpdateBanner, Universal update notification for all channels.
  */
 
-const VERSION_CHECK_URL = 'https://larkup.de/api/version';
+const VERSION_CHECK_URL = 'https://www.larkup.de/api/version';
 const DISMISS_KEY = 'larkup-update-dismissed';
 const DISMISS_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -120,7 +120,7 @@ export function UpdateBanner() {
         console.error('Auto-update failed:', err);
         setUpdating(false);
         // Fall back to download page
-        window.open('https://larkup.de/download', '_blank');
+        window.open('https://www.larkup.de/download', '_blank');
       }
     } else {
       try {

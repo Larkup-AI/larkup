@@ -1,7 +1,7 @@
 import { log } from "./ui/logger";
 import pkg from "../package.json" with { type: "json" };
 
-const VERSION_CHECK_URL = "https://larkup.de/api/version";
+const VERSION_CHECK_URL = "https://www.larkup.de/api/version";
 
 function compareVersions(a: string, b: string): number {
   const pa = a.replace(/^v/, "").split(".").map(Number);

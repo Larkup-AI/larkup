@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Larkup — Local Installer (macOS / Linux / WSL)
 # Self-contained under ~/.larkup — no root, no system packages touched.
-# Usage: curl -fsSL https://larkup.de/install-local.sh | bash
+# Usage: curl -fsSL https://www.larkup.de/install-local.sh | bash
 
 # ── Config ────────────────────────────────────────────────────
 PACKAGE_NAME="larkup"
@@ -128,8 +128,8 @@ Installs a self-contained Larkup setup under a single directory.
 No system packages are touched. Node.js is bundled automatically.
 
 Usage:
-  curl -fsSL https://larkup.de/install-local.sh | bash
-  curl -fsSL https://larkup.de/install-local.sh | bash -s -- [OPTIONS]
+  curl -fsSL https://www.larkup.de/install-local.sh | bash
+  curl -fsSL https://www.larkup.de/install-local.sh | bash -s -- [OPTIONS]
 
 Options:
   --prefix <path>   Install directory (default: ~/.larkup)
@@ -141,13 +141,13 @@ Options:
 
 Examples:
   # Default install to ~/.larkup
-  curl -fsSL https://larkup.de/install-local.sh | bash
+  curl -fsSL https://www.larkup.de/install-local.sh | bash
 
   # Custom prefix
-  curl -fsSL https://larkup.de/install-local.sh | bash -s -- --prefix ~/tools/larkup
+  curl -fsSL https://www.larkup.de/install-local.sh | bash -s -- --prefix ~/tools/larkup
 
   # Dry run
-  curl -fsSL https://larkup.de/install-local.sh | bash -s -- --dry-run
+  curl -fsSL https://www.larkup.de/install-local.sh | bash -s -- --dry-run
 EOF
 }
 
@@ -189,7 +189,7 @@ identify_system() {
       fi ;;
     MINGW*|MSYS*|CYGWIN*)
       log_error "Windows detected. Use the PowerShell installer instead:"
-      log_error "  iwr -useb https://larkup.de/install.ps1 | iex"
+      log_error "  iwr -useb https://www.larkup.de/install.ps1 | iex"
       exit 1 ;;
     *) log_error "Unsupported OS: ${uname_s}"; exit 1 ;;
   esac
@@ -364,7 +364,7 @@ fi
 
 if [[ ! -f "\${CLI_ENTRY}" ]]; then
   echo "error: Larkup CLI entry point not found." >&2
-  echo "Try re-running the installer: curl -fsSL https://larkup.de/install-local.sh | bash" >&2
+  echo "Try re-running the installer: curl -fsSL https://www.larkup.de/install-local.sh | bash" >&2
   exit 1
 fi
 
@@ -468,7 +468,7 @@ show_summary() {
   echo -e "${BOLD}Get started:${NC}"
   echo -e "  ${OCHRE}${BIN_NAME} dev${NC}"
   echo ""
-  echo -e "  ${DIM}Docs:   https://larkup.de/docs${NC}"
+  echo -e "  ${DIM}Docs:   https://www.larkup.de/docs${NC}"
   echo -e "  ${DIM}Issues: https://github.com/Larkup-AI/larkup/issues${NC}"
   echo ""
   echo -e "  ${DIM}To uninstall: rm -rf ${LARKUP_PREFIX}${NC}"

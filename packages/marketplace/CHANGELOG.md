@@ -1,5 +1,11 @@
 # @larkup/marketplace
 
+## 0.1.16
+
+### Patch Changes
+
+- 5da7a99: Replace deprecated fluent-ffmpeg with direct child_process.spawn calls. Eliminates npm deprecation warnings for fluent-ffmpeg and node-domexception. Increases auto-install timeout to 5min for large dependencies like ffmpeg.
+
 ## 0.1.15
 
 ### Patch Changes

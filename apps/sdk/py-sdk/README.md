@@ -31,4 +31,4 @@ The SDK supports health and OpenAPI discovery, retrieval, document CRUD, sequent
 
 `LarkupHubClient` and `AsyncLarkupHubClient` provide typed Marketplace catalog discovery. Install and uninstall operations remain in the CLI because they change the local Larkup tool directory.
 
-See the [Python SDK documentation](https://larkup.de/docs/sdk/python) for the complete guide.
+See the [Python SDK documentation](https://www.larkup.de/docs/sdk/python) for the complete guide.
