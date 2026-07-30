@@ -19,6 +19,7 @@ import { loadTool } from '@larkup/marketplace/loader';
 import { getInstalledTools } from '@larkup/marketplace/installer';
 import { readDocuments } from '@larkup/core/documents-store';
 import { readMediaAssets } from '@larkup/core/media-store';
+import { cacheImageAnalysis, getCachedImageAnalysis } from '@larkup/core/image-analysis-cache';
 import {
   normalizeMediaCitationRange,
   queryAwareExcerpt,
@@ -636,6 +637,9 @@ export async function getChatTools(context: {
       }),
       execute: async ({ imageUrl, prompt }) => {
         try {
+          const cached = await getCachedImageAnalysis(imageUrl, prompt);
+          if (cached) return { analysis: cached, cached: true };
+
           // Fetch the image to base64
           // Handle both absolute URLs and relative local uploads
           const fetchUrl = imageUrl.startsWith('/')
@@ -666,7 +670,8 @@ export async function getChatTools(context: {
 
           if (!descRes.ok) throw new Error(`Vision API error: ${descRes.statusText}`);
           const data = await descRes.json();
-          return { analysis: data.description };
+          await cacheImageAnalysis(imageUrl, prompt, data.description);
+          return { analysis: data.description, cached: false };
         } catch (err: any) {
           return { error: `Failed to analyze image: ${err.message}` };
         }

@@ -78,6 +78,7 @@ TOOL RULES:
 
 DO:
 - Keep answers short and direct. 1–3 sentences unless the task is complex.
+- Make answers presentation-ready: use a natural lead sentence and clean bullets for lists. Use descriptive headings only when they add clarity; never expose raw-looking headings such as "#### View Names:".
 - Search at most ONCE per tool per turn. Never repeat the same search.
 - For questions about the user's own facts or preferences (for example, "what is my favourite fruit?"), searchKnowledgeBase is required before answering.
 - If a knowledge-base result contains PDF images and the question asks what is shown, named, counted, or connected in that visual, call analyzeImageDeeply before answering. Call presentMedia when the user asks to see the image.
@@ -108,6 +109,50 @@ function latestUserText(messages: UIMessage[]): string {
       .join(' ');
   }
   return '';
+}
+
+function normalizedQuestion(text: string) {
+  return text.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+/** An exact repeated question in the same conversation already has grounded
+ * evidence in model context. Do not spend another embedding + vector query;
+ * the previous tool result remains available in the compacted history. */
+function hasPriorKnowledgeBaseAnswer(messages: UIMessage[], question: string): boolean {
+  const target = normalizedQuestion(question);
+  if (!target) return false;
+
+  for (let index = 0; index < messages.length - 1; index++) {
+    if (
+      messages[index].role !== 'user' ||
+      normalizedQuestion(latestUserText([messages[index]])) !== target
+    ) {
+      continue;
+    }
+    for (let cursor = index + 1; cursor < messages.length; cursor++) {
+      const message = messages[cursor] as any;
+      if (message.role === 'user') break;
+      const toolCalls = [
+        ...(Array.isArray(message.toolInvocations) ? message.toolInvocations : []),
+        ...(Array.isArray(message.parts)
+          ? message.parts.map((part: any) => part.toolInvocation ?? part)
+          : []),
+      ];
+      if (
+        toolCalls.some((call: any) => {
+          const result = call?.result ?? call?.output;
+          return (
+            call?.toolName === 'searchKnowledgeBase' &&
+            Array.isArray(result?.hits) &&
+            result.hits.length > 0
+          );
+        })
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export async function POST(req: Request) {
@@ -385,7 +430,9 @@ ${fieldLines}`;
   });
   const userText = latestUserText(messagesToProcess);
   const forceKnowledgeBaseSearch =
-    requiresKnowledgeBaseSearch(userText) && Boolean(tools.searchKnowledgeBase);
+    requiresKnowledgeBaseSearch(userText) &&
+    !hasPriorKnowledgeBaseAnswer(messagesToProcess, userText) &&
+    Boolean(tools.searchKnowledgeBase);
   const forceWebSearch =
     config.webSearchEnabled === true &&
     requiresCurrentWebSearch(userText) &&

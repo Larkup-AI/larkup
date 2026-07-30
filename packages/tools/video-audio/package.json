@@ -33,6 +33,10 @@
       "optional": true
     }
   },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2"
+  },
   "devDependencies": {
     "@larkup/marketplace": "workspace:*",
     "@types/node": "^26.1.2",

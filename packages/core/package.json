@@ -28,6 +28,7 @@
     "./tabular-store": "./src/tabular-store.ts",
     "./analytics-store": "./src/analytics-store.ts",
     "./media-store": "./src/media-store.ts",
+    "./image-analysis-cache": "./src/image-analysis-cache.ts",
     "./corpus-retriever": "./src/corpus-retriever.ts"
   },
   "dependencies": {
