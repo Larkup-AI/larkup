@@ -355,6 +355,12 @@ configure_npm_globals() {
     return 0
   fi
 
+  # Clean corrupted state from previous failed installs
+  if [[ -d "${new_prefix}/lib/node_modules/${PACKAGE_NAME}" ]]; then
+    log_debug "Removing stale ${PACKAGE_NAME} from ${new_prefix}"
+    rm -rf "${new_prefix}/lib/node_modules/${PACKAGE_NAME}" 2>/dev/null || true
+  fi
+
   mkdir -p "${new_prefix}"
   npm config set prefix "${new_prefix}"
   NPM_GLOBAL_BIN="${new_prefix}/bin"
@@ -447,6 +453,9 @@ install_larkup() {
   local install_log
   install_log="$(new_tmp_file)"
 
+  # Clear corrupted cache 
+  npm cache clean --force >/dev/null 2>&1 || true
+
   # Run npm install in background for spinner
   npm install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps "$spec" >"$install_log" 2>&1 &
   local npm_pid=$!
@@ -490,8 +499,6 @@ install_larkup() {
 }
 
 # ── Post-install verification ─────────────────────────────────
-# The #1 real-world failure: npm install succeeds but the binary
-# isn't on PATH. Detect this and give actionable guidance.
 verify_install() {
   if [[ "$DRY_RUN" == "1" ]]; then
     log_dry "Would verify '${BIN_NAME}' is reachable on PATH"
