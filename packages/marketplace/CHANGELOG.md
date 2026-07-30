@@ -1,5 +1,11 @@
 # @larkup/marketplace
 
+## 0.1.15
+
+### Patch Changes
+
+- f23cba6: Auto-install missing system dependencies (e.g. ffmpeg) during tool installation using the platform package manager (brew on macOS, apt/dnf/pacman/apk on Linux). Falls back to actionable error messages with the exact install command when auto-install is not possible.
+
 ## 0.1.14
 
 ### Patch Changes
