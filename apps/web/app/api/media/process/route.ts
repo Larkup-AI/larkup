@@ -26,8 +26,6 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// One lightweight in-process queue per app instance prevents different users
-// from launching several memory-heavy FFmpeg jobs at once.
 let mediaProcessingChain: Promise<void> = Promise.resolve();
 
 type StageReporter = (stage: MediaPipelineStage, patch: MediaProcessingStepPatch) => Promise<void>;
@@ -114,7 +112,6 @@ async function enqueueMediaProcessing(
       void (serverId ? runWithServer(serverId, touch) : touch()).catch(() => {});
     }, 60_000);
 
-    // Run processing in the background
     const runJob = async () => {
       for (const initialAsset of toProcess) {
         queuedAssetIds.delete(initialAsset.id);
@@ -142,9 +139,7 @@ async function enqueueMediaProcessing(
           const now = Date.now();
           const isTerminal =
             patch.status === 'completed' || patch.status === 'skipped' || patch.status === 'failed';
-          // FFmpeg and providers can report many events per second. Each stage
-          // keeps its own throttle so parallel transcription and vision never
-          // overwrite or suppress one another.
+
           if (
             !isTerminal &&
             patch.status === 'running' &&
@@ -224,7 +219,6 @@ async function enqueueMediaProcessing(
                 return { storageUri, fileSize: stat.size };
               };
 
-              // Process the first entry into the current asset
               const firstEntry = entries[0];
               const mimeType = firstEntry.mimeType || 'application/octet-stream';
               const ext = path.extname(firstEntry.path).slice(1) || 'mp4';
@@ -245,7 +239,6 @@ async function enqueueMediaProcessing(
                 sourceTranscripts.set(currentAsset.id, firstEntry.sourceTranscript);
               }
 
-              // If playlist, insert the rest as new pending assets and process them later
               if (entries.length > 1) {
                 const newInputs: import('@larkup/core/media-store').NewMediaAssetInput[] = [];
                 for (let i = 1; i < entries.length; i++) {
@@ -276,7 +269,7 @@ async function enqueueMediaProcessing(
                   if (transcript?.chunks?.length) sourceTranscripts.set(extraAsset.id, transcript);
                   queuedAssetIds.add(extraAsset.id);
                 });
-                // Push them to the queue to be processed in this loop
+
                 toProcess.push(...claimedExtraAssets);
               }
             } finally {
@@ -481,8 +474,6 @@ async function processMediaWithTool(
 
   const storage = createStorageProvider();
 
-  // Process local media in place so multi-hour files are not duplicated in
-  // Node.js memory. Other storage providers retain the buffered fallback.
   const { promises: fs } = await import('node:fs');
   const path = await import('node:path');
   const os = await import('node:os');
@@ -514,7 +505,10 @@ async function processMediaWithTool(
         'Add the API key for the selected Audio Provider in Settings → Marketplace Tools → Video & Audio.',
       );
     }
-    const frameIntervalSecs = Math.max(5, Number(installedTool?.config?.frameInterval ?? 30) || 30);
+    const frameIntervalSecs = qualityToFrameInterval(
+      asset.indexingQuality,
+      Number(installedTool?.config?.frameInterval ?? 30) || 30,
+    );
     const language =
       typeof toolConfig.audioLanguage === 'string' ? toolConfig.audioLanguage : 'auto';
     const effectiveLanguage =
@@ -522,6 +516,7 @@ async function processMediaWithTool(
         ? sourceTranscript.language
         : language;
     const localUrl = `/api/media/${asset.id}`;
+    const userInstructions = asset.indexingInstructions?.trim() || '';
 
     const limits = getConcurrencyLimits();
 
@@ -537,11 +532,9 @@ async function processMediaWithTool(
       const result = await tool.processVideo(tmpFile, {
         outputDir: tmpDir,
         frameIntervalSecs,
-        maxFrames: 600,
+        maxFrames: qualityToMaxFrames(asset.indexingQuality),
         threads: limits.ffmpegThreads,
         parallelExtraction: limits.canParallelizeFfmpeg,
-        // Manual captions can be authoritative. Automatic captions remain a
-        // fallback and must not silently bypass the configured audio provider.
         skipAudioExtraction: hasManualSourceTranscript,
         onProgress: (value: number) => {
           void reportStage('extract', {
@@ -563,7 +556,6 @@ async function processMediaWithTool(
         hasManualSourceTranscript ? sourceTranscript : null,
       );
 
-      // Process audio transcript
       if (hasManualSourceTranscript) {
         await reportStage('transcribe', {
           status: 'completed',
@@ -640,14 +632,9 @@ async function processMediaWithTool(
         });
       }
 
-      // Analyze consecutive frames together so the vision model can infer
-      // actions, transitions, and persistent on-screen text rather than seeing
-      // every frame as an unrelated image.
       const scenePromise = (async () => {
         const extractedFrames = result.frames as { path: string; timestampSecs: number }[];
         const analysisWindowSecs = visualAnalysisWindow(result.meta.durationSecs);
-        // Chronological batches preserve visual context while keeping a
-        // long recording within a practical vision-request budget.
         const frameGroups = groupFramesByWindow(extractedFrames, analysisWindowSecs, 12);
         if (frameGroups.length === 0) {
           await reportStage('vision', {
@@ -667,10 +654,8 @@ async function processMediaWithTool(
         let skipped = 0;
         let visionThrottled = false;
         let lastVisionRequestAt = 0;
+        let runningContext = '';
         const visionProvider = globalConfig.chatProvider || globalConfig.embeddingProvider;
-        // Providers commonly rate-limit visual generation much more tightly
-        // than text generation. Serializing and pacing Google requests avoids
-        // turning a temporary 429 into a failed video index.
         const visionConcurrency = visionProvider === 'google' ? 1 : limits.apiConcurrency;
         const visionMinIntervalMs = visionProvider === 'google' ? 4_250 : 0;
         const recordProgress = () => {
@@ -689,7 +674,7 @@ async function processMediaWithTool(
         const descriptions = await mapConcurrent(
           frameGroups,
           visionConcurrency,
-          async (frames: { path: string; timestampSecs: number }[]) => {
+          async (frames: { path: string; timestampSecs: number }[], groupIndex: number) => {
             if (visionThrottled) {
               skipped++;
               recordProgress();
@@ -709,23 +694,28 @@ async function processMediaWithTool(
               if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
             }
             lastVisionRequestAt = Date.now();
+
+            const isIntro = groupIndex === 0;
+            const contextBlock = runningContext
+              ? `\nPreviously observed state: ${runningContext}\nReport what CHANGED or is NEW compared to the previous state.`
+              : '';
+            const userBlock = userInstructions
+              ? `\nUser focus instructions: ${userInstructions}`
+              : '';
+            const introBlock = isIntro
+              ? '\nThis is the OPENING of the video. Identify the content type, participants, teams, topic, and any visible setup or initial state. This context will guide analysis of subsequent sequences.'
+              : '';
+
+            const prompt = `These are chronological frames from "${asset.fileName}" at ${timestamps}.${introBlock}${contextBlock}${userBlock}
+Write one evidence note for this time range. Track people, actions, interactions, state changes, important objects, and exact meaningful on-screen text. Perform careful OCR, including Arabic and other right-to-left text without reversing labels. For scoreboards or result animations, compare frames in timestamp order and report the latest visible score as the current/final state; associate each number with the correct nearby team/person label. If a score or counter changed since the previous state, explicitly note the old and new values. Record a winner or result only when visually supported. Omit boilerplate about facts that are not shown. Be factual, information-dense, and concise.`;
+
             try {
               const descRes = await fetchWithRetry(
                 scopedApiUrl('/api/describe-image', reqUrl, serverId),
                 {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    base64Images,
-                    prompt: `These are chronological frames from "${asset.fileName}" at ${timestamps}.
-Write one evidence note for this time range. Track people, actions, interactions, state changes,
-important objects, and exact meaningful on-screen text. Perform careful OCR, including Arabic and
-other right-to-left text without reversing labels. For scoreboards or result animations, compare
-frames in timestamp order and report the latest visible score as the current/final state; associate
-each number with the correct nearby team/person label. Record a winner or result only when visually
-supported. Omit boilerplate about facts that are not shown. Be factual, information-dense, and
-concise.`,
-                  }),
+                  body: JSON.stringify({ base64Images, prompt }),
                 },
               );
               if (!descRes.ok) {
@@ -733,9 +723,7 @@ concise.`,
                 try {
                   const errorBody = (await descRes.json()) as { error?: string };
                   detail = errorBody.error?.trim() || '';
-                } catch {
-                  // Keep the status-only fallback for non-JSON failures.
-                }
+                } catch {}
                 if (/quota|rate limit|resource_exhausted|too many requests/i.test(detail)) {
                   visionThrottled = true;
                 }
@@ -748,6 +736,20 @@ concise.`,
                 return null;
               }
               const { description } = (await descRes.json()) as { description?: string };
+              if (description) {
+                const { extractRunningState } = await import('@larkup/tool-video-audio');
+                const newState = extractRunningState(description);
+                if (newState) {
+                  runningContext = runningContext
+                    ? `${runningContext}; ${newState}`.slice(-500)
+                    : newState;
+                }
+                if (isIntro && description.length > 20) {
+                  runningContext = `[Intro] ${description.slice(0, 300)}${
+                    runningContext ? '; ' + runningContext : ''
+                  }`.slice(-500);
+                }
+              }
               return description
                 ? { text: description, startSecs, endSecs: Math.max(startSecs + 1, endSecs) }
                 : null;
@@ -1040,9 +1042,32 @@ concise.`,
     }
     throw error;
   } finally {
-    // Clean up temp files
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+function qualityToFrameInterval(quality: number | undefined, baseInterval: number): number {
+  const q =
+    typeof quality === 'number' && Number.isFinite(quality)
+      ? Math.max(0, Math.min(100, quality))
+      : 50;
+  if (q <= 20) return Math.max(5, baseInterval * 2);
+  if (q <= 40) return Math.max(5, Math.round(baseInterval * 1.5));
+  if (q <= 60) return Math.max(5, baseInterval);
+  if (q <= 80) return Math.max(5, Math.round(baseInterval * 0.6));
+  return Math.max(3, Math.round(baseInterval * 0.4));
+}
+
+function qualityToMaxFrames(quality: number | undefined): number {
+  const q =
+    typeof quality === 'number' && Number.isFinite(quality)
+      ? Math.max(0, Math.min(100, quality))
+      : 50;
+  if (q <= 20) return 100;
+  if (q <= 40) return 250;
+  if (q <= 60) return 600;
+  if (q <= 80) return 900;
+  return 1200;
 }
 
 function visualAnalysisWindow(durationSecs: number): number {
@@ -1098,9 +1123,6 @@ function groupFramesByWindow<T extends { timestampSecs: number }>(
   return groups;
 }
 
-// Serialize index updates from concurrent media workers. This keeps vector
-// writes bounded and guarantees an asset is only marked complete after its
-// timeline is actually searchable.
 let indexChain: Promise<void> = Promise.resolve();
 
 function ensureSearchable(
@@ -1266,8 +1288,6 @@ async function rollbackPendingDocuments(
   if (await cleanupDocumentRecords(documentIds)) {
     await updateMediaAsset(assetId, { pendingDocumentIds: [] }).catch(() => {});
   } else {
-    // Keep the IDs durably attached to the asset. A retry or deletion can then
-    // remove partial vectors before publishing a new generation.
     await updateMediaAsset(assetId, { pendingDocumentIds: documentIds }).catch(() => {});
   }
 }

@@ -85,6 +85,8 @@ interface MediaAsset {
   createdAt: string;
   dimensions?: { width: number; height: number };
   durationSecs?: number;
+  indexingInstructions?: string;
+  indexingQuality?: number;
 }
 
 interface StagedMedia {
@@ -151,6 +153,29 @@ function estimateMedia(durationSecs: number, isVideo: boolean) {
     processingMinutes: Math.max(1, Math.ceil(minutes * (isVideo ? 0.35 : 0.2))),
     visualScenes: isVideo ? Math.max(1, Math.ceil(durationSecs / visualWindowSecs)) : 0,
   };
+}
+
+function qualityFrameEstimate(quality: number, durationSecs: number): number {
+  const intervalMap: Record<number, number> = { 20: 60, 40: 45, 60: 30, 80: 18, 100: 12 };
+  const maxMap: Record<number, number> = { 20: 100, 40: 250, 60: 600, 80: 900, 100: 1200 };
+  const tier =
+    quality <= 20 ? 20 : quality <= 40 ? 40 : quality <= 60 ? 60 : quality <= 80 ? 80 : 100;
+  const interval = intervalMap[tier];
+  const max = maxMap[tier];
+  return Math.min(max, Math.max(1, Math.ceil(durationSecs / interval)));
+}
+
+function qualityVisionCalls(quality: number, durationSecs: number): number {
+  const windowSecs = durationSecs >= 4 * 60 * 60 ? 15 * 60 : durationSecs > 60 * 60 ? 5 * 60 : 60;
+  const frames = qualityFrameEstimate(quality, durationSecs);
+  return Math.max(1, Math.ceil(frames / Math.max(1, Math.floor(windowSecs / 10))));
+}
+
+function qualityCostEstimate(quality: number, durationSecs: number): string {
+  const calls = qualityVisionCalls(quality, durationSecs);
+  const transcriptionCost = (durationSecs / 60) * 0.006;
+  const visionCost = calls * 0.003;
+  return (transcriptionCost + visionCost).toFixed(2);
 }
 
 function readMediaDuration(file: File): Promise<number | undefined> {
@@ -587,6 +612,8 @@ function MediaContent({
   const [playlistAlertOpen, setPlaylistAlertOpen] = useState(false);
   const [assetToRemove, setAssetToRemove] = useState<MediaAsset | null>(null);
   const [importMode, setImportMode] = useState<'upload' | 'url'>('upload');
+  const [indexingInstructions, setIndexingInstructions] = useState('');
+  const [indexingQuality, setIndexingQuality] = useState(50);
   const mediaApiUrl = serverId
     ? `/api/media?serverId=${encodeURIComponent(serverId)}`
     : '/api/media';
@@ -764,6 +791,10 @@ function MediaContent({
         const batch = staged.slice(i, i + BATCH_SIZE);
         const formData = new FormData();
         batch.forEach((item) => formData.append('file', item.file));
+        if (indexingInstructions.trim()) {
+          formData.append('indexingInstructions', indexingInstructions.trim());
+        }
+        formData.append('indexingQuality', String(indexingQuality));
 
         const res = await fetch(mediaApiUrl, {
           method: 'POST',
@@ -1186,6 +1217,69 @@ function MediaContent({
                     : ''
                 }`}
               />
+            </div>
+          ) : null}
+
+          {mediaType !== 'image' && staged.length > 0 ? (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/10 px-3 py-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  Focus Instructions
+                </label>
+                <Textarea
+                  value={indexingInstructions}
+                  onChange={(e) => setIndexingInstructions(e.target.value)}
+                  placeholder="e.g. Track the score between Team A and Team B, focus on goal moments and final result..."
+                  className="bg-background text-xs min-h-16 max-h-24 resize-none"
+                  rows={2}
+                />
+                <p className="text-[10px] text-muted-foreground/60">
+                  Tell the AI what to focus on while watching. This guides frame analysis and
+                  improves answer accuracy.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                    Indexing Depth
+                  </label>
+                  <span className="text-[10px] font-medium tabular-nums text-foreground">
+                    {indexingQuality <= 20
+                      ? 'Quick Scan'
+                      : indexingQuality <= 40
+                      ? 'Standard'
+                      : indexingQuality <= 60
+                      ? 'Balanced'
+                      : indexingQuality <= 80
+                      ? 'Deep'
+                      : 'Maximum'}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={indexingQuality}
+                  onChange={(e) => setIndexingQuality(Number(e.target.value))}
+                  className="w-full h-1.5 accent-primary cursor-pointer"
+                />
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground/60">
+                  <span>Faster · Cheaper</span>
+                  <span>Slower · More Accurate</span>
+                </div>
+                {stagedDuration > 0 ? (
+                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-0.5">
+                    <span>~{qualityFrameEstimate(indexingQuality, stagedDuration)} frames</span>
+                    <span>·</span>
+                    <span>~{qualityVisionCalls(indexingQuality, stagedDuration)} vision calls</span>
+                    <span>·</span>
+                    <span className="tabular-nums">
+                      ~${qualityCostEstimate(indexingQuality, stagedDuration)}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
             </div>
           ) : null}
 

@@ -17,6 +17,7 @@ import {
   Database,
   Film,
   Upload,
+  Eye,
 } from 'lucide-react';
 import {
   Select,
@@ -74,6 +75,7 @@ export function CorpusPanel({
     { type: 'single'; doc: SourceDocument } | { type: 'all' } | { type: 'selected' } | null
   >(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [inspectorDoc, setInspectorDoc] = useState<SourceDocument | null>(null);
 
   const [page, setPage] = useState(0);
 
@@ -345,6 +347,16 @@ export function CorpusPanel({
                           <Pencil className="size-4" />
                         </button>
                       )}
+                      {doc.metadata?.isGroup && (
+                        <button
+                          type="button"
+                          aria-label="Inspect indexed content"
+                          onClick={() => setInspectorDoc(doc)}
+                          className="text-muted-foreground transition-colors hover:text-primary"
+                        >
+                          <Eye className="size-4" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         aria-label="Delete document"
@@ -448,7 +460,87 @@ export function CorpusPanel({
           }
         }}
       />
+
+      <VideoKnowledgeInspector
+        doc={inspectorDoc}
+        allDocuments={documents}
+        onClose={() => setInspectorDoc(null)}
+      />
     </>
+  );
+}
+
+function VideoKnowledgeInspector({
+  doc,
+  allDocuments,
+  onClose,
+}: {
+  doc: SourceDocument | null;
+  allDocuments: SourceDocument[];
+  onClose: () => void;
+}) {
+  if (!doc || !doc.metadata?.isGroup) return null;
+
+  const childIds: string[] = doc.metadata?.childIds ?? [];
+  const children = childIds
+    .map((id: string) => allDocuments.find((d) => d.id === id))
+    .filter((d): d is SourceDocument => d !== undefined)
+    .sort((a, b) => {
+      const aStart = a.metadata?.startSecs ?? 0;
+      const bStart = b.metadata?.startSecs ?? 0;
+      return aStart - bStart;
+    });
+
+  return (
+    <Dialog open={!!doc} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="w-full max-w-3xl max-h-[90%]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Film className="size-4 text-muted-foreground" />
+            {doc.title}
+          </DialogTitle>
+          <DialogDescription>
+            {children.length} indexed segment{children.length !== 1 ? 's' : ''} ·{' '}
+            {doc.charCount.toLocaleString()} total characters
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="max-h-[70vh]">
+          <div className="space-y-4 pr-4">
+            {children.map((child, index) => {
+              const startSecs = child.metadata?.startSecs;
+              const hasTimestamp = typeof startSecs === 'number';
+              return (
+                <div
+                  key={child.id}
+                  className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                      {hasTimestamp
+                        ? `${Math.floor(startSecs / 60)}:${String(
+                            Math.floor(startSecs % 60),
+                          ).padStart(2, '0')}`
+                        : `Segment ${index + 1}`}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+                      {child.charCount.toLocaleString()} chars
+                    </span>
+                  </div>
+                  <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground font-mono">
+                    {child.content}
+                  </pre>
+                </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

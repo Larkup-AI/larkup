@@ -64,6 +64,9 @@ async function saveMedia(req: Request) {
 
     const formData = await req.formData();
     const files = formData.getAll('file') as File[];
+    const indexingInstructions = (formData.get('indexingInstructions') as string) || undefined;
+    const rawQuality = formData.get('indexingQuality') as string | null;
+    const indexingQuality = rawQuality ? Number(rawQuality) : undefined;
 
     if (files.length === 0) {
       return NextResponse.json({ error: 'No files provided.' }, { status: 400 });
@@ -75,7 +78,7 @@ async function saveMedia(req: Request) {
     for (const file of files) {
       const type = detectMediaType(file.type);
       if (!type) {
-        continue; // skip unsupported types silently
+        continue;
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
@@ -90,6 +93,8 @@ async function saveMedia(req: Request) {
         mimeType: file.type,
         storageUri,
         fileSize: file.size,
+        indexingInstructions,
+        indexingQuality,
       });
     }
 
@@ -97,7 +102,6 @@ async function saveMedia(req: Request) {
       return NextResponse.json({ error: 'No supported media files found.' }, { status: 400 });
     }
 
-    // Batch create media asset records
     const { addMediaAssets } = await import('@larkup/core/media-store');
     const assets = await addMediaAssets(results);
 
