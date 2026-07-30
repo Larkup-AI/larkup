@@ -448,7 +448,7 @@ install_larkup() {
   install_log="$(new_tmp_file)"
 
   # Run npm install in background for spinner
-  npm install -g --no-fund --no-audit --ignore-scripts "$spec" >"$install_log" 2>&1 &
+  npm install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps "$spec" >"$install_log" 2>&1 &
   local npm_pid=$!
 
   local chars="/-\\|"
@@ -463,8 +463,8 @@ install_larkup() {
   done
   echo -en "\r\033[K" # Clear line
   
-  wait $npm_pid
-  local exit_code=$?
+  local exit_code=0
+  wait $npm_pid || exit_code=$?
 
   if [[ $exit_code -eq 0 ]]; then
     [[ "$is_upgrade" == "1" ]] && log_success "Larkup upgraded!" || log_success "Larkup installed!"
