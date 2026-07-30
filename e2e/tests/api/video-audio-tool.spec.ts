@@ -69,7 +69,7 @@ test.describe('Video & Audio marketplace tool', () => {
     }
   });
 
-  test('aligns transcript and visual evidence into searchable timeline segments', async () => {
+  test('aligns transcript and visual evidence into searchable timeline segments with running state', async () => {
     execFileSync('pnpm', ['--filter', '@larkup/tool-video-audio', 'build'], {
       cwd: repoRoot,
       stdio: 'pipe',
@@ -99,6 +99,39 @@ test.describe('Video & Audio marketplace tool', () => {
     expect(segments[0].text).toContain('scoreboard changes');
     expect(segments[1].text).toContain('The blue team wins');
     expect(segments[1]).toMatchObject({ sequence: 1, startSecs: 60, endSecs: 120 });
+
+    expect(typeof segments[0].cumulativeState).toBe('string');
+    expect(typeof segments[1].cumulativeState).toBe('string');
+    expect(segments[0].cumulativeState).toContain('2–3');
+    expect(segments[1].text).toContain('Running state from earlier');
+  });
+
+  test('extractRunningState detects scores and winners from mixed-language text', async () => {
+    execFileSync('pnpm', ['--filter', '@larkup/tool-video-audio', 'build'], {
+      cwd: repoRoot,
+      stdio: 'pipe',
+    });
+    const tool = await import(
+      pathToFileURL(path.join(repoRoot, 'packages/tools/video-audio/dist/index.js')).href
+    );
+
+    const scoreText = 'The scoreboard shows 3-2 in favor of blue team. Score: Blue 3, Red 2';
+    const state = tool.extractRunningState(scoreText);
+    expect(state).toBeTruthy();
+    expect(state).toContain('3-2');
+
+    const arabicText = 'نتيجة المباراة: فريق الأهلي 2 - فريق الزمالك 1';
+    const arabicState = tool.extractRunningState(arabicText);
+    expect(arabicState).toBeTruthy();
+    expect(arabicState).toContain('نتيجة');
+
+    const winnerText = 'The champion is the blue team with a final score of 5-3';
+    const winnerState = tool.extractRunningState(winnerText);
+    expect(winnerState).toBeTruthy();
+
+    const noScoreText = 'A beautiful sunset over the mountain';
+    const emptyState = tool.extractRunningState(noScoreText);
+    expect(emptyState).toBe('');
   });
 
   test('builds Nova-3 Deepgram requests with explicit and inferred languages', async () => {

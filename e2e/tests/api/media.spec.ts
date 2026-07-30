@@ -98,6 +98,27 @@ test.describe('Media API (/api/media)', () => {
     }
   });
 
+  test('persists indexing instructions and quality when uploading media', async ({ request }) => {
+    const upload = await request.post('/api/media', {
+      multipart: {
+        file: {
+          name: `e2e-quality-${Date.now()}.wav`,
+          mimeType: 'audio/wav',
+          buffer: createSilentWav(),
+        },
+        indexingInstructions: 'Track the score between Team A and Team B',
+        indexingQuality: '80',
+      },
+    });
+    expect(upload.status()).toBe(201);
+    const body = await upload.json();
+    const asset = body.assets[0];
+    expect(asset.indexingInstructions).toBe('Track the score between Team A and Team B');
+    expect(asset.indexingQuality).toBe(80);
+
+    await request.delete(`/api/media?id=${asset.id}`).catch(() => {});
+  });
+
   test.afterAll(async ({ request }) => {
     if (assetId) await request.delete(`/api/media?id=${assetId}`).catch(() => {});
   });
