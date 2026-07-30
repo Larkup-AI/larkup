@@ -595,18 +595,10 @@ function formatProviderName(provider: string): string {
     .join(' ');
 }
 
-async function importFfmpeg() {
-  return import('fluent-ffmpeg');
-}
-
 async function probeAudioDuration(audioPath: string): Promise<number> {
-  const ffmpeg = await importFfmpeg();
-  return new Promise((resolve, reject) => {
-    ffmpeg.default.ffprobe(audioPath, (error: Error | null, data: any) => {
-      if (error) reject(error);
-      else resolve(Number(data.format?.duration ?? 0));
-    });
-  });
+  const { ffprobe } = await import('./ffmpeg-spawn');
+  const data = await ffprobe(audioPath);
+  return Number(data.format?.duration ?? 0);
 }
 
 async function splitAudio(
@@ -615,30 +607,37 @@ async function splitAudio(
   segmentSecs: number,
   onProgress?: (progress: number) => void | Promise<void>,
 ): Promise<string[]> {
-  const ffmpeg = await importFfmpeg();
+  const { runFfmpeg } = await import('./ffmpeg-spawn');
   const path = await import('node:path');
   const { promises: fs } = await import('node:fs');
   const pattern = path.join(outputDir, 'part_%04d.mp3');
 
-  await new Promise<void>((resolve, reject) => {
-    ffmpeg
-      .default(audioPath)
-      .noVideo()
-      .audioChannels(1)
-      .audioFrequency(16_000)
-      .audioCodec('libmp3lame')
-      .audioBitrate('32k')
-      .format('segment')
-      .outputOptions([`-segment_time ${segmentSecs}`, '-reset_timestamps 1'])
-      .output(pattern)
-      .on('progress', (progress: { percent?: number }) => {
-        if (typeof progress.percent === 'number') {
-          void onProgress?.(Math.max(0, Math.min(1, progress.percent / 100)));
-        }
-      })
-      .on('end', () => resolve())
-      .on('error', reject)
-      .run();
+  const duration = await probeAudioDuration(audioPath);
+  await runFfmpeg({
+    args: [
+      '-i',
+      audioPath,
+      '-vn',
+      '-ac',
+      '1',
+      '-ar',
+      '16000',
+      '-codec:a',
+      'libmp3lame',
+      '-b:a',
+      '32k',
+      '-f',
+      'segment',
+      '-segment_time',
+      String(segmentSecs),
+      '-reset_timestamps',
+      '1',
+      pattern,
+    ],
+    durationSecs: duration,
+    onProgress: (percent) => {
+      void onProgress?.(Math.max(0, Math.min(1, percent)));
+    },
   });
 
   return (await fs.readdir(outputDir))

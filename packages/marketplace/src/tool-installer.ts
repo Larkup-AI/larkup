@@ -195,10 +195,13 @@ async function tryAutoInstallDep(
 
   if (!installCmd) return false;
 
-  onProgress?.(`Auto-installing ${dep}…`);
+  onProgress?.(`Auto-installing ${dep} via "${installCmd}"…`);
   try {
-    await execAsync(installCmd, { timeout: 120_000 });
-  } catch {
+    await execAsync(installCmd, { timeout: 300_000 });
+    onProgress?.(`${dep} installation command finished.`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    onProgress?.(`Auto-install of ${dep} failed: ${message}`);
     return false;
   }
 
