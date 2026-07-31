@@ -1,5 +1,17 @@
 # larkup
 
+## 0.1.48
+
+### Patch Changes
+
+- aae57aa: Recover gracefully from embedding quota limits, improve Knowledge Base and visual-answer UX, and bundle video processing binaries so media tooling installs without a separate ffmpeg setup.
+- Updated dependencies [aae57aa]
+  - @larkup/core@0.3.2
+  - @larkup/marketplace@0.1.17
+  - @larkup/tool-video-audio@0.3.2
+  - @larkup/scraper@0.1.33
+  - @larkup/tool-doc-editor@0.2.10
+
 ## 0.1.47
 
 ### Patch Changes
