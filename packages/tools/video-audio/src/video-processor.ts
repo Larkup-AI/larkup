@@ -55,32 +55,21 @@ export interface MultimodalSegment extends TimedText {
   cumulativeState: string;
 }
 
+const MAX_CUMULATIVE_CONTEXT_LENGTH = 500;
+
+/**
+ * Return a bounded, language-neutral excerpt suitable for carrying evidence
+ * into a later timeline segment. The name is retained for API compatibility.
+ */
 export function extractRunningState(text: string): string {
-  const stateLines: string[] = [];
-  const scorePatterns = [
-    /\b(\d+)\s*[-–:]\s*(\d+)\b/g,
-    /(?:score|نتيجة|الأهداف)[:\s]*(.{5,60})/gi,
-    /(?:leading|winning|ahead|فائز|متقدم|يتقدم)[:\s]*(.{5,40})/gi,
-    /(?:goal|هدف|أحرز|سجل)[:\s]*(.{5,60})/gi,
-  ];
-  for (const pattern of scorePatterns) {
-    const matches = text.matchAll(pattern);
-    for (const match of matches) {
-      stateLines.push(match[0].trim());
-    }
-  }
-  const resultPatterns = [
-    /(?:winner|won|champion|beat|defeated|فاز|كسب|البطل|حسم|انتصر)[:\s]*(.{5,60})/gi,
-    /(?:final|result|outcome|النتيجة النهائية)[:\s]*(.{5,60})/gi,
-  ];
-  for (const pattern of resultPatterns) {
-    const matches = text.matchAll(pattern);
-    for (const match of matches) {
-      stateLines.push(match[0].trim());
-    }
-  }
-  const unique = [...new Set(stateLines)];
-  return unique.slice(-6).join('; ').slice(-500);
+  return text.replace(/\s+/g, ' ').trim().slice(-MAX_CUMULATIVE_CONTEXT_LENGTH);
+}
+
+function appendRunningState(previous: string, current: string): string {
+  if (!current) return previous;
+  if (!previous) return current;
+  if (previous.includes(current)) return previous;
+  return `${previous}\n${current}`.slice(-MAX_CUMULATIVE_CONTEXT_LENGTH);
 }
 
 export function buildMultimodalSegments(
@@ -111,6 +100,7 @@ export function buildMultimodalSegments(
 
     const transcriptText = [...new Set(spoken)].join(' ');
     const visualContext = [...new Set(seen)].join(' ');
+    const currentEvidence = [transcriptText, visualContext].filter(Boolean).join('\n');
     const parts = [
       `Timeline: ${formatTimestamp(startSecs)}–${formatTimestamp(endSecs)}.`,
       runningState ? `Running state from earlier: ${runningState}` : '',
@@ -119,10 +109,7 @@ export function buildMultimodalSegments(
     ].filter(Boolean);
 
     const segmentText = parts.join('\n');
-    const newState = extractRunningState(segmentText);
-    if (newState) {
-      runningState = newState;
-    }
+    runningState = appendRunningState(runningState, extractRunningState(currentEvidence));
 
     segments.push({
       text: segmentText,

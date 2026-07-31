@@ -1,30 +1,14 @@
-/**
- * Lightweight ffmpeg/ffprobe helpers using child_process.spawn.
- *
- * Replaces the deprecated `fluent-ffmpeg` library with direct process
- * spawning for maximum compatibility and zero third-party runtime deps.
- */
-
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 
-/* ------------------------------------------------------------------ */
-/* Binary resolution                                                    */
-/* ------------------------------------------------------------------ */
-
 let _ffmpegPath: string | null = null;
 let _ffprobePath: string | null = null;
 
-/**
- * Resolve the ffmpeg binary path. The packaged binary makes the marketplace
- * tool work on a clean machine; a system installation remains the fallback.
- */
 function resolveFfmpegPath(): string {
   if (_ffmpegPath) return _ffmpegPath;
 
-  // Try the bundled binary first.
   try {
     const installerPath = require.resolve('@ffmpeg-installer/ffmpeg');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -34,7 +18,7 @@ function resolveFfmpegPath(): string {
       return _ffmpegPath;
     }
   } catch {
-    // Not installed — fall through to system binary
+    // Use a system installation when the optional bundled binary is unavailable.
   }
 
   _ffmpegPath = 'ffmpeg';
@@ -44,7 +28,6 @@ function resolveFfmpegPath(): string {
 function resolveFfprobePath(): string {
   if (_ffprobePath) return _ffprobePath;
 
-  // Try the bundled binary first.
   try {
     const installerPath = require.resolve('@ffprobe-installer/ffprobe');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -54,16 +37,12 @@ function resolveFfprobePath(): string {
       return _ffprobePath;
     }
   } catch {
-    // Not installed — fall through
+    // Use a system installation when the optional bundled binary is unavailable.
   }
 
   _ffprobePath = 'ffprobe';
   return _ffprobePath;
 }
-
-/* ------------------------------------------------------------------ */
-/* ffprobe                                                              */
-/* ------------------------------------------------------------------ */
 
 export interface ProbeResult {
   format: {
@@ -79,9 +58,6 @@ export interface ProbeResult {
   }>;
 }
 
-/**
- * Probe a media file for metadata using ffprobe.
- */
 export function ffprobe(filePath: string): Promise<ProbeResult> {
   return new Promise((resolve, reject) => {
     const args = [
@@ -119,10 +95,6 @@ export function ffprobe(filePath: string): Promise<ProbeResult> {
   });
 }
 
-/* ------------------------------------------------------------------ */
-/* ffmpeg runner                                                        */
-/* ------------------------------------------------------------------ */
-
 export interface FfmpegRunOptions {
   args: string[];
   /** Parse progress from stderr lines and call back with percent 0–1. */
@@ -133,9 +105,6 @@ export interface FfmpegRunOptions {
   durationSecs?: number;
 }
 
-/**
- * Run an ffmpeg command and return a promise that resolves on success.
- */
 export function runFfmpeg(options: FfmpegRunOptions): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = ['-y', ...options.args];
@@ -145,14 +114,12 @@ export function runFfmpeg(options: FfmpegRunOptions): Promise<void> {
     proc.stderr.on('data', (data: Uint8Array) => {
       stderrBuf += data.toString();
 
-      // Process line by line
       const lines = stderrBuf.split('\n');
       stderrBuf = lines.pop() ?? '';
 
       for (const line of lines) {
         options.onStderr?.(line);
 
-        // Parse progress: "time=HH:MM:SS.ms" or "time=SS.ms"
         if (options.onProgress && options.durationSecs && options.durationSecs > 0) {
           const timeMatch = line.match(/time=(\d+):(\d+):(\d+)\.(\d+)/);
           if (timeMatch) {

@@ -126,8 +126,7 @@ export async function importMediaUrl(
       );
     } catch (error) {
       if (!isVideoHostForbidden(error)) throw error;
-      // Video hosts occasionally reject a freshly-issued media URL. Re-extract
-      // it with a conservative one-fragment retry before failing the asset.
+      // Retry once with a freshly resolved URL and lower fragment concurrency.
       options.onProgress?.({ message: 'Source rejected the download; refreshing the video link…' });
       try {
         output = await runYtDlp(
@@ -212,7 +211,6 @@ function isVideoHostForbidden(error: unknown): boolean {
   return error instanceof Error && /\b(?:403|forbidden)\b/i.test(error.message);
 }
 
-/** Keep upstream yt-dlp output out of the end-user status while retaining a useful cause. */
 function friendlyVideoDownloadError(error: unknown): Error {
   if (isVideoHostForbidden(error)) {
     return new Error(
@@ -222,11 +220,6 @@ function friendlyVideoDownloadError(error: unknown): Error {
   return error instanceof Error ? error : new Error('Video download failed. Please try again.');
 }
 
-/**
- * Read the video's own manual or automatic captions through yt-dlp. This is
- * both faster and usually more accurate than transcribing compressed audio,
- * especially for names and non-English speech.
- */
 async function fetchYouTubeTranscript(url: string): Promise<TranscriptionResult | undefined> {
   const output = await runYtDlp(['--dump-single-json', '--skip-download', '--no-playlist', url]);
   const data = JSON.parse(output) as {
@@ -282,7 +275,6 @@ function selectSubtitleTrack(
   return undefined;
 }
 
-/** Parse YouTube's timestamped json3 caption format into indexing chunks. */
 export function parseYouTubeJson3Transcript(
   data: {
     events?: { tStartMs?: number; dDurationMs?: number; segs?: { utf8?: string }[] }[];
@@ -396,8 +388,7 @@ function runYtDlp(
   onProgress?: (progress: { percent?: number; message: string }) => void,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    // Ensure yt-dlp can find Node.js as a JS runtime (required inside Docker
-    // containers that ship node but not deno).
+    // yt-dlp needs a JavaScript runtime in Node-only containers.
     const fullArgs = ['--js-runtimes', 'nodejs:node', ...args];
     const child = spawn('yt-dlp', fullArgs, { shell: false });
     let stdout = '';

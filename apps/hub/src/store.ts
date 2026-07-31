@@ -103,7 +103,7 @@ export function seedRegistry(): void {
           label: 'Transcription language',
           type: 'text',
           defaultValue: 'auto',
-          help: 'Use auto to infer Arabic from the media title and use provider detection otherwise. Enter a language code such as ar, ar-EG, en, or de to override it.',
+          help: 'Use auto for provider language detection, or enter a language code such as ar, ar-EG, en, or de to override it.',
         },
         {
           key: 'audioApiKey',

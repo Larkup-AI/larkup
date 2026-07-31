@@ -106,7 +106,7 @@ test.describe('Video & Audio marketplace tool', () => {
     expect(segments[1].text).toContain('Running state from earlier');
   });
 
-  test('extractRunningState detects scores and winners from mixed-language text', async () => {
+  test('preserves bounded multilingual timeline context without domain-specific matching', async () => {
     execFileSync('pnpm', ['--filter', '@larkup/tool-video-audio', 'build'], {
       cwd: repoRoot,
       stdio: 'pipe',
@@ -115,26 +115,13 @@ test.describe('Video & Audio marketplace tool', () => {
       pathToFileURL(path.join(repoRoot, 'packages/tools/video-audio/dist/index.js')).href
     );
 
-    const scoreText = 'The scoreboard shows 3-2 in favor of blue team. Score: Blue 3, Red 2';
-    const state = tool.extractRunningState(scoreText);
-    expect(state).toBeTruthy();
-    expect(state).toContain('3-2');
-
-    const arabicText = 'نتيجة المباراة: فريق الأهلي 2 - فريق الزمالك 1';
-    const arabicState = tool.extractRunningState(arabicText);
-    expect(arabicState).toBeTruthy();
-    expect(arabicState).toContain('نتيجة');
-
-    const winnerText = 'The champion is the blue team with a final score of 5-3';
-    const winnerState = tool.extractRunningState(winnerText);
-    expect(winnerState).toBeTruthy();
-
-    const noScoreText = 'A beautiful sunset over the mountain';
-    const emptyState = tool.extractRunningState(noScoreText);
-    expect(emptyState).toBe('');
+    const context = 'تفاصيل المنتج: اللون أزرق. The device temperature is 42°C.';
+    expect(tool.extractRunningState(context)).toBe(context);
+    expect(tool.extractRunningState('  first\n second  ')).toBe('first second');
+    expect(tool.extractRunningState('x'.repeat(600))).toHaveLength(500);
   });
 
-  test('builds Nova-3 Deepgram requests with explicit and inferred languages', async () => {
+  test('builds Deepgram requests with explicit languages or provider detection', async () => {
     execFileSync('pnpm', ['--filter', '@larkup/tool-video-audio', 'build'], {
       cwd: repoRoot,
       stdio: 'pipe',
@@ -143,29 +130,19 @@ test.describe('Video & Audio marketplace tool', () => {
       pathToFileURL(path.join(repoRoot, 'packages/tools/video-audio/dist/index.js')).href
     );
 
-    expect(tool.inferLanguageHintFromText('ديربي الكون مع عاشور و دكتور عبد العزيز')).toBe('ar');
-    expect(tool.inferLanguageHintFromText('English football final')).toBeUndefined();
+    expect(tool.inferLanguageHintFromText('أي عنوان')).toBeUndefined();
 
-    const inferredArabic = new URL(
+    const automatic = new URL(
       tool.buildDeepgramTranscriptionUrl({
         language: 'auto',
         context: 'ديربي الكون مع عاشور و دكتور عبد العزيز',
       }),
     );
-    expect(inferredArabic.searchParams.get('model')).toBe('nova-3');
-    expect(inferredArabic.searchParams.get('language')).toBe('ar');
-    expect(inferredArabic.searchParams.has('detect_language')).toBe(false);
-    expect(inferredArabic.searchParams.getAll('keyterm')).toContain('عاشور');
-    expect(inferredArabic.searchParams.getAll('keyterm')).toContain('العزيز');
-
-    const automatic = new URL(
-      tool.buildDeepgramTranscriptionUrl({
-        context: 'English football final',
-      }),
-    );
     expect(automatic.searchParams.get('model')).toBe('nova-3-general');
     expect(automatic.searchParams.get('detect_language')).toBe('true');
     expect(automatic.searchParams.has('language')).toBe(false);
+    expect(automatic.searchParams.getAll('keyterm')).toContain('عاشور');
+    expect(automatic.searchParams.getAll('keyterm')).toContain('العزيز');
 
     const configured = new URL(
       tool.buildDeepgramTranscriptionUrl({
@@ -178,7 +155,7 @@ test.describe('Video & Audio marketplace tool', () => {
     expect(configured.searchParams.has('detect_language')).toBe(false);
 
     const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-deepgram-e2e-'));
-    const audioPath = path.join(workspace, 'arabic.mp3');
+    const audioPath = path.join(workspace, 'audio.mp3');
     const originalFetch = globalThis.fetch;
     const progress: Array<{ current: number; total: number; message: string }> = [];
     let requestCount = 0;
@@ -187,8 +164,8 @@ test.describe('Video & Audio marketplace tool', () => {
       globalThis.fetch = async (input) => {
         requestCount++;
         const requestUrl = new URL(String(input));
-        expect(requestUrl.searchParams.get('model')).toBe('nova-3');
-        expect(requestUrl.searchParams.get('language')).toBe('ar');
+        expect(requestUrl.searchParams.get('model')).toBe('nova-3-general');
+        expect(requestUrl.searchParams.get('detect_language')).toBe('true');
         return new Response(
           JSON.stringify({
             metadata: { duration: 2 },
