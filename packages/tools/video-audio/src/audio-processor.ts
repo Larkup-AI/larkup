@@ -1,14 +1,3 @@
-/**
- * Audio processing pipeline.
- *
- * Transcription strategies:
- * 1. Explicitly selected Audio Provider API (OpenAI, Groq, Deepgram, or ElevenLabs)
- * 2. Local Whisper.cpp — fully offline via nodejs-whisper (optional)
- *
- * The transcription is split into timestamped chunks for granular
- * retrieval in the RAG pipeline.
- */
-
 export interface TranscriptChunk {
   text: string;
   startSecs: number;
@@ -43,7 +32,7 @@ export interface TranscriptionOptions {
   chunkDurationSecs?: number;
   /** Language hint (e.g., "en", "de") */
   language?: string;
-  /** Short context such as the media title, used to preserve names and infer Arabic. */
+  /** Optional context, such as a media title, that can help preserve names. */
   context?: string;
   /** Reports completed transcription work and its current unit. */
   onProgress?: (
@@ -57,29 +46,15 @@ export interface TranscriptionOptions {
 const DEEPGRAM_TRANSCRIPTION_URL = 'https://api.deepgram.com/v1/listen';
 const AUTO_LANGUAGE = 'auto';
 
-/**
- * Infer only languages that cannot reliably use Deepgram's automatic language
- * detection. Other text intentionally returns undefined so the provider can
- * perform its own detection.
- */
-export function inferLanguageHintFromText(text?: string): string | undefined {
-  if (!text) return undefined;
-  const letters = text.match(/\p{Letter}/gu) ?? [];
-  if (letters.length === 0) return undefined;
-
-  const arabicLetters = text.match(/\p{Script=Arabic}/gu)?.length ?? 0;
-  return arabicLetters >= 2 && arabicLetters / letters.length >= 0.2 ? 'ar' : undefined;
+/** @deprecated Use an explicit language code or provider language detection. */
+export function inferLanguageHintFromText(_text?: string): undefined {
+  return undefined;
 }
 
-/**
- * Build the Deepgram request URL without reading environment or provider state,
- * making provider routing and language behavior straightforward to test.
- */
 export function buildDeepgramTranscriptionUrl(
   options: Pick<TranscriptionOptions, 'language' | 'context'> = {},
 ): string {
-  const configuredLanguage = normalizeLanguage(options.language);
-  const language = configuredLanguage ?? inferLanguageHintFromText(options.context);
+  const language = normalizeLanguage(options.language);
   const url = new URL(DEEPGRAM_TRANSCRIPTION_URL);
 
   url.searchParams.set('model', language ? 'nova-3' : 'nova-3-general');
@@ -100,9 +75,6 @@ export function buildDeepgramTranscriptionUrl(
   return url.toString();
 }
 
-/**
- * Transcribe an audio file and return timestamped chunks.
- */
 export async function transcribeAudio(
   audioPath: string,
   options: TranscriptionOptions = {},
@@ -125,9 +97,6 @@ export async function transcribeAudio(
   return result;
 }
 
-/**
- * Full pipeline: transcribe + chunk for an audio file.
- */
 export async function processAudio(
   audioPath: string,
   options: TranscriptionOptions = {},
@@ -211,10 +180,6 @@ async function transcribeLongAudio(
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* API-based transcription                                             */
-/* ------------------------------------------------------------------ */
-
 async function transcribeViaApi(
   audioPath: string,
   options: TranscriptionOptions,
@@ -243,7 +208,6 @@ async function transcribeViaApi(
     );
   }
 
-  // 1. Handle Deepgram Native API
   if (provider === 'deepgram') {
     const dgUrl = buildDeepgramTranscriptionUrl(options);
     const res = await fetch(dgUrl, {
@@ -265,37 +229,21 @@ async function transcribeViaApi(
     const alt = channel?.alternatives?.[0];
     const text = alt?.transcript || '';
     const words = alt?.words || [];
-    const requestedLanguage =
-      normalizeLanguage(options.language) ?? inferLanguageHintFromText(options.context);
+    const requestedLanguage = normalizeLanguage(options.language);
     const detectedLanguage =
       channel?.detected_language ??
       alt?.languages?.[0] ??
       data.metadata?.language ??
       requestedLanguage;
 
-    const chunks: TranscriptChunk[] = [];
-    let currentText = '';
-    let chunkStart = words[0]?.start ?? 0;
-    let chunkEnd = words[0]?.end ?? 0;
-
-    for (const w of words) {
-      if (w.start - chunkStart >= chunkDuration && currentText.trim()) {
-        chunks.push({
-          text: currentText.trim(),
-          startSecs: chunkStart,
-          endSecs: chunkEnd,
-        });
-        currentText = w.punctuated_word || w.word;
-        chunkStart = w.start;
-        chunkEnd = w.end;
-      } else {
-        currentText += (currentText ? ' ' : '') + (w.punctuated_word || w.word);
-        chunkEnd = w.end;
-      }
-    }
-    if (currentText.trim()) {
-      chunks.push({ text: currentText.trim(), startSecs: chunkStart, endSecs: chunkEnd });
-    }
+    const chunks = chunkWords(
+      words.map((word: { start: number; end: number; word: string; punctuated_word?: string }) => ({
+        start: word.start,
+        end: word.end,
+        text: word.punctuated_word || word.word,
+      })),
+      chunkDuration,
+    );
 
     const language = typeof detectedLanguage === 'string' ? detectedLanguage : undefined;
     return {
@@ -307,7 +255,6 @@ async function transcribeViaApi(
     };
   }
 
-  // 2. Handle OpenAI-compatible APIs (OpenAI, Groq, etc)
   let url = 'https://api.openai.com/v1/audio/transcriptions';
   let model = 'whisper-1';
 
@@ -354,28 +301,16 @@ async function transcribeViaApi(
 
   const data = await res.json();
 
-  // ElevenLabs format is slightly different
   if (provider === 'elevenlabs') {
     const words = data.words || [];
-    const chunks: TranscriptChunk[] = [];
-    let currentText = '';
-    let chunkStart = words[0]?.start ?? 0;
-    let chunkEnd = words[0]?.end ?? 0;
-
-    for (const w of words) {
-      if (w.start - chunkStart >= chunkDuration && currentText.trim()) {
-        chunks.push({ text: currentText.trim(), startSecs: chunkStart, endSecs: chunkEnd });
-        currentText = w.text;
-        chunkStart = w.start;
-        chunkEnd = w.end;
-      } else {
-        currentText += (currentText ? ' ' : '') + w.text;
-        chunkEnd = w.end;
-      }
-    }
-    if (currentText.trim()) {
-      chunks.push({ text: currentText.trim(), startSecs: chunkStart, endSecs: chunkEnd });
-    }
+    const chunks = chunkWords(
+      words.map((word: { start: number; end: number; text: string }) => ({
+        start: word.start,
+        end: word.end,
+        text: word.text,
+      })),
+      chunkDuration,
+    );
 
     return {
       fullText: data.text,
@@ -390,7 +325,6 @@ async function transcribeViaApi(
     };
   }
 
-  // OpenAI/Groq compatible format
   const segments = data.segments || [];
   const chunks = mergeSegmentsIntoChunks(segments, chunkDuration);
 
@@ -407,15 +341,10 @@ async function transcribeViaApi(
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* Local Whisper transcription                                         */
-/* ------------------------------------------------------------------ */
-
 async function transcribeLocal(
   audioPath: string,
   options: TranscriptionOptions,
 ): Promise<TranscriptionResult> {
-  // Try to load nodejs-whisper
   let whisper: any;
   try {
     whisper = await import('nodejs-whisper');
@@ -444,7 +373,6 @@ async function transcribeLocal(
   const fullText = typeof result === 'string' ? result : String(result);
   const chunkDuration = options.chunkDurationSecs ?? 30;
 
-  // Without timestamps from local whisper, create fixed-size chunks
   const chunks = splitTextIntoChunks(fullText, chunkDuration);
 
   return {
@@ -459,10 +387,6 @@ async function transcribeLocal(
     },
   };
 }
-
-/* ------------------------------------------------------------------ */
-/* Chunking helpers                                                    */
-/* ------------------------------------------------------------------ */
 
 function mergeSegmentsIntoChunks(
   segments: { start: number; end: number; text: string }[],
@@ -502,12 +426,38 @@ function mergeSegmentsIntoChunks(
   return chunks;
 }
 
+function chunkWords(
+  words: Array<{ start: number; end: number; text: string }>,
+  chunkDurationSecs: number,
+): TranscriptChunk[] {
+  if (words.length === 0) return [];
+
+  const chunks: TranscriptChunk[] = [];
+  let currentText = '';
+  let chunkStart = words[0].start;
+  let chunkEnd = words[0].end;
+
+  for (const word of words) {
+    if (word.start - chunkStart >= chunkDurationSecs && currentText.trim()) {
+      chunks.push({ text: currentText.trim(), startSecs: chunkStart, endSecs: chunkEnd });
+      currentText = word.text;
+      chunkStart = word.start;
+    } else {
+      currentText += `${currentText ? ' ' : ''}${word.text}`;
+    }
+    chunkEnd = word.end;
+  }
+
+  if (currentText.trim()) {
+    chunks.push({ text: currentText.trim(), startSecs: chunkStart, endSecs: chunkEnd });
+  }
+  return chunks;
+}
+
 function splitTextIntoChunks(text: string, chunkDurationSecs: number): TranscriptChunk[] {
-  // Approximate: split text into equal parts based on word count
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
 
-  // Assume ~150 words per minute of speech
   const wordsPerChunk = Math.ceil((150 / 60) * chunkDurationSecs);
   const chunks: TranscriptChunk[] = [];
   let offset = 0;
