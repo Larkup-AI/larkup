@@ -11,7 +11,15 @@ const nextConfig = {
     "@larkup/scraper",
     "@larkup/marketplace",
   ],
-  serverExternalPackages: ["@lancedb/lancedb", "chromadb", "dockerode", "@larkup/sandbox"],
+  serverExternalPackages: [
+    "@lancedb/lancedb",
+    "@ffmpeg-installer/ffmpeg",
+    "@ffprobe-installer/ffprobe",
+    "@larkup/sandbox",
+    "chromadb",
+    "dockerode",
+    "nodejs-whisper",
+  ],
   typescript: {
     ignoreBuildErrors: true,
   },
