@@ -154,7 +154,7 @@ export function UpdateBanner() {
         </p>
 
         {channel !== 'desktop' && (
-          <code className="ml-auto hidden max-w-[38rem] truncate rounded-[5px] border border-border bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground lg:block">
+          <code className="ml-auto hidden max-w-152 truncate rounded-[5px] border border-border bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground lg:block">
             {UPDATE_COMMANDS[channel]}
           </code>
         )}
