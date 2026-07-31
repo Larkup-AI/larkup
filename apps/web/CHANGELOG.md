@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.49
+
+### Patch Changes
+
+- 3537604: Keep optional video and audio binaries outside the Next.js server bundle.
+
 ## 0.1.48
 
 ### Patch Changes
