@@ -1,5 +1,11 @@
 # @larkup/tool-video-audio
 
+## 0.3.2
+
+### Patch Changes
+
+- aae57aa: Recover gracefully from embedding quota limits, improve Knowledge Base and visual-answer UX, and bundle video processing binaries so media tooling installs without a separate ffmpeg setup.
+
 ## 0.3.1
 
 ### Patch Changes
