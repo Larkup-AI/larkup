@@ -1,5 +1,13 @@
 # @larkup/marketplace
 
+## 0.1.18
+
+### Patch Changes
+
+- 2d0d490: Improve AI Gateway rate-limit recovery and make video processing use bundled ffmpeg binaries without a system dependency.
+- Updated dependencies [e40bbe8]
+  - @larkup/core@0.3.3
+
 ## 0.1.17
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @larkup/tool-video-audio
 
+## 0.3.3
+
+### Patch Changes
+
+- 0f990fc: Prevent optional Local Whisper support from breaking Video & Audio indexing when it is not installed, and make the tool's ESM video processor load correctly at runtime.
+- 2d0d490: Improve AI Gateway rate-limit recovery and make video processing use bundled ffmpeg binaries without a system dependency.
+
 ## 0.3.2
 
 ### Patch Changes

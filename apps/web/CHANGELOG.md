@@ -1,5 +1,23 @@
 # larkup
 
+## 0.1.50
+
+### Patch Changes
+
+- ebd798e: Search indexed media before web search for named match-result and score questions, so chat answers can use video evidence without requiring users to repeat that the recording was uploaded.
+- 2d0d490: Improve AI Gateway rate-limit recovery and make video processing use bundled ffmpeg binaries without a system dependency.
+- e40bbe8: Harden installer validation across supported operating systems and align bundled runtime requirements with Node.js 22.
+- e40bbe8: Make the built-in crawler available without Docker setup, route native requests through saved proxy settings, and report empty failed crawls accurately.
+- 2d0d490: Simplify the knowledge-ingestion experience with background website crawling, unified media entry, and separate Add and Knowledge Base navigation.
+- Updated dependencies [0f990fc]
+- Updated dependencies [2d0d490]
+- Updated dependencies [e40bbe8]
+  - @larkup/tool-video-audio@0.3.3
+  - @larkup/marketplace@0.1.18
+  - @larkup/scraper@0.1.34
+  - @larkup/core@0.3.3
+  - @larkup/tool-doc-editor@0.2.11
+
 ## 0.1.49
 
 ### Patch Changes

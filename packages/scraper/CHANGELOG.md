@@ -1,5 +1,13 @@
 # @larkup/scraper
 
+## 0.1.34
+
+### Patch Changes
+
+- e40bbe8: Make the built-in crawler available without Docker setup, route native requests through saved proxy settings, and report empty failed crawls accurately.
+- Updated dependencies [e40bbe8]
+  - @larkup/core@0.3.3
+
 ## 0.1.33
 
 ### Patch Changes

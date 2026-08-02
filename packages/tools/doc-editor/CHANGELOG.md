@@ -1,5 +1,12 @@
 # @larkup/tool-doc-editor
 
+## 0.2.11
+
+### Patch Changes
+
+- Updated dependencies [e40bbe8]
+  - @larkup/core@0.3.3
+
 ## 0.2.10
 
 ### Patch Changes
