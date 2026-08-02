@@ -70,7 +70,7 @@ function createChatModel(
 const SMART_RETRIEVAL_POLICY = `
 
 TOOL RULES:
-1. searchKnowledgeBase → Use FIRST when the question is about the user's indexed data (documents, files, images, videos, diagrams, anything they uploaded).
+1. searchKnowledgeBase → Use FIRST when the question is about the user's indexed data (documents, files, images, videos, diagrams, anything they uploaded). A question about who won a named match or its score may refer to an indexed recording even when the user does not repeat "my video"; inspect the knowledge base first.
 2. webSearch → Use for clearly current/public facts. If a prior local search was not relevant or failed, use it as the one permitted fallback. If web search fails, use the knowledge base as the one permitted fallback.
 3. Other tools → Use when the question specifically requires them.
 4. General knowledge → Answer directly for common knowledge unrelated to the user's data.
