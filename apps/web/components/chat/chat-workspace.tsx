@@ -981,24 +981,48 @@ function ChatWorkspaceInner() {
                   Thinking…
                 </div>
               ) : null}
-              {error ? (
-                <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
-                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                  <div className="flex-1">
-                    <p className="text-sm text-foreground">
-                      {error.message || 'Something went wrong while generating a response.'}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => regenerate()}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-secondary"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      Try again
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+              {error
+                ? (() => {
+                    const raw =
+                      error.message || 'Something went wrong while generating a response.';
+                    // Sanitize: if the message contains URLs or is too long, clean it up
+                    let displayMessage = raw;
+                    if (
+                      raw.includes('rate-limited') ||
+                      raw.includes('rate_limit') ||
+                      raw.includes('429')
+                    ) {
+                      displayMessage =
+                        'Vercel AI Gateway could not serve this model because it is rate-limited. We tried compatible backups. Try again shortly, choose another model, or add AI Gateway credits / a provider key in Settings.';
+                    } else if (raw.includes('unavailable tool') || raw.includes('NoSuchTool')) {
+                      displayMessage =
+                        'The model tried an unavailable action. Please try your question again.';
+                    } else if (
+                      raw.length > 200 ||
+                      raw.includes('http://') ||
+                      raw.includes('https://')
+                    ) {
+                      displayMessage =
+                        'Something went wrong while generating a response. Please try again.';
+                    }
+                    return (
+                      <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+                        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                        <div className="flex-1">
+                          <p className="text-sm text-foreground">{displayMessage}</p>
+                          <button
+                            type="button"
+                            onClick={() => regenerate()}
+                            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-secondary"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Try again
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()
+                : null}
             </div>
           )}
         </div>

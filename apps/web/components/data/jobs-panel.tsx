@@ -316,7 +316,7 @@ export function JobsPanel({ jobs, onChanged }: { jobs: CrawlJob[]; onChanged: ()
                       </Badge>
                       {job.status === 'failed' && (
                         <span
-                          className="text-[10px] text-destructive max-w-[140px] truncate"
+                          className="text-[10px] text-destructive max-w-35 truncate"
                           title={
                             job.error || job.targets.find((t) => t.error)?.error || 'Unknown error'
                           }

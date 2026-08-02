@@ -4,6 +4,7 @@ import {
   readLocalState,
   refreshLocalStatus,
   startLocal,
+  startNativeLocal,
   stopLocal,
   isInsideDocker,
   checkDockerSibling,
@@ -67,10 +68,11 @@ export async function POST(req: Request) {
 
   if (runtimeEnv === 'docker') {
     if (action === 'start') {
-      // A `docker run` container cannot create sibling containers: it has no
-      // Docker daemon or Compose plugin. Only attach to a crawler started with
-      // the optional compose profile.
-      const state = await connectDockerSibling();
+      // A `docker run` container cannot create sibling containers. Attach to
+      // an optional Firecrawl sibling when present, otherwise use the built-in
+      // crawler that runs in this Larkup process.
+      const sibling = await checkDockerSibling();
+      const state = sibling.available ? await connectDockerSibling() : await startNativeLocal();
       const { apiKey, ...safe } = state;
       return NextResponse.json({ state: { ...safe, hasKey: Boolean(apiKey) } });
     } else {

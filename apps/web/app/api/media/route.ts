@@ -116,11 +116,47 @@ async function importRemoteMedia(req: Request) {
   const body = (await req.json()) as {
     urls?: string[];
     estimateOnly?: boolean;
-    mediaType?: 'video' | 'audio';
+    mediaType?: 'image' | 'video' | 'audio';
   };
   const urls = [...new Set(body.urls?.map((url) => url.trim()).filter(Boolean) ?? [])];
   if (urls.length === 0 || urls.length > 10) {
     return NextResponse.json({ error: 'Provide between 1 and 10 media URLs.' }, { status: 400 });
+  }
+  if (body.mediaType === 'image') {
+    try {
+      const storage = createStorageProvider();
+      const { addMediaAssets } = await import('@larkup/core/media-store');
+      const inputs: NewMediaAssetInput[] = [];
+      for (const url of urls) {
+        const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+        if (!response.ok) throw new Error(`Could not download ${url}`);
+        const mimeType =
+          response.headers.get('content-type')?.split(';')[0] || mimeFromFileName(url);
+        if (!mimeType.startsWith('image/')) throw new Error('The URL does not point to an image.');
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const ext = url.split('?')[0].split('.').pop() || 'img';
+        const storageUri = await storage.store(
+          `images/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`,
+          buffer,
+          mimeType,
+        );
+        inputs.push({
+          type: 'image',
+          fileName: url.split('/').pop()?.split('?')[0] || 'image',
+          mimeType,
+          storageUri,
+          fileSize: buffer.length,
+          originalUrl: url,
+        });
+      }
+      const assets = await addMediaAssets(inputs);
+      return NextResponse.json({ assets, count: assets.length }, { status: 201 });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Could not import image URLs.' },
+        { status: 400 },
+      );
+    }
   }
   if (!(await isToolInstalled('video-audio'))) {
     return NextResponse.json(

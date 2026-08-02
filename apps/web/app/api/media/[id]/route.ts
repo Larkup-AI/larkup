@@ -57,7 +57,7 @@ async function serveMedia(_req: Request, { params }: { params: Promise<{ id: str
         });
       }
       const chunk = data.subarray(start, end + 1);
-      return new NextResponse(chunk, {
+      return new NextResponse(new Uint8Array(chunk), {
         status: 206,
         headers: {
           'Content-Type': mimeType,
@@ -69,7 +69,7 @@ async function serveMedia(_req: Request, { params }: { params: Promise<{ id: str
       });
     }
 
-    return new NextResponse(data, {
+    return new NextResponse(new Uint8Array(data), {
       headers: {
         'Content-Type': mimeType,
         'Accept-Ranges': 'bytes',

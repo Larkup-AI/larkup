@@ -55,15 +55,14 @@ export function seedRegistry(): void {
         'Process video and audio files for your knowledge base. ' +
         'Creates multilingual transcripts, adaptive visual/OCR evidence, timestamped sections, ' +
         'and whole-media notes. Supports YouTube URLs, ' +
-        'direct file upload, and bulk processing. Requires ffmpeg on your system.',
+        'direct file upload, and bulk processing. Includes ffmpeg automatically; yt-dlp is only required for YouTube URLs.',
       category: 'media',
-      version: '0.2.1',
+      version: '0.3.2',
       pricing: 'free',
       emoji: '🎬',
       icon: 'Film',
       packageName: '@larkup/tool-video-audio',
       installSize: '~15 MB',
-      systemDeps: ['ffmpeg'],
       author: 'Larkup',
       capabilities: [
         'video-indexing',

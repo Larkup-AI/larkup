@@ -7,7 +7,7 @@ import {
   MessageCircle,
   Database,
   Settings,
-  BarChart3,
+  Plus,
   ChevronLeft,
   Server,
   type LucideIcon,
@@ -37,8 +37,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'chat', label: 'Chat', href: '/chat', icon: MessageCircle },
+  { id: 'add', label: 'Add', href: '/add', icon: Plus },
   { id: 'data', label: 'Data', href: '/data', icon: Database },
-  { id: 'analytics', label: 'Analytics', href: '/analytics', icon: BarChart3 },
   { id: 'settings', label: 'Settings', href: '/settings', icon: Settings },
 ];
 

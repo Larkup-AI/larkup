@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSession, enrichPDFWithText, getSession } from '@larkup/tool-doc-editor';
-// @ts-expect-error — import from lib to avoid pdf-parse's test-file-loading bug
-import pdfParse from 'pdf-parse/lib/pdf-parse.js';
+import { PDFParse } from 'pdf-parse';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,8 +28,14 @@ export async function POST(req: Request) {
     if (session.type === 'pdf' && session.parsed.rawText === '') {
       if (session.parsed.totalPages <= 5) {
         try {
-          const pdfData = await pdfParse(buffer);
-          const enrichedParsed = enrichPDFWithText(session.parsed, pdfData.text);
+          const parser = new PDFParse({ data: buffer });
+          let text = '';
+          try {
+            text = (await parser.getText()).text;
+          } finally {
+            await parser.destroy();
+          }
+          const enrichedParsed = enrichPDFWithText(session.parsed, text);
           session.parsed = enrichedParsed;
         } catch {
           // pdf-parse failed — continue with whatever we have

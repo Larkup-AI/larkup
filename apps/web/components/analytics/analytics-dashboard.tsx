@@ -192,7 +192,7 @@ export function AnalyticsDashboard() {
           </TabsList>
           <div className="flex items-center">
             <Select value={timeframe} onValueChange={(val) => val && setTimeframe(val)}>
-              <SelectTrigger className="w-[140px] h-10! text-sm bg-white dark:bg-background focus:ring-0 focus:border-input data-[state=open]:ring-0 data-[state=open]:border-input outline-none focus:outline-none">
+              <SelectTrigger className="w-35 h-10! text-sm bg-white dark:bg-background focus:ring-0 focus:border-input data-[state=open]:ring-0 data-[state=open]:border-input outline-none focus:outline-none">
                 <SelectValue placeholder="Select timeframe">
                   {timeframe === '7d' && 'Last 7 days'}
                   {timeframe === '14d' && 'Last 14 days'}

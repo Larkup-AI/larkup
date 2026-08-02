@@ -4,10 +4,19 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, usePathname } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { CrawlJob, SourceDocument, IndexRun } from '@larkup/core/types';
-import { Globe, FileUp, Type, Image, Plug, Briefcase, ChevronDown } from 'lucide-react';
+import {
+  Globe,
+  FileUp,
+  Type,
+  Image,
+  Plug,
+  Briefcase,
+  ChevronDown,
+  Loader2,
+  Plus,
+} from 'lucide-react';
 import { ScrapePanel } from '@/components/data/scrape-panel';
 import { PastePanel } from '@/components/data/paste-panel';
 import { UploadPanel } from '@/components/data/upload-panel';
@@ -15,8 +24,9 @@ import { MediaPanel } from '@/components/data/media-panel';
 import { IntegrationsPanel } from '@/components/data/integrations-panel';
 import { JobsPanel } from '@/components/data/jobs-panel';
 import { CorpusPanel } from '@/components/data/corpus-panel';
-import { FirecrawlNotice } from '@/components/data/firecrawl-notice';
 import { IndexWorkspace } from '@/components/index/index-workspace';
+import type { DataPrimaryAction } from '@/components/data/data-primary-action';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -61,29 +71,23 @@ async function fetchJobsWithSync(url: string): Promise<{
 
 // ---------- Tab definitions ----------
 
-const TOP_TABS = [
-  { id: 'add', label: 'Add Data' },
-  { id: 'corpus', label: 'Knowledge Base' },
-] as const;
-
 const SUB_TABS = [
-  { id: 'website', label: 'Website', icon: Globe },
   { id: 'files', label: 'Files', icon: FileUp },
   { id: 'text', label: 'Text', icon: Type },
+  { id: 'website', label: 'Website', icon: Globe },
   { id: 'media', label: 'Media', icon: Image },
   { id: 'notion', label: 'Integrations', icon: Plug },
 ] as const;
 
-type TopTabId = (typeof TOP_TABS)[number]['id'];
+type TopTabId = 'add' | 'corpus';
 type SubTabId = (typeof SUB_TABS)[number]['id'];
 
-export function DataWorkspace() {
+export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
   const getInitialTab = (): TopTabId => {
-    const tab = searchParams.get('tab') as TopTabId;
-    if (tab && TOP_TABS.some((t) => t.id === tab)) return tab;
+    if (view) return view;
     return 'add';
   };
 
@@ -97,33 +101,31 @@ export function DataWorkspace() {
   const [activeSubTab, setActiveSubTabState] = useState<SubTabId>(getInitialSubTab());
 
   useEffect(() => {
-    const tab = searchParams.get('tab') as TopTabId;
-    if (tab && tab !== activeTab && TOP_TABS.some((t) => t.id === tab)) {
-      setActiveTabState(tab);
+    if (view) {
+      setActiveTabState(view);
+      return;
     }
     const subtab = searchParams.get('subtab') as SubTabId;
     if (subtab && subtab !== activeSubTab && SUB_TABS.some((t) => t.id === subtab)) {
       setActiveSubTabState(subtab);
     }
-  }, [searchParams, activeTab, activeSubTab]);
-
-  const setActiveTab = useCallback(
-    (tab: TopTabId) => {
-      setActiveTabState(tab);
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('tab', tab);
-      window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
-    },
-    [pathname, searchParams],
-  );
+  }, [searchParams, activeTab, activeSubTab, view]);
 
   const setActiveSubTab = (subtab: SubTabId) => {
+    // The outgoing panel owns the shared primary action. Clear it before changing
+    // tabs so the incoming panel can register its action after it mounts.
+    // Clearing it in an effect races with that registration on initial render.
+    setPrimaryAction(null);
     setActiveSubTabState(subtab);
     const params = new URLSearchParams(searchParams.toString());
     params.set('subtab', subtab);
     window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
   };
   const [showJobsDrawer, setShowJobsDrawer] = useState(false);
+  const [primaryAction, setPrimaryAction] = useState<DataPrimaryAction | null>(null);
+  const registerPrimaryAction = useCallback((action: DataPrimaryAction | null) => {
+    setPrimaryAction(action);
+  }, []);
   const [indexDialogOpen, setIndexDialogOpen] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const prevJobsRef = useRef<CrawlJob[]>([]);
@@ -133,7 +135,6 @@ export function DataWorkspace() {
       data?.jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 4000 : 0,
   });
   const jobs = jobsQuery.data?.jobs ?? [];
-  const configured = jobsQuery.data?.configured ?? true;
   const hasActive = jobs.some((j) => j.status === 'running' || j.status === 'queued');
 
   const docsQuery = useSWR<DocsResponse>('/api/documents', fetcher, {
@@ -246,106 +247,110 @@ export function DataWorkspace() {
 
   return (
     <div className="px-6 md:px-8">
-      {/* ─── Top-level tabs + action buttons ─── */}
-      <div className="flex w-full items-center justify-between mb-6">
-        <div className="flex items-center rounded-sm bg-white/90 p-0.5 border h-11">
-          {TOP_TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
+      {view === 'add' && (
+        <>
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                Add to knowledge
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add websites, files, text, and media. We handle the rest in the background.
+              </p>
+            </div>
+            {jobs.length > 0 && (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                type="button"
+                onClick={() => setShowJobsDrawer(!showJobsDrawer)}
                 className={cn(
-                  'relative flex cursor-pointer items-center justify-center px-4 h-9 text-sm font-medium transition-colors outline-none ',
-                  isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  'flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors',
+                  hasActive
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    : 'border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                 )}
               >
-                {isActive && (
-                  <motion.div
-                    layoutId="data-tabs-indicator"
-                    className="absolute inset-0 rounded-sm bg-background  border border-border/50"
-                    initial={false}
-                    transition={{
-                      type: 'spring',
-                      stiffness: 500,
-                      damping: 35,
-                    }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center">
-                  {tab.label}
-                  {tab.id === 'add' && hasActive && (
-                    <span className="ml-2 flex items-center gap-1.5 text-xs text-emerald-600">
-                      <span className="relative flex size-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-                        <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-                      </span>
-                    </span>
+                <Briefcase className="size-4" />
+                {hasActive
+                  ? `${
+                      jobs.filter((j) => j.status === 'running' || j.status === 'queued').length
+                    } active`
+                  : `${jobs.length} job${jobs.length === 1 ? '' : 's'}`}
+                <ChevronDown
+                  className={cn(
+                    'size-4 transition-transform duration-200',
+                    showJobsDrawer && 'rotate-180',
                   )}
-                </span>
+                />
               </button>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Floating jobs indicator */}
-          {jobs.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowJobsDrawer(!showJobsDrawer)}
-              className={cn(
-                'flex items-center gap-2 rounded-lg border h-10 px-4 text-sm font-medium transition-colors',
-                hasActive
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                  : 'border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-              )}
+            )}
+          </div>
+          <div className="mb-4 mt-9 flex items-center justify-between border-b border-border">
+            <div
+              className={cn('-mb-2 flex items-center gap-1', activeSubTab === 'notion' && 'mb-0')}
             >
-              <Briefcase className="size-4" />
-              {hasActive ? (
-                <>
-                  <span className="relative flex size-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-                  </span>
-                  {jobs.filter((j) => j.status === 'running' || j.status === 'queued').length}{' '}
-                  active
-                </>
-              ) : (
-                <>
-                  {jobs.length} job{jobs.length !== 1 ? 's' : ''}
-                </>
+              {SUB_TABS.map((tab) => {
+                const isActive = activeSubTab === tab.id;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveSubTab(tab.id)}
+                    className={cn(
+                      'relative flex items-center gap-2 px-4 py-2.5  text-sm font-medium transition-colors outline-none',
+                      isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <Icon className="size-4" />
+                    {tab.label}
+                    {isActive && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-primary motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-2 motion-safe:duration-200"
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2 pb-1">
+              {primaryAction && (
+                <Button
+                  size="default"
+                  onClick={primaryAction.onClick}
+                  disabled={primaryAction.disabled || primaryAction.loading}
+                >
+                  {primaryAction.loading ? (
+                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="mr-1.5 size-3.5" />
+                  )}
+                  {primaryAction.label}
+                </Button>
               )}
-              <ChevronDown
-                className={cn(
-                  'ml-1 size-4 transition-transform duration-200',
-                  showJobsDrawer && 'rotate-180',
-                )}
-              />
-            </button>
-          )}
+            </div>
+          </div>
+        </>
+      )}
 
-          {/* Indexing begins automatically after data is added. */}
-          <Dialog open={indexDialogOpen} onOpenChange={setIndexDialogOpen}>
-            <DialogContent className="max-w-lg overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Making your data searchable</DialogTitle>
-                <DialogDescription>
-                  This runs safely in the background. You can close this and come back anytime.
-                </DialogDescription>
-              </DialogHeader>
-              <IndexWorkspace
-                automatic
-                onDone={() => {
-                  indexQuery.mutate();
-                  setResetKey((k) => k + 1);
-                }}
-                onClose={() => setIndexDialogOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+      {/* Indexing begins automatically after data is added. */}
+      <Dialog open={indexDialogOpen} onOpenChange={setIndexDialogOpen}>
+        <DialogContent className="max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Making your data searchable</DialogTitle>
+            <DialogDescription>
+              This runs safely in the background. You can close this and come back anytime.
+            </DialogDescription>
+          </DialogHeader>
+          <IndexWorkspace
+            automatic
+            onDone={() => {
+              indexQuery.mutate();
+              setResetKey((k) => k + 1);
+            }}
+            onClose={() => setIndexDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* ─── Jobs drawer (minimal, collapsible) ─── */}
       {showJobsDrawer && jobs.length > 0 && (
@@ -366,54 +371,17 @@ export function DataWorkspace() {
         </div>
       )}
 
-      <div className="mt-2">
+      <div>
         {activeTab === 'add' && (
           <div className="w-full">
-            {/* ─── Line-style sub-tabs ─── */}
-            <div className="border-b border-border mb-6">
-              <div className="flex items-center gap-1 -mb-px">
-                {SUB_TABS.map((tab) => {
-                  const isActive = activeSubTab === tab.id;
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveSubTab(tab.id)}
-                      className={cn(
-                        'relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors outline-none',
-                        isActive
-                          ? 'text-foreground'
-                          : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      <Icon className="size-4" />
-                      {tab.label}
-                      {isActive && (
-                        <motion.div
-                          layoutId="add-data-sub-tab-indicator"
-                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
-                          initial={false}
-                          transition={{
-                            type: 'spring',
-                            stiffness: 500,
-                            damping: 35,
-                          }}
-                        />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* ─── Tab content ─── */}
-            <div className="relative" key={resetKey}>
+            <div className="relative " key={resetKey}>
               {activeSubTab === 'website' && (
                 <div className="w-full flex flex-col gap-8 animate-in fade-in duration-200">
                   <div>
                     <ScrapePanel
                       onStarted={handleScrapeStarted}
-                      crawlerControl={<FirecrawlNotice cloudConfigured={configured} />}
+                      onActionChange={registerPrimaryAction}
                     />
                   </div>
                   {/* {jobs.length > 0 && !showJobsDrawer && (
@@ -429,19 +397,23 @@ export function DataWorkspace() {
 
               {activeSubTab === 'files' && (
                 <div className="animate-in fade-in duration-200">
-                  <UploadPanel onAdded={handleDataAdded} />
+                  <UploadPanel onAdded={handleDataAdded} onActionChange={registerPrimaryAction} />
                 </div>
               )}
 
               {activeSubTab === 'text' && (
                 <div className=" animate-in fade-in duration-200">
-                  <PastePanel onAdded={handleDataAdded} />
+                  <PastePanel onAdded={handleDataAdded} onActionChange={registerPrimaryAction} />
                 </div>
               )}
 
               {activeSubTab === 'media' && (
                 <div className="animate-in fade-in duration-200">
-                  <MediaPanel onAdded={refreshAll} onIndexed={handleMediaIndexed} />
+                  <MediaPanel
+                    onAdded={refreshAll}
+                    onIndexed={handleMediaIndexed}
+                    onActionChange={registerPrimaryAction}
+                  />
                 </div>
               )}
 

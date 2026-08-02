@@ -260,7 +260,7 @@ export function MarketplaceToolsSettings() {
                           </span>
                         )}
                         {schema.key === 'audioApiKey' && vStatus?.status === 'error' && (
-                          <span className="text-[10px] text-destructive font-medium truncate max-w-[150px]">
+                          <span className="text-[10px] text-destructive font-medium truncate max-w-37.5">
                             {vStatus.message}
                           </span>
                         )}

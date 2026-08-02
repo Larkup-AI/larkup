@@ -676,7 +676,7 @@ export function ChatSignatureRequest({
                   onTouchStart={startDrawing}
                   onTouchEnd={endDrawing}
                   onTouchMove={draw}
-                  className="w-full h-[150px] cursor-crosshair block"
+                  className="w-full h-37.5 cursor-crosshair block"
                 />
                 <Button
                   variant="outline"

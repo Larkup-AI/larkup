@@ -21,6 +21,7 @@ import {
   requiresKnowledgeBaseSearch,
   retrievalToolsForStep,
 } from '@/lib/retrieval-routing';
+import { gatewayProviderOptions } from '@/lib/gateway-fallbacks';
 
 export const maxDuration = 60;
 
@@ -445,6 +446,10 @@ ${fieldLines}`;
 
   const result = streamText({
     model,
+    // The Gateway owns model failover. Retrying the same quota-limited model
+    // only makes the user wait longer and consumes their request allowance.
+    maxRetries: 0,
+    providerOptions: gatewayProviderOptions(resolvedProvider, chatModelId),
     system: systemPrompt,
     messages: await convertToModelMessages(safeMessages, { tools }),
     maxOutputTokens: 4096,
@@ -476,23 +481,71 @@ ${fieldLines}`;
   });
 
   return result.toUIMessageStreamResponse({
+    sendReasoning: true,
     onError: (error: any) => {
-      console.error('[chat] stream error:', error);
-      if (error && typeof error === 'object') {
-        if (error.message) {
-          return error.message;
-        }
-        if (error.error && error.error.message) {
-          return error.error.message;
-        }
-        try {
-          return JSON.stringify(error);
-        } catch {
-          return 'Something went wrong while generating a response.';
-        }
+      // Extract the deepest error message available
+      const rawMessage: string =
+        error?.lastError?.message ||
+        error?.message ||
+        error?.error?.message ||
+        (typeof error === 'string' ? error : '');
+
+      // Only log non-trivial errors to console (skip tool-routing noise)
+      const isToolRouting =
+        rawMessage.includes('unavailable tool') || error?.name === 'AI_NoSuchToolError';
+      if (!isToolRouting) {
+        console.error('[chat] stream error:', rawMessage);
       }
-      const message = error instanceof Error ? error.message : String(error);
-      return message || 'Something went wrong while generating a response.';
+
+      // ── Rate limit / quota exceeded ──
+      if (
+        rawMessage.includes('rate-limited') ||
+        rawMessage.includes('rate_limit') ||
+        rawMessage.includes('RateLimitError') ||
+        rawMessage.includes('429') ||
+        rawMessage.includes('quota')
+      ) {
+        return 'Vercel AI Gateway could not serve this model because it is rate-limited. We tried compatible backup models. Try again shortly, choose another model, or add AI Gateway credits / a provider key in Settings.';
+      }
+
+      // ── Model tried to call a tool that was not available in this step ──
+      // This happens when the step-routing removes a tool but the model still
+      // tries to call it. It is not a real failure — just retry.
+      if (isToolRouting) {
+        return 'The model tried an unavailable action. Please try your question again.';
+      }
+
+      // ── Authentication / API key errors ──
+      if (
+        rawMessage.includes('401') ||
+        rawMessage.includes('Unauthorized') ||
+        rawMessage.includes('Invalid API Key') ||
+        rawMessage.includes('authentication')
+      ) {
+        return 'Your API key appears to be invalid or expired. Please check your AI provider settings.';
+      }
+
+      // ── Context length / token limit ──
+      if (
+        rawMessage.includes('context_length') ||
+        rawMessage.includes('maximum context') ||
+        rawMessage.includes('too many tokens') ||
+        rawMessage.includes('max_tokens')
+      ) {
+        return 'The conversation is too long for this model. Try starting a new chat or switching to a model with a larger context window.';
+      }
+
+      // ── Timeout ──
+      if (rawMessage.includes('timeout') || rawMessage.includes('ETIMEDOUT')) {
+        return 'The request timed out. Please try again.';
+      }
+
+      // ── Generic fallback — strip any URLs and technical noise ──
+      if (rawMessage.length > 200 || rawMessage.includes('http')) {
+        return 'Something went wrong while generating a response. Please try again.';
+      }
+
+      return rawMessage || 'Something went wrong while generating a response.';
     },
   });
 }

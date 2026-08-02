@@ -16,7 +16,7 @@ function getResponseHtml(status: string) {
             window.opener.postMessage({ type: 'notion_oauth', status: '${status}' }, '*');
             window.close();
           } else {
-            window.location.href = "/data?notion=${status}";
+            window.location.href = "/add?notion=${status}";
           }
         </script>
         <p>Authentication complete. You can close this window.</p>

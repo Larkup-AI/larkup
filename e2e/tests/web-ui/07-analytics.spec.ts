@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Analytics Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/analytics');
+    await page.goto('/settings?section=analytics');
     await page.waitForSelector('text=Analytics', { timeout: 60_000 });
   });
 
