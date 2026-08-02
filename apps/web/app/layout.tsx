@@ -1,6 +1,5 @@
 import { Analytics } from '@vercel/analytics/next';
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/sonner';
 import { WorkspaceProvider } from '@/components/workspace/workspace-provider';
@@ -8,12 +7,6 @@ import { ThemeCustomizerProvider } from '@/components/theme-customizer-provider'
 import { ClientLayoutWrapper } from '@/components/client-layout-wrapper';
 import { GlobalIndexProgress } from '@/components/index/global-index-progress';
 import { UpdateBanner } from '@/components/update-banner';
-
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 export const metadata: Metadata = {
   title: 'larkup',
@@ -27,11 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} bg-transparent`}
-    >
+    <html lang="en" suppressHydrationWarning className="bg-transparent">
       <body suppressHydrationWarning className="font-sans antialiased ">
         <script
           dangerouslySetInnerHTML={{

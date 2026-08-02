@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input';
 import { useWorkspace } from '@/components/workspace/workspace-provider';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type { DataPrimaryAction } from '@/components/data/data-primary-action';
 import {
   Dialog,
   DialogContent,
@@ -53,6 +54,7 @@ import {
 /* ------------------------------------------------------------------ */
 
 type MediaSubTab = 'images' | 'video' | 'audio';
+type MediaEntryTab = 'upload' | 'url';
 type MediaPipelineStage = 'download' | 'extract' | 'transcribe' | 'vision' | 'synthesize' | 'index';
 
 interface MediaProcessingStep {
@@ -228,11 +230,14 @@ const INDEXING_PROGRESS_CLASS =
 export function MediaPanel({
   onAdded,
   onIndexed,
+  onActionChange,
 }: {
   onAdded: () => void;
   onIndexed: (asset: MediaAsset) => void;
+  onActionChange?: (action: DataPrimaryAction | null) => void;
 }) {
   const [activeTab, setActiveTab] = useState<MediaSubTab>('images');
+  const [entryTab, setEntryTab] = useState<MediaEntryTab>('upload');
   const mediaType = TAB_TO_TYPE[activeTab];
   const previousStatusesRef = useRef<Map<string, MediaAsset['processingStatus']> | null>(null);
   const { activeServer } = useWorkspace();
@@ -352,7 +357,7 @@ export function MediaPanel({
     ? enabledTools.length === 0 || enabledTools.includes('video-audio')
     : true;
 
-  const needsTool = activeTab !== 'images' && !isToolInstalled;
+  const needsTool = false;
   const isToolDisabled = activeTab !== 'images' && isToolInstalled && !isToolEnabled;
 
   const assets = data?.assets ?? [];
@@ -360,19 +365,21 @@ export function MediaPanel({
 
   return (
     <div className="space-y-5">
-      {/* Sub-tab navigation */}
+      {/* Keep the task choice small. File type is detected after selection. */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
         <div className="flex items-center gap-1 border border-border/90 rounded-lg bg-muted/60 p-1">
-          {SUB_TABS.map((tab) => {
+          {[
+            { id: 'upload' as const, label: 'Upload', icon: Upload },
+            { id: 'url' as const, label: 'From URL', icon: Link2 },
+          ].map((tab) => {
             const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            const count = data?.stats?.byType?.[TAB_TO_TYPE[tab.id]] ?? 0;
+            const isActive = entryTab === tab.id;
 
             return (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setEntryTab(tab.id)}
                 className={cn(
                   'relative flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium transition-all duration-200 rounded-md',
                   isActive
@@ -382,18 +389,6 @@ export function MediaPanel({
               >
                 <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.75} />
                 {tab.label}
-                {count > 0 && (
-                  <span
-                    className={cn(
-                      'flex h-4 items-center justify-center rounded-full px-1.5 text-[10px] tabular-nums',
-                      isActive
-                        ? 'bg-secondary text-secondary-foreground'
-                        : 'bg-secondary/50 text-muted-foreground',
-                    )}
-                  >
-                    {count}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -437,6 +432,32 @@ export function MediaPanel({
           }}
           audioConfigured={audioConfigured}
           onConfigureAudio={() => router.push('/settings?section=tool-settings')}
+          entryTab={entryTab}
+          onMediaTypeDetected={(type) => setActiveTab(type === 'image' ? 'images' : type)}
+          videoAudioToolInstalled={isToolInstalled}
+          onToolRequired={() => {
+            toast.error('Video & Audio tool required', {
+              description: 'Install it to add video or audio.',
+              action: {
+                label: 'Install',
+                onClick: async () => {
+                  const toastId = toast.loading('Installing video tool…');
+                  try {
+                    const res = await fetch('/api/marketplace/video-audio', { method: 'POST' });
+                    const body = await res.json();
+                    if (!res.ok) throw new Error(body.error || 'Install failed');
+                    toast.success('Video tool installed', { id: toastId });
+                    void mutateTools();
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : 'Install failed', {
+                      id: toastId,
+                    });
+                  }
+                },
+              },
+            });
+          }}
+          onActionChange={onActionChange}
         />
       )}
     </div>
@@ -568,6 +589,11 @@ function MediaContent({
   onUploadComplete,
   audioConfigured,
   onConfigureAudio,
+  entryTab,
+  onMediaTypeDetected,
+  videoAudioToolInstalled,
+  onToolRequired,
+  onActionChange,
 }: {
   mediaType: 'image' | 'video' | 'audio';
   tab: MediaSubTab;
@@ -579,6 +605,11 @@ function MediaContent({
   onUploadComplete: () => void;
   audioConfigured: boolean;
   onConfigureAudio: () => void;
+  entryTab: MediaEntryTab;
+  onMediaTypeDetected: (type: 'image' | 'video' | 'audio') => void;
+  videoAudioToolInstalled: boolean;
+  onToolRequired: () => void;
+  onActionChange?: (action: DataPrimaryAction | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -586,8 +617,6 @@ function MediaContent({
 
   useEffect(() => {
     setStagedState(globalStagedMedia[mediaType] || []);
-    setUrlsText('');
-    setRemoteEstimates(null);
   }, [mediaType]);
 
   const setStaged = (val: React.SetStateAction<StagedMedia[]>) => {
@@ -607,36 +636,51 @@ function MediaContent({
   } | null>(null);
   const [urlsText, setUrlsText] = useState('');
   const [remoteEstimates, setRemoteEstimates] = useState<RemoteEstimate[] | null>(null);
+  const [remoteType, setRemoteType] = useState<'image' | 'video' | 'audio'>(mediaType);
   const [checkingUrls, setCheckingUrls] = useState(false);
   const [importingUrls, setImportingUrls] = useState(false);
   const [playlistAlertOpen, setPlaylistAlertOpen] = useState(false);
   const [assetToRemove, setAssetToRemove] = useState<MediaAsset | null>(null);
-  const [importMode, setImportMode] = useState<'upload' | 'url'>('upload');
   const [indexingInstructions, setIndexingInstructions] = useState('');
   const [indexingQuality, setIndexingQuality] = useState(50);
   const mediaApiUrl = serverId
     ? `/api/media?serverId=${encodeURIComponent(serverId)}`
     : '/api/media';
 
-  const accept = SUB_TABS.find((t) => t.id === tab)?.accept ?? '*/*';
+  const accept = 'image/*,video/*,audio/*';
 
   async function handleFiles(files: FileList | File[]) {
+    const detectedType = getMediaType(Array.from(files)[0]);
+    if (!detectedType) {
+      toast.error('Choose an image, video, or audio file.');
+      return;
+    }
+    if (detectedType !== 'image' && !videoAudioToolInstalled) {
+      onToolRequired();
+      return;
+    }
     const inspected = await Promise.all(
-      Array.from(files).map(async (file): Promise<StagedMedia | null> => {
-        const type = getMediaType(file);
-        if (type !== mediaType) {
-          toast.error(`${file.name} is not a${mediaType === 'audio' ? 'n' : ''} ${mediaType} file`);
-          return null;
-        }
-        const id = Math.random().toString(36).slice(2);
-        const preview =
-          type === 'image' || type === 'audio' ? URL.createObjectURL(file) : undefined;
-        const durationSecs = type === 'image' ? undefined : await readMediaDuration(file);
-        return { id, file, type, preview, durationSecs };
-      }),
+      Array.from(files)
+        .filter((file) => getMediaType(file) === detectedType)
+        .map(async (file): Promise<StagedMedia | null> => {
+          const type = getMediaType(file);
+          if (!type) return null;
+          const id = Math.random().toString(36).slice(2);
+          const preview =
+            type === 'image' || type === 'audio' ? URL.createObjectURL(file) : undefined;
+          const durationSecs = type === 'image' ? undefined : await readMediaDuration(file);
+          return { id, file, type, preview, durationSecs };
+        }),
     );
     const newFiles = inspected.filter((item): item is StagedMedia => item !== null);
-    if (newFiles.length > 0) setStaged((prev) => [...prev, ...newFiles]);
+    if (newFiles.length > 0) {
+      if (detectedType === mediaType) {
+        setStaged((prev) => [...prev, ...newFiles]);
+      } else {
+        globalStagedMedia[detectedType] = [...(globalStagedMedia[detectedType] || []), ...newFiles];
+        onMediaTypeDetected(detectedType);
+      }
+    }
   }
 
   function removeFile(id: string) {
@@ -667,8 +711,13 @@ function MediaContent({
     }
   }
 
-  function ensureAudioConfiguration(): boolean {
-    if (mediaType === 'image' || audioConfigured) return true;
+  function ensureAudioConfiguration(type = mediaType): boolean {
+    if (type === 'image') return true;
+    if (!videoAudioToolInstalled) {
+      onToolRequired();
+      return false;
+    }
+    if (audioConfigured) return true;
     toast.error('Set up an audio provider to index video or audio.', {
       description: 'Select a provider and add its API key in Installed Tools.',
       duration: 10_000,
@@ -708,16 +757,30 @@ function MediaContent({
       .slice(0, 10);
   }
 
+  function mediaTypeFromUrl(url: string): 'image' | 'video' | 'audio' {
+    const path = url.split('?')[0].toLowerCase();
+    if (/\.(png|jpe?g|webp|gif|svg|avif)$/.test(path)) return 'image';
+    if (/\.(mp3|wav|ogg|m4a|flac|aac)$/.test(path)) return 'audio';
+    return 'video';
+  }
+
   async function reviewRemoteEstimate() {
     const urls = parsedUrls();
     if (urls.length === 0) return;
-    if (!ensureAudioConfiguration()) return;
+    const type = mediaTypeFromUrl(urls[0]);
+    setRemoteType(type);
+    onMediaTypeDetected(type);
+    if (!ensureAudioConfiguration(type)) return;
     setCheckingUrls(true);
     try {
+      if (type === 'image') {
+        setRemoteEstimates(urls.map((originalUrl) => ({ originalUrl, mediaType: 'unknown' })));
+        return;
+      }
       const res = await fetch(mediaApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls, estimateOnly: true, mediaType }),
+        body: JSON.stringify({ urls, estimateOnly: true, mediaType: type }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Could not inspect media URLs');
@@ -732,7 +795,7 @@ function MediaContent({
   async function importRemoteUrls(ignorePlaylist = false) {
     let urls = parsedUrls();
     if (urls.length === 0 || !remoteEstimates) return;
-    if (!ensureAudioConfiguration()) return;
+    if (!ensureAudioConfiguration(remoteType)) return;
 
     if (ignorePlaylist) {
       urls = urls.map((url) => {
@@ -752,12 +815,12 @@ function MediaContent({
       const res = await fetch(mediaApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls, mediaType }),
+        body: JSON.stringify({ urls, mediaType: remoteType }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Media import failed');
       const ids = (data.assets as MediaAsset[]).map((asset) => asset.id);
-      toast.success(`${mediaType === 'video' ? 'Video' : 'Audio'} import started`, {
+      toast.success('Media import started', {
         description: 'Queued for download and indexing. You can safely leave in the meantime.',
         duration: 8_000,
       });
@@ -905,6 +968,48 @@ function MediaContent({
     remoteEstimates?.reduce((total, estimate) => total + (estimate.durationSecs ?? 0), 0) ?? 0;
   const remoteEstimate = estimateMedia(remoteDuration, mediaType === 'video');
   const activeAssets = assets.filter(isActiveJob);
+  const hasUrls = parsedUrls().length > 0;
+
+  function submitUrlMedia() {
+    const totalEntries =
+      remoteEstimates?.reduce((sum: number, item: any) => sum + (item.entryCount ?? 1), 0) ?? 0;
+    if (totalEntries > 1) {
+      setPlaylistAlertOpen(true);
+    } else {
+      void importRemoteUrls();
+    }
+  }
+
+  useEffect(() => {
+    const fromUrl = entryTab === 'url';
+    onActionChange?.({
+      label: fromUrl ? (remoteEstimates ? 'Add media' : 'Check URL') : 'Add media',
+      onClick: () => {
+        if (fromUrl) {
+          if (remoteEstimates) submitUrlMedia();
+          else void reviewRemoteEstimate();
+        } else {
+          void uploadAll();
+        }
+      },
+      disabled: fromUrl ? !hasUrls : staged.length === 0,
+      loading: fromUrl ? checkingUrls || importingUrls : uploading,
+    });
+    return () => onActionChange?.(null);
+  }, [
+    entryTab,
+    remoteEstimates,
+    hasUrls,
+    urlsText,
+    checkingUrls,
+    importingUrls,
+    staged,
+    uploading,
+    remoteType,
+    indexingInstructions,
+    indexingQuality,
+    onActionChange,
+  ]);
 
   return (
     <div className="space-y-4">
@@ -929,94 +1034,63 @@ function MediaContent({
         />
       ) : null}
 
-      {mediaType !== 'image' && (
-        <div className="mt-5 flex items-center gap-4 border-b border-border/40 mb-4 px-2">
-          <button
-            type="button"
-            onClick={() => setImportMode('upload')}
-            className={cn(
-              'flex items-center gap-1.5 pb-2.5 text-[13px] font-medium border-b-2 transition-colors -mb-px',
-              importMode === 'upload'
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
-            )}
-          >
-            <Upload className="size-3.5" />
-            Upload File
-          </button>
-          <button
-            type="button"
-            onClick={() => setImportMode('url')}
-            className={cn(
-              'flex items-center gap-1.5 pb-2.5 text-[13px] font-medium border-b-2 transition-colors -mb-1px',
-              importMode === 'url'
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
-            )}
-          >
-            <Link2 className="size-3.5" />
-            Import URL
-          </button>
-        </div>
-      )}
-
-      {mediaType !== 'image' && importMode === 'url' ? (
+      {entryTab === 'url' ? (
         <div className="w-full">
           <div className="flex items-center gap-2">
             <Input
-              aria-label={`Import ${mediaType} URL`}
+              aria-label="Import media URL"
               value={urlsText}
               onChange={(event) => {
                 setUrlsText(event.target.value);
                 setRemoteEstimates(null);
               }}
-              placeholder={
-                mediaType === 'video'
-                  ? 'https://youtube.com/watch?v=…'
-                  : 'https://cdn.example.com/episode.mp3'
-              }
+              placeholder="Paste an image, video, or audio URL"
               className="bg-background text-xs h-9 flex-1"
             />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 text-xs"
-              disabled={checkingUrls || importingUrls || parsedUrls().length === 0}
-              onClick={reviewRemoteEstimate}
-            >
-              {checkingUrls ? (
-                <Loader2 className="mr-1.5 size-3 animate-spin" />
-              ) : (
-                <Clock className="mr-1.5 size-3" />
-              )}
-              Review
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-9 text-xs"
-              disabled={!remoteEstimates || importingUrls}
-              onClick={() => {
-                const totalEntries =
-                  remoteEstimates?.reduce(
-                    (sum: number, item: any) => sum + (item.entryCount ?? 1),
-                    0,
-                  ) ?? 0;
-                if (totalEntries > 1) {
-                  setPlaylistAlertOpen(true);
-                } else {
-                  importRemoteUrls();
-                }
-              }}
-            >
-              {importingUrls ? (
-                <Loader2 className="mr-1.5 size-3 animate-spin" />
-              ) : (
-                <Sparkles className="mr-1.5 size-3" />
-              )}
-              Import
-            </Button>
+            {!onActionChange && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 text-xs"
+                disabled={checkingUrls || importingUrls || parsedUrls().length === 0}
+                onClick={reviewRemoteEstimate}
+              >
+                {checkingUrls ? (
+                  <Loader2 className="mr-1.5 size-3 animate-spin" />
+                ) : (
+                  <Clock className="mr-1.5 size-3" />
+                )}
+                Review
+              </Button>
+            )}
+            {!onActionChange && (
+              <Button
+                type="button"
+                size="sm"
+                className="h-9 text-xs"
+                disabled={!remoteEstimates || importingUrls}
+                onClick={() => {
+                  const totalEntries =
+                    remoteEstimates?.reduce(
+                      (sum: number, item: any) => sum + (item.entryCount ?? 1),
+                      0,
+                    ) ?? 0;
+                  if (totalEntries > 1) {
+                    setPlaylistAlertOpen(true);
+                  } else {
+                    importRemoteUrls();
+                  }
+                }}
+              >
+                {importingUrls ? (
+                  <Loader2 className="mr-1.5 size-3 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1.5 size-3" />
+                )}
+                Import
+              </Button>
+            )}
           </div>
 
           <AlertDialog open={playlistAlertOpen} onOpenChange={setPlaylistAlertOpen}>
@@ -1051,9 +1125,7 @@ function MediaContent({
             </AlertDialogContent>
           </AlertDialog>
           <p className="mt-2 pl-1 text-[11px] leading-relaxed text-muted-foreground">
-            Direct {mediaType} links
-            {mediaType === 'video' ? ', YouTube videos, or playlists' : ''}. Add up to 10 URLs
-            separated by commas.
+            Direct media links, YouTube videos, or playlists. Add up to 10 URLs separated by commas.
           </p>
           {remoteEstimates
             ? (() => {
@@ -1300,19 +1372,21 @@ function MediaContent({
               >
                 Clear All
               </button>
-              <Button
-                onClick={uploadAll}
-                disabled={uploading || staged.length === 0}
-                size="sm"
-                className="h-7 text-xs px-3"
-              >
-                {uploading ? (
-                  <Loader2 className="size-3 animate-spin mr-1.5" />
-                ) : (
-                  <FileUp className="size-3 mr-1.5" />
-                )}
-                Upload {staged.length} file{staged.length !== 1 ? 's' : ''}
-              </Button>
+              {!onActionChange && (
+                <Button
+                  onClick={uploadAll}
+                  disabled={uploading || staged.length === 0}
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                >
+                  {uploading ? (
+                    <Loader2 className="size-3 animate-spin mr-1.5" />
+                  ) : (
+                    <FileUp className="size-3 mr-1.5" />
+                  )}
+                  Upload {staged.length} file{staged.length !== 1 ? 's' : ''}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1910,9 +1984,9 @@ function ActiveIndexingList({
                     : asset.processingMessage || 'Preparing media indexing...'}
                 </p>
               </div>
-              {/* {asset.processingSteps?.length ? (
+              {asset.processingSteps?.length ? (
                 <PipelineSteps steps={asset.processingSteps} />
-              ) : null} */}
+              ) : null}
             </div>
           );
         })}

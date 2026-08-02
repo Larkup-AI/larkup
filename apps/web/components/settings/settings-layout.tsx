@@ -12,6 +12,7 @@ import {
   Store,
   type LucideIcon,
   Grid2X2Plus,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,7 +27,8 @@ export type SettingsSection =
   | 'appearance'
   | 'deployment'
   | 'marketplace'
-  | 'tool-settings';
+  | 'tool-settings'
+  | 'analytics';
 
 interface SectionItem {
   id: SettingsSection;
@@ -64,6 +66,7 @@ const SECTION_GROUPS: SectionGroup[] = [
       { id: 'prompts', label: 'Agent Customization', icon: Grid2X2Plus },
       { id: 'playground', label: 'Playground', icon: Search },
       { id: 'appearance', label: 'Appearance', icon: Palette },
+      { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     ],
   },
 ];

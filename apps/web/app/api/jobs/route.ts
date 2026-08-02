@@ -42,8 +42,7 @@ export async function POST(req: Request) {
   const docs = await readDocuments();
   const existingUrls = new Set(docs.filter((d) => d.url).map((d) => d.url!));
 
-  const baseMap = new Map<string, CrawlTarget>();
-  const pathMap = new Map<string, CrawlTarget>();
+  const targets = new Map<string, CrawlTarget>();
 
   (body.targets ?? []).forEach((t) => {
     if (!t.url || !/^https?:\/\//i.test(t.url)) return;
@@ -52,30 +51,22 @@ export async function POST(req: Request) {
       const u = new URL(t.url);
       const origin = u.origin;
 
-      // Add base if not existing
-      if (!existingUrls.has(origin) && !existingUrls.has(origin + '/')) {
-        baseMap.set(origin, {
-          url: origin,
-          scope: t.scope === 'domain' ? 'domain' : 'page',
+      // A page request must scrape the exact selected page. For a domain
+      // crawl, begin at the site root so the frontier can discover the site.
+      const scope = t.scope === 'domain' ? 'domain' : 'page';
+      const targetUrl = scope === 'domain' ? origin : u.toString();
+      if (!existingUrls.has(targetUrl)) {
+        targets.set(targetUrl, {
+          url: targetUrl,
+          scope,
           status: 'queued',
           pagesCrawled: 0,
         });
       }
-
-      if (t.url !== origin && t.url !== origin + '/') {
-        if (!existingUrls.has(t.url)) {
-          pathMap.set(t.url, {
-            url: t.url,
-            scope: t.scope === 'domain' ? 'domain' : 'page',
-            status: 'queued',
-            pagesCrawled: 0,
-          });
-        }
-      }
     } catch {
       // Fallback for weird URLs
       if (!existingUrls.has(t.url)) {
-        pathMap.set(t.url, {
+        targets.set(t.url, {
           url: t.url,
           scope: t.scope === 'domain' ? 'domain' : 'page',
           status: 'queued',
@@ -85,7 +76,7 @@ export async function POST(req: Request) {
     }
   });
 
-  const cleaned = [...Array.from(baseMap.values()), ...Array.from(pathMap.values())];
+  const cleaned = [...targets.values()];
 
   if (cleaned.length === 0) {
     return NextResponse.json(

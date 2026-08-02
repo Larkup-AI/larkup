@@ -76,6 +76,15 @@ test.describe('Video & Audio marketplace tool', () => {
         { cwd: workspace },
       );
 
+      // The tool owns binary permissions: pnpm may skip dependency lifecycle
+      // scripts, so ffprobe must still work without a host installation.
+      const binaries = await import(
+        pathToFileURL(path.join(repoRoot, 'packages/tools/video-audio/dist/ffmpeg-spawn.js')).href
+      );
+      await expect(binaries.ffprobe(videoPath)).resolves.toMatchObject({
+        format: { duration: expect.any(String) },
+      });
+
       const framesDir = path.join(workspace, 'frames');
       const frames = await tool.extractSceneFrames(videoPath, {
         outputDir: framesDir,

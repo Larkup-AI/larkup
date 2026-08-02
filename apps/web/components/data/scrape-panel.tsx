@@ -6,7 +6,6 @@ import { formatErrorMessage } from '@/lib/error-formatter';
 import {
   Globe,
   Loader2,
-  Rocket,
   Search,
   ChevronDown,
   ChevronsDown,
@@ -21,7 +20,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 
 import { Switch } from '@/components/ui/switch';
 import {
@@ -32,12 +30,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { GenericAlert } from '@/components/alerts/generic-alert';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import useSWR from 'swr';
 import { useRouter } from 'next/navigation';
 import type { RagConfig } from '@larkup/core/types';
+import type { DataPrimaryAction } from '@/components/data/data-primary-action';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
@@ -47,13 +45,6 @@ function domainOf(url: string) {
   } catch {
     return url;
   }
-}
-
-function formatCount(n: number): string {
-  if (n >= 1_000_000_000) return `~${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `~${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `~${(n / 1_000).toFixed(0)}K`;
-  return n.toLocaleString();
 }
 
 function formatDuration(seconds: number): string {
@@ -80,11 +71,11 @@ function estimateEtlDuration(
 export function ScrapePanel({
   disabled,
   onStarted,
-  crawlerControl,
+  onActionChange,
 }: {
   disabled?: boolean;
   onStarted: (job: CrawlJob) => void;
-  crawlerControl?: React.ReactNode;
+  onActionChange?: (action: DataPrimaryAction | null) => void;
 }) {
   const router = useRouter();
   const {
@@ -99,7 +90,6 @@ export function ScrapePanel({
     pageLimit,
     setPageLimit,
     searchLimit,
-    setSearchLimit,
     showAdvanced,
     setShowAdvanced,
     serperTotalForQuery,
@@ -115,12 +105,10 @@ export function ScrapePanel({
   const [starting, setStarting] = useState(false);
   /** When true: only the exact custom URLs are scraped — no deep crawl/pagination */
   const [specificUrls, setSpecificUrls] = useState(false);
-  const [serperConfigured, setSerperConfigured] = useState<boolean | null>(null);
   const [firecrawlConfigured, setFirecrawlConfigured] = useState<boolean | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const crawlerStarted = useRef(false);
   const { data: configData } = useSWR('/api/config', fetcher);
   const activeProvider = configData?.config?.webSearchProvider || 'tavily';
-  const [fetchingCount, setFetchingCount] = useState(false);
   const [cachedQueries, setCachedQueries] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -133,6 +121,27 @@ export function ScrapePanel({
         onClick: () => router.push('/settings?section=general#web-crawler'),
       },
     });
+  }
+
+  async function ensureCrawlerReady() {
+    if (crawlerStarted.current) return true;
+    const toastId = toast.loading('Preparing website search…');
+    try {
+      const res = await fetch('/api/firecrawl/local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Could not prepare the crawler.');
+      crawlerStarted.current = true;
+      toast.dismiss(toastId);
+      return true;
+    } catch (error) {
+      toast.dismiss(toastId);
+      toast.error(formatErrorMessage(error));
+      return false;
+    }
   }
 
   useEffect(() => {
@@ -347,7 +356,6 @@ export function ScrapePanel({
 
     if (!endpoint) return;
 
-    setFetchingCount(true);
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -364,8 +372,6 @@ export function ScrapePanel({
       }
     } catch {
       // Silent fail — count is optional
-    } finally {
-      setFetchingCount(false);
     }
   }
 
@@ -389,6 +395,7 @@ export function ScrapePanel({
     // Removed setSearchState(null) so we append instead of clear
 
     try {
+      if (!(await ensureCrawlerReady())) return;
       if (activeProvider === 'local' || !activeProvider) {
         await Promise.all(queries.map((q) => searchFirecrawl(q, queries.length > 1)));
       } else {
@@ -503,37 +510,8 @@ export function ScrapePanel({
       return;
     }
 
-    const items: SearchResultItem[] = urls.map((url) => ({
-      url,
-      title: url,
-    }));
-
-    setSearchState((prev) => {
-      const existingUrls = new Set(prev?.results.map((r) => r.url) ?? []);
-      const newItems = items.filter((item) => !existingUrls.has(item.url));
-      const combined = [...newItems, ...(prev?.results ?? [])];
-
-      return prev
-        ? {
-            ...prev,
-            results: combined,
-            totalResults: prev.totalResults + newItems.length,
-          }
-        : {
-            results: combined,
-            totalResults: combined.length,
-            totalResultsIsEstimate: false,
-            currentPage: 1,
-            totalPages: 1,
-            hasMore: false,
-            query: '',
-            searchProvider: 'firecrawl',
-          };
-    });
-
-    const newSelected = Object.fromEntries(urls.map((u) => [u, true]));
-    setSelected((prev) => ({ ...prev, ...newSelected }));
     setManualUrl('');
+    void startJob(urls, true);
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -556,32 +534,28 @@ export function ScrapePanel({
       toast.error('Select at least one URL to scrape.');
       return;
     }
-    setConfirmOpen(true);
+    void startJob();
   }
 
-  async function startJob() {
+  async function startJob(urls = selectedUrls, exactUrls = false) {
     setStarting(true);
-    setConfirmOpen(false);
-    const effectiveScope: CrawlScope = specificUrls ? 'page' : scope;
+    const effectiveScope: CrawlScope = specificUrls || exactUrls ? 'page' : scope;
     try {
+      if (!(await ensureCrawlerReady())) return;
       const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          keywords: query || selectedUrls[0],
-          pageLimit: specificUrls ? 1 : pageLimit,
-          targets: selectedUrls.map((url) => ({ url, scope: effectiveScope })),
+          keywords: query || urls[0],
+          pageLimit: specificUrls || exactUrls ? 1 : pageLimit,
+          targets: urls.map((url) => ({ url, scope: effectiveScope })),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Could not start job');
 
-      toast.success('Scrape queued', {
-        description: specificUrls
-          ? `We will connect to ${selectedUrls.length} specific URL(s) and show real page progress as each response arrives. You can navigate away.`
-          : `${selectedUrls.length} ${
-              effectiveScope === 'domain' ? 'domain(s)' : 'page(s)'
-            } selected. We will show real page progress as each response arrives; no artificial completion estimate. You can navigate away.`,
+      toast.success('Website added', {
+        description: 'We’ll finish it in the background.',
         duration: 8000,
       });
 
@@ -612,13 +586,37 @@ export function ScrapePanel({
 
   const [inputMode, setInputMode] = useState<'search' | 'url'>('search');
 
+  useEffect(() => {
+    const hasSelection = selectedUrls.length > 0;
+    const isUrl = inputMode === 'url';
+    onActionChange?.({
+      label: isUrl ? 'Add website' : hasSelection ? 'Add selected' : 'Search website',
+      onClick: () => {
+        if (isUrl) void addManual();
+        else if (hasSelection) handleStartClick();
+        else void runSearch();
+      },
+      disabled: disabled || (isUrl ? !manualUrl.trim() : !hasSelection && !query.trim()),
+      loading: searching || starting,
+    });
+    return () => onActionChange?.(null);
+  }, [
+    disabled,
+    inputMode,
+    manualUrl,
+    query,
+    searching,
+    starting,
+    selectedUrls.length,
+    onActionChange,
+  ]);
+
   return (
     <div className="space-y-4">
       {/* Unified input area */}
       <div className="space-y-3">
         {/* Mode toggle + input */}
         <div className="flex items-center gap-2">
-          {crawlerControl}
           <Tabs
             value={inputMode}
             onValueChange={(v) => setInputMode(v as 'search' | 'url')}
@@ -667,21 +665,6 @@ export function ScrapePanel({
                     }
                   }}
                 />
-                {query.length > 0 && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8"
-                    onClick={() => {
-                      setShowDropdown(false);
-                      runSearch();
-                    }}
-                    disabled={disabled || searching}
-                  >
-                    {searching ? <Loader2 className="size-3.5 animate-spin mr-1" /> : null}
-                    Search
-                  </Button>
-                )}
                 {showDropdown && cachedQueries.length > 0 && (
                   <div
                     ref={dropdownRef}
@@ -724,53 +707,9 @@ export function ScrapePanel({
                   onChange={(e) => setManualUrl(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addManual()}
                 />
-                {manualUrl.length > 0 && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8"
-                    onClick={addManual}
-                    disabled={disabled}
-                  >
-                    Add
-                  </Button>
-                )}
               </>
             )}
           </div>
-
-          {/* Search limit (only in search mode) */}
-          {inputMode === 'search' && (
-            <Input
-              type="number"
-              min={1}
-              max={100}
-              value={searchLimit}
-              disabled={disabled || searching}
-              onChange={(e) => setSearchLimit(Number(e.target.value) || 15)}
-              title="Max results"
-              className="w-20 shrink-0 tabular-nums"
-            />
-          )}
-
-          {/* Start Scraping Button (always visible) */}
-          <Button
-            onClick={handleStartClick}
-            disabled={disabled || starting || selectedUrls.length === 0}
-            className="shrink-0"
-          >
-            {starting ? (
-              <Loader2 className="size-4 animate-spin mr-1" />
-            ) : (
-              <Rocket className="size-4 mr-2" />
-            )}
-            Start Scraping
-            {selectedUrls.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {selectedUrls.length}
-              </Badge>
-            )}
-          </Button>
         </div>
       </div>
 
@@ -825,7 +764,7 @@ export function ScrapePanel({
               onValueChange={(v) => setScope(v as CrawlScope)}
               disabled={specificUrls || disabled}
             >
-              <SelectTrigger className="w-40 bg-white h-8 text-xs">
+              <SelectTrigger className="w-52 bg-white h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -991,28 +930,6 @@ export function ScrapePanel({
             )}
         </div>
       )}
-
-      {/* Confirmation modal */}
-      <GenericAlert
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title="Start Scraping?"
-        description={
-          specificUrls
-            ? `This will scrape ${selectedUrls.length} specific URL${
-                selectedUrls.length !== 1 ? 's' : ''
-              } exactly as provided, no deep crawl or pagination.\n\nThe job will run in the background. You can navigate away and check progress anytime.`
-            : `This will scrape ${selectedUrls.length} ${
-                scope === 'domain' ? 'domain(s)' : 'page(s)'
-              }${
-                scope === 'domain' ? ` with up to ${pageLimit} pages each` : ''
-              }.\n\n• Total pages: ~${estimate.totalPages.toLocaleString()}\n• Estimated time: ${formatDuration(
-                estimate.estimatedSeconds,
-              )}\n\nThe job will run in the background. You can navigate away and check progress anytime.`
-        }
-        actionText="Start Scraping"
-        onAction={startJob}
-      />
     </div>
   );
 }

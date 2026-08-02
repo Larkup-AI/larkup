@@ -4,15 +4,30 @@ import { hasEnv, ENV_KEYS } from '../../utils/env-loader';
 
 test.describe.serial('Data Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/data');
-    await page.waitForSelector('text=Upload files, scrape the web', { timeout: 60_000 });
+    await page.goto('/add');
+    await page.waitForSelector('text=Add to knowledge', { timeout: 60_000 });
   });
 
   test('page loads with correct heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Data', exact: true })).toBeVisible();
     await expect(
-      page.getByText('Upload files, scrape the web, or manage your knowledge base.'),
+      page.getByRole('heading', { name: 'Add to knowledge', exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByText('Add websites, files, text, and media. We handle the rest in the background.'),
+    ).toBeVisible();
+  });
+
+  test('keeps the primary add action in the tab bar', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Search website' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Files', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Add files' })).toBeDisabled();
+
+    await page.getByRole('button', { name: 'Text', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Add text' })).toBeDisabled();
+
+    await page.getByRole('button', { name: 'Media', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Add media' })).toBeDisabled();
   });
 
   // ── File Uploads ──────────────────────────────────────────────────────────
@@ -219,9 +234,7 @@ test.describe.serial('Data Page', () => {
   // ── Corpus Management ─────────────────────────────────────────────────────
 
   test('corpus document list shows uploaded documents', async ({ page }) => {
-    // Switch to Knowledge Base tab
-    const kbTab = page.getByText('Knowledge Base', { exact: true }).first();
-    await kbTab.click();
+    await page.goto('/data');
     await page.waitForTimeout(500);
 
     // After previous uploads, verify the corpus has documents
@@ -232,16 +245,13 @@ test.describe.serial('Data Page', () => {
   });
 
   test('corpus exposes a clear-all reset action', async ({ page }) => {
-    const kbTab = page.getByText('Knowledge Base', { exact: true }).first();
-    await kbTab.click();
+    await page.goto('/data');
 
     await expect(page.getByRole('button', { name: 'Clear all files' })).toBeVisible();
   });
 
   test('delete a document from corpus', async ({ page }) => {
-    // Switch to Knowledge Base tab
-    const kbTab = page.getByText('Knowledge Base', { exact: true }).first();
-    await kbTab.click();
+    await page.goto('/data');
     await page.waitForTimeout(500);
 
     // Find a delete button on any document
@@ -265,16 +275,16 @@ test.describe.serial('Data Page', () => {
 
   // ── Media Tab ─────────────────────────────────────────────────────────────
 
-  test('media tab shows Images sub-tab', async ({ page }) => {
+  test('media tab has upload and URL entry modes', async ({ page }) => {
     const mediaTab = page.getByText('Media', { exact: true }).first();
     if (await mediaTab.isVisible()) {
       await mediaTab.click();
       await page.waitForTimeout(500);
 
-      // Images sub-tab should be visible and active
-      await expect(page.getByRole('button', { name: /^Images/ })).toBeVisible({
+      await expect(page.getByRole('button', { name: 'Upload' })).toBeVisible({
         timeout: 5_000,
       });
+      await expect(page.getByRole('button', { name: 'From URL' })).toBeVisible();
     }
   });
 
@@ -292,38 +302,33 @@ test.describe.serial('Data Page', () => {
     await page.waitForTimeout(3_000);
 
     // Click upload button
-    const uploadBtn = page.getByRole('button', { name: /Upload/i }).first();
+    const uploadBtn = page.getByRole('button', { name: 'Add media' });
     if (await uploadBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await uploadBtn.click();
       await page.waitForTimeout(3_000);
     }
   });
 
-  test('media video tab shows install prompt', async ({ page }) => {
+  test('video uploads stage without asking for a host ffmpeg installation', async ({ page }) => {
     const mediaTab = page.getByText('Media', { exact: true }).first();
     await mediaTab.click();
     await page.waitForTimeout(500);
 
-    // Switch to Video sub-tab
-    const videoTab = page.getByText('Video', { exact: true }).first();
-    if (await videoTab.isVisible()) {
-      await videoTab.click();
-      await page.waitForTimeout(500);
-
-      // Should show install prompt if tool not installed
-      const installPrompt = page.getByText('Install from Marketplace');
-      const hasPrompt = await installPrompt.isVisible({ timeout: 5_000 }).catch(() => false);
-      console.log(`  📦 Video tab install prompt visible: ${hasPrompt}`);
-    }
+    const fileInput = page.locator('input[type="file"]').first();
+    await fileInput.setInputFiles({
+      name: 'demo.mp4',
+      mimeType: 'video/mp4',
+      buffer: Buffer.alloc(8),
+    });
+    await expect(page.getByText('demo.mp4', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add media' })).toBeEnabled();
+    await expect(page.getByText(/Missing system dependencies|brew install ffmpeg/i)).toHaveCount(0);
   });
 
   test('audio uploads provide a playable staged preview', async ({ page }) => {
     const mediaTab = page.getByText('Media', { exact: true }).first();
     await mediaTab.click();
     await page.waitForTimeout(500);
-
-    const audioTab = page.getByText('Audio', { exact: true }).first();
-    await audioTab.click();
 
     const fileInput = page.locator('input[type="file"]').first();
     test.skip(
@@ -433,8 +438,7 @@ test.describe.serial('Data Page', () => {
       });
     });
 
-    await page.goto('/data?tab=add&subtab=media');
-    await page.getByRole('button', { name: /^Video/ }).click();
+    await page.goto('/add?subtab=media');
 
     await expect(page.getByText('Indexing 1 file')).toBeVisible();
     await expect(page.getByText('2 / 5 audio parts')).toBeVisible();

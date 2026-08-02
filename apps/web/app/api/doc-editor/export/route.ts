@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
 
-  return new NextResponse(result.buffer, {
+  return new NextResponse(new Uint8Array(result.buffer), {
     status: 200,
     headers: {
       'Content-Type': result.mimeType,

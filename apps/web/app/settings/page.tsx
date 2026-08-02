@@ -14,6 +14,7 @@ import { ConnectionsSection } from '@/components/settings/connections-section';
 import { DeploymentSection } from '@/components/settings/deployment-section';
 import { MarketplaceSection } from '@/components/settings/marketplace-section';
 import { MarketplaceToolsSettings } from '@/components/settings/marketplace-tools-settings';
+import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
 
 function SettingsContent() {
   const searchParams = useSearchParams();
@@ -69,6 +70,17 @@ function SettingsContent() {
       {activeSection === 'prompts' && <PromptsSection />}
       {activeSection === 'playground' && <PlaygroundSection />}
       {activeSection === 'appearance' && <AppearanceSection />}
+      {activeSection === 'analytics' && (
+        <section className="space-y-6">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Analytics</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Track usage, requests, and performance of your AI server.
+            </p>
+          </div>
+          <AnalyticsDashboard />
+        </section>
+      )}
     </SettingsLayout>
   );
 }

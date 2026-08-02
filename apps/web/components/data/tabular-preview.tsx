@@ -1,39 +1,33 @@
-"use client";
+'use client';
 
-import { useMemo } from "react";
-import type { ColumnMeta } from "@larkup/core/tabular-store";
+import { useMemo } from 'react';
+import type { ColumnMeta } from '@larkup/core/tabular-store';
 
-const TYPE_BADGES: Record<
-  string,
-  { icon: string; label: string; color: string }
-> = {
+const TYPE_BADGES: Record<string, { icon: string; label: string; color: string }> = {
   number: {
-    icon: "🔢",
-    label: "Number",
-    color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+    icon: '🔢',
+    label: 'Number',
+    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   },
   string: {
-    icon: "📝",
-    label: "Text",
-    color:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+    icon: '📝',
+    label: 'Text',
+    color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
   },
   date: {
-    icon: "📅",
-    label: "Date",
-    color:
-      "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+    icon: '📅',
+    label: 'Date',
+    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   },
   boolean: {
-    icon: "✓",
-    label: "Boolean",
-    color:
-      "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300",
+    icon: '✓',
+    label: 'Boolean',
+    color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
   },
   mixed: {
-    icon: "◆",
-    label: "Mixed",
-    color: "bg-gray-100 text-gray-700 dark:bg-gray-800/50 dark:text-gray-300",
+    icon: '◆',
+    label: 'Mixed',
+    color: 'bg-gray-100 text-gray-700 dark:bg-gray-800/50 dark:text-gray-300',
   },
 };
 
@@ -60,7 +54,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
         {label}
       </span>
       <span className="text-sm font-semibold tabular-nums text-foreground">
-        {typeof value === "number"
+        {typeof value === 'number'
           ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
           : value}
       </span>
@@ -97,12 +91,11 @@ export function TabularPreview({
     // Quick type detection for preview
     return columnNames.map((name) => {
       const vals = rows.slice(0, 20).map((r) => r[name]);
-      const nonNull = vals.filter((v) => v != null && v !== "");
-      const allNum =
-        nonNull.length > 0 && nonNull.every((v) => !isNaN(Number(v)));
+      const nonNull = vals.filter((v) => v != null && v !== '');
+      const allNum = nonNull.length > 0 && nonNull.every((v) => !isNaN(Number(v)));
       return {
         name,
-        type: allNum ? "number" : "string",
+        type: allNum ? 'number' : 'string',
         nullCount: vals.length - nonNull.length,
         uniqueCount: new Set(nonNull.map(String)).size,
       } as ColumnMeta;
@@ -111,7 +104,7 @@ export function TabularPreview({
 
   // Numeric columns with stats
   const numericStats = useMemo(() => {
-    return columnMeta.filter((c) => c.type === "number" && c.stats).slice(0, 4);
+    return columnMeta.filter((c) => c.type === 'number' && c.stats).slice(0, 4);
   }, [columnMeta]);
 
   const previewRows = rows.slice(0, maxPreviewRows);
@@ -154,9 +147,7 @@ export function TabularPreview({
         <div className="space-y-2">
           {numericStats.map((col) => (
             <div key={col.name}>
-              <div className="mb-1 text-[10px] font-medium text-muted-foreground">
-                {col.name}
-              </div>
+              <div className="mb-1 text-[10px] font-medium text-muted-foreground">{col.name}</div>
               <div className="flex flex-wrap gap-1.5">
                 {col.stats && (
                   <>
@@ -199,19 +190,13 @@ export function TabularPreview({
                   {previewColumnNames.map((col) => (
                     <td
                       key={col}
-                      className="max-w-[150px] truncate whitespace-nowrap px-2.5 py-1.5 tabular-nums text-foreground"
-                      title={String(row[col] ?? "")}
+                      className="max-w-37.5 truncate whitespace-nowrap px-2.5 py-1.5 tabular-nums text-foreground"
+                      title={String(row[col] ?? '')}
                     >
-                      {row[col] === null || row[col] === undefined
-                        ? "—"
-                        : String(row[col])}
+                      {row[col] === null || row[col] === undefined ? '—' : String(row[col])}
                     </td>
                   ))}
-                  {hasMoreColumns && (
-                    <td className="px-2.5 py-1.5 text-muted-foreground">
-                      ...
-                    </td>
-                  )}
+                  {hasMoreColumns && <td className="px-2.5 py-1.5 text-muted-foreground">...</td>}
                 </tr>
               ))}
             </tbody>

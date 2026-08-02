@@ -18,6 +18,7 @@ import { ChatSignatureRequest } from '@/components/chat/tools/chat-signature-req
 import { Sparkles, FileEdit, CheckCircle2, Globe, ChevronDown } from 'lucide-react';
 import { ChatMediaPreview, parseMediaRefs } from '@/components/chat/tools/chat-media-preview';
 import { useDocEditor } from '@/components/chat/canvas/doc-editor-provider';
+import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/chat/reasoning';
 
 function FollowUpButtons({
   suggestions,
@@ -151,6 +152,46 @@ function splitTextAndTables(
   flushText();
 
   return segments;
+}
+
+/* ------------------------------------------------------------------ */
+/* Strip <think> tags from LLM output and extract reasoning text        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Extracts `<think>…</think>` blocks from raw LLM text.
+ * Returns the cleaned text (with think blocks removed) and the
+ * concatenated reasoning content. Handles:
+ * - Complete `<think>…</think>` blocks
+ * - Unclosed `<think>…` blocks (streaming / partial output)
+ * - Multiple think blocks in the same text
+ */
+function stripThinkTags(text: string): { cleanText: string; reasoningText: string } {
+  if (!text) return { cleanText: '', reasoningText: '' };
+
+  const reasoningParts: string[] = [];
+  let cleaned = text;
+
+  // Extract complete <think>…</think> blocks
+  const completeRegex = /<think>([\s\S]*?)<\/think>/gi;
+  let match;
+  while ((match = completeRegex.exec(cleaned)) !== null) {
+    reasoningParts.push(match[1].trim());
+  }
+  cleaned = cleaned.replace(completeRegex, '');
+
+  // Extract unclosed <think>… (streaming, no closing tag yet)
+  const unclosedRegex = /<think>([\s\S]*)$/i;
+  const unclosedMatch = cleaned.match(unclosedRegex);
+  if (unclosedMatch) {
+    reasoningParts.push(unclosedMatch[1].trim());
+    cleaned = cleaned.replace(unclosedRegex, '');
+  }
+
+  return {
+    cleanText: cleaned.trim(),
+    reasoningText: reasoningParts.filter(Boolean).join('\n\n'),
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -818,6 +859,50 @@ export function MessageItem({
 
   const textParts = parts.filter((p: any) => p.type === 'text');
 
+  // Collect native AI SDK reasoning parts (e.g. DeepSeek R1, Claude extended thinking)
+  const nativeReasoningParts = parts.filter((p: any) => p.type === 'reasoning');
+  const nativeReasoningText = nativeReasoningParts
+    .map((p: any) => p.text || '')
+    .filter(Boolean)
+    .join('\n\n');
+  const hasNativeReasoning = nativeReasoningParts.length > 0;
+  const lastPart = parts.at(-1);
+  const isNativeReasoningStreaming = isLast && isStreaming && lastPart?.type === 'reasoning';
+
+  // Extract <think> tag reasoning from text parts (fallback for models like Qwen)
+  const { allCleanTexts, thinkReasoningText, hasThinkTags } = useMemo(() => {
+    let thinkText = '';
+    let hasTags = false;
+    const cleanTexts: string[] = [];
+    for (const part of textParts) {
+      const raw = part.text || '';
+      const { cleanText, reasoningText } = stripThinkTags(raw);
+      cleanTexts.push(cleanText);
+      if (reasoningText) {
+        thinkText += (thinkText ? '\n\n' : '') + reasoningText;
+        hasTags = true;
+      }
+    }
+    return { allCleanTexts: cleanTexts, thinkReasoningText: thinkText, hasThinkTags: hasTags };
+  }, [textParts]);
+
+  // Determine if <think> reasoning is still streaming (unclosed tag in last text part)
+  const isThinkReasoningStreaming = useMemo(() => {
+    if (!isLast || !isStreaming || !hasThinkTags) return false;
+    const lastText = textParts.at(-1)?.text || '';
+    // Still streaming if there's an unclosed <think> tag
+    const openCount = (lastText.match(/<think>/gi) || []).length;
+    const closeCount = (lastText.match(/<\/think>/gi) || []).length;
+    return openCount > closeCount;
+  }, [isLast, isStreaming, hasThinkTags, textParts]);
+
+  // Combined reasoning
+  const combinedReasoningText = [nativeReasoningText, thinkReasoningText]
+    .filter(Boolean)
+    .join('\n\n');
+  const hasAnyReasoning = hasNativeReasoning || hasThinkTags;
+  const isReasoningStreaming = isNativeReasoningStreaming || isThinkReasoningStreaming;
+
   const isShimmering =
     textParts.every((p: any) => !p.text || p.text.trim().length === 0) && isLast && isStreaming;
 
@@ -866,6 +951,14 @@ export function MessageItem({
       {/* All search attempts are intentionally one compact disclosure. */}
       {webSearchParts.length > 0 && <WebSearchSummary parts={webSearchParts} />}
 
+      {/* Reasoning block (native AI SDK reasoning + <think> tag fallback) */}
+      {hasAnyReasoning && (
+        <Reasoning isStreaming={isReasoningStreaming}>
+          <ReasoningTrigger />
+          <ReasoningContent>{combinedReasoningText}</ReasoningContent>
+        </Reasoning>
+      )}
+
       {/* Non-visualization tool outputs (data tables, sandbox results) */}
       {nonVizToolParts
         .filter((p: any) => getToolInfo(p).isCompleted)
@@ -891,6 +984,7 @@ export function MessageItem({
       {isLast &&
         isStreaming &&
         executingParts.length === 0 &&
+        !hasAnyReasoning &&
         textParts.every((p: any) => !p.text || p.text.trim().length === 0) && (
           <div className="flex items-center gap-2.5 py-1 text-[13px] text-muted-foreground animate-pulse">
             <Sparkles className="size-4 text-foreground/60" />
@@ -898,18 +992,23 @@ export function MessageItem({
           </div>
         )}
 
-      {/* Text parts — with markdown table detection + media refs */}
+      {/* Text parts — with markdown table detection + media refs + think-tag stripping */}
       {textParts.map((part: any, i: number) => {
         const rawText = part.text || '';
         if (!rawText.trim()) return null;
 
+        // Use pre-stripped text (think tags already removed)
+        const strippedText = allCleanTexts[i] ?? rawText;
+
         // Extract media references before processing
-        const mediaRefs = parseMediaRefs(rawText);
+        const mediaRefs = parseMediaRefs(strippedText);
         // Strip media refs from text for markdown rendering
-        let cleanText = rawText;
+        let cleanText = strippedText;
         for (const ref of mediaRefs) {
           cleanText = cleanText.replace(ref.fullMatch, '');
         }
+
+        if (!cleanText.trim() && mediaRefs.length === 0) return null;
 
         const segments = splitTextAndTables(cleanText);
 
@@ -1016,13 +1115,18 @@ function renderMarkdown(text: string): string {
 
   // Unordered lists — collect consecutive lines into <ul>
   html = html.replace(/^- (.+)$/gm, '<li class="msg-li">$1</li>');
-  // Wrap consecutive <li> in <ul>
+  // Wrap consecutive <li> in <ul> (including when separated by blank lines)
   html = html.replace(
     /(<li class="msg-li">.*?<\/li>\n?)+/g,
     (match) => `<ul class="msg-ul">${match}</ul>`,
   );
 
-  // Ordered lists
+  // Ordered lists — normalize paragraph-separated numbered lists first.
+  // Small LLMs often output `1. item\n\n1. item\n\n1. item` instead of
+  // consecutive lines. Collapse the double-newlines between numbered items
+  // so they group into a single <ol>.
+  html = html.replace(/(^\d+\. .+$)(\n\n)((?=\d+\. ))/gm, '$1\n$3');
+
   html = html.replace(/^\d+\. (.+)$/gm, '<li class="msg-li-ordered">$1</li>');
   html = html.replace(
     /(<li class="msg-li-ordered">.*?<\/li>\n?)+/g,
@@ -1032,7 +1136,7 @@ function renderMarkdown(text: string): string {
   // Paragraphs
   html = html.replace(/\n\n/g, '</p><p class="msg-p">');
 
-  html = html.replace(/(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)\n+/g, '$1');
+  html = html.replace(/(<?\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)\n+/g, '$1');
   html = html.replace(/\n+(<\/?(?:ul|ol|li|h1|h2|h3|pre)[^>]*>)/g, '$1');
 
   html = html.replace(/\n/g, '<br/>');

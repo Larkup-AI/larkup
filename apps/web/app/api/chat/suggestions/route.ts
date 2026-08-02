@@ -16,6 +16,7 @@ import { createDeepSeek } from '@ai-sdk/deepseek';
 import { createGateway } from '@ai-sdk/gateway';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
+import { gatewayProviderOptions } from '@/lib/gateway-fallbacks';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,6 +107,8 @@ export async function POST(req: Request) {
 
       const { object } = await generateObject({
         model: aiModel,
+        maxRetries: 0,
+        providerOptions: gatewayProviderOptions(resolvedProvider, chatModelId),
         system:
           'You are an AI that suggests 3 very short and concise questions a user could ask based on the provided text.',
         prompt: `Text:\n${context}`,
@@ -119,7 +122,10 @@ export async function POST(req: Request) {
 
       return NextResponse.json({ suggestions: object.suggestions });
     } catch (e: any) {
-      console.error('Failed to generate suggestions:', e.message);
+      // Silently fall back to defaults — suggestion generation is non-critical
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[suggestions] Falling back to defaults:', e.message?.slice(0, 120));
+      }
       return NextResponse.json({
         suggestions: ['What is this corpus about?', 'Summarize the key concepts'],
       });

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageCircle, Database, Settings, BarChart3, type LucideIcon } from 'lucide-react';
+import { MessageCircle, Database, Settings, Plus, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ServerSwitcher } from '@/components/workspace/server-switcher';
@@ -28,8 +28,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'chat', label: 'Chat', href: '/chat', icon: MessageCircle },
+  { id: 'add', label: 'Add', href: '/add', icon: Plus },
   { id: 'data', label: 'Data', href: '/data', icon: Database },
-  { id: 'analytics', label: 'Analytics', href: '/analytics', icon: BarChart3 },
   { id: 'settings', label: 'Settings', href: '/settings', icon: Settings },
 ];
 

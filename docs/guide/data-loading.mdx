@@ -9,7 +9,7 @@ Larkup gives you a complete data pipeline out of the box. Crawl entire domains, 
 
 The **Add Data** tab is your starting point for loading content into the pipeline. You can choose from three ingestion modes:
 
-- **Web Scrape**: Crawl websites by keyword search or direct URL. Powered by Firecrawl, with support for local and cloud modes.
+- **Web Scrape**: Crawl websites by keyword search or direct URL. The built-in local crawler works immediately; Firecrawl Cloud is available for JavaScript-heavy or protected sites.
 - **Paste Text**: Drop in raw text or a single URL for quick ingestion.
 - **Upload Files**: Drag and drop files directly. Supported formats include PDF, Word (`.docx`), Markdown, CSV, JSON, Excel, and plain text.
 - **Media**: Upload images, video, or audio. The optional **Video & Audio** marketplace tool also imports direct media URLs, YouTube videos, and playlists (up to 10 items per batch).
@@ -29,10 +29,6 @@ Use **View Uploads** to index an existing video or audio asset again after chang
 Search retrieves more semantic candidates for media and expands a matching moment with its immediately preceding and following timeline segments. This gives the answering agent enough before → event → after context for questions about outcomes, actions, or a specific scene in a long recording.
 
 After indexing, matching chat sources include an embedded player and seek to the cited time range. YouTube citations also link to the original video at the matching timestamp. Direct URL imports reject private or local network addresses.
-
-<Frame caption="Launch a local Firecrawl crawler in Docker">
-  <img src="/images/data/launch-firecrwal-server.png" alt="Launch web crawler" />
-</Frame>
 
 <Frame caption="Upload files by dragging them into the UI, PDF, Word, JSON, and more">
   <img src="/images/data/upload-files.png" alt="File upload interface" />
@@ -58,11 +54,15 @@ Large scraping and upload operations run as background **ETL Jobs**. The ETL Job
 
 Larkup supports both **local** and **cloud** scraping. You can configure everything from the **Global Settings** panel, no `.env` editing required.
 
-### Local Firecrawl
+### Built-in Local Crawler
 
-Click **Launch Web Crawler** in the Add Data tab to connect to the optional local Firecrawl stack. A bearer token is generated automatically, so you can start scraping immediately with zero signup.
+The local crawler is ready by default in curl, npm, desktop, and Docker installs. It does not require Docker, a browser binary, an account, an API key, or a separate launch step. Paste a URL into **Add Data → Website** and start scraping.
 
-The standalone `docker run` image contains only Larkup, so it cannot launch sibling Docker services by itself. To use local crawling with Docker, start the crawler profile from the repository:
+It retrieves server-rendered HTML. For sites that require a browser, have strong anti-bot protection, or render all content in JavaScript, choose **Cloud web crawler** in Settings and add a Firecrawl API key.
+
+### Optional Self-hosted Firecrawl
+
+The built-in crawler remains the default. If you need the optional browser-based Firecrawl stack in a Docker deployment, start the crawler profile from the repository:
 
 ```bash
 docker compose -f docker/docker-compose-prod.yaml --profile crawler up -d
@@ -93,4 +93,4 @@ For organizations that route traffic through a proxy, such as for higher request
   <img src="/images/data/set-firecrawl-cloud.png" alt="Proxy settings in Global Settings" />
 </Frame>
 
-Larkup automatically routes all outgoing scraping requests through your configured proxy.
+Larkup routes built-in local crawling and local web search through the saved proxy immediately. The same settings take priority over a legacy `proxies.txt` pool when starting the optional self-hosted Firecrawl stack.

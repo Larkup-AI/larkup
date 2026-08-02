@@ -332,7 +332,7 @@ export function GeneralSection() {
                   <span className="text-[10px] text-green-500 font-medium">✓ Verified</span>
                 )}
                 {verifyStatus.status === 'error' && (
-                  <span className="text-[10px] text-red-500 font-medium truncate max-w-[150px]">
+                  <span className="text-[10px] text-red-500 font-medium truncate max-w-37.5">
                     {verifyStatus.message}
                   </span>
                 )}
@@ -485,7 +485,7 @@ export function GeneralSection() {
                   <span className="text-[10px] text-green-500 font-medium">✓ Verified</span>
                 )}
                 {verifyCrawlerStatus.status === 'error' && (
-                  <span className="text-[10px] text-red-500 font-medium truncate max-w-[150px]">
+                  <span className="text-[10px] text-red-500 font-medium truncate max-w-37.5">
                     {verifyCrawlerStatus.message}
                   </span>
                 )}
@@ -572,7 +572,7 @@ export function GeneralSection() {
         <CardContent className="space-y-4">
           <Tabs defaultValue="one-line" className="w-full ">
             <div className="flex mb-4">
-              <TabsList className="grid w-[140px] grid-cols-2 h-8! bg-muted/10">
+              <TabsList className="grid w-35 grid-cols-2 h-8! bg-muted/10">
                 <TabsTrigger value="one-line" className="text-xs h-6">
                   One Line
                 </TabsTrigger>

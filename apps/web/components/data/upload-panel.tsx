@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { formatErrorMessage } from '@/lib/error-formatter';
 import {
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { TabularPreview } from '@/components/data/tabular-preview';
+import type { DataPrimaryAction } from '@/components/data/data-primary-action';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import {
@@ -69,7 +70,13 @@ interface StagedFile {
 
 let globalStagedFiles: StagedFile[] = [];
 
-export function UploadPanel({ onAdded }: { onAdded: () => void }) {
+export function UploadPanel({
+  onAdded,
+  onActionChange,
+}: {
+  onAdded: () => void;
+  onActionChange?: (action: DataPrimaryAction | null) => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [staged, setStagedState] = useState<StagedFile[]>(globalStagedFiles);
   const [indexAllImages, setIndexAllImages] = useState(false);
@@ -496,6 +503,21 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
     }
   }
 
+  useEffect(() => {
+    onActionChange?.({
+      label:
+        staged.length === 0
+          ? 'Add files'
+          : staged.length === 1
+          ? 'Add file'
+          : `Add ${staged.length} files`,
+      onClick: ingest,
+      disabled: staged.length === 0,
+      loading: saving,
+    });
+    return () => onActionChange?.(null);
+  }, [staged, saving, onActionChange]);
+
   function updateEditingFile(patch: Partial<StagedFile>) {
     setStaged((prev) => prev.map((f) => (f.id === editingFileId ? { ...f, ...patch } : f)));
   }
@@ -710,14 +732,16 @@ export function UploadPanel({ onAdded }: { onAdded: () => void }) {
         </div>
       )}
 
-      <Button onClick={ingest} disabled={saving || staged.length === 0}>
-        {saving ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4" />}
-        {saving && progress
-          ? `Adding ${progress.current} of ${progress.total}`
-          : `Add ${staged.length > 0 ? staged.length : ''} file${
-              staged.length === 1 ? '' : 's'
-            } to corpus`}
-      </Button>
+      {!onActionChange && (
+        <Button onClick={ingest} disabled={saving || staged.length === 0}>
+          {saving ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4" />}
+          {saving && progress
+            ? `Adding ${progress.current} of ${progress.total}`
+            : `Add ${staged.length > 0 ? staged.length : ''} file${
+                staged.length === 1 ? '' : 's'
+              } to corpus`}
+        </Button>
+      )}
 
       {/* Mapping Dialog */}
       <Dialog open={!!editingFile} onOpenChange={(open) => !open && setEditingFileId(null)}>

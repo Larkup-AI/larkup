@@ -1,10 +1,27 @@
 import { spawn } from 'node:child_process';
+import { chmodSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 
 let _ffmpegPath: string | null = null;
 let _ffprobePath: string | null = null;
+
+/**
+ * Some package managers intentionally skip dependency lifecycle scripts. The
+ * bundled binaries are still valid in that case, but can lose their executable
+ * bit on Unix. Repair it opportunistically; Windows ignores this permission.
+ */
+function prepareBundledBinary(binaryPath: string): string {
+  try {
+    chmodSync(binaryPath, 0o755);
+  } catch {
+    // Package files can be read-only in serverless deployments. Their package
+    // archive permissions are normally already correct, so spawning remains
+    // the final authority.
+  }
+  return binaryPath;
+}
 
 function resolveFfmpegPath(): string {
   if (_ffmpegPath) return _ffmpegPath;
@@ -14,7 +31,7 @@ function resolveFfmpegPath(): string {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const installer = require(installerPath) as { path?: string };
     if (installer?.path) {
-      _ffmpegPath = installer.path;
+      _ffmpegPath = prepareBundledBinary(installer.path);
       return _ffmpegPath;
     }
   } catch {
@@ -33,7 +50,7 @@ function resolveFfprobePath(): string {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const installer = require(installerPath) as { path?: string };
     if (installer?.path) {
-      _ffprobePath = installer.path;
+      _ffprobePath = prepareBundledBinary(installer.path);
       return _ffprobePath;
     }
   } catch {

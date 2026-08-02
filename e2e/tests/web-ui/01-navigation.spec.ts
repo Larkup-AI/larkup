@@ -12,10 +12,10 @@ test.describe('Navigation & Layout', () => {
 
   test('sidebar navigation links are visible', async ({ page }) => {
     await page.goto('/data');
-    await page.waitForSelector('text=Upload files, scrape the web', { timeout: 60_000 });
+    await page.waitForSelector('text=Knowledge Base', { timeout: 60_000 });
 
     // Verify main navigation items exist in sidebar
-    const navItems = ['Data', 'Chat', 'Settings'];
+    const navItems = ['Add', 'Data', 'Chat', 'Settings'];
     for (const item of navItems) {
       const link = page
         .getByRole('link', { name: item })
@@ -32,7 +32,9 @@ test.describe('Navigation & Layout', () => {
 
   test('navigate to Data page', async ({ page }) => {
     await page.goto('/data');
-    await expect(page.getByText('Upload files, scrape the web').first()).toBeVisible({
+    await expect(
+      page.getByText('Review and manage everything your AI can learn from.').first(),
+    ).toBeVisible({
       timeout: 60_000,
     });
   });
