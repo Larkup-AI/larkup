@@ -2,6 +2,17 @@
  * Keeps retrieval routing deterministic before the chat model is asked to
  * decide whether a returned source is actually useful.
  */
+function isMatchResultQuestion(text: string): boolean {
+  return (
+    /\b(?:who\s+won|winner|final\s+score|scoreline|match\s+result|what(?:'s|\s+is|\s+was)?\s+the\s+score)\b[\s\S]{0,120}\b(?:match|game|fixture|final|vs?\.?|versus)\b/i.test(
+      text,
+    ) ||
+    /\b(?:match|game|fixture|final|vs?\.?|versus)\b[\s\S]{0,120}\b(?:who\s+won|winner|final\s+score|scoreline|result|score)\b/i.test(
+      text,
+    )
+  );
+}
+
 export function requiresKnowledgeBaseSearch(text: string): boolean {
   const normalized = text.trim();
   if (/^(hi|hello|hey|thanks|thank you|ok|sure|yes|no|please|help)\b/i.test(normalized)) {
@@ -28,14 +39,19 @@ export function requiresKnowledgeBaseSearch(text: string): boolean {
     /\b(the|this|that)\s+(document|file|diagram|image|picture|upload|pdf|report)\b/i.test(
       normalized,
     ) ||
+    // A named match is commonly a question about an indexed recording. The
+    // user does not need to repeat "my video" for every follow-up question.
+    isMatchResultQuestion(normalized) ||
     /\b(uploaded?|indexed|scraped|knowledge base|corpus)\b/i.test(normalized) ||
     /\bshow\s+me\b/i.test(normalized)
   );
 }
 
-/** Current/public questions should begin on the web unless they explicitly
- * refer to the user's indexed data, which the caller gives precedence to. */
+/** Current/public questions should begin on the web unless they may refer to
+ * indexed data. A match/result question checks the local recording first and
+ * can still use web search as its one fallback. */
 export function requiresCurrentWebSearch(text: string): boolean {
+  if (requiresKnowledgeBaseSearch(text)) return false;
   return /\b(?:search (?:the )?web|search online|look (?:it )?up|internet|latest|current|today|yesterday|breaking news|weather|stock price|exchange rate|election result|schedule|who won|winner|match result|final score)\b/i.test(
     text,
   );

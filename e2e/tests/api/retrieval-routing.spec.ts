@@ -29,25 +29,26 @@ test.describe('Smart retrieval routing', () => {
     ).toEqual(['webSearch', 'analyzeImageDeeply', 'presentMedia']);
   });
 
-  test('routes public match results to web first and retains local failure recovery', () => {
-    expect(requiresKnowledgeBaseSearch('Who won the Egypt and Argentina match?')).toBe(false);
-    expect(requiresCurrentWebSearch('Who won the Egypt and Argentina match?')).toBe(true);
+  test('routes named match results to the knowledge base before web fallback', () => {
+    const question = 'Who won the Argentina Egypt match and what was the score?';
+    expect(requiresKnowledgeBaseSearch(question)).toBe(true);
+    expect(requiresCurrentWebSearch(question)).toBe(false);
     expect(
       retrievalToolsForStep({
         stepNumber: 0,
-        forceKnowledgeBaseSearch: false,
-        forceWebSearch: true,
+        forceKnowledgeBaseSearch: true,
+        forceWebSearch: false,
         toolNames,
       }),
-    ).toEqual({ toolChoice: { type: 'tool', toolName: 'webSearch' } });
+    ).toEqual({ toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' } });
     expect(
       retrievalToolsForStep({
         stepNumber: 1,
-        forceKnowledgeBaseSearch: false,
-        forceWebSearch: true,
+        forceKnowledgeBaseSearch: true,
+        forceWebSearch: false,
         toolNames,
       })?.activeTools,
-    ).toEqual(['searchKnowledgeBase', 'analyzeImageDeeply', 'presentMedia']);
+    ).toEqual(['webSearch', 'analyzeImageDeeply', 'presentMedia']);
   });
 
   test('does not make search tools available for ordinary conversation', () => {
