@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { ffprobe, runFfmpeg } from './ffmpeg-spawn';
+import { ffprobe, runFfmpeg } from './ffmpeg-spawn.js';
 
 export interface VideoProcessResult {
   audioPath?: string;
