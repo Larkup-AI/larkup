@@ -347,7 +347,11 @@ async function transcribeLocal(
 ): Promise<TranscriptionResult> {
   let whisper: any;
   try {
-    whisper = await import('nodejs-whisper');
+    // Local Whisper is deliberately optional. Keep the module specifier dynamic
+    // so Next does not try to resolve it while compiling the media route for
+    // API-based providers.
+    const whisperModule = 'nodejs-whisper';
+    whisper = await import(/* webpackIgnore: true */ whisperModule);
   } catch {
     throw new Error(
       'Local Whisper is not installed. ' +
@@ -546,7 +550,7 @@ function formatProviderName(provider: string): string {
 }
 
 async function probeAudioDuration(audioPath: string): Promise<number> {
-  const { ffprobe } = await import('./ffmpeg-spawn');
+  const { ffprobe } = await import('./ffmpeg-spawn.js');
   const data = await ffprobe(audioPath);
   return Number(data.format?.duration ?? 0);
 }
@@ -557,7 +561,7 @@ async function splitAudio(
   segmentSecs: number,
   onProgress?: (progress: number) => void | Promise<void>,
 ): Promise<string[]> {
-  const { runFfmpeg } = await import('./ffmpeg-spawn');
+  const { runFfmpeg } = await import('./ffmpeg-spawn.js');
   const path = await import('node:path');
   const { promises: fs } = await import('node:fs');
   const pattern = path.join(outputDir, 'part_%04d.mp3');

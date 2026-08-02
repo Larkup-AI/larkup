@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { access, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -8,6 +8,28 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
 test.describe('Video & Audio marketplace tool', () => {
+  test('keeps Local Whisper optional when the tool is bundled', async () => {
+    execFileSync('pnpm', ['--filter', '@larkup/tool-video-audio', 'build'], {
+      cwd: repoRoot,
+      stdio: 'pipe',
+    });
+
+    const compiledProcessor = await readFile(
+      path.join(repoRoot, 'packages/tools/video-audio/dist/audio-processor.js'),
+      'utf8',
+    );
+    expect(compiledProcessor).toContain("const whisperModule = 'nodejs-whisper'");
+    expect(compiledProcessor).not.toContain("import('nodejs-whisper')");
+
+    const tool = await import(
+      pathToFileURL(path.join(repoRoot, 'packages/tools/video-audio/dist/index.js')).href
+    );
+    expect(typeof tool.processVideo).toBe('function');
+    await expect(
+      tool.transcribeAudio('/not-used-for-provider-validation.wav', { provider: 'local' }),
+    ).rejects.toThrow(/Local Whisper is not installed/i);
+  });
+
   test('extracts bounded scene frames and blocks private URL imports', async () => {
     test.setTimeout(120_000);
     execFileSync('pnpm', ['--filter', '@larkup/tool-video-audio', 'build'], {
