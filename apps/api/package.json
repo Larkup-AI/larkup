@@ -6,9 +6,9 @@
     "hono": "^4.12.30"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@types/node": "^26.1.2",
     "tsx": "^4.7.0",
-    "typescript": "^5.4.5"
+    "typescript": "^7.0.2"
   },
   "version": "0.0.1"
 }
