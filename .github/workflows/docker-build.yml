@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      version:
+        description: Exact release version to publish alongside latest
+        required: true
+        type: string
 
 jobs:
   build:
@@ -30,6 +35,6 @@ jobs:
             NEXT_PUBLIC_DOCKER_ENV=true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/larkup:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/larkup:${{ github.event.release.tag_name || 'latest' }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/larkup:${{ inputs.version || github.event.release.tag_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
