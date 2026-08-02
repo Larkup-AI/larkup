@@ -8,8 +8,8 @@ set -euo pipefail
 # ── Config ────────────────────────────────────────────────────
 PACKAGE_NAME="larkup"
 BIN_NAME="larkup"
-NODE_MAJOR=20
-NODE_VERSION="v20.18.0"  # pinned portable Node version
+NODE_MAJOR=22
+NODE_VERSION="v22.23.2"  # pinned portable Node version
 LARKUP_PREFIX="${HOME}/.larkup"
 
 # ── Flags ─────────────────────────────────────────────────────

@@ -1,6 +1,8 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { ProxyAgent, type Dispatcher } from 'undici';
+import { readConfig } from '@larkup/core/config-store';
 
 /**
  * Small, dependency-free crawler used by the desktop, CLI, and curl install.
@@ -36,6 +38,53 @@ interface NativeCrawl {
   pages: NativePage[];
   delivered: number;
   cancelled?: boolean;
+  /** Most recent request error, retained so an empty crawl is diagnosable. */
+  lastError?: string;
+}
+
+interface NativeFetchInit extends RequestInit {
+  dispatcher?: Dispatcher;
+}
+
+let proxyAgent: { url: string; dispatcher: ProxyAgent } | undefined;
+
+function proxyUrlFromConfig(config: Awaited<ReturnType<typeof readConfig>>): string | undefined {
+  if (!config.useScraperProxy || !config.scraperProxyServer) return undefined;
+
+  let proxy: URL;
+  try {
+    proxy = new URL(config.scraperProxyServer);
+  } catch {
+    throw new Error('The configured local proxy URL is invalid. Update it in Settings.');
+  }
+  if (proxy.protocol !== 'http:' && proxy.protocol !== 'https:') {
+    throw new Error('The configured local proxy must use http or https.');
+  }
+
+  // Settings keep credentials separate so they are never displayed as part of
+  // the proxy address. Prefer those values, while still supporting a URL that
+  // was pasted with credentials in it.
+  if (config.scraperProxyUsername) proxy.username = config.scraperProxyUsername;
+  if (config.scraperProxyPassword) proxy.password = config.scraperProxyPassword;
+  return proxy.toString();
+}
+
+async function nativeFetch(input: RequestInfo | URL, init?: NativeFetchInit): Promise<Response> {
+  const proxyUrl = proxyUrlFromConfig(await readConfig());
+  if (!proxyUrl) return fetch(input, init);
+
+  if (!proxyAgent || proxyAgent.url !== proxyUrl) {
+    const previous = proxyAgent;
+    proxyAgent = { url: proxyUrl, dispatcher: new ProxyAgent(proxyUrl) };
+    // Do not make a changed proxy wait for keep-alive connections from the old
+    // one. Closing is best-effort and never interrupts the new request.
+    void previous?.dispatcher.close().catch(() => {});
+  }
+  return fetch(input, { ...init, dispatcher: proxyAgent.dispatcher } as NativeFetchInit);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'The website could not be reached.';
 }
 
 async function readCrawls(): Promise<Record<string, NativeCrawl>> {
@@ -139,7 +188,7 @@ export async function nativeSearchWeb(query: string, limit = 10): Promise<Native
   // occasionally rate-limit a shared IP, so use a second source instead of
   // turning a temporary upstream limit into a misleading "Network error".
   try {
-    const response = await fetch(
+    const response = await nativeFetch(
       `https://search.brave.com/search?q=${encodeURIComponent(query)}&source=web`,
       { headers, redirect: 'follow', signal: AbortSignal.timeout(20_000) },
     );
@@ -151,7 +200,7 @@ export async function nativeSearchWeb(query: string, limit = 10): Promise<Native
     // Continue to the fallback below.
   }
 
-  const fallback = await fetch(
+  const fallback = await nativeFetch(
     `https://www.bing.com/search?format=rss&q=${encodeURIComponent(query)}`,
     {
       headers: { ...headers, Accept: 'application/rss+xml,application/xml,text/xml' },
@@ -224,7 +273,7 @@ function linksFromHtml(html: string, baseUrl: string, origin: string): string[] 
 }
 
 export async function nativeScrapePage(url: string): Promise<NativePage> {
-  const response = await fetch(url, {
+  const response = await nativeFetch(url, {
     headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
     redirect: 'follow',
     signal: AbortSignal.timeout(20_000),
@@ -267,6 +316,7 @@ export async function getNativeCrawlStatus(id: string): Promise<{
   total: number;
   completed: number;
   pages: NativePage[];
+  error?: string;
 }> {
   const crawl = await readCrawl(id);
   if (!crawl) throw new Error('Native crawl was not found.');
@@ -290,20 +340,25 @@ export async function getNativeCrawlStatus(id: string): Promise<{
         if (new URL(link).origin !== crawl.origin) continue;
         if (!crawl.visited.includes(link) && !crawl.queue.includes(link)) crawl.queue.push(link);
       }
-    } catch {
-      // A single inaccessible page must not abort a whole domain crawl.
+    } catch (error) {
+      // Keep crawling the rest of a domain, but do not report a completely
+      // empty crawl as a success. That used to hide DNS, proxy, and HTTP
+      // failures behind a misleading "completed" job.
+      crawl.lastError = errorMessage(error);
     }
   }
 
   const newPages = crawl.pages.slice(crawl.delivered).map(({ links: _links, ...page }) => page);
   crawl.delivered = crawl.pages.length;
   const finished = !crawl.queue.length || crawl.pages.length >= crawl.limit;
+  const failed = finished && crawl.pages.length === 0 && Boolean(crawl.lastError);
   await writeCrawl(crawl);
   return {
-    state: finished ? 'completed' : 'scraping',
+    state: failed ? 'failed' : finished ? 'completed' : 'scraping',
     total: crawl.limit,
     completed: crawl.pages.length,
     pages: newPages,
+    error: failed ? crawl.lastError : undefined,
   };
 }
 

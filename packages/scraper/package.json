@@ -11,10 +11,11 @@
     "./local-runtime": "./src/local-runtime.ts"
   },
   "dependencies": {
-    "@larkup/core": "workspace:*"
+    "@larkup/core": "workspace:*",
+    "undici": "^6.28.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
-    "typescript": "7.0.2"
+    "typescript": "^6.0.3"
   }
 }

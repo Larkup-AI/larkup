@@ -1,0 +1,32 @@
+diff --git a/dist/rollup.js b/dist/rollup.js
+index e128b61b9558318b9f86dc11d72c31f09a8eb7db..e13a0f711fe87ed9108cd45602cdff50c2221234 100644
+--- a/dist/rollup.js
++++ b/dist/rollup.js
+@@ -4851,10 +4851,15 @@ var require_rollup_plugin_dts = _chunkTWFEYLU4js.__commonJS.call(void 0, {
+     }
+     var DTS_EXTENSIONS = /\.d\.(c|m)?tsx?$/;
+     var dts = ".d.ts";
++    var sys = ts2.sys || {
++      getCurrentDirectory: () => process.cwd(),
++      newLine: "\n",
++      useCaseSensitiveFileNames: false
++    };
+     var formatHost = {
+-      getCurrentDirectory: () => ts2.sys.getCurrentDirectory(),
+-      getNewLine: () => ts2.sys.newLine,
+-      getCanonicalFileName: ts2.sys.useCaseSensitiveFileNames ? (f) => f : (f) => f.toLowerCase()
++      getCurrentDirectory: () => sys.getCurrentDirectory(),
++      getNewLine: () => sys.newLine,
++      getCanonicalFileName: sys.useCaseSensitiveFileNames ? (f) => f : (f) => f.toLowerCase()
+     };
+     var DEFAULT_OPTIONS = {
+       // Ensure ".d.ts" modules are generated
+@@ -4871,7 +4876,7 @@ var require_rollup_plugin_dts = _chunkTWFEYLU4js.__commonJS.call(void 0, {
+       // Ensure TS2742 errors are visible
+       preserveSymlinks: true,
+       // Ensure we can parse the latest code
+-      target: ts2.ScriptTarget.ESNext
++      target: ts2.ScriptTarget ? ts2.ScriptTarget.ESNext : 99
+     };
+     var configByPath = /* @__PURE__ */ new Map();
+     var logCache = (...args) => process.env.DTS_LOG_CACHE ? console.log("[cache]", ...args) : null;

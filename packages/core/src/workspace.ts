@@ -273,6 +273,11 @@ function defaultConfigFor(
     chatApiKey: prevConfig.chatApiKey ?? DEFAULT_CONFIG.chatApiKey,
     customChatModels: prevConfig.customChatModels ?? DEFAULT_CONFIG.customChatModels,
     serperApiKey: prevConfig.serperApiKey ?? DEFAULT_CONFIG.serperApiKey,
+    scraperProxyServer: prevConfig.scraperProxyServer ?? DEFAULT_CONFIG.scraperProxyServer,
+    scraperProxyUsername: prevConfig.scraperProxyUsername ?? DEFAULT_CONFIG.scraperProxyUsername,
+    scraperProxyPassword: prevConfig.scraperProxyPassword ?? DEFAULT_CONFIG.scraperProxyPassword,
+    useScraperProxy: prevConfig.useScraperProxy ?? DEFAULT_CONFIG.useScraperProxy,
+    webCrawlerProvider: prevConfig.webCrawlerProvider ?? DEFAULT_CONFIG.webCrawlerProvider,
     firecrawlApiKey: prevConfig.firecrawlApiKey ?? DEFAULT_CONFIG.firecrawlApiKey,
     updatedAt: new Date().toISOString(),
   };

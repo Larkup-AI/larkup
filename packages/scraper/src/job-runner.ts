@@ -101,8 +101,13 @@ async function advanceDomainTarget(
       pulled++;
 
       if (status.state === 'completed') state = 'completed';
-      else if (status.state === 'failed') state = 'failed';
-      else if (status.state === 'cancelled') state = 'cancelled';
+      else if (status.state === 'failed') {
+        state = 'failed';
+        target = {
+          ...target,
+          error: status.error || 'The crawl did not return any readable pages.',
+        };
+      } else if (status.state === 'cancelled') state = 'cancelled';
 
       if (status.next) {
         cursor = status.next;

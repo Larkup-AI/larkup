@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import os from 'os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../..');
@@ -22,28 +23,30 @@ test.describe('Installation Methods', () => {
   test('npm install -g larkup — CLI installable from registry', async () => {
     test.setTimeout(120_000);
 
+    const installPrefix = fs.mkdtempSync(path.join(os.tmpdir(), 'larkup-install-'));
     try {
-      // Actually try to install the package from npm globally
-      // (Using a custom prefix so we don't pollute the actual global node_modules if possible,
-      // but for the sake of mimicking a user, we'll just run it)
-      const output = execSync('npm install -g larkup', {
-        timeout: 90_000,
-        encoding: 'utf-8',
-        stdio: 'pipe',
-      });
+      // Install into an isolated prefix, just as a first-time user would, without
+      // modifying the developer or CI runner's global npm directory.
+      const output = execFileSync(
+        'npm',
+        ['install', '-g', '--prefix', installPrefix, '--no-audit', '--no-fund', 'larkup'],
+        {
+          timeout: 90_000,
+          encoding: 'utf-8',
+          stdio: 'pipe',
+        },
+      );
       console.log(`  ✓ npm install successful:\n${output.trim()}`);
 
-      // Verify we can run it
-      const version = execSync('larkup --help', { encoding: 'utf-8' });
-      expect(version).toContain('larkup');
+      const binary =
+        process.platform === 'win32'
+          ? path.join(installPrefix, 'larkup.cmd')
+          : path.join(installPrefix, 'bin', 'larkup');
+      const version = execFileSync(binary, ['--version'], { encoding: 'utf-8' });
+      expect(version.trim()).toMatch(/^\d+\.\d+\.\d+/);
       console.log(`  ✓ CLI is executable after global install`);
-    } catch (err: any) {
-      console.warn(
-        `  ⚠ npm install -g failed (might not be published yet or permissions issue): ${err.message?.substring(
-          0,
-          200,
-        )}`,
-      );
+    } finally {
+      fs.rmSync(installPrefix, { recursive: true, force: true });
     }
   });
 

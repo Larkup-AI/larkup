@@ -24,7 +24,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 20
-          registry-url: "https://registry.npmjs.org"
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -36,3 +36,34 @@ jobs:
         run: pnpm changeset publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  installer-smoke:
+    name: ${{ matrix.name }} published install
+    needs: build-and-publish
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-24.04
+            command: scripts/test-release-install.sh
+          - name: macOS Intel
+            os: macos-15-intel
+            command: scripts/test-release-install.sh
+          - name: macOS Apple Silicon
+            os: macos-14
+            command: scripts/test-release-install.sh
+          - name: Windows x64
+            os: windows-2025
+            command: ./scripts/test-release-install.ps1
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+      - name: Validate published install and server health
+        shell: ${{ startsWith(matrix.os, 'windows') && 'pwsh' || 'bash' }}
+        run: ${{ matrix.command }}

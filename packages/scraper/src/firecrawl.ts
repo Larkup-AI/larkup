@@ -50,10 +50,10 @@ async function resolveEndpoint(): Promise<Endpoint> {
       }
       return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: 'local' };
     }
-    throw new FirecrawlError(
-      'The selected web crawler is not running. Choose a crawler provider in Settings.',
-      401,
-    );
+    // The built-in crawler has no process to launch. Fall back to it when an
+    // old/stopped Firecrawl state exists so curl, CLI, desktop, and container
+    // installs work without Docker or a setup click.
+    return { base: 'native://larkup-crawler', key: 'native', mode: 'native' };
   }
 
   // cloud
@@ -71,8 +71,7 @@ export async function isFirecrawlConfigured() {
   const provider = config.webCrawlerProvider || 'local';
 
   if (provider === 'local') {
-    const local = await readLocalState();
-    return Boolean(local.running && local.apiKey);
+    return true;
   }
 
   return Boolean(config.firecrawlApiKey);
@@ -233,6 +232,7 @@ export interface CrawlStatus {
   pages: ScrapedPage[];
   /** cursor URL for the next page of results, if any */
   next?: string;
+  error?: string;
 }
 
 interface FcCrawlStatusResponse {
@@ -244,6 +244,7 @@ interface FcCrawlStatusResponse {
     markdown?: string;
     metadata?: { title?: string; sourceURL?: string; url?: string };
   }>;
+  error?: string;
 }
 
 /**
@@ -264,6 +265,7 @@ export async function getCrawlStatus(idOrCursor: string, isCursor = false): Prom
     total: json.total ?? 0,
     completed: json.completed ?? 0,
     next: json.next,
+    error: json.error,
     pages: (json.data ?? []).map((p) => ({
       url: p.metadata?.sourceURL || p.metadata?.url || '',
       title: p.metadata?.title || p.metadata?.sourceURL || 'Untitled',

@@ -15,12 +15,14 @@ DRY_RUN=0
 NO_PROMPT=0
 VERBOSE=0
 VERSION="latest"
+NO_START=0
 
 # ── State ─────────────────────────────────────────────────────
 DETECTED_OS=""
 DETECTED_ARCH=""
 NPM_GLOBAL_BIN=""
 TMPFILES=()
+INSTALL_ERROR_REPORTED=0
 
 # ── Colors (auto-disabled outside TTY) ────────────────────────
 if [[ -t 1 ]]; then
@@ -67,7 +69,7 @@ cleanup() {
   for f in "${TMPFILES[@]:-}"; do
     rm -rf "$f" 2>/dev/null || true
   done
-  if [[ $exit_code -ne 0 && $exit_code -ne 130 ]]; then
+  if [[ $exit_code -ne 0 && $exit_code -ne 130 && "$INSTALL_ERROR_REPORTED" != "1" ]]; then
     echo ""
     log_error "Installation failed (exit code ${exit_code})."
     log_error "Re-run with --verbose for details, or open an issue:"
@@ -144,6 +146,7 @@ Usage:
 Options:
   --version <ver>   Install a specific version (default: latest)
   --no-prompt       Skip interactive prompts (CI-friendly)
+  --no-start        Install and verify without starting Larkup
   --dry-run         Show what would happen without making changes
   --verbose         Enable debug output
   --help            Show this help message
@@ -162,6 +165,7 @@ parse_args() {
         [[ -z "${2:-}" || "${2:-}" == --* ]] && { log_error "--version requires a value"; exit 1; }
         VERSION="$2"; shift 2 ;;
       --no-prompt) NO_PROMPT=1; shift ;;
+      --no-start)   NO_START=1; shift ;;
       --dry-run)   DRY_RUN=1; shift ;;
       --verbose)   VERBOSE=1; shift ;;
       --help|-h)   show_help; exit 0 ;;
@@ -216,6 +220,38 @@ get_node_semver() {
   echo "${major} ${minor} ${patch}"
 }
 
+# System package managers can install a newer Node.js without changing a shell
+# that is still prioritising nvm, asdf, or an older Homebrew prefix. Prefer a
+# known compatible binary before running npm so node and npm use the same
+# runtime in this process.
+activate_supported_node() {
+  local candidate candidate_dir components major
+  local candidates=(
+    "$(command -v node 2>/dev/null || true)"
+    "/opt/homebrew/opt/node@${NODEJS_SETUP_MAJOR}/bin/node"
+    "/usr/local/opt/node@${NODEJS_SETUP_MAJOR}/bin/node"
+    "/usr/local/bin/node"
+    "/usr/bin/node"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    [[ -x "$candidate" ]] || continue
+    components="$("$candidate" -v 2>/dev/null | sed 's/^v//' | tr '.' ' ')" || continue
+    read -r major _ _ <<< "$components"
+    [[ "$major" =~ ^[0-9]+$ && "$major" -ge "$MIN_NODE_MAJOR" ]] || continue
+
+    candidate_dir="$(dirname "$candidate")"
+    if [[ ":${PATH}:" != *":${candidate_dir}:"* ]]; then
+      export PATH="${candidate_dir}:${PATH}"
+    fi
+    hash -r 2>/dev/null || true
+    log_debug "Using Node.js $($candidate -v) from ${candidate_dir}"
+    return 0
+  done
+
+  return 1
+}
+
 check_node() {
   log_info "Checking for Node.js (>= v${MIN_NODE_MAJOR}) and npm..."
 
@@ -267,9 +303,30 @@ install_node() {
       brew install "node@${NODEJS_SETUP_MAJOR}"
       brew link --overwrite "node@${NODEJS_SETUP_MAJOR}" 2>/dev/null || true
     else
-      log_error "Homebrew not found. Install Node.js manually: https://nodejs.org/"
-      log_error "Or install Homebrew first: https://brew.sh"
-      exit 1
+      # Use the official archive only when Homebrew is unavailable. The archive
+      # contains both node and npm and works on Intel and Apple Silicon Macs.
+      log_info "Homebrew not found — downloading the official Node.js installer..."
+      local node_version version_index tmp_tar tmp_extract node_dir
+      version_index="$(new_tmp_file)"
+      fetch_to_file "https://nodejs.org/dist/latest-v${NODEJS_SETUP_MAJOR}.x/" "$version_index"
+      node_version="$(grep -m1 -oE 'node-v[0-9]+\.[0-9]+\.[0-9]+' "$version_index" | sed 's/node-//' || true)"
+      [[ -n "$node_version" ]] || { log_error "Could not resolve the latest Node.js v${NODEJS_SETUP_MAJOR} release."; exit 1; }
+
+      tmp_tar="$(new_tmp_file)"
+      tmp_extract="$(new_tmp_dir)"
+      log_info "Downloading Node.js ${node_version} for macOS (${DETECTED_ARCH})..."
+      fetch_to_file "https://nodejs.org/dist/${node_version}/node-${node_version}-darwin-${DETECTED_ARCH}.tar.gz" "$tmp_tar"
+      tar -xzf "$tmp_tar" -C "$tmp_extract"
+      node_dir="$(find "$tmp_extract" -mindepth 1 -maxdepth 1 -type d -name 'node-*' -print -quit)"
+      [[ -n "$node_dir" ]] || { log_error "Failed to extract the Node.js archive."; exit 1; }
+
+      log_info "Installing Node.js to /usr/local (requires admin password)..."
+      elevate mkdir -p /usr/local/bin /usr/local/lib /usr/local/include /usr/local/share
+      elevate cp -R "${node_dir}/bin/." /usr/local/bin/
+      elevate cp -R "${node_dir}/lib/." /usr/local/lib/
+      [[ -d "${node_dir}/include" ]] && elevate cp -R "${node_dir}/include/." /usr/local/include/
+      [[ -d "${node_dir}/share" ]] && elevate cp -R "${node_dir}/share/." /usr/local/share/
+      log_success "Node.js ${node_version} installed from official archive"
     fi
 
   elif [[ "$DETECTED_OS" == "linux" || "$DETECTED_OS" == "wsl" ]]; then
@@ -304,9 +361,9 @@ install_node() {
     fi
   fi
 
-  # Verify
-  if ! command -v node &>/dev/null; then
-    log_error "Node.js installation completed but 'node' not found in PATH."
+  # Verify and make the new runtime take precedence over stale nvm/asdf paths.
+  if ! activate_supported_node || ! command -v npm &>/dev/null; then
+    log_error "Node.js installation completed but Node.js v${MIN_NODE_MAJOR}+ and npm are not available in PATH."
     log_error "Restart your shell and retry."
     exit 1
   fi
@@ -456,24 +513,32 @@ install_larkup() {
   # Clear corrupted cache 
   npm cache clean --force >/dev/null 2>&1 || true
 
-  # Run npm install in background for spinner
-  npm install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps "$spec" >"$install_log" 2>&1 &
-  local npm_pid=$!
-
-  local chars="/-\\|"
-  local start_time=$SECONDS
-  while kill -0 $npm_pid 2>/dev/null; do
-    local elapsed=$((SECONDS - start_time))
-    for (( i=0; i<${#chars}; i++ )); do
-      if ! kill -0 $npm_pid 2>/dev/null; then break 2; fi
-      echo -en "\r${BLUE}==> ${NC}Installing ${BOLD}${spec}${NC}... [${elapsed}s] ${chars:$i:1} "
-      sleep 0.1
-    done
-  done
-  echo -en "\r\033[K" # Clear line
-  
   local exit_code=0
-  wait $npm_pid || exit_code=$?
+  if [[ "$VERBOSE" == "1" ]]; then
+    log_info "Streaming npm output because --verbose was supplied..."
+    if npm install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps "$spec" 2>&1 | tee "$install_log"; then
+      exit_code=0
+    else
+      local pipeline_status=("${PIPESTATUS[@]}")
+      exit_code="${pipeline_status[0]}"
+    fi
+  else
+    # Run npm install in background for a compact progress indicator.
+    npm install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps "$spec" >"$install_log" 2>&1 &
+    local npm_pid=$!
+    local chars="/-\\|"
+    local start_time=$SECONDS
+    while kill -0 $npm_pid 2>/dev/null; do
+      local elapsed=$((SECONDS - start_time))
+      for (( i=0; i<${#chars}; i++ )); do
+        if ! kill -0 $npm_pid 2>/dev/null; then break 2; fi
+        echo -en "\r${BLUE}==> ${NC}Installing ${BOLD}${spec}${NC}... [${elapsed}s] ${chars:$i:1} "
+        sleep 0.1
+      done
+    done
+    echo -en "\r\033[K" # Clear line
+    wait $npm_pid || exit_code=$?
+  fi
 
   if [[ $exit_code -eq 0 ]]; then
     [[ "$is_upgrade" == "1" ]] && log_success "Larkup upgraded!" || log_success "Larkup installed!"
@@ -494,7 +559,12 @@ install_larkup() {
   debug_log="$(sed -n -E 's/.*A complete log of this run can be found in:[[:space:]]*//p' "$install_log" | tail -n1 || true)"
   [[ -n "$debug_log" ]] && log_info "npm debug log: ${debug_log}"
 
-  log_error "Re-run with --verbose for full output."
+  if [[ "$VERBOSE" == "1" ]]; then
+    log_error "See the npm output above for the failure details."
+  else
+    log_error "Re-run with --verbose for full output."
+  fi
+  INSTALL_ERROR_REPORTED=1
   exit 1
 }
 
@@ -581,7 +651,7 @@ main() {
   show_next_steps
   log_success "Done! 🚀"
 
-  if [[ "$DRY_RUN" != "1" ]]; then
+  if [[ "$DRY_RUN" != "1" && "$NO_START" != "1" ]]; then
     echo ""
     log_info "Starting Larkup..."
     if [[ -t 0 ]]; then
@@ -591,6 +661,8 @@ main() {
     else
       log_warn "Cannot auto-start Larkup without a terminal. Run 'larkup dev' manually."
     fi
+  elif [[ "$NO_START" == "1" ]]; then
+    log_info "Skipping automatic start (--no-start). Run 'larkup dev' when ready."
   fi
 }
 

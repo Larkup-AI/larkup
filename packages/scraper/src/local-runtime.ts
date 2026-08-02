@@ -59,7 +59,19 @@ async function getProxy(): Promise<{
   username?: string;
   password?: string;
 } | null> {
-  // which slightly improves latency and avoids session stickiness.
+  // Settings are the explicit user choice and must take precedence over an
+  // optional legacy proxies.txt pool.
+  const config = await readConfig();
+  if (config.useScraperProxy && config.scraperProxyServer) {
+    return {
+      server: config.scraperProxyServer,
+      username: config.scraperProxyUsername,
+      password: config.scraperProxyPassword,
+    };
+  }
+
+  // A proxies.txt pool remains a compatibility fallback for scripted Docker
+  // deployments; choose one line per launch to avoid session stickiness.
   try {
     const proxiesPath = path.join(process.cwd(), 'proxies.txt');
     const raw = await fs.readFile(proxiesPath, 'utf8');
@@ -81,15 +93,6 @@ async function getProxy(): Promise<{
       }
     }
   } catch (err) {}
-
-  const config = await readConfig();
-  if (config.useScraperProxy && config.scraperProxyServer) {
-    return {
-      server: config.scraperProxyServer,
-      username: config.scraperProxyUsername,
-      password: config.scraperProxyPassword,
-    };
-  }
 
   return null;
 }
@@ -115,6 +118,19 @@ const EMPTY: LocalFirecrawlState = {
   project: CONTAINER_PREFIX,
   mode: 'native',
 };
+
+function nativeState(startedAt?: string): LocalFirecrawlState {
+  return {
+    running: true,
+    endpoint: 'native://larkup-crawler',
+    apiKey: 'native',
+    port: 0,
+    project: 'native',
+    mode: 'native',
+    startedAt: startedAt || new Date().toISOString(),
+    lastError: undefined,
+  };
+}
 
 /* ----------------------------- state io ----------------------------- */
 
@@ -292,16 +308,7 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
   // Docker. Starting the built-in crawler is instantaneous; actual crawling
   // happens on demand in the app process.
   if (!isInsideDocker()) {
-    return writeState({
-      running: true,
-      endpoint: 'native://larkup-crawler',
-      apiKey: 'native',
-      port: 0,
-      project: 'native',
-      mode: 'native',
-      startedAt: new Date().toISOString(),
-      lastError: undefined,
-    });
+    return writeState(nativeState());
   }
 
   const avail = await checkDocker();
@@ -372,6 +379,15 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
   });
 }
 
+/**
+ * The dependency-free crawler is always available in the Larkup process,
+ * including when Larkup itself runs in Docker. This is the no-setup fallback
+ * when a Docker deployment does not include the optional Firecrawl profile.
+ */
+export async function startNativeLocal(): Promise<LocalFirecrawlState> {
+  return writeState(nativeState());
+}
+
 /** Stop and remove the local Firecrawl containers. */
 export async function stopLocal(): Promise<LocalFirecrawlState> {
   const prev = await readLocalState();
@@ -392,10 +408,11 @@ export async function stopLocal(): Promise<LocalFirecrawlState> {
 /** Re-check whether the local instance is actually responding. */
 export async function refreshLocalStatus(): Promise<LocalFirecrawlState> {
   const state = await readLocalState();
-  if (state.mode === 'native') return state;
-  if (!state.startedAt) return state;
+  if (state.mode === 'native') return nativeState(state.startedAt);
+  if (!state.startedAt) return nativeState();
   const healthy = await isHealthy(state.endpoint);
   if (healthy !== state.running) {
+    if (!healthy) return nativeState();
     return writeState({ ...state, running: healthy });
   }
   return state;

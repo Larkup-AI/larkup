@@ -43,6 +43,7 @@
     "ai": "^7.0.42"
   },
   "devDependencies": {
-    "typescript": "7.0.2"
+    "@types/node": "^26",
+    "typescript": "^6.0.3"
   }
 }
