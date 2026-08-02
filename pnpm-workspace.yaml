@@ -6,3 +6,5 @@ packages:
   - e2e
 ignoredBuiltDependencies:
   - '@ffmpeg-installer/darwin-arm64'
+patchedDependencies:
+  tsup: patches/tsup.patch

@@ -15,6 +15,9 @@
     "@larkup/vector-stores#build": {
       "dependsOn": []
     },
+    "@larkup/desktop#build": {
+      "dependsOn": ["larkup#build"]
+    },
     "lint": {
       "dependsOn": ["^build"]
     },

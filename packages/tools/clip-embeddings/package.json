@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@larkup/marketplace": "workspace:*",
-    "typescript": "7.0.2"
+    "typescript": "^6.0.3"
   },
   "license": "Apache-2.0",
   "repository": {

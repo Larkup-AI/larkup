@@ -176,9 +176,9 @@ section "Node.js Version Requirements"
 for script in "scripts/install.sh" "scripts/install-local.sh" "scripts/install.ps1"; do
   filepath="${PROJECT_ROOT}/${script}"
   
-  # Check minimum Node version is consistent (should be 18)
-  if grep -qE "(MIN_NODE_MAJOR|MinNodeMajor).*=.*18" "$filepath"; then
-    pass "${script}: minimum Node version = 18"
+  # Check minimum Node version is consistent across all installers.
+  if grep -qE "(MIN_NODE_MAJOR|MinNodeMajor|NODE_MAJOR).*=.*22" "$filepath"; then
+    pass "${script}: minimum Node version = 22"
   else
     min=$(grep -oE "(MIN_NODE_MAJOR|MinNodeMajor|NODE_MAJOR).*=.*[0-9]+" "$filepath" | head -1 || echo "not found")
     warn "${script}: minimum Node check — ${min}"

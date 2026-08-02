@@ -1,12 +1,17 @@
 import { expect, test } from '@playwright/test';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { DEFAULT_CONFIG } from '../../../packages/core/src/types';
+import { writeConfig } from '../../../packages/core/src/config-store';
 import { readLocalState, startLocal, stopLocal } from '../../../packages/scraper/src/local-runtime';
 import { isFirecrawlConfigured, searchWeb } from '../../../packages/scraper/src/firecrawl';
 import {
   getNativeCrawlStatus,
   startNativeCrawl,
+  nativeScrapePage,
 } from '../../../packages/scraper/src/native-crawler';
 
 test('curl-style local install starts the built-in crawler without Docker', async () => {
@@ -35,7 +40,6 @@ test('native crawler search returns public result URLs without Docker or an API 
   const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-native-search-'));
   try {
     process.chdir(workspace);
-    await startLocal();
     globalThis.fetch = (async () =>
       new Response(
         '<a href="https://example.com/result" class="search-link l1"><div class="title" title="Example result">Example result</div></a>',
@@ -45,6 +49,84 @@ test('native crawler search returns public result URLs without Docker or an API 
     await expect(searchWeb('example query', 5)).resolves.toEqual([
       { url: 'https://example.com/result', title: 'Example result' },
     ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.chdir(originalCwd);
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test('native crawler sends local scrape traffic through the saved proxy', async () => {
+  const originalCwd = process.cwd();
+  const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-native-proxy-'));
+  const target = createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end('<html><title>Proxied page</title><body>Readable proxied content</body></html>');
+  });
+  const proxy = createServer();
+  let proxyAuthorization: string | undefined;
+
+  try {
+    await new Promise<void>((resolve) => target.listen(0, '127.0.0.1', resolve));
+    const targetPort = (target.address() as net.AddressInfo).port;
+    proxy.on('connect', (request, socket, head) => {
+      proxyAuthorization = request.headers['proxy-authorization'];
+      const [host, port] = request.url!.split(':');
+      const upstream = net.connect(Number(port), host, () => {
+        socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+        if (head.length) upstream.write(head);
+        upstream.pipe(socket);
+        socket.pipe(upstream);
+      });
+      upstream.on('error', () => socket.destroy());
+    });
+    await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+    const proxyPort = (proxy.address() as net.AddressInfo).port;
+
+    process.chdir(workspace);
+    await writeConfig({
+      ...DEFAULT_CONFIG,
+      useScraperProxy: true,
+      scraperProxyServer: `http://127.0.0.1:${proxyPort}`,
+      scraperProxyUsername: 'proxy-user',
+      scraperProxyPassword: 'proxy-password',
+    });
+
+    await expect(
+      nativeScrapePage(`http://127.0.0.1:${targetPort}/internship-program`),
+    ).resolves.toMatchObject({
+      title: 'Proxied page',
+      markdown: 'Proxied page Readable proxied content',
+    });
+    expect(proxyAuthorization).toBe(
+      `Basic ${Buffer.from('proxy-user:proxy-password').toString('base64')}`,
+    );
+  } finally {
+    process.chdir(originalCwd);
+    proxy.closeAllConnections();
+    target.closeAllConnections();
+    proxy.close();
+    target.close();
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test('native domain crawl reports an inaccessible site instead of completing empty', async () => {
+  const originalCwd = process.cwd();
+  const originalFetch = globalThis.fetch;
+  const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-native-crawl-error-'));
+  try {
+    process.chdir(workspace);
+    globalThis.fetch = (async () => {
+      throw new Error('Network connection failed');
+    }) as typeof fetch;
+
+    const crawl = await startNativeCrawl('https://example.com', 1);
+    await expect(getNativeCrawlStatus(crawl)).resolves.toMatchObject({
+      state: 'failed',
+      completed: 0,
+      error: 'Network connection failed',
+    });
   } finally {
     globalThis.fetch = originalFetch;
     process.chdir(originalCwd);

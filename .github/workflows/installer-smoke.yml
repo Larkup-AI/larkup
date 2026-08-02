@@ -1,0 +1,64 @@
+name: Installer Smoke Tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/install.sh'
+      - 'scripts/install.ps1'
+      - 'scripts/install-local.sh'
+      - 'scripts/test-release-install.*'
+      - '.github/workflows/installer-smoke.yml'
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/install.sh'
+      - 'scripts/install.ps1'
+      - 'scripts/install-local.sh'
+      - 'scripts/test-release-install.*'
+      - '.github/workflows/installer-smoke.yml'
+  schedule:
+    - cron: '20 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  unix:
+    name: ${{ matrix.name }} clean install
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-24.04
+          - name: macOS Intel
+            os: macos-15-intel
+          - name: macOS Apple Silicon
+            os: macos-14
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Validate installer shell scripts
+        run: scripts/test-install-scripts.sh
+      - name: Clean install and server health check
+        run: scripts/test-release-install.sh
+
+  windows:
+    name: Windows x64 clean install
+    runs-on: windows-2025
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Clean install and server health check
+        shell: pwsh
+        run: ./scripts/test-release-install.ps1

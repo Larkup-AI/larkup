@@ -20,8 +20,8 @@ $ErrorActionPreference = "Stop"
 # ── Config ────────────────────────────────────────────────────
 $PackageName = "larkup"
 $BinName     = "larkup"
-$MinNodeMajor = 18
-$NodeSetupMajor = 20
+$MinNodeMajor = 22
+$NodeSetupMajor = 22
 
 # Track exit code so we don't kill the host when piped via iex
 $script:ResultCode = 0
@@ -261,7 +261,19 @@ function Install-NodeRuntime {
     if (-not $installed) {
         Write-Step "Downloading Node.js installer..."
         $arch = Get-SystemArch
-        $msiUrl = "https://nodejs.org/dist/latest-v${NodeSetupMajor}.x/node-v${NodeSetupMajor}.0.0-${arch}.msi"
+        # latest-v22.x is an index page, not an MSI directory. Resolve an
+        # actual release that ships an installer for this architecture.
+        $release = Invoke-RestMethod -Uri "https://nodejs.org/dist/index.json" -UseBasicParsing |
+            Where-Object {
+                $_.version -like "v${NodeSetupMajor}.*" -and
+                $_.files -contains "win-${arch}-msi"
+            } |
+            Select-Object -First 1
+        if (-not $release) {
+            Write-Err "No Node.js v${NodeSetupMajor} MSI is available for Windows $arch."
+            Stop-Installer
+        }
+        $msiUrl = "https://nodejs.org/dist/$($release.version)/node-$($release.version)-win-${arch}.msi"
         $msiPath = Join-Path $env:TEMP "larkup-node-installer.msi"
 
         try {
