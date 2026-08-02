@@ -17,22 +17,22 @@
     "larkup": "tsx src/index.ts"
   },
   "dependencies": {
-    "@ai-sdk/cohere": "^4.0.12",
-    "@ai-sdk/deepseek": "^3.0.13",
-    "@ai-sdk/gateway": "^4.0.28",
-    "@ai-sdk/google": "^4.0.24",
-    "@ai-sdk/mistral": "^4.0.14",
-    "@ai-sdk/openai": "^4.0.20",
-    "@ai-sdk/openai-compatible": "^3.0.14",
+    "@ai-sdk/cohere": "^4.0.15",
+    "@ai-sdk/deepseek": "^3.0.16",
+    "@ai-sdk/gateway": "^4.0.32",
+    "@ai-sdk/google": "^4.0.28",
+    "@ai-sdk/mistral": "^4.0.17",
+    "@ai-sdk/openai": "^4.0.24",
+    "@ai-sdk/openai-compatible": "^3.0.17",
     "@clack/prompts": "^1.7.0",
-    "@lancedb/lancedb": "^0.31.0",
+    "@lancedb/lancedb": "^0.33.0",
     "@larkup/core": "workspace:*",
     "@larkup/marketplace": "workspace:*",
     "@larkup/vector-stores": "workspace:*",
     "@pinecone-database/pinecone": "^8.1.0",
-    "ai": "^7.0.37",
-    "apache-arrow": "^18.1.0",
-    "chalk": "^5.6.2",
+    "ai": "^7.0.42",
+    "apache-arrow": "^21.2.0",
+    "chalk": "^6.0.0",
     "chromadb": "^3.5.0",
     "cli-table3": "^0.6.5",
     "commander": "^15.0.0",
@@ -41,6 +41,6 @@
   "devDependencies": {
     "tsup": "^8.0.0",
     "tsx": "^4.22.4",
-    "typescript": "5.7.3"
+    "typescript": "7.0.2"
   }
 }
