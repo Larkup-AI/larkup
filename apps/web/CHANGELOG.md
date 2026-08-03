@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.58
+
+### Patch Changes
+
+- 9a565c8: Make chat retrieval resilient to partial index runs, reuse successful evidence for clear follow-up questions, and keep retrieval-only responses free of internal implementation details. Media previews are available when supported by retrieved evidence.
+
 ## 0.1.57
 
 ### Patch Changes
