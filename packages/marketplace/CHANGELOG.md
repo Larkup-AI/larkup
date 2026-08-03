@@ -1,5 +1,11 @@
 # @larkup/marketplace
 
+## 0.1.21
+
+### Patch Changes
+
+- 4398407: Automatically prepare the official yt-dlp executable for YouTube imports, removing the host installation requirement.
+
 ## 0.1.20
 
 ### Patch Changes

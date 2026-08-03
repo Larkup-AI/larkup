@@ -1,5 +1,11 @@
 # @larkup/tool-video-audio
 
+## 0.3.5
+
+### Patch Changes
+
+- 4398407: Automatically prepare the official yt-dlp executable for YouTube imports, removing the host installation requirement.
+
 ## 0.3.4
 
 ### Patch Changes
