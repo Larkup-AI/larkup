@@ -253,6 +253,10 @@ export async function checkSystemDeps(toolId: string): Promise<string[]> {
 
   const missing: string[] = [];
   for (const dep of descriptor.systemDeps) {
+    // Video & Audio ships a platform binary via @ffmpeg-installer/ffmpeg.
+    // Older Hub manifests still advertise ffmpeg as a host prerequisite; do
+    // not let that stale metadata block installation.
+    if (toolId === 'video-audio' && dep === 'ffmpeg') continue;
     // A container cannot normally talk to the host Docker daemon. Do not block
     // installation of tools that use Docker only for optional capabilities
     // (for example DOCX/PPTX editing); those capabilities report their own

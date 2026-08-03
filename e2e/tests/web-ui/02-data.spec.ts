@@ -156,20 +156,20 @@ test.describe.serial('Data Page', () => {
   // ── Web Scraping ──────────────────────────────────────────────────────────
 
   test('web scraping panel is visible', async ({ page }) => {
-    test.skip(
-      !hasEnv(ENV_KEYS.FIRECRAWL_CLOUD_API_KEY) && !hasEnv(ENV_KEYS.SERPER_API_KEY),
-      'No search providers configured',
-    );
-
     // Look for the scrape panel/tab
     const scrapeTab = page.getByText('Website', { exact: true }).first();
     if (await scrapeTab.isVisible()) {
       await scrapeTab.click();
       await page.waitForTimeout(500);
 
-      // Verify scrape panel elements exist (defaults to Search mode)
-      const searchInput = page.locator('input[placeholder*="search" i]').first();
-      await expect(searchInput).toBeVisible({ timeout: 5_000 });
+      // Direct URL is the default because it is the most predictable way to
+      // add a known page. Search remains available as an explicit mode.
+      const urlInput = page.locator('input[placeholder*="url" i]').first();
+      await expect(urlInput).toBeVisible({ timeout: 5_000 });
+      await page.getByText('Search', { exact: true }).first().click();
+      await expect(
+        page.locator('input[placeholder*="search for websites" i]').first(),
+      ).toBeVisible();
     }
   });
 

@@ -19,6 +19,7 @@ const nextConfig = {
     "chromadb",
     "dockerode",
     "nodejs-whisper",
+    "pdf-parse",
   ],
   typescript: {
     ignoreBuildErrors: true,

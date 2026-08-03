@@ -2,7 +2,6 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { readConfig } from '@larkup/core/config-store';
 import { readRun } from '@larkup/core/index-store';
-import { refreshServerStatus } from '@larkup/core/generator/server-runtime';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import { embedQuery } from '@larkup/core/indexing/embedder';
 import { runWithServer } from '@larkup/core/workspace';
@@ -54,44 +53,9 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
   const doRetrieve = async () => {
     const config = await readConfig();
     const candidateCount = Math.max(topK * 4, 20);
-
-    // 1) Try running generated server first
-    const server = await refreshServerStatus();
-    if (server.running) {
-      try {
-        const start = Date.now();
-        const res = await fetch(`${server.endpoint}/query`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, topK: candidateCount }),
-          signal: AbortSignal.timeout(15_000),
-        });
-        const data = await res.json();
-
-        const { trackUsageEvent } = await import('@larkup/core/analytics-store');
-        void trackUsageEvent({
-          type: 'server_request',
-          endpoint: '/query',
-          method: 'POST',
-          statusCode: res.status,
-          latencyMs: Date.now() - start,
-          serverId: serverId ?? undefined,
-          timestamp: new Date().toISOString(),
-        });
-
-        // Generated servers from an older configuration can point at a
-        // different local table than the active workspace. An empty response
-        // must not hide the workspace index: fall back to direct retrieval,
-        // which resolves the active server's table consistently.
-        if (res.ok && Array.isArray(data.hits) && data.hits.length > 0) {
-          return formatKnowledgeHits(query, data.hits as any[], topK);
-        }
-      } catch {
-        // Fall through to direct retrieval
-      }
-    }
-
-    // 2) Direct retrieval from local vector store
+    // The workspace index is the source of truth for the Chat page. A running
+    // generated server can be stale or target a different local table, which
+    // made mixed website/file collections appear to have missing evidence.
     const run = await readRun();
     if (!run || run.status !== 'completed' || (run.totalChunks ?? 0) === 0) {
       return { query, hits: [] };

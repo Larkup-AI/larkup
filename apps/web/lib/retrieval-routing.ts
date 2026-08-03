@@ -47,14 +47,10 @@ export function requiresKnowledgeBaseSearch(text: string): boolean {
   );
 }
 
-/** Current/public questions should begin on the web unless they may refer to
- * indexed data. A match/result question checks the local recording first and
- * can still use web search as its one fallback. */
+/** The chat workspace is intentionally a retrieval-only experience. */
 export function requiresCurrentWebSearch(text: string): boolean {
-  if (requiresKnowledgeBaseSearch(text)) return false;
-  return /\b(?:search (?:the )?web|search online|look (?:it )?up|internet|latest|current|today|yesterday|breaking news|weather|stock price|exchange rate|election result|schedule|who won|winner|match result|final score)\b/i.test(
-    text,
-  );
+  void text;
+  return false;
 }
 
 /** Only the first retrieval is forced. The other source remains available for
@@ -72,14 +68,12 @@ export function retrievalToolsForStep(options: {
   if (stepNumber === 0 && forceKnowledgeBaseSearch) {
     return { toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' } };
   }
-  if (stepNumber === 0 && forceWebSearch) {
-    return { toolChoice: { type: 'tool', toolName: 'webSearch' } };
-  }
+  if (stepNumber === 0 && forceWebSearch) return { activeTools: without('webSearch') };
   if (stepNumber === 0) {
     return { activeTools: without('webSearch', 'searchKnowledgeBase') };
   }
   if (stepNumber === 1 && forceKnowledgeBaseSearch) {
-    return { activeTools: without('searchKnowledgeBase') };
+    return { activeTools: without('searchKnowledgeBase', 'webSearch') };
   }
   if (stepNumber === 1 && forceWebSearch) {
     return { activeTools: without('webSearch') };
