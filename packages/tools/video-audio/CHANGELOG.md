@@ -1,5 +1,11 @@
 # @larkup/tool-video-audio
 
+## 0.3.6
+
+### Patch Changes
+
+- 57a3be9: Offer a one-click Video & Audio tool update when an older installation asks the user to install yt-dlp manually.
+
 ## 0.3.5
 
 ### Patch Changes
