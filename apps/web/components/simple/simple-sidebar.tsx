@@ -5,18 +5,7 @@ import { usePathname } from 'next/navigation';
 import { MessageCircle, FileStack, SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useThemeCustomizer, type PanelBgVariant } from '@/components/theme-customizer-provider';
 import { ThemeSwitcher } from '@/components/theme-switcher';
-
-const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
-  'panel-default': undefined,
-  'panel-white': '#FFFFFF',
-  'panel-fafafa': '#FAFAFA',
-  'panel-warm': '#F7F1EA',
-  'panel-soft': '#FBFAF8',
-  'panel-silver': '#F8F8F8',
-  'panel-stone': '#F5F5F2',
-};
 
 interface NavItem {
   id: string;
@@ -52,20 +41,13 @@ const SIMPLE_NAV: NavItem[] = [
 
 export function SimpleSidebar() {
   const pathname = usePathname();
-  const { pageStyle, navBg } = useThemeCustomizer();
-
-  const navColor = navBg ? NAV_BG_COLORS[navBg] : undefined;
-  const navStyle = navColor ? { backgroundColor: navColor } : undefined;
 
   return (
     <TooltipProvider delay={150}>
       <aside
         className={cn(
-          'sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start py-3 md:flex',
-          !navColor ? 'bg-background' : '',
-          pageStyle === 'fused' ? 'border-r border-border' : '',
+          'sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start py-3 md:flex bg-background',
         )}
-        style={navStyle}
       >
         {/* Brand */}
         <Tooltip>
@@ -124,8 +106,8 @@ export function SimpleSidebar() {
                     className={cn(
                       'relative flex size-9 items-center justify-center rounded-xl transition-colors',
                       active
-                        ? 'bg-white border text-primary'
-                        : 'text-foreground/70 group-hover:bg-white/90 group-hover:text-foreground',
+                        ? 'bg-white dark:bg-muted border text-primary'
+                        : 'text-foreground/70 group-hover:bg-white/90 dark:group-hover:bg-muted group-hover:text-foreground',
                     )}
                   >
                     <Icon className="size-[19px]" strokeWidth={active ? 2.25 : 2} />

@@ -6,18 +6,7 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useWorkspace } from '@/components/workspace/workspace-provider';
 import { ThemeSwitcher } from '@/components/theme-switcher';
-import { useThemeCustomizer, type PanelBgVariant } from '@/components/theme-customizer-provider';
 import { MessageCircle, FileStack, SlidersHorizontal, type LucideIcon } from 'lucide-react';
-
-const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
-  'panel-default': undefined,
-  'panel-white': '#FFFFFF',
-  'panel-fafafa': '#FAFAFA',
-  'panel-warm': '#F7F1EA',
-  'panel-soft': '#FBFAF8',
-  'panel-silver': '#F8F8F8',
-  'panel-stone': '#F5F5F2',
-};
 
 interface NavItem {
   id: string;
@@ -54,19 +43,13 @@ const SIMPLE_NAV: NavItem[] = [
 export function SimpleTopNav() {
   const pathname = usePathname();
   const { username } = useWorkspace();
-  const { navBg } = useThemeCustomizer();
-
-  const navColor = navBg ? NAV_BG_COLORS[navBg] : undefined;
-  const navStyle = navColor ? { backgroundColor: navColor } : undefined;
 
   return (
     <TooltipProvider delay={150}>
       <header
         className={cn(
-          'sticky top-0 z-50 flex h-16 shrink-0 items-center gap-4 border-b border-border px-4 md:px-6',
-          !navColor ? 'bg-white' : '',
+          'sticky top-0 z-50 flex h-16 shrink-0 items-center gap-4 border-b border-border px-4 md:px-6 bg-white dark:bg-background',
         )}
-        style={navStyle}
       >
         {/* Brand */}
         <Link
@@ -80,7 +63,7 @@ export function SimpleTopNav() {
 
         {/* Navigation */}
         <nav className="flex flex-1 h-full items-end pb-0 gap-2 md:gap-4 ml-4">
-          {SIMPLE_NAV.map((item, index) => {
+          {SIMPLE_NAV.map((item) => {
             const Icon = item.icon;
             const active = pathname?.startsWith(item.href);
 

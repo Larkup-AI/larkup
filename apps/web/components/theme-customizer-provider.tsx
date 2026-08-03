@@ -2,57 +2,15 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-export type ThemeVariant =
-  | 'default'
-  | 'theme-gaia'
-  | 'theme-docker'
-  | 'theme-pinecone'
-  | 'theme-vercel'
-  | 'theme-elevenlabs'
-  | 'theme-espresso'
-  | 'theme-sienna'
-  | 'theme-caramel';
-
-export type BackgroundVariant =
-  | 'bg-default'
-  | 'bg-warm'
-  | 'bg-soft'
-  | 'bg-pure'
-  | 'bg-silver'
-  | 'bg-sage'
-  | 'bg-fafafa'
-  | 'bg-stone';
-
-export type PanelBgVariant =
-  | 'panel-default'
-  | 'panel-white'
-  | 'panel-fafafa'
-  | 'panel-warm'
-  | 'panel-soft'
-  | 'panel-silver'
-  | 'panel-stone';
+export type ThemeVariant = 'default' | 'theme-larkup' | 'theme-gaia';
 
 export type LayoutVariant = 'sidebar' | 'topnav' | 'collapsed';
-
-export type RadiusVariant = 'radius-0' | 'radius-sm' | 'radius-default' | 'radius-lg';
-
-export type PageStyleVariant = 'card' | 'fused';
 
 interface ThemeCustomizerContextValue {
   theme: ThemeVariant;
   setTheme: (theme: ThemeVariant) => void;
   layout: LayoutVariant;
   setLayout: (layout: LayoutVariant) => void;
-  radius: RadiusVariant;
-  setRadius: (radius: RadiusVariant) => void;
-  background: BackgroundVariant;
-  setBackground: (bg: BackgroundVariant) => void;
-  panelBg: PanelBgVariant;
-  setPanelBg: (bg: PanelBgVariant) => void;
-  navBg: PanelBgVariant;
-  setNavBg: (bg: PanelBgVariant) => void;
-  pageStyle: PageStyleVariant;
-  setPageStyle: (style: PageStyleVariant) => void;
   isMounted: boolean;
 }
 
@@ -70,57 +28,51 @@ export function ThemeCustomizerProvider({ children }: { children: React.ReactNod
   const [isMounted, setIsMounted] = useState(false);
   const [theme, setThemeState] = useState<ThemeVariant>('default');
   const [layout, setLayout] = useState<LayoutVariant>('sidebar');
-  const [radius, setRadius] = useState<RadiusVariant>('radius-default');
-  const [background, setBackground] = useState<BackgroundVariant>('bg-default');
-  const [panelBg, setPanelBg] = useState<PanelBgVariant>('panel-default');
-  const [navBg, setNavBg] = useState<PanelBgVariant>('panel-default');
-  const [pageStyle, setPageStyle] = useState<PageStyleVariant>('card');
 
   useEffect(() => {
     setIsMounted(true);
 
     const savedTheme = localStorage.getItem('app-theme') as ThemeVariant;
     const savedLayout = localStorage.getItem('app-layout') as LayoutVariant;
-    const savedRadius = localStorage.getItem('app-radius') as RadiusVariant;
-    const savedBackground = localStorage.getItem('app-background') as BackgroundVariant;
-    const savedPanelBg = localStorage.getItem('app-panel-bg') as PanelBgVariant;
-    const savedNavBg = localStorage.getItem('app-nav-bg') as PanelBgVariant;
-    const savedPageStyle = localStorage.getItem('app-pagestyle') as PageStyleVariant;
 
-    if (savedTheme) setThemeState(savedTheme);
+    if (savedTheme && (savedTheme === 'default' || savedTheme === 'theme-larkup')) {
+      setThemeState(savedTheme);
+    }
     if (savedLayout) setLayout(savedLayout);
-    if (savedRadius) setRadius(savedRadius);
-    if (savedBackground) setBackground(savedBackground);
-    if (savedPanelBg) setPanelBg(savedPanelBg);
-    if (savedNavBg) setNavBg(savedNavBg);
-    if (savedPageStyle) setPageStyle(savedPageStyle);
+
+    // Clean up old localStorage keys from the previous theme system
+    localStorage.removeItem('app-background');
+    localStorage.removeItem('app-panel-bg');
+    localStorage.removeItem('app-nav-bg');
+    localStorage.removeItem('app-radius');
+    localStorage.removeItem('app-pagestyle');
   }, []);
 
   useEffect(() => {
     if (!isMounted) return;
     localStorage.setItem('app-theme', theme);
     localStorage.setItem('app-layout', layout);
-    localStorage.setItem('app-radius', radius);
-    localStorage.setItem('app-background', background);
-    localStorage.setItem('app-panel-bg', panelBg);
-    localStorage.setItem('app-nav-bg', navBg);
-    localStorage.setItem('app-pagestyle', pageStyle);
 
     // Update body classes
     const body = document.body;
 
-    // Remove old classes
+    // Remove old theme classes
     Array.from(body.classList).forEach((cls) => {
-      if (cls.startsWith('theme-') || cls.startsWith('radius-') || cls.startsWith('bg-')) {
+      if (cls.startsWith('theme-')) {
         body.classList.remove(cls);
       }
     });
 
-    // Add new classes
+    // Remove old bg-* and radius-* classes from previous theme system
+    Array.from(body.classList).forEach((cls) => {
+      if (cls.startsWith('bg-') || cls.startsWith('radius-')) {
+        body.classList.remove(cls);
+      }
+    });
+
+    // Add new theme class
     if (theme !== 'default') body.classList.add(theme);
-    if (radius !== 'radius-default') body.classList.add(radius);
-    if (background) body.classList.add(background);
-  }, [theme, layout, radius, background, panelBg, navBg, pageStyle, isMounted]);
+  }, [theme, layout, isMounted]);
 
   return (
     <ThemeCustomizerContext.Provider
@@ -129,16 +81,6 @@ export function ThemeCustomizerProvider({ children }: { children: React.ReactNod
         setTheme: setThemeState,
         layout,
         setLayout,
-        radius,
-        setRadius,
-        background,
-        setBackground,
-        panelBg,
-        setPanelBg,
-        navBg,
-        setNavBg,
-        pageStyle,
-        setPageStyle,
         isMounted,
       }}
     >

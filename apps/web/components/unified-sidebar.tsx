@@ -14,19 +14,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useThemeCustomizer, type PanelBgVariant } from '@/components/theme-customizer-provider';
 import { ServerSwitcher } from '@/components/workspace/server-switcher';
 import { useWorkspace } from '@/components/workspace/workspace-provider';
-
-const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
-  'panel-default': undefined,
-  'panel-white': '#FFFFFF',
-  'panel-fafafa': '#FAFAFA',
-  'panel-warm': '#F7F1EA',
-  'panel-soft': '#FBFAF8',
-  'panel-silver': '#F8F8F8',
-  'panel-stone': '#F5F5F2',
-};
 
 interface NavItem {
   id: string;
@@ -44,7 +33,6 @@ const NAV_ITEMS: NavItem[] = [
 
 export function UnifiedSidebar() {
   const pathname = usePathname();
-  const { pageStyle, navBg } = useThemeCustomizer();
   const { activeServer } = useWorkspace();
   const [collapsed, setCollapsed] = useState(true);
 
@@ -59,19 +47,13 @@ export function UnifiedSidebar() {
     localStorage.setItem('sidebar-collapsed', String(next));
   };
 
-  const navColor = navBg ? NAV_BG_COLORS[navBg] : undefined;
-  const navStyle = navColor ? { backgroundColor: navColor } : undefined;
-
   return (
     <TooltipProvider delay={150}>
       <aside
         className={cn(
-          'sticky top-0 hidden h-screen shrink-0 flex-col self-start py-4 md:flex transition-all duration-300 ease-in-out',
+          'sticky top-0 hidden h-screen shrink-0 flex-col self-start py-4 md:flex transition-all duration-300 ease-in-out bg-background',
           collapsed ? 'w-18' : 'w-60',
-          !navColor ? 'bg-background' : '',
-          pageStyle === 'fused' ? 'border-r border-border' : '',
         )}
-        style={navStyle}
       >
         <div
           className={cn(
@@ -143,8 +125,8 @@ export function UnifiedSidebar() {
                         className={cn(
                           'group relative flex size-10 items-center justify-center rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
                           active
-                            ? 'bg-[#F0F0F0] text-foreground'
-                            : 'text-muted-foreground hover:bg-[#EBEBEB] hover:text-foreground',
+                            ? 'bg-[#F0F0F0] dark:bg-muted text-foreground'
+                            : 'text-muted-foreground hover:bg-[#EBEBEB] dark:hover:bg-muted hover:text-foreground',
                         )}
                       />
                     }
@@ -172,8 +154,8 @@ export function UnifiedSidebar() {
                 className={cn(
                   'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   active
-                    ? 'bg-[#F0F0F0] text-foreground'
-                    : 'text-muted-foreground hover:bg-[#EBEBEB] hover:text-foreground',
+                    ? 'bg-[#F0F0F0] dark:bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-[#EBEBEB] dark:hover:bg-muted hover:text-foreground',
                 )}
               >
                 <Icon className="size-4.5 shrink-0" strokeWidth={active ? 2.25 : 1.75} />

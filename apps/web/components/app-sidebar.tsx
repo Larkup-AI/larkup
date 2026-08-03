@@ -15,20 +15,8 @@ import { cn } from '@/lib/utils';
 import { STAGES, CURRENT_PHASE } from '@larkup/core/stages';
 import type { StageId } from '@larkup/core/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useThemeCustomizer, type PanelBgVariant } from './theme-customizer-provider';
 import { ThemeSwitcher } from './theme-switcher';
 
-const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
-  'panel-default': undefined,
-  'panel-white': '#FFFFFF',
-  'panel-fafafa': '#FAFAFA',
-  'panel-warm': '#F7F1EA',
-  'panel-soft': '#FBFAF8',
-  'panel-silver': '#F8F8F8',
-  'panel-stone': '#F5F5F2',
-};
-
-// [#CDA1FE]
 const STAGE_ICONS: Record<StageId, LucideIcon> = {
   configure: SlidersHorizontal,
   data: FileStack,
@@ -39,20 +27,13 @@ const STAGE_ICONS: Record<StageId, LucideIcon> = {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { pageStyle, navBg } = useThemeCustomizer();
-
-  const navColor = navBg ? NAV_BG_COLORS[navBg] : undefined;
-  const navStyle = navColor ? { backgroundColor: navColor } : undefined;
 
   return (
     <TooltipProvider delay={150}>
       <aside
         className={cn(
-          'sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start py-3 md:flex',
-          !navColor ? 'bg-background' : '',
-          pageStyle === 'fused' ? 'border-r border-border' : '',
+          'sticky top-0 hidden h-screen w-[84px] shrink-0 flex-col items-center gap-1 self-start py-3 md:flex bg-background',
         )}
-        style={navStyle}
       >
         {/* Brand */}
         <Tooltip>
@@ -65,7 +46,6 @@ export function AppSidebar() {
               />
             }
           >
-            {/* <Boxes className="size-5" /> */}
             <img src={'/logo9.png'} className="size-6.5" alt="logo" />
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
@@ -94,10 +74,10 @@ export function AppSidebar() {
                   className={cn(
                     'relative flex size-9 items-center justify-center rounded-xl transition-colors',
                     active
-                      ? 'bg-white border text-primary'
+                      ? 'bg-white dark:bg-muted border text-primary'
                       : locked
                       ? 'text-muted-foreground/50'
-                      : 'text-foreground/70 group-hover:bg-white/90 group-hover:text-foreground',
+                      : 'text-foreground/70 group-hover:bg-white/90 dark:group-hover:bg-muted group-hover:text-foreground',
                   )}
                 >
                   <Icon className="size-[19px]" strokeWidth={active ? 2.25 : 2} />

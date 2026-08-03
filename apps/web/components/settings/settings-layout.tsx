@@ -103,8 +103,8 @@ export function SettingsLayout({ activeSection, onSectionChange, children }: Set
                       className={cn(
                         'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-all duration-200 text-left outline-none',
                         active
-                          ? 'font-medium text-foreground bg-[#F0F0F0]'
-                          : 'font-normal text-muted-foreground hover:bg-[#EBEBEB] hover:text-foreground',
+                          ? 'font-medium text-foreground bg-[#F0F0F0] dark:bg-muted'
+                          : 'font-normal text-muted-foreground hover:bg-[#EBEBEB] dark:hover:bg-muted hover:text-foreground',
                       )}
                     >
                       <Icon className="size-4 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
@@ -130,8 +130,8 @@ export function SettingsLayout({ activeSection, onSectionChange, children }: Set
               className={cn(
                 'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors border',
                 active
-                  ? 'bg-[#F0F0F0] border-transparent text-foreground'
-                  : 'bg-transparent border-transparent text-muted-foreground hover:bg-[#EBEBEB]',
+                  ? 'bg-[#F0F0F0] dark:bg-muted border-transparent text-foreground'
+                  : 'bg-transparent border-transparent text-muted-foreground hover:bg-[#EBEBEB] dark:hover:bg-muted',
               )}
             >
               <Icon className="size-3.5" />
