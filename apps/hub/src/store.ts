@@ -55,9 +55,9 @@ export function seedRegistry(): void {
         'Process video and audio files for your knowledge base. ' +
         'Creates multilingual transcripts, adaptive visual/OCR evidence, timestamped sections, ' +
         'and whole-media notes. Supports YouTube URLs, ' +
-        'direct file upload, and bulk processing. Includes ffmpeg automatically; yt-dlp is only required for YouTube URLs.',
+        'direct file upload, and bulk processing. Includes ffmpeg automatically and prepares the YouTube downloader on first use.',
       category: 'media',
-      version: '0.3.4',
+      version: '0.3.5',
       pricing: 'free',
       emoji: '🎬',
       icon: 'Film',

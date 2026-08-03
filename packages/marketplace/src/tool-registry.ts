@@ -183,7 +183,7 @@ const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
     name: 'Video & Audio',
     description: 'Index video and audio files with transcription and frame analysis.',
     category: 'media',
-    version: '0.3.4',
+    version: '0.3.5',
     pricing: 'free',
     emoji: '🎬',
     icon: 'Film',

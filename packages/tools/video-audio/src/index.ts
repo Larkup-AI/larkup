@@ -13,7 +13,13 @@ export {
   processAudio,
   transcribeAudio,
 } from './audio-processor.js';
-export { importMediaUrl, inspectMediaUrl, parseYouTubeJson3Transcript } from './url-importer.js';
+export {
+  importMediaUrl,
+  inspectMediaUrl,
+  parseYouTubeJson3Transcript,
+  ensureManagedYtDlp,
+  getManagedYtDlpPath,
+} from './url-importer.js';
 export type {
   MultimodalSegment,
   TimedText,
