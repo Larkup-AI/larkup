@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
 
 export const runtime = 'nodejs';
@@ -12,9 +11,31 @@ export const dynamic = 'force-dynamic';
 // the API and worker versions stay in lockstep.
 const appRequire = createRequire(`${process.cwd()}/package.json`);
 const pdfParseRequire = createRequire(appRequire.resolve('pdf-parse'));
-PDFParse.setWorker(
-  pathToFileURL(pdfParseRequire.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href,
-);
+let pdfParserPromise: Promise<typeof import('pdf-parse')['PDFParse']> | undefined;
+
+async function getPdfParser() {
+  if (!pdfParserPromise) {
+    pdfParserPromise = (async () => {
+      // pdfjs-dist needs these globals while its Node build is evaluated. The
+      // static import used to run first in the standalone server, where the
+      // transitive optional canvas package was not traced, causing every PDF
+      // upload to fail with "DOMMatrix is not defined".
+      const canvas = await import('@napi-rs/canvas');
+      Object.assign(globalThis, {
+        DOMMatrix: canvas.DOMMatrix,
+        ImageData: canvas.ImageData,
+        Path2D: canvas.Path2D,
+      });
+
+      const { PDFParse } = await import('pdf-parse');
+      PDFParse.setWorker(
+        pathToFileURL(pdfParseRequire.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href,
+      );
+      return PDFParse;
+    })();
+  }
+  return pdfParserPromise;
+}
 
 export async function POST(req: Request) {
   try {
@@ -32,6 +53,7 @@ export async function POST(req: Request) {
       // pdf-parse accepts typed-array input consistently across Next's Node
       // runtime and standalone builds. Passing Buffer directly can fail for
       // otherwise-valid PDFs after bundling.
+      const PDFParse = await getPdfParser();
       const parser = new PDFParse({ data: new Uint8Array(buffer) });
       try {
         text = (await parser.getText()).text;

@@ -36,6 +36,7 @@
     "@larkup/tool-doc-editor": "workspace:*",
     "@larkup/tool-video-audio": "workspace:*",
     "@larkup/vector-stores": "workspace:*",
+    "@napi-rs/canvas": "0.1.80",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@uiw/codemirror-theme-github": "^4.25.10",
