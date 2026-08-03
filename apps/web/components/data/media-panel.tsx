@@ -664,10 +664,6 @@ function MediaContent({
       toast.error('Choose an image, video, or audio file.');
       return;
     }
-    if (detectedType !== 'image' && !videoAudioToolInstalled) {
-      onToolRequired();
-      return;
-    }
     const inspected = await Promise.all(
       Array.from(files)
         .filter((file) => getMediaType(file) === detectedType)
