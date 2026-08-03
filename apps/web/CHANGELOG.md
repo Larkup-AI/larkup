@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.51
+
+### Patch Changes
+
+- 426c3e3: Make the chat history control accessible and keep production E2E checks aligned with the configured server port.
+
 ## 0.1.50
 
 ### Patch Changes
