@@ -30,6 +30,36 @@ test.describe('Video & Audio marketplace tool', () => {
     ).rejects.toThrow(/Local Whisper is not installed/i);
   });
 
+  test('prepares a managed YouTube downloader instead of requiring a host yt-dlp command', async () => {
+    execFileSync('pnpm', ['--filter', '@larkup/tool-video-audio', 'build'], {
+      cwd: repoRoot,
+      stdio: 'pipe',
+    });
+
+    const tool = await import(
+      pathToFileURL(path.join(repoRoot, 'packages/tools/video-audio/dist/index.js')).href
+    );
+    const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-ytdlp-managed-'));
+    const originalFetch = globalThis.fetch;
+    let downloadCount = 0;
+    globalThis.fetch = async (input) => {
+      downloadCount += 1;
+      expect(String(input)).toMatch(/yt-dlp\/releases\/latest\/download\//);
+      return new Response('managed yt-dlp binary', { status: 200 });
+    };
+
+    try {
+      const firstPath = await tool.ensureManagedYtDlp(workspace);
+      const secondPath = await tool.ensureManagedYtDlp(workspace);
+      expect(firstPath).toBe(secondPath);
+      expect(await readFile(firstPath, 'utf8')).toBe('managed yt-dlp binary');
+      expect(downloadCount).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
+
   test('extracts bounded scene frames and blocks private URL imports', async () => {
     test.setTimeout(120_000);
     execFileSync('pnpm', ['--filter', '@larkup/tool-video-audio', 'build'], {

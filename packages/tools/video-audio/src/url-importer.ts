@@ -39,6 +39,71 @@ export interface UrlInspection {
   isYouTube: boolean;
 }
 
+const YT_DLP_DOWNLOAD_TIMEOUT_MS = 120_000;
+const managedYtDlpDownloads = new Map<string, Promise<string>>();
+
+/**
+ * The Video & Audio tool owns its YouTube downloader. The official standalone
+ * yt-dlp release is downloaded once into Larkup's writable tool directory and
+ * reused thereafter, so users never need to install a host command themselves.
+ */
+export function getManagedYtDlpPath(rootDir = process.cwd()): string {
+  const executable = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+  return path.join(rootDir, '.larkup', 'tools', 'bin', executable);
+}
+
+export async function ensureManagedYtDlp(rootDir = process.cwd()): Promise<string> {
+  const configuredPath = process.env.LARKUP_YTDLP_PATH?.trim();
+  if (configuredPath) return configuredPath;
+
+  const binaryPath = getManagedYtDlpPath(rootDir);
+  try {
+    await fs.access(binaryPath);
+    return binaryPath;
+  } catch {
+    // Download below. The map prevents simultaneous media jobs from racing to
+    // write the same executable on first use.
+  }
+
+  const pending = managedYtDlpDownloads.get(binaryPath);
+  if (pending) return pending;
+
+  const download = (async () => {
+    const downloadUrl =
+      'https://github.com/yt-dlp/yt-dlp/releases/latest/download/' +
+      (process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+    const temporaryPath = `${binaryPath}.${randomUUID()}.download`;
+
+    try {
+      await fs.mkdir(path.dirname(binaryPath), { recursive: true });
+      const response = await fetch(downloadUrl, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(YT_DLP_DOWNLOAD_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        throw new Error(`download returned HTTP ${response.status}`);
+      }
+      await fs.writeFile(temporaryPath, Buffer.from(await response.arrayBuffer()), {
+        mode: 0o755,
+      });
+      if (process.platform !== 'win32') await fs.chmod(temporaryPath, 0o755);
+      await fs.rename(temporaryPath, binaryPath);
+      return binaryPath;
+    } catch (error) {
+      await fs.rm(temporaryPath, { force: true }).catch(() => {});
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Could not prepare the built-in YouTube downloader. Check your internet connection and try again. (${detail})`,
+      );
+    } finally {
+      managedYtDlpDownloads.delete(binaryPath);
+    }
+  })();
+
+  managedYtDlpDownloads.set(binaryPath, download);
+  return download;
+}
+
 export async function inspectMediaUrl(url: string): Promise<UrlInspection> {
   const parsed = validHttpUrl(url);
   if (isYouTube(parsed)) {
@@ -383,14 +448,16 @@ function mimeFromExtension(ext: string): string | undefined {
     } as Record<string, string>
   )[ext.toLowerCase()];
 }
-function runYtDlp(
+async function runYtDlp(
   args: string[],
   onProgress?: (progress: { percent?: number; message: string }) => void,
 ): Promise<string> {
+  onProgress?.({ message: 'Preparing YouTube downloader…' });
+  const binaryPath = await ensureManagedYtDlp();
   return new Promise((resolve, reject) => {
     // yt-dlp needs a JavaScript runtime in Node-only containers.
     const fullArgs = ['--js-runtimes', 'nodejs:node', ...args];
-    const child = spawn('yt-dlp', fullArgs, { shell: false });
+    const child = spawn(binaryPath, fullArgs, { shell: false });
     let stdout = '';
     let stderr = '';
     let timedOut = false;
@@ -415,9 +482,7 @@ function runYtDlp(
     (child as any).on('error', (error: NodeJS.ErrnoException) =>
       reject(
         error.code === 'ENOENT'
-          ? new Error(
-              'yt-dlp is required for YouTube URLs. Install it from https://github.com/yt-dlp/yt-dlp#installation',
-            )
+          ? new Error('The built-in YouTube downloader could not be started. Try importing again.')
           : error,
       ),
     );

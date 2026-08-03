@@ -14,7 +14,7 @@ This tool processes video and audio files for your knowledge base:
 
 - **ffmpeg** is bundled automatically with the package on supported platforms.
   A system `ffmpeg` installation is only used as a fallback for an unsupported platform.
-- **yt-dlp is only required for YouTube URLs** (local files and direct URLs do not require it)
+- **YouTube downloader is prepared automatically on first use** (local files and direct URLs do not need it)
 
 ## How It Works
 
