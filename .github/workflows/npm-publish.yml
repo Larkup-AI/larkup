@@ -46,16 +46,13 @@ jobs:
         include:
           - name: Linux x64
             os: ubuntu-24.04
-            command: scripts/test-release-install.sh
           - name: macOS Intel
-            os: macos-15-intel
-            command: scripts/test-release-install.sh
+            # macos-13 is the supported GitHub-hosted Intel runner.
+            os: macos-13
           - name: macOS Apple Silicon
             os: macos-14
-            command: scripts/test-release-install.sh
           - name: Windows x64
             os: windows-2025
-            command: ./scripts/test-release-install.ps1
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
@@ -64,6 +61,14 @@ jobs:
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
-      - name: Validate published install and server health
-        shell: ${{ startsWith(matrix.os, 'windows') && 'pwsh' || 'bash' }}
-        run: ${{ matrix.command }}
+      # `shell` does not support the matrix context. Keep the OS-specific
+      # commands as static steps so GitHub can validate the workflow before
+      # scheduling its matrix jobs.
+      - name: Validate published install and server health (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: scripts/test-release-install.sh
+      - name: Validate published install and server health (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/test-release-install.ps1

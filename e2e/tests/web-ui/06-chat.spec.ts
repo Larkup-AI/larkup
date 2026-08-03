@@ -83,11 +83,7 @@ test.describe.serial('Chat Page', () => {
     const isSetupRequired = await page.getByText('Setup Required').isVisible();
     if (isSetupRequired) return;
 
-    // Open History
-    await page
-      .locator('button', { has: page.locator('.lucide-history') })
-      .first()
-      .click();
+    await page.getByRole('button', { name: 'Chat history' }).click();
 
     await expect(page.getByRole('heading', { name: 'Chat History' })).toBeVisible();
   });

@@ -43,6 +43,9 @@ jobs:
         pnpm test:e2e
       env:
         CI: true
+        # Playwright's base URL and the E2E helpers use 4567. Next defaults to
+        # 3000 for `start`, so set the production server port explicitly.
+        PORT: "4567"
 
     - uses: actions/upload-artifact@v7
       if: ${{ !cancelled() }}
