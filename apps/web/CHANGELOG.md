@@ -1,5 +1,17 @@
 # larkup
 
+## 0.1.54
+
+### Patch Changes
+
+- d7d293c: Make Chat retrieval-only, reliably parse PDFs in Next deployments, simplify website entry, and prevent stale Video & Audio metadata from requiring a host ffmpeg installation.
+- Updated dependencies [d7d293c]
+  - @larkup/core@0.3.4
+  - @larkup/marketplace@0.1.19
+  - @larkup/scraper@0.1.35
+  - @larkup/tool-doc-editor@0.2.12
+  - @larkup/tool-video-audio@0.3.3
+
 ## 0.1.53
 
 ### Patch Changes
