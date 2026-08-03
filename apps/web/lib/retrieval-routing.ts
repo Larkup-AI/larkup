@@ -47,6 +47,77 @@ export function requiresKnowledgeBaseSearch(text: string): boolean {
   );
 }
 
+type ChatMessageWithToolParts = {
+  role?: string;
+  parts?: unknown;
+  toolInvocations?: unknown;
+};
+
+function resultHasHits(result: unknown): boolean {
+  if (typeof result === 'string') {
+    try {
+      return resultHasHits(JSON.parse(result));
+    } catch {
+      return false;
+    }
+  }
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    Array.isArray((result as { hits?: unknown }).hits) &&
+    (result as { hits: unknown[] }).hits.length > 0
+  );
+}
+
+/**
+ * A follow-up may safely reuse evidence that is still in the conversation.
+ * Do not reuse an empty search: a new, more specific wording can surface a
+ * relevant chunk on the next attempt.
+ */
+export function hasPriorKnowledgeBaseEvidence(messages: ChatMessageWithToolParts[]): boolean {
+  return messages.some((message) => {
+    if (message.role !== 'assistant') return false;
+    const parts = Array.isArray(message.parts) ? message.parts : [];
+    const toolPartsContainHits = parts.some((part: any) => {
+      if (part?.type === 'tool-invocation') {
+        return (
+          part.toolInvocation?.toolName === 'searchKnowledgeBase' &&
+          resultHasHits(part.toolInvocation?.result)
+        );
+      }
+      return part?.type === 'tool-searchKnowledgeBase' && resultHasHits(part.output ?? part.result);
+    });
+    if (toolPartsContainHits) return true;
+
+    const invocations = Array.isArray(message.toolInvocations) ? message.toolInvocations : [];
+    return invocations.some(
+      (invocation: any) =>
+        invocation?.toolName === 'searchKnowledgeBase' && resultHasHits(invocation?.result),
+    );
+  });
+}
+
+/**
+ * Keep retrieval efficient for natural continuations such as "what about it?"
+ * while treating every new standalone question as a fresh lookup.
+ */
+export function isLikelyKnowledgeFollowUp(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    /^(?:and|also|then|so)\b/.test(normalized) ||
+    /^(?:tell me more|continue|go on|can you (?:explain|elaborate|clarify))\b/.test(normalized) ||
+    /\b(?:it|this|that|they|them|those|these|its|their)\b/.test(normalized)
+  );
+}
+
+export function canReuseKnowledgeBaseEvidence(
+  text: string,
+  messages: ChatMessageWithToolParts[],
+): boolean {
+  return isLikelyKnowledgeFollowUp(text) && hasPriorKnowledgeBaseEvidence(messages);
+}
+
 /** The chat workspace is intentionally a retrieval-only experience. */
 export function requiresCurrentWebSearch(text: string): boolean {
   void text;
@@ -56,17 +127,17 @@ export function requiresCurrentWebSearch(text: string): boolean {
 /** Only the first retrieval is forced. The other source remains available for
  * exactly one recovery attempt; subsequent steps are reserved for analysis and
  * the final answer. */
-export function retrievalToolsForStep(options: {
+export function retrievalToolsForStep<ToolName extends string>(options: {
   stepNumber: number;
   forceKnowledgeBaseSearch: boolean;
   forceWebSearch: boolean;
-  toolNames: string[];
-}): { toolChoice?: { type: 'tool'; toolName: string }; activeTools?: string[] } | undefined {
+  toolNames: readonly ToolName[];
+}): { toolChoice?: { type: 'tool'; toolName: ToolName }; activeTools?: ToolName[] } | undefined {
   const { stepNumber, forceKnowledgeBaseSearch, forceWebSearch, toolNames } = options;
   const without = (...blocked: string[]) => toolNames.filter((name) => !blocked.includes(name));
 
   if (stepNumber === 0 && forceKnowledgeBaseSearch) {
-    return { toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' } };
+    return { toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' as ToolName } };
   }
   if (stepNumber === 0 && forceWebSearch) return { activeTools: without('webSearch') };
   if (stepNumber === 0) {
