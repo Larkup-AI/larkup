@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 import {
+  canReuseKnowledgeBaseEvidence,
+  hasPriorKnowledgeBaseEvidence,
+  isLikelyKnowledgeFollowUp,
   requiresCurrentWebSearch,
   requiresKnowledgeBaseSearch,
   retrievalToolsForStep,
@@ -64,5 +67,41 @@ test.describe('Retrieval-only chat routing', () => {
         toolNames,
       })?.activeTools,
     ).toEqual(['analyzeImageDeeply', 'presentMedia']);
+  });
+
+  test('reuses successful evidence only for clear conversational follow-ups', () => {
+    const messages = [
+      {
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-searchKnowledgeBase',
+            output: {
+              query: 'internship support',
+              hits: [{ title: 'HIP', text: 'Funding details' }],
+            },
+          },
+        ],
+      },
+    ];
+
+    expect(hasPriorKnowledgeBaseEvidence(messages)).toBe(true);
+    expect(isLikelyKnowledgeFollowUp('What about it?')).toBe(true);
+    expect(canReuseKnowledgeBaseEvidence('What about it?', messages)).toBe(true);
+    expect(canReuseKnowledgeBaseEvidence('What is the Buddy Program?', messages)).toBe(false);
+  });
+
+  test('does not reuse an empty or failed search result', () => {
+    const messages = [
+      {
+        role: 'assistant',
+        toolInvocations: [
+          { toolName: 'searchKnowledgeBase', state: 'result', result: { hits: [] } },
+        ],
+      },
+    ];
+
+    expect(hasPriorKnowledgeBaseEvidence(messages)).toBe(false);
+    expect(canReuseKnowledgeBaseEvidence('Tell me more about it', messages)).toBe(false);
   });
 });

@@ -1,7 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { readConfig } from '@larkup/core/config-store';
-import { readRun } from '@larkup/core/index-store';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import { embedQuery } from '@larkup/core/indexing/embedder';
 import { runWithServer } from '@larkup/core/workspace';
@@ -52,26 +51,42 @@ function documentEditModelOutput({ output }: { output: any }) {
 export async function queryKnowledgeBase(query: string, topK: number, serverId: string | null) {
   const doRetrieve = async () => {
     const config = await readConfig();
-    const candidateCount = Math.max(topK * 4, 20);
-    // The workspace index is the source of truth for the Chat page. A running
-    // generated server can be stale or target a different local table, which
-    // made mixed website/file collections appear to have missing evidence.
-    const run = await readRun();
-    if (!run || run.status !== 'completed' || (run.totalChunks ?? 0) === 0) {
+    // Retrieve enough candidates to preserve document diversity in large,
+    // mixed collections without sending an unbounded result set to the model.
+    const candidateCount = Math.max(topK * 6, 30);
+    // Document status is more precise than the last index-run summary: a later
+    // partial run can be marked failed even though earlier uploaded and scraped
+    // documents were successfully indexed and remain queryable.
+    const documents = await readDocuments();
+    if (!documents.some((document) => document.status === 'indexed')) {
       return { query, hits: [] };
     }
 
-    const vector = await embedQuery(config, query);
-    const adapter = await createAdapter(config);
-    const hits = await adapter.query(vector, candidateCount, query);
-    return formatKnowledgeHits(query, hits, topK);
+    try {
+      const vector = await embedQuery(config, query);
+      const adapter = await createAdapter(config);
+      const hits = await adapter.query(vector, candidateCount, query);
+      return formatKnowledgeHits(query, hits, topK, documents);
+    } catch (error) {
+      // A retrieval outage must not become a model/tool failure that exposes
+      // implementation details. The chat policy handles an empty result with
+      // its normal, user-facing uncertainty response.
+      console.error('[chat] knowledge-base retrieval failed:', error);
+      return { query, hits: [] };
+    }
   };
 
   return serverId ? runWithServer(serverId, doRetrieve) : doRetrieve();
 }
 
-async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) {
-  const [documents, mediaAssets] = await Promise.all([readDocuments(), readMediaAssets()]);
+async function formatKnowledgeHits(
+  query: string,
+  rawHits: any[],
+  topK: number,
+  indexedDocuments?: Awaited<ReturnType<typeof readDocuments>>,
+) {
+  const [storedDocuments, mediaAssets] = await Promise.all([readDocuments(), readMediaAssets()]);
+  const documents = indexedDocuments ?? storedDocuments;
   const documentsById = new Map(documents.map((document) => [document.id, document]));
   const activeMediaDocumentIds = new Set(mediaAssets.flatMap((asset) => asset.documentIds));
   const hydrated = rawHits.map((hit) => {
@@ -88,6 +103,14 @@ async function formatKnowledgeHits(query: string, rawHits: any[], topK: number) 
   const selected: any[] = [];
   const hitsPerDocument = new Map<string, number>();
   for (const hit of hydrated) {
+    // Never resurrect a vector whose document was deleted or which is no
+    // longer indexed. This matters after a mixed scrape/upload index retry.
+    if (
+      !documentsById.has(hit.documentId) ||
+      documentsById.get(hit.documentId)?.status !== 'indexed'
+    ) {
+      continue;
+    }
     if (
       hit.metadata?.mediaAssetId &&
       (!documentsById.has(hit.documentId) || !activeMediaDocumentIds.has(hit.documentId))

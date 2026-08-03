@@ -13,10 +13,9 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGateway } from '@ai-sdk/gateway';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
-import { DEFAULT_SYSTEM_PROMPT } from '@larkup/core/types';
 
 import { getChatTools } from './tools';
-import { retrievalToolsForStep } from '@/lib/retrieval-routing';
+import { canReuseKnowledgeBaseEvidence, retrievalToolsForStep } from '@/lib/retrieval-routing';
 import { gatewayProviderOptions } from '@/lib/gateway-fallbacks';
 
 export const maxDuration = 60;
@@ -67,11 +66,12 @@ function createChatModel(
 const RETRIEVAL_ONLY_POLICY = `
 
 CHAT SCOPE:
-- This chat answers only from the user's provided material. It is not a general-purpose assistant.
-- Call searchKnowledgeBase once before every substantive answer. Use only the returned evidence.
-- If the search has no relevant result, reply exactly: "I couldn't find information about that in the available material."
-- Never answer from general knowledge, use web search, run code or analysis tools, or invent details.
-- Keep the answer natural and direct. Do not mention searching, indexing, a corpus, a database, a knowledge base, or the available material when evidence was found.
+- Answer only from the user's provided material. This is not a general-purpose assistant.
+- Search once before a new substantive question. For a clear follow-up, reuse the evidence already returned in this conversation when it fully supports the answer.
+- Use only returned evidence. If no evidence supports an answer, reply exactly: "I don't know."
+- Never answer from general knowledge, browse the web, run code, perform analysis, or invent details.
+- Speak naturally and directly. Never mention or imply searching, indexing, a corpus, a database, a knowledge base, retrieved material, source documents, or what information is available. Do not use phrases such as "the indexed page says" or "the data shows."
+- When the user asks to see, watch, play, or hear supporting material, use presentMedia with an exact result returned by searchKnowledgeBase. Otherwise do not call presentMedia.
 `;
 
 function latestUserText(messages: UIMessage[]): string {
@@ -348,11 +348,12 @@ Available Form Fields (${docFields?.length ?? 0} total):
 ${fieldLines}`;
   }
 
+  // The generic product prompt lists tools that intentionally are not exposed
+  // in this retrieval-only chat. Keeping it out of this request prevents a
+  // model from attempting an unavailable sandbox/corpus action and surfacing a
+  // technical failure to the user.
   const systemPrompt =
-    DEFAULT_SYSTEM_PROMPT +
-    (config.systemPrompt && config.systemPrompt !== DEFAULT_SYSTEM_PROMPT
-      ? `\n\nUSER INSTRUCTIONS:\n${config.systemPrompt}`
-      : '') +
+    (config.systemPrompt ? `USER INSTRUCTIONS:\n${config.systemPrompt}\n` : '') +
     RETRIEVAL_ONLY_POLICY +
     tabularContext +
     docContext;
@@ -365,9 +366,15 @@ ${fieldLines}`;
   // The Chat page is the product's RAG surface, not an agent workbench. Keep
   // sandbox, web, and corpus tools out of this request so a model cannot take
   // a Docker-backed detour instead of answering from retrieved evidence.
-  const tools = { searchKnowledgeBase: allTools.searchKnowledgeBase };
+  const tools = {
+    searchKnowledgeBase: allTools.searchKnowledgeBase,
+    presentMedia: allTools.presentMedia,
+  };
   const userText = latestUserText(messagesToProcess);
-  const forceKnowledgeBaseSearch = Boolean(userText.trim()) && Boolean(tools.searchKnowledgeBase);
+  const forceKnowledgeBaseSearch =
+    Boolean(userText.trim()) &&
+    Boolean(tools.searchKnowledgeBase) &&
+    !canReuseKnowledgeBaseEvidence(userText, messagesToProcess);
 
   // Debug: log payload sizes to console in development
   if (process.env.NODE_ENV === 'development') {
@@ -391,7 +398,7 @@ ${fieldLines}`;
         stepNumber,
         forceKnowledgeBaseSearch,
         forceWebSearch: false,
-        toolNames: Object.keys(tools),
+        toolNames: ['searchKnowledgeBase', 'presentMedia'] as const,
       }),
     onFinish: async ({ usage, response }) => {
       const { trackUsageEvent, estimateCost } = await import('@larkup/core/analytics-store');
