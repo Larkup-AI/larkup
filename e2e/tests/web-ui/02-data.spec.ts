@@ -281,7 +281,7 @@ test.describe.serial('Data Page', () => {
       await mediaTab.click();
       await page.waitForTimeout(500);
 
-      await expect(page.getByRole('button', { name: 'Upload' })).toBeVisible({
+      await expect(page.getByRole('button', { name: 'Upload', exact: true })).toBeVisible({
         timeout: 5_000,
       });
       await expect(page.getByRole('button', { name: 'From URL' })).toBeVisible();

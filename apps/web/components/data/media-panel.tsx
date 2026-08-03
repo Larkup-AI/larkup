@@ -184,14 +184,23 @@ function readMediaDuration(file: File): Promise<number | undefined> {
   return new Promise((resolve) => {
     const element = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio');
     const url = URL.createObjectURL(file);
+    let settled = false;
+    const finish = (duration?: number) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      URL.revokeObjectURL(url);
+      resolve(duration);
+    };
+    // Some browsers never emit metadata or error events for incomplete media.
+    // Staging must stay responsive even when the eventual upload is rejected.
+    const timeout = window.setTimeout(() => finish(undefined), 3_000);
     element.preload = 'metadata';
     element.onloadedmetadata = () => {
-      URL.revokeObjectURL(url);
-      resolve(Number.isFinite(element.duration) ? element.duration : undefined);
+      finish(Number.isFinite(element.duration) ? element.duration : undefined);
     };
     element.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(undefined);
+      finish(undefined);
     };
     element.src = url;
   });
