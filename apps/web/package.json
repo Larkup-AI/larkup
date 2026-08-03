@@ -77,7 +77,7 @@
     "@types/pdfjs-dist": "^2.10.378",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "postcss": "^8.5",
+    "postcss": "^8.5.25",
     "tailwindcss": "^4.2.0",
     "typescript": "^6.0.3"
   }

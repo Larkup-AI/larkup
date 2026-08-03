@@ -7,17 +7,6 @@ import { cn } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ServerSwitcher } from '@/components/workspace/server-switcher';
 import { useWorkspace } from '@/components/workspace/workspace-provider';
-import { useThemeCustomizer, type PanelBgVariant } from './theme-customizer-provider';
-
-const NAV_BG_COLORS: Record<PanelBgVariant, string | undefined> = {
-  'panel-default': undefined,
-  'panel-white': '#FFFFFF',
-  'panel-fafafa': '#FAFAFA',
-  'panel-warm': '#F7F1EA',
-  'panel-soft': '#FBFAF8',
-  'panel-silver': '#F8F8F8',
-  'panel-stone': '#F5F5F2',
-};
 
 interface NavItem {
   id: string;
@@ -36,19 +25,13 @@ const NAV_ITEMS: NavItem[] = [
 export function AppTopNav() {
   const pathname = usePathname();
   const { username } = useWorkspace();
-  const { navBg } = useThemeCustomizer();
-
-  const navColor = navBg ? NAV_BG_COLORS[navBg] : undefined;
-  const navStyle = navColor ? { backgroundColor: navColor } : undefined;
 
   return (
     <TooltipProvider delay={150}>
       <header
         className={cn(
-          'sticky top-0 z-50 flex h-14 shrink-0 items-center gap-6 border-b border-border px-4 md:px-6',
-          !navColor ? 'bg-[#F5F5F4]' : '',
+          'sticky top-0 z-50 flex h-14 shrink-0 items-center gap-6 border-b border-border px-4 md:px-6 bg-[#F5F5F4] dark:bg-background',
         )}
-        style={navStyle}
       >
         {/* Brand */}
         <Link href="/chat" aria-label="larkup home" className="flex items-center gap-2.5 shrink-0">

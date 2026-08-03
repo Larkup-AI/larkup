@@ -7,6 +7,7 @@ import { ThemeCustomizerProvider } from '@/components/theme-customizer-provider'
 import { ClientLayoutWrapper } from '@/components/client-layout-wrapper';
 import { GlobalIndexProgress } from '@/components/index/global-index-progress';
 import { UpdateBanner } from '@/components/update-banner';
+import { ThemeProvider } from 'next-themes';
 
 export const metadata: Metadata = {
   title: 'larkup',
@@ -24,17 +25,24 @@ export default function RootLayout({
       <body suppressHydrationWarning className="font-sans antialiased ">
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('app-theme');var b=localStorage.getItem('app-background');var r=localStorage.getItem('app-radius');var d=document.body;if(t&&t!=='default')d.classList.add(t);if(b)d.classList.add(b);if(r&&r!=='radius-default')d.classList.add(r);}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('app-theme');var d=document.body;if(t&&t!=='default')d.classList.add(t);}catch(e){}})();`,
           }}
         />
-        <UpdateBanner />
-        <ThemeCustomizerProvider>
-          <WorkspaceProvider>
-            <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
-            <Toaster position="bottom-left" />
-            <GlobalIndexProgress />
-          </WorkspaceProvider>
-        </ThemeCustomizerProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <UpdateBanner />
+          <ThemeCustomizerProvider>
+            <WorkspaceProvider>
+              <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+              <Toaster position="bottom-left" />
+              <GlobalIndexProgress />
+            </WorkspaceProvider>
+          </ThemeCustomizerProvider>
+        </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

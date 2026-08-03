@@ -10,12 +10,12 @@
     "deploy": "vercel deploy"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.10",
+    "@hono/node-server": "^2.0.12",
     "hono": "^4.12.30"
   },
   "devDependencies": {
     "@types/node": "^26",
-    "tsx": "^4.7.0",
+    "tsx": "^4.23.5",
     "typescript": "^6.0.3",
     "vercel": "58.4.0"
   }
