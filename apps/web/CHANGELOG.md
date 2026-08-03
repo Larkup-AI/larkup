@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.59
+
+### Patch Changes
+
+- e8366d0: Fix PDF uploads in standalone deployments.
+
 ## 0.1.58
 
 ### Patch Changes
