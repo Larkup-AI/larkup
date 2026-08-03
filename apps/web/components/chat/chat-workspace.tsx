@@ -813,6 +813,7 @@ function ChatWorkspaceInner() {
                       render={
                         <button
                           type="button"
+                          aria-label="Chat history"
                           className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                         >
                           <History className="h-4 w-4" />
