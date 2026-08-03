@@ -1,6 +1,6 @@
 {
   "name": "larkup",
-  "version": "0.1.58",
+  "version": "0.1.59",
   "type": "module",
   "bin": {
     "larkup": "./bin/larkup.js"
