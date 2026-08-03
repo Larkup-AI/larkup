@@ -4,13 +4,13 @@ import { LarkupClient } from '../../../apps/sdk/js-sdk/src/index';
 const WEB_API = 'http://localhost:4567';
 let ragServer = 'http://localhost:8080';
 let client: LarkupClient;
+const sdkApiKey = process.env.AI_GATEWAY_APIKEY?.trim() || process.env.OPENAI_API_KEY?.trim() || '';
 
 test.describe.serial('JavaScript SDK', () => {
+  test.skip(!sdkApiKey, 'AI_GATEWAY_APIKEY or OPENAI_API_KEY is required for SDK E2E');
+
   test.beforeAll(async ({ request }) => {
     const gatewayApiKey = process.env.AI_GATEWAY_APIKEY?.trim();
-    const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
-    const apiKey = gatewayApiKey || openaiApiKey;
-    expect(apiKey, 'AI_GATEWAY_APIKEY or OPENAI_API_KEY is required for SDK E2E').toBeTruthy();
 
     const configResponse = await request.get(`${WEB_API}/api/config`);
     const { config } = await configResponse.json();
@@ -20,8 +20,8 @@ test.describe.serial('JavaScript SDK', () => {
         ...config,
         embeddingProvider: provider,
         chatProvider: provider,
-        embeddingApiKey: apiKey,
-        chatApiKey: apiKey,
+        embeddingApiKey: sdkApiKey,
+        chatApiKey: sdkApiKey,
       },
     });
     expect(updateResponse.ok()).toBe(true);
