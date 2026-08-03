@@ -57,7 +57,7 @@ export function seedRegistry(): void {
         'and whole-media notes. Supports YouTube URLs, ' +
         'direct file upload, and bulk processing. Includes ffmpeg automatically and prepares the YouTube downloader on first use.',
       category: 'media',
-      version: '0.3.5',
+      version: '0.3.6',
       pricing: 'free',
       emoji: '🎬',
       icon: 'Film',
