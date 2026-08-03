@@ -19,11 +19,14 @@ try {
     & (Join-Path $ProjectRoot 'scripts/install.ps1') -NoPrompt
     if ($LASTEXITCODE -ne 0) { throw "The Windows installer exited with code $LASTEXITCODE." }
 
-    # npm 10.9+ protects the `prefix` config key from `npm config get`.
-    # The installer uses the Windows default global-bin directory instead.
-    $npmPrefix = Join-Path $env:APPDATA 'npm'
-    if (-not (Test-Path (Join-Path $npmPrefix 'larkup.cmd'))) {
-        throw "The installer did not create larkup.cmd in $npmPrefix."
+    # npm 10.9+ protects the `prefix` config key from `npm config get`, but
+    # continues to honor NPM_CONFIG_PREFIX for global installs. Prefer that
+    # isolated test prefix, then support npm's normal Windows default.
+    $npmPrefix = @($env:NPM_CONFIG_PREFIX, (Join-Path $env:APPDATA 'npm')) |
+        Where-Object { $_ -and (Test-Path (Join-Path $_ 'larkup.cmd')) } |
+        Select-Object -First 1
+    if (-not $npmPrefix) {
+        throw 'The installer did not create larkup.cmd in a global npm bin directory.'
     }
     $env:Path = "$npmPrefix;$env:Path"
     $version = & larkup --version
