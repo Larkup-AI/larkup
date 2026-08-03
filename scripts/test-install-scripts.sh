@@ -17,9 +17,11 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-pass() { ((PASS++)); echo -e "  ${GREEN}✓${NC} $1"; }
-fail() { ((FAIL++)); echo -e "  ${RED}✗${NC} $1"; }
-warn() { ((WARN++)); echo -e "  ${YELLOW}!${NC} $1"; }
+# Use prefix increments so the arithmetic command succeeds under Bash's
+# `errexit` mode even when a counter begins at zero (as it does in CI).
+pass() { ((++PASS)); echo -e "  ${GREEN}✓${NC} $1"; }
+fail() { ((++FAIL)); echo -e "  ${RED}✗${NC} $1"; }
+warn() { ((++WARN)); echo -e "  ${YELLOW}!${NC} $1"; }
 section() { echo -e "\n${BLUE}━━━${NC} ${BOLD}$1${NC}"; }
 
 # ── File existence ───────────────────────────────────────────

@@ -10,12 +10,15 @@ const PY_TEST_SCRIPT = path.resolve(__dirname, 'py_sdk_test.py');
 
 const WEB_API = 'http://localhost:4567';
 let RAG_SERVER = 'http://localhost:8080';
+const sdkApiKey = process.env.AI_GATEWAY_APIKEY?.trim() || process.env.OPENAI_API_KEY?.trim() || '';
 
 /**
  * Python SDK E2E tests — spawns a Python subprocess to test the SDK
  * against the running RAG server.
  */
 test.describe('Python SDK — larkup', () => {
+  test.skip(!sdkApiKey, 'AI_GATEWAY_APIKEY or OPENAI_API_KEY is required for SDK E2E');
+
   test.beforeAll(async ({ request }) => {
     try {
       const statusRes = await request.get(`${WEB_API}/api/server/local`);

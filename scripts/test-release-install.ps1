@@ -19,7 +19,12 @@ try {
     & (Join-Path $ProjectRoot 'scripts/install.ps1') -NoPrompt
     if ($LASTEXITCODE -ne 0) { throw "The Windows installer exited with code $LASTEXITCODE." }
 
-    $npmPrefix = (& npm config get prefix).Trim()
+    # npm 10.9+ protects the `prefix` config key from `npm config get`.
+    # The installer uses the Windows default global-bin directory instead.
+    $npmPrefix = Join-Path $env:APPDATA 'npm'
+    if (-not (Test-Path (Join-Path $npmPrefix 'larkup.cmd'))) {
+        throw "The installer did not create larkup.cmd in $npmPrefix."
+    }
     $env:Path = "$npmPrefix;$env:Path"
     $version = & larkup --version
     if ($LASTEXITCODE -ne 0 -or $version -notmatch '^\d+\.\d+\.\d+') {
