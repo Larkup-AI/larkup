@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { FIXTURES, TEST_PASTE_TEXT, TEST_PASTE_TITLE } from '../../utils/fixtures';
 import { hasEnv, ENV_KEYS } from '../../utils/env-loader';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
 test.describe.serial('Data Page', () => {
   test.beforeEach(async ({ page }) => {
@@ -323,6 +328,15 @@ test.describe.serial('Data Page', () => {
     await expect(page.getByText('demo.mp4', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add media' })).toBeEnabled();
     await expect(page.getByText(/Missing system dependencies|brew install ffmpeg/i)).toHaveCount(0);
+  });
+
+  test('Media upgrade guidance replaces the legacy yt-dlp installation prompt', async () => {
+    const source = await readFile(
+      path.join(repoRoot, 'apps/web/components/data/media-panel.tsx'),
+      'utf8',
+    );
+    expect(source).toContain("normalizedMessage.includes('yt-dlp is required for youtube urls')");
+    expect(source).toContain("label: 'Update tool'");
   });
 
   test('audio uploads provide a playable staged preview', async ({ page }) => {

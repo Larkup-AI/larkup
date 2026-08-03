@@ -701,7 +701,8 @@ function MediaContent({
     const normalizedMessage = msg.toLowerCase();
     if (
       normalizedMessage.includes('video & audio tool needs an update') ||
-      normalizedMessage.includes('video & audio tool not properly installed')
+      normalizedMessage.includes('video & audio tool not properly installed') ||
+      normalizedMessage.includes('yt-dlp is required for youtube urls')
     ) {
       toast.error('Update Video & Audio to continue.', {
         description:
