@@ -33,7 +33,16 @@
   },
   "pnpm": {
     "overrides": {
-      "typescript": "^6.0.3"
+      "typescript": "^6.0.3",
+      "undici": "^6.28.0",
+      "body-parser": "^2.3.0",
+      "esbuild": "^0.24.0",
+      "minimatch": "^9.0.4",
+      "tar": "^7.4.3",
+      "glob": "^11.0.0",
+      "ajv": "^8.16.0",
+      "path-to-regexp": "^8.0.0",
+      "postcss": "^8.4.38"
     }
   }
 }
