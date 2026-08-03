@@ -16,11 +16,7 @@ import type { CustomModelConfig } from '@larkup/core/types';
 import { DEFAULT_SYSTEM_PROMPT } from '@larkup/core/types';
 
 import { getChatTools } from './tools';
-import {
-  requiresCurrentWebSearch,
-  requiresKnowledgeBaseSearch,
-  retrievalToolsForStep,
-} from '@/lib/retrieval-routing';
+import { retrievalToolsForStep } from '@/lib/retrieval-routing';
 import { gatewayProviderOptions } from '@/lib/gateway-fallbacks';
 
 export const maxDuration = 60;
@@ -68,30 +64,14 @@ function createChatModel(
   }
 }
 
-const SMART_RETRIEVAL_POLICY = `
+const RETRIEVAL_ONLY_POLICY = `
 
-TOOL RULES:
-1. searchKnowledgeBase → Use FIRST when the question is about the user's indexed data (documents, files, images, videos, diagrams, anything they uploaded). A question about who won a named match or its score may refer to an indexed recording even when the user does not repeat "my video"; inspect the knowledge base first.
-2. webSearch → Use for clearly current/public facts. If a prior local search was not relevant or failed, use it as the one permitted fallback. If web search fails, use the knowledge base as the one permitted fallback.
-3. Other tools → Use when the question specifically requires them.
-4. General knowledge → Answer directly for common knowledge unrelated to the user's data.
-5. If nothing helps, say so honestly.
-
-DO:
-- Keep answers short and direct. 1–3 sentences unless the task is complex.
-- Make answers presentation-ready: use a natural lead sentence and clean bullets for lists. Use descriptive headings only when they add clarity; never expose raw-looking headings such as "#### View Names:".
-- Search at most ONCE per tool per turn. Never repeat the same search.
-- For questions about the user's own facts or preferences (for example, "what is my favourite fruit?"), searchKnowledgeBase is required before answering.
-- If a knowledge-base result contains PDF images and the question asks what is shown, named, counted, or connected in that visual, call analyzeImageDeeply before answering. Call presentMedia when the user asks to see the image.
-- For an indexed video outcome question, inspect endingContext before saying that a winner or final score is unavailable. Use only explicitly supported evidence.
-- Use presentMedia to show images/videos/audio from indexed content.
-- For follow-ups like "show me that", reuse the mediaAssetId from earlier results — do not search again.
-
-DO NOT:
-- Search for greetings, casual chat, writing help, or general knowledge you already know.
-- Output markdown images like ![alt](url) — the UI blocks them. Always use presentMedia instead.
-- Present every search result. Pick the single best one.
-- Guess or fabricate when results are insufficient.
+CHAT SCOPE:
+- This chat answers only from the user's provided material. It is not a general-purpose assistant.
+- Call searchKnowledgeBase once before every substantive answer. Use only the returned evidence.
+- If the search has no relevant result, reply exactly: "I couldn't find information about that in the available material."
+- Never answer from general knowledge, use web search, run code or analysis tools, or invent details.
+- Keep the answer natural and direct. Do not mention searching, indexing, a corpus, a database, a knowledge base, or the available material when evidence was found.
 `;
 
 function latestUserText(messages: UIMessage[]): string {
@@ -110,50 +90,6 @@ function latestUserText(messages: UIMessage[]): string {
       .join(' ');
   }
   return '';
-}
-
-function normalizedQuestion(text: string) {
-  return text.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
-}
-
-/** An exact repeated question in the same conversation already has grounded
- * evidence in model context. Do not spend another embedding + vector query;
- * the previous tool result remains available in the compacted history. */
-function hasPriorKnowledgeBaseAnswer(messages: UIMessage[], question: string): boolean {
-  const target = normalizedQuestion(question);
-  if (!target) return false;
-
-  for (let index = 0; index < messages.length - 1; index++) {
-    if (
-      messages[index].role !== 'user' ||
-      normalizedQuestion(latestUserText([messages[index]])) !== target
-    ) {
-      continue;
-    }
-    for (let cursor = index + 1; cursor < messages.length; cursor++) {
-      const message = messages[cursor] as any;
-      if (message.role === 'user') break;
-      const toolCalls = [
-        ...(Array.isArray(message.toolInvocations) ? message.toolInvocations : []),
-        ...(Array.isArray(message.parts)
-          ? message.parts.map((part: any) => part.toolInvocation ?? part)
-          : []),
-      ];
-      if (
-        toolCalls.some((call: any) => {
-          const result = call?.result ?? call?.output;
-          return (
-            call?.toolName === 'searchKnowledgeBase' &&
-            Array.isArray(result?.hits) &&
-            result.hits.length > 0
-          );
-        })
-      ) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 export async function POST(req: Request) {
@@ -417,27 +353,21 @@ ${fieldLines}`;
     (config.systemPrompt && config.systemPrompt !== DEFAULT_SYSTEM_PROMPT
       ? `\n\nUSER INSTRUCTIONS:\n${config.systemPrompt}`
       : '') +
-    SMART_RETRIEVAL_POLICY +
-    (config.webSearchEnabled
-      ? '\nWeb search is available. Use it for current events or public facts not in the knowledge base.\n'
-      : '') +
+    RETRIEVAL_ONLY_POLICY +
     tabularContext +
     docContext;
-  const tools = await getChatTools({
+  const allTools = await getChatTools({
     serverId,
     docSessionId,
     config,
     origin: new URL(req.url).origin,
   });
+  // The Chat page is the product's RAG surface, not an agent workbench. Keep
+  // sandbox, web, and corpus tools out of this request so a model cannot take
+  // a Docker-backed detour instead of answering from retrieved evidence.
+  const tools = { searchKnowledgeBase: allTools.searchKnowledgeBase };
   const userText = latestUserText(messagesToProcess);
-  const forceKnowledgeBaseSearch =
-    requiresKnowledgeBaseSearch(userText) &&
-    !hasPriorKnowledgeBaseAnswer(messagesToProcess, userText) &&
-    Boolean(tools.searchKnowledgeBase);
-  const forceWebSearch =
-    config.webSearchEnabled === true &&
-    requiresCurrentWebSearch(userText) &&
-    Boolean(tools.webSearch);
+  const forceKnowledgeBaseSearch = Boolean(userText.trim()) && Boolean(tools.searchKnowledgeBase);
 
   // Debug: log payload sizes to console in development
   if (process.env.NODE_ENV === 'development') {
@@ -460,7 +390,7 @@ ${fieldLines}`;
       retrievalToolsForStep({
         stepNumber,
         forceKnowledgeBaseSearch,
-        forceWebSearch: forceWebSearch && !forceKnowledgeBaseSearch,
+        forceWebSearch: false,
         toolNames: Object.keys(tools),
       }),
     onFinish: async ({ usage, response }) => {

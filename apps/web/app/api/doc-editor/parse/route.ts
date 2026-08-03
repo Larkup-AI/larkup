@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { createSession, enrichPDFWithText, getSession } from '@larkup/tool-doc-editor';
 import { PDFParse } from 'pdf-parse';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const appRequire = createRequire(`${process.cwd()}/package.json`);
+const pdfParseRequire = createRequire(appRequire.resolve('pdf-parse'));
+PDFParse.setWorker(
+  pathToFileURL(pdfParseRequire.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href,
+);
 
 /**
  * POST /api/doc-editor/parse

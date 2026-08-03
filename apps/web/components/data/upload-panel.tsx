@@ -214,11 +214,17 @@ export function UploadPanel({
             body: formData,
           });
 
+          const data = await res.json().catch(() => ({}));
           if (!res.ok) {
-            throw new Error(`Failed to parse ${file.name}`);
+            throw new Error(data.error || `Could not extract text from ${file.name}`);
           }
 
-          const { text } = await res.json();
+          const { text } = data;
+          if (!text?.trim()) {
+            throw new Error(
+              'This PDF does not contain selectable text. Try another copy of the file.',
+            );
+          }
           next.push({
             id,
             name: file.name,

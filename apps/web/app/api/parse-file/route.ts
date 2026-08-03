@@ -1,9 +1,20 @@
 import { NextResponse } from 'next/server';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+// pdf-parse's default Node worker path is lost when Next bundles a route.
+// Resolve the matching worker from pdf-parse's own pdfjs-dist dependency so
+// the API and worker versions stay in lockstep.
+const appRequire = createRequire(`${process.cwd()}/package.json`);
+const pdfParseRequire = createRequire(appRequire.resolve('pdf-parse'));
+PDFParse.setWorker(
+  pathToFileURL(pdfParseRequire.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href,
+);
 
 export async function POST(req: Request) {
   try {
@@ -18,7 +29,10 @@ export async function POST(req: Request) {
     let text = '';
 
     if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      const parser = new PDFParse({ data: buffer });
+      // pdf-parse accepts typed-array input consistently across Next's Node
+      // runtime and standalone builds. Passing Buffer directly can fail for
+      // otherwise-valid PDFs after bundling.
+      const parser = new PDFParse({ data: new Uint8Array(buffer) });
       try {
         text = (await parser.getText()).text;
       } finally {
@@ -32,6 +46,13 @@ export async function POST(req: Request) {
       text = result.value;
     } else {
       return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
+    }
+
+    if (!text.trim()) {
+      return NextResponse.json(
+        { error: 'No readable text was found in this file.' },
+        { status: 422 },
+      );
     }
 
     return NextResponse.json({ text });

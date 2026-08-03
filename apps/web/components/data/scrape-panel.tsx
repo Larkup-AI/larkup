@@ -584,7 +584,7 @@ export function ScrapePanel({
     [selectedUrls.length, effectiveScopeForEstimate, specificUrls, pageLimit],
   );
 
-  const [inputMode, setInputMode] = useState<'search' | 'url'>('search');
+  const [inputMode, setInputMode] = useState<'search' | 'url'>('url');
 
   useEffect(() => {
     const hasSelection = selectedUrls.length > 0;
@@ -624,18 +624,18 @@ export function ScrapePanel({
           >
             <TabsList className="inline-flex bg-white/70 h-9 items-center justify-center rounded-lg  border border-border p-0.5 text-muted-foreground">
               <TabsTrigger
-                value="search"
-                className="inline-flex items-center h-9 justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
-              >
-                <Search className="size-3.5 mr-1.5" />
-                Search
-              </TabsTrigger>
-              <TabsTrigger
                 value="url"
                 className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
               >
                 <Globe className="size-3.5 mr-1.5" />
                 Direct URL
+              </TabsTrigger>
+              <TabsTrigger
+                value="search"
+                className="inline-flex items-center h-9 justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
+              >
+                <Search className="size-3.5 mr-1.5" />
+                Search
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -649,7 +649,7 @@ export function ScrapePanel({
                   ref={inputRef}
                   id="kw"
                   autoComplete="off"
-                  placeholder='Search keywords, e.g. "RAG pipelines"'
+                  placeholder='Search for websites, e.g. "RAG pipelines"'
                   value={query}
                   disabled={disabled}
                   className="pl-9 pr-22"

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
-import { KnowledgeBaseResult } from '@/components/chat/tools/knowledge-base-result';
 import { ChatChart, type ChartConfig } from '@/components/chat/tools/chat-chart';
 import { ChatDataTable, type DataTableConfig } from '@/components/chat/tools/chat-data-table';
 import {
@@ -945,9 +944,6 @@ export function MessageItem({
 
   return (
     <div className="message assistant-message flex flex-col gap-4" data-role="assistant">
-      {/* Knowledge base results */}
-      {kbParts.length > 0 && <KnowledgeBaseResult parts={kbParts} isShimmering={isShimmering} />}
-
       {/* All search attempts are intentionally one compact disclosure. */}
       {webSearchParts.length > 0 && <WebSearchSummary parts={webSearchParts} />}
 

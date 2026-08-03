@@ -260,15 +260,16 @@ export async function buildRegistry(opts?: {
   // Start with hardcoded fallback
   const registry = { ...FALLBACK_REGISTRY };
 
-  // Layer local manifests on top (they're the most up-to-date for development)
-  const localManifests = await discoverLocalManifests();
-  Object.assign(registry, localManifests);
-
-  // Layer Hub API catalog on top (newest published versions)
+  // Layer Hub API catalog over the offline fallback.
   if (!opts?.skipHub) {
     const hubCatalog = await fetchHubCatalog(opts?.hubUrl);
     Object.assign(registry, hubCatalog);
   }
+
+  // Local (including installed) manifests are the source of truth. This also
+  // prevents a stale Hub descriptor from reintroducing obsolete system deps.
+  const localManifests = await discoverLocalManifests();
+  Object.assign(registry, localManifests);
 
   cachedRegistry = registry;
   return registry;
