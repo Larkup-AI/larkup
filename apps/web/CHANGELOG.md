@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.53
+
+### Patch Changes
+
+- bde8141: Allow bundled video and audio files to stage before optional processing is configured.
+
 ## 0.1.52
 
 ### Patch Changes
