@@ -23,7 +23,7 @@ test('the Hub advertises bundled video processing without a system ffmpeg depend
   const videoTool = getHubTool('video-audio')?.manifest;
 
   expect(videoTool).toMatchObject({
-    version: '0.3.2',
+    version: '0.3.6',
     packageName: '@larkup/tool-video-audio',
   });
   expect(videoTool?.systemDeps).toBeUndefined();

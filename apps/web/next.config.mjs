@@ -1,25 +1,26 @@
-import { readFileSync } from "node:fs";
+import { readFileSync } from 'node:fs';
 
 // Read version from package.json at build time
-const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8"));
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: [
-    "@larkup/core",
-    "@larkup/vector-stores",
-    "@larkup/scraper",
-    "@larkup/marketplace",
+    '@larkup/core',
+    '@larkup/vector-stores',
+    '@larkup/scraper',
+    '@larkup/marketplace',
   ],
   serverExternalPackages: [
-    "@lancedb/lancedb",
-    "@ffmpeg-installer/ffmpeg",
-    "@ffprobe-installer/ffprobe",
-    "@larkup/sandbox",
-    "chromadb",
-    "dockerode",
-    "nodejs-whisper",
-    "pdf-parse",
+    '@lancedb/lancedb',
+    '@ffmpeg-installer/ffmpeg',
+    '@ffprobe-installer/ffprobe',
+    '@larkup/sandbox',
+    'chromadb',
+    'dockerode',
+    'nodejs-whisper',
+    '@napi-rs/canvas',
+    'pdf-parse',
   ],
   typescript: {
     ignoreBuildErrors: true,
@@ -27,15 +28,15 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  output: process.env.E2E_BUILD ? undefined : "standalone",
+  output: process.env.E2E_BUILD ? undefined : 'standalone',
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version,
   },
   async rewrites() {
     return [
       {
-        source: "/uploads/:path*",
-        destination: "/api/uploads/:path*",
+        source: '/uploads/:path*',
+        destination: '/api/uploads/:path*',
       },
     ];
   },
