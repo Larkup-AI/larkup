@@ -23,7 +23,7 @@ test.describe.serial('Data Page', () => {
   });
 
   test('keeps the primary add action in the tab bar', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Search website' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add website' })).toBeDisabled();
 
     await page.getByRole('button', { name: 'Files', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Add files' })).toBeDisabled();
