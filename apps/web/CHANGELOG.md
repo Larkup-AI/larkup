@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.52
+
+### Patch Changes
+
+- 23cb4ee: Keep video and audio staging responsive when a browser cannot read media metadata, and stabilize media E2E selectors.
+
 ## 0.1.51
 
 ### Patch Changes
