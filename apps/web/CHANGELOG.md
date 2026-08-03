@@ -1,5 +1,15 @@
 # larkup
 
+## 0.1.55
+
+### Patch Changes
+
+- 7601d83: Update Video & Audio from the Media page when an installed tool is stale, and prefer the newest marketplace catalog version so packaged ffmpeg helpers load correctly after installation.
+- Updated dependencies [7601d83]
+  - @larkup/marketplace@0.1.20
+  - @larkup/tool-video-audio@0.3.4
+  - @larkup/tool-doc-editor@0.2.12
+
 ## 0.1.54
 
 ### Patch Changes
