@@ -698,11 +698,27 @@ function MediaContent({
 
   function showErrorToast(err: unknown) {
     const msg = formatErrorMessage(err);
+    const normalizedMessage = msg.toLowerCase();
     if (
-      msg.toLowerCase().includes('api key') ||
-      msg.toLowerCase().includes('configuration') ||
-      msg.toLowerCase().includes('missing provider') ||
-      msg.toLowerCase().includes('choose an audio provider')
+      normalizedMessage.includes('video & audio tool needs an update') ||
+      normalizedMessage.includes('video & audio tool not properly installed')
+    ) {
+      toast.error('Update Video & Audio to continue.', {
+        description:
+          'Your installed tool is out of date. Update it, then try adding the media again.',
+        duration: 10_000,
+        action: {
+          label: 'Update tool',
+          onClick: () => void updateVideoAudioTool(),
+        },
+      });
+      return;
+    }
+    if (
+      normalizedMessage.includes('api key') ||
+      normalizedMessage.includes('configuration') ||
+      normalizedMessage.includes('missing provider') ||
+      normalizedMessage.includes('choose an audio provider')
     ) {
       toast.error(msg, {
         duration: 10000,
@@ -713,6 +729,23 @@ function MediaContent({
       });
     } else {
       toast.error(msg);
+    }
+  }
+
+  async function updateVideoAudioTool() {
+    const toastId = toast.loading('Updating Video & Audio…');
+    try {
+      const response = await fetch('/api/marketplace/video-audio?force=true', { method: 'POST' });
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) throw new Error(body?.error || 'Could not update Video & Audio.');
+      toast.success('Video & Audio updated', {
+        id: toastId,
+        description: 'Try adding the media again.',
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not update Video & Audio.', {
+        id: toastId,
+      });
     }
   }
 

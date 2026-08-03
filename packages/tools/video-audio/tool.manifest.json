@@ -5,7 +5,7 @@
   "description": "Index video and audio files with transcription and frame analysis.",
   "longDescription": "Process long video and audio files for your knowledge base. Splits oversized Whisper uploads, captures scene-change-aware frames in a bounded pass, and supports local files, bounded direct URL downloads, and YouTube videos/playlists. Includes ffmpeg automatically; yt-dlp is only required for YouTube URLs.",
   "category": "media",
-  "version": "0.3.2",
+  "version": "0.3.4",
   "pricing": "free",
   "emoji": "🎬",
   "icon": "Film",
@@ -23,7 +23,7 @@
   "downloads": 0,
   "repositoryUrl": "https://github.com/Larkup-AI/larkup",
   "license": "Apache-2.0",
-  "updatedAt": "2026-07-20",
+  "updatedAt": "2026-08-03",
   "configSchema": [
     {
       "key": "frameInterval",

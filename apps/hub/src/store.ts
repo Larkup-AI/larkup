@@ -57,7 +57,7 @@ export function seedRegistry(): void {
         'and whole-media notes. Supports YouTube URLs, ' +
         'direct file upload, and bulk processing. Includes ffmpeg automatically; yt-dlp is only required for YouTube URLs.',
       category: 'media',
-      version: '0.3.2',
+      version: '0.3.4',
       pricing: 'free',
       emoji: '🎬',
       icon: 'Film',
