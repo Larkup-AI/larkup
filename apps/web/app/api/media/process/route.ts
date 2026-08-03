@@ -468,7 +468,7 @@ async function processMediaWithTool(
 ): Promise<void> {
   const tool = await loadTool<any>('video-audio');
   if (!tool) {
-    throw new Error('Failed to load Video & Audio tool');
+    throw new Error('The installed Video & Audio tool needs an update.');
   }
   await cleanupIncompleteMediaPublication(asset);
 

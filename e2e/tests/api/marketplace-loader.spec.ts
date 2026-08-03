@@ -3,11 +3,39 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadTool, unloadTool } from '../../../packages/marketplace/src/tool-loader';
+import { mergeToolDescriptors } from '../../../packages/marketplace/src/tool-registry';
+import type { ToolDescriptor } from '../../../packages/marketplace/src/types';
 import {
   getInstalledTools,
   isToolInstalled,
   uninstallTool,
 } from '../../../packages/marketplace/src/tool-installer';
+
+function videoTool(version: string): ToolDescriptor {
+  return {
+    id: 'video-audio',
+    name: 'Video & Audio',
+    description: 'Test tool',
+    category: 'media',
+    version,
+    pricing: 'free',
+    icon: 'Film',
+    packageName: '@larkup/tool-video-audio',
+    installSize: '~15 MB',
+    author: 'Larkup',
+    capabilities: [],
+    downloads: 0,
+  };
+}
+
+test('keeps a newer marketplace catalog entry when an installed tool manifest is stale', () => {
+  const merged = mergeToolDescriptors(
+    { 'video-audio': videoTool('0.3.4') },
+    { 'video-audio': videoTool('0.3.2') },
+  );
+
+  expect(merged['video-audio'].version).toBe('0.3.4');
+});
 
 test('bundled first-party tools are not marked installed until the user installs them', async () => {
   const originalCwd = process.cwd();

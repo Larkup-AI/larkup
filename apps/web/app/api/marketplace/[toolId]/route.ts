@@ -6,6 +6,7 @@ import {
   isToolInstalled,
   getInstalledTool,
 } from '@larkup/marketplace/installer';
+import { unloadTool } from '@larkup/marketplace/loader';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ toolId:
 }
 
 /** POST → install a tool. */
-export async function POST(_req: Request, { params }: { params: Promise<{ toolId: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ toolId: string }> }) {
   const { toolId } = await params;
   const descriptor = await getToolById(toolId);
   if (!descriptor) {
@@ -39,13 +40,20 @@ export async function POST(_req: Request, { params }: { params: Promise<{ toolId
   }
 
   const alreadyInstalled = await isToolInstalled(toolId);
-  if (alreadyInstalled) {
+  const forceUpdate = new URL(req.url).searchParams.get('force') === 'true';
+  if (alreadyInstalled && !forceUpdate) {
     return NextResponse.json({ status: 'already-installed' });
   }
 
   try {
     await installTool(toolId);
-    return NextResponse.json({ status: 'installed' }, { status: 201 });
+    // A successful re-install may have replaced the package's ESM files.
+    // Ensure the next media job imports the new module rather than a cached one.
+    unloadTool(toolId);
+    return NextResponse.json(
+      { status: alreadyInstalled ? 'updated' : 'installed' },
+      { status: alreadyInstalled ? 200 : 201 },
+    );
   } catch (err) {
     let message = err instanceof Error ? err.message : 'Install failed.';
 

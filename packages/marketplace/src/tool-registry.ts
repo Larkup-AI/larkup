@@ -24,6 +24,46 @@ import { DEFAULT_HUB_URL } from './types';
 let cachedRegistry: Record<string, ToolDescriptor> | null = null;
 
 /**
+ * Compare the numeric portions of two semver versions. Marketplace manifests
+ * use stable releases, but accepting a suffix keeps a pre-release catalog
+ * entry from incorrectly outranking its corresponding stable release.
+ */
+function compareToolVersions(left: string, right: string): number {
+  const parse = (version: string) => {
+    const [core, suffix = ''] = version.split('-', 2);
+    const parts = core.split('.').map((part) => Number.parseInt(part, 10) || 0);
+    return { parts, stable: suffix.length === 0 };
+  };
+  const a = parse(left);
+  const b = parse(right);
+  const length = Math.max(a.parts.length, b.parts.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (a.parts[index] ?? 0) - (b.parts[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  if (a.stable === b.stable) return 0;
+  return a.stable ? 1 : -1;
+}
+
+/**
+ * Merge catalog entries without allowing an older Hub response or an already
+ * installed package to downgrade the version users are offered.
+ */
+export function mergeToolDescriptors(
+  current: Record<string, ToolDescriptor>,
+  incoming: Record<string, ToolDescriptor>,
+): Record<string, ToolDescriptor> {
+  const merged = { ...current };
+  for (const [id, descriptor] of Object.entries(incoming)) {
+    const existing = merged[id];
+    if (!existing || compareToolVersions(descriptor.version, existing.version) >= 0) {
+      merged[id] = descriptor;
+    }
+  }
+  return merged;
+}
+
+/**
  * Scan workspace tool directories for `tool.manifest.json` files.
  * This is used in monorepo development and in Docker builds where
  * tools are bundled at build time.
@@ -143,7 +183,7 @@ const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
     name: 'Video & Audio',
     description: 'Index video and audio files with transcription and frame analysis.',
     category: 'media',
-    version: '0.3.2',
+    version: '0.3.4',
     pricing: 'free',
     emoji: '🎬',
     icon: 'Film',
@@ -257,19 +297,19 @@ export async function buildRegistry(opts?: {
 }): Promise<Record<string, ToolDescriptor>> {
   if (cachedRegistry) return cachedRegistry;
 
-  // Start with hardcoded fallback
-  const registry = { ...FALLBACK_REGISTRY };
+  // Start with hardcoded fallback.
+  let registry = { ...FALLBACK_REGISTRY };
 
   // Layer Hub API catalog over the offline fallback.
   if (!opts?.skipHub) {
     const hubCatalog = await fetchHubCatalog(opts?.hubUrl);
-    Object.assign(registry, hubCatalog);
+    registry = mergeToolDescriptors(registry, hubCatalog);
   }
 
-  // Local (including installed) manifests are the source of truth. This also
-  // prevents a stale Hub descriptor from reintroducing obsolete system deps.
+  // A local workspace manifest wins on equal versions, while an older
+  // installed package cannot hide a newer catalog release that repairs it.
   const localManifests = await discoverLocalManifests();
-  Object.assign(registry, localManifests);
+  registry = mergeToolDescriptors(registry, localManifests);
 
   cachedRegistry = registry;
   return registry;
