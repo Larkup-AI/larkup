@@ -1,18 +1,18 @@
-import { Hono } from "hono";
-import { handle } from "hono/vercel";
-import notionRoute from "./routes/notion.js";
+import { Hono } from 'hono';
+import { handle } from 'hono/vercel';
+import oauthRoute from './routes/oauth.js';
 
 const app = new Hono();
 
-app.get("/", (c) => c.text("Larkup OAuth Proxy API is running."));
+app.get('/', (c) => c.text('Larkup OAuth Proxy API is running.'));
 
 const apiApp = new Hono();
-apiApp.get("/health", (c) => c.json({ status: "ok", service: "larkup-proxy" }));
+apiApp.get('/health', (c) => c.json({ status: 'ok', service: 'larkup-proxy' }));
 
-// Register integrations routes
-apiApp.route("/oauth/notion", notionRoute);
+// Registry-backed OAuth routes: /api/oauth/:integration and callback.
+apiApp.route('/oauth', oauthRoute);
 
-app.route("/api", apiApp);
+app.route('/api', apiApp);
 
 export const GET = handle(app);
 export const POST = handle(app);
