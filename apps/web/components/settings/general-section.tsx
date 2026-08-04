@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { Loader2, Save, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Save, Eye, EyeOff, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -24,10 +25,26 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { useWorkspace } from '@/components/workspace/workspace-provider';
-import Image from 'next/image';
-import { Tabs, TabsTrigger, TabsList, TabsContent } from '../ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  useThemeCustomizer,
+  type ThemeVariant,
+  type LayoutVariant,
+} from '@/components/theme-customizer-provider';
+
+const THEMES: { id: ThemeVariant; name: string; color: string; description: string }[] = [
+  { id: 'default', name: 'Default', color: '#000000', description: 'Clean & minimal gray palette' },
+  {
+    id: 'theme-gaia',
+    name: 'Larkup',
+    color: '#e6d343ff',
+    description: 'Warm ivory with dark accents',
+  },
+];
+
+const LAYOUTS: { id: LayoutVariant; name: string; description: string }[] = [
+  { id: 'sidebar', name: 'Sidebar Navigation', description: 'Classic left sidebar layout' },
+  { id: 'topnav', name: 'Top Navigation', description: 'Horizontal navigation bar' },
+];
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
@@ -36,6 +53,7 @@ export function GeneralSection() {
   const [form, setForm] = useState<Partial<RagConfig>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const { username, setUsername } = useWorkspace();
+  const { theme, setTheme, layout, setLayout, isMounted } = useThemeCustomizer();
   const [localName, setLocalName] = useState(username || '');
   const [showApiKey, setShowApiKey] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -44,6 +62,29 @@ export function GeneralSection() {
     status: 'success' | 'error' | null;
     message?: string;
   }>({ status: null });
+
+  const [persistedTheme, setPersistedTheme] = useState<string | null>(null);
+  const [persistedLayout, setPersistedLayout] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isMounted) {
+      setPersistedTheme(localStorage.getItem('app-theme') || 'default');
+      setPersistedLayout(localStorage.getItem('app-layout') || 'sidebar');
+    }
+  }, [isMounted]);
+
+  const dirtyAppearance =
+    persistedTheme !== null &&
+    persistedLayout !== null &&
+    (theme !== persistedTheme || layout !== persistedLayout);
+
+  const handleSaveAppearance = () => {
+    setTheme(theme, true);
+    setLayout(layout, true);
+    setPersistedTheme(theme);
+    setPersistedLayout(layout);
+    toast.success('Appearance settings saved');
+  };
 
   useEffect(() => {
     if (data?.config) setForm(data.config);
@@ -231,509 +272,70 @@ export function GeneralSection() {
         </CardFooter>
       </Card>
 
-      {/* Web Search */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Web Search</CardTitle>
-          <CardDescription className="text-xs">
-            Enable AI-powered web search for enriched answers.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Web Search Provider</Label>
-            <Select
-              value={form.webSearchProvider || 'tavily'}
-              onValueChange={(value) => {
-                setForm({ ...form, webSearchProvider: value as any });
-                setVerifyStatus({ status: null });
-              }}
-            >
-              <SelectTrigger className=" w-full">
-                <div className="flex items-center gap-2">
-                  {/* {form.webSearchProvider === 'google' && <Image src="/icons/google.png" alt="Google" width={16} height={16} />} */}
-                  {form.webSearchProvider === 'serper' && (
-                    <Image src="/icons/serper.png" alt="Serper" width={16} height={16} />
-                  )}
-                  {form.webSearchProvider === 'tavily' && (
-                    <Image src="/icons/tavily.png" alt="Tavily" width={16} height={16} />
-                  )}
-                  {form.webSearchProvider === 'brave' && (
-                    <Image src="/icons/brave.png" alt="Brave" width={16} height={16} />
-                  )}
-                  {form.webSearchProvider === 'bing' && (
-                    <Image src="/icons/serpapi.svg" alt="SerpApi" width={16} height={16} />
-                  )}
-                  {form.webSearchProvider === 'exa' && (
-                    <Image src="/icons/exa.png" alt="Exa" width={16} height={16} />
-                  )}
-                  {form.webSearchProvider === 'local' && (
-                    <Image src="/icons/firecrawl.png" alt="Local" width={16} height={16} />
-                  )}
-                  <SelectValue placeholder="Select provider" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="serper">
-                  <div className="flex items-center gap-2">
-                    <Image src="/icons/serper.png" alt="Serper" width={16} height={16} />
-                    <span>Serper</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="tavily">
-                  <div className="flex items-center gap-2">
-                    <Image src="/icons/tavily.png" alt="Tavily" width={16} height={16} />
-                    <span>Tavily</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="brave">
-                  <div className="flex items-center gap-2">
-                    <Image src="/icons/brave.png" alt="Brave" width={16} height={16} />
-                    <span>Brave</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="bing">
-                  <div className="flex items-center gap-2">
-                    <Image src="/icons/serpapi.svg" alt="SerpApi" width={16} height={16} />
-                    <span>Bing (via SerpApi)</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="exa">
-                  <div className="flex items-center gap-2">
-                    <Image src="/icons/exa.png" alt="Exa" width={16} height={16} />
-                    <span>Exa</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="local">
-                  <div className="flex items-center gap-2">
-                    <Image src="/icons/firecrawl.png" alt="Local Crawler" width={16} height={16} />
-                    <span>Local (Firecrawl)</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {form.webSearchProvider !== 'local' && (
-            <div className="space-y-1.5 pt-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">
-                  {form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
-                    ? 'Serper API Key'
-                    : form.webSearchProvider === 'brave'
-                    ? 'Brave API Key'
-                    : form.webSearchProvider === 'bing'
-                    ? 'SerpApi API Key'
-                    : form.webSearchProvider === 'exa'
-                    ? 'Exa API Key'
-                    : 'Tavily API Key'}
-                </Label>
-                {verifyStatus.status === 'success' && (
-                  <span className="text-[10px] text-green-500 font-medium">✓ Verified</span>
-                )}
-                {verifyStatus.status === 'error' && (
-                  <span className="text-[10px] text-red-500 font-medium truncate max-w-37.5">
-                    {verifyStatus.message}
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    type={showApiKey ? 'text' : 'password'}
-                    className="text-sm pr-10"
-                    value={
-                      form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
-                        ? form.serperApiKey || ''
-                        : form.webSearchProvider === 'brave'
-                        ? form.braveApiKey || ''
-                        : form.webSearchProvider === 'bing'
-                        ? form.bingApiKey || ''
-                        : form.webSearchProvider === 'exa'
-                        ? form.exaApiKey || ''
-                        : form.tavilyApiKey || ''
-                    }
-                    onChange={(e) => {
-                      setVerifyStatus({ status: null });
-                      if (
-                        form.webSearchProvider === 'serper' ||
-                        form.webSearchProvider === 'google'
-                      ) {
-                        setForm({ ...form, serperApiKey: e.target.value });
-                      } else if (form.webSearchProvider === 'brave') {
-                        setForm({ ...form, braveApiKey: e.target.value });
-                      } else if (form.webSearchProvider === 'bing') {
-                        setForm({ ...form, bingApiKey: e.target.value });
-                      } else if (form.webSearchProvider === 'exa') {
-                        setForm({ ...form, exaApiKey: e.target.value });
-                      } else {
-                        setForm({ ...form, tavilyApiKey: e.target.value });
-                      }
-                    }}
-                    placeholder={
-                      form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
-                        ? 'Your Serper API Key'
-                        : form.webSearchProvider === 'brave'
-                        ? 'Your Brave API Key'
-                        : form.webSearchProvider === 'bing'
-                        ? 'Your SerpApi API Key'
-                        : form.webSearchProvider === 'exa'
-                        ? 'Your Exa API Key'
-                        : 'Your Tavily API Key'
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                  >
-                    {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </Button>
-                </div>
-                <Button
-                  className={'rounded-lg'}
-                  variant="outline"
-                  size="default"
-                  onClick={handleVerify}
-                  disabled={verifying}
-                >
-                  {verifying ? <Loader2 className="size-4 animate-spin" /> : 'Verify'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-end pt-4 border-t">
-          <Button
-            size="sm"
-            disabled={saving === 'webSearch' || !dirtyWebSearch}
-            onClick={() => handleSave('webSearch')}
-            className="gap-1.5"
-          >
-            {saving === 'webSearch' ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Save className="size-3.5" />
-            )}
-            Save
-          </Button>
-        </CardFooter>
-      </Card>
-
-      {/* Web Scraper Provider */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Web Scraper</CardTitle>
-          <CardDescription className="text-xs">
-            Choose the web crawler used to search and import websites.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Web Scraper Provider</Label>
-            <Select
-              value={form.webCrawlerProvider || 'local'}
-              onValueChange={(val) => {
-                setForm({ ...form, webCrawlerProvider: val as 'local' | 'cloud' });
-                setVerifyCrawlerStatus({ status: null });
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <div className="flex items-center gap-2">
-                  <Image src="/icons/firecrawl.png" alt="Web crawler" width={16} height={16} />
-                  <span>
-                    {form.webCrawlerProvider === 'cloud'
-                      ? 'Cloud web crawler'
-                      : 'Local web crawler'}
-                  </span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="local">
-                  <div className="flex items-center gap-2">
-                    <Image
-                      src="/icons/firecrawl.png"
-                      alt="Local web crawler"
-                      width={16}
-                      height={16}
-                    />
-                    <span>Local web crawler</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="cloud">
-                  <div className="flex items-center gap-2">
-                    <Image
-                      src="/icons/firecrawl.png"
-                      alt="Cloud web crawler"
-                      width={16}
-                      height={16}
-                    />
-                    <span>Cloud web crawler</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {form.webCrawlerProvider === 'cloud' && (
-            <div className="space-y-1.5 pt-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Web crawler API key</Label>
-                {verifyCrawlerStatus.status === 'success' && (
-                  <span className="text-[10px] text-green-500 font-medium">✓ Verified</span>
-                )}
-                {verifyCrawlerStatus.status === 'error' && (
-                  <span className="text-[10px] text-red-500 font-medium truncate max-w-37.5">
-                    {verifyCrawlerStatus.message}
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    type={showApiKey ? 'text' : 'password'}
-                    className="text-sm pr-10"
-                    value={form.firecrawlApiKey || ''}
-                    onChange={(e) => {
-                      setVerifyCrawlerStatus({ status: null });
-                      setForm({ ...form, firecrawlApiKey: e.target.value });
-                    }}
-                    placeholder="fc-..."
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                  >
-                    {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </Button>
-                </div>
-                <Button
-                  className="rounded-lg"
-                  variant="outline"
-                  size="default"
-                  disabled={verifyingCrawler}
-                  onClick={handleVerifyCrawler}
-                >
-                  {verifyingCrawler ? <Loader2 className="size-4 animate-spin" /> : 'Verify'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-end pt-4 border-t">
-          <Button
-            size="sm"
-            disabled={saving === 'webCrawler' || !dirtyWebCrawler}
-            onClick={() => handleSave('webCrawler')}
-            className="gap-1.5"
-          >
-            {saving === 'webCrawler' ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Save className="size-3.5" />
-            )}
-            Save
-          </Button>
-        </CardFooter>
-      </Card>
-
-      {/* Proxy Settings */}
-      <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-          <div className="space-y-1.5">
-            <CardTitle className="text-sm">Local Proxy Settings</CardTitle>
+      {/* Appearance */}
+      {isMounted && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Appearance</CardTitle>
             <CardDescription className="text-xs">
-              Configure proxy settings for the local scraper.
+              Customize the theme and layout of your workspace.
             </CardDescription>
-          </div>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={form.useScraperProxy || false}
-                      onCheckedChange={(checked) => setForm({ ...form, useScraperProxy: checked })}
-                    />
-                  </div>
-                }
-              />
-              <TooltipContent>
-                <p>Enable proxy for web scraping</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Tabs defaultValue="one-line" className="w-full ">
-            <div className="flex mb-4">
-              <TabsList className="grid w-35 grid-cols-2 h-8! bg-muted/10">
-                <TabsTrigger value="one-line" className="text-xs h-6">
-                  One Line
-                </TabsTrigger>
-                <TabsTrigger value="form" className="text-xs h-6">
-                  Form
-                </TabsTrigger>
-              </TabsList>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-3">
+              <Label className="text-xs">Theme</Label>
+              <Select value={theme} onValueChange={(val) => setTheme(val as ThemeVariant, false)}>
+                <SelectTrigger className="w-full text-sm">
+                  <SelectValue placeholder="Select theme" />
+                </SelectTrigger>
+                <SelectContent>
+                  {THEMES.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-3 w-3 rounded-full border border-border/50"
+                          style={{ background: t.color }}
+                        />
+                        <span>{t.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <TabsContent value="one-line" className="mt-0 w-full">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Proxy URL</Label>
-                <Input
-                  className="text-sm"
-                  value={(() => {
-                    if (!form.scraperProxyServer) return '';
-                    try {
-                      const url = new URL(form.scraperProxyServer);
-                      if (form.scraperProxyUsername)
-                        url.username = encodeURIComponent(form.scraperProxyUsername);
-                      if (form.scraperProxyPassword)
-                        url.password = encodeURIComponent(form.scraperProxyPassword);
-                      return url.toString().replace(/\/$/, '');
-                    } catch {
-                      return form.scraperProxyServer;
-                    }
-                  })()}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    let server = val;
-                    let username = '';
-                    let password = '';
-                    const trimmed = val.trim();
-                    if (trimmed) {
-                      try {
-                        const url = new URL(trimmed);
-                        if (url.username || url.password) {
-                          username = decodeURIComponent(url.username);
-                          password = decodeURIComponent(url.password);
-                          url.username = '';
-                          url.password = '';
-                          server = url.toString().replace(/\/$/, '');
-                        }
-                      } catch {
-                        const parts = trimmed.split(':');
-                        if (parts.length === 4 && !trimmed.startsWith('http')) {
-                          server = `http://${parts[0]}:${parts[1]}`;
-                          username = parts[2];
-                          password = parts[3];
-                        }
-                      }
-                    }
-                    setForm({
-                      ...form,
-                      scraperProxyServer: server,
-                      scraperProxyUsername: username,
-                      scraperProxyPassword: password,
-                    });
-                  }}
-                  placeholder="http://proxy.example.com:8080 (or paste one-liner)"
-                />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="form" className="mt-0 space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Proxy Server</Label>
-                <Input
-                  className="text-sm"
-                  value={form.scraperProxyServer || ''}
-                  onChange={(e) => setForm({ ...form, scraperProxyServer: e.target.value })}
-                  placeholder="http://proxy.example.com:8080"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Proxy Username</Label>
-                  <Input
-                    className="text-sm"
-                    value={form.scraperProxyUsername || ''}
-                    onChange={(e) => setForm({ ...form, scraperProxyUsername: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Proxy Password</Label>
-                  <div className="relative">
-                    <Input
-                      type={showProxyPassword ? 'text' : 'password'}
-                      className="text-sm pr-10"
-                      value={form.scraperProxyPassword || ''}
-                      onChange={(e) => setForm({ ...form, scraperProxyPassword: e.target.value })}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
-                      onClick={() => setShowProxyPassword(!showProxyPassword)}
-                    >
-                      {showProxyPassword ? (
-                        <EyeOff className="size-4" />
-                      ) : (
-                        <Eye className="size-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-        <CardFooter className="flex justify-end gap-2 pt-4 border-t">
-          <Button
-            className="rounded-lg gap-2"
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              const promise = (async () => {
-                if (!form.scraperProxyServer) {
-                  throw new Error('Proxy server is required');
-                }
-                const res = await fetch('/api/proxy/verify', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    server: form.scraperProxyServer,
-                    username: form.scraperProxyUsername,
-                    password: form.scraperProxyPassword,
-                  }),
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                  throw new Error(data.error || 'Proxy verification failed');
-                }
-                return data;
-              })();
-
-              toast.promise(promise, {
-                loading: 'Verifying proxy...',
-                success: 'Proxy configuration is valid!',
-                error: (err) => err.message || 'Proxy verification failed',
-              });
-            }}
-          >
-            Verify Proxy
-          </Button>
-          <Button
-            size="sm"
-            disabled={saving === 'proxy' || !dirtyProxy}
-            onClick={() => handleSave('proxy')}
-            className="gap-1.5"
-          >
-            {saving === 'proxy' ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
+            <div className="space-y-3">
+              <Label className="text-xs">Navigation Style</Label>
+              <Select
+                value={layout}
+                onValueChange={(val) => setLayout(val as LayoutVariant, false)}
+              >
+                <SelectTrigger className="w-full text-sm">
+                  <SelectValue placeholder="Select layout" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LAYOUTS.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-end pt-4 border-t">
+            <Button
+              size="sm"
+              disabled={!dirtyAppearance}
+              onClick={handleSaveAppearance}
+              className="gap-1.5"
+            >
               <Save className="size-3.5" />
-            )}
-            Save
-          </Button>
-        </CardFooter>
-      </Card>
+              Save
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
     </div>
   );
 }

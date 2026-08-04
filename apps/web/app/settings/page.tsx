@@ -8,7 +8,7 @@ import { ModelsSection } from '@/components/settings/models-section';
 import { ServerSection } from '@/components/settings/server-section';
 import { PromptsSection } from '@/components/settings/prompts-section';
 import { PlaygroundSection } from '@/components/settings/playground-section';
-import { AppearanceSection } from '@/components/settings/appearance-section';
+import { SearchIntegrationsSection } from '@/components/settings/search-integrations-section';
 import { StorageSection } from '@/components/settings/storage-section';
 import { ConnectionsSection } from '@/components/settings/connections-section';
 import { DeploymentSection } from '@/components/settings/deployment-section';
@@ -69,7 +69,7 @@ function SettingsContent() {
       {activeSection === 'tool-settings' && <MarketplaceToolsSettings />}
       {activeSection === 'prompts' && <PromptsSection />}
       {activeSection === 'playground' && <PlaygroundSection />}
-      {activeSection === 'appearance' && <AppearanceSection />}
+      {activeSection === 'search-web' && <SearchIntegrationsSection />}
       {activeSection === 'analytics' && (
         <section className="space-y-6">
           <div>
