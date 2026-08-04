@@ -141,7 +141,8 @@ export function retrievalToolsForStep<ToolName extends string>(options: {
   }
   if (stepNumber === 0 && forceWebSearch) return { activeTools: without('webSearch') };
   if (stepNumber === 0) {
-    return { activeTools: without('webSearch', 'searchKnowledgeBase') };
+    // If not forced, allow the model to choose searchKnowledgeBase natively on follow-ups
+    return { activeTools: without('webSearch') };
   }
   if (stepNumber === 1 && forceKnowledgeBaseSearch) {
     return { activeTools: without('searchKnowledgeBase', 'webSearch') };

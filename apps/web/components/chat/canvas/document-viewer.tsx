@@ -212,7 +212,7 @@ export function DocumentViewer() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
-              className="mx-auto max-w-2xl rounded-xl border border-border bg-white dark:bg-card p-8 shadow-sm"
+              className="mx-auto max-w-2xl rounded-xl border border-border bg-white dark:bg-card p-8 35"
               style={{
                 aspectRatio: '16/9',
                 transform: `scale(${zoom / 100})`,

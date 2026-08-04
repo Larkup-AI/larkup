@@ -727,7 +727,7 @@ export function UploadPanel({
       )}
 
       {progress && (
-        <div className="space-y-2">
+        <div className="space-y-2 mb-4">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{progress.message || 'Processing...'}</span>
             <span className="tabular-nums font-mono">

@@ -138,17 +138,17 @@ interface ChatStatus {
   suggestions: string[];
 }
 
-export function ChatWorkspace() {
+export function ChatWorkspace({ chatId }: { chatId?: string } = {}) {
   return (
     <DocEditorProvider>
       <DocumentCanvas>
-        <ChatWorkspaceInner />
+        <ChatWorkspaceInner chatId={chatId} />
       </DocumentCanvas>
     </DocEditorProvider>
   );
 }
 
-function ChatWorkspaceInner() {
+function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   const { activeServer } = useWorkspace();
   const { sessionId, parsedDocument, openCanvas, isLoading: isDocLoading } = useDocEditor();
   const docEditorState = { sessionId, fields: parsedDocument?.fields || [] };
@@ -184,9 +184,10 @@ function ChatWorkspaceInner() {
     el.style.height = `${el.scrollHeight}px`;
   }, [input]);
 
-  const [currentChatId, setCurrentChatId] = useState<string>('');
+  const [currentChatId, setCurrentChatId] = useState<string>(chatId || '');
   const [history, setHistory] = useState<{ id: string; title: string; updatedAt: number }[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isInitializingChat, setIsInitializingChat] = useState(!!chatId);
 
   // Load history on mount
   useEffect(() => {
@@ -269,6 +270,22 @@ function ChatWorkspaceInner() {
   } = useChat({
     transport,
   });
+
+  // Initialize specific chat if ID is provided via prop
+  useEffect(() => {
+    if (chatId) {
+      setIsInitializingChat(true);
+      get(`chat_messages_${chatId}`).then((msgs) => {
+        if (msgs) {
+          setMessages(msgs);
+          setCurrentChatId(chatId);
+        }
+        setIsInitializingChat(false);
+      });
+    } else {
+      setIsInitializingChat(false);
+    }
+  }, [chatId, setMessages]);
 
   useEffect(() => {
     if (pendingMessage && docEditorState.sessionId && !isDocLoading) {
@@ -363,6 +380,10 @@ function ChatWorkspaceInner() {
       }
 
       set(`chat_messages_${activeId}`, currentMessages);
+
+      if (window.location.pathname === '/chat') {
+        window.history.replaceState(null, '', `/chat/${activeId}`);
+      }
 
       setHistory((prev) => {
         const existing = prev.find((p) => p.id === activeId);
@@ -518,6 +539,7 @@ function ChatWorkspaceInner() {
     setMessages([]);
     setInput('');
     setCurrentChatId(crypto.randomUUID());
+    window.history.pushState(null, '', '/chat');
   }
 
   useEffect(() => {
@@ -566,6 +588,7 @@ function ChatWorkspaceInner() {
       setMessages(msgs);
       setCurrentChatId(id);
       setIsHistoryOpen(false);
+      window.history.pushState(null, '', `/chat/${id}`);
     }
   }
 
@@ -580,6 +603,7 @@ function ChatWorkspaceInner() {
       setMessages([]);
       setInput('');
       setCurrentChatId('');
+      window.history.pushState(null, '', '/chat');
     }
   }
 
@@ -640,7 +664,7 @@ function ChatWorkspaceInner() {
     [openCanvas],
   );
 
-  const isEmpty = messages.length === 0;
+  const isEmpty = messages.length === 0 && !isInitializingChat;
   const ready = status?.ready ?? false;
   const selectedModelData = status?.availableModels?.find((m) => m.id === selectedModel);
 
@@ -938,13 +962,13 @@ function ChatWorkspaceInner() {
               <p className="max-w-md text-sm leading-relaxed text-muted-foreground text-pretty">
                 Ask questions and get AI-powered answers grounded in your indexed documents.
               </p>
-              {!status?.indexed && (
+              {/* {!status?.indexed && (
                 <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
                   <TriangleAlert className="size-3.5 shrink-0" />
-                  No documents indexed yet, add documents in the Docs page. The agent can still
-                  answer general questions.
+                  No documents indexed yet. Add documents in the Docs page to get grounded answers
+                  with source citations.
                 </div>
-              )}
+              )} */}
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 {status?.suggestions && status.suggestions.length > 0 ? (
                   status.suggestions.map((s) => (
@@ -976,10 +1000,11 @@ function ChatWorkspaceInner() {
                   serverId={serverId}
                 />
               ))}
-              {chatStatus === 'submitted' ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-foreground" />
-                  Thinking…
+              {chatStatus === 'submitted' || isInitializingChat ? (
+                <div className="flex items-center gap-2">
+                  <div className="size-7 bg-white border border-border rounded-full flex items-center justify-center p-1 animate-pulse">
+                    <img src="/logo.png" alt="logo" className="size-4 animate-spin" />
+                  </div>
                 </div>
               ) : null}
               {error

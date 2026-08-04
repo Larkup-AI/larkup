@@ -26,7 +26,10 @@ export function useNotionAuth({ onSuccess, onError }: UseNotionAuthOptions = {})
   const connectToNotion = (onClosePopup?: () => void) => {
     const customAuthUrl =
       process.env.NEXT_PUBLIC_NOTION_AUTHORIZATION_URL ||
-      'https://larkup-proxy.vercel.app/api/oauth/notion';
+      `${
+        process.env.NEXT_PUBLIC_INTEGRATIONS_PROXY_URL ||
+        'https://larkup-proxy.vercel.app/api/oauth'
+      }/notion`;
 
     const redirectUri = `${window.location.origin}/api/integrations/notion/callback`;
     const authUrl = `${customAuthUrl}?redirect_to=${encodeURIComponent(redirectUri)}`;

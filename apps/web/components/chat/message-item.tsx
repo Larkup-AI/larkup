@@ -15,7 +15,8 @@ import {
 } from '@/components/chat/tools/corpus-data-result';
 import { ChatSignatureRequest } from '@/components/chat/tools/chat-signature-request';
 import { Sparkles, FileEdit, CheckCircle2, Globe, ChevronDown } from 'lucide-react';
-import { ChatMediaPreview, parseMediaRefs } from '@/components/chat/tools/chat-media-preview';
+import { ChatMediaPreview } from '@/components/chat/tools/chat-media-preview';
+import { KnowledgeBaseResult } from '@/components/chat/tools/knowledge-base-result';
 import { useDocEditor } from '@/components/chat/canvas/doc-editor-provider';
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/chat/reasoning';
 
@@ -47,515 +48,6 @@ function FollowUpButtons({
     </div>
   );
 }
-
-interface ParsedTable {
-  columns: string[];
-  rows: Record<string, any>[];
-}
-
-function splitTextAndTables(
-  text: string,
-): Array<{ type: 'text'; content: string } | { type: 'table'; table: ParsedTable }> {
-  if (!text) return [];
-
-  const lines = text.split('\n');
-  const segments: Array<{ type: 'text'; content: string } | { type: 'table'; table: ParsedTable }> =
-    [];
-  let currentText: string[] = [];
-  let tableLines: string[] = [];
-  let inTable = false;
-
-  const isTableRow = (line: string) => {
-    const trimmed = line.trim();
-    return trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2;
-  };
-
-  const isSeparatorRow = (line: string) => /^\|[\s\-:|]+\|$/.test(line.trim());
-
-  const flushText = () => {
-    if (currentText.length > 0) {
-      const content = currentText.join('\n').trim();
-      if (content) {
-        segments.push({ type: 'text', content });
-      }
-      currentText = [];
-    }
-  };
-
-  const flushTable = () => {
-    if (tableLines.length < 2) {
-      currentText.push(...tableLines);
-      tableLines = [];
-      return;
-    }
-
-    const headerLine = tableLines[0];
-    const columns = headerLine
-      .split('|')
-      .map((c) => c.trim())
-      .filter(Boolean);
-
-    let dataStart = 1;
-    if (tableLines.length > 1 && isSeparatorRow(tableLines[1])) {
-      dataStart = 2;
-    }
-
-    const rows: Record<string, any>[] = [];
-    for (let i = dataStart; i < tableLines.length; i++) {
-      const rawCells = tableLines[i]
-        .split('|')
-        .slice(1, -1)
-        .map((c) => c.trim());
-
-      const row: Record<string, any> = {};
-      columns.forEach((col, j) => {
-        const val = rawCells[j] ?? '';
-        const num = Number(val);
-        row[col] = !isNaN(num) && val !== '' ? num : val;
-      });
-      rows.push(row);
-    }
-
-    if (columns.length > 0 && rows.length > 0) {
-      segments.push({
-        type: 'table',
-        table: { columns, rows },
-      });
-    }
-    tableLines = [];
-  };
-
-  for (const line of lines) {
-    if (isTableRow(line)) {
-      if (!inTable) {
-        flushText();
-        inTable = true;
-      }
-      if (!isSeparatorRow(line) || tableLines.length === 1) {
-        tableLines.push(line);
-      } else if (isSeparatorRow(line)) {
-        tableLines.push(line);
-      }
-    } else {
-      if (inTable) {
-        flushTable();
-        inTable = false;
-      }
-      currentText.push(line);
-    }
-  }
-
-  if (inTable) {
-    flushTable();
-  }
-  flushText();
-
-  return segments;
-}
-
-/* ------------------------------------------------------------------ */
-/* Strip <think> tags from LLM output and extract reasoning text        */
-/* ------------------------------------------------------------------ */
-
-/**
- * Extracts `<think>…</think>` blocks from raw LLM text.
- * Returns the cleaned text (with think blocks removed) and the
- * concatenated reasoning content. Handles:
- * - Complete `<think>…</think>` blocks
- * - Unclosed `<think>…` blocks (streaming / partial output)
- * - Multiple think blocks in the same text
- */
-function stripThinkTags(text: string): { cleanText: string; reasoningText: string } {
-  if (!text) return { cleanText: '', reasoningText: '' };
-
-  const reasoningParts: string[] = [];
-  let cleaned = text;
-
-  // Extract complete <think>…</think> blocks
-  const completeRegex = /<think>([\s\S]*?)<\/think>/gi;
-  let match;
-  while ((match = completeRegex.exec(cleaned)) !== null) {
-    reasoningParts.push(match[1].trim());
-  }
-  cleaned = cleaned.replace(completeRegex, '');
-
-  // Extract unclosed <think>… (streaming, no closing tag yet)
-  const unclosedRegex = /<think>([\s\S]*)$/i;
-  const unclosedMatch = cleaned.match(unclosedRegex);
-  if (unclosedMatch) {
-    reasoningParts.push(unclosedMatch[1].trim());
-    cleaned = cleaned.replace(unclosedRegex, '');
-  }
-
-  return {
-    cleanText: cleaned.trim(),
-    reasoningText: reasoningParts.filter(Boolean).join('\n\n'),
-  };
-}
-
-/* ------------------------------------------------------------------ */
-/* Tool part helpers — unified state detection                         */
-/* ------------------------------------------------------------------ */
-
-/** Extract normalized tool info from a part, handling ALL AI SDK format variants. */
-function getToolInfo(part: any): {
-  toolName: string;
-  isExecuting: boolean;
-  isCompleted: boolean;
-  output: any;
-  input: any;
-} {
-  if (part.type === 'tool-invocation') {
-    const ti = part.toolInvocation;
-    const state = ti.state;
-    return {
-      toolName: ti.toolName,
-      isExecuting: state === 'partial-call' || state === 'call',
-      isCompleted:
-        (state === 'result' || state === 'output' || state === 'output-available') &&
-        ti.result !== undefined,
-      output: ti.result,
-      input: ti.args,
-    };
-  }
-
-  if (part.type?.startsWith('tool-') && part.type !== 'tool-invocation') {
-    const toolName = part.type.replace('tool-', '');
-    const state = part.state;
-    return {
-      toolName,
-      isExecuting: state === 'input-streaming' || state === 'input-available',
-      isCompleted:
-        (state === 'output' || state === 'output-available') && part.output !== undefined,
-      output: part.output,
-      input: part.input,
-    };
-  }
-
-  return {
-    toolName: '',
-    isExecuting: false,
-    isCompleted: false,
-    output: undefined,
-    input: undefined,
-  };
-}
-
-/* ------------------------------------------------------------------ */
-/* Tool part renderers                                                 */
-/* ------------------------------------------------------------------ */
-
-function renderToolPart(
-  part: any,
-  index: number,
-  addToolResult?: Function,
-  updateFromToolResult?: Function,
-): React.ReactNode | null {
-  const { toolName, isExecuting, isCompleted, output, input } = getToolInfo(part);
-
-  // Still executing — show loading indicator
-  if (isExecuting) {
-    if (toolName === 'searchKnowledgeBase') return null;
-
-    if (toolName === 'requestDocumentSignature') {
-      const callId = part.toolInvocation?.toolCallId || part.toolCallId || part.id || '';
-      return (
-        <ChatSignatureRequest
-          key={index}
-          detectedLocations={input?.detectedLocations}
-          toolCallId={callId}
-          addToolResult={addToolResult}
-        />
-      );
-    }
-
-    return (
-      <div
-        key={index}
-        className="flex items-center gap-2.5 py-3 text-[13px] text-muted-foreground animate-pulse"
-      >
-        <Sparkles className="size-4 text-foreground/60" />
-        <span className="font-medium text-foreground/80">
-          {toolName === 'queryTabularData' && 'Querying data...'}
-          {toolName === 'generateVisualization' && 'Generating chart...'}
-          {toolName === 'executeAnalysis' && 'Running analysis...'}
-          {toolName === 'getIndexedData' && 'Fetching corpus data...'}
-          {toolName === 'analyzeCorpusWithCode' && 'Analyzing corpus...'}
-          {toolName === 'fillDocumentForm' && 'Filling form fields...'}
-          {toolName === 'editDocument' && 'Editing document...'}
-          {toolName === 'requestDocumentSignature' && 'Processing signature request...'}
-          {![
-            'queryTabularData',
-            'generateVisualization',
-            'executeAnalysis',
-            'getIndexedData',
-            'analyzeCorpusWithCode',
-            'fillDocumentForm',
-            'editDocument',
-            'requestDocumentSignature',
-          ].includes(toolName) && 'Processing...'}
-        </span>
-      </div>
-    );
-  }
-
-  // Completed — render the result (including failed sandbox — ChatSandboxResult handles error display)
-  if (isCompleted) {
-    switch (toolName) {
-      case 'queryTabularData': {
-        if (output.error) return null;
-        const tableConfig: DataTableConfig = {
-          columns: output.columns ?? [],
-          rows: output.rows ?? [],
-          totalRows: output.totalRows ?? 0,
-          aggregationResults: output.aggregationResults,
-        };
-        if (tableConfig.rows.length === 0 && !tableConfig.aggregationResults) return null;
-        return <ChatDataTable key={index} config={tableConfig} />;
-      }
-
-      case 'generateVisualization': {
-        const chartConfig = output as ChartConfig;
-        if (!chartConfig?.data || chartConfig.data.length === 0) return null;
-        return <ChatChart key={index} config={chartConfig} />;
-      }
-
-      case 'executeAnalysis':
-      case 'analyzeCorpusWithCode': {
-        const result = output as SandboxResultConfig;
-        const code = input?.code;
-        return <ChatSandboxResult key={index} config={result} code={code} />;
-      }
-
-      case 'getIndexedData': {
-        const corpusConfig = output as CorpusDataConfig;
-        if (!corpusConfig) return null;
-        return <CorpusDataResult key={index} config={corpusConfig} />;
-      }
-
-      case 'fillDocumentForm':
-      case 'editDocument': {
-        if (!output.success) return null;
-
-        const fileName = output.fileName || 'Document';
-        const cType = output.mimeType || '';
-        const ext = fileName.split('.').pop()?.toLowerCase() || '';
-        let iconPath = '/icons/image.png'; // default fallback for images and unknown files
-        if (
-          ['csv', 'xls', 'xlsx'].includes(ext) ||
-          cType.includes('excel') ||
-          cType.includes('spreadsheet')
-        )
-          iconPath = '/icons/excel.png';
-        else if (['doc', 'docx'].includes(ext) || cType.includes('word'))
-          iconPath = '/icons/word.png';
-        else if (['md', 'markdown'].includes(ext)) iconPath = '/icons/markdown.png';
-        else if (['pdf'].includes(ext) || cType === 'application/pdf') iconPath = '/icons/pdf.png';
-        else if (!ext) iconPath = '/icons/word.png'; // Generic file icon
-
-        return (
-          <div
-            key={index}
-            onClick={() => {
-              if (updateFromToolResult && output.fileBase64) {
-                updateFromToolResult(output);
-              }
-            }}
-            className="group flex items-center gap-3 rounded-xl border border-border/60 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400 cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-emerald-900/20 transition"
-          >
-            <div className="size-8 shrink-0 rounded-md overflow-hidden bg-white border border-emerald-200/50 flex items-center justify-center p-1.5 shadow-sm">
-              <img src={iconPath} alt={fileName} className="w-full h-full object-contain" />
-            </div>
-            <div className="flex flex-col flex-1">
-              <span className="font-medium text-emerald-800 dark:text-emerald-300">
-                {toolName === 'fillDocumentForm' ? 'Form fields updated in ' : 'Edited '}
-                <span className="font-bold">{fileName}</span>
-              </span>
-              <span className="text-xs opacity-80 mt-0.5">
-                {output.updatedFields?.length || 0}{' '}
-                {output.updatedFields?.length === 1 ? 'change' : 'changes'} applied. Preview updated
-                in Canvas.
-              </span>
-            </div>
-            {output.fileBase64 && (
-              <div className="opacity-0 group-hover:opacity-100 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 transition">
-                <FileEdit className="size-3" />
-                View this version
-              </div>
-            )}
-          </div>
-        );
-      }
-
-      case 'requestDocumentSignature': {
-        if (!output?.success) return null;
-        return (
-          <div
-            key={index}
-            onClick={() => {
-              if (updateFromToolResult && output.fileBase64) {
-                updateFromToolResult(output);
-              }
-            }}
-            className="group flex items-center gap-3 rounded-xl border border-border/60 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400 mt-2 cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-emerald-900/20 transition"
-          >
-            <CheckCircle2 className="size-5 shrink-0 text-emerald-500" />
-            <div className="flex-1 flex items-center justify-between">
-              <span className="font-medium text-emerald-800 dark:text-emerald-300">
-                Document signed successfully.
-              </span>
-              {output.fileBase64 && (
-                <div className="opacity-0 group-hover:opacity-100 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 transition">
-                  <FileEdit className="size-3" />
-                  View this version
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
-
-      case 'webSearch': {
-        if (output.error) return null;
-        const resultsCount = output.results?.length || 0;
-        return (
-          <div key={index} className="mb-2 w-full">
-            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
-              <Globe className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate max-w-62.5 sm:max-w-100">
-                Searched web for "{input?.query}"
-              </span>
-              <span className="shrink-0 text-[10px] bg-secondary text-foreground px-1.5 py-0.5 rounded-full font-medium ml-1">
-                {resultsCount} result{resultsCount === 1 ? '' : 's'}
-              </span>
-            </div>
-          </div>
-        );
-      }
-
-      case 'analyzeImageDeeply': {
-        if (output.error) return null;
-        const imageUrl = input?.imageUrl as string | undefined;
-        return (
-          <div key={index} className="mb-2 w-full">
-            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
-              <Sparkles className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate max-w-62.5 sm:max-w-100">Analyzed image</span>
-            </div>
-            {imageUrl ? (
-              <div className="mt-1.5 max-w-xs">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imageUrl}
-                  alt="Analyzed image"
-                  className="rounded-lg border border-border/50 object-cover max-h-48 w-auto"
-                  loading="lazy"
-                />
-              </div>
-            ) : null}
-          </div>
-        );
-      }
-
-      case 'presentMedia': {
-        if (
-          !output?.success ||
-          !output.assetId ||
-          !['image', 'video', 'audio'].includes(output.mediaType)
-        ) {
-          return null;
-        }
-        return (
-          <ChatMediaPreview
-            key={index}
-            assetId={output.assetId}
-            mediaType={output.mediaType}
-            fileName={output.fileName}
-            mediaUrl={output.mediaUrl}
-            sourceUrl={output.sourceUrl}
-            startSecs={output.startSecs}
-            endSecs={output.endSecs}
-          />
-        );
-      }
-
-      default:
-        // Generic fallback for any other tools (like marketplace tools) to prevent them from disappearing
-        return (
-          <div key={index} className="mb-2 w-full">
-            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate max-w-62.5 sm:max-w-100">Used {toolName}</span>
-            </div>
-          </div>
-        );
-    }
-  }
-
-  return null;
-}
-
-function WebSearchSummary({ parts }: { parts: any[] }) {
-  const [open, setOpen] = useState(false);
-  const searches = parts.map((part) => {
-    const info = getToolInfo(part);
-    const results = Array.isArray(info.output?.results) ? info.output.results : [];
-    return { query: info.input?.query as string | undefined, results, running: info.isExecuting };
-  });
-  const resultCount = searches.reduce((count, search) => count + search.results.length, 0);
-  const running = searches.some((search) => search.running);
-
-  return (
-    <div className="mb-2 w-full">
-      <button
-        type="button"
-        onClick={() => (resultCount > 0 || searches.length > 1) && setOpen((value) => !value)}
-        className="inline-flex items-center gap-2 rounded-md border border-border/50 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50"
-      >
-        <Globe className="size-3.5 shrink-0" />
-        <span>{running ? 'Searching the web…' : 'Searched the web'}</span>
-        {!running && resultCount > 0 ? (
-          <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-foreground">
-            {resultCount} result{resultCount === 1 ? '' : 's'}
-          </span>
-        ) : null}
-        {!running && (resultCount > 0 || searches.length > 1) ? (
-          <ChevronDown className={`size-3 transition-transform ${open ? 'rotate-180' : ''}`} />
-        ) : null}
-      </button>
-
-      {open ? (
-        <div className="mt-2 max-w-xl overflow-hidden rounded-lg border border-border/60 bg-background text-xs">
-          {searches
-            .flatMap((search) => search.results)
-            .slice(0, 5)
-            .map((result: any, index) => (
-              <a
-                key={`${result.url ?? result.title ?? index}-${index}`}
-                href={result.url}
-                target="_blank"
-                rel="noreferrer"
-                className="block border-b border-border/50 px-3 py-2.5 last:border-0 hover:bg-muted/40"
-              >
-                <span className="block truncate font-medium text-foreground">
-                  {result.title || result.url}
-                </span>
-                {result.snippet ? (
-                  <span className="mt-0.5 block line-clamp-2 text-muted-foreground">
-                    {result.snippet}
-                  </span>
-                ) : null}
-              </a>
-            ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Main message component                                              */
-/* ------------------------------------------------------------------ */
 
 export function MessageItem({
   message,
@@ -650,9 +142,8 @@ export function MessageItem({
         }
       });
     }
-  }, [docToolFingerprint, updateFromToolResult, isLast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [docToolFingerprint, updateFromToolResult, isLast]);
 
-  // Auto-resolve duplicate signature tools
   useEffect(() => {
     if (!isLast || !addToolResult) return;
     const signatureTools = parts.filter(
@@ -828,7 +319,7 @@ export function MessageItem({
             </div>
           )}
           {text && (
-            <div className="rounded-2xl rounded-br-md bg-[#edecec] px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
+            <div className="rounded-2xl rounded-br-md bg-muted border border-border/25 px-4 py-2 text-[15px] leading-relaxed text-foreground">
               {text}
             </div>
           )}
@@ -837,13 +328,12 @@ export function MessageItem({
     );
   }
 
-  // --- Assistant message ---
-
-  // Categorize parts using unified detection
+  // Assistant message
   const kbParts = parts.filter((p: any) => {
     const { toolName } = getToolInfo(p);
     return toolName === 'searchKnowledgeBase';
   });
+  const isKnowledgeSearchActive = kbParts.some((part: any) => getToolInfo(part).isExecuting);
 
   let signatureFound = false;
   const toolParts = parts.filter((p: any) => {
@@ -858,7 +348,6 @@ export function MessageItem({
 
   const textParts = parts.filter((p: any) => p.type === 'text');
 
-  // Collect native AI SDK reasoning parts (e.g. DeepSeek R1, Claude extended thinking)
   const nativeReasoningParts = parts.filter((p: any) => p.type === 'reasoning');
   const nativeReasoningText = nativeReasoningParts
     .map((p: any) => p.text || '')
@@ -868,7 +357,6 @@ export function MessageItem({
   const lastPart = parts.at(-1);
   const isNativeReasoningStreaming = isLast && isStreaming && lastPart?.type === 'reasoning';
 
-  // Extract <think> tag reasoning from text parts (fallback for models like Qwen)
   const { allCleanTexts, thinkReasoningText, hasThinkTags } = useMemo(() => {
     let thinkText = '';
     let hasTags = false;
@@ -885,17 +373,14 @@ export function MessageItem({
     return { allCleanTexts: cleanTexts, thinkReasoningText: thinkText, hasThinkTags: hasTags };
   }, [textParts]);
 
-  // Determine if <think> reasoning is still streaming (unclosed tag in last text part)
   const isThinkReasoningStreaming = useMemo(() => {
     if (!isLast || !isStreaming || !hasThinkTags) return false;
     const lastText = textParts.at(-1)?.text || '';
-    // Still streaming if there's an unclosed <think> tag
     const openCount = (lastText.match(/<think>/gi) || []).length;
     const closeCount = (lastText.match(/<\/think>/gi) || []).length;
     return openCount > closeCount;
   }, [isLast, isStreaming, hasThinkTags, textParts]);
 
-  // Combined reasoning
   const combinedReasoningText = [nativeReasoningText, thinkReasoningText]
     .filter(Boolean)
     .join('\n\n');
@@ -920,7 +405,6 @@ export function MessageItem({
       getToolInfo(p).toolName !== 'webSearch',
   );
 
-  // Build tabs if we have multiple visualizations
   const vizTabs =
     vizParts.length > 1
       ? vizParts.map((p: any, i: number) => {
@@ -932,7 +416,6 @@ export function MessageItem({
         })
       : null;
 
-  // Separate in-progress tool parts for loading indicators
   const executingParts = useMemo(
     () =>
       toolParts.filter((p: any) => {
@@ -943,26 +426,24 @@ export function MessageItem({
   );
 
   return (
-    <div className="message assistant-message flex flex-col gap-4" data-role="assistant">
-      {/* All search attempts are intentionally one compact disclosure. */}
+    <div className="message assistant-message flex flex-col gap-2" data-role="assistant">
+      {kbParts.length > 0 && <KnowledgeBaseResult parts={kbParts} isShimmering={isShimmering} />}
+
       {webSearchParts.length > 0 && <WebSearchSummary parts={webSearchParts} />}
 
-      {/* Reasoning block (native AI SDK reasoning + <think> tag fallback) */}
-      {hasAnyReasoning && (
+      {hasAnyReasoning && !isKnowledgeSearchActive && (
         <Reasoning isStreaming={isReasoningStreaming}>
           <ReasoningTrigger />
           <ReasoningContent>{combinedReasoningText}</ReasoningContent>
         </Reasoning>
       )}
 
-      {/* Non-visualization tool outputs (data tables, sandbox results) */}
       {nonVizToolParts
         .filter((p: any) => getToolInfo(p).isCompleted)
         .map((part: any, i: number) =>
           renderToolPart(part, i, addToolResult, updateFromToolResult),
         )}
 
-      {/* Visualization outputs */}
       {vizTabs ? (
         <ChatTabs config={{ tabs: vizTabs }} />
       ) : (
@@ -971,40 +452,32 @@ export function MessageItem({
         )
       )}
 
-      {/* Loading states for in-progress tools */}
       {executingParts.map((part: any, i: number) =>
         renderToolPart(part, i, addToolResult, updateFromToolResult),
       )}
 
-      {/* Thinking state when streaming but no tools executing and no text yet */}
       {isLast &&
         isStreaming &&
         executingParts.length === 0 &&
+        !isKnowledgeSearchActive &&
         !hasAnyReasoning &&
         textParts.every((p: any) => !p.text || p.text.trim().length === 0) && (
-          <div className="flex items-center gap-2.5 py-1 text-[13px] text-muted-foreground animate-pulse">
-            <Sparkles className="size-4 text-foreground/60" />
-            <span className="font-medium text-foreground/80">Thinking...</span>
+          <div className="flex items-center gap-2">
+            <div className="size-6.5 bg-white border border-border rounded-full flex items-center justify-center p-1 animate-pulse">
+              <img src="/logo.png" alt="logo" className="size-4 animate-spin" />
+            </div>
           </div>
         )}
 
-      {/* Text parts — with markdown table detection + media refs + think-tag stripping */}
+      {/* Text parts — with markdown table detection + think-tag stripping */}
       {textParts.map((part: any, i: number) => {
         const rawText = part.text || '';
         if (!rawText.trim()) return null;
 
-        // Use pre-stripped text (think tags already removed)
         const strippedText = allCleanTexts[i] ?? rawText;
+        const cleanText = strippedText.replace(/\[(?:IMAGE_REF|VIDEO_REF|AUDIO_REF):[^\]]+\]/g, '');
 
-        // Extract media references before processing
-        const mediaRefs = parseMediaRefs(strippedText);
-        // Strip media refs from text for markdown rendering
-        let cleanText = strippedText;
-        for (const ref of mediaRefs) {
-          cleanText = cleanText.replace(ref.fullMatch, '');
-        }
-
-        if (!cleanText.trim() && mediaRefs.length === 0) return null;
+        if (!cleanText.trim()) return null;
 
         const segments = splitTextAndTables(cleanText);
 
@@ -1029,27 +502,10 @@ export function MessageItem({
                 />
               );
             })}
-            {/* Render inline media previews */}
-            {mediaRefs.map((ref, j) => (
-              <ChatMediaPreview
-                key={`media-${j}`}
-                assetId={ref.assetId}
-                mediaType={ref.type}
-                fileName={ref.extra}
-                mediaUrl={
-                  serverId
-                    ? `/api/media/${ref.assetId}?serverId=${encodeURIComponent(serverId)}`
-                    : undefined
-                }
-                startSecs={ref.startSecs}
-                endSecs={ref.endSecs}
-              />
-            ))}
           </div>
         );
       })}
 
-      {/* One model-selected media citation, kept separate from raw search results. */}
       {mediaToolParts
         .filter((p: any) => getToolInfo(p).isCompleted)
         .map((part: any, i: number) =>
@@ -1059,17 +515,480 @@ export function MessageItem({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Premium markdown → HTML renderer for chat messages.                 */
-/* ------------------------------------------------------------------ */
+interface ParsedTable {
+  columns: string[];
+  rows: Record<string, any>[];
+}
+
+function splitTextAndTables(
+  text: string,
+): Array<{ type: 'text'; content: string } | { type: 'table'; table: ParsedTable }> {
+  if (!text) return [];
+
+  const lines = text.split('\n');
+  const segments: Array<{ type: 'text'; content: string } | { type: 'table'; table: ParsedTable }> =
+    [];
+  let currentText: string[] = [];
+  let tableLines: string[] = [];
+  let inTable = false;
+
+  const isTableRow = (line: string) => {
+    const trimmed = line.trim();
+    return trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2;
+  };
+
+  const isSeparatorRow = (line: string) => /^\|[\s\-:|]+\|$/.test(line.trim());
+
+  const flushText = () => {
+    if (currentText.length > 0) {
+      const content = currentText.join('\n').trim();
+      if (content) {
+        segments.push({ type: 'text', content });
+      }
+      currentText = [];
+    }
+  };
+
+  const flushTable = () => {
+    if (tableLines.length < 2) {
+      currentText.push(...tableLines);
+      tableLines = [];
+      return;
+    }
+
+    const headerLine = tableLines[0];
+    const columns = headerLine
+      .split('|')
+      .map((c) => c.trim())
+      .filter(Boolean);
+
+    let dataStart = 1;
+    if (tableLines.length > 1 && isSeparatorRow(tableLines[1])) {
+      dataStart = 2;
+    }
+
+    const rows: Record<string, any>[] = [];
+    for (let i = dataStart; i < tableLines.length; i++) {
+      const rawCells = tableLines[i]
+        .split('|')
+        .slice(1, -1)
+        .map((c) => c.trim());
+
+      const row: Record<string, any> = {};
+      columns.forEach((col, j) => {
+        const val = rawCells[j] ?? '';
+        const num = Number(val);
+        row[col] = !isNaN(num) && val !== '' ? num : val;
+      });
+      rows.push(row);
+    }
+
+    if (columns.length > 0 && rows.length > 0) {
+      segments.push({
+        type: 'table',
+        table: { columns, rows },
+      });
+    }
+    tableLines = [];
+  };
+
+  for (const line of lines) {
+    if (isTableRow(line)) {
+      if (!inTable) {
+        flushText();
+        inTable = true;
+      }
+      if (!isSeparatorRow(line) || tableLines.length === 1) {
+        tableLines.push(line);
+      } else if (isSeparatorRow(line)) {
+        tableLines.push(line);
+      }
+    } else {
+      if (inTable) {
+        flushTable();
+        inTable = false;
+      }
+      currentText.push(line);
+    }
+  }
+
+  if (inTable) {
+    flushTable();
+  }
+  flushText();
+
+  return segments;
+}
+
+function stripThinkTags(text: string): { cleanText: string; reasoningText: string } {
+  if (!text) return { cleanText: '', reasoningText: '' };
+
+  const reasoningParts: string[] = [];
+  let cleaned = text;
+
+  // Extract complete <think>…</think> blocks
+  const completeRegex = /<think>([\s\S]*?)<\/think>/gi;
+  let match;
+  while ((match = completeRegex.exec(cleaned)) !== null) {
+    reasoningParts.push(match[1].trim());
+  }
+  cleaned = cleaned.replace(completeRegex, '');
+
+  // Extract unclosed <think>… (streaming, no closing tag yet)
+  const unclosedRegex = /<think>([\s\S]*)$/i;
+  const unclosedMatch = cleaned.match(unclosedRegex);
+  if (unclosedMatch) {
+    reasoningParts.push(unclosedMatch[1].trim());
+    cleaned = cleaned.replace(unclosedRegex, '');
+  }
+
+  return {
+    cleanText: cleaned.trim(),
+    reasoningText: reasoningParts.filter(Boolean).join('\n\n'),
+  };
+}
+
+function getToolInfo(part: any): {
+  toolName: string;
+  isExecuting: boolean;
+  isCompleted: boolean;
+  output: any;
+  input: any;
+} {
+  if (part.type === 'tool-invocation') {
+    const ti = part.toolInvocation;
+    const state = ti.state;
+    return {
+      toolName: ti.toolName,
+      isExecuting: state === 'partial-call' || state === 'call',
+      isCompleted:
+        (state === 'result' || state === 'output' || state === 'output-available') &&
+        ti.result !== undefined,
+      output: ti.result,
+      input: ti.args,
+    };
+  }
+
+  if (part.type?.startsWith('tool-') && part.type !== 'tool-invocation') {
+    const toolName = part.type.replace('tool-', '');
+    const state = part.state;
+    return {
+      toolName,
+      isExecuting: state === 'input-streaming' || state === 'input-available',
+      isCompleted:
+        (state === 'output' || state === 'output-available') && part.output !== undefined,
+      output: part.output,
+      input: part.input,
+    };
+  }
+
+  return {
+    toolName: '',
+    isExecuting: false,
+    isCompleted: false,
+    output: undefined,
+    input: undefined,
+  };
+}
+
+function renderToolPart(
+  part: any,
+  index: number,
+  addToolResult?: Function,
+  updateFromToolResult?: Function,
+): React.ReactNode | null {
+  const { toolName, isExecuting, isCompleted, output, input } = getToolInfo(part);
+
+  // Still executing — show loading indicator
+  if (isExecuting) {
+    if (toolName === 'searchKnowledgeBase') return null;
+
+    if (toolName === 'requestDocumentSignature') {
+      const callId = part.toolInvocation?.toolCallId || part.toolCallId || part.id || '';
+      return (
+        <ChatSignatureRequest
+          key={index}
+          detectedLocations={input?.detectedLocations}
+          toolCallId={callId}
+          addToolResult={addToolResult}
+        />
+      );
+    }
+
+    return (
+      <div key={index} className="flex items-center gap-2 py-3">
+        <div className="size-6.5 bg-white dark:bg-card border border-border rounded-full flex items-center justify-center p-1 animate-pulse">
+          <img src="/logo.png" alt="logo" className="size-4 animate-spin" />
+        </div>
+        <span className="text-[13px] font-medium text-foreground/80 animate-pulse">
+          {toolName === 'queryTabularData' && 'Querying data...'}
+          {toolName === 'generateVisualization' && 'Generating chart...'}
+          {toolName === 'executeAnalysis' && 'Running analysis...'}
+          {toolName === 'getIndexedData' && 'Fetching corpus data...'}
+          {toolName === 'analyzeCorpusWithCode' && 'Analyzing corpus...'}
+          {toolName === 'fillDocumentForm' && 'Filling form fields...'}
+          {toolName === 'editDocument' && 'Editing document...'}
+          {toolName === 'requestDocumentSignature' && 'Processing signature request...'}
+          {![
+            'queryTabularData',
+            'generateVisualization',
+            'executeAnalysis',
+            'getIndexedData',
+            'analyzeCorpusWithCode',
+            'fillDocumentForm',
+            'editDocument',
+            'requestDocumentSignature',
+          ].includes(toolName) && 'Processing...'}
+        </span>
+      </div>
+    );
+  }
+
+  if (isCompleted) {
+    switch (toolName) {
+      case 'queryTabularData': {
+        if (output.error) return null;
+        const tableConfig: DataTableConfig = {
+          columns: output.columns ?? [],
+          rows: output.rows ?? [],
+          totalRows: output.totalRows ?? 0,
+          aggregationResults: output.aggregationResults,
+        };
+        if (tableConfig.rows.length === 0 && !tableConfig.aggregationResults) return null;
+        return <ChatDataTable key={index} config={tableConfig} />;
+      }
+
+      case 'generateVisualization': {
+        const chartConfig = output as ChartConfig;
+        if (!chartConfig?.data || chartConfig.data.length === 0) return null;
+        return <ChatChart key={index} config={chartConfig} />;
+      }
+
+      case 'executeAnalysis':
+      case 'analyzeCorpusWithCode': {
+        const result = output as SandboxResultConfig;
+        const code = input?.code;
+        return <ChatSandboxResult key={index} config={result} code={code} />;
+      }
+
+      case 'getIndexedData': {
+        const corpusConfig = output as CorpusDataConfig;
+        if (!corpusConfig) return null;
+        return <CorpusDataResult key={index} config={corpusConfig} />;
+      }
+
+      case 'fillDocumentForm':
+      case 'editDocument': {
+        if (!output.success) return null;
+
+        const fileName = output.fileName || 'Document';
+        const cType = output.mimeType || '';
+        const ext = fileName.split('.').pop()?.toLowerCase() || '';
+        let iconPath = '/icons/image.png'; // default fallback for images and unknown files
+        if (
+          ['csv', 'xls', 'xlsx'].includes(ext) ||
+          cType.includes('excel') ||
+          cType.includes('spreadsheet')
+        )
+          iconPath = '/icons/excel.png';
+        else if (['doc', 'docx'].includes(ext) || cType.includes('word'))
+          iconPath = '/icons/word.png';
+        else if (['md', 'markdown'].includes(ext)) iconPath = '/icons/markdown.png';
+        else if (['pdf'].includes(ext) || cType === 'application/pdf') iconPath = '/icons/pdf.png';
+        else if (!ext) iconPath = '/icons/word.png';
+
+        return (
+          <div
+            key={index}
+            onClick={() => {
+              if (updateFromToolResult && output.fileBase64) {
+                updateFromToolResult(output);
+              }
+            }}
+            className="group flex items-center gap-3 rounded-xl border border-border/60 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400 cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-emerald-900/20 transition"
+          >
+            <div className="size-8 shrink-0 rounded-md overflow-hidden bg-white border border-emerald-200/50 flex items-center justify-center p-1.5 35">
+              <img src={iconPath} alt={fileName} className="w-full h-full object-contain" />
+            </div>
+            <div className="flex flex-col flex-1">
+              <span className="font-medium text-emerald-800 dark:text-emerald-300">
+                {toolName === 'fillDocumentForm' ? 'Form fields updated in ' : 'Edited '}
+                <span className="font-bold">{fileName}</span>
+              </span>
+              <span className="text-xs opacity-80 mt-0.5">
+                {output.updatedFields?.length || 0}{' '}
+                {output.updatedFields?.length === 1 ? 'change' : 'changes'} applied. Preview updated
+                in Canvas.
+              </span>
+            </div>
+            {output.fileBase64 && (
+              <div className="opacity-0 group-hover:opacity-100 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 transition">
+                <FileEdit className="size-3" />
+                View this version
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      case 'requestDocumentSignature': {
+        if (!output?.success) return null;
+        return (
+          <div
+            key={index}
+            onClick={() => {
+              if (updateFromToolResult && output.fileBase64) {
+                updateFromToolResult(output);
+              }
+            }}
+            className="group flex items-center gap-3 rounded-xl border border-border/60 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400 mt-2 cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-emerald-900/20 transition"
+          >
+            <CheckCircle2 className="size-5 shrink-0 text-emerald-500" />
+            <div className="flex-1 flex items-center justify-between">
+              <span className="font-medium text-emerald-800 dark:text-emerald-300">
+                Document signed successfully.
+              </span>
+              {output.fileBase64 && (
+                <div className="opacity-0 group-hover:opacity-100 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 transition">
+                  <FileEdit className="size-3" />
+                  View this version
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      case 'webSearch': {
+        if (output.error) return null;
+        const resultsCount = output.results?.length || 0;
+        return (
+          <div key={index} className="mb-2 w-full">
+            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
+              <Globe className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate max-w-62.5 sm:max-w-100">
+                Searched web for "{input?.query}"
+              </span>
+              <span className="shrink-0 text-[10px] bg-secondary text-foreground px-1.5 py-0.5 rounded-full font-medium ml-1">
+                {resultsCount} result{resultsCount === 1 ? '' : 's'}
+              </span>
+            </div>
+          </div>
+        );
+      }
+
+      case 'analyzeImageDeeply': {
+        if (output.error) return null;
+        return (
+          <div key={index} className="mb-2 w-full">
+            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
+              <Sparkles className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate max-w-62.5 sm:max-w-100">Analyzed indexed image</span>
+            </div>
+          </div>
+        );
+      }
+
+      case 'presentMedia': {
+        if (
+          !output?.success ||
+          !output.assetId ||
+          !['image', 'video', 'audio'].includes(output.mediaType)
+        ) {
+          return null;
+        }
+        return (
+          <ChatMediaPreview
+            key={index}
+            assetId={output.assetId}
+            mediaType={output.mediaType}
+            fileName={output.fileName}
+            mediaUrl={output.mediaUrl}
+            sourceUrl={output.sourceUrl}
+            startSecs={output.startSecs}
+            endSecs={output.endSecs}
+          />
+        );
+      }
+
+      default:
+        return (
+          <div key={index} className="mb-2 w-full">
+            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate max-w-62.5 sm:max-w-100">Used {toolName}</span>
+            </div>
+          </div>
+        );
+    }
+  }
+
+  return null;
+}
+
+function WebSearchSummary({ parts }: { parts: any[] }) {
+  const [open, setOpen] = useState(false);
+  const searches = parts.map((part) => {
+    const info = getToolInfo(part);
+    const results = Array.isArray(info.output?.results) ? info.output.results : [];
+    return { query: info.input?.query as string | undefined, results, running: info.isExecuting };
+  });
+  const resultCount = searches.reduce((count, search) => count + search.results.length, 0);
+  const running = searches.some((search) => search.running);
+
+  return (
+    <div className="mb-2 w-full">
+      <button
+        type="button"
+        onClick={() => (resultCount > 0 || searches.length > 1) && setOpen((value) => !value)}
+        className="inline-flex items-center gap-2 rounded-md border border-border/50 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50"
+      >
+        <Globe className="size-3.5 shrink-0" />
+        <span>{running ? 'Searching the web…' : 'Searched the web'}</span>
+        {!running && resultCount > 0 ? (
+          <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+            {resultCount} result{resultCount === 1 ? '' : 's'}
+          </span>
+        ) : null}
+        {!running && (resultCount > 0 || searches.length > 1) ? (
+          <ChevronDown className={`size-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+        ) : null}
+      </button>
+
+      {open ? (
+        <div className="mt-2 max-w-xl overflow-hidden rounded-lg border border-border/60 bg-background text-xs">
+          {searches
+            .flatMap((search) => search.results)
+            .slice(0, 5)
+            .map((result: any, index) => (
+              <a
+                key={`${result.url ?? result.title ?? index}-${index}`}
+                href={result.url}
+                target="_blank"
+                rel="noreferrer"
+                className="block border-b border-border/50 px-3 py-2.5 last:border-0 hover:bg-muted/40"
+              >
+                <span className="block truncate font-medium text-foreground">
+                  {result.title || result.url}
+                </span>
+                {result.snippet ? (
+                  <span className="mt-0.5 block line-clamp-2 text-muted-foreground">
+                    {result.snippet}
+                  </span>
+                ) : null}
+              </a>
+            ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function renderMarkdown(text: string): string {
   if (!text) return '';
 
   let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  // Model-generated image URLs are not reliable and must never become network requests.
-  // Indexed images are displayed only through the verified presentMedia tool result.
   html = html.replace(
     /!\[([^\]]*)\]\([^)]*\)/g,
     (_match, alt) =>

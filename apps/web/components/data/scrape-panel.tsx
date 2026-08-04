@@ -649,7 +649,7 @@ export function ScrapePanel({
                   ref={inputRef}
                   id="kw"
                   autoComplete="off"
-                  placeholder='Search for websites, e.g. "RAG pipelines"'
+                  placeholder='Search for websites, e.g. "Who is the best player in the world?"'
                   value={query}
                   disabled={disabled}
                   className="pl-9 pr-22"

@@ -15,7 +15,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
 
 import { getChatTools } from './tools';
-import { canReuseKnowledgeBaseEvidence, retrievalToolsForStep } from '@/lib/retrieval-routing';
+import { hasPriorKnowledgeBaseEvidence, retrievalToolsForStep } from '@/lib/retrieval-routing';
 import { gatewayProviderOptions } from '@/lib/gateway-fallbacks';
 
 export const maxDuration = 60;
@@ -63,14 +63,15 @@ function createChatModel(
   }
 }
 
-const RETRIEVAL_ONLY_POLICY = `
+const CHAT_POLICY = `
 
 CHAT SCOPE:
-- Answer only from the user's provided material. This is not a general-purpose assistant.
+- Answer only from the user's provided material (documents or datasets).
+- CRITICAL TOOL USAGE: You MUST use a tool (searchKnowledgeBase, queryTabularData, or executeAnalysis) BEFORE attempting to answer ANY substantive question. NEVER answer without fetching the relevant documents or data first, unless you already have the EXACT specific evidence returned in the conversation history. Even if a question sounds like personal trivia or general knowledge (e.g., "what is my favorite food?", "who is the CEO?"), YOU MUST SEARCH THE KNOWLEDGE BASE FIRST. Do not say "I don't know" without executing a search first!
 - Search once before a new substantive question. For a clear follow-up, reuse the evidence already returned in this conversation when it fully supports the answer.
-- Use only returned evidence. If no evidence supports an answer, reply exactly: "I don't know."
-- Never answer from general knowledge, browse the web, run code, perform analysis, or invent details.
-- Speak naturally and directly. Never mention or imply searching, indexing, a corpus, a database, a knowledge base, retrieved material, source documents, or what information is available. Do not use phrases such as "the indexed page says" or "the data shows."
+- Use only returned evidence or analysis results. If no evidence supports an answer, reply exactly: "I don't know."
+- Do not answer from general knowledge or invent details.
+- Speak naturally and directly. Never mention or imply searching, indexing, a corpus, a database, a knowledge base, retrieved material, source documents, or what information is available.
 - When the user asks to see, watch, play, or hear supporting material, use presentMedia with an exact result returned by searchKnowledgeBase. Otherwise do not call presentMedia.
 `;
 
@@ -295,9 +296,11 @@ export async function POST(req: Request) {
   });
 
   let tabularContext = '';
+  let hasTabularData = false;
   try {
     const datasets = await listTabularDatasets();
     if (datasets.length > 0) {
+      hasTabularData = true;
       tabularContext = `\n\nAvailable tabular datasets:\n${datasets
         .map((d) => {
           const colDescriptions = d.columns
@@ -354,7 +357,7 @@ ${fieldLines}`;
   // technical failure to the user.
   const systemPrompt =
     (config.systemPrompt ? `USER INSTRUCTIONS:\n${config.systemPrompt}\n` : '') +
-    RETRIEVAL_ONLY_POLICY +
+    CHAT_POLICY +
     tabularContext +
     docContext;
   const allTools = await getChatTools({
@@ -363,18 +366,28 @@ ${fieldLines}`;
     config,
     origin: new URL(req.url).origin,
   });
-  // The Chat page is the product's RAG surface, not an agent workbench. Keep
-  // sandbox, web, and corpus tools out of this request so a model cannot take
-  // a Docker-backed detour instead of answering from retrieved evidence.
+  // Provide both RAG tools and Data Analysis tools so the model can handle complex queries (e.g. Excel)
   const tools = {
     searchKnowledgeBase: allTools.searchKnowledgeBase,
     presentMedia: allTools.presentMedia,
+    queryTabularData: allTools.queryTabularData,
+    generateVisualization: allTools.generateVisualization,
+    executeAnalysis: allTools.executeAnalysis,
+    analyzeImageDeeply: allTools.analyzeImageDeeply,
   };
   const userText = latestUserText(messagesToProcess);
-  const forceKnowledgeBaseSearch =
-    Boolean(userText.trim()) &&
-    Boolean(tools.searchKnowledgeBase) &&
-    !canReuseKnowledgeBaseEvidence(userText, messagesToProcess);
+  const isGreeting =
+    /^(hi|hello|hey|thanks|thank you|ok|sure|yes|no|please|help|how are you|good morning|good afternoon|good evening|bye|goodbye)[.!\s]*$/i.test(
+      userText.trim(),
+    );
+
+  if (isGreeting && tools.searchKnowledgeBase) {
+    // Completely remove the search tool for simple greetings to guarantee no retrieval overhead
+    delete (tools as any).searchKnowledgeBase;
+  }
+
+  // We now rely entirely on the model's native intelligence and the CRITICAL TOOL USAGE
+  // prompt directive to decide when to search or query. No more forced tool choices!
 
   // Debug: log payload sizes to console in development
   if (process.env.NODE_ENV === 'development') {
@@ -393,13 +406,23 @@ ${fieldLines}`;
     // Three steps: retrieve → optionally inspect/present media → answer.
     stopWhen: stepCountIs(3),
     toolChoice: 'auto',
-    prepareStep: ({ stepNumber }) =>
-      retrievalToolsForStep({
+    prepareStep: ({ stepNumber }) => {
+      const config = retrievalToolsForStep({
         stepNumber,
-        forceKnowledgeBaseSearch,
+        forceKnowledgeBaseSearch: false,
         forceWebSearch: false,
-        toolNames: ['searchKnowledgeBase', 'presentMedia'] as const,
-      }),
+        toolNames: [
+          'searchKnowledgeBase',
+          'presentMedia',
+          'queryTabularData',
+          'generateVisualization',
+          'executeAnalysis',
+          'analyzeImageDeeply',
+        ] as const,
+      });
+
+      return config;
+    },
     onFinish: async ({ usage, response }) => {
       const { trackUsageEvent, estimateCost } = await import('@larkup/core/analytics-store');
       const u = usage as any;

@@ -114,6 +114,7 @@ export function UnifiedSidebar() {
               return (
                 <Tooltip key={item.id}>
                   <TooltipTrigger
+                    className={''}
                     render={
                       <Link
                         href={item.href}
@@ -127,8 +128,8 @@ export function UnifiedSidebar() {
                         className={cn(
                           'group relative flex size-10 items-center justify-center rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
                           active
-                            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                            ? 'bg-sidebar-accent/60 text-sidebar-accent-foreground hover:bg-sidebar-accent'
+                            : 'text-muted-foreground hover:bg-white/65 hover:text-foreground',
                         )}
                       />
                     }
@@ -156,8 +157,8 @@ export function UnifiedSidebar() {
                 className={cn(
                   'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   active
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                    ? 'bg-sidebar-accent/70 text-sidebar-accent-foreground hover:bg-sidebar-accent/70'
+                    : 'text-muted-foreground hover:bg-white/65 hover:text-foreground',
                 )}
               >
                 <Icon className="size-4.5 shrink-0" strokeWidth={active ? 2.25 : 1.75} />

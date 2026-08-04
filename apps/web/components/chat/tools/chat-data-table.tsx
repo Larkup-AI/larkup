@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from 'react';
 import {
   ArrowUpDown,
   ArrowUp,
@@ -12,7 +12,10 @@ import {
   Check,
   Search,
   X,
-} from "lucide-react";
+  Type,
+  Hash,
+  CalendarDays,
+} from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -20,16 +23,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 export interface DataTableConfig {
   columns: string[];
@@ -39,8 +37,8 @@ export interface DataTableConfig {
 }
 
 function formatCell(value: any): string {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "number") {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'number') {
     return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
   }
   return String(value);
@@ -48,33 +46,31 @@ function formatCell(value: any): string {
 
 function downloadCSV(columns: string[], rows: Record<string, any>[]) {
   const csv = [
-    columns.join(","),
+    columns.join(','),
     ...rows.map((row) =>
       columns
         .map((c) => {
-          const v = String(row[c] ?? "");
-          return v.includes(",") || v.includes('"')
-            ? `"${v.replace(/"/g, '""')}"`
-            : v;
+          const v = String(row[c] ?? '');
+          return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
         })
-        .join(","),
+        .join(','),
     ),
-  ].join("\n");
+  ].join('\n');
 
-  const blob = new Blob([csv], { type: "text/csv" });
+  const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
-  a.download = "data.csv";
+  a.download = 'data.csv';
   a.click();
   URL.revokeObjectURL(url);
 }
 
 function copyTable(columns: string[], rows: Record<string, any>[]) {
   const text = [
-    columns.join("\t"),
-    ...rows.map((row) => columns.map((c) => String(row[c] ?? "")).join("\t")),
-  ].join("\n");
+    columns.join('\t'),
+    ...rows.map((row) => columns.map((c) => String(row[c] ?? '')).join('\t')),
+  ].join('\n');
   navigator.clipboard.writeText(text);
 }
 
@@ -82,17 +78,16 @@ function copyTable(columns: string[], rows: Record<string, any>[]) {
 function columnTypeIndicator(
   col: string,
   rows: Record<string, any>[],
-): { icon: string; label: string } {
+): { icon: React.ReactNode; label: string } {
   const sample = rows.slice(0, 10).map((r) => r[col]);
-  const nonNull = sample.filter(
-    (v) => v !== null && v !== undefined && v !== "",
-  );
-  if (nonNull.length === 0) return { icon: "Aa", label: "text" };
+  const nonNull = sample.filter((v) => v !== null && v !== undefined && v !== '');
+  if (nonNull.length === 0)
+    return { icon: <Type className="size-3 text-blue-500" />, label: 'text' };
   const allNum = nonNull.every((v) => !isNaN(Number(v)));
-  if (allNum) return { icon: "#", label: "number" };
+  if (allNum) return { icon: <Hash className="size-3 text-emerald-500" />, label: 'number' };
   const allDate = nonNull.every((v) => !isNaN(Date.parse(String(v))));
-  if (allDate) return { icon: "📅", label: "date" };
-  return { icon: "Aa", label: "text" };
+  if (allDate) return { icon: <CalendarDays className="size-3 text-orange-500" />, label: 'date' };
+  return { icon: <Type className="size-3 text-blue-500" />, label: 'text' };
 }
 
 const PAGE_SIZES = [10, 25, 50, 100];
@@ -100,10 +95,10 @@ const PAGE_SIZES = [10, 25, 50, 100];
 export function ChatDataTable({ config }: { config: DataTableConfig }) {
   const { columns, rows, totalRows, aggregationResults } = config;
   const [sortCol, setSortCol] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
 
   // Filter rows by search
@@ -112,7 +107,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
     const q = searchQuery.toLowerCase();
     return rows.filter((row) =>
       columns.some((col) =>
-        String(row[col] ?? "")
+        String(row[col] ?? '')
           .toLowerCase()
           .includes(q),
       ),
@@ -130,9 +125,8 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
       if (vb == null) return -1;
       const na = Number(va);
       const nb = Number(vb);
-      if (!isNaN(na) && !isNaN(nb))
-        return sortDir === "asc" ? na - nb : nb - na;
-      return sortDir === "asc"
+      if (!isNaN(na) && !isNaN(nb)) return sortDir === 'asc' ? na - nb : nb - na;
+      return sortDir === 'asc'
         ? String(va).localeCompare(String(vb))
         : String(vb).localeCompare(String(va));
     });
@@ -145,10 +139,10 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
   const handleSort = useCallback(
     (col: string) => {
       if (sortCol === col) {
-        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
       } else {
         setSortCol(col);
-        setSortDir("asc");
+        setSortDir('asc');
       }
       setPage(0);
     },
@@ -161,37 +155,27 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
     setTimeout(() => setCopied(false), 2000);
   }, [columns, rows]);
 
-  const handleDownload = useCallback(
-    () => downloadCSV(columns, rows),
-    [columns, rows],
-  );
+  const handleDownload = useCallback(() => downloadCSV(columns, rows), [columns, rows]);
 
   if (columns.length === 0 || rows.length === 0) {
-    return (
-      <div className="py-4 text-center text-sm text-muted-foreground">
-        No data returned
-      </div>
-    );
+    return <div className="py-4 text-center text-sm text-muted-foreground">No data returned</div>;
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border/90 bg-white my-4 animate-in fade-in slide-in-from-bottom-2 duration-500 [&_*:focus]:outline-none [&_*:focus-visible]:ring-0">
+    <div className="overflow-hidden rounded-xl border border-border/90 bg-muted my-4 animate-in fade-in slide-in-from-bottom-2 duration-500 [&_*:focus]:outline-none [&_*:focus-visible]:ring-0">
       {/* Aggregation results (KPI cards) */}
       {aggregationResults && Object.keys(aggregationResults).length > 0 && (
         <div className="flex flex-wrap gap-3 border-b border-border/30 px-4 py-3">
           {Object.entries(aggregationResults).map(([key, value]) => {
-            const [op, ...colParts] = key.split("_");
-            const col = colParts.join("_");
+            const [op, ...colParts] = key.split('_');
+            const col = colParts.join('_');
             return (
-              <div
-                key={key}
-                className="flex flex-col rounded-lg bg-transparent px-2 py-1"
-              >
+              <div key={key} className="flex flex-col rounded-lg bg-transparent px-2 py-1">
                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   {op} of {col}
                 </span>
                 <span className="text-lg font-semibold tabular-nums text-foreground">
-                  {typeof value === "number"
+                  {typeof value === 'number'
                     ? value.toLocaleString(undefined, {
                         maximumFractionDigits: 4,
                       })
@@ -219,7 +203,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
           {searchQuery && (
             <button
               type="button"
-              onClick={() => setSearchQuery("")}
+              onClick={() => setSearchQuery('')}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="size-3" />
@@ -233,12 +217,8 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
             onClick={handleCopy}
             className="h-7 gap-1.5 text-[11px] text-muted-foreground focus:ring-0 focus-visible:ring-0"
           >
-            {copied ? (
-              <Check className="size-3 text-emerald-500" />
-            ) : (
-              <Copy className="size-3" />
-            )}
-            {copied ? "Copied" : "Copy"}
+            {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+            {copied ? 'Copied' : 'Copy'}
           </Button>
           <Button
             variant="ghost"
@@ -256,7 +236,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
       <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/20 hover:bg-muted/20 border-b border-border/30">
+            <TableRow className="bg-background hover:bg-background border-b border-border/30">
               {columns.map((col) => {
                 const { icon } = columnTypeIndicator(col, rows);
                 return (
@@ -266,12 +246,12 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
                     onClick={() => handleSort(col)}
                   >
                     <span className="flex items-center gap-1.5">
-                      <span className="text-[10px] opacity-40 font-mono">
+                      <span className="flex items-center justify-center size-5 bg-background border border-border/50 rounded-sm">
                         {icon}
                       </span>
                       <span>{col}</span>
                       {sortCol === col ? (
-                        sortDir === "asc" ? (
+                        sortDir === 'asc' ? (
                           <ArrowUp className="size-3 text-primary" />
                         ) : (
                           <ArrowDown className="size-3 text-primary" />
@@ -289,16 +269,13 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
             {displayRows.map((row, i) => (
               <TableRow
                 key={i}
-                className={cn(
-                  "transition border-border/25",
-                  i % 2 === 1 && "bg-muted/8",
-                )}
+                className={cn('transition border-border/25', i % 2 === 1 && 'bg-muted/8')}
               >
                 {columns.map((col) => (
                   <TableCell
                     key={col}
                     className="max-w-[220px] truncate px-3 py-2 text-xs tabular-nums"
-                    title={String(row[col] ?? "")}
+                    title={String(row[col] ?? '')}
                   >
                     {formatCell(row[col])}
                   </TableCell>
@@ -313,9 +290,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
       <div className="flex items-center justify-between border-t border-border/30 px-3 py-2">
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground">
-            {filteredRows.length !== rows.length
-              ? `${filteredRows.length} matched of `
-              : ""}
+            {filteredRows.length !== rows.length ? `${filteredRows.length} matched of ` : ''}
             {totalRows.toLocaleString()} rows
           </span>
           <div className="h-3 w-px bg-border/40" />

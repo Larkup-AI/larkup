@@ -35,6 +35,12 @@ test.describe.serial('Chat Page', () => {
       await expect(responseElement).toBeVisible({ timeout: 60_000 });
       const responseText = await responseElement.textContent();
       expect(responseText?.length).toBeGreaterThan(10);
+
+      // Search-backed answers expose the exact retrieved sources. This also
+      // covers the empty state when the workspace has no matching evidence.
+      await expect(page.getByTestId('chat-citations')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText(/Sources|No matching sources/)).toBeVisible();
+      await expect(page.getByTestId('citation-list')).toBeHidden();
     }
   });
 
