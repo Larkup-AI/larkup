@@ -8,9 +8,9 @@ export type LayoutVariant = 'sidebar' | 'topnav' | 'collapsed';
 
 interface ThemeCustomizerContextValue {
   theme: ThemeVariant;
-  setTheme: (theme: ThemeVariant) => void;
+  setTheme: (theme: ThemeVariant, persist?: boolean) => void;
   layout: LayoutVariant;
-  setLayout: (layout: LayoutVariant) => void;
+  setLayout: (layout: LayoutVariant, persist?: boolean) => void;
   isMounted: boolean;
 }
 
@@ -27,7 +27,21 @@ export function useThemeCustomizer() {
 export function ThemeCustomizerProvider({ children }: { children: React.ReactNode }) {
   const [isMounted, setIsMounted] = useState(false);
   const [theme, setThemeState] = useState<ThemeVariant>('default');
-  const [layout, setLayout] = useState<LayoutVariant>('sidebar');
+  const [layout, setLayoutState] = useState<LayoutVariant>('sidebar');
+
+  const setTheme = (newTheme: ThemeVariant, persist = true) => {
+    setThemeState(newTheme);
+    if (persist && typeof window !== 'undefined') {
+      localStorage.setItem('app-theme', newTheme);
+    }
+  };
+
+  const setLayout = (newLayout: LayoutVariant, persist = true) => {
+    setLayoutState(newLayout);
+    if (persist && typeof window !== 'undefined') {
+      localStorage.setItem('app-layout', newLayout);
+    }
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -35,7 +49,10 @@ export function ThemeCustomizerProvider({ children }: { children: React.ReactNod
     const savedTheme = localStorage.getItem('app-theme') as ThemeVariant;
     const savedLayout = localStorage.getItem('app-layout') as LayoutVariant;
 
-    if (savedTheme && (savedTheme === 'default' || savedTheme === 'theme-larkup')) {
+    if (
+      savedTheme &&
+      (savedTheme === 'default' || savedTheme === 'theme-larkup' || savedTheme === 'theme-gaia')
+    ) {
       setThemeState(savedTheme);
     }
     if (savedLayout) setLayout(savedLayout);
@@ -50,8 +67,6 @@ export function ThemeCustomizerProvider({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!isMounted) return;
-    localStorage.setItem('app-theme', theme);
-    localStorage.setItem('app-layout', layout);
 
     // Update body classes
     const body = document.body;
@@ -78,7 +93,7 @@ export function ThemeCustomizerProvider({ children }: { children: React.ReactNod
     <ThemeCustomizerContext.Provider
       value={{
         theme,
-        setTheme: setThemeState,
+        setTheme,
         layout,
         setLayout,
         isMounted,

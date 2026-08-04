@@ -30,13 +30,14 @@ export function AppTopNav() {
     <TooltipProvider delay={150}>
       <header
         className={cn(
-          'sticky top-0 z-50 flex h-14 shrink-0 items-center gap-6 border-b border-border px-4 md:px-6 bg-[#F5F5F4] dark:bg-background',
+          'sticky top-0 z-50 flex h-14 shrink-0 items-center gap-6 border-b border-border px-4 md:px-6 bg-sidebar',
         )}
       >
         {/* Brand */}
         <Link href="/chat" aria-label="larkup home" className="flex items-center gap-2.5 shrink-0">
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground  transition-transform hover:scale-105">
-            <img src="/logo9.png" className="size-5" alt="logo" />
+            <img src="/logo9.png" className="size-5 dark:hidden" alt="logo" />
+            <img src="/logo.png" className="size-5 hidden dark:block" alt="logo" />
           </span>
           <span className="font-semibold tracking-tight text-foreground hidden sm:inline-block">
             Larkup

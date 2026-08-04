@@ -113,6 +113,9 @@
   --sidebar-primary: #FFFFFF;
   --sidebar-primary-foreground: #000000;
   --sidebar-border: #2E2E2E;
+  --sidebar-accent: #1A1A1A;
+  --sidebar-accent-foreground: #FAFAFA;
+  --sidebar-ring: #FFFFFF;
 }
 
 @layer base {
