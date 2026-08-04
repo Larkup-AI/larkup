@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { NotionPanel } from '@/components/data/notion-panel';
+import { IntegrationResourcesPanel } from '@/components/data/integration-resources-panel';
 import { useNotionAuth } from '@/hooks/use-notion-auth';
+import { useIntegrationAuth } from '@/hooks/use-integration-auth';
+import { integrations, readyIntegrations } from '@larkup/integrations';
 import { cn } from '@/lib/utils';
-import { CableIcon } from 'lucide-react';
+import { CableIcon, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,125 +23,35 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface Integration {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  icon: string;
-  available: boolean;
-}
-
-const INTEGRATIONS: Integration[] = [
-  {
-    id: 'notion',
-    name: 'Notion',
-    category: 'Documentation',
-    description: 'Pages, docs, and knowledge bases.',
-    icon: '/notion.png',
-    available: true,
-  },
-  {
-    id: 'google-drive',
-    name: 'Google Drive',
-    category: 'Documentation',
-    description: 'Files, folders, and shared drives.',
-    icon: '/icons/google-drive.png',
-    available: false,
-  },
-  {
-    id: 'google-calendar',
-    name: 'Google Calendar',
-    category: 'Communication',
-    description: 'Events, schedules, and meetings.',
-    icon: '/icons/google-calender.png',
-    available: false,
-  },
-  {
-    id: 'slack',
-    name: 'Slack',
-    category: 'Communication',
-    description: 'Channels, messages, and DMs.',
-    icon: '/icons/slack.png',
-    available: false,
-  },
-  {
-    id: 'salesforce',
-    name: 'Salesforce',
-    category: 'CRM',
-    description: 'Accounts, contacts, and opportunities.',
-    icon: '/icons/Salesforce.png',
-    available: false,
-  },
-  {
-    id: 'linear',
-    name: 'Linear',
-    category: 'Project Management',
-    description: 'Issues, projects, and roadmaps.',
-    icon: '/icons/linear.png',
-    available: false,
-  },
-  {
-    id: 'jira',
-    name: 'Jira',
-    category: 'Project Management',
-    description: 'Issues, sprints, and projects.',
-    icon: '/icons/jira.png',
-    available: false,
-  },
-  {
-    id: 'confluence',
-    name: 'Confluence',
-    category: 'Documentation',
-    description: 'Pages, spaces, and knowledge bases.',
-    icon: '/icons/Confluence.png',
-    available: false,
-  },
-  {
-    id: 'sharepoint',
-    name: 'SharePoint',
-    category: 'Documentation',
-    description: 'Sites, lists, and document libraries.',
-    icon: '/icons/sharepoint.png',
-    available: false,
-  },
-  {
-    id: 'sap',
-    name: 'SAP',
-    category: 'ERP',
-    description: 'Business processes, data, and analytics.',
-    icon: '/icons/sap.png',
-    available: false,
-  },
-  {
-    id: 'outlook',
-    name: 'Outlook',
-    category: 'Communication',
-    description: 'Emails, contacts, and calendars.',
-    icon: '/icons/outlook.png',
-    available: false,
-  },
-  {
-    id: 'onedrive',
-    name: 'OneDrive',
-    category: 'Documentation',
-    description: 'Files, folders, and shared drives.',
-    icon: '/icons/onedrive.png',
-    available: false,
-  },
-];
-
 export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
   const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const {
-    data: notionData,
-    isLoading: isNotionLoading,
-    mutate: mutateNotion,
-  } = useSWR('/api/integrations/notion', (url) => fetch(url).then((res) => res.json()));
+    data: connectionData,
+    isLoading: isLoadingStatus,
+    mutate: mutateConnections,
+  } = useSWR('/api/integrations', (url) => fetch(url).then((res) => res.json()));
+  const connectedStatus = Object.fromEntries(
+    (connectionData?.integrations ?? []).map((integration: { id: string; connected: boolean }) => [
+      integration.id,
+      integration.connected,
+    ]),
+  ) as Record<string, boolean>;
+  const visibleIntegrations = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const priority = (integration: (typeof integrations)[number]) => {
+      if (integration.status === 'ready' && connectedStatus[integration.id]) return 0;
+      return integration.status === 'ready' ? 1 : 2;
+    };
 
-  const connectedStatus: Record<string, boolean> = { notion: notionData?.connected ?? false };
-  const isLoadingStatus = isNotionLoading && notionData === undefined;
+    return integrations
+      .filter(
+        (integration) =>
+          !query || `${integration.name} ${integration.category}`.toLowerCase().includes(query),
+      )
+      .sort((left, right) => priority(left) - priority(right));
+  }, [connectedStatus, search]);
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [requestName, setRequestName] = useState('');
@@ -193,7 +106,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
   };
 
   const fetchStatuses = () => {
-    mutateNotion();
+    mutateConnections();
   };
 
   const { connectToNotion: handleConnectNotion } = useNotionAuth({
@@ -205,13 +118,29 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
       toast.error(error);
     },
   });
+  const { connect: connectIntegration } = useIntegrationAuth({
+    onSuccess: (integration) => {
+      fetchStatuses();
+      const name = integrations.find((item) => item.id === integration)?.name ?? 'integration';
+      toast.success(`Successfully connected to ${name}`);
+    },
+    onError: (error) => toast.error(error),
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Available integrations */}
+    <div className="space-y-6 pb-9">
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-foreground">Available Integrations</h3>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              aria-label="Search integrations"
+              placeholder="Search integrations..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="h-9 bg-background pl-9"
+            />
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -223,17 +152,19 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
           </Button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {INTEGRATIONS.map((integration) => {
+          {visibleIntegrations.map((integration) => {
             const isConnected = connectedStatus[integration.id];
 
             return (
               <div
                 key={integration.id}
+                data-testid="integration-card"
+                data-integration-id={integration.id}
                 className={cn(
                   'group flex items-center justify-between gap-3.5 rounded-xl border px-4 py-3.5 text-left transition-all',
-                  integration.available
+                  integration.status === 'ready'
                     ? 'border-border bg-white/80 hover:border-primary/20 hover:bg-white'
-                    : 'border-border/40 opacity-60',
+                    : 'border-border/60 bg-muted/15',
                 )}
               >
                 <div className="flex items-center gap-3.5 min-w-0">
@@ -260,46 +191,52 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
                 </div>
 
                 <div className="shrink-0">
-                  {integration.available ? (
-                    isLoadingStatus ? (
-                      <Button variant="outline" size="sm" className="h-8 w-21" disabled>
-                        <Loader2 className="size-3.5 animate-spin" />
-                      </Button>
-                    ) : isConnected || false ? (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="h-8 w-21"
-                        onClick={() => setActiveIntegration(integration.id)}
-                      >
-                        Configure
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-21 bg-muted/50 hover:bg-muted/80 "
-                        onClick={() => {
-                          if (integration.id === 'notion') {
-                            handleConnectNotion();
-                          } else {
-                            setActiveIntegration(integration.id);
-                          }
-                        }}
-                      >
-                        Connect
-                      </Button>
-                    )
-                  ) : (
-                    <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded-md px-2 py-0.5 shrink-0">
-                      Soon
+                  {integration.status === 'coming-soon' ? (
+                    <span className="rounded-md border border-border/70 bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground">
+                      Coming soon
                     </span>
+                  ) : isLoadingStatus ? (
+                    <Button variant="outline" size="sm" className="h-8 w-21" disabled>
+                      <Loader2 className="size-3.5 animate-spin" />
+                    </Button>
+                  ) : isConnected ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-8 w-21"
+                      onClick={() => setActiveIntegration(integration.id)}
+                    >
+                      Configure
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-21 bg-muted/50 hover:bg-muted/80 "
+                      onClick={() =>
+                        integration.id === 'notion'
+                          ? handleConnectNotion()
+                          : connectIntegration(integration.id)
+                      }
+                    >
+                      Connect
+                    </Button>
                   )}
                 </div>
               </div>
             );
           })}
         </div>
+        {search.trim() &&
+          !integrations.some((integration) =>
+            `${integration.name} ${integration.category}`
+              .toLowerCase()
+              .includes(search.trim().toLowerCase()),
+          ) && (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              No integrations match “{search.trim()}”.
+            </p>
+          )}
       </div>
 
       <Dialog
@@ -309,18 +246,32 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
             setActiveIntegration(null);
             // Re-fetch status when closing modal to update UI
             if (activeIntegration === 'notion') {
-              mutateNotion();
+              mutateConnections();
             }
           }
         }}
       >
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
           <DialogHeader className="sr-only">
             <DialogTitle>Integration Panel</DialogTitle>
           </DialogHeader>
           {activeIntegration === 'notion' && (
             <NotionPanel onAdded={onAdded} onClose={() => setActiveIntegration(null)} />
           )}
+          {activeIntegration &&
+            activeIntegration !== 'notion' &&
+            (() => {
+              const integration = readyIntegrations.find((item) => item.id === activeIntegration);
+              return integration ? (
+                <IntegrationResourcesPanel
+                  integration={integration.id}
+                  name={integration.name}
+                  icon={integration.icon}
+                  onAdded={onAdded}
+                  onClose={() => setActiveIntegration(null)}
+                />
+              ) : null;
+            })()}
         </DialogContent>
       </Dialog>
 

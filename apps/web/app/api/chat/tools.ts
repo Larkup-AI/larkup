@@ -51,9 +51,10 @@ function documentEditModelOutput({ output }: { output: any }) {
 export async function queryKnowledgeBase(query: string, topK: number, serverId: string | null) {
   const doRetrieve = async () => {
     const config = await readConfig();
-    // Retrieve enough candidates to preserve document diversity in large,
-    // mixed collections without sending an unbounded result set to the model.
-    const candidateCount = Math.max(topK * 6, 30);
+    // Retrieve a small diverse pool. Sending a very large candidate set into
+    // the answer model noticeably delays the first streamed token without
+    // helping the user-facing source list.
+    const candidateCount = Math.max(topK * 6, 24);
     // Document status is more precise than the last index-run summary: a later
     // partial run can be marked failed even though earlier uploaded and scraped
     // documents were successfully indexed and remain queryable.
@@ -276,7 +277,10 @@ async function formatKnowledgeHits(
         title: hit.title ?? 'Untitled',
         url: hit.url ?? '',
         score: Number((hit.score ?? 0).toFixed(3)),
-        text: queryAwareExcerpt(hit.text ?? '', query, 4_000),
+        // This is evidence for both the model and the source citation UI. A
+        // focused excerpt is enough to answer accurately and keeps the first
+        // response substantially faster than passing whole document chunks.
+        text: queryAwareExcerpt(hit.text ?? '', query, 1_600),
         // PDF extraction stores its verified upload URLs on the source
         // document, rather than creating media-library assets. Expose those
         // URLs explicitly so the presentation tool can validate and render
@@ -325,12 +329,12 @@ export async function getChatTools(context: {
   const builtInTools: Record<string, any> = {
     searchKnowledgeBase: tool({
       description:
-        "HIGHEST PRIORITY TOOL — Search the user's private RAG knowledge base. ALWAYS use this FIRST before webSearch or any other tool when the question may relate to the user's indexed data. This includes questions about documents, files, images, diagrams, videos, or anything the user may have uploaded. Do not use for general knowledge, casual conversation, or writing tasks. Search once with a focused query. If it returns no relevant evidence or an error and the question asks for public/current information, webSearch is available once as a fallback. For media, inspect the returned timeline and endingContext, and reuse exact mediaAssetId/startSecs/endSecs values with presentMedia when a preview is useful. Never guess timestamps.",
+        "HIGHEST PRIORITY TOOL — Search the user's private RAG knowledge base. ALWAYS use this FIRST before webSearch or any other tool when the user asks a question. You MUST use this tool if you are asked a question and do not already have the exact answer in your context. Even if the question seems like personal trivia, general knowledge, or random facts (e.g., 'what is my favorite food?', 'what is X?'), you MUST search the knowledge base because the user's uploaded documents likely contain the answer. Search once with a focused query. If it returns no relevant evidence and the question asks for public/current info, webSearch is available once as a fallback. For media, reuse exact mediaAssetId/startSecs/endSecs values with presentMedia when a preview is useful.",
       inputSchema: z.object({
         query: z.string().describe('The search query for the knowledge base.'),
       }),
       execute: async ({ query }) => {
-        return queryKnowledgeBase(query, 5, serverId ?? null);
+        return queryKnowledgeBase(query, 4, serverId ?? null);
       },
     }),
 
@@ -480,7 +484,7 @@ export async function getChatTools(context: {
 
     generateVisualization: tool({
       description:
-        'Generate an interactive chart visualization. Use this when the user asks to see trends, comparisons, distributions, or any visual representation of data. The UI will render this as an interactive Recharts chart.',
+        'Generate an interactive chart visualization. Use this when the user asks to see trends, comparisons, distributions, or any visual representation of data. The UI will render this as an interactive Recharts chart automatically. CRITICAL: Do NOT attempt to embed a markdown image (e.g. ![chart](url)) after calling this tool. The UI handles the rendering. Simply summarize the chart verbally.',
       inputSchema: z.object({
         chartType: z
           .enum(['bar', 'area', 'line', 'pie', 'scatter', 'radar'])
@@ -507,6 +511,12 @@ export async function getChatTools(context: {
             }),
           )
           .describe('Data series to plot.'),
+        colors: z
+          .array(z.string())
+          .optional()
+          .describe(
+            'Array of hex colors to use for the chart palette. The AI should decide and pick elegant, classy colors that contrast beautifully against a soft, muted background. Make it dynamic and appropriate for the data.',
+          ),
         stacked: z.boolean().optional().describe('Whether to stack bar/area charts.'),
         showLegend: z.boolean().optional().default(true).describe('Whether to show the legend.'),
         xAxisLabel: z.string().optional().describe('Label for the X axis.'),
@@ -623,45 +633,58 @@ export async function getChatTools(context: {
           ),
       }),
       execute: async ({ imageUrl, prompt }) => {
-        try {
-          const cached = await getCachedImageAnalysis(imageUrl, prompt);
-          if (cached) return { analysis: cached, cached: true };
+        const analyzeIndexedImage = async () => {
+          try {
+            // A model may only inspect an image that is actually part of the
+            // active corpus. This prevents guessed URLs from becoming a chat
+            // preview or an image-analysis request.
+            const documents = await readDocuments();
+            const isIndexedImage = documents.some(
+              (document) =>
+                document.status === 'indexed' &&
+                (document.metadata?.imageUrl === imageUrl ||
+                  (Array.isArray(document.metadata?.images) &&
+                    document.metadata.images.some((image: any) => image?.imageUrl === imageUrl))),
+            );
+            if (!isIndexedImage) {
+              return { error: 'That image is not available in the indexed material.' };
+            }
 
-          // Fetch the image to base64
-          // Handle both absolute URLs and relative local uploads
-          const fetchUrl = imageUrl.startsWith('/')
-            ? new URL(
-                imageUrl,
+            const cached = await getCachedImageAnalysis(imageUrl, prompt);
+            if (cached) return { analysis: cached, cached: true };
+
+            const fetchUrl = imageUrl.startsWith('/')
+              ? new URL(
+                  imageUrl,
+                  context.origin ?? `http://127.0.0.1:${process.env.PORT || 3000}`,
+                ).toString()
+              : imageUrl;
+            const res = await fetch(fetchUrl);
+            if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
+            const base64 = Buffer.from(await res.arrayBuffer()).toString('base64');
+
+            const descRes = await fetch(
+              new URL(
+                '/api/describe-image',
                 context.origin ?? `http://127.0.0.1:${process.env.PORT || 3000}`,
-              ).toString()
-            : imageUrl;
-          const res = await fetch(fetchUrl);
-          if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
-          const buffer = await res.arrayBuffer();
-          const base64 = Buffer.from(buffer).toString('base64');
-          const mimeType = res.headers.get('content-type') || 'image/png';
-          const dataUrl = `data:${mimeType};base64,${base64}`;
+              ).toString(),
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ base64, prompt }),
+              },
+            );
 
-          // Post to our describe-image endpoint which handles model setup
-          const descRes = await fetch(
-            new URL(
-              '/api/describe-image',
-              context.origin ?? `http://127.0.0.1:${process.env.PORT || 3000}`,
-            ).toString(),
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ base64, prompt }),
-            },
-          );
+            if (!descRes.ok) throw new Error(`Vision API error: ${descRes.statusText}`);
+            const data = await descRes.json();
+            await cacheImageAnalysis(imageUrl, prompt, data.description);
+            return { analysis: data.description, cached: false };
+          } catch (err: any) {
+            return { error: `Failed to analyze image: ${err.message}` };
+          }
+        };
 
-          if (!descRes.ok) throw new Error(`Vision API error: ${descRes.statusText}`);
-          const data = await descRes.json();
-          await cacheImageAnalysis(imageUrl, prompt, data.description);
-          return { analysis: data.description, cached: false };
-        } catch (err: any) {
-          return { error: `Failed to analyze image: ${err.message}` };
-        }
+        return serverId ? runWithServer(serverId, analyzeIndexedImage) : analyzeIndexedImage();
       },
     }),
 
@@ -1060,6 +1083,12 @@ export async function getChatTools(context: {
         // Keeping it available prevents an enabled web-search configuration
         // from silently removing the user's local knowledge base.
         'searchKnowledgeBase',
+        // Data analysis and visualizations are part of the first-party chat
+        // experience. Keep them available even when a legacy enabled-tools
+        // configuration only lists marketplace tools.
+        'queryTabularData',
+        'generateVisualization',
+        'executeAnalysis',
         // PDF/image hits can require one visual pass after retrieval. This is
         // available only to a follow-up tool step, never auto-run on chat.
         'analyzeImageDeeply',

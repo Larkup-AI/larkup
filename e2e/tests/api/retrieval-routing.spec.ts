@@ -8,7 +8,23 @@ import {
   retrievalToolsForStep,
 } from '../../../apps/web/lib/retrieval-routing';
 
-const toolNames = ['searchKnowledgeBase', 'webSearch', 'analyzeImageDeeply', 'presentMedia'];
+const toolNames = [
+  'searchKnowledgeBase',
+  'webSearch',
+  'analyzeImageDeeply',
+  'presentMedia',
+  'queryTabularData',
+  'generateVisualization',
+  'executeAnalysis',
+];
+
+const postRetrievalTools = [
+  'analyzeImageDeeply',
+  'presentMedia',
+  'queryTabularData',
+  'generateVisualization',
+  'executeAnalysis',
+];
 
 test.describe('Retrieval-only chat routing', () => {
   test('keeps private-index questions local first and never exposes web fallback', () => {
@@ -29,7 +45,7 @@ test.describe('Retrieval-only chat routing', () => {
         forceWebSearch: false,
         toolNames,
       })?.activeTools,
-    ).toEqual(['analyzeImageDeeply', 'presentMedia']);
+    ).toEqual(postRetrievalTools);
   });
 
   test('routes named match results to the knowledge base', () => {
@@ -51,7 +67,7 @@ test.describe('Retrieval-only chat routing', () => {
         forceWebSearch: false,
         toolNames,
       })?.activeTools,
-    ).toEqual(['analyzeImageDeeply', 'presentMedia']);
+    ).toEqual(postRetrievalTools);
   });
 
   test('does not expose web search for ordinary conversation', () => {
@@ -66,7 +82,7 @@ test.describe('Retrieval-only chat routing', () => {
         forceWebSearch: false,
         toolNames,
       })?.activeTools,
-    ).toEqual(['analyzeImageDeeply', 'presentMedia']);
+    ).toEqual(postRetrievalTools);
   });
 
   test('reuses successful evidence only for clear conversational follow-ups', () => {

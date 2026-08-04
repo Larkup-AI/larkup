@@ -33,16 +33,15 @@ import { Button } from '@/components/ui/button';
 /* ------------------------------------------------------------------ */
 
 const CHART_COLORS = [
+  '#10b981', // green (emerald)
   '#f97316', // orange
-  '#10b981', // emerald
   '#3b82f6', // blue
-  '#8b5cf6', // violet
-  '#f43f5e', // rose
-  '#f59e0b', // amber
-  '#06b6d4', // cyan
-  '#64748b', // slate
-  '#ec4899', // pink
-  '#14b8a6', // teal
+  '#22c55e', // green
+  '#f59e0b', // amber/orange
+  '#0ea5e9', // sky blue
+  '#84cc16', // lime green
+  '#ea580c', // dark orange
+  '#2563eb', // dark blue
 ];
 
 /* Gradient definitions for area / bar fills */
@@ -111,6 +110,7 @@ export interface ChartConfig {
   data: Record<string, any>[];
   xAxisKey: string;
   series: SeriesConfig[];
+  colors?: string[];
   stacked?: boolean;
   showLegend?: boolean;
   xAxisLabel?: string;
@@ -207,6 +207,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     data,
     xAxisKey,
     series,
+    colors,
     stacked,
     showLegend = true,
     xAxisLabel,
@@ -215,10 +216,14 @@ export function ChatChart({ config }: { config: ChartConfig }) {
 
   const stableData = useDeepMemo(() => data, [data]);
 
-  const chartColors = useDeepMemo(
-    () => series.map((s, i) => s.color || CHART_COLORS[i % CHART_COLORS.length]),
-    [series],
-  );
+  const chartColors = useDeepMemo(() => {
+    const palette = colors && colors.length > 0 ? colors : CHART_COLORS;
+    return series.map((s, i) => s.color || palette[i % palette.length]);
+  }, [series, colors]);
+
+  const pieColors = useDeepMemo(() => {
+    return colors && colors.length > 0 ? colors : CHART_COLORS;
+  }, [colors]);
 
   const chartDots = useDeepMemo(() => {
     return chartColors.map((color) => ({ r: 3, fill: color }));
@@ -405,7 +410,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               {stableData.map((entry, i) => (
                 <Cell
                   key={`cell-${i}`}
-                  fill={chartColors[i % chartColors.length]}
+                  fill={pieColors[i % pieColors.length]}
                   stroke="var(--card)"
                   strokeWidth={2}
                 />
@@ -502,7 +507,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
       // ResponsiveContainer's ResizeObserver (it keeps reporting new
       // sizes every animation frame), which caused the
       // "Maximum update depth exceeded" crash. Fade-only is safe.
-      className="overflow-hidden rounded-xl border border-border/70 bg-white my-4 animate-in fade-in duration-300 [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_*:focus-visible]:ring-0"
+      className="overflow-hidden rounded-xl border border-border/70 bg-muted my-4 animate-in fade-in duration-300 [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_*:focus-visible]:ring-0"
     >
       {/* Header */}
       <div className="flex flex-row justify-between items-center gap-4 border-b border-border/30 px-4 py-3">

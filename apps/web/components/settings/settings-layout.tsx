@@ -13,6 +13,7 @@ import {
   type LucideIcon,
   Grid2X2Plus,
   BarChart3,
+  Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,7 +49,7 @@ const SECTION_GROUPS: SectionGroup[] = [
       { id: 'general', label: 'General', icon: Settings2 },
       { id: 'models', label: 'AI Models', icon: Sparkles },
       { id: 'storage', label: 'Storage', icon: Database },
-      { id: 'search-web', label: 'Search & Scraping', icon: Search },
+      { id: 'search-web', label: 'Search & Scraping', icon: Globe },
       { id: 'connections', label: 'Connections', icon: Plug },
     ],
   },
@@ -102,7 +103,7 @@ export function SettingsLayout({ activeSection, onSectionChange, children }: Set
                       className={cn(
                         'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-all duration-200 text-left outline-none',
                         active
-                          ? 'font-medium text-foreground bg-sidebar-accent'
+                          ? 'font-medium text-foreground bg-sidebar-accent/70'
                           : 'font-normal text-muted-foreground hover:bg-muted hover:text-foreground',
                       )}
                     >

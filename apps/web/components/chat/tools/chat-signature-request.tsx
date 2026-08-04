@@ -394,7 +394,7 @@ export function ChatSignatureRequest({
   return (
     <Card className="my-4 shadow-none! bg-transparent w-full max-w-3xl border-border">
       <CardHeader className="flex flex-row items-center gap-3 space-y-0">
-        <div className="size-10 shrink-0 rounded-md overflow-hidden bg-white border border-border flex items-center justify-center p-1.5 shadow-sm">
+        <div className="size-10 shrink-0 rounded-md overflow-hidden bg-white border border-border flex items-center justify-center p-1.5 35">
           <img src={iconPath} alt={displayFileName} className="w-full h-full object-contain" />
         </div>
         <div>

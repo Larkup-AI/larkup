@@ -10,15 +10,27 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 test.describe.serial('Data Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/add');
-    await page.waitForSelector('text=Add to knowledge', { timeout: 60_000 });
+    await page.waitForSelector('text=Add Websites', { timeout: 60_000 });
   });
 
-  test('page loads with correct heading', async ({ page }) => {
+  test('page changes its guidance to match the active data tab', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Add Websites', exact: true })).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Add to knowledge', exact: true }),
+      page.getByText('Add a URL or discover and crawl websites for your knowledge base.'),
     ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Files', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Add Files', exact: true })).toBeVisible();
     await expect(
-      page.getByText('Add websites, files, text, and media. We handle the rest in the background.'),
+      page.getByText('Upload PDFs, documents, spreadsheets, CSVs, JSON files, and more.'),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Media', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Add Media', exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Integrations', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Add Integrations', exact: true }),
     ).toBeVisible();
   });
 
@@ -33,6 +45,130 @@ test.describe.serial('Data Page', () => {
 
     await page.getByRole('button', { name: 'Media', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Add media' })).toBeDisabled();
+  });
+
+  test('shows ready integrations alongside the complete coming-soon catalog', async ({ page }) => {
+    await page.getByRole('button', { name: 'Integrations', exact: true }).click();
+    for (const integration of [
+      'Notion',
+      'Google Analytics',
+      'Google Calendar',
+      'Google Docs',
+      'Google Drive',
+      'Google Maps',
+      'Google Meet',
+      'Google Sheets',
+      'Google Slides',
+      'Slack',
+      'GitHub',
+      'Confluence',
+    ]) {
+      await expect(page.getByText(integration, { exact: true })).toBeVisible();
+    }
+    await expect(page.getByText('Airtable', { exact: true })).toBeVisible();
+    await expect(page.getByText('Microsoft Teams', { exact: true })).toBeVisible();
+    await expect(page.getByText('Zoom', { exact: true })).toBeVisible();
+    await expect(page.getByText('Coming soon', { exact: true }).first()).toBeVisible();
+    for (const removedIntegration of [
+      'Microsoft Dynamics 365',
+      'monday.com',
+      'Confluence Data Center',
+    ]) {
+      await expect(page.getByText(removedIntegration, { exact: true })).toHaveCount(0);
+    }
+    await page.getByRole('textbox', { name: 'Search integrations' }).fill('Airtable');
+    await expect(page.getByText('Airtable', { exact: true })).toBeVisible();
+    await expect(page.getByText('Google Drive', { exact: true })).toHaveCount(0);
+  });
+
+  test('promotes connected integrations before other supported sources', async ({ page }) => {
+    await page.route('**/api/integrations', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          integrations: [
+            { id: 'notion', connected: true },
+            { id: 'slack', connected: true },
+          ],
+        }),
+      });
+    });
+
+    await page.goto('/add?subtab=notion');
+    await expect(page.getByTestId('integration-card').first()).toHaveAttribute(
+      'data-integration-id',
+      'notion',
+    );
+    await expect(page.getByTestId('integration-card').nth(1)).toHaveAttribute(
+      'data-integration-id',
+      'slack',
+    );
+    await expect(page.getByTestId('integration-card').nth(2)).toHaveAttribute(
+      'data-integration-id',
+      'google-drive',
+    );
+  });
+
+  test('starts Google OAuth directly from the integration card', async ({ page }) => {
+    await page.getByRole('button', { name: 'Integrations', exact: true }).click();
+    await page.evaluate(() => {
+      window.open = ((url: string | URL) => {
+        sessionStorage.setItem('integration-oauth-url', String(url));
+        return null;
+      }) as typeof window.open;
+    });
+
+    await page
+      .locator('[data-integration-id="google-calendar"]')
+      .getByRole('button', { name: 'Connect' })
+      .click();
+    await expect
+      .poll(() => page.evaluate(() => sessionStorage.getItem('integration-oauth-url')))
+      .toContain('/google-calendar?redirect_to=');
+  });
+
+  test('Notion resource rows truncate long values without horizontal overflow', async ({
+    page,
+  }) => {
+    await page.route('**/api/integrations', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ integrations: [{ id: 'notion', connected: true }] }),
+      });
+    });
+    await page.route('**/api/integrations/notion', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          connected: true,
+          configured: true,
+          pages: [
+            {
+              id: 'long-page',
+              title:
+                'https://brandlogos.net/wp-content/uploads/2025/12/google_antigravity-logo_brandlogos.net_qw4jc.png',
+              icon: 'https://cdn.notion.so/very-long-external-icon-path.png',
+              url: 'https://notion.so/long-page',
+              lastEdited: '2026-08-04T00:00:00.000Z',
+              parentType: 'workspace',
+            },
+          ],
+          databases: [],
+        }),
+      });
+    });
+
+    await page.goto('/add?subtab=notion');
+    await page.getByRole('button', { name: 'Configure', exact: true }).click();
+
+    const list = page.getByTestId('notion-resource-list');
+    await expect(list).toBeVisible();
+    await expect(
+      page.getByTitle(
+        'https://brandlogos.net/wp-content/uploads/2025/12/google_antigravity-logo_brandlogos.net_qw4jc.png',
+      ),
+    ).toBeVisible();
+    expect(await list.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   });
 
   // ── File Uploads ──────────────────────────────────────────────────────────

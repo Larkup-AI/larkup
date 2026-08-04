@@ -82,6 +82,29 @@ const SUB_TABS = [
 type TopTabId = 'add' | 'corpus';
 type SubTabId = (typeof SUB_TABS)[number]['id'];
 
+const SUB_TAB_INTRO: Record<SubTabId, { title: string; description: string }> = {
+  files: {
+    title: 'Add Files',
+    description: 'Upload PDFs, documents, spreadsheets, CSVs, JSON files, and more.',
+  },
+  text: {
+    title: 'Add Text',
+    description: 'Paste notes, documentation, transcripts, or any text you want to search.',
+  },
+  website: {
+    title: 'Add Websites',
+    description: 'Add a URL or discover and crawl websites for your knowledge base.',
+  },
+  media: {
+    title: 'Add Media',
+    description: 'Upload images, audio, and video, or add media from a URL.',
+  },
+  notion: {
+    title: 'Add Integrations',
+    description: 'Connect your tools and import the data your team already uses.',
+  },
+};
+
 export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -245,6 +268,8 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
     toast.success('Media indexed and added to your Knowledge Base.');
   }, [mutateDocuments, mutateIndex]);
 
+  const activeSubTabIntro = SUB_TAB_INTRO[activeSubTab];
+
   return (
     <div className="px-6 md:px-8">
       {view === 'add' && (
@@ -252,11 +277,9 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
           <div className="mb-2 flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                Add to knowledge
+                {activeSubTabIntro.title}
               </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Add websites, files, text, and media. We handle the rest in the background.
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{activeSubTabIntro.description}</p>
             </div>
             {jobs.length > 0 && (
               <button

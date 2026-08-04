@@ -89,7 +89,7 @@ export function SimpleSidebar() {
                       className={cn(
                         'group relative flex size-10 items-center justify-center rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         active
-                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          ? 'bg-primary text-primary-foreground 35'
                           : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
                       )}
                     />

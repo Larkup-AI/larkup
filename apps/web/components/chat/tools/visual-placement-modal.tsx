@@ -250,7 +250,7 @@ export function VisualPlacementModal({
             </div>
           )}
 
-          <div ref={containerRef} className="relative shadow-sm bg-white overflow-hidden shrink-0">
+          <div ref={containerRef} className="relative 35 bg-white overflow-hidden shrink-0">
             <canvas ref={canvasRef} className="block w-full h-auto" />
 
             {!isLoading && (

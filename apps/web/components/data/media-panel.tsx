@@ -1238,7 +1238,7 @@ function MediaContent({
                         return (
                           <div
                             key={i}
-                            className="relative w-full overflow-hidden rounded-xl aspect-video shadow-md border border-border/50 ring-1 ring-border/20 bg-black"
+                            className="relative w-full overflow-hidden rounded-xl aspect-video 35 border border-border/50 ring-1 ring-border/20 bg-black"
                           >
                             <iframe
                               src={embedUrl}
@@ -1255,7 +1255,7 @@ function MediaContent({
                             key={i}
                             src={embedUrl}
                             controls
-                            className="w-full max-w-sm rounded-md aspect-video bg-muted object-cover shadow-sm border border-border"
+                            className="w-full max-w-sm rounded-md aspect-video bg-muted object-cover 35 border border-border"
                           />
                         );
                       }

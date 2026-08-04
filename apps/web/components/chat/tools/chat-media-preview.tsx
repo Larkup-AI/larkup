@@ -30,13 +30,31 @@ export function ChatMediaPreview({
   endSecs?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const assetUrl = mediaUrl || `/api/media/${assetId}`;
+  const [imageUnavailable, setImageUnavailable] = useState(false);
+  // Media is rendered only from a server-validated presentMedia result. Do
+  // not invent a URL from an identifier emitted in model text: it could point
+  // to a missing or unrelated asset and creates the misleading dummy preview
+  // shown in the previous chat experience.
+  const assetUrl = mediaUrl;
+  if (!assetUrl) return null;
   const playbackUrl =
     startSecs !== undefined
       ? `${assetUrl.split('#')[0]}#t=${startSecs}${endSecs !== undefined ? `,${endSecs}` : ''}`
       : assetUrl;
 
   if (mediaType === 'image') {
+    if (imageUnavailable) {
+      return (
+        <div className="my-2 w-full max-w-xl rounded-lg border border-border bg-card p-3">
+          <p className="text-xs text-muted-foreground">This source image is no longer available.</p>
+          <MediaCitationFooter
+            icon={<ImageIcon className="size-3 text-muted-foreground" />}
+            fileName={fileName}
+            sourceUrl={sourceUrl}
+          />
+        </div>
+      );
+    }
     return (
       <>
         <div className="my-2 w-full max-w-xl overflow-hidden rounded-lg border border-border bg-card">
@@ -50,6 +68,7 @@ export function ChatMediaPreview({
               alt={fileName ?? 'Image'}
               className="max-h-[420px] w-full object-contain"
               loading="lazy"
+              onError={() => setImageUnavailable(true)}
             />
             <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/20 group-hover:opacity-100">
               <Maximize2 className="size-5 text-white" />
@@ -80,6 +99,7 @@ export function ChatMediaPreview({
               alt={fileName ?? 'Image'}
               className="max-h-[80vh] max-w-[90vw] rounded-lg object-contain"
               onClick={(event) => event.stopPropagation()}
+              onError={() => setImageUnavailable(true)}
             />
           </div>
         )}

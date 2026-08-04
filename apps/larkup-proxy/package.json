@@ -7,7 +7,7 @@
     "dev:hono": "hono dev api/index.ts"
   },
   "dependencies": {
-    "@larkup/integrations": "workspace:*",
+    "@larkup/integrations": "0.1.0",
     "hono": "^4.1.0"
   },
   "devDependencies": {
