@@ -51,7 +51,7 @@ export function UnifiedSidebar() {
     <TooltipProvider delay={150}>
       <aside
         className={cn(
-          'sticky top-0 hidden h-screen shrink-0 flex-col self-start py-4 md:flex transition-all duration-300 ease-in-out bg-background',
+          'sticky top-0 hidden h-screen shrink-0 flex-col self-start py-4 md:flex transition-all duration-300 ease-in-out bg-sidebar',
           collapsed ? 'w-18' : 'w-60',
         )}
       >
@@ -72,7 +72,8 @@ export function UnifiedSidebar() {
                   />
                 }
               >
-                <img src="/logo9.png" className="size-5" alt="logo" />
+                <img src="/logo9.png" className="size-5 dark:hidden" alt="logo" />
+                <img src="/logo.png" className="size-5 hidden dark:block" alt="logo" />
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
                 Expand sidebar
@@ -82,7 +83,8 @@ export function UnifiedSidebar() {
             <>
               <Link href="/chat" className="flex items-center gap-2.5">
                 <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground  transition-transform hover:scale-105">
-                  <img src="/logo9.png" className="size-5" alt="logo" />
+                  <img src="/logo9.png" className="size-5 dark:hidden" alt="logo" />
+                  <img src="/logo.png" className="size-5 hidden dark:block" alt="logo" />
                 </span>
                 <span className="text-sm font-semibold tracking-tight text-foreground">Larkup</span>
               </Link>
@@ -125,8 +127,8 @@ export function UnifiedSidebar() {
                         className={cn(
                           'group relative flex size-10 items-center justify-center rounded-xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
                           active
-                            ? 'bg-[#F0F0F0] dark:bg-muted text-foreground'
-                            : 'text-muted-foreground hover:bg-[#EBEBEB] dark:hover:bg-muted hover:text-foreground',
+                            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                         )}
                       />
                     }
@@ -154,8 +156,8 @@ export function UnifiedSidebar() {
                 className={cn(
                   'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   active
-                    ? 'bg-[#F0F0F0] dark:bg-muted text-foreground'
-                    : 'text-muted-foreground hover:bg-[#EBEBEB] dark:hover:bg-muted hover:text-foreground',
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
               >
                 <Icon className="size-4.5 shrink-0" strokeWidth={active ? 2.25 : 1.75} />

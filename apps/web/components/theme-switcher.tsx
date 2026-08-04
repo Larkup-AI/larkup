@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 
 const THEMES: { id: ThemeVariant; name: string; color: string; description: string }[] = [
   { id: 'default', name: 'Default', color: '#000000', description: 'Clean & minimal' },
-  { id: 'theme-larkup', name: 'Larkup', color: '#F3C751', description: 'Warm & golden' },
+  { id: 'theme-gaia', name: 'Larkup', color: '#F5F4ED', description: 'Warm ivory & dark' },
 ];
 
 export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {
@@ -142,10 +142,10 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                         key={t.id}
                         onClick={() => setTheme(t.id)}
                         className={cn(
-                          'relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 p-3 text-xs transition-all hover:bg-muted/50',
+                          'relative flex flex-col items-center justify-center gap-2 rounded-lg border p-3 text-xs transition-all hover:bg-muted/50',
                           theme === t.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-transparent hover:border-border',
+                            ? 'border-primary/60 bg-primary/5'
+                            : 'border-border/40 hover:border-border',
                         )}
                       >
                         <div
@@ -162,8 +162,8 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                   </div>
                 </div>
 
-                {/* Color Mode (Light/Dark/System) */}
-                <div className="space-y-3">
+                {/* Color Mode — hidden for now */}
+                {/* <div className="space-y-3">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Monitor className="h-4 w-4 text-muted-foreground" /> Mode
                   </label>
@@ -181,10 +181,10 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                           key={mode.id}
                           onClick={() => setColorMode(mode.id)}
                           className={cn(
-                            'flex flex-col items-center gap-1.5 rounded-lg border-2 p-2.5 text-xs transition-all hover:bg-muted/50',
+                            'flex flex-col items-center gap-1.5 rounded-lg border p-2.5 text-xs transition-all hover:bg-muted/50',
                             colorMode === mode.id
-                              ? 'border-primary bg-primary/5'
-                              : 'border-transparent hover:border-border',
+                              ? 'border-primary/60 bg-primary/5'
+                              : 'border-border/40 hover:border-border',
                           )}
                         >
                           <Icon className="size-4" />
@@ -193,7 +193,7 @@ function ThemeSwitcherContent({ floating = true }: { floating?: boolean }) {
                       );
                     })}
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
           )}

@@ -46,7 +46,8 @@ export function AppSidebar() {
               />
             }
           >
-            <img src={'/logo9.png'} className="size-6.5" alt="logo" />
+            <img src="/logo9.png" className="size-6.5 dark:hidden" alt="logo" />
+            <img src="/logo.png" className="size-6.5 hidden dark:block" alt="logo" />
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
             Larkup
