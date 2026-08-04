@@ -20,11 +20,11 @@ export type SettingsSection =
   | 'general'
   | 'models'
   | 'storage'
-  | 'server'
+  | 'search-web'
   | 'connections'
+  | 'server'
   | 'prompts'
   | 'playground'
-  | 'appearance'
   | 'deployment'
   | 'marketplace'
   | 'tool-settings'
@@ -48,9 +48,8 @@ const SECTION_GROUPS: SectionGroup[] = [
       { id: 'general', label: 'General', icon: Settings2 },
       { id: 'models', label: 'AI Models', icon: Sparkles },
       { id: 'storage', label: 'Storage', icon: Database },
-      { id: 'server', label: 'Larkup Server', icon: Server },
+      { id: 'search-web', label: 'Search & Scraping', icon: Search },
       { id: 'connections', label: 'Connections', icon: Plug },
-      // { id: 'deployment', label: 'Deploy & Share', icon: Share2 },
     ],
   },
   {
@@ -63,9 +62,9 @@ const SECTION_GROUPS: SectionGroup[] = [
   {
     label: 'Advanced',
     items: [
+      { id: 'server', label: 'Larkup Server', icon: Server },
       { id: 'prompts', label: 'Agent Customization', icon: Grid2X2Plus },
       { id: 'playground', label: 'Playground', icon: Search },
-      { id: 'appearance', label: 'Appearance', icon: Palette },
       { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     ],
   },
@@ -103,8 +102,8 @@ export function SettingsLayout({ activeSection, onSectionChange, children }: Set
                       className={cn(
                         'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-all duration-200 text-left outline-none',
                         active
-                          ? 'font-medium text-foreground bg-[#F0F0F0] dark:bg-muted'
-                          : 'font-normal text-muted-foreground hover:bg-[#EBEBEB] dark:hover:bg-muted hover:text-foreground',
+                          ? 'font-medium text-foreground bg-sidebar-accent'
+                          : 'font-normal text-muted-foreground hover:bg-muted hover:text-foreground',
                       )}
                     >
                       <Icon className="size-4 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
@@ -130,8 +129,8 @@ export function SettingsLayout({ activeSection, onSectionChange, children }: Set
               className={cn(
                 'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors border',
                 active
-                  ? 'bg-[#F0F0F0] dark:bg-muted border-transparent text-foreground'
-                  : 'bg-transparent border-transparent text-muted-foreground hover:bg-[#EBEBEB] dark:hover:bg-muted',
+                  ? 'bg-sidebar-accent border-transparent text-foreground'
+                  : 'bg-transparent border-transparent text-muted-foreground hover:bg-muted',
               )}
             >
               <Icon className="size-3.5" />
