@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.61
+
+### Patch Changes
+
+- 81a619b: Ship only the standalone production runtime in the npm package and externalize the SSH runtime dependency during the Next.js build.
+
 ## 0.1.60
 
 ### Patch Changes
