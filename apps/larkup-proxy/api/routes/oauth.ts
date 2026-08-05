@@ -1,9 +1,58 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Hono } from 'hono';
-import { getIntegration, isIntegrationId } from '@larkup/integrations';
+import { getIntegration } from '@larkup/integrations';
+import type { OAuthIntegrationDefinition } from '@larkup/integrations';
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const app = new Hono();
+
+// Atlassian replaces an account's existing grant when the same OAuth client
+// receives new consent. Both product flows must therefore request this shared
+// read-only scope set or connecting Jira would remove Confluence access (and
+// vice versa).
+const atlassianReadScopes = [
+  'read:jira-work',
+  'read:confluence-content.all',
+  'read:confluence-space.summary',
+  'offline_access',
+];
+
+/**
+ * Keep OAuth working while the proxy consumes a separately published registry
+ * package. The Atlassian entries also preserve the shared-scope rule if that
+ * package predates the Jira and Confluence fix.
+ */
+const proxyOAuthOverrides: Record<string, OAuthIntegrationDefinition> = {
+  jira: {
+    authorizationUrl: 'https://auth.atlassian.com/authorize',
+    tokenUrl: 'https://auth.atlassian.com/oauth/token',
+    scopes: atlassianReadScopes,
+    clientIdEnv: 'ATLASSIAN_CLIENT_ID',
+    clientSecretEnv: 'ATLASSIAN_CLIENT_SECRET',
+    accessTokenEnv: 'ATLASSIAN_ACCESS_TOKEN',
+    clientAuthentication: 'body',
+    authorizationParams: { audience: 'api.atlassian.com', prompt: 'consent' },
+  },
+  confluence: {
+    authorizationUrl: 'https://auth.atlassian.com/authorize',
+    tokenUrl: 'https://auth.atlassian.com/oauth/token',
+    scopes: atlassianReadScopes,
+    clientIdEnv: 'ATLASSIAN_CLIENT_ID',
+    clientSecretEnv: 'ATLASSIAN_CLIENT_SECRET',
+    accessTokenEnv: 'ATLASSIAN_ACCESS_TOKEN',
+    clientAuthentication: 'body',
+    authorizationParams: { audience: 'api.atlassian.com', prompt: 'consent' },
+  },
+  linear: {
+    authorizationUrl: 'https://linear.app/oauth/authorize',
+    tokenUrl: 'https://api.linear.app/oauth/token',
+    scopes: ['read'],
+    clientIdEnv: 'LINEAR_CLIENT_ID',
+    clientSecretEnv: 'LINEAR_CLIENT_SECRET',
+    accessTokenEnv: 'LINEAR_ACCESS_TOKEN',
+    clientAuthentication: 'body',
+  },
+};
 
 /**
  * Centralized OAuth broker for all registry integrations. The app that starts
@@ -13,7 +62,7 @@ const app = new Hono();
 app.get('/:integration', (c) => {
   const integrationId = c.req.param('integration');
   const redirectTo = c.req.query('redirect_to');
-  const integration = getIntegration(integrationId);
+  const integration = getOAuthIntegration(integrationId);
   if (!integration || !redirectTo) return c.text('Unknown integration or missing redirect_to', 400);
   if (!isAllowedCallback(redirectTo, integrationId))
     return c.text('Unapproved OAuth callback URL', 400);
@@ -35,6 +84,8 @@ app.get('/:integration', (c) => {
   for (const [key, value] of Object.entries(integration.oauth.authorizationParams ?? {}))
     authorizationUrl.searchParams.set(key, value);
   if (integrationId === 'notion') authorizationUrl.searchParams.set('owner', 'user');
+  if (integrationId === 'jira' || integrationId === 'confluence')
+    authorizationUrl.searchParams.set('prompt', 'consent');
 
   return c.redirect(authorizationUrl.toString());
 });
@@ -44,7 +95,8 @@ app.get('/:integration/callback', async (c) => {
   const code = c.req.query('code');
   const signedState = c.req.query('state');
   const oauthError = c.req.query('error');
-  if (!isIntegrationId(integrationId) || !signedState) return c.text('Invalid OAuth callback', 400);
+  if (!getOAuthIntegration(integrationId) || !signedState)
+    return c.text('Invalid OAuth callback', 400);
 
   const state = verifyState(signedState);
   if (
@@ -56,7 +108,7 @@ app.get('/:integration/callback', async (c) => {
   if (oauthError || !code)
     return redirectResult(state.redirectTo, { error: oauthError ?? 'missing_code' });
 
-  const integration = getIntegration(integrationId)!;
+  const integration = getOAuthIntegration(integrationId)!;
   const clientId = process.env[integration.oauth.clientIdEnv];
   const clientSecret = process.env[integration.oauth.clientSecretEnv];
   if (!clientId || !clientSecret)
@@ -94,6 +146,16 @@ function getProxyCallback(requestUrl: string, integrationId: string): string {
   return `${new URL(requestUrl).origin}/api/oauth/${integrationId}/callback`;
 }
 
+function getOAuthIntegration(
+  integrationId: string,
+): { oauth: OAuthIntegrationDefinition } | undefined {
+  const oauth = proxyOAuthOverrides[integrationId];
+  if (oauth) return { oauth };
+  const integration = getIntegration(integrationId);
+  if (integration?.status === 'ready') return integration;
+  return undefined;
+}
+
 function redirectResult(redirectTo: string, parameters: Record<string, string>): Response {
   const url = new URL(redirectTo);
   for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
@@ -107,8 +169,14 @@ function isAllowedCallback(value: string, integrationId: string): boolean {
       process.env.LARKUP_ALLOWED_REDIRECT_ORIGINS ?? 'http://localhost:4567,http://localhost:3000'
     )
       .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean);
+      .map((origin) => {
+        try {
+          return new URL(origin.trim()).origin;
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((origin): origin is string => Boolean(origin));
     return (
       allowedOrigins.includes(url.origin) &&
       url.pathname === `/api/integrations/${integrationId}/callback`
