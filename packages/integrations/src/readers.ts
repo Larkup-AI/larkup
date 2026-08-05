@@ -17,9 +17,21 @@ async function atlassianCloudsWithScope(
     'https://api.atlassian.com/oauth/token/accessible-resources',
     token,
   )) as unknown as Json[];
-  const matchingClouds = clouds.filter(
-    (cloud) => !Array.isArray(cloud.scopes) || cloud.scopes.includes(scope),
-  );
+
+  // Atlassian's accessible-resources response may omit the `scopes` array
+  // entirely, or use classic scope names (e.g. "confluence-content.all")
+  // vs. granular names (e.g. "read:confluence-content.all"). Accept all of:
+  //   1. No scopes array → treat as full access
+  //   2. Exact match
+  //   3. Partial/suffix match (the scope key without the "read:" prefix)
+  const scopeSuffix = scope.replace(/^read:/, '');
+  const matchingClouds = clouds.filter((cloud) => {
+    if (!Array.isArray(cloud.scopes)) return true;
+    return cloud.scopes.some(
+      (s: string) => s === scope || s === scopeSuffix || s.endsWith(`:${scopeSuffix}`),
+    );
+  });
+
   if (!matchingClouds.length)
     throw new Error(
       `No ${product} site with the required access is available. Ask a site admin for ${product} access, then reconnect.`,

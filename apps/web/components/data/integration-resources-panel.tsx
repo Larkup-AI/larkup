@@ -105,28 +105,33 @@ export function IntegrationResourcesPanel({
     );
   if (!data?.connected)
     return (
-      <div className="flex flex-col items-center gap-4 p-4 py-12 text-center">
-        <img src={icon} alt="" className="size-9 object-contain" />
-        <div>
-          <h3 className="text-lg font-semibold">Connect {name}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Read and import selected knowledge into your corpus.
-          </p>
-          {data?.error && <p className="mt-2 text-xs text-destructive">{data.error}</p>}
-        </div>
-        <div className="flex gap-2">
+      <div className="flex w-full min-w-0 flex-col">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4 py-12 text-center">
+          <img src={icon} alt="" className="size-9 object-contain" />
+          <div>
+            <h3 className="text-lg font-semibold">Connect {name}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Read and import selected knowledge into your corpus.
+            </p>
+            {data?.error && <p className="mt-2 text-xs text-destructive">{data.error}</p>}
+          </div>
           <Button onClick={() => connect(integration)}>Connect {name}</Button>
-          {data?.error && (
+        </div>
+        {data?.error && (
+          <DialogFooter className="!m-0 flex flex-row items-center justify-between space-x-0 gap-2 border-t border-border/70 bg-muted/50 p-4 sm:justify-between">
             <Button variant="destructive" onClick={disconnect} disabled={disconnecting}>
               {disconnecting ? (
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="size-4 mr-2 animate-spin" />
               ) : (
-                <Unplug className="size-4" />
+                <Unplug className="size-4 mr-2" />
               )}
               Disconnect
             </Button>
-          )}
-        </div>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        )}
       </div>
     );
   return (
@@ -138,20 +143,15 @@ export function IntegrationResourcesPanel({
             {name} connected{' '}
             <span className="text-muted-foreground">· {resources.length} items</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={() => mutate()}>
-              <RefreshCw className="mr-1 size-3" />
-              Refresh
-            </Button>
-            <Button variant="destructive" size="sm" onClick={disconnect} disabled={disconnecting}>
-              {disconnecting ? (
-                <Loader2 className="mr-1 size-3 animate-spin" />
-              ) : (
-                <Unplug className="mr-1 size-3" />
-              )}
-              Disconnect
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => mutate()}
+            className="h-7 shrink-0 gap-1.5 text-xs"
+          >
+            <RefreshCw className="size-3" />
+            Refresh
+          </Button>
         </div>
         <div className="max-h-96 overflow-y-auto rounded-lg border">
           <label className="flex items-center gap-3 border-b px-3 py-2 text-sm font-medium">
@@ -188,13 +188,24 @@ export function IntegrationResourcesPanel({
           ))}
         </div>
       </div>
-      <DialogFooter className="!m-0 border-t bg-muted/50 p-4">
-        <Button variant="outline" onClick={onClose}>
-          Close
+      <DialogFooter className="!m-0 flex flex-row items-center justify-between space-x-0 gap-2 border-t border-border/70 bg-muted/50 p-4 sm:justify-between">
+        <Button variant="destructive" onClick={disconnect} disabled={importing || disconnecting}>
+          {disconnecting ? (
+            <Loader2 className="size-4 mr-2 animate-spin" />
+          ) : (
+            <Unplug className="size-4 mr-2" />
+          )}
+          Disconnect
         </Button>
-        <Button disabled={!selected.size || importing} onClick={importSelected}>
-          {importing && <Loader2 className="mr-2 size-4 animate-spin" />}Import selected
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={onClose} disabled={importing || disconnecting}>
+            Cancel
+          </Button>
+          <Button disabled={!selected.size || importing || disconnecting} onClick={importSelected}>
+            {importing && <Loader2 className="mr-2 size-4 animate-spin" />}
+            Import {selected.size || ''} selected
+          </Button>
+        </div>
       </DialogFooter>
     </div>
   );
