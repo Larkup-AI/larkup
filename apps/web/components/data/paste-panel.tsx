@@ -33,8 +33,8 @@ export function PastePanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: title.trim() || 'Pasted text',
-          content,
-          source: 'paste',
+          content: content,
+          source: 'text',
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Failed');

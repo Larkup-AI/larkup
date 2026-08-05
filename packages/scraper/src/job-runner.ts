@@ -52,7 +52,7 @@ async function advancePageTarget(
       throw new Error('Scraping blocked by anti-bot protection (e.g. Cloudflare)');
     }
     const added = await addCrawledDocuments(jobId, [
-      { title: page.title, url: page.url, content: page.markdown, source: 'scrape' },
+      { title: page.title, url: page.url, content: page.markdown, source: 'website' },
     ]);
     return {
       added,
@@ -95,7 +95,7 @@ async function advanceDomainTarget(
       pagesCrawled = status.completed || pagesCrawled;
       for (const p of status.pages) {
         if (!isBlockedPage(p.markdown)) {
-          batch.push({ title: p.title, url: p.url, content: p.markdown, source: 'scrape' });
+          batch.push({ title: p.title, url: p.url, content: p.markdown, source: 'website' });
         }
       }
       pulled++;

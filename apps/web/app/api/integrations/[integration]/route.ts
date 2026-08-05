@@ -69,7 +69,7 @@ export async function POST(
             body: JSON.stringify({
               title: document.title,
               content: document.content,
-              source: 'paste',
+              source: 'integrations',
               url: document.url,
               metadata: {
                 integrationId: selected.integration.id,

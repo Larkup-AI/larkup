@@ -283,7 +283,7 @@ export function addTabularDocuments(
       const doc: SourceDocument = {
         id: randomUUID(),
         title,
-        source: 'tabular',
+        source: 'files',
         content,
         charCount: content.length,
         status: 'unindexed',

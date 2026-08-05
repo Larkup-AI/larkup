@@ -695,7 +695,7 @@ export async function getChatTools(context: {
         filter: z
           .object({
             source: z
-              .enum(['paste', 'upload', 'scrape', 'tabular', 'media'])
+              .enum(['text', 'files', 'website', 'media', 'integrations'])
               .optional()
               .describe('Filter by document source type.'),
             status: z

@@ -137,7 +137,7 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             title: title || 'Untitled Notion Page',
             content,
-            source: 'paste',
+            source: 'integrations',
             url: pageInfo.url,
             metadata: {
               notionPageId: pageId,
