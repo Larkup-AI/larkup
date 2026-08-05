@@ -203,8 +203,8 @@ importers:
   apps/larkup-proxy:
     dependencies:
       '@larkup/integrations':
-        specifier: workspace:*
-        version: link:../../packages/integrations
+        specifier: 0.1.0
+        version: 0.1.0
       hono:
         specifier: ^4.12.34
         version: 4.13.0
@@ -1930,6 +1930,9 @@ packages:
     os: [darwin, linux, win32]
     peerDependencies:
       apache-arrow: '>=15.0.0 <=18.1.0'
+
+  '@larkup/integrations@0.1.0':
+    resolution: {integrity: sha512-r8E+xmrHI4TI1Ugv2DtX4ja8iisKiU8qAHCahI67qtuJK7gfjdg56LKSL4Fb6JtEwenwg/DbBd41tmf/RytAIw==}
 
   '@lezer/common@1.5.2':
     resolution: {integrity: sha512-sxQE460fPZyU3sdc8lafxiPwJHBzZRy/udNFynGQky1SePYBdhkBl1kOagA9uT3pxR8K09bOrmTUqA9wb/PjSQ==}
@@ -9060,6 +9063,8 @@ snapshots:
     transitivePeerDependencies:
       - '@types/node'
       - encoding
+
+  '@larkup/integrations@0.1.0': {}
 
   '@lezer/common@1.5.2': {}
 

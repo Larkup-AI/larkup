@@ -6,7 +6,7 @@ import { NotionPanel } from '@/components/data/notion-panel';
 import { IntegrationResourcesPanel } from '@/components/data/integration-resources-panel';
 import { useNotionAuth } from '@/hooks/use-notion-auth';
 import { useIntegrationAuth } from '@/hooks/use-integration-auth';
-import { integrations, readyIntegrations } from '@larkup/integrations';
+import { integrations } from '@larkup/integrations';
 import { cn } from '@/lib/utils';
 import { CableIcon, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,37 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+
+const googleIntegrationsAwaitingVerification = new Set([
+  'google-analytics',
+  'google-calendar',
+  'google-docs',
+  'google-drive',
+  'google-maps',
+  'google-meet',
+  'google-sheets',
+  'google-slides',
+]);
+
+const hiddenIntegrationIds = new Set(['jira-data-center']);
+const releasedIntegrationIds = new Set(['jira', 'linear']);
+
+// The display policy lives here so a cached integration-package release cannot
+// reintroduce retired cards or hide integrations that are live in the proxy.
+// Google remains unavailable until its production OAuth verification is complete.
+const panelIntegrations = integrations
+  .filter((integration) => !hiddenIntegrationIds.has(integration.id))
+  .map((integration) => {
+    if (googleIntegrationsAwaitingVerification.has(integration.id)) {
+      return { ...integration, status: 'coming-soon' as const };
+    }
+
+    if (releasedIntegrationIds.has(integration.id)) {
+      return { ...integration, status: 'ready' as const };
+    }
+
+    return integration;
+  });
 
 export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
   const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
@@ -40,12 +71,12 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
   ) as Record<string, boolean>;
   const visibleIntegrations = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const priority = (integration: (typeof integrations)[number]) => {
+    const priority = (integration: (typeof panelIntegrations)[number]) => {
       if (integration.status === 'ready' && connectedStatus[integration.id]) return 0;
       return integration.status === 'ready' ? 1 : 2;
     };
 
-    return integrations
+    return panelIntegrations
       .filter(
         (integration) =>
           !query || `${integration.name} ${integration.category}`.toLowerCase().includes(query),
@@ -121,7 +152,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
   const { connect: connectIntegration } = useIntegrationAuth({
     onSuccess: (integration) => {
       fetchStatuses();
-      const name = integrations.find((item) => item.id === integration)?.name ?? 'integration';
+      const name = panelIntegrations.find((item) => item.id === integration)?.name ?? 'integration';
       toast.success(`Successfully connected to ${name}`);
     },
     onError: (error) => toast.error(error),
@@ -228,7 +259,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
           })}
         </div>
         {search.trim() &&
-          !integrations.some((integration) =>
+          !panelIntegrations.some((integration) =>
             `${integration.name} ${integration.category}`
               .toLowerCase()
               .includes(search.trim().toLowerCase()),
@@ -261,14 +292,19 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
           {activeIntegration &&
             activeIntegration !== 'notion' &&
             (() => {
-              const integration = readyIntegrations.find((item) => item.id === activeIntegration);
+              const integration = panelIntegrations.find(
+                (item) => item.id === activeIntegration && item.status === 'ready',
+              );
               return integration ? (
                 <IntegrationResourcesPanel
                   integration={integration.id}
                   name={integration.name}
                   icon={integration.icon}
                   onAdded={onAdded}
-                  onClose={() => setActiveIntegration(null)}
+                  onClose={() => {
+                    setActiveIntegration(null);
+                    mutateConnections();
+                  }}
                 />
               ) : null;
             })()}
