@@ -590,7 +590,7 @@ export function ScrapePanel({
     const hasSelection = selectedUrls.length > 0;
     const isUrl = inputMode === 'url';
     onActionChange?.({
-      label: isUrl ? 'Add website' : hasSelection ? 'Add selected' : 'Search website',
+      label: isUrl ? 'Add website' : hasSelection ? 'Add selected' : 'Search topic',
       onClick: () => {
         if (isUrl) void addManual();
         else if (hasSelection) handleStartClick();
