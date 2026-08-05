@@ -165,3 +165,79 @@
   --chart-4: #444444;
   --chart-5: #222222;
 }
+
+/* ── White Theme ── */
+.theme-linear {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --panel: #f9f9f9;
+  --panel-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #0a0a0a;
+  --primary-foreground: #ffffff;
+  --secondary: #f9f9f9;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f9f9f9;
+  --muted-foreground: #737373;
+  --accent: #f9f9f9;
+  --accent-foreground: #0a0a0a;
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #0a0a0a;
+  --sidebar: #f9f9f9;
+  --sidebar-foreground: #737373;
+  --sidebar-primary: #0a0a0a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-border: #e5e5e5;
+  --sidebar-accent: #e5e5e5;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-ring: #0a0a0a;
+  --chart-1: #0a0a0a;
+  --chart-2: #555555;
+  --chart-3: #888888;
+  --chart-4: #bbbbbb;
+  --chart-5: #e8e6dd;
+}
+
+.dark.theme-linear,
+.theme-linear .dark {
+  --background: #000000;
+  --foreground: #fafafa;
+  --card: #0a0a0a;
+  --card-foreground: #fafafa;
+  --panel: #111111;
+  --panel-foreground: #fafafa;
+  --popover: #0a0a0a;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #0a0a0a;
+  --secondary: #222222;
+  --secondary-foreground: #fafafa;
+  --muted: #222222;
+  --muted-foreground: #a3a3a3;
+  --accent: #222222;
+  --accent-foreground: #fafafa;
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: #262626;
+  --input: #262626;
+  --ring: #fafafa;
+  --sidebar: #111111;
+  --sidebar-foreground: #a3a3a3;
+  --sidebar-primary: #fafafa;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-border: #262626;
+  --sidebar-accent: #222222;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-ring: #fafafa;
+  --chart-1: #fafafa;
+  --chart-2: #a3a3a3;
+  --chart-3: #737373;
+  --chart-4: #404040;
+  --chart-5: #262626;
+}

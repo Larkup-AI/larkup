@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-export type ThemeVariant = 'default' | 'theme-larkup' | 'theme-gaia';
+export type ThemeVariant = 'default' | 'theme-larkup' | 'theme-gaia' | 'theme-linear';
 
 export type LayoutVariant = 'sidebar' | 'topnav' | 'collapsed';
 
@@ -26,7 +26,7 @@ export function useThemeCustomizer() {
 
 export function ThemeCustomizerProvider({ children }: { children: React.ReactNode }) {
   const [isMounted, setIsMounted] = useState(false);
-  const [theme, setThemeState] = useState<ThemeVariant>('default');
+  const [theme, setThemeState] = useState<ThemeVariant>('theme-gaia');
   const [layout, setLayoutState] = useState<LayoutVariant>('sidebar');
 
   const setTheme = (newTheme: ThemeVariant, persist = true) => {
@@ -51,7 +51,10 @@ export function ThemeCustomizerProvider({ children }: { children: React.ReactNod
 
     if (
       savedTheme &&
-      (savedTheme === 'default' || savedTheme === 'theme-larkup' || savedTheme === 'theme-gaia')
+      (savedTheme === 'default' ||
+        savedTheme === 'theme-larkup' ||
+        savedTheme === 'theme-gaia' ||
+        savedTheme === 'theme-linear')
     ) {
       setThemeState(savedTheme);
     }
