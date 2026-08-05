@@ -48,6 +48,8 @@ local-chat-connection-larkup
 # ── Desktop Binaries ─────────────────────────────
 apps/desktop/src-tauri/binaries/
 apps/desktop/src-tauri/target/
+.pnpm-store/
+*.tsbuildinfo
 
 # ── Sensitive / Internal ─────────────────────────
 npm-login.sh

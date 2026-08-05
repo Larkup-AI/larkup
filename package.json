@@ -32,6 +32,10 @@
     ]
   },
   "pnpm": {
+    "patchedDependencies": {
+      "read-yaml-file@1.1.0": "patches/read-yaml-file@1.1.0.patch",
+      "tsup": "patches/tsup.patch"
+    },
     "overrides": {
       "typescript": "^6.0.3",
       "undici": "^6.28.0",
