@@ -263,7 +263,7 @@ RESPONSE FORMATTING (Analytics Style):
 /* ------------------------------------------------------------------ */
 
 /** How a document entered the corpus. */
-export type DocumentSource = 'paste' | 'upload' | 'scrape' | 'tabular' | 'media';
+export type DocumentSource = 'text' | 'files' | 'website' | 'media' | 'integrations';
 
 /**
  * A single cleaned document in the corpus. This is the unit that Phase 3

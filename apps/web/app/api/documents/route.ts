@@ -91,8 +91,8 @@ export async function POST(req: Request) {
     const doc = await addDocument({
       title: body.title ?? 'Untitled',
       content: body.content,
-      source: body.source === 'upload' ? 'upload' : 'paste',
-      url: body.url,
+      source: body.source === 'files' ? 'files' : 'text',
+      url: body.url || '',
       metadata: body.metadata,
     });
     return NextResponse.json({ document: doc }, { status: 201 });

@@ -396,7 +396,7 @@ export function UploadPanel({
           payloads.push({
             title: f.name,
             content: contentStr,
-            source: 'upload',
+            source: 'files',
             url: fileUrl,
             metadata:
               uploadedImages.length > 0
@@ -420,7 +420,8 @@ export function UploadPanel({
           payloads.push({
             title: `${f.name} - Line ${i + 1}`,
             content: line,
-            source: 'upload',
+            url: fileUrl,
+            source: 'files',
           });
         });
       } else if (f.format === 'structured' && f.rows) {
@@ -457,9 +458,9 @@ export function UploadPanel({
           if (content.trim()) {
             payloads.push({
               title,
-              content,
+              content: JSON.stringify(f.tabularRows),
               metadata,
-              source: f.indexAsTabular ? 'tabular' : 'upload',
+              source: 'files',
             });
           }
         }

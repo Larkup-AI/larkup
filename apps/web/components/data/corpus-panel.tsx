@@ -6,7 +6,6 @@ import { formatErrorMessage } from '@/lib/error-formatter';
 import {
   FileText,
   Trash2,
-  ClipboardPaste,
   FileUp,
   Globe,
   Pencil,
@@ -14,10 +13,12 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Database,
   Film,
   Upload,
   Eye,
+  Type,
+  Image,
+  Plug,
 } from 'lucide-react';
 import {
   Select,
@@ -53,12 +54,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
-const SOURCE_META: Record<DocumentSource, { label: string; icon: typeof Globe }> = {
-  scrape: { label: 'Scraped', icon: Globe },
-  paste: { label: 'Pasted', icon: ClipboardPaste },
-  upload: { label: 'Uploaded', icon: FileUp },
-  tabular: { label: 'Tabular', icon: Database },
-  media: { label: 'Media', icon: Film },
+const SOURCE_META: Record<DocumentSource, { label: string; icon: any }> = {
+  website: { label: 'Website', icon: Globe },
+  text: { label: 'Text', icon: Type },
+  files: { label: 'Files', icon: FileUp },
+  media: { label: 'Media', icon: Image },
+  integrations: { label: 'Integrations', icon: Plug },
 };
 
 export function CorpusPanel({
@@ -184,27 +185,30 @@ export function CorpusPanel({
     <>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between pb-3">
         <div className="flex items-center gap-3">
-          <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{filteredDocuments.length}</span> document
-            {filteredDocuments.length === 1 ? '' : 's'} in corpus
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: 'all', label: 'All Sources' },
+              ...Object.entries(SOURCE_META).map(([key, meta]) => ({ id: key, label: meta.label })),
+            ].map((tab) => {
+              const isActive = sourceFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSourceFilter(tab.id as any)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    isActive
+                      ? 'bg-muted text-foreground'
+                      : 'border border-border bg-transparent text-muted-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          {documents.length > 0 && (
-            <Select value={sourceFilter} onValueChange={(v: any) => setSourceFilter(v)}>
-              <SelectTrigger className="w-35 shadow-none border-border/70 bg-white  h-8 text-xs">
-                <SelectValue placeholder="All Sources" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sources</SelectItem>
-                {Object.entries(SOURCE_META).map(([key, meta]) => (
-                  <SelectItem key={key} value={key}>
-                    {meta.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           <Select
             value={statusFilter}
             onValueChange={(v) => v && setStatusFilter(v as 'all' | 'indexed' | 'unindexed')}
