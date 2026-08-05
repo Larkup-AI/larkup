@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.62
+
+### Patch Changes
+
+- 7805168: Align the npm runtime dependency on Next.js with the standalone production build.
+
 ## 0.1.61
 
 ### Patch Changes
