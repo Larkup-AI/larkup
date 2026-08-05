@@ -5,6 +5,11 @@
   "bin": {
     "larkup": "./bin/larkup.js"
   },
+  "files": [
+    "bin",
+    ".next/standalone",
+    "public"
+  ],
   "scripts": {
     "dev": "next dev -p 4567",
     "build": "next build",
