@@ -1,0 +1,7 @@
+diff --git a/index.js b/index.js
+index 9f1ffd8..45eabc8 100644
+--- a/index.js
++++ b/index.js
+@@ -8 +8 @@
+-const parse = data => yaml.safeLoad(stripBom(data))
++const parse = data => yaml.load(stripBom(data))
