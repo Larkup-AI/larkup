@@ -10,12 +10,7 @@ const app = new Hono();
 // receives new consent. Both product flows must therefore request this shared
 // read-only scope set or connecting Jira would remove Confluence access (and
 // vice versa).
-const atlassianReadScopes = [
-  'read:jira-work',
-  'read:confluence-content.all',
-  'read:confluence-space.summary',
-  'offline_access',
-];
+const atlassianReadScopes = ['read:jira-work', 'read:page:confluence', 'offline_access'];
 
 /**
  * Keep OAuth working while the proxy consumes a separately published registry
@@ -29,7 +24,7 @@ const proxyOAuthOverrides: Record<string, OAuthIntegrationDefinition> = {
     scopes: atlassianReadScopes,
     clientIdEnv: 'ATLASSIAN_CLIENT_ID',
     clientSecretEnv: 'ATLASSIAN_CLIENT_SECRET',
-    accessTokenEnv: 'ATLASSIAN_ACCESS_TOKEN',
+    accessTokenEnv: 'JIRA_ACCESS_TOKEN',
     clientAuthentication: 'body',
     authorizationParams: { audience: 'api.atlassian.com', prompt: 'consent' },
   },
@@ -39,7 +34,7 @@ const proxyOAuthOverrides: Record<string, OAuthIntegrationDefinition> = {
     scopes: atlassianReadScopes,
     clientIdEnv: 'ATLASSIAN_CLIENT_ID',
     clientSecretEnv: 'ATLASSIAN_CLIENT_SECRET',
-    accessTokenEnv: 'ATLASSIAN_ACCESS_TOKEN',
+    accessTokenEnv: 'CONFLUENCE_ACCESS_TOKEN',
     clientAuthentication: 'body',
     authorizationParams: { audience: 'api.atlassian.com', prompt: 'consent' },
   },

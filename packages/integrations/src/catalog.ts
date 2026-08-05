@@ -7,8 +7,7 @@ import type {
 
 export const atlassianReadScopes = [
   'read:jira-work',
-  'read:confluence-content.all',
-  'read:confluence-space.summary',
+  'read:page:confluence',
   'offline_access',
 ] as const;
 
@@ -230,7 +229,7 @@ export const readyIntegrations = [
       scopes: [...atlassianReadScopes],
       clientIdEnv: 'ATLASSIAN_CLIENT_ID',
       clientSecretEnv: 'ATLASSIAN_CLIENT_SECRET',
-      accessTokenEnv: 'ATLASSIAN_ACCESS_TOKEN',
+      accessTokenEnv: 'JIRA_ACCESS_TOKEN',
       clientAuthentication: 'body',
       authorizationParams: { audience: 'api.atlassian.com', prompt: 'consent' },
     },
@@ -265,7 +264,7 @@ export const readyIntegrations = [
       scopes: [...atlassianReadScopes],
       clientIdEnv: 'ATLASSIAN_CLIENT_ID',
       clientSecretEnv: 'ATLASSIAN_CLIENT_SECRET',
-      accessTokenEnv: 'ATLASSIAN_ACCESS_TOKEN',
+      accessTokenEnv: 'CONFLUENCE_ACCESS_TOKEN',
       clientAuthentication: 'body',
       authorizationParams: { audience: 'api.atlassian.com', prompt: 'consent' },
     },

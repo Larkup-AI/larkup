@@ -46,12 +46,7 @@ test('Atlassian integrations request one shared scope set', () => {
   const jiraScopes = getIntegration('jira')!.oauth.scopes;
   const confluenceScopes = getIntegration('confluence')!.oauth.scopes;
   assert.deepEqual(jiraScopes, confluenceScopes);
-  assert.deepEqual(jiraScopes, [
-    'read:jira-work',
-    'read:confluence-content.all',
-    'read:confluence-space.summary',
-    'offline_access',
-  ]);
+  assert.deepEqual(jiraScopes, ['read:jira-work', 'read:page:confluence', 'offline_access']);
 });
 
 test('the full coming-soon catalog remains visible without enabling unfinished readers', () => {
@@ -325,7 +320,7 @@ test('Atlassian readers use only sites that expose their product scope', async (
     if (url.includes('accessible-resources'))
       return Response.json([
         { id: 'jira-cloud', scopes: ['read:jira-work'] },
-        { id: 'confluence-cloud', scopes: ['read:confluence-content.all'] },
+        { id: 'confluence-cloud', scopes: ['read:page:confluence'] },
       ]);
     if (url.includes('/ex/confluence/confluence-cloud/'))
       return Response.json({

@@ -29,6 +29,7 @@ NPM_USER="$(npm whoami)"
 echo "Authenticated to npm as ${NPM_USER}."
 
 echo "Building npm release targets..."
+pnpm --filter @larkup/integrations build
 pnpm --filter @larkup/sandbox build
 pnpm --filter @larkup/tool-doc-editor build
 pnpm --filter @larkup/tool-video-audio build

@@ -315,7 +315,7 @@ const readers: Record<IntegrationId, IntegrationReader> = {
               `https://api.atlassian.com/ex/jira/${
                 cloud.id
               }/rest/api/3/search/jql?jql=${encodeURIComponent(
-                'ORDER BY updated DESC',
+                'updated >= -52w ORDER BY updated DESC',
               )}&maxResults=100&fields=summary,status,updated,project`,
               token,
             );
@@ -465,28 +465,26 @@ const readers: Record<IntegrationId, IntegrationReader> = {
   },
   confluence: {
     async listResources(token) {
-      const [cloud] = await atlassianCloudsWithScope(
-        token,
-        'read:confluence-content.all',
-        'Confluence',
-      );
+      const [cloud] = await atlassianCloudsWithScope(token, 'read:page:confluence', 'Confluence');
       const cloudId = cloud.id;
       const data = await requestJson(
-        `https://api.atlassian.com/ex/confluence/${cloudId}/wiki/rest/api/content?type=page&limit=100&expand=version,space`,
+        `https://api.atlassian.com/ex/confluence/${cloudId}/wiki/api/v2/pages?limit=100`,
         token,
       );
       return (data.results ?? []).map((page: Json) => ({
         id: `${cloudId}:${page.id}`,
         title: page.title,
-        url: page._links?.base ? `${page._links.base}${page._links.webui}` : undefined,
-        updatedAt: page.version?.when,
+        url: page._links?.webui
+          ? `https://${cloud.name}.atlassian.net/wiki${page._links.webui}`
+          : undefined,
+        updatedAt: page.createdAt || page.version?.createdAt,
         kind: 'page',
       }));
     },
     async getResource(token, resource) {
       const [cloudId, pageId] = resource.id.split(':');
       const data = await requestJson(
-        `https://api.atlassian.com/ex/confluence/${cloudId}/wiki/rest/api/content/${pageId}?expand=body.storage`,
+        `https://api.atlassian.com/ex/confluence/${cloudId}/wiki/api/v2/pages/${pageId}?body-format=storage`,
         token,
       );
       return { ...resource, content: stripHtml(data.body?.storage?.value ?? '') };
