@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, PanelLeft, PanelTop } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,18 +31,47 @@ import {
 } from '@/components/theme-customizer-provider';
 
 const THEMES: { id: ThemeVariant; name: string; color: string; description: string }[] = [
-  { id: 'default', name: 'Default', color: '#000000', description: 'Clean & minimal gray palette' },
   {
     id: 'theme-gaia',
-    name: 'Larkup',
+    name: 'Warm Ivory',
     color: '#e6d343ff',
     description: 'Warm ivory with dark accents',
   },
+  {
+    id: 'default',
+    name: 'Minimalist Gray',
+    color: '#636262ff',
+    description: 'Clean & minimal gray palette',
+  },
+  {
+    id: 'theme-linear',
+    name: 'Crisp White',
+    color: '#c7c6c6ff',
+    description: 'Crisp white with soft gray navigation',
+  },
 ];
 
-const LAYOUTS: { id: LayoutVariant; name: string; description: string }[] = [
-  { id: 'sidebar', name: 'Sidebar Navigation', description: 'Classic left sidebar layout' },
-  { id: 'topnav', name: 'Top Navigation', description: 'Horizontal navigation bar' },
+const LAYOUTS: {
+  id: LayoutVariant;
+  name: string;
+  description: string;
+  icon: React.ElementType;
+  color: string;
+}[] = [
+  {
+    id: 'sidebar',
+    name: 'Sidebar Navigation',
+    description: 'Classic left sidebar layout',
+    icon: PanelLeft,
+    color: 'text-blue-500',
+  },
+  {
+    id: 'topnav',
+    name: 'Top Navigation',
+    description: 'Horizontal navigation bar',
+    icon: PanelTop,
+    color: 'text-emerald-500',
+  },
 ];
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
@@ -54,20 +83,13 @@ export function GeneralSection() {
   const { username, setUsername } = useWorkspace();
   const { theme, setTheme, layout, setLayout, isMounted } = useThemeCustomizer();
   const [localName, setLocalName] = useState(username || '');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [showProxyPassword, setShowProxyPassword] = useState(false);
-  const [verifyStatus, setVerifyStatus] = useState<{
-    status: 'success' | 'error' | null;
-    message?: string;
-  }>({ status: null });
 
   const [persistedTheme, setPersistedTheme] = useState<string | null>(null);
   const [persistedLayout, setPersistedLayout] = useState<string | null>(null);
 
   useEffect(() => {
     if (isMounted) {
-      setPersistedTheme(localStorage.getItem('app-theme') || 'default');
+      setPersistedTheme(localStorage.getItem('app-theme') || 'theme-gaia');
       setPersistedLayout(localStorage.getItem('app-layout') || 'sidebar');
     }
   }, [isMounted]);
@@ -159,70 +181,6 @@ export function GeneralSection() {
     }
   }
 
-  async function handleVerify() {
-    if (!form.webSearchProvider) return;
-    setVerifying(true);
-    setVerifyStatus({ status: null });
-
-    let apiKey = '';
-    if (form.webSearchProvider === 'serper' || form.webSearchProvider === 'google')
-      apiKey = form.serperApiKey || '';
-    if (form.webSearchProvider === 'tavily') apiKey = form.tavilyApiKey || '';
-    if (form.webSearchProvider === 'brave') apiKey = form.braveApiKey || '';
-    if (form.webSearchProvider === 'bing') apiKey = form.bingApiKey || '';
-    if (form.webSearchProvider === 'exa') apiKey = form.exaApiKey || '';
-
-    try {
-      const res = await fetch('/api/search/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: form.webSearchProvider, apiKey }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Verification failed');
-
-      setVerifyStatus({ status: 'success' });
-      toast.success('API Key verified successfully!');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Verification failed';
-      setVerifyStatus({ status: 'error', message: msg });
-      toast.error(msg);
-    } finally {
-      setVerifying(false);
-    }
-  }
-
-  const [verifyingCrawler, setVerifyingCrawler] = useState(false);
-  const [verifyCrawlerStatus, setVerifyCrawlerStatus] = useState<{
-    status: 'success' | 'error' | null;
-    message?: string;
-  }>({ status: null });
-
-  async function handleVerifyCrawler() {
-    if (form.webCrawlerProvider !== 'cloud') return;
-    setVerifyingCrawler(true);
-    setVerifyCrawlerStatus({ status: null });
-
-    try {
-      const res = await fetch('/api/search/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'firecrawl', apiKey: form.firecrawlApiKey || '' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Verification failed');
-
-      setVerifyCrawlerStatus({ status: 'success' });
-      toast.success('Crawler API Key verified successfully!');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Verification failed';
-      setVerifyCrawlerStatus({ status: 'error', message: msg });
-      toast.error(msg);
-    } finally {
-      setVerifyingCrawler(false);
-    }
-  }
-
   if (isLoading) {
     return (
       <div className="flex h-40 items-center justify-center">
@@ -285,7 +243,17 @@ export function GeneralSection() {
               <Label className="text-xs">Theme</Label>
               <Select value={theme} onValueChange={(val) => setTheme(val as ThemeVariant, false)}>
                 <SelectTrigger className="w-full text-sm">
-                  <SelectValue placeholder="Select theme" />
+                  {THEMES.find((t) => t.id === theme) ? (
+                    <div className="flex items-center gap-2 flex-1 text-left">
+                      <div
+                        className="h-3 w-3 rounded-full border border-border/50"
+                        style={{ background: THEMES.find((t) => t.id === theme)?.color }}
+                      />
+                      <span>{THEMES.find((t) => t.id === theme)?.name}</span>
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="Select theme" />
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   {THEMES.map((t) => (
@@ -310,14 +278,35 @@ export function GeneralSection() {
                 onValueChange={(val) => setLayout(val as LayoutVariant, false)}
               >
                 <SelectTrigger className="w-full text-sm">
-                  <SelectValue placeholder="Select layout" />
+                  {LAYOUTS.find((l) => l.id === layout) ? (
+                    <div className="flex items-center gap-2 flex-1 text-left">
+                      {(() => {
+                        const l = LAYOUTS.find((l) => l.id === layout)!;
+                        const Icon = l.icon;
+                        return (
+                          <>
+                            <Icon className={`size-4 ${l.color}`} />
+                            <span>{l.name}</span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="Select layout" />
+                  )}
                 </SelectTrigger>
                 <SelectContent>
-                  {LAYOUTS.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}
-                    </SelectItem>
-                  ))}
+                  {LAYOUTS.map((l) => {
+                    const Icon = l.icon;
+                    return (
+                      <SelectItem key={l.id} value={l.id}>
+                        <div className="flex items-center gap-2">
+                          <Icon className={`size-4 ${l.color}`} />
+                          <span>{l.name}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
