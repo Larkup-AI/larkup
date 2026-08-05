@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { CheckCircle2, Loader2, RefreshCw, Unplug } from 'lucide-react';
+import { CheckCircle2, Loader2, RefreshCw, Search, Unplug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { useIntegrationAuth } from '@/hooks/use-integration-auth';
 import { toast } from 'sonner';
 
@@ -46,7 +47,28 @@ export function IntegrationResourcesPanel({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
+
   const resources = data?.resources ?? [];
+
+  const kinds = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of resources) {
+      if (r.kind) set.add(r.kind);
+    }
+    return ['all', ...Array.from(set).sort()];
+  }, [resources]);
+
+  const filteredResources = useMemo(() => {
+    return resources.filter((r) => {
+      if (activeTab !== 'all' && r.kind !== activeTab) return false;
+      if (search && !r.title.toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    });
+  }, [resources, search, activeTab]);
+
   const { connect } = useIntegrationAuth({
     onSuccess: () => {
       toast.success(`${name} connected`);
@@ -55,8 +77,10 @@ export function IntegrationResourcesPanel({
     onError: (error) => toast.error(error),
   });
   const allSelected = useMemo(
-    () => resources.length > 0 && resources.every((resource) => selected.has(resource.id)),
-    [resources, selected],
+    () =>
+      filteredResources.length > 0 &&
+      filteredResources.every((resource) => selected.has(resource.id)),
+    [filteredResources, selected],
   );
 
   async function disconnect() {
@@ -142,50 +166,93 @@ export function IntegrationResourcesPanel({
             <CheckCircle2 className="size-4 text-green-600" />
             {name} connected{' '}
             <span className="text-muted-foreground">· {resources.length} items</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => mutate()}
+              className="h-7 shrink-0 gap-1.5 text-xs"
+            >
+              <RefreshCw className="size-3" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => mutate()}
-            className="h-7 shrink-0 gap-1.5 text-xs"
-          >
-            <RefreshCw className="size-3" />
-            Refresh
-          </Button>
         </div>
-        <div className="max-h-96 overflow-y-auto rounded-lg border">
-          <label className="flex items-center gap-3 border-b px-3 py-2 text-sm font-medium">
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+            <Input
+              placeholder={`Search ${resources.length} items...`}
+              className="h-9 pl-9"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+          {kinds.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {kinds.map((kind) => {
+                const isActive = activeTab === kind;
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => setActiveTab(kind)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                      isActive
+                        ? 'bg-muted text-foreground'
+                        : 'border border-border bg-transparent text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    {kind}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="max-h-80 overflow-y-auto rounded-lg border">
+          <label className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background px-3 py-2 text-sm font-medium">
             <Checkbox
               checked={allSelected}
               onCheckedChange={() =>
-                setSelected(
-                  allSelected ? new Set() : new Set(resources.map((resource) => resource.id)),
-                )
+                setSelected((current) => {
+                  const next = new Set(current);
+                  if (allSelected) {
+                    filteredResources.forEach((r) => next.delete(r.id));
+                  } else {
+                    filteredResources.forEach((r) => next.add(r.id));
+                  }
+                  return next;
+                })
               }
             />
             Select all
           </label>
-          {resources.map((resource) => (
-            <label
-              key={resource.id}
-              className="flex cursor-pointer items-center gap-3 border-b px-3 py-2.5 last:border-0 hover:bg-muted/30"
-            >
-              <Checkbox
-                checked={selected.has(resource.id)}
-                onCheckedChange={() =>
-                  setSelected((current) => {
-                    const next = new Set(current);
-                    next.has(resource.id) ? next.delete(resource.id) : next.add(resource.id);
-                    return next;
-                  })
-                }
-              />
-              <span className="min-w-0 flex-1 truncate text-sm">{resource.title}</span>
-              {resource.kind && (
-                <span className="text-[10px] text-muted-foreground">{resource.kind}</span>
-              )}
-            </label>
-          ))}
+          {filteredResources.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              No items match your filters.
+            </div>
+          ) : (
+            filteredResources.map((resource) => (
+              <label
+                key={resource.id}
+                className="flex cursor-pointer items-center gap-3 border-b px-3 py-2.5 last:border-0 hover:bg-muted/30"
+              >
+                <Checkbox
+                  checked={selected.has(resource.id)}
+                  onCheckedChange={() =>
+                    setSelected((current) => {
+                      const next = new Set(current);
+                      next.has(resource.id) ? next.delete(resource.id) : next.add(resource.id);
+                      return next;
+                    })
+                  }
+                />
+                <span className="min-w-0 flex-1 truncate text-sm">{resource.title}</span>
+                {resource.kind && (
+                  <span className="text-[10px] text-muted-foreground">{resource.kind}</span>
+                )}
+              </label>
+            ))
+          )}
         </div>
       </div>
       <DialogFooter className="!m-0 flex flex-row items-center justify-between space-x-0 gap-2 border-t border-border/70 bg-muted/50 p-4 sm:justify-between">
