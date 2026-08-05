@@ -16,6 +16,7 @@ COPY e2e/package.json ./e2e/
 COPY apps/larkup-proxy/package.json ./apps/larkup-proxy/
 COPY apps/web/package.json ./apps/web/
 COPY packages/core/package.json ./packages/core/
+COPY packages/integrations/package.json ./packages/integrations/
 COPY packages/marketplace/package.json ./packages/marketplace/
 COPY packages/sandbox/package.json ./packages/sandbox/
 COPY packages/scraper/package.json ./packages/scraper/
