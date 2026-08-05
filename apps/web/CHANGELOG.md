@@ -1,5 +1,13 @@
 # larkup
 
+## 0.1.60
+
+### Patch Changes
+
+- 9962fb6: Add searchable, type-filtered integration resource selection in the data panel.
+- Updated dependencies [561c800]
+  - @larkup/integrations@0.2.0
+
 ## 0.1.59
 
 ### Patch Changes
