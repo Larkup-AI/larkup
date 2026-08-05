@@ -15,7 +15,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
 
 import { getChatTools } from './tools';
-import { hasPriorKnowledgeBaseEvidence, retrievalToolsForStep } from '@/lib/retrieval-routing';
+import { hasPriorKnowledgeBaseEvidence } from '@/lib/retrieval-routing';
 import { gatewayProviderOptions } from '@/lib/gateway-fallbacks';
 
 export const maxDuration = 60;
@@ -406,23 +406,6 @@ ${fieldLines}`;
     // Three steps: retrieve → optionally inspect/present media → answer.
     stopWhen: stepCountIs(3),
     toolChoice: 'auto',
-    prepareStep: ({ stepNumber }) => {
-      const config = retrievalToolsForStep({
-        stepNumber,
-        forceKnowledgeBaseSearch: false,
-        forceWebSearch: false,
-        toolNames: [
-          'searchKnowledgeBase',
-          'presentMedia',
-          'queryTabularData',
-          'generateVisualization',
-          'executeAnalysis',
-          'analyzeImageDeeply',
-        ] as const,
-      });
-
-      return config;
-    },
     onFinish: async ({ usage, response }) => {
       const { trackUsageEvent, estimateCost } = await import('@larkup/core/analytics-store');
       const u = usage as any;
