@@ -18,6 +18,7 @@ const nextConfig = {
     '@larkup/sandbox',
     'chromadb',
     'dockerode',
+    'node-ssh',
     'nodejs-whisper',
     '@napi-rs/canvas',
     'pdf-parse',
