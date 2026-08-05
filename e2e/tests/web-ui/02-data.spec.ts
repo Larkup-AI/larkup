@@ -47,7 +47,9 @@ test.describe.serial('Data Page', () => {
     await expect(page.getByRole('button', { name: 'Add media' })).toBeDisabled();
   });
 
-  test('shows ready integrations alongside the complete coming-soon catalog', async ({ page }) => {
+  test('keeps the six available providers above Google integrations awaiting verification', async ({
+    page,
+  }) => {
     await page.getByRole('button', { name: 'Integrations', exact: true }).click();
     for (const integration of [
       'Notion',
@@ -59,6 +61,8 @@ test.describe.serial('Data Page', () => {
       'Google Meet',
       'Google Sheets',
       'Google Slides',
+      'Jira',
+      'Linear',
       'Slack',
       'GitHub',
       'Confluence',
@@ -68,11 +72,33 @@ test.describe.serial('Data Page', () => {
     await expect(page.getByText('Airtable', { exact: true })).toBeVisible();
     await expect(page.getByText('Microsoft Teams', { exact: true })).toBeVisible();
     await expect(page.getByText('Zoom', { exact: true })).toBeVisible();
-    await expect(page.getByText('Coming soon', { exact: true }).first()).toBeVisible();
+    for (const integration of [
+      'Google Analytics',
+      'Google Calendar',
+      'Google Docs',
+      'Google Drive',
+      'Google Maps',
+      'Google Meet',
+      'Google Sheets',
+      'Google Slides',
+    ]) {
+      const card = page.locator('[data-integration-id]').filter({ hasText: integration });
+      await expect(card.getByText('Coming soon', { exact: true })).toBeVisible();
+    }
+    await expect(page.getByTestId('integration-card').first()).toHaveAttribute(
+      'data-integration-id',
+      'confluence',
+    );
+    const displayedIds = await page
+      .getByTestId('integration-card')
+      .evaluateAll((cards) => cards.map((card) => card.getAttribute('data-integration-id')));
+    expect(displayedIds.indexOf('jira')).toBeLessThan(displayedIds.indexOf('google-analytics'));
+    expect(displayedIds.indexOf('linear')).toBeLessThan(displayedIds.indexOf('google-analytics'));
     for (const removedIntegration of [
       'Microsoft Dynamics 365',
       'monday.com',
       'Confluence Data Center',
+      'Jira Data Center',
     ]) {
       await expect(page.getByText(removedIntegration, { exact: true })).toHaveCount(0);
     }
@@ -105,26 +131,70 @@ test.describe.serial('Data Page', () => {
     );
     await expect(page.getByTestId('integration-card').nth(2)).toHaveAttribute(
       'data-integration-id',
-      'google-drive',
+      'confluence',
     );
   });
 
-  test('starts Google OAuth directly from the integration card', async ({ page }) => {
+  test('does not expose Google OAuth until verification is complete', async ({ page }) => {
     await page.getByRole('button', { name: 'Integrations', exact: true }).click();
-    await page.evaluate(() => {
-      window.open = ((url: string | URL) => {
-        sessionStorage.setItem('integration-oauth-url', String(url));
-        return null;
-      }) as typeof window.open;
+    const calendarCard = page.locator('[data-integration-id="google-calendar"]');
+    await expect(calendarCard.getByText('Coming soon', { exact: true })).toBeVisible();
+    await expect(calendarCard.getByRole('button', { name: 'Connect' })).toHaveCount(0);
+    await expect(
+      page
+        .locator('[data-integration-id="jira"]')
+        .getByRole('button', { name: /Connect|Configure/ }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator('[data-integration-id="linear"]')
+        .getByRole('button', { name: /Connect|Configure/ }),
+    ).toBeVisible();
+    const zoomCard = page.locator('[data-integration-id="zoom"]');
+    await expect(zoomCard.getByText('Coming soon', { exact: true })).toBeVisible();
+    await expect(zoomCard.getByRole('button', { name: 'Connect' })).toHaveCount(0);
+  });
+
+  test('disconnects a connected non-Notion integration from its configure panel', async ({
+    page,
+  }) => {
+    let connected = true;
+    await page.route('**/api/integrations', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ integrations: [{ id: 'github', connected }] }),
+      });
+    });
+    await page.route('**/api/integrations/github', async (route) => {
+      if (route.request().method() === 'DELETE') {
+        connected = false;
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true }),
+        });
+        return;
+      }
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          connected,
+          resources: connected ? [{ id: 'repo', title: 'larkup/repo', kind: 'repository' }] : [],
+        }),
+      });
     });
 
+    await page.getByRole('button', { name: 'Integrations', exact: true }).click();
     await page
-      .locator('[data-integration-id="google-calendar"]')
-      .getByRole('button', { name: 'Connect' })
+      .locator('[data-integration-id="github"]')
+      .getByRole('button', { name: 'Configure' })
       .click();
-    await expect
-      .poll(() => page.evaluate(() => sessionStorage.getItem('integration-oauth-url')))
-      .toContain('/google-calendar?redirect_to=');
+    await expect(page.getByText('GitHub connected')).toBeVisible();
+    const disconnect = page.getByRole('button', { name: 'Disconnect' });
+    await expect(disconnect).toHaveClass(/bg-red-500/);
+    await disconnect.click();
+    await expect(
+      page.locator('[data-integration-id="github"]').getByRole('button', { name: 'Connect' }),
+    ).toBeVisible();
   });
 
   test('Notion resource rows truncate long values without horizontal overflow', async ({
