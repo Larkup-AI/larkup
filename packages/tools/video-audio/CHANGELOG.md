@@ -1,5 +1,13 @@
 # @larkup/tool-video-audio
 
+## 0.5.0
+
+### Minor Changes
+
+- 07e35de: Add the evidence-first Video Knowledge Engine foundation: durable revisions and
+  jobs, bounded media inspection, source-grounded citations, and public video
+  knowledge citation types.
+
 ## 0.3.6
 
 ### Patch Changes
