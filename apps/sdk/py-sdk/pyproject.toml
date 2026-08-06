@@ -1,6 +1,6 @@
 [project]
 name = "larkup"
-version = "0.1.63"
+version = "0.1.64"
 description = "Official Python SDK for the Larkup API"
 readme = "README.md"
 license = "MIT"

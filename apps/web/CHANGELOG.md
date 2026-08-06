@@ -1,5 +1,12 @@
 # larkup
 
+## 0.1.64
+
+### Patch Changes
+
+- Keep local workspace data, environment files, and duplicated dependencies out
+  of the standalone npm artifact.
+
 ## 0.1.63
 
 ### Patch Changes
