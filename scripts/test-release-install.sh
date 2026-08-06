@@ -62,8 +62,13 @@ SERVER_PID=""
 printf 'yes\n' | larkup remove
 hash -r 2>/dev/null || true
 
-if command -v larkup >/dev/null 2>&1; then
-  echo "larkup is still available after removal." >&2
+if [ -e "$NPM_CONFIG_PREFIX/bin/larkup" ]; then
+  echo "The isolated larkup command is still available after removal." >&2
+  exit 1
+fi
+
+if PATH="$NPM_CONFIG_PREFIX/bin:/usr/bin:/bin" command -v larkup >/dev/null 2>&1; then
+  echo "larkup is unexpectedly available in the isolated command path after removal." >&2
   exit 1
 fi
 
