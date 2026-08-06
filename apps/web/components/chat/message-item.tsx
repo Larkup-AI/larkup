@@ -16,6 +16,7 @@ import {
 import { ChatSignatureRequest } from '@/components/chat/tools/chat-signature-request';
 import { Sparkles, FileEdit, CheckCircle2, Globe, ChevronDown } from 'lucide-react';
 import { ChatMediaPreview } from '@/components/chat/tools/chat-media-preview';
+import { VideoEvidenceResult } from '@/components/chat/tools/video-evidence-result';
 import { KnowledgeBaseResult } from '@/components/chat/tools/knowledge-base-result';
 import { useDocEditor } from '@/components/chat/canvas/doc-editor-provider';
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/chat/reasoning';
@@ -397,11 +398,15 @@ export function MessageItem({
 
   const vizParts = toolParts.filter(isVizPart);
   const mediaToolParts = toolParts.filter((p: any) => getToolInfo(p).toolName === 'presentMedia');
+  const videoEvidenceParts = toolParts.filter(
+    (p: any) => getToolInfo(p).toolName === 'queryVideoKnowledge',
+  );
   const webSearchParts = toolParts.filter((p: any) => getToolInfo(p).toolName === 'webSearch');
   const nonVizToolParts = toolParts.filter(
     (p: any) =>
       !isVizPart(p) &&
       getToolInfo(p).toolName !== 'presentMedia' &&
+      getToolInfo(p).toolName !== 'queryVideoKnowledge' &&
       getToolInfo(p).toolName !== 'webSearch',
   );
 
@@ -428,6 +433,8 @@ export function MessageItem({
   return (
     <div className="message assistant-message flex flex-col gap-2" data-role="assistant">
       {kbParts.length > 0 && <KnowledgeBaseResult parts={kbParts} isShimmering={isShimmering} />}
+
+      {videoEvidenceParts.length > 0 && <VideoEvidenceResult parts={videoEvidenceParts} />}
 
       {webSearchParts.length > 0 && <WebSearchSummary parts={webSearchParts} />}
 
@@ -893,7 +900,7 @@ function renderToolPart(
         if (
           !output?.success ||
           !output.assetId ||
-          !['image', 'video', 'audio'].includes(output.mediaType)
+          !['image', 'video', 'audio', 'frame-preview'].includes(output.mediaType)
         ) {
           return null;
         }

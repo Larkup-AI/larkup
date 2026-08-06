@@ -472,14 +472,31 @@ async function resolveManifest(toolId: string): Promise<ToolDescriptor> {
  * Outside the monorepo, tools are downloaded from npm.
  */
 async function isWorkspaceTool(packageName: string): Promise<boolean> {
+  return Boolean(await resolveWorkspaceToolPath(packageName));
+}
+
+/**
+ * Return the real package root for a pnpm/workspace-linked tool. This must not
+ * rely on CommonJS `require.resolve`: Next.js route handlers run as ESM and
+ * can otherwise mistake a bundled workspace tool for a remote npm package.
+ */
+async function resolveWorkspaceToolPath(packageName: string): Promise<string | undefined> {
   try {
-    // Resolving a bundled package is instant. Running `pnpm ls -r` here made
-    // a small first-party tool installation wait on a full workspace scan (or
-    // a missing pnpm binary) on every end-user machine.
-    require.resolve(packageName, { paths: [process.cwd()] });
-    return true;
+    const linkedPath = path.join(process.cwd(), 'node_modules', ...packageName.split('/'));
+    const packageRoot = await fs.realpath(linkedPath);
+    const manifest = JSON.parse(
+      await fs.readFile(path.join(packageRoot, 'package.json'), 'utf8'),
+    ) as {
+      name?: string;
+    };
+    // Registry packages resolve inside node_modules; a pnpm workspace link
+    // resolves to the repository package directory outside of it.
+    return manifest.name === packageName &&
+      !packageRoot.includes(`${path.sep}node_modules${path.sep}`)
+      ? packageRoot
+      : undefined;
   } catch {
-    return false;
+    return undefined;
   }
 }
 
@@ -552,16 +569,9 @@ export async function installTool(
     if (isWorkspace) {
       // Monorepo development — tool is already linked via workspace
       report('downloading', 30, 'Resolving workspace package…');
-      try {
-        // Resolve the workspace package path
-        const modulePath = require.resolve(descriptor.packageName, {
-          paths: [process.cwd()],
-        });
-        resolvedPath = path.dirname(modulePath);
-      } catch {
-        // Fallback: try resolving from node_modules directly
-        resolvedPath = path.join(process.cwd(), 'node_modules', descriptor.packageName);
-      }
+      resolvedPath =
+        (await resolveWorkspaceToolPath(descriptor.packageName)) ??
+        path.join(process.cwd(), 'node_modules', descriptor.packageName);
       source = 'local';
       report('installing', 60, 'Workspace package resolved.');
     } else {

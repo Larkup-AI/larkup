@@ -15,6 +15,7 @@ import { readConfig } from '@larkup/core/config-store';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import type { MediaType } from '@larkup/core/types';
 import { runWithServer } from '@larkup/core/workspace';
+import { deleteVideoKnowledgeForMediaAsset } from '@larkup/core/video-knowledge/deletion-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -236,6 +237,7 @@ async function removeMedia(req: Request) {
       await storage.delete(asset.storageUri).catch(() => {});
       if (asset.thumbnailUri) await storage.delete(asset.thumbnailUri).catch(() => {});
       await deleteDocuments(documentIds);
+      await deleteVideoKnowledgeForMediaAsset(asset.id);
     }
     await deleteMediaAsset(id);
   } else if (ids) {
@@ -254,6 +256,7 @@ async function removeMedia(req: Request) {
       await storage.delete(asset.storageUri).catch(() => {});
       if (asset.thumbnailUri) await storage.delete(asset.thumbnailUri).catch(() => {});
       await deleteDocuments(documentIds);
+      await deleteVideoKnowledgeForMediaAsset(asset.id);
     }
     await deleteMediaAssets(idList);
   }

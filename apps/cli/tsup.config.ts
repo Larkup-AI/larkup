@@ -1,21 +1,21 @@
-import { defineConfig } from "tsup";
+import { defineConfig } from 'tsup';
 
-export default defineConfig({
-  entry: ["src/index.ts"],
-  format: ["esm"],
-  noExternal: ["@larkup/core", "@larkup/marketplace", "@larkup/vector-stores"],
+export default defineConfig((options) => ({
+  entry: ['src/index.ts'],
+  format: ['esm'],
+  noExternal: ['@larkup/core', '@larkup/marketplace', '@larkup/vector-stores'],
   external: [
-    "@lancedb/lancedb",
-    "@pinecone-database/pinecone",
-    "chromadb",
-    "@ai-sdk/cohere",
-    "@ai-sdk/deepseek",
-    "@ai-sdk/gateway",
-    "@ai-sdk/google",
-    "@ai-sdk/mistral",
-    "@ai-sdk/openai",
-    "@ai-sdk/openai-compatible",
-    "ai"
+    '@lancedb/lancedb',
+    '@pinecone-database/pinecone',
+    'chromadb',
+    '@ai-sdk/cohere',
+    '@ai-sdk/deepseek',
+    '@ai-sdk/gateway',
+    '@ai-sdk/google',
+    '@ai-sdk/mistral',
+    '@ai-sdk/openai',
+    '@ai-sdk/openai-compatible',
+    'ai',
   ],
-  clean: true,
-});
+  clean: !options.watch,
+}));

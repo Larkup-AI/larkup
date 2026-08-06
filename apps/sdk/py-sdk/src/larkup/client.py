@@ -17,10 +17,14 @@ from .types import (
     HealthResponse,
     IndexProgressEvent,
     LarkupClientOptions,
+    MediaAsset,
+    MediaJobStatus,
+    MediaListResponse,
     PaginatedDocuments,
     QueryRequest,
     QueryResponse,
     ScrapeResponse,
+    RefinementDecisionResponse,
 )
 
 
@@ -152,6 +156,24 @@ class LarkupClient:
     def scrape(self, url: str) -> ScrapeResponse:
         """Scrape a URL and index its text chunks."""
         return ScrapeResponse(**self._request("POST", "/scrape", json={"url": url}))
+
+    def list_media(self) -> MediaListResponse:
+        return MediaListResponse(**self._request("GET", "/media"))
+
+    def get_media(self, id: str) -> MediaAsset:
+        return MediaAsset(**self._request("GET", f"/media/{quote(id, safe='')}"))
+
+    def delete_media(self, id: str) -> Dict[str, Any]:
+        return self._request("DELETE", f"/media/{quote(id, safe='')}")
+
+    def get_media_job_status(self, job_id: str) -> MediaJobStatus:
+        return MediaJobStatus(**self._request("GET", f"/media/jobs/{quote(job_id, safe='')}"))
+
+    def approve_refinement(self, job_id: str) -> RefinementDecisionResponse:
+        return RefinementDecisionResponse(**self._request("POST", f"/media/jobs/{quote(job_id, safe='')}/approval", json={"decision": "approve"}))
+
+    def decline_refinement(self, job_id: str) -> RefinementDecisionResponse:
+        return RefinementDecisionResponse(**self._request("POST", f"/media/jobs/{quote(job_id, safe='')}/approval", json={"decision": "decline"}))
 
     def corpus_summary(self) -> CorpusSummary:
         """Return aggregate corpus statistics."""
@@ -359,6 +381,24 @@ class AsyncLarkupClient:
         return ScrapeResponse(
             **await self._request("POST", "/scrape", json={"url": url})
         )
+
+    async def list_media(self) -> MediaListResponse:
+        return MediaListResponse(**await self._request("GET", "/media"))
+
+    async def get_media(self, id: str) -> MediaAsset:
+        return MediaAsset(**await self._request("GET", f"/media/{quote(id, safe='')}"))
+
+    async def delete_media(self, id: str) -> Dict[str, Any]:
+        return await self._request("DELETE", f"/media/{quote(id, safe='')}")
+
+    async def get_media_job_status(self, job_id: str) -> MediaJobStatus:
+        return MediaJobStatus(**await self._request("GET", f"/media/jobs/{quote(job_id, safe='')}"))
+
+    async def approve_refinement(self, job_id: str) -> RefinementDecisionResponse:
+        return RefinementDecisionResponse(**await self._request("POST", f"/media/jobs/{quote(job_id, safe='')}/approval", json={"decision": "approve"}))
+
+    async def decline_refinement(self, job_id: str) -> RefinementDecisionResponse:
+        return RefinementDecisionResponse(**await self._request("POST", f"/media/jobs/{quote(job_id, safe='')}/approval", json={"decision": "decline"}))
 
     async def corpus_summary(self) -> CorpusSummary:
         """Return aggregate corpus statistics."""

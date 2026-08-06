@@ -122,6 +122,35 @@ async def test_chat_async(async_client):
 
 
 @respx.mock
+def test_media_management_sync(sync_client):
+    asset = {
+        "id": "media-1", "type": "video", "fileName": "demo.mp4",
+        "mimeType": "video/mp4", "storageUri": "media://demo", "fileSize": 42,
+        "processingStatus": "completed", "documentIds": ["doc-1"],
+        "createdAt": "2026-08-06T00:00:00Z",
+    }
+    respx.get(f"{BASE_URL}/media").mock(return_value=Response(200, json={"assets": [asset], "total": 1}))
+    respx.get(f"{BASE_URL}/media/media-1").mock(return_value=Response(200, json=asset))
+    respx.get(f"{BASE_URL}/media/jobs/job-1").mock(return_value=Response(200, json={"id": "job-1", "status": "completed", "attempt": 1, "createdAt": "2026-08-06T00:00:00Z", "updatedAt": "2026-08-06T00:00:01Z"}))
+    respx.post(f"{BASE_URL}/media/jobs/ref-1/approval").mock(return_value=Response(200, json={"job": {"id": "ref-1", "status": "queued"}}))
+
+    assert sync_client.list_media().assets[0].id == "media-1"
+    assert sync_client.get_media("media-1").fileName == "demo.mp4"
+    assert sync_client.get_media_job_status("job-1").status == "completed"
+    assert sync_client.approve_refinement("ref-1").job["status"] == "queued"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_media_management_async(async_client):
+    respx.get(f"{BASE_URL}/media").mock(return_value=Response(200, json={"assets": [], "total": 0}))
+    respx.post(f"{BASE_URL}/media/jobs/ref-2/approval").mock(return_value=Response(200, json={"job": {"id": "ref-2", "status": "declined"}}))
+
+    assert (await async_client.list_media()).total == 0
+    assert (await async_client.decline_refinement("ref-2")).job["status"] == "declined"
+
+
+@respx.mock
 def test_corpus_operations_sync(sync_client):
     respx.get(f"{BASE_URL}/corpus/summary").mock(
         return_value=Response(

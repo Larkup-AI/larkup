@@ -202,3 +202,73 @@ class LarkupClientOptions(BaseModel):
 class LarkupHubClientOptions(BaseModel):
     base_url: Optional[str] = None
     api_key: Optional[str] = None
+
+
+class VideoEvidenceConfidence(BaseModel):
+    score: float
+    calibrationStatus: Literal["calibrated", "uncalibrated"]
+    uncertaintyReasons: List[str]
+
+
+class VideoEvidenceCitation(BaseModel):
+    mediaAssetId: str
+    evidenceId: str
+    startSecs: float
+    endSecs: float
+    precision: Literal["word", "segment", "frame", "estimated"]
+    confidence: VideoEvidenceConfidence
+    conflicted: Optional[bool] = None
+
+
+class VideoKnowledgeQueryRequest(BaseModel):
+    mediaAssetId: str
+    query: str
+    limit: Optional[int] = None
+
+
+class VideoKnowledgeVerification(BaseModel):
+    status: Literal["supported", "conflicted", "insufficient", "needs_inspection"]
+    reasons: List[str]
+
+
+class VideoKnowledgeQueryResponse(BaseModel):
+    success: bool
+    evidence: List[VideoEvidenceCitation]
+    verification: VideoKnowledgeVerification
+
+
+class MediaAsset(BaseModel):
+    id: str
+    type: Literal["image", "video", "audio"]
+    fileName: str
+    mimeType: str
+    storageUri: str
+    fileSize: int
+    processingStatus: Literal["pending", "processing", "completed", "failed"]
+    processingProgress: Optional[int] = None
+    processingError: Optional[str] = None
+    processingMessage: Optional[str] = None
+    caption: Optional[str] = None
+    durationSecs: Optional[float] = None
+    documentIds: List[str] = []
+    activeVideoKnowledgeRevisionId: Optional[str] = None
+    activeVideoKnowledgeManifestId: Optional[str] = None
+    createdAt: str
+
+
+class MediaListResponse(BaseModel):
+    assets: List[MediaAsset]
+    total: int
+
+
+class MediaJobStatus(BaseModel):
+    id: str
+    status: str
+    attempt: int
+    error: Optional[str] = None
+    createdAt: str
+    updatedAt: str
+
+
+class RefinementDecisionResponse(BaseModel):
+    job: Dict[str, Any]

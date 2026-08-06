@@ -1,8 +1,8 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { addDocument, corpusStats } from "@larkup/core/documents-store";
-import { log } from "../ui/logger";
-import { inServerScope, requireActive } from "../lib/scope";
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { addDocument, corpusStats } from '@larkup/core/documents-store';
+import { log } from '../ui/logger';
+import { inServerScope, requireActive } from '../lib/scope';
 
 interface AddDocOptions {
   server?: string;
@@ -24,7 +24,7 @@ export async function addDocCommand(options: AddDocOptions) {
         ? options.file
         : path.join(process.cwd(), options.file);
       try {
-        content = await fs.readFile(abs, "utf8");
+        content = await fs.readFile(abs, 'utf8');
       } catch {
         log.error(`Could not read file: ${abs}`);
       }
@@ -32,15 +32,15 @@ export async function addDocCommand(options: AddDocOptions) {
     } else if (options.text) {
       content = options.text;
     } else {
-      log.error("Provide --file <path> or --text <string>.");
+      log.error('Provide --file <path> or --text <string>.');
     }
 
-    if (!content!.trim()) log.error("The document content is empty.");
+    if (!content!.trim()) log.error('The document content is empty.');
 
     const doc = await addDocument({
-      title: title ?? "Untitled",
+      title: title ?? 'Untitled',
       content: content!,
-      source: options.file ? "upload" : "paste",
+      source: options.file ? 'files' : 'text',
       url: options.url,
     });
 

@@ -1,9 +1,21 @@
 import { promises as fs } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { ffprobe, runFfmpeg } from './ffmpeg-spawn.js';
+import { selectFramesByInformationGain } from './frame-selector.js';
+import type {
+  MediaProbeResult,
+  StreamInfo,
+  FrameArtifact,
+  FrameExtractionOptions,
+  InspectionRequest,
+  InspectionResult,
+} from './contracts.js';
 
 export interface VideoProcessResult {
   audioPath?: string;
+  /** Extraction failure is distinct from a source that has no usable audio. */
+  audioExtractionError?: string;
   frames: { path: string; timestampSecs: number }[];
   meta: {
     durationSecs: number;
@@ -13,6 +25,23 @@ export interface VideoProcessResult {
   };
 }
 
+/**
+ * A low-resolution activity probe. These are deliberately cheap visual
+ * changes, not semantic detections: the worker uses them to slow down around
+ * potential activity before spending vision-model calls.
+ */
+export interface ActivityProbeOptions {
+  outputDir: string;
+  durationSecs: number;
+  maxFrames: number;
+  startSecs?: number;
+  endSecs?: number;
+  minGapSecs?: number;
+  threshold?: number;
+  threads?: number;
+  signal?: AbortSignal;
+}
+
 export interface VideoProcessOptions {
   outputDir: string;
   frameIntervalSecs?: number;
@@ -20,8 +49,11 @@ export interface VideoProcessOptions {
   sceneThreshold?: number;
   threads?: number;
   parallelExtraction?: boolean;
+  /** Maximum source duration processed in one extraction batch. */
+  chunkDurationSecs?: number;
   skipAudioExtraction?: boolean;
   onProgress?: (progress: number) => void;
+  signal?: AbortSignal;
 }
 
 export interface VideoSamplingPlan {
@@ -42,6 +74,41 @@ export interface EndingSamplingPlan {
   timestamps: number[];
 }
 
+/** Create deterministic overlapping chunks without retaining a whole video in memory. */
+export function createTimelineChunkPlan(
+  durationSecs: number,
+  chunkDurationSecs = 300,
+  overlapSecs = 3,
+): Array<{
+  index: number;
+  startSecs: number;
+  endSecs: number;
+  overlapStartSecs: number;
+  overlapEndSecs: number;
+}> {
+  const duration = Number.isFinite(durationSecs) ? Math.max(0, durationSecs) : 0;
+  const chunk = Number.isFinite(chunkDurationSecs) ? Math.max(1, chunkDurationSecs) : 300;
+  const overlap = Number.isFinite(overlapSecs) ? Math.max(0, Math.min(overlapSecs, chunk / 2)) : 3;
+  const result: Array<{
+    index: number;
+    startSecs: number;
+    endSecs: number;
+    overlapStartSecs: number;
+    overlapEndSecs: number;
+  }> = [];
+  for (let startSecs = 0, index = 0; startSecs < duration; startSecs += chunk, index++) {
+    const endSecs = Math.min(duration, startSecs + chunk);
+    result.push({
+      index,
+      startSecs,
+      endSecs,
+      overlapStartSecs: index === 0 ? startSecs : Math.max(0, startSecs - overlap),
+      overlapEndSecs: endSecs === duration ? endSecs : Math.min(duration, endSecs + overlap),
+    });
+  }
+  return result;
+}
+
 export interface TimedText {
   text: string;
   startSecs: number;
@@ -55,6 +122,9 @@ export interface MultimodalSegment extends TimedText {
   cumulativeState: string;
 }
 
+// Keep the carry-over small enough that a long quiet recording cannot crowd
+// out evidence from the active bundle. The durable evidence store—not prompt
+// history—is the source of truth for older context.
 const MAX_CUMULATIVE_CONTEXT_LENGTH = 500;
 
 /**
@@ -279,44 +349,218 @@ export async function processVideo(
   };
 
   const extractAudioPromise = options.skipAudioExtraction
-    ? Promise.resolve(undefined)
-    : extractAudio(videoPath, audioPath, options.threads, (progress) => {
-        audioProgress = Math.max(audioProgress, progress);
-        reportExtractionProgress();
-      })
+    ? Promise.resolve({ path: undefined, error: undefined as string | undefined })
+    : extractAudio(
+        videoPath,
+        audioPath,
+        options.threads,
+        (progress) => {
+          audioProgress = Math.max(audioProgress, progress);
+          reportExtractionProgress();
+        },
+        options.signal,
+      )
         .then(() => {
           audioProgress = 1;
           reportExtractionProgress();
-          return audioPath;
+          return { path: audioPath, error: undefined };
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           audioProgress = 1;
           reportExtractionProgress();
-          return undefined;
+          return {
+            path: undefined,
+            error: error instanceof Error ? error.message : 'Audio extraction failed.',
+          };
         });
-  const extractFramesPromise = extractSceneFrames(videoPath, {
+  const extractFramesPromise = extractChunkedSceneFrames(videoPath, {
     outputDir: framesDir,
     intervalSecs: interval,
     maxFrames,
     durationSecs: meta.durationSecs,
     sceneThreshold: options.sceneThreshold,
     threads: options.threads,
+    chunkDurationSecs: options.chunkDurationSecs,
     onProgress: (progress) => {
       frameProgress = Math.max(frameProgress, progress);
       reportExtractionProgress();
     },
+    signal: options.signal,
   });
 
   let frames: { path: string; timestampSecs: number }[];
-  let extractedAudioPath: string | undefined;
+  let extractedAudio: { path?: string; error?: string };
   if (options.parallelExtraction) {
-    [extractedAudioPath, frames] = await Promise.all([extractAudioPromise, extractFramesPromise]);
+    [extractedAudio, frames] = await Promise.all([extractAudioPromise, extractFramesPromise]);
   } else {
-    extractedAudioPath = await extractAudioPromise;
+    extractedAudio = await extractAudioPromise;
     frames = await extractFramesPromise;
   }
 
-  return { audioPath: extractedAudioPath, frames, meta };
+  return {
+    audioPath: extractedAudio.path,
+    audioExtractionError: extractedAudio.error,
+    frames,
+    meta,
+  };
+}
+
+/**
+ * Keeps long recordings bounded by extracting one overlap-aware timeline chunk
+ * at a time. Short videos retain the higher-fidelity shot-aware path.
+ */
+export async function extractChunkedSceneFrames(
+  videoPath: string,
+  options: Parameters<typeof extractSceneFrames>[1] & { chunkDurationSecs?: number },
+): Promise<{ path: string; timestampSecs: number }[]> {
+  const duration = options.durationSecs || (await probeVideo(videoPath)).durationSecs;
+  const chunks = createTimelineChunkPlan(duration, options.chunkDurationSecs ?? 300);
+  if (chunks.length <= 1) return extractSceneFrames(videoPath, options);
+  await fs.mkdir(options.outputDir, { recursive: true });
+  const plan = createVideoSamplingPlan(duration, options.intervalSecs, options.maxFrames);
+  const output: { path: string; timestampSecs: number }[] = [];
+  // Schedule coverage anchors globally, rather than giving the first chunks
+  // all remaining capacity. The activity pass below must run across the
+  // complete source even when the coverage budget is intentionally sparse.
+  const periodicTimestamps = Array.from({ length: plan.periodicFrameCount }, (_, index) =>
+    Math.min(Math.max(0, duration - 1), index * plan.periodicIntervalSecs),
+  );
+  for (const chunk of chunks) {
+    const chunkDuration = Math.max(1, chunk.overlapEndSecs - chunk.overlapStartSecs);
+    const chunkPeriodicTimestamps = periodicTimestamps.filter(
+      (timestampSecs) =>
+        timestampSecs >= chunk.startSecs &&
+        (chunk.index === chunks.length - 1
+          ? timestampSecs <= chunk.endSecs
+          : timestampSecs < chunk.endSecs),
+    );
+    const frames =
+      chunkPeriodicTimestamps.length > 0
+        ? await extractFramesAtTimestamps(videoPath, chunkPeriodicTimestamps, {
+            outputDir: path.join(
+              options.outputDir,
+              `chunk-${String(chunk.index).padStart(4, '0')}`,
+            ),
+            threads: options.threads,
+            signal: options.signal,
+            onProgress: (progress) =>
+              options.onProgress?.((chunk.index + progress) / chunks.length),
+          })
+        : [];
+    for (const frame of frames) {
+      if (output.some((existing) => Math.abs(existing.timestampSecs - frame.timestampSecs) < 1))
+        continue;
+      output.push(frame);
+    }
+    // A coarse, low-resolution pass is the attention trigger for long
+    // recordings. Unlike a shot-cut detector it reacts to sustained visual
+    // change, so a mostly static view with a brief event can receive dense
+    // evidence without decoding every source frame at vision-model cost.
+    const activityAllocation = Math.max(
+      1,
+      Math.ceil((plan.sceneFrameCount * chunkDuration) / Math.max(1, duration)),
+    );
+    const activityFrames = await extractActivityFrames(videoPath, {
+      outputDir: path.join(options.outputDir, `activity-${String(chunk.index).padStart(4, '0')}`),
+      durationSecs: duration,
+      startSecs: chunk.overlapStartSecs,
+      endSecs: chunk.overlapEndSecs,
+      maxFrames: activityAllocation,
+      minGapSecs: Math.max(1, Math.min(10, plan.minimumSceneGapSecs / 4)),
+      threads: options.threads,
+      signal: options.signal,
+    });
+    for (const frame of activityFrames) {
+      if (!output.some((existing) => Math.abs(existing.timestampSecs - frame.timestampSecs) < 1)) {
+        output.push(frame);
+      }
+    }
+  }
+  const endingPlan = createEndingSamplingPlan(duration, plan.endingFrameCount);
+  if (endingPlan.frameCount > 0) {
+    output.push(
+      ...(await extractFrames(videoPath, {
+        outputDir: path.join(options.outputDir, 'ending'),
+        intervalSecs: endingPlan.intervalSecs,
+        maxFrames: endingPlan.frameCount,
+        durationSecs: duration,
+        startSecs: endingPlan.startSecs,
+        threads: options.threads,
+        signal: options.signal,
+      })),
+    );
+  }
+  options.onProgress?.(1);
+  return selectExtractedFrames(
+    output.sort((left, right) => left.timestampSecs - right.timestampSecs),
+    plan,
+  );
+}
+
+/**
+ * Finds visually active moments at one decoded frame per second. It is an
+ * attention signal only: no person/object/action is inferred here. The
+ * subsequent vision stage sees the retained activity frames and can request a
+ * bounded rewind when those anchors are insufficient.
+ */
+export async function extractActivityFrames(
+  videoPath: string,
+  options: ActivityProbeOptions,
+): Promise<{ path: string; timestampSecs: number }[]> {
+  if (options.maxFrames <= 0) return [];
+  await fs.mkdir(options.outputDir, { recursive: true });
+  const startSecs = Math.max(0, options.startSecs ?? 0);
+  const endSecs = Math.max(
+    startSecs,
+    Math.min(options.durationSecs, options.endSecs ?? options.durationSecs),
+  );
+  const rangeDuration = Math.max(0, endSecs - startSecs);
+  if (rangeDuration === 0) return [];
+  const minGapSecs = Math.max(1, Math.min(60, options.minGapSecs ?? 2));
+  const threshold = Math.max(0.001, Math.min(1, options.threshold ?? 0.015));
+  const pattern = path.join(options.outputDir, 'activity_%04d.jpg');
+  const timestamps: number[] = [];
+
+  try {
+    await runFfmpeg({
+      args: [
+        '-ss',
+        String(startSecs),
+        '-t',
+        String(rangeDuration),
+        '-i',
+        videoPath,
+        '-vf',
+        `fps=1,scale='min(320,iw)':-2,select='gt(scene,${threshold})*if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${minGapSecs}))',showinfo`,
+        '-vsync',
+        'vfr',
+        '-frames:v',
+        String(Math.max(1, Math.floor(options.maxFrames))),
+        ...(options.threads ? ['-threads', String(options.threads)] : []),
+        pattern,
+      ],
+      durationSecs: rangeDuration,
+      onStderr: (line) => {
+        const match = line.match(/pts_time:([0-9.]+)/);
+        if (match) timestamps.push(startSecs + Number(match[1]));
+      },
+      signal: options.signal,
+    });
+  } catch {
+    // Activity scanning is an optimisation. Periodic anchors remain a safe,
+    // explicitly lower-confidence fallback for codecs that reject this filter.
+    return [];
+  }
+  const files = (await fs.readdir(options.outputDir))
+    .filter((name) => /^activity_\d+\.jpg$/.test(name))
+    .sort()
+    .slice(0, options.maxFrames);
+  return files.map((name, index) => ({
+    path: path.join(options.outputDir, name),
+    timestampSecs:
+      timestamps.at(-files.length + index) ??
+      startSecs + ((index + 1) * rangeDuration) / (files.length + 1),
+  }));
 }
 
 export async function extractSceneFrames(
@@ -329,6 +573,7 @@ export async function extractSceneFrames(
     sceneThreshold?: number;
     threads?: number;
     onProgress?: (progress: number) => void;
+    signal?: AbortSignal;
   },
 ): Promise<{ path: string; timestampSecs: number }[]> {
   await fs.mkdir(options.outputDir, { recursive: true });
@@ -363,6 +608,7 @@ export async function extractSceneFrames(
       durationSecs: duration,
       startSecs: endingPlan.startSecs,
       threads: options.threads,
+      signal: options.signal,
       onProgress: (progress) =>
         reportProgress(periodicWeight + sceneWeight + progress * endingWeight),
     });
@@ -391,6 +637,7 @@ export async function extractSceneFrames(
           {
             outputDir: options.outputDir,
             threads: options.threads,
+            signal: options.signal,
             onProgress: (progress) => reportProgress(progress * periodicWeight),
           },
         )
@@ -400,9 +647,11 @@ export async function extractSceneFrames(
           maxFrames: plan.periodicFrameCount,
           durationSecs: duration,
           threads: options.threads,
+          signal: options.signal,
           onProgress: (progress) => reportProgress(progress * periodicWeight),
         });
-  if (plan.sceneFrameCount === 0) return addEndingEvidence(periodicFrames);
+  if (plan.sceneFrameCount === 0)
+    return selectExtractedFrames(await addEndingEvidence(periodicFrames), plan);
 
   const threshold = options.sceneThreshold ?? 0.3;
   const sceneDir = path.join(options.outputDir, 'scenes');
@@ -437,6 +686,7 @@ export async function extractSceneFrames(
         const match = line.match(/pts_time:([0-9.]+)/);
         if (match) timestamps.push(Number(match[1]));
       },
+      signal: options.signal,
     });
   } catch {
     // Scene detection may fail on some codecs — continue with periodic frames
@@ -446,7 +696,7 @@ export async function extractSceneFrames(
     .filter((name) => /^scene_\d+\.jpg$/.test(name))
     .sort()
     .slice(0, plan.sceneFrameCount);
-  if (!files.length) return addEndingEvidence(periodicFrames);
+  if (!files.length) return selectExtractedFrames(await addEndingEvidence(periodicFrames), plan);
   timestamps = timestamps.slice(-files.length);
   const sceneFrames = files.map((name, index) => ({
     path: path.join(sceneDir, name),
@@ -460,7 +710,47 @@ export async function extractSceneFrames(
     (frame, index) =>
       index === 0 || Math.abs(frame.timestampSecs - merged[index - 1].timestampSecs) >= 1,
   );
-  return addEndingEvidence(deduplicated);
+  return selectExtractedFrames(await addEndingEvidence(deduplicated), plan);
+}
+
+function selectExtractedFrames(
+  candidates: { path: string; timestampSecs: number }[],
+  plan: VideoSamplingPlan,
+): { path: string; timestampSecs: number }[] {
+  const selected = selectFramesByInformationGain(
+    candidates.map((frame, index) => {
+      const isActivity = frame.path.includes(`${path.sep}activity-`);
+      const isScene = frame.path.includes(`${path.sep}scenes${path.sep}`);
+      const isEnding = frame.path.includes(`${path.sep}ending${path.sep}`);
+      return {
+        ...frame,
+        // Periodic anchors are an explicit maximum-gap guarantee. They cannot
+        // be displaced merely because an earlier activity frame was retained.
+        protected:
+          index === 0 || index === candidates.length - 1 || (!isActivity && !isScene && !isEnding),
+        signals: {
+          shotChange: isScene ? 1 : 0,
+          // These frames came from the low-resolution activity pass. Giving the
+          // cue both perceptual and motion weight prevents coarse coverage
+          // anchors from consuming the whole budget before an active interval.
+          perceptualChange: isActivity ? 1 : 0,
+          // Periodic anchors protect coverage; ending samples are favored for
+          // outcomes without making the endpoint the only source of truth.
+          motionChange: isActivity ? 1 : isEnding ? 0.45 : 0,
+        },
+      };
+    }),
+    {
+      maxFrames: plan.maxFrames,
+      maximumCoverageGapSecs: Math.max(plan.periodicIntervalSecs, 1),
+    },
+  );
+  return selected
+    .filter((selection) => selection.decision !== 'dropped')
+    .map((selection) => ({
+      path: selection.candidate.path,
+      timestampSecs: selection.candidate.timestampSecs,
+    }));
 }
 
 async function extractFramesAtTimestamps(
@@ -470,6 +760,7 @@ async function extractFramesAtTimestamps(
     outputDir: string;
     threads?: number;
     onProgress?: (progress: number) => void;
+    signal?: AbortSignal;
   },
 ): Promise<{ path: string; timestampSecs: number }[]> {
   await fs.mkdir(options.outputDir, { recursive: true });
@@ -499,6 +790,7 @@ async function extractFramesAtTimestamps(
             ...(options.threads ? ['-threads', String(options.threads)] : []),
             outputPath,
           ],
+          signal: options.signal,
         });
         results[index] = { path: outputPath, timestampSecs };
         completed += 1;
@@ -518,8 +810,10 @@ export async function extractFrames(
     maxFrames: number;
     durationSecs?: number;
     startSecs?: number;
+    endSecs?: number;
     threads?: number;
     onProgress?: (progress: number) => void;
+    signal?: AbortSignal;
   },
 ): Promise<{ path: string; timestampSecs: number }[]> {
   await fs.mkdir(options.outputDir, { recursive: true });
@@ -531,7 +825,8 @@ export async function extractFrames(
   }
 
   const startSecs = Math.max(0, Math.min(options.startSecs ?? 0, duration));
-  const rangeDuration = Math.max(0, duration - startSecs);
+  const endSecs = Math.max(startSecs, Math.min(options.endSecs ?? duration, duration));
+  const rangeDuration = Math.max(0, endSecs - startSecs);
   const frameCount = Math.max(
     1,
     Math.min(Math.ceil(rangeDuration / options.intervalSecs), options.maxFrames),
@@ -542,6 +837,7 @@ export async function extractFrames(
       ...(startSecs > 0 ? ['-ss', String(startSecs)] : []),
       '-i',
       videoPath,
+      ...(endSecs < duration ? ['-t', String(rangeDuration)] : []),
       '-vf',
       `select='if(isnan(prev_selected_t),1,gte(t-prev_selected_t,${options.intervalSecs}))',scale='min(1280,iw)':-2`,
       '-vsync',
@@ -553,6 +849,7 @@ export async function extractFrames(
     ],
     durationSecs: rangeDuration,
     onProgress: options.onProgress,
+    signal: options.signal,
   });
   const files = (await fs.readdir(options.outputDir))
     .filter((name) => /^frame_\d+\.jpg$/.test(name))
@@ -569,6 +866,7 @@ function extractAudio(
   outputPath: string,
   threads?: number,
   onProgress?: (progress: number) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   return runFfmpeg({
     args: [
@@ -585,6 +883,7 @@ function extractAudio(
       outputPath,
     ],
     onProgress,
+    signal,
   });
 }
 
@@ -603,5 +902,220 @@ async function probeVideo(videoPath: string): Promise<VideoMeta> {
     width: videoStream?.width ?? 0,
     height: videoStream?.height ?? 0,
     codec: videoStream?.codec_name ?? 'unknown',
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Evidence-grade probe                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Probe media metadata with full stream detail. Returns a typed
+ * `MediaProbeResult` suitable for evidence persistence and budget
+ * estimation.
+ *
+ * Unlike the internal `probeVideo`, this is a public export that
+ * returns rotation, per-stream info, corruption signals, and
+ * format-level metadata.
+ */
+export async function probeMedia(mediaPath: string): Promise<MediaProbeResult> {
+  const data = await ffprobe(mediaPath);
+  const videoStream = data.streams?.find((s) => s.codec_type === 'video');
+
+  const streams: StreamInfo[] = (data.streams ?? []).map((s, index) => {
+    const codecType = (s.codec_type ?? 'data') as StreamInfo['codecType'];
+    const tags = s.tags as Record<string, string> | undefined;
+    const rFrameRate = s.r_frame_rate as string | undefined;
+    let fps: number | undefined;
+    if (rFrameRate) {
+      const [num, den] = rFrameRate.split('/').map(Number);
+      if (num && den) fps = Math.round((num / den) * 100) / 100;
+    }
+    return {
+      index,
+      codecType,
+      codecName: s.codec_name ?? 'unknown',
+      width: codecType === 'video' ? s.width : undefined,
+      height: codecType === 'video' ? s.height : undefined,
+      fps: codecType === 'video' ? fps : undefined,
+      sampleRate:
+        codecType === 'audio'
+          ? Number(s.sample_rate as string | undefined) || undefined
+          : undefined,
+      channels: codecType === 'audio' ? (s.channels as number | undefined) : undefined,
+      language: tags?.language,
+      durationSecs: s.duration ? parseFloat(String(s.duration)) : undefined,
+    };
+  });
+
+  // Detect rotation from side-data or container tags.
+  let rotation = 0;
+  const sideData = (videoStream as any)?.side_data_list as Array<{ rotation?: number }> | undefined;
+  if (sideData) {
+    const rotEntry = sideData.find((sd) => sd.rotation !== undefined);
+    if (rotEntry?.rotation !== undefined) rotation = Math.abs(rotEntry.rotation);
+  }
+  if (rotation === 0) {
+    const tags = videoStream?.tags as Record<string, string> | undefined;
+    const rotateTag = tags?.rotate;
+    if (rotateTag) rotation = Math.abs(Number(rotateTag)) || 0;
+  }
+
+  // Corruption signals: negative duration, missing streams, or error flags.
+  const rawDuration = parseFloat(data.format?.duration ?? '0');
+  const hasCorruptionSignals =
+    rawDuration <= 0 || (data.streams ?? []).length === 0 || (data.format as any)?.probe_score < 25;
+
+  return {
+    durationSecs: Math.max(0, rawDuration),
+    width: videoStream?.width ?? 0,
+    height: videoStream?.height ?? 0,
+    codec: videoStream?.codec_name ?? 'unknown',
+    rotation,
+    videoStreamCount: streams.filter((s) => s.codecType === 'video').length,
+    audioStreamCount: streams.filter((s) => s.codecType === 'audio').length,
+    subtitleStreamCount: streams.filter((s) => s.codecType === 'subtitle').length,
+    streams,
+    hasCorruptionSignals,
+    formatName: (data.format?.format_name as string) ?? 'unknown',
+    bitRate: Number(data.format?.bit_rate) || undefined,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Single-frame extraction                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Extract a single frame at an exact timestamp. Used by the chat agent
+ * to show "what was on screen at X:XX" — the agent's equivalent of
+ * rewinding to a precise moment.
+ *
+ * Returns a `FrameArtifact` with the frame's path, timestamp, and
+ * dimensions. The frame is always a JPEG.
+ */
+export async function extractFrameAtTimestamp(
+  mediaPath: string,
+  timestampSecs: number,
+  options: FrameExtractionOptions,
+): Promise<FrameArtifact> {
+  await fs.mkdir(options.outputDir, { recursive: true });
+  if (!Number.isFinite(timestampSecs)) throw new Error('Frame timestamp must be a finite number.');
+  const maxWidth = Math.max(64, Math.min(1_920, Math.floor(options.maxWidth ?? 1280)));
+  const clampedTimestamp = Math.max(0, timestampSecs);
+  const outputPath = path.join(
+    options.outputDir,
+    `frame_${String(Math.round(clampedTimestamp * 1_000)).padStart(10, '0')}_${randomUUID()}.jpg`,
+  );
+
+  await runFfmpeg({
+    args: [
+      '-ss',
+      String(clampedTimestamp),
+      '-i',
+      mediaPath,
+      '-vf',
+      `scale='min(${maxWidth},iw)':-2`,
+      '-frames:v',
+      '1',
+      '-q:v',
+      '2',
+      ...(options.threads ? ['-threads', String(options.threads)] : []),
+      outputPath,
+    ],
+    signal: options.signal,
+  });
+
+  // Read actual dimensions from the extracted frame via ffprobe.
+  let width = 0;
+  let height = 0;
+  try {
+    const frameProbe = await ffprobe(outputPath);
+    const frameStream = frameProbe.streams?.find((s) => s.codec_type === 'video');
+    width = frameStream?.width ?? 0;
+    height = frameStream?.height ?? 0;
+  } catch {
+    // Non-critical: dimensions default to 0 if ffprobe fails on the frame.
+  }
+
+  return {
+    path: outputPath,
+    timestampSecs: clampedTimestamp,
+    timestampPrecision: 'estimated',
+    width,
+    height,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Bounded time-range inspection                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Extract frames from a bounded time range for deeper analysis.
+ * This is the tool-level primitive behind the online brain's
+ * `inspectTimeRange` — it lets the agent "rewind" to a specific
+ * window when knowledge is insufficient.
+ *
+ * The range is clamped to safe defaults: initially no more than
+ * 30 seconds and 24 frames per the plan's inspection policy.
+ */
+export async function inspectTimeRange(request: InspectionRequest): Promise<InspectionResult> {
+  if (!Number.isFinite(request.startSecs) || !Number.isFinite(request.endSecs)) {
+    throw new Error('Inspection range timestamps must be finite numbers.');
+  }
+  if (!Number.isFinite(request.maxFrames))
+    throw new Error('Inspection frame limit must be finite.');
+  if (request.signal?.aborted) throw new Error('Inspection was cancelled.');
+  const probe = await probeMedia(request.mediaPath);
+  const duration = probe.durationSecs;
+
+  // Clamp range to video bounds.
+  const startSecs = Math.max(0, Math.min(request.startSecs, duration));
+  const endSecs = Math.max(startSecs, Math.min(request.endSecs, duration));
+  // Enforce safety limits from the plan's inspection policy.
+  const maxDurationSecs = 30;
+  const maxFrames = Math.max(0, Math.min(Math.floor(request.maxFrames), 24));
+  const effectiveEnd = Math.min(endSecs, startSecs + maxDurationSecs);
+  const effectiveDuration = effectiveEnd - startSecs;
+
+  if (effectiveDuration <= 0 || maxFrames <= 0) {
+    return {
+      frames: [],
+      actualRange: { startSecs, endSecs: effectiveEnd },
+      probe,
+    };
+  }
+
+  await fs.mkdir(request.outputDir, { recursive: true });
+  const intervalSecs = maxFrames > 1 ? effectiveDuration / (maxFrames - 1) : effectiveDuration;
+  const timestamps = Array.from({ length: maxFrames }, (_, i) =>
+    Math.min(startSecs + i * intervalSecs, effectiveEnd),
+  );
+
+  // Extract frames at computed timestamps in parallel (bounded concurrency).
+  const maxWidth = request.maxWidth ?? 1280;
+  const frames: FrameArtifact[] = [];
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(2, timestamps.length) }, async () => {
+      while (cursor < timestamps.length) {
+        const index = cursor++;
+        const ts = timestamps[index];
+        const frame = await extractFrameAtTimestamp(request.mediaPath, ts, {
+          outputDir: request.outputDir,
+          maxWidth,
+          threads: request.threads,
+          signal: request.signal,
+        });
+        frames[index] = frame;
+      }
+    }),
+  );
+
+  return {
+    frames: frames.filter(Boolean).sort((a, b) => a.timestampSecs - b.timestampSecs),
+    actualRange: { startSecs, endSecs: effectiveEnd },
+    probe,
   };
 }

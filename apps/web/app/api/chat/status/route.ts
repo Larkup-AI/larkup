@@ -92,6 +92,17 @@ export async function GET(req: Request) {
         context_window: m.context_window,
         tags: m.tags,
       })),
+      // Keep this workspace-wide list separate from the chat provider list.
+      // A vision tool may intentionally use a different provider than chat.
+      availableVisionModels: allChatModels
+        .filter((m) => m.tags?.includes('vision'))
+        .map((m) => ({
+          id: m.id,
+          label: m.name,
+          provider: m.provider,
+          context_window: m.context_window,
+          tags: m.tags,
+        })),
       availableEmbeddingModels: mergedEmbeddings.map((m) => ({
         id: m.id,
         label: m.label,

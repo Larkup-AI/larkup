@@ -1,11 +1,11 @@
 {
   "name": "@larkup/tool-video-audio",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
-  "description": "Larkup marketplace tool: video & audio indexing with transcription and frame analysis.",
+  "description": "Larkup marketplace tool: evidence-first video intelligence with adaptive attention, source rewind, and audio analysis.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

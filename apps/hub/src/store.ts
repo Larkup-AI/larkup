@@ -49,12 +49,13 @@ export function seedRegistry(): void {
   const builtinTools: ToolDescriptor[] = [
     {
       id: 'video-audio',
-      name: 'Video & Audio',
-      description: 'Index video and audio files with transcription and frame analysis.',
+      name: 'Video Intelligence',
+      description:
+        'Build evidence-backed video timelines with adaptive attention and bounded source rewind.',
       longDescription:
-        'Process video and audio files for your knowledge base. ' +
-        'Creates multilingual transcripts, adaptive visual/OCR evidence, timestamped sections, ' +
-        'and whole-media notes. Supports YouTube URLs, ' +
+        'Evidence-first video reasoning for your knowledge base. ' +
+        'Creates multilingual transcripts, activity-aware visual/OCR evidence, timestamped source ranges, ' +
+        'and bounded rewind for complex questions. Supports YouTube URLs, ' +
         'direct file upload, and bulk processing. Includes ffmpeg automatically and prepares the YouTube downloader on first use.',
       category: 'media',
       version: '0.3.6',
@@ -70,8 +71,18 @@ export function seedRegistry(): void {
         'transcription',
         'frame-extraction',
         'youtube-import',
+        'attention-driven-analysis',
+        'temporal-evidence',
+        'bounded-source-rewind',
       ],
-      tags: ['transcription', 'ffmpeg', 'video', 'audio', 'whisper'],
+      tags: [
+        'video intelligence',
+        'temporal reasoning',
+        'transcription',
+        'ffmpeg',
+        'video',
+        'audio',
+      ],
       downloads: 0,
       repositoryUrl: 'https://github.com/Larkup-AI/larkup',
       license: 'Apache-2.0',
@@ -79,7 +90,7 @@ export function seedRegistry(): void {
       configSchema: [
         {
           key: 'frameInterval',
-          label: 'Frame extraction interval (seconds)',
+          label: 'Baseline coverage interval (seconds)',
           type: 'text',
           defaultValue: '10',
           help: 'Baseline cadence for duration-aware coverage frames; scene changes and a reserved ending pass are added separately.',

@@ -138,6 +138,11 @@ export interface RagConfig {
   chatProvider?: string;
   chatApiKey?: string;
   customChatModels?: CustomModelConfig[];
+  /** Optional dedicated vision-language model used by media and image tools. */
+  visionProvider?: string;
+  visionModelId?: string;
+  visionApiKey?: string;
+  customVisionModels?: CustomModelConfig[];
 
   /** dynamic tool configuration */
   toolConfigs?: Record<string, Record<string, any>>;
@@ -191,6 +196,8 @@ export const DEFAULT_CONFIG: RagConfig = {
   exaApiKey: '',
   chatModelId: '',
   chatApiKey: '',
+  visionModelId: '',
+  visionApiKey: '',
   scraperProxyServer: '',
   scraperProxyUsername: '',
   scraperProxyPassword: '',
@@ -349,6 +356,12 @@ export interface MediaAsset {
   documentIds: string[];
   pendingDocumentIds?: string[];
   supersededDocumentIds?: string[];
+  /** Active durable Video Knowledge Engine revision, when media has been migrated. */
+  activeVideoKnowledgeRevisionId?: string;
+  /** Active evidence/projection manifest for the revision above. */
+  activeVideoKnowledgeManifestId?: string;
+  /** Current/last durable job, used for status, cancellation, and scoped retry. */
+  activeVideoKnowledgeJobId?: string;
   indexingInstructions?: string;
   indexingQuality?: number;
   createdAt: string;

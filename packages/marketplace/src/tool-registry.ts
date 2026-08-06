@@ -180,8 +180,9 @@ export async function fetchToolFromHub(
 const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
   'video-audio': {
     id: 'video-audio',
-    name: 'Video & Audio',
-    description: 'Index video and audio files with transcription and frame analysis.',
+    name: 'Video Intelligence',
+    description:
+      'Build evidence-backed video timelines with adaptive attention and bounded source rewind.',
     category: 'media',
     version: '0.3.6',
     pricing: 'free',
@@ -196,8 +197,11 @@ const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
       'transcription',
       'frame-extraction',
       'youtube-import',
+      'attention-driven-analysis',
+      'temporal-evidence',
+      'bounded-source-rewind',
     ],
-    tags: ['transcription', 'ffmpeg', 'video', 'audio', 'whisper'],
+    tags: ['video intelligence', 'temporal reasoning', 'transcription', 'ffmpeg', 'video', 'audio'],
     downloads: 0,
     repositoryUrl: 'https://github.com/Larkup-AI/larkup',
     license: 'Apache-2.0',
@@ -205,7 +209,7 @@ const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
     configSchema: [
       {
         key: 'frameInterval',
-        label: 'Frame extraction interval (seconds)',
+        label: 'Baseline coverage interval (seconds)',
         type: 'text',
         defaultValue: '10',
         help: 'Baseline cadence for duration-aware coverage frames; scene changes and a reserved ending pass are added separately.',

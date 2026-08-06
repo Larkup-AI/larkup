@@ -17,12 +17,23 @@ import { loadTool } from '@larkup/marketplace/loader';
 import { getInstalledTools } from '@larkup/marketplace/installer';
 import { readDocuments } from '@larkup/core/documents-store';
 import { readMediaAssets } from '@larkup/core/media-store';
+import {
+  searchVideoKnowledge,
+  videoKnowledgeRetrievalCapabilities,
+} from '@larkup/core/video-knowledge/retrieval';
+import { planVideoInvestigation as buildVideoInvestigationPlan } from '@larkup/core/video-knowledge/investigation';
+import { verifyMediaEvidence } from '@larkup/core/video-knowledge/verification';
+import { planVideoQuestion } from '@larkup/core/video-knowledge/query-planner';
+import { decideInspection } from '@larkup/core/video-knowledge/inspection-policy';
+import { trackUsageEvent } from '@larkup/core/analytics-store';
 import { cacheImageAnalysis, getCachedImageAnalysis } from '@larkup/core/image-analysis-cache';
 import {
   normalizeMediaCitationRange,
   queryAwareExcerpt,
   timestampMediaUrl,
 } from '@/lib/media-knowledge';
+
+const queryVideoKnowledgeCache = new Map<string, { expiresAt: number; value: any }>();
 
 function documentEditModelOutput({ output }: { output: any }) {
   return {
@@ -155,22 +166,8 @@ async function formatKnowledgeHits(
   const trailingDocuments = timestampedDocuments.filter(
     (document) => Number(document.metadata?.endSecs ?? 0) >= mediaDuration - trailingHorizonSecs,
   );
-  // Result announcements can occur shortly before the literal final minutes
-  // (for example during a trophy or score recap). Preserve the latest explicit
-  // outcome evidence from the whole indexed timeline, not only the trailing
-  // window returned by a semantic match.
-  const timelineOutcomeDocuments = isOutcomeQuery(query)
-    ? timestampedDocuments.filter((document) => isOutcomeEvidence(document.content)).slice(-3)
-    : [];
-  const signaledEndingDocuments = isOutcomeQuery(query)
-    ? trailingDocuments.filter((document) => isOutcomeEvidence(document.content)).slice(-2)
-    : [];
   const timestampedEnding = [
-    ...new Map(
-      [...timelineOutcomeDocuments, ...signaledEndingDocuments, ...trailingDocuments.slice(-4)].map(
-        (document) => [document.id, document],
-      ),
-    ).values(),
+    ...new Map(trailingDocuments.slice(-4).map((document) => [document.id, document])).values(),
   ].sort(
     (left, right) => Number(left.metadata?.endSecs ?? 0) - Number(right.metadata?.endSecs ?? 0),
   );
@@ -228,59 +225,70 @@ async function formatKnowledgeHits(
     hits: selected.map((hit, hitIndex) => {
       const sequence = Number(hit.metadata?.sequence);
       const startSecs = Number(hit.metadata?.startSecs);
-      const timelineContext = hit.metadata?.mediaAssetId
-        ? documents
-            .filter((document) => {
-              const candidateSequence = Number(document.metadata?.sequence);
-              const candidateStart = Number(document.metadata?.startSecs);
-              return (
-                document.status === 'indexed' &&
-                activeMediaDocumentIds.has(document.id) &&
-                document.metadata?.mediaAssetId === hit.metadata.mediaAssetId &&
-                Number.isFinite(sequence) &&
-                Number.isFinite(candidateSequence) &&
-                Math.abs(candidateSequence - sequence) <= 1 &&
-                // Sequence is the authoritative adjacency marker. Fixed
-                // 90-second distance broke wider adaptive windows used for
-                // multi-hour camera and screen recordings.
-                (!Number.isFinite(startSecs) ||
-                  !Number.isFinite(candidateStart) ||
-                  Math.abs(candidateStart - startSecs) <=
-                    Math.max(
-                      90,
-                      Number(hit.metadata?.endSecs ?? startSecs) - startSecs,
-                      Number(document.metadata?.endSecs ?? candidateStart) - candidateStart,
-                    ))
-              );
-            })
-            .sort(
-              (left, right) =>
-                Number(left.metadata?.startSecs ?? 0) - Number(right.metadata?.startSecs ?? 0),
-            )
-            .map((document) => ({
-              role:
-                Number(document.metadata?.sequence) < sequence
-                  ? 'before'
-                  : Number(document.metadata?.sequence) > sequence
-                  ? 'after'
-                  : 'matched',
-              title: document.title,
-              url: document.url,
-              text: queryAwareExcerpt(document.content, query, 3_200),
-              startSecs: document.metadata?.startSecs,
-              endSecs: document.metadata?.endSecs,
-            }))
+      const activeVideoAsset = hit.metadata?.mediaAssetId
+        ? mediaAssets.find((asset) => asset.id === hit.metadata.mediaAssetId)
         : undefined;
+      const usesEvidenceFirstVideoKnowledge = Boolean(
+        activeVideoAsset?.activeVideoKnowledgeRevisionId &&
+          (activeVideoAsset.type === 'video' || activeVideoAsset.type === 'audio'),
+      );
+      const timelineContext =
+        hit.metadata?.mediaAssetId && !usesEvidenceFirstVideoKnowledge
+          ? documents
+              .filter((document) => {
+                const candidateSequence = Number(document.metadata?.sequence);
+                const candidateStart = Number(document.metadata?.startSecs);
+                return (
+                  document.status === 'indexed' &&
+                  activeMediaDocumentIds.has(document.id) &&
+                  document.metadata?.mediaAssetId === hit.metadata.mediaAssetId &&
+                  Number.isFinite(sequence) &&
+                  Number.isFinite(candidateSequence) &&
+                  Math.abs(candidateSequence - sequence) <= 1 &&
+                  // Sequence is the authoritative adjacency marker. Fixed
+                  // 90-second distance broke wider adaptive windows used for
+                  // multi-hour camera and screen recordings.
+                  (!Number.isFinite(startSecs) ||
+                    !Number.isFinite(candidateStart) ||
+                    Math.abs(candidateStart - startSecs) <=
+                      Math.max(
+                        90,
+                        Number(hit.metadata?.endSecs ?? startSecs) - startSecs,
+                        Number(document.metadata?.endSecs ?? candidateStart) - candidateStart,
+                      ))
+                );
+              })
+              .sort(
+                (left, right) =>
+                  Number(left.metadata?.startSecs ?? 0) - Number(right.metadata?.startSecs ?? 0),
+              )
+              .map((document) => ({
+                role:
+                  Number(document.metadata?.sequence) < sequence
+                    ? 'before'
+                    : Number(document.metadata?.sequence) > sequence
+                    ? 'after'
+                    : 'matched',
+                title: document.title,
+                url: document.url,
+                text: queryAwareExcerpt(document.content, query, 3_200),
+                startSecs: document.metadata?.startSecs,
+                endSecs: document.metadata?.endSecs,
+              }))
+          : undefined;
 
       return {
         documentId: hit.documentId,
         title: hit.title ?? 'Untitled',
         url: hit.url ?? '',
         score: Number((hit.score ?? 0).toFixed(3)),
-        // This is evidence for both the model and the source citation UI. A
-        // focused excerpt is enough to answer accurately and keeps the first
-        // response substantially faster than passing whole document chunks.
-        text: queryAwareExcerpt(hit.text ?? '', query, 1_600),
+        // An active Video Knowledge revision replaces this disposable vector
+        // projection as the factual source. Do not leak the old timeline
+        // excerpt to the model: it can otherwise answer from a broad/dummy
+        // window without running the evidence verification tool.
+        text: usesEvidenceFirstVideoKnowledge
+          ? 'Smart video evidence is available. Call queryVideoKnowledge with this mediaAssetId before answering any factual question about this media.'
+          : queryAwareExcerpt(hit.text ?? '', query, 1_600),
         // PDF extraction stores its verified upload URLs on the source
         // document, rather than creating media-library assets. Expose those
         // URLs explicitly so the presentation tool can validate and render
@@ -297,24 +305,16 @@ async function formatKnowledgeHits(
                 },
               ]
             : undefined),
-        metadata: hit.metadata,
+        metadata: {
+          ...hit.metadata,
+          usesEvidenceFirstVideoKnowledge,
+        },
         timelineContext,
-        endingContext: hitIndex === 0 ? endingContext : undefined,
+        endingContext:
+          hitIndex === 0 && !usesEvidenceFirstVideoKnowledge ? endingContext : undefined,
       };
     }),
   };
-}
-
-function isOutcomeQuery(query: string): boolean {
-  return /\b(who won|winner|won|final score|scoreline|result|beat|defeated|victor|champion|took (?:the )?(?:game|match|round))\b|من فاز|مين فاز|الفائز|النتيجة|نتيجة|فاز|كسب|البطل|حسم|انتصر/i.test(
-    query,
-  );
-}
-
-function isOutcomeEvidence(text: string): boolean {
-  return /\b(winner|won|final score|total score|scoreline|champion|victor|defeated|beat)\b|الفائز|النتيجة|فاز|كسب|البطل|حسم|انتصر/i.test(
-    text,
-  );
 }
 
 export async function getChatTools(context: {
@@ -324,12 +324,12 @@ export async function getChatTools(context: {
   /** Public origin of the incoming chat request, used for local media URLs. */
   origin?: string;
 }) {
-  const { serverId, docSessionId, config } = context;
+  const { serverId, docSessionId, config, origin } = context;
 
   const builtInTools: Record<string, any> = {
     searchKnowledgeBase: tool({
       description:
-        "HIGHEST PRIORITY TOOL — Search the user's private RAG knowledge base. ALWAYS use this FIRST before webSearch or any other tool when the user asks a question. You MUST use this tool if you are asked a question and do not already have the exact answer in your context. Even if the question seems like personal trivia, general knowledge, or random facts (e.g., 'what is my favorite food?', 'what is X?'), you MUST search the knowledge base because the user's uploaded documents likely contain the answer. Search once with a focused query. If it returns no relevant evidence and the question asks for public/current info, webSearch is available once as a fallback. For media, reuse exact mediaAssetId/startSecs/endSecs values with presentMedia when a preview is useful.",
+        "HIGHEST PRIORITY TOOL — Search the user's private RAG knowledge base. ALWAYS use this FIRST before webSearch or any other tool when the user asks a question. You MUST use this tool if you are asked a question and do not already have the exact answer in your context. Even if the question seems like personal trivia, general knowledge, or random facts (e.g., 'what is my favorite food?', 'what is X?'), you MUST search the knowledge base because the user's uploaded documents likely contain the answer. Search once with a focused query. If it returns no relevant evidence and the question asks for public/current info, webSearch is available once as a fallback. When a result has a mediaAssetId and the user asks a factual video/audio question, you MUST call queryVideoKnowledge before answering; cite only its returned active evidence ranges. DO NOT call presentMedia automatically. Only call presentMedia with exact mediaAssetId/startSecs/endSecs values if the user EXPLICITLY asks to preview or see the video/moment.",
       inputSchema: z.object({
         query: z.string().describe('The search query for the knowledge base.'),
       }),
@@ -338,9 +338,189 @@ export async function getChatTools(context: {
       },
     }),
 
+    queryVideoKnowledge: tool({
+      description:
+        'Use this for every factual question about an indexed video or audio asset after searchKnowledgeBase identifies its mediaAssetId. It performs a fresh hierarchical investigation (chapters → scenes → events/states → active source evidence) on every call, returns seekable ranges, and highlights unresolved conflicts. Use it for simple, temporal, comparative, exact-text, counting, and outcome questions before answering; do not infer a claim beyond these records.',
+      inputSchema: z.object({
+        mediaAssetId: z.string().describe('Exact mediaAssetId returned by searchKnowledgeBase.'),
+        query: z.string().describe('The user’s focused question or sub-question about this media.'),
+        limit: z.number().int().min(1).max(12).optional(),
+      }),
+      execute: async ({ mediaAssetId, query, limit }) => {
+        const run = async () => {
+          const asset = (await readMediaAssets()).find(
+            (candidate) => candidate.id === mediaAssetId,
+          );
+          if (!asset || asset.processingStatus !== 'completed') {
+            return { success: false, error: 'That indexed media asset is no longer available.' };
+          }
+          const cacheKey = `${serverId ?? 'default'}:${mediaAssetId}:${query
+            .normalize('NFKC')
+            .toLocaleLowerCase()
+            .trim()}`;
+          const cached = queryVideoKnowledgeCache.get(cacheKey);
+          if (cached && cached.expiresAt > Date.now()) {
+            return cached.value;
+          }
+          const plan = planVideoQuestion(query);
+          const investigation = await buildVideoInvestigationPlan(mediaAssetId, query);
+          // The regular RAG retriever owns embeddings/vector providers. Join
+          // its media projection hits back to active Core evidence so video
+          // answers get hybrid semantic + lexical retrieval without treating
+          // vector documents as source truth.
+          const semantic = await queryKnowledgeBase(query, 24, null);
+          const semanticDocumentIds = semantic.hits
+            .filter((hit: any) => hit.metadata?.mediaAssetId === mediaAssetId)
+            .map((hit: any) => String(hit.documentId));
+          const hits = await searchVideoKnowledge(mediaAssetId, query, limit ?? 8, {
+            modalities: plan.modalities,
+            minimumRangeDistanceSecs: 2,
+            semanticDocumentIds,
+            queryPlan: plan,
+            videoDurationSecs: asset.durationSecs,
+          });
+          const verification = await verifyMediaEvidence({
+            mediaAssetId,
+            evidenceIds: hits.map((hit) => hit.evidence.id),
+            requiresFramePrecision: /\b(exact|precisely|frame|at\s+\d{1,2}:\d{2})\b/i.test(query),
+          });
+          const inspectionDecision = decideInspection({
+            required:
+              plan.requiresInspectionWhenInsufficient &&
+              ['insufficient', 'needs_inspection'].includes(verification.status),
+            plausibleRange: hits.length > 0 || Boolean(asset.durationSecs),
+            estimate: {
+              durationSecs: 30,
+              bytes: 64 * 1024 * 1024,
+              sandboxSeconds: 30,
+              spendUsd: 0,
+              lowerResolutionProbability: hits.length > 0 ? 0.65 : 0,
+            },
+            budget: {
+              remainingDurationSecs: 180,
+              remainingBytes: 1024 * 1024 * 1024,
+              remainingSandboxSeconds: 600,
+              remainingSpendUsd: 0.5,
+              usedBundleRuns: 0,
+            },
+          });
+          void trackUsageEvent({
+            type: 'media_processing',
+            mediaOperation: 'investigation',
+            mediaAssetId,
+            queryKind: plan.kinds.join(','),
+            cache: investigation?.cache ?? 'miss',
+            evidenceCount: hits.length,
+            timestamp: new Date().toISOString(),
+          });
+          const result = {
+            success: true,
+            mediaAssetId: asset.id,
+            fileName: asset.fileName,
+            sourceUrl: `/api/media/${asset.id}${
+              serverId ? `?serverId=${encodeURIComponent(serverId)}` : ''
+            }`,
+            originalUrl: asset.originalUrl,
+            verification,
+            plan,
+            investigation,
+            retrievalCapabilities: videoKnowledgeRetrievalCapabilities(),
+            inspectionDecision,
+            evidence: hits.map((hit) => {
+              const rawText =
+                typeof hit.evidence.payload === 'object' &&
+                hit.evidence.payload &&
+                'text' in hit.evidence.payload
+                  ? String((hit.evidence.payload as { text?: unknown }).text ?? '')
+                  : JSON.stringify(hit.evidence.payload);
+              return {
+                evidenceId: hit.evidence.id,
+                modality: hit.evidence.modality,
+                text: rawText,
+                startSecs: hit.evidence.timeRange.startSecs,
+                endSecs: hit.evidence.timeRange.endSecs,
+                precision: hit.evidence.timeRange.precision,
+                confidence: hit.evidence.confidence,
+                conflicted: hit.conflict,
+              };
+            }),
+          };
+          queryVideoKnowledgeCache.set(cacheKey, {
+            expiresAt: Date.now() + 5 * 60_000,
+            value: result,
+          });
+          return result;
+        };
+        return serverId ? runWithServer(serverId, run) : run();
+      },
+    }),
+
+    planVideoInvestigation: tool({
+      description:
+        'Plan a complex video investigation before source inspection. It searches the active time hierarchy (chapters, scenes, events, states) and returns the best candidate ranges. Use this when queryVideoKnowledge has weak or no direct evidence, or when the question requires before/after reasoning, tracking, counting, or a chain of events. Then inspect only the returned range(s), never the entire video.',
+      inputSchema: z.object({
+        mediaAssetId: z.string().describe('Exact mediaAssetId returned by searchKnowledgeBase.'),
+        question: z.string().describe('The full user question, including any temporal conditions.'),
+      }),
+      execute: async ({ mediaAssetId, question }) => {
+        const run = async () => {
+          const asset = (await readMediaAssets()).find(
+            (candidate) => candidate.id === mediaAssetId,
+          );
+          if (!asset || asset.processingStatus !== 'completed') {
+            return { success: false, error: 'That indexed media asset is no longer available.' };
+          }
+          const investigation = await buildVideoInvestigationPlan(mediaAssetId, question);
+          if (!investigation)
+            return { success: false, error: 'No active video knowledge revision is available.' };
+          void trackUsageEvent({
+            type: 'media_processing',
+            mediaOperation: 'investigation',
+            mediaAssetId,
+            queryKind: 'planner',
+            cache: investigation.cache,
+            timestamp: new Date().toISOString(),
+          });
+          return { success: true, ...investigation };
+        };
+        return serverId ? runWithServer(serverId, run) : run();
+      },
+    }),
+
+    inspectVideoKnowledge: tool({
+      description:
+        'Use only after queryVideoKnowledge returns needs_inspection or a required/optional inspection decision. This performs one bounded, authorized source rewind and persists only validated OCR/visual evidence. After a successful inspection, call queryVideoKnowledge again with the same focused sub-question to verify the newly active evidence before answering. Never request an unbounded whole-video scan.',
+      inputSchema: z.object({
+        mediaAssetId: z.string(),
+        startSecs: z.number().nonnegative(),
+        endSecs: z.number().nonnegative(),
+        purpose: z.enum(['verify-visual', 'high-res-ocr', 'compare', 'count', 'track', 'code']),
+        queryId: z.string().min(1).max(128),
+        maxFrames: z.number().int().min(1).max(24).optional(),
+      }),
+      execute: async ({ mediaAssetId, startSecs, endSecs, purpose, queryId, maxFrames }) => {
+        if (!origin)
+          return {
+            success: false,
+            error: 'Source inspection is unavailable without a request origin.',
+          };
+        const url = new URL('/api/media/inspect', origin);
+        if (serverId) url.searchParams.set('serverId', serverId);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mediaAssetId, startSecs, endSecs, purpose, queryId, maxFrames }),
+        });
+        const result = await response
+          .json()
+          .catch(() => ({ error: 'Inspection returned an invalid response.' }));
+        return response.ok ? { success: true, ...result } : { success: false, ...result };
+      },
+    }),
+
     presentMedia: tool({
       description:
-        'Embed one indexed image, video segment, or audio segment as a compact citation in the chat. Use the exact mediaAssetId for Media-library assets, or the exact images[].imageUrl returned by searchKnowledgeBase for an image extracted from a PDF. Call this when the user asks to see, watch, play, or hear the media. Prefer one best citation and do not call this for every search hit.',
+        'Embed one indexed image, video segment, or audio segment as a compact citation in the chat. Use the exact mediaAssetId for Media-library assets, or the exact images[].imageUrl returned by searchKnowledgeBase for an image extracted from a PDF. Call this when the user asks to see, watch, play, or hear the media. Set extractFrame=true with a specific startSecs to show "what was on screen at X:XX" as a single frame preview instead of a video player. Prefer one best citation and do not call this for every search hit.',
       inputSchema: z.object({
         assetId: z
           .string()
@@ -362,8 +542,14 @@ export async function getChatTools(context: {
           .nonnegative()
           .optional()
           .describe('Exact segment end time returned by searchKnowledgeBase.'),
+        extractFrame: z
+          .boolean()
+          .optional()
+          .describe(
+            'When true, extract and show a single frame at startSecs instead of embedding the video player. Use this to answer "show me what was on screen at X:XX".',
+          ),
       }),
-      execute: async ({ assetId, imageUrl, startSecs, endSecs }) => {
+      execute: async ({ assetId, imageUrl, startSecs, endSecs, extractFrame }) => {
         const resolvePresentation = async () => {
           if (imageUrl) {
             const documents = await readDocuments();
@@ -418,15 +604,27 @@ export async function getChatTools(context: {
               ? timestampMediaUrl(asset.originalUrl || mediaUrl, range.startSecs)
               : asset.originalUrl || mediaUrl;
 
+          // Frame preview: extract a single frame at the timestamp instead
+          // of embedding the full video player. This answers "show me what
+          // was on screen at X:XX" with a precise image.
+          let framePreviewUrl: string | undefined;
+          if (extractFrame && asset.type === 'video' && range.startSecs !== undefined) {
+            const frameQuery = new URLSearchParams();
+            frameQuery.set('t', String(range.startSecs));
+            if (serverId) frameQuery.set('serverId', serverId);
+            framePreviewUrl = `/api/media/${asset.id}/frame?${frameQuery.toString()}`;
+          }
+
           return {
             success: true,
             assetId: asset.id,
-            mediaType: asset.type,
+            mediaType: framePreviewUrl ? ('frame-preview' as const) : asset.type,
             fileName: asset.fileName,
-            mediaUrl,
+            mediaUrl: framePreviewUrl || mediaUrl,
             sourceUrl,
             startSecs: range.startSecs,
             endSecs: range.endSecs,
+            framePreviewUrl,
           };
         };
 
@@ -1092,6 +1290,13 @@ export async function getChatTools(context: {
         // PDF/image hits can require one visual pass after retrieval. This is
         // available only to a follow-up tool step, never auto-run on chat.
         'analyzeImageDeeply',
+        // A video match must be verified against immutable evidence rather
+        // than answered from an ordinary vector chunk. These are first-party
+        // retrieval capabilities, so legacy enabled-tools settings may not
+        // silently remove them.
+        'queryVideoKnowledge',
+        'planVideoInvestigation',
+        'inspectVideoKnowledge',
         'presentMedia',
         'fillDocumentForm',
         'editDocument',

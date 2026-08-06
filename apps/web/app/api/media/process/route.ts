@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   claimMediaAsset,
   updateMediaAsset,
@@ -12,8 +12,33 @@ import { getInstalledTool, isToolInstalled } from '@larkup/marketplace/installer
 import { loadTool } from '@larkup/marketplace/loader';
 import { createStorageProvider } from '@larkup/marketplace/storage';
 import { readConfig } from '@larkup/core/config-store';
+import { trackUsageEvent } from '@larkup/core/analytics-store';
 import type { MediaAsset, MediaPipelineStage } from '@larkup/core/types';
 import { runWithServer } from '@larkup/core/workspace';
+import {
+  createVideoKnowledgeRevision,
+  findVideoKnowledgeRevision,
+  updateVideoKnowledgeRevision,
+} from '@larkup/core/video-knowledge/revision-store';
+import {
+  checkpointVideoKnowledgeJob,
+  createVideoKnowledgeJob,
+  finishVideoKnowledgeJob,
+  getVideoKnowledgeJob,
+  recoverStaleVideoKnowledgeJobs,
+} from '@larkup/core/video-knowledge/job-store';
+import {
+  buildVideoKnowledgeFromEvidence,
+  type OfflineKnowledgeEvidenceInput,
+} from '@larkup/core/video-knowledge/knowledge-builder';
+import type { MetadataValue } from '@larkup/core/video-knowledge/types';
+import { activateVideoKnowledgeManifest } from '@larkup/core/video-knowledge/manifest-store';
+import { saveVideoKnowledgeProjection } from '@larkup/core/video-knowledge/manifest-store';
+import { appendFrameArtifact } from '@larkup/core/video-knowledge/evidence-store';
+import {
+  getCachedArtifactAnalysis,
+  saveCachedArtifactAnalysis,
+} from '@larkup/core/video-knowledge/artifact-cache-store';
 import { getConcurrencyLimits } from '@/lib/os-concurrency';
 import {
   buildMediaDocumentInputs,
@@ -22,6 +47,11 @@ import {
   formatTime,
   type MediaEvidenceSegment,
 } from '@/lib/media-knowledge';
+import {
+  createConfiguredOcrAdapter,
+  createConfiguredVisionAdapter,
+} from '@/lib/video-intelligence/model-adapters';
+import { startLeasedVideoKnowledgeJob } from '@/lib/video-intelligence/worker';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -79,6 +109,9 @@ async function enqueueMediaProcessing(
   serverId?: string,
 ): Promise<NextResponse> {
   try {
+    // A process restart can leave a leased job behind. Recover its durable
+    // checkpoint before accepting more work; a new worker may then claim it.
+    await recoverStaleVideoKnowledgeJobs();
     const assets = await readMediaAssets();
     const matchingAssets = assets.filter((asset) => assetIds.includes(asset.id));
     const claimedAssets = await Promise.all(
@@ -488,19 +521,25 @@ async function processMediaWithTool(
   const documentIds: string[] = [];
   let published = false;
   let indexAttempted = false;
+  let knowledgeRun:
+    | { revisionId: string; jobId: string; owner: string; signal: AbortSignal; release: () => void }
+    | undefined;
 
   try {
     const installedTool = await getInstalledTool('video-audio');
     const globalConfig = await readConfig();
     const toolConfig = globalConfig.toolConfigs?.['video-audio'] || {};
+    const videoKnowledgeEnabled =
+      toolConfig.videoKnowledgeEnabled !== false && toolConfig.videoKnowledgeEnabled !== 'false';
     const provider = typeof toolConfig.audioProvider === 'string' ? toolConfig.audioProvider : '';
     const apiKey = typeof toolConfig.audioApiKey === 'string' ? toolConfig.audioApiKey : '';
-    if (!provider) {
+    const hasSourceTranscript = Boolean(sourceTranscript?.chunks?.length);
+    if (!hasSourceTranscript && !provider) {
       throw new Error(
         'Choose an Audio Provider in Settings → Marketplace Tools → Video & Audio before indexing media.',
       );
     }
-    if (provider !== 'local' && !apiKey) {
+    if (!hasSourceTranscript && provider !== 'local' && !apiKey) {
       throw new Error(
         'Add the API key for the selected Audio Provider in Settings → Marketplace Tools → Video & Audio.',
       );
@@ -509,6 +548,16 @@ async function processMediaWithTool(
       asset.indexingQuality,
       Number(installedTool?.config?.frameInterval ?? 30) || 30,
     );
+    const configuredMaxFrames = Number(toolConfig.maxFrames);
+    const maxFrames =
+      Number.isFinite(configuredMaxFrames) && configuredMaxFrames > 0
+        ? Math.min(2_000, Math.floor(configuredMaxFrames))
+        : qualityToMaxFrames(asset.indexingQuality);
+    const configuredChunkDuration = Number(toolConfig.chunkDurationSecs);
+    const chunkDurationSecs =
+      Number.isFinite(configuredChunkDuration) && configuredChunkDuration > 0
+        ? Math.max(30, Math.min(1_800, Math.floor(configuredChunkDuration)))
+        : 300;
     const language =
       typeof toolConfig.audioLanguage === 'string' ? toolConfig.audioLanguage : 'auto';
     const effectiveLanguage =
@@ -518,24 +567,68 @@ async function processMediaWithTool(
     const localUrl = `/api/media/${asset.id}`;
     const userInstructions = asset.indexingInstructions?.trim() || '';
 
+    // Duration limit: reject videos that exceed the configured maximum.
+    const maxDurationSecs = Number(toolConfig.maxDurationSecs) || 14_400;
+    let preflightProbe: { durationSecs: number } | undefined;
+    if (maxDurationSecs > 0 && tool.probeMedia) {
+      try {
+        const probe = await tool.probeMedia(tmpFile);
+        preflightProbe = probe;
+        if (probe.durationSecs > maxDurationSecs) {
+          const hours = Math.floor(maxDurationSecs / 3600);
+          const mins = Math.floor((maxDurationSecs % 3600) / 60);
+          const limit = hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
+          throw new Error(
+            `This ${Math.floor(
+              probe.durationSecs / 60,
+            )}-minute video exceeds the ${limit} maximum. ` +
+              'Increase "Maximum video duration" in Settings → Marketplace Tools → Video & Audio.',
+          );
+        }
+        if (probe.hasCorruptionSignals) {
+          console.warn(
+            `[media] Probe detected corruption signals for asset ${asset.id}; proceeding with best effort.`,
+          );
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('exceeds the')) throw err;
+        // Probe failure is non-fatal: the processing pipeline will fail on
+        // its own if the file is truly unreadable.
+        console.warn('[media] Pre-processing probe failed; continuing:', err);
+      }
+    }
+
     const limits = getConcurrencyLimits();
 
     if (asset.type === 'video' && tool.processVideo) {
       const sourceKind = sourceTranscript?.origin?.kind;
-      const hasManualSourceTranscript =
-        Boolean(sourceTranscript?.chunks?.length) && sourceKind !== 'youtube-auto';
       await reportStage('extract', {
         status: 'running',
         percent: 0,
         message: `Extracting adaptive frames and audio (${limits.ffmpegThreads} FFmpeg threads)...`,
       });
+      if (videoKnowledgeEnabled) {
+        knowledgeRun = await beginVideoKnowledgeRun({
+          asset,
+          mediaPath: tmpFile,
+          durationSecs: preflightProbe?.durationSecs ?? 0,
+          maxDurationSecs,
+          maxFrames,
+        });
+        await updateMediaAsset(asset.id, { activeVideoKnowledgeJobId: knowledgeRun.jobId });
+        await checkpointVideoKnowledgeJob(knowledgeRun.jobId, knowledgeRun.owner, 'extracting', {
+          chunkIndex: 0,
+        });
+      }
       const result = await tool.processVideo(tmpFile, {
         outputDir: tmpDir,
         frameIntervalSecs,
-        maxFrames: qualityToMaxFrames(asset.indexingQuality),
+        maxFrames,
+        chunkDurationSecs,
         threads: limits.ffmpegThreads,
         parallelExtraction: limits.canParallelizeFfmpeg,
-        skipAudioExtraction: hasManualSourceTranscript,
+        skipAudioExtraction: hasSourceTranscript,
+        signal: knowledgeRun?.signal,
         onProgress: (value: number) => {
           void reportStage('extract', {
             status: 'running',
@@ -544,6 +637,21 @@ async function processMediaWithTool(
           }).catch(() => {});
         },
       });
+      void trackUsageEvent({
+        type: 'media_processing',
+        mediaType: 'video',
+        mediaOperation: 'probe',
+        durationSecs: result.meta.durationSecs,
+        timestamp: new Date().toISOString(),
+      });
+      await assertVideoKnowledgeJobActive(knowledgeRun);
+      if (knowledgeRun) {
+        await persistVideoFrameArtifacts({
+          mediaAssetId: asset.id,
+          knowledgeRevisionId: knowledgeRun.revisionId,
+          frames: result.frames,
+        });
+      }
       await reportStage('extract', {
         status: 'completed',
         current: result.frames.length,
@@ -553,16 +661,25 @@ async function processMediaWithTool(
       });
 
       let transcriptPromise: Promise<any | null> = Promise.resolve(
-        hasManualSourceTranscript ? sourceTranscript : null,
+        hasSourceTranscript ? sourceTranscript : null,
       );
 
-      if (hasManualSourceTranscript) {
+      if (hasSourceTranscript) {
         await reportStage('transcribe', {
           status: 'completed',
           current: sourceTranscript?.chunks.length,
           total: sourceTranscript?.chunks.length,
           unit: 'caption sections',
-          message: 'Using timestamped manual source captions.',
+          message: `Indexed ${
+            sourceTranscript?.chunks.length ?? 0
+          } timestamped source-caption sections; no audio transcription was needed.`,
+        });
+        void trackUsageEvent({
+          type: 'media_processing',
+          mediaType: 'video',
+          mediaOperation: 'source_transcript',
+          durationSecs: sourceTranscript?.durationSecs,
+          timestamp: new Date().toISOString(),
         });
       } else if (result.audioPath && tool.processAudio) {
         transcriptPromise = (async () => {
@@ -655,7 +772,10 @@ async function processMediaWithTool(
         let visionThrottled = false;
         let lastVisionRequestAt = 0;
         let runningContext = '';
-        const visionProvider = globalConfig.chatProvider || globalConfig.embeddingProvider;
+        const visionProvider =
+          globalConfig.visionProvider ||
+          globalConfig.chatProvider ||
+          globalConfig.embeddingProvider;
         const visionConcurrency = visionProvider === 'google' ? 1 : limits.apiConcurrency;
         const visionMinIntervalMs = visionProvider === 'google' ? 4_250 : 0;
         const recordProgress = () => {
@@ -671,6 +791,10 @@ async function processMediaWithTool(
             }).catch(() => {});
           }
         };
+        // Vision is deliberately invoked through the server-only, schema
+        // validating adapter. Free-form captions are useful presentation
+        // projections, but they must never be the durable source of truth.
+        const visionAdapter = createConfiguredVisionAdapter();
         const descriptions = await mapConcurrent(
           frameGroups,
           visionConcurrency,
@@ -680,78 +804,35 @@ async function processMediaWithTool(
               recordProgress();
               return null;
             }
-            const base64Images = await Promise.all(
-              frames.map(async (frame) => (await fs.readFile(frame.path)).toString('base64')),
-            );
             const startSecs = frames[0].timestampSecs;
             const endSecs = Math.min(
               result.meta.durationSecs,
               Math.max(startSecs + 1, frames.at(-1)!.timestampSecs + frameIntervalSecs),
             );
-            const timestamps = frames.map((frame) => formatTime(frame.timestampSecs)).join(', ');
             if (visionMinIntervalMs > 0) {
               const remaining = visionMinIntervalMs - (Date.now() - lastVisionRequestAt);
               if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
             }
             lastVisionRequestAt = Date.now();
 
-            const isIntro = groupIndex === 0;
-            const contextBlock = runningContext
-              ? `\nPreviously observed state: ${runningContext}\nReport what CHANGED or is NEW compared to the previous state.`
-              : '';
-            const userBlock = userInstructions
-              ? `\nUser focus instructions: ${userInstructions}`
-              : '';
-            const introBlock = isIntro
-              ? '\nThis is the OPENING of the video. Identify the content type, participants, teams, topic, and any visible setup or initial state. This context will guide analysis of subsequent sequences.'
-              : '';
-
-            const prompt = `These are chronological frames from "${asset.fileName}" at ${timestamps}.${introBlock}${contextBlock}${userBlock}
-Write one evidence note for this time range. Track people, actions, interactions, state changes, important objects, and exact meaningful on-screen text. Perform careful OCR, including Arabic and other right-to-left text without reversing labels. For scoreboards or result animations, compare frames in timestamp order and report the latest visible score as the current/final state; associate each number with the correct nearby team/person label. If a score or counter changed since the previous state, explicitly note the old and new values. Record a winner or result only when visually supported. Omit boilerplate about facts that are not shown. Be factual, information-dense, and concise.`;
-
             try {
-              const descRes = await fetchWithRetry(
-                scopedApiUrl('/api/describe-image', reqUrl, serverId),
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ base64Images, prompt }),
-                },
-              );
-              if (!descRes.ok) {
-                let detail = '';
-                try {
-                  const errorBody = (await descRes.json()) as { error?: string };
-                  detail = errorBody.error?.trim() || '';
-                } catch {}
-                if (/quota|rate limit|resource_exhausted|too many requests/i.test(detail)) {
-                  visionThrottled = true;
-                }
-                skipped++;
-                console.warn(
-                  `Visual sequence ${formatTime(startSecs)}–${formatTime(endSecs)} was skipped: ${
-                    detail || `HTTP ${descRes.status}`
-                  }`,
-                );
-                return null;
-              }
-              const { description } = (await descRes.json()) as { description?: string };
-              if (description) {
+              const analysis = await visionAdapter.analyze({
+                frames,
+                previousContext: [runningContext, userInstructions].filter(Boolean).join('\n'),
+                signal: knowledgeRun?.signal,
+              });
+              const text = analysis.observations.map((observation) => observation.value).join(' ');
+              if (text) {
                 const { extractRunningState } = await import('@larkup/tool-video-audio');
-                const newState = extractRunningState(description);
-                if (newState) {
-                  runningContext = runningContext
-                    ? `${runningContext}; ${newState}`.slice(-500)
-                    : newState;
-                }
-                if (isIntro && description.length > 20) {
-                  runningContext = `[Intro] ${description.slice(0, 300)}${
-                    runningContext ? '; ' + runningContext : ''
-                  }`.slice(-500);
-                }
+                runningContext = extractRunningState(`${runningContext}\n${text}`);
               }
-              return description
-                ? { text: description, startSecs, endSecs: Math.max(startSecs + 1, endSecs) }
+              return text
+                ? {
+                    text,
+                    startSecs,
+                    endSecs: Math.max(startSecs + 1, endSecs),
+                    observations: analysis.observations,
+                  }
                 : null;
             } catch (error) {
               skipped++;
@@ -782,7 +863,23 @@ Write one evidence note for this time range. Track people, actions, interactions
         return descriptions;
       })();
 
-      const [transcript, sceneDescriptions] = await Promise.all([transcriptPromise, scenePromise]);
+      const ocrPromise = knowledgeRun
+        ? extractOfflineOcrEvidence({
+            mediaAssetId: asset.id,
+            knowledgeRevisionId: knowledgeRun.revisionId,
+            frames: result.frames,
+            maxFrames: Math.max(1, Math.min(120, Number(toolConfig.maxOcrFrames) || 60)),
+            signal: knowledgeRun.signal,
+            concurrency: limits.apiConcurrency,
+          })
+        : Promise.resolve<OfflineKnowledgeEvidenceInput[]>([]);
+
+      const [transcript, sceneDescriptions, ocrEvidence] = await Promise.all([
+        transcriptPromise,
+        scenePromise,
+        ocrPromise,
+      ]);
+      await assertVideoKnowledgeJobActive(knowledgeRun);
 
       const validScenes = sceneDescriptions.filter(
         (scene): scene is NonNullable<typeof scene> => scene !== null,
@@ -848,12 +945,14 @@ Write one evidence note for this time range. Track people, actions, interactions
         transcriptSource,
         transcriptProvider: transcript?.origin?.provider || provider,
         transcriptLanguage: transcript?.language,
+        knowledgeRevisionId: knowledgeRun?.revisionId,
       }).map((input) => ({ ...input, id: randomUUID() }));
       documentIds.push(...documentInputs.map((input) => input.id));
       if (!(await updateMediaAsset(asset.id, { pendingDocumentIds: documentIds }))) {
         throw new Error('Media asset was removed before its evidence could be published.');
       }
       const documents = await addDocuments(documentInputs);
+      await assertVideoKnowledgeJobActive(knowledgeRun);
 
       await reportStage('index', {
         status: 'running',
@@ -876,6 +975,46 @@ Write one evidence note for this time range. Track people, actions, interactions
         status: 'completed',
         message: 'Video timeline and notes are searchable.',
       });
+      let activeManifestId: string | undefined;
+      if (knowledgeRun) {
+        const manifest = await publishVideoKnowledge({
+          assetId: asset.id,
+          knowledgeRun,
+          segments,
+          transcriptChunks: transcript?.chunks ?? [],
+          visualObservations: validScenes,
+          ocrEvidence,
+          documentIds: documents.map((document) => ({
+            documentId: document.id,
+            kind: document.metadata?.isMediaSummary
+              ? 'overview'
+              : document.metadata?.contentKind === 'media-chapter'
+              ? 'chapter'
+              : document.metadata?.contentKind === 'multimodal-segment'
+              ? 'scene'
+              : document.metadata?.contentKind === 'video-visual'
+              ? 'visual'
+              : 'transcript',
+            startSecs: Number.isFinite(Number(document.metadata?.startSecs))
+              ? Number(document.metadata?.startSecs)
+              : undefined,
+            endSecs: Number.isFinite(Number(document.metadata?.endSecs))
+              ? Number(document.metadata?.endSecs)
+              : undefined,
+          })),
+        });
+        activeManifestId = manifest.id;
+        void trackUsageEvent({
+          type: 'media_processing',
+          mediaType: 'video',
+          mediaOperation: 'projection',
+          durationSecs: result.meta.durationSecs,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      // Publication is deliberately last: a manifest activates only after all
+      // replacement documents indexed, and the asset swaps its document IDs
+      // in the same final step. An earlier failure leaves old IDs untouched.
       const publishedAsset = await updateMediaAsset(asset.id, {
         processingStatus: 'completed',
         caption: summary.slice(0, 600),
@@ -886,6 +1025,12 @@ Write one evidence note for this time range. Track people, actions, interactions
         supersededDocumentIds: asset.documentIds,
         processingProgress: 100,
         processingMessage: undefined,
+        ...(knowledgeRun
+          ? {
+              activeVideoKnowledgeRevisionId: knowledgeRun.revisionId,
+              activeVideoKnowledgeManifestId: activeManifestId,
+            }
+          : {}),
       });
       if (!publishedAsset) {
         throw new Error('Media asset was removed before indexing completed.');
@@ -934,6 +1079,16 @@ Write one evidence note for this time range. Track people, actions, interactions
         transcript.durationSecs,
         60,
       ) as MediaEvidenceSegment[];
+      if (videoKnowledgeEnabled) {
+        knowledgeRun = await beginVideoKnowledgeRun({
+          asset,
+          mediaPath: tmpFile,
+          durationSecs: transcript.durationSecs,
+          maxDurationSecs,
+          maxFrames: 0,
+        });
+        await updateMediaAsset(asset.id, { activeVideoKnowledgeJobId: knowledgeRun.jobId });
+      }
       if (segments.length === 0) {
         throw new Error('The transcription completed without searchable speech.');
       }
@@ -987,12 +1142,14 @@ Write one evidence note for this time range. Track people, actions, interactions
         transcriptSource: transcript?.origin?.kind || 'provider-stt',
         transcriptProvider: transcript?.origin?.provider || provider,
         transcriptLanguage: transcript.language,
+        knowledgeRevisionId: knowledgeRun?.revisionId,
       }).map((input) => ({ ...input, id: randomUUID() }));
       documentIds.push(...documentInputs.map((input) => input.id));
       if (!(await updateMediaAsset(asset.id, { pendingDocumentIds: documentIds }))) {
         throw new Error('Media asset was removed before its evidence could be published.');
       }
       const documents = await addDocuments(documentInputs);
+      await assertVideoKnowledgeJobActive(knowledgeRun);
 
       await reportStage('index', {
         status: 'running',
@@ -1015,6 +1172,32 @@ Write one evidence note for this time range. Track people, actions, interactions
         status: 'completed',
         message: 'Audio transcript and notes are searchable.',
       });
+      let activeManifestId: string | undefined;
+      if (knowledgeRun) {
+        const manifest = await publishVideoKnowledge({
+          assetId: asset.id,
+          knowledgeRun,
+          segments,
+          transcriptChunks: transcript.chunks,
+          visualObservations: [],
+          ocrEvidence: [],
+          documentIds: documents.map((document) => ({
+            documentId: document.id,
+            kind: document.metadata?.isMediaSummary
+              ? 'overview'
+              : document.metadata?.contentKind === 'media-chapter'
+              ? 'chapter'
+              : 'transcript',
+            startSecs: Number.isFinite(Number(document.metadata?.startSecs))
+              ? Number(document.metadata?.startSecs)
+              : undefined,
+            endSecs: Number.isFinite(Number(document.metadata?.endSecs))
+              ? Number(document.metadata?.endSecs)
+              : undefined,
+          })),
+        });
+        activeManifestId = manifest.id;
+      }
       const publishedAsset = await updateMediaAsset(asset.id, {
         processingStatus: 'completed',
         caption: summary.slice(0, 600),
@@ -1024,6 +1207,12 @@ Write one evidence note for this time range. Track people, actions, interactions
         supersededDocumentIds: asset.documentIds,
         processingProgress: 100,
         processingMessage: undefined,
+        ...(knowledgeRun
+          ? {
+              activeVideoKnowledgeRevisionId: knowledgeRun.revisionId,
+              activeVideoKnowledgeManifestId: activeManifestId,
+            }
+          : {}),
       });
       if (!publishedAsset) {
         throw new Error('Media asset was removed before indexing completed.');
@@ -1037,13 +1226,485 @@ Write one evidence note for this time range. Track people, actions, interactions
       await trackMediaProcessing('audio', transcript.durationSecs, 0, provider);
     }
   } catch (error) {
+    if (knowledgeRun) {
+      const message = error instanceof Error ? error.message : 'Video knowledge processing failed.';
+      const cancelled = /cancelled/i.test(message);
+      await updateVideoKnowledgeRevision(knowledgeRun.revisionId, {
+        status: cancelled ? 'cancelled' : 'failed',
+      }).catch(() => {});
+      await finishVideoKnowledgeJob(
+        knowledgeRun.jobId,
+        knowledgeRun.owner,
+        cancelled ? 'cancelled' : 'failed',
+        message,
+      ).catch(() => {});
+    }
     if (!published) {
       await rollbackPendingDocuments(asset.id, documentIds, indexAttempted);
     }
     throw error;
   } finally {
+    knowledgeRun?.release();
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+async function fingerprintMediaFile(mediaPath: string): Promise<string> {
+  const { createReadStream } = await import('node:fs');
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(mediaPath)) hash.update(chunk);
+  return hash.digest('hex');
+}
+
+async function assertVideoKnowledgeJobActive(run: { jobId: string } | undefined) {
+  if (!run) return;
+  const job = await getVideoKnowledgeJob(run.jobId);
+  if (!job || job.cancellationRequestedAt)
+    throw new Error('Video knowledge processing was cancelled.');
+}
+
+async function beginVideoKnowledgeRun(input: {
+  asset: MediaAsset;
+  mediaPath: string;
+  durationSecs: number;
+  maxDurationSecs: number;
+  maxFrames: number;
+}) {
+  const sourceFingerprint = await fingerprintMediaFile(input.mediaPath);
+  const pipelineVersion = 'video-knowledge-v1';
+  const existingRevision = await findVideoKnowledgeRevision(
+    input.asset.id,
+    sourceFingerprint,
+    pipelineVersion,
+  );
+  const revision =
+    existingRevision ??
+    (await createVideoKnowledgeRevision({
+      mediaAssetId: input.asset.id,
+      sourceFingerprint,
+      pipelineVersion,
+      guidance: input.asset.indexingInstructions?.trim()
+        ? { text: input.asset.indexingInstructions.trim(), createdAt: new Date().toISOString() }
+        : undefined,
+      budget: {
+        maxDurationSecs: input.maxDurationSecs,
+        maxBytes: input.asset.fileSize,
+        maxFrames: input.maxFrames,
+        maxModelCalls: 0,
+        maxCostUsd: 0,
+        usedDurationSecs: input.durationSecs,
+      },
+      coverage: {
+        sourceDurationSecs: input.durationSecs,
+        inspectedRanges: [],
+        transcriptCoverage: 0,
+        visualCoverage: 0,
+        ocrCoverage: 0,
+        partialReasons: [],
+      },
+    }));
+  const job = await createVideoKnowledgeJob({
+    mediaAssetId: input.asset.id,
+    knowledgeRevisionId: revision.id,
+    idempotencyKey: `${input.asset.id}:${sourceFingerprint}:video-knowledge-v1`,
+    budget: revision.budget,
+  });
+  const lease = await startLeasedVideoKnowledgeJob(job.id);
+  if (!lease) throw new Error('Unable to claim the video knowledge job.');
+  await lease.checkpoint('observing', { chunkIndex: 0 });
+  return {
+    revisionId: revision.id,
+    jobId: job.id,
+    owner: lease.owner,
+    signal: lease.signal,
+    release: lease.release,
+  };
+}
+
+async function publishVideoKnowledge(input: {
+  assetId: string;
+  knowledgeRun: { revisionId: string; jobId: string; owner: string };
+  segments: MediaEvidenceSegment[];
+  transcriptChunks: Array<{ text: string; startSecs: number; endSecs: number }>;
+  visualObservations: Array<{
+    startSecs: number;
+    endSecs: number;
+    observations?: Array<{
+      kind: 'object' | 'action' | 'ui' | 'chart' | 'relationship' | 'state';
+      value: string;
+      frameTimestamps: number[];
+      confidence: number;
+      uncertaintyReasons: string[];
+    }>;
+  }>;
+  ocrEvidence: OfflineKnowledgeEvidenceInput[];
+  documentIds: Array<{
+    documentId: string;
+    kind: 'overview' | 'chapter' | 'scene' | 'transcript' | 'visual';
+    startSecs?: number;
+    endSecs?: number;
+  }>;
+}) {
+  const { deriveAudioSignals } = await import('@larkup/tool-video-audio');
+  const confidence = (score: number, reasons: string[] = []) => ({
+    score: Math.max(0, Math.min(1, score)),
+    source: 'provider' as const,
+    calibrationStatus: 'uncalibrated' as const,
+    uncertaintyReasons: reasons,
+  });
+  const evidence: OfflineKnowledgeEvidenceInput[] = [
+    ...input.transcriptChunks
+      .filter((chunk) => chunk.text.trim())
+      .map((chunk) => ({
+        modality: 'transcript' as const,
+        timeRange: {
+          startSecs: chunk.startSecs,
+          endSecs: chunk.endSecs,
+          precision: 'segment' as const,
+        },
+        payload: { text: chunk.text },
+        source: { kind: 'provider' as const, provider: 'stt' },
+        confidence: confidence(0.8, ['Transcript timing is provider-segment precision.']),
+        observation: { kind: 'speech' as const, value: { text: chunk.text } },
+      })),
+    ...input.visualObservations.flatMap((sequence) =>
+      (sequence.observations ?? []).map((observation) => ({
+        modality: 'visual' as const,
+        timeRange: {
+          startSecs: Math.min(...observation.frameTimestamps),
+          endSecs: Math.max(...observation.frameTimestamps),
+          // FFmpeg seeking supplies an evidence timestamp, but not a verified
+          // source PTS. Keep this estimated until a bounded precise inspection
+          // has established the requested frame-level detail.
+          precision: 'estimated' as const,
+        },
+        payload: { text: observation.value, frameTimestamps: observation.frameTimestamps },
+        source: {
+          kind: 'provider' as const,
+          provider: 'configured-vision',
+          version: 'structured-v1',
+        },
+        confidence: confidence(observation.confidence, observation.uncertaintyReasons),
+        observation: {
+          kind: observation.kind,
+          value:
+            observation.kind === 'state'
+              ? parseStructuredState(observation.value)
+              : { text: observation.value },
+        },
+      })),
+    ),
+    ...deriveAudioSignals(input.transcriptChunks).map((signal) => ({
+      modality: 'audio-event' as const,
+      timeRange: {
+        startSecs: signal.timestampSecs,
+        endSecs: signal.timestampSecs,
+        precision: 'segment' as const,
+      },
+      payload: {
+        transcriptChange: signal.transcriptChange,
+        silenceBoundary: signal.silenceBoundary,
+      },
+      source: { kind: 'heuristic' as const, version: 'audio-signals-v1' },
+      confidence: {
+        ...confidence(0.5, ['Derived from transcript boundaries, not raw audio classification.']),
+        source: 'heuristic' as const,
+      },
+      observation: {
+        kind: 'audio-event' as const,
+        value: {
+          transcriptChange: signal.transcriptChange,
+          silenceBoundary: signal.silenceBoundary,
+        },
+      },
+    })),
+    ...input.ocrEvidence,
+  ];
+  // A transcript-only asset remains useful; explicit evidence is preferable to
+  // falling back to the legacy, free-text timeline bridge.
+  if (evidence.length === 0) {
+    throw new Error('No validated source evidence was produced for this media revision.');
+  }
+  const built = await buildVideoKnowledgeFromEvidence({
+    mediaAssetId: input.assetId,
+    knowledgeRevisionId: input.knowledgeRun.revisionId,
+    evidence,
+  });
+  const projections = await Promise.all(
+    input.documentIds.map((document) =>
+      saveVideoKnowledgeProjection({
+        mediaAssetId: input.assetId,
+        knowledgeRevisionId: input.knowledgeRun.revisionId,
+        kind: document.kind,
+        documentId: document.documentId,
+        lineageIds: [],
+        evidenceIds: built.evidenceIds,
+        ...(document.startSecs !== undefined && document.endSecs !== undefined
+          ? {
+              timeRange: {
+                startSecs: document.startSecs,
+                endSecs: document.endSecs,
+                precision: 'segment' as const,
+              },
+            }
+          : {}),
+        quality: {
+          score: 0.7,
+          source: 'heuristic',
+          calibrationStatus: 'uncalibrated',
+          uncertaintyReasons: ['Search projection; source evidence is authoritative.'],
+        },
+        active: false,
+      }),
+    ),
+  );
+  await checkpointVideoKnowledgeJob(
+    input.knowledgeRun.jobId,
+    input.knowledgeRun.owner,
+    'projecting',
+    {
+      completedEvidenceIds: built.evidenceIds,
+      completedProjectionIds: projections.map((projection) => projection.id),
+    },
+  );
+  const manifest = await activateVideoKnowledgeManifest({
+    mediaAssetId: input.assetId,
+    knowledgeRevisionId: input.knowledgeRun.revisionId,
+    activeEvidenceRevisionIds: Object.fromEntries(
+      built.evidenceLineageIds.map((lineageId, index) => [lineageId, built.evidenceIds[index]]),
+    ),
+    activeObservationRevisionIds: Object.fromEntries(
+      built.observationLineageIds.map((lineageId, index) => [
+        lineageId,
+        built.observationIds[index],
+      ]),
+    ),
+    activeProjectionIds: projections.map((projection) => projection.id),
+    activationReason: 'initial',
+  });
+  await updateVideoKnowledgeRevision(input.knowledgeRun.revisionId, {
+    status: 'completed',
+    activeManifestId: manifest.id,
+    coverage: {
+      sourceDurationSecs: Math.max(0, ...input.segments.map((segment) => segment.endSecs)),
+      // A timeline window is a navigation projection, not proof that every
+      // frame inside it was watched. Persist only the source intervals that
+      // were actually transcribed or sampled so the agent can honestly decide
+      // to rewind instead of treating sparse anchors as continuous coverage.
+      inspectedRanges: [
+        ...input.transcriptChunks.map((chunk) => ({
+          startSecs: chunk.startSecs,
+          endSecs: chunk.endSecs,
+          precision: 'segment' as const,
+        })),
+        ...input.visualObservations.flatMap((sequence) =>
+          (sequence.observations ?? []).flatMap((observation) =>
+            observation.frameTimestamps.map((timestampSecs) => ({
+              startSecs: timestampSecs,
+              endSecs: timestampSecs,
+              precision: 'estimated' as const,
+            })),
+          ),
+        ),
+        ...input.ocrEvidence.map((item) => item.timeRange),
+      ],
+      transcriptCoverage: coverageFraction(
+        input.transcriptChunks.map((chunk) => ({
+          startSecs: chunk.startSecs,
+          endSecs: chunk.endSecs,
+        })),
+        Math.max(0, ...input.segments.map((segment) => segment.endSecs)),
+      ),
+      visualCoverage: 0,
+      ocrCoverage: 0,
+      partialReasons: [
+        'Visual understanding uses adaptive source anchors rather than continuous frame-by-frame observation.',
+        'The raw source is retained so the agent can perform a bounded rewind when an answer needs stronger visual evidence.',
+      ],
+    },
+  });
+  await finishVideoKnowledgeJob(input.knowledgeRun.jobId, input.knowledgeRun.owner, 'completed');
+  return manifest;
+}
+
+/**
+ * OCR is a retained-frame operation with a durable cache key that includes
+ * content, operation, and analyzer schema—not a filename, path, or secret.
+ */
+async function extractOfflineOcrEvidence(input: {
+  mediaAssetId: string;
+  knowledgeRevisionId: string;
+  frames: Array<{ path: string; timestampSecs: number }>;
+  maxFrames: number;
+  signal: AbortSignal;
+  concurrency?: number;
+}): Promise<OfflineKnowledgeEvidenceInput[]> {
+  const { createArtifactCacheKey } = await import('@larkup/tool-video-audio');
+  const { readFile } = await import('node:fs/promises');
+  const adapter = createConfiguredOcrAdapter();
+  const step = Math.max(1, Math.ceil(input.frames.length / input.maxFrames));
+  const selected = input.frames.filter((_, index) => index % step === 0).slice(0, input.maxFrames);
+  const evidenceList = await mapConcurrent(selected, input.concurrency ?? 5, async (frame) => {
+    if (input.signal.aborted) throw new Error('Video knowledge processing was cancelled.');
+    const bytes = await readFile(frame.path);
+    const contentHash = createHash('sha256').update(bytes).digest('hex');
+    const key = createArtifactCacheKey({
+      contentHash,
+      operation: 'ocr',
+      promptVersion: 'ocr-visible-text-v1',
+      schemaVersion: '1',
+    });
+    const cached = await getCachedArtifactAnalysis(input.mediaAssetId, key);
+    const payload =
+      cached ??
+      (await (async () => {
+        const result = await adapter.recognize({ imagePath: frame.path, signal: input.signal });
+        const value: MetadataValue = {
+          blocks: result.blocks.map((block) => ({
+            text: block.text,
+            left: block.left,
+            top: block.top,
+            width: block.width,
+            height: block.height,
+            confidence: block.confidence,
+            ...(block.language ? { language: block.language } : {}),
+            ...(block.direction ? { direction: block.direction } : {}),
+          })),
+          ...(result.provider ? { provider: result.provider } : {}),
+          ...(result.model ? { model: result.model } : {}),
+        };
+        await saveCachedArtifactAnalysis({
+          key,
+          mediaAssetId: input.mediaAssetId,
+          knowledgeRevisionId: input.knowledgeRevisionId,
+          operation: 'ocr',
+          value,
+        });
+        return value;
+      })());
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const payloadRecord = payload as Record<string, MetadataValue>;
+    const blocks: MetadataValue[] = Array.isArray(payloadRecord.blocks) ? payloadRecord.blocks : [];
+    const text = blocks
+      .map((block: MetadataValue) =>
+        block && typeof block === 'object' && !Array.isArray(block) ? block.text : '',
+      )
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .join('\n');
+    if (!text) return null;
+    return {
+      modality: 'ocr',
+      timeRange: {
+        startSecs: frame.timestampSecs,
+        endSecs: frame.timestampSecs,
+        precision: 'estimated',
+      },
+      payload,
+      source: {
+        kind: 'provider',
+        provider:
+          typeof payloadRecord.provider === 'string' ? payloadRecord.provider : 'configured-ocr',
+        ...(typeof payloadRecord.model === 'string' ? { model: payloadRecord.model } : {}),
+      },
+      confidence: {
+        score: Math.min(
+          1,
+          Math.max(
+            0,
+            blocks.reduce(
+              (sum: number, block: MetadataValue) =>
+                sum +
+                (block &&
+                typeof block === 'object' &&
+                !Array.isArray(block) &&
+                typeof block.confidence === 'number'
+                  ? block.confidence
+                  : 0),
+              0,
+            ) / Math.max(1, blocks.length),
+          ),
+        ),
+        source: 'provider',
+        calibrationStatus: 'uncalibrated',
+        uncertaintyReasons: ['OCR derived from a retained adaptive frame.'],
+      },
+      observation: { kind: 'ocr', value: { text } },
+    } as OfflineKnowledgeEvidenceInput;
+  });
+  return evidenceList.filter((e): e is OfflineKnowledgeEvidenceInput => e !== null);
+}
+
+function parseStructuredState(value: string): MetadataValue {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (
+      typeof parsed.subject === 'string' &&
+      typeof parsed.property === 'string' &&
+      parsed.value !== undefined
+    ) {
+      return { subject: parsed.subject, property: parsed.property, value: String(parsed.value) };
+    }
+  } catch {}
+  return { text: value };
+}
+
+async function persistVideoFrameArtifacts(input: {
+  mediaAssetId: string;
+  knowledgeRevisionId: string;
+  frames: Array<{ path: string; timestampSecs: number }>;
+}) {
+  const { createArtifactCacheKey } = await import('@larkup/tool-video-audio');
+  const { readFile } = await import('node:fs/promises');
+  await Promise.all(
+    input.frames.map(async (frame) => {
+      const bytes = await readFile(frame.path);
+      const contentHash = createHash('sha256').update(bytes).digest('hex');
+      const storageRef = createArtifactCacheKey({
+        contentHash,
+        operation: 'frame-artifact',
+        schemaVersion: '1',
+      });
+      await appendFrameArtifact({
+        mediaAssetId: input.mediaAssetId,
+        knowledgeRevisionId: input.knowledgeRevisionId,
+        storageRef,
+        timestampSecs: frame.timestampSecs,
+        width: 0,
+        height: 0,
+        contentHash,
+        candidateSignals: {},
+        selectionDecision: 'retained',
+        selectionReason: 'adaptive-extraction',
+      });
+    }),
+  );
+}
+
+/** Fraction of the source timeline with source-backed continuous evidence. */
+function coverageFraction(
+  ranges: Array<{ startSecs: number; endSecs: number }>,
+  durationSecs: number,
+): number {
+  if (!Number.isFinite(durationSecs) || durationSecs <= 0) return 0;
+  const ordered = ranges
+    .filter((range) => Number.isFinite(range.startSecs) && Number.isFinite(range.endSecs))
+    .map((range) => ({
+      startSecs: Math.max(0, Math.min(durationSecs, range.startSecs)),
+      endSecs: Math.max(0, Math.min(durationSecs, Math.max(range.startSecs, range.endSecs))),
+    }))
+    .sort((left, right) => left.startSecs - right.startSecs);
+  let covered = 0;
+  let active: { startSecs: number; endSecs: number } | undefined;
+  for (const range of ordered) {
+    if (!active || range.startSecs > active.endSecs) {
+      if (active) covered += active.endSecs - active.startSecs;
+      active = range;
+    } else {
+      active.endSecs = Math.max(active.endSecs, range.endSecs);
+    }
+  }
+  if (active) covered += active.endSecs - active.startSecs;
+  return Math.max(0, Math.min(1, covered / durationSecs));
 }
 
 function qualityToFrameInterval(quality: number | undefined, baseInterval: number): number {
