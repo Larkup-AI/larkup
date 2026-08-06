@@ -3,7 +3,7 @@ import { generateText } from 'ai';
 import { readConfig } from '@larkup/core/config-store';
 import { getModelsByType } from '@larkup/core/models-cache';
 import { runWithServer } from '@larkup/core/workspace';
-import { createChatModel, resolveConfiguredChatModel } from '@/lib/chat-model-provider';
+import { createChatModel, resolveConfiguredVisionModel } from '@/lib/chat-model-provider';
 import { createImageDescriptionSignal, isImageDescriptionAbort } from '@/lib/image-description';
 
 export const runtime = 'nodejs';
@@ -29,12 +29,12 @@ async function describeImage(req: Request) {
 
     const config = await readConfig();
     const models = await getModelsByType('language');
-    const resolved = resolveConfiguredChatModel(config, models, { requiredTag: 'vision' });
+    const resolved = resolveConfiguredVisionModel(config, models);
     const model = createChatModel(
       resolved.provider,
       resolved.modelId,
       resolved.apiKey,
-      config.customChatModels,
+      config.customVisionModels,
     ) as any;
 
     const defaultPrompt =

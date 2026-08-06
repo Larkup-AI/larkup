@@ -6,7 +6,11 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createMistral } from '@ai-sdk/mistral';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { getDefaultChatModel, toChatDescriptor } from '@larkup/core/chat-models/registry';
+import {
+  getDefaultChatModel,
+  getDefaultVisionModel,
+  toChatDescriptor,
+} from '@larkup/core/chat-models/registry';
 import type { GatewayModel } from '@larkup/core/models-cache';
 import type { CustomModelConfig, RagConfig } from '@larkup/core/types';
 
@@ -65,6 +69,42 @@ export function resolveConfiguredChatModel(
     modelId,
     apiKey: config.chatApiKey || config.embeddingApiKey || undefined,
   };
+}
+
+/**
+ * Resolve the workspace-wide vision-language model. Image-capable tools share
+ * this setting so they do not accidentally run on a text-only chat model.
+ */
+export function resolveConfiguredVisionModel(
+  config: RagConfig,
+  availableModels: GatewayModel[] = [],
+): ResolvedChatModel {
+  const provider =
+    config.visionProvider || config.chatProvider || config.embeddingProvider || 'openai';
+  let modelId = config.visionModelId?.trim();
+  const customModels = config.customVisionModels ?? [];
+
+  if (!modelId && provider === 'custom' && customModels[0]) {
+    modelId = `custom:${customModels[0].modelName}`;
+  }
+
+  if (!modelId) {
+    modelId = getDefaultVisionModel(availableModels.map(toChatDescriptor), provider)?.id;
+  }
+
+  if (!modelId) {
+    throw new Error(
+      `No vision-capable model is available for ${provider}. Configure a Vision Model in Settings → AI Models.`,
+    );
+  }
+
+  const chatProvider = config.chatProvider || config.embeddingProvider;
+  const apiKey =
+    config.visionApiKey ||
+    (provider === chatProvider ? config.chatApiKey : undefined) ||
+    (provider === config.embeddingProvider ? config.embeddingApiKey : undefined);
+
+  return { provider, modelId, apiKey };
 }
 
 export function createChatModel(

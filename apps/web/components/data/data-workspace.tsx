@@ -117,7 +117,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   const getInitialSubTab = (): SubTabId => {
     const subtab = searchParams.get('subtab') as SubTabId;
     if (subtab && SUB_TABS.some((t) => t.id === subtab)) return subtab;
-    return 'website';
+    return 'files';
   };
 
   const [activeTab, setActiveTabState] = useState<TopTabId>(getInitialTab());

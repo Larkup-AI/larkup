@@ -420,7 +420,6 @@ export function UploadPanel({
           payloads.push({
             title: `${f.name} - Line ${i + 1}`,
             content: line,
-            url: fileUrl,
             source: 'files',
           });
         });
@@ -458,7 +457,7 @@ export function UploadPanel({
           if (content.trim()) {
             payloads.push({
               title,
-              content: JSON.stringify(f.tabularRows),
+              content,
               metadata,
               source: 'files',
             });

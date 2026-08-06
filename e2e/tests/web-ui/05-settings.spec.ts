@@ -53,9 +53,9 @@ test.describe('Settings Page', () => {
     const sections = [
       ['AI Models', 'AI Models'],
       ['Storage', 'Storage'],
+      ['Search & Scraping', 'Search & Scraping'],
       ['Agent Customization', 'Agent Customization'],
       ['Playground', 'Playground'],
-      ['Appearance', 'Appearance'],
     ] as const;
 
     for (const [navigationName, headingName] of sections) {
@@ -66,6 +66,8 @@ test.describe('Settings Page', () => {
           `section=${encodeURIComponent(
             navigationName === 'AI Models'
               ? 'models'
+              : navigationName === 'Search & Scraping'
+              ? 'search-web'
               : navigationName === 'Agent Customization'
               ? 'prompts'
               : navigationName.toLowerCase(),
@@ -73,6 +75,16 @@ test.describe('Settings Page', () => {
         ),
       );
     }
+  });
+
+  test('AI Models exposes an independent vision model card', async ({ page }) => {
+    await page.getByRole('button', { name: 'AI Models', exact: true }).click();
+
+    await expect(page.getByRole('heading', { name: 'AI Models', exact: true })).toBeVisible();
+    await expect(page.getByText('Vision Model', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('Only providers with vision-capable models are shown.', { exact: false }),
+    ).toBeVisible();
   });
 
   test('search provider verification', async ({ page }) => {
@@ -97,6 +109,7 @@ test.describe('Settings Page', () => {
       }
     });
 
+    await page.getByRole('button', { name: 'Search & Scraping', exact: true }).click();
     const webSearchCard = page.locator('[data-slot="card"]', { hasText: 'Web Search' }).first();
     const providerSelect = webSearchCard.getByRole('combobox');
     const providers = [

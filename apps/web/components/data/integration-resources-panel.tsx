@@ -142,7 +142,7 @@ export function IntegrationResourcesPanel({
           <Button onClick={() => connect(integration)}>Connect {name}</Button>
         </div>
         {data?.error && (
-          <DialogFooter className="!m-0 flex flex-row items-center justify-between space-x-0 gap-2 border-t border-border/70 bg-muted/50 p-4 sm:justify-between">
+          <DialogFooter className="m-0! flex flex-row items-center justify-between space-x-0 gap-2 border-t border-border/70 bg-muted/50 p-4 sm:justify-between">
             <Button variant="destructive" onClick={disconnect} disabled={disconnecting}>
               {disconnecting ? (
                 <Loader2 className="size-4 mr-2 animate-spin" />
@@ -255,7 +255,7 @@ export function IntegrationResourcesPanel({
           )}
         </div>
       </div>
-      <DialogFooter className="!m-0 flex flex-row items-center justify-between space-x-0 gap-2 border-t border-border/70 bg-muted/50 p-4 sm:justify-between">
+      <DialogFooter className="m-0! flex flex-row items-center justify-between space-x-0 gap-2 border-t border-border/70 bg-muted/50 p-4 sm:justify-between">
         <Button variant="destructive" onClick={disconnect} disabled={importing || disconnecting}>
           {disconnecting ? (
             <Loader2 className="size-4 mr-2 animate-spin" />

@@ -42,8 +42,12 @@ export function WelcomeScreen() {
   // UI state
   const [saving, setSaving] = useState(false);
   const [showSeparateChat, setShowSeparateChat] = useState(false);
+  const [showSeparateVision, setShowSeparateVision] = useState(false);
+  const [visionProvider, setVisionProvider] = useState<string>('vercel_ai_gateway');
+  const [visionApiKey, setVisionApiKey] = useState('');
   const [showEmbeddingApiKey, setShowEmbeddingApiKey] = useState(false);
   const [showChatApiKey, setShowChatApiKey] = useState(false);
+  const [showVisionApiKey, setShowVisionApiKey] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState<'embedding' | 'chat' | null>(null);
 
   const isCustomEmbedding = embeddingProvider === 'custom';
@@ -69,6 +73,8 @@ export function WelcomeScreen() {
         return false;
       }
     }
+
+    if (showSeparateVision && !visionApiKey) return false;
 
     return true;
   };
@@ -111,6 +117,12 @@ export function WelcomeScreen() {
         }
       }
 
+      // Vision is its own capability: default to the selected chat provider,
+      // or let a user choose a dedicated provider/key for media tools now.
+      payload.visionProvider = showSeparateVision ? visionProvider : payload.chatProvider;
+      payload.visionApiKey = showSeparateVision ? visionApiKey : payload.chatApiKey;
+      payload.visionModelId = '';
+
       const verifyRes = await fetch('/api/config/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,6 +135,9 @@ export function WelcomeScreen() {
           chatApiKey: payload.chatApiKey,
           chatModelId: payload.chatModelId,
           customChatModels: payload.customChatModels,
+          visionProvider: payload.visionProvider,
+          visionApiKey: payload.visionApiKey,
+          visionModelId: payload.visionModelId,
         }),
       });
 
@@ -191,6 +206,9 @@ export function WelcomeScreen() {
         // Sync chat provider if not separately configured
         if (!showSeparateChat) {
           setChatProvider(value);
+        }
+        if (!showSeparateVision) {
+          setVisionProvider(value);
         }
       } else {
         setChatProvider(value);
@@ -407,6 +425,104 @@ export function WelcomeScreen() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Vision Provider */}
+            <button
+              type="button"
+              onClick={() => setShowSeparateVision(!showSeparateVision)}
+              className="flex w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showSeparateVision ? (
+                <ChevronUp className="size-3.5" />
+              ) : (
+                <ChevronDown className="size-3.5" />
+              )}
+              Use a dedicated vision model for video and images
+            </button>
+
+            {showSeparateVision && (
+              <div className="space-y-3 rounded-xl border border-border/40 bg-muted/20 p-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">Vision Provider</label>
+                  <Select
+                    value={visionProvider}
+                    onValueChange={(value) => setVisionProvider(value ?? '')}
+                  >
+                    <SelectTrigger className="w-full bg-white/90 hover:bg-white">
+                      <span className="flex items-center gap-2">
+                        {PROVIDER_META[visionProvider as keyof typeof PROVIDER_META] ? (
+                          <>
+                            <ProviderIcon
+                              src={
+                                PROVIDER_META[visionProvider as keyof typeof PROVIDER_META].iconSrc
+                              }
+                              alt={
+                                PROVIDER_META[visionProvider as keyof typeof PROVIDER_META].label
+                              }
+                              pillBg={
+                                PROVIDER_META[visionProvider as keyof typeof PROVIDER_META].pillBg
+                              }
+                              size={16}
+                            />
+                            {PROVIDER_META[visionProvider as keyof typeof PROVIDER_META].label}
+                          </>
+                        ) : (
+                          'Select provider'
+                        )}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WELCOME_PROVIDERS.filter((provider) => provider !== 'custom').map(
+                        (provider) => {
+                          const meta = PROVIDER_META[provider];
+                          if (!meta) return null;
+                          return (
+                            <SelectItem key={provider} value={provider}>
+                              <div className="flex items-center gap-2">
+                                <ProviderIcon
+                                  src={meta.iconSrc}
+                                  alt={meta.label}
+                                  pillBg={meta.pillBg}
+                                  size={16}
+                                />
+                                <span>{meta.label}</span>
+                              </div>
+                            </SelectItem>
+                          );
+                        },
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Only vision-capable models are used; the default is selected automatically.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">Vision API Key</label>
+                  <div className="relative">
+                    <Input
+                      type={showVisionApiKey ? 'text' : 'password'}
+                      value={visionApiKey}
+                      onChange={(event) => setVisionApiKey(event.target.value)}
+                      placeholder="sk-..."
+                      className="bg-background/50 pr-10"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showVisionApiKey ? 'Hide vision API key' : 'Show vision API key'}
+                      onClick={() => setShowVisionApiKey((visible) => !visible)}
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                    >
+                      {showVisionApiKey ? (
+                        <EyeOff className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

@@ -1,16 +1,19 @@
 ---
-title: "Configuration Reference"
-description: "Configure models, storage, web search, installed tools, and agent access."
+title: 'Configuration Reference'
+description: 'Configure models, storage, web search, installed tools, and agent access.'
 ---
 
 Open **Settings** to configure the active Larkup workspace. Changes apply to Chat, indexing, and the generated server.
 
 ## AI Models
 
-Use **Settings → AI Models** to select the providers and models used for embeddings and chat.
+Use **Settings → AI Models** to select the providers and models used for embeddings, chat, and vision tasks.
 
 <Frame caption="Embedding and chat model settings">
-  <img src="/images/new/ai-models-settings.png" alt="AI Models settings with embedding and chat providers" />
+  <img
+    src="/images/new/ai-models-settings.png"
+    alt="AI Models settings with embedding and chat providers"
+  />
 </Frame>
 
 ### Embedding model
@@ -21,8 +24,13 @@ The embedding model turns loaded content and search queries into vectors. Choose
 
 The chat model generates answers from retrieved context. It can use the same provider as embeddings or a separate provider and key.
 
+### Vision model
+
+The vision model powers image descriptions, video-frame analysis, OCR, and other tools that need to understand pixels. It has its own provider, model, and API key, so it can be different from the chat model. The picker only offers providers with compatible vision models; leaving the model on **Default** selects the appropriate vision-language model for that provider.
+
 <Note>
-  Changing the embedding model requires indexing existing content again so stored vectors use the same model as future queries.
+  Changing the embedding model requires indexing existing content again so stored vectors use the
+  same model as future queries.
 </Note>
 
 ## Storage and retrieval
@@ -30,7 +38,10 @@ The chat model generates answers from retrieved context. It can use the same pro
 Use **Settings → Storage** to choose the indexing strategy and storage engine.
 
 <Frame caption="Indexing strategy and storage engine settings">
-  <img src="/images/new/storage-settings.png" alt="Storage settings with Hybrid retrieval and LanceDB configuration" />
+  <img
+    src="/images/new/storage-settings.png"
+    alt="Storage settings with Hybrid retrieval and LanceDB configuration"
+  />
 </Frame>
 
 <AccordionGroup>
@@ -41,7 +52,8 @@ Use **Settings → Storage** to choose the indexing strategy and storage engine.
     Finds exact terms such as names, product codes, identifiers, and specialized vocabulary.
   </Accordion>
   <Accordion title="Hybrid Search" icon="layer-group">
-    Combines semantic and lexical retrieval. This is a strong default for mixed business and technical content.
+    Combines semantic and lexical retrieval. This is a strong default for mixed business and
+    technical content.
   </Accordion>
 </AccordionGroup>
 
@@ -52,7 +64,10 @@ LanceDB can run from a local path, LanceDB Cloud, or S3 compatible storage. Use 
 Use **Settings → General** to name the workspace and configure optional web search.
 
 <Frame caption="Workspace and web search settings">
-  <img src="/images/new/general-settings.png" alt="General settings with workspace name and web search provider" />
+  <img
+    src="/images/new/general-settings.png"
+    alt="General settings with workspace name and web search provider"
+  />
 </Frame>
 
 Web search can enrich answers with current information. Select a supported provider and store its API key from this page.
@@ -62,7 +77,10 @@ Web search can enrich answers with current information. Select a supported provi
 Marketplace tools can add their own provider and processing settings. Open **Settings → Installed Tools** after installing a tool.
 
 <Frame caption="Settings for the installed Video and Audio tool">
-  <img src="/images/new/marketplace-tools-settings.png" alt="Installed tool settings for video transcription and frame analysis" />
+  <img
+    src="/images/new/marketplace-tools-settings.png"
+    alt="Installed tool settings for video transcription and frame analysis"
+  />
 </Frame>
 
 For example, the Video and Audio tool lets you choose an audio provider, verify its API key, and control the frame extraction interval.
@@ -72,7 +90,10 @@ For example, the Video and Audio tool lets you choose an audio provider, verify 
 Use **Settings → Agent Customization** to control which capabilities the assistant can call.
 
 <Frame caption="Choose the tools available to the assistant">
-  <img src="/images/new/agent-tools.png" alt="Agent tool controls for search, charts, analysis, forms, and document editing" />
+  <img
+    src="/images/new/agent-tools.png"
+    alt="Agent tool controls for search, charts, analysis, forms, and document editing"
+  />
 </Frame>
 
 Available tools can include:

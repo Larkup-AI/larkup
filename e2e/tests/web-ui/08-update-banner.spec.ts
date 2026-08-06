@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Update banner', () => {
-  test('shows the CLI update command and copies it', async ({ context, page }) => {
+  test('shows the channel update command and copies it', async ({ context, page }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.route('https://www.larkup.de/api/version', async (route) => {
       await route.fulfill({
@@ -14,12 +14,14 @@ test.describe('Update banner', () => {
 
     await expect(page.getByText('Larkup v999.0.0 is available.')).toBeVisible();
 
+    const updateCommand = await page.locator('code').textContent();
+    expect(updateCommand).toBeTruthy();
     const copyButton = page.getByRole('button', { name: 'Copy update command' });
     await copyButton.click();
 
     await expect(copyButton).toContainText('Copied');
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe('larkup update');
+      .toBe(updateCommand);
   });
 });

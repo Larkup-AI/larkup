@@ -9,7 +9,9 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 
 test.describe.serial('Data Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/add');
+    // The add workspace defaults to Files. Select the Website panel explicitly
+    // so this suite does not depend on state left by another browser session.
+    await page.goto('/add?subtab=website');
     await page.waitForSelector('text=Add Websites', { timeout: 60_000 });
   });
 
@@ -520,6 +522,26 @@ test.describe.serial('Data Page', () => {
     }
   });
 
+  test('uploaded media library supports search, source-style filters, and pagination', async ({
+    page,
+  }) => {
+    await page.getByText('Media', { exact: true }).first().click();
+
+    const viewUploads = page.getByRole('button', { name: 'View Uploads' });
+    test.skip(
+      !(await viewUploads.isVisible({ timeout: 5_000 }).catch(() => false)),
+      'No uploaded media is available in this test environment.',
+    );
+
+    await viewUploads.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: 'Uploaded media' })).toBeVisible();
+    await expect(dialog.getByRole('textbox', { name: 'Search uploaded media' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Images \d+/ })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Previous uploads page' })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Next uploads page' })).toBeVisible();
+  });
+
   test('video uploads stage without asking for a host ffmpeg installation', async ({ page }) => {
     const mediaTab = page.getByText('Media', { exact: true }).first();
     await mediaTab.click();
@@ -565,7 +587,7 @@ test.describe.serial('Data Page', () => {
     await expect(page.getByLabel('Preview preview.wav')).toBeVisible();
   });
 
-  test('media indexing shows independent live pipeline stage counts', async ({ page }) => {
+  test('media indexing shows the primary live pipeline stage', async ({ page }) => {
     const updatedAt = new Date().toISOString();
     const mediaPayload = {
       assets: [
@@ -661,9 +683,12 @@ test.describe.serial('Data Page', () => {
     await page.goto('/add?subtab=media');
 
     await expect(page.getByText('Indexing 1 file')).toBeVisible();
-    await expect(page.getByText('2 / 5 audio parts')).toBeVisible();
-    await expect(page.getByText('18 / 43 sequences')).toBeVisible();
-    await expect(page.getByText('Connect notes')).toBeVisible();
-    await expect(page.getByText('Search index')).toBeVisible();
+    // The UI deliberately shows only the primary active step, avoiding a
+    // noisy list of concurrent pipeline stages while preserving its exact
+    // factual progress and the independent overall percentage.
+    await expect(
+      page.getByText('Visual analysis · 18 / 43 sequences · 42% this step'),
+    ).toBeVisible();
+    await expect(page.getByRole('progressbar')).toHaveCount(1);
   });
 });

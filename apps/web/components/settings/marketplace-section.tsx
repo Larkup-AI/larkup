@@ -111,7 +111,7 @@ export function MarketplaceSection() {
         }
         toast.dismiss(toastId);
         if (toolId === 'video-audio') {
-          toast.success('Video & Audio installed', {
+          toast.success('Video Intelligence installed', {
             description: 'Choose an audio provider before you index media.',
             action: {
               label: 'Set up audio',

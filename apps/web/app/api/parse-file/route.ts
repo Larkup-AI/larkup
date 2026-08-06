@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
 import mammoth from 'mammoth';
+import { getData } from 'pdf-parse/worker';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// pdf-parse's default Node worker path is lost when Next bundles a route.
-// Resolve the matching worker from pdf-parse's own pdfjs-dist dependency so
-// the API and worker versions stay in lockstep.
-const appRequire = createRequire(`${process.cwd()}/package.json`);
-const pdfParseRequire = createRequire(appRequire.resolve('pdf-parse'));
+// Use pdf-parse's packaged worker payload. Unlike a filesystem path, it is
+// preserved in Next's standalone output and always matches the parser version.
 let pdfParserPromise: Promise<typeof import('pdf-parse')['PDFParse']> | undefined;
 
 async function getPdfParser() {
@@ -28,9 +24,7 @@ async function getPdfParser() {
       });
 
       const { PDFParse } = await import('pdf-parse');
-      PDFParse.setWorker(
-        pathToFileURL(pdfParseRequire.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href,
-      );
+      PDFParse.setWorker(getData());
       return PDFParse;
     })();
   }
