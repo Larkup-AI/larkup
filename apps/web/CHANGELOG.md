@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.66
+
+### Patch Changes
+
+- be8763c: Fix installer removal leaving files and optimize CI pipeline
+
 ## 0.1.65
 
 ### Patch Changes
