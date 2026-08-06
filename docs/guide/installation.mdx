@@ -1,9 +1,10 @@
 ---
-title: "Installation"
-description: "Get up and running with Larkup in seconds."
+title: 'Installation'
+description: 'Get up and running with Larkup in seconds.'
 ---
 
-{/*
+{/\*
+
 ## Desktop App <Icon icon="desktop" />
 
 The easiest way to use Larkup is the desktop app. It provides the full graphical interface with no terminal required.
@@ -17,6 +18,7 @@ The easiest way to use Larkup is the desktop app. It provides the full graphical
     **M1, M2, M3 Macs**
 
     Download the Apple Silicon `.dmg` installer for macOS 12+.
+
   </Card>
 
   <Card
@@ -27,6 +29,7 @@ The easiest way to use Larkup is the desktop app. It provides the full graphical
     **Intel Macs**
 
     Download the Intel `.dmg` installer for macOS 12+.
+
   </Card>
 
   <Card
@@ -37,6 +40,7 @@ The easiest way to use Larkup is the desktop app. It provides the full graphical
     **64-bit (x64)**
 
     Download the `.exe` installer for Windows 10+.
+
   </Card>
 
   <Card
@@ -47,11 +51,13 @@ The easiest way to use Larkup is the desktop app. It provides the full graphical
     **AppImage / .deb**
 
     Download for Ubuntu, Debian, Fedora & more.
+
   </Card>
 </CardGroup>
 
 <Tip>
-  All desktop downloads are available on the [Download Page](https://www.larkup.de/download) with options for each architecture.
+  All desktop downloads are available on the [Download Page](https://www.larkup.de/download) with
+  options for each architecture.
 </Tip>
 */}
 
@@ -70,6 +76,7 @@ Prefer the command line? Install the Larkup CLI in one command:
     ```bash
     larkup dev
     ```
+
   </Tab>
   <Tab title="Windows" icon="windows">
     ```powershell
@@ -81,6 +88,7 @@ Prefer the command line? Install the Larkup CLI in one command:
     ```powershell
     larkup dev
     ```
+
   </Tab>
 </Tabs>
 
@@ -89,6 +97,16 @@ The script handles dependencies like Node.js, configures your PATH, and sets the
 <Note>
   You may need to restart your terminal after installation for the `larkup` command to be available.
 </Note>
+
+## Uninstall
+
+To permanently remove the curl/npm installation and its Larkup database, tools, and local configuration, run:
+
+```bash
+larkup remove
+```
+
+The command shows a warning and only continues after you enter `y` or `yes`. `larkup delete` is an alias. Open a new terminal afterwards; `larkup` will no longer be available.
 
 ## Installation Reliability
 
@@ -129,7 +147,7 @@ If you see a version number, you're good. Head to the [Quickstart](/guide/quicks
     Alternatively, add a Firecrawl cloud API key in Settings.
 
     To stop and reopen:
-    
+
     ```bash
     # Stop the container
     docker stop larkup
@@ -137,6 +155,7 @@ If you see a version number, you're good. Head to the [Quickstart](/guide/quicks
     # Start it again
     docker start larkup && open http://localhost:4567
     ```
+
   </Tab>
   <Tab title="npm" icon="npm">
     If you already have Node.js installed:
@@ -150,6 +169,7 @@ If you see a version number, you're good. Head to the [Quickstart](/guide/quicks
     ```bash
     larkup dev
     ```
+
   </Tab>
   <Tab title="From source" icon="github">
     ```bash
@@ -159,6 +179,7 @@ If you see a version number, you're good. Head to the [Quickstart](/guide/quicks
     ```
 
     Builds and starts the app at `http://localhost:4567`.
+
   </Tab>
 </Tabs>
 
@@ -170,13 +191,13 @@ If you prefer an installation that requires no root access and does not modify s
 curl -fsSL https://www.larkup.de/install-local.sh | bash
 ```
 
-To uninstall, simply delete the folder:
+To uninstall the isolated installation and its data, run:
 
 ```bash
-rm -rf ~/.larkup
+larkup remove
 ```
 
-## Custom Install 
+## Custom Install
 
 You can customize the main installation scripts using the following flags:
 
@@ -197,6 +218,7 @@ You can customize the main installation scripts using the following flags:
     # Preview without making changes
     curl -fsSL https://www.larkup.de/install.sh | bash -s -- --dry-run
     ```
+
   </Tab>
   <Tab title="Windows" icon="windows">
     Run the script file directly with flags:
@@ -211,6 +233,7 @@ You can customize the main installation scripts using the following flags:
     # Preview without making changes
     .\install.ps1 -DryRun
     ```
+
   </Tab>
 </Tabs>
 
@@ -247,6 +270,7 @@ command in your terminal.
     ```
 
     Watchtower checks for new images daily and updates automatically.
+
   </Tab>
   <Tab title="npm / CLI" icon="npm">
     Update the CLI to the latest version:
@@ -260,6 +284,7 @@ command in your terminal.
     ```bash
     curl -fsSL https://www.larkup.de/install.sh | bash
     ```
+
   </Tab>
 </Tabs>
 
@@ -267,8 +292,8 @@ command in your terminal.
 
 ## System Requirements
 
-| Requirement | Details |
-| --- | --- |
-| **Node.js** | v22+ (installed automatically if missing) |
-| **OS** | macOS, Linux, WSL, or Windows |
-| **Architecture** | x64 or ARM64 |
+| Requirement      | Details                                   |
+| ---------------- | ----------------------------------------- |
+| **Node.js**      | v22+ (installed automatically if missing) |
+| **OS**           | macOS, Linux, WSL, or Windows             |
+| **Architecture** | x64 or ARM64                              |

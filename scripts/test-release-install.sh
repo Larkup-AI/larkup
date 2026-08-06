@@ -44,11 +44,32 @@ SERVER_PID=$!
 for _ in $(seq 1 60); do
   if curl --fail --silent --show-error "http://127.0.0.1:4568/api/servers" >/dev/null; then
     echo "Installed Larkup server is healthy."
-    exit 0
+    break
   fi
   sleep 1
 done
 
-echo "Installed Larkup server did not become healthy. Log follows:" >&2
-tail -n 100 "$TEST_ROOT/larkup.log" >&2 || true
-exit 1
+if ! curl --fail --silent --show-error "http://127.0.0.1:4568/api/servers" >/dev/null; then
+  echo "Installed Larkup server did not become healthy. Log follows:" >&2
+  tail -n 100 "$TEST_ROOT/larkup.log" >&2 || true
+  exit 1
+fi
+
+kill "$SERVER_PID" 2>/dev/null || true
+wait "$SERVER_PID" 2>/dev/null || true
+SERVER_PID=""
+
+printf 'yes\n' | larkup remove
+hash -r 2>/dev/null || true
+
+if command -v larkup >/dev/null 2>&1; then
+  echo "larkup is still available after removal." >&2
+  exit 1
+fi
+
+if [ -e "$NPM_CONFIG_PREFIX/lib/node_modules/larkup" ]; then
+  echo "The global larkup package directory still exists after removal." >&2
+  exit 1
+fi
+
+echo "Installed Larkup removal completed successfully."
