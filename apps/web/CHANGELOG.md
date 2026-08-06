@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.65
+
+### Patch Changes
+
+- 5d04242: Add a confirmed `larkup remove` command that removes the global installation and its local data.
+
 ## 0.1.64
 
 ### Patch Changes
