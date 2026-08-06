@@ -73,6 +73,9 @@ async function removeCommand() {
   }
 
   await fs.rm(path.join(packageDir, '.larkup'), { recursive: true, force: true });
+  await fs.rm(path.join(packageDir, '.larkupdb'), { recursive: true, force: true });
+  await fs.rm(path.join(packageDir, '.next', 'cache'), { recursive: true, force: true });
+  await fs.rm(path.join(packageDir, '.env.local'), { force: true });
   await uninstallGlobalPackage();
 }
 

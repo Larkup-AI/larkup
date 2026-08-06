@@ -17,6 +17,7 @@ const nextConfig = {
     '@ffprobe-installer/ffprobe',
     '@larkup/sandbox',
     'chromadb',
+    '@chroma-core/default-embed',
     'dockerode',
     'node-ssh',
     'nodejs-whisper',
