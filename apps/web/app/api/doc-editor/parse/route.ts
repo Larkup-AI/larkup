@@ -1,17 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
 import { createSession, enrichPDFWithText, getSession } from '@larkup/tool-doc-editor';
 import { PDFParse } from 'pdf-parse';
+import { getData } from 'pdf-parse/worker';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const appRequire = createRequire(`${process.cwd()}/package.json`);
-const pdfParseRequire = createRequire(appRequire.resolve('pdf-parse'));
-PDFParse.setWorker(
-  pathToFileURL(pdfParseRequire.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href,
-);
 
 /**
  * POST /api/doc-editor/parse
@@ -36,6 +29,9 @@ export async function POST(req: Request) {
     if (session.type === 'pdf' && session.parsed.rawText === '') {
       if (session.parsed.totalPages <= 5) {
         try {
+          // Keep the worker inside the standalone bundle instead of relying on
+          // a source-tree path that does not exist in production containers.
+          PDFParse.setWorker(getData());
           const parser = new PDFParse({ data: buffer });
           let text = '';
           try {

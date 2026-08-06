@@ -105,6 +105,10 @@
             ]
           },
           {
+            "group": "Media",
+            "pages": ["api-reference/endpoints/media"]
+          },
+          {
             "group": "ETL & Scraping",
             "pages": ["api-reference/endpoints/scrape"]
           }

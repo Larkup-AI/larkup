@@ -10,6 +10,7 @@ test.describe.serial('Config API (/api/config)', () => {
     expect(body).toHaveProperty('config');
     expect(body.config).toHaveProperty('projectName');
     expect(body.config).toHaveProperty('embeddingModelId');
+    expect(body.config).toHaveProperty('visionModelId');
     expect(body.config).toHaveProperty('vectorStore');
     expect(body.config).toHaveProperty('topK');
     expect(body.config).toHaveProperty('chunking');

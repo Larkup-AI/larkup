@@ -1,13 +1,17 @@
 import { expect, test } from '@playwright/test';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadTool, unloadTool } from '../../../packages/marketplace/src/tool-loader';
-import { mergeToolDescriptors } from '../../../packages/marketplace/src/tool-registry';
+import {
+  invalidateRegistryCache,
+  mergeToolDescriptors,
+} from '../../../packages/marketplace/src/tool-registry';
 import type { ToolDescriptor } from '../../../packages/marketplace/src/types';
 import {
   getInstalledTools,
   isToolInstalled,
+  installTool,
   uninstallTool,
 } from '../../../packages/marketplace/src/tool-installer';
 
@@ -45,6 +49,48 @@ test('bundled first-party tools are not marked installed until the user installs
     await expect(getInstalledTools()).resolves.toEqual([]);
   } finally {
     process.chdir(originalCwd);
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test('installs a pnpm workspace-linked tool locally without attempting a registry download', async () => {
+  const originalCwd = process.cwd();
+  const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-marketplace-workspace-'));
+  const appDir = path.join(workspace, 'apps', 'web');
+  const packageDir = path.join(workspace, 'packages', 'tools', 'video-audio');
+
+  try {
+    await mkdir(path.join(appDir, 'node_modules', '@larkup'), { recursive: true });
+    await mkdir(packageDir, { recursive: true });
+    await writeFile(
+      path.join(packageDir, 'package.json'),
+      JSON.stringify({ name: '@larkup/tool-video-audio' }),
+    );
+    await writeFile(
+      path.join(packageDir, 'tool.manifest.json'),
+      JSON.stringify(videoTool('9.9.9')),
+    );
+    await symlink(packageDir, path.join(appDir, 'node_modules', '@larkup', 'tool-video-audio'));
+
+    process.chdir(appDir);
+    invalidateRegistryCache();
+    await installTool('video-audio');
+
+    const installed = await getInstalledTools();
+    const resolvedPackageDir = await realpath(packageDir);
+    expect(installed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'video-audio',
+          version: '9.9.9',
+          source: 'local',
+          resolvedPath: resolvedPackageDir,
+        }),
+      ]),
+    );
+  } finally {
+    process.chdir(originalCwd);
+    invalidateRegistryCache();
     await rm(workspace, { recursive: true, force: true });
   }
 });

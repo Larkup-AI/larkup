@@ -13,6 +13,7 @@ import {
   Clock,
   X,
   Trash2,
+  Settings,
 } from 'lucide-react';
 import { useScrapeStore, type SearchState } from '@/store/scrape-store';
 import type { CrawlJob, CrawlScope, SearchResultItem } from '@larkup/core/types';
@@ -90,6 +91,7 @@ export function ScrapePanel({
     pageLimit,
     setPageLimit,
     searchLimit,
+    setSearchLimit,
     showAdvanced,
     setShowAdvanced,
     serperTotalForQuery,
@@ -111,6 +113,7 @@ export function ScrapePanel({
   const activeProvider = configData?.config?.webSearchProvider || 'tavily';
   const [cachedQueries, setCachedQueries] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [displayPage, setDisplayPage] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -392,6 +395,7 @@ export function ScrapePanel({
     if (queries.length === 0) return;
 
     setSearching(true);
+    setDisplayPage(1);
     // Removed setSearchState(null) so we append instead of clear
 
     try {
@@ -572,6 +576,19 @@ export function ScrapePanel({
   const gatherAllAvailable =
     searchState?.searchProvider !== 'firecrawl' && searchState?.hasMore && !gatheringAll;
 
+  const ITEMS_PER_PAGE = 5;
+  const totalDisplayPages = Math.max(1, Math.ceil(results.length / ITEMS_PER_PAGE));
+  const currentDisplayResults = results.slice(
+    (displayPage - 1) * ITEMS_PER_PAGE,
+    displayPage * ITEMS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    if (displayPage > totalDisplayPages && totalDisplayPages > 0) {
+      setDisplayPage(totalDisplayPages);
+    }
+  }, [totalDisplayPages, displayPage]);
+
   // Estimate for confirmation modal
   const effectiveScopeForEstimate: CrawlScope = specificUrls ? 'page' : scope;
   const estimate = useMemo(
@@ -727,18 +744,20 @@ export function ScrapePanel({
 
       {/* Minimal Action Row */}
       <div className="flex items-center justify-between mt-2">
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {showAdvanced ? (
-            <ChevronDown className="size-3.5" />
-          ) : (
-            <ChevronsDown className="size-3.5" />
-          )}
-          {showAdvanced ? 'Hide advanced settings' : 'Advanced settings'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showAdvanced ? (
+              <ChevronDown className="size-3.5" />
+            ) : (
+              <ChevronsDown className="size-3.5" />
+            )}
+            {showAdvanced ? 'Hide advanced settings' : 'Advanced settings'}
+          </button>
+        </div>
 
         {/* Estimation inline */}
         {selectedUrls.length > 0 && (
@@ -755,80 +774,117 @@ export function ScrapePanel({
 
       {/* Advanced Settings Collapsible */}
       {showAdvanced && (
-        <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-muted/30 p-3 mt-2 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="flex items-center gap-2">
-            <Label className="text-xs text-muted-foreground">Scope</Label>
-            <Select
-              defaultValue={scope}
-              value={scope}
-              onValueChange={(v) => setScope(v as CrawlScope)}
-              disabled={specificUrls || disabled}
-            >
-              <SelectTrigger className="w-52 bg-white h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="page">Scrape pages only</SelectItem>
-                <SelectItem value="domain">Crawl whole domain</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {scope === 'domain' && !specificUrls && (
+        <div className="flex flex-wrap items-center  justify-between w-full rounded-lg border border-border bg-muted/30 gap-4  p-3 mt-2 animate-in slide-in-from-top-2 fade-in duration-200">
+          <div className="flex ">
             <div className="flex items-center gap-2">
-              <Label htmlFor="limit" className="text-xs text-muted-foreground">
-                Max pages
-              </Label>
-              <Input
-                id="limit"
-                type="number"
-                min={1}
-                max={500}
-                value={pageLimit}
+              <Label className="text-xs text-muted-foreground">Scope</Label>
+              <Select
+                defaultValue={scope}
+                value={scope}
+                onValueChange={(v) => setScope(v as CrawlScope)}
                 disabled={specificUrls || disabled}
-                onChange={(e) => setPageLimit(Number(e.target.value) || 1)}
-                className="w-20 h-8 tabular-nums text-xs"
-              />
+              >
+                <SelectTrigger className="w-52 bg-white h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="page">Scrape pages only</SelectItem>
+                  <SelectItem value="domain">Crawl whole domain</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
 
-          <div className="flex items-center gap-2">
-            <Switch
-              id="specific-urls-inline"
-              checked={specificUrls}
-              onCheckedChange={setSpecificUrls}
-              disabled={disabled}
-              size="sm"
-            />
-            <Label
-              htmlFor="specific-urls-inline"
-              className="text-xs font-medium cursor-pointer flex items-center gap-1"
-            >
-              Exact URLs only
-              <TooltipProvider delay={0}>
-                <Tooltip>
-                  <TooltipTrigger
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground"
-                    onClick={(e) => e.preventDefault()}
-                  >
-                    <Info className="size-3" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-50 text-center">
-                      Scrape exact URLs only — no deep crawl or pagination.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </Label>
+            {scope === 'domain' && !specificUrls && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="limit" className="text-xs text-muted-foreground">
+                  Max pages
+                </Label>
+                <Input
+                  id="limit"
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={pageLimit}
+                  disabled={specificUrls || disabled}
+                  onChange={(e) => setPageLimit(Number(e.target.value) || 1)}
+                  className="w-20 h-8 tabular-nums text-xs"
+                />
+              </div>
+            )}
+
+            {inputMode === 'search' && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="search-limit" className="text-xs text-muted-foreground">
+                  Max results
+                </Label>
+                <Input
+                  id="search-limit"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={searchLimit}
+                  disabled={disabled}
+                  onChange={(e) => setSearchLimit(Number(e.target.value) || 1)}
+                  className="w-20 h-8 tabular-nums text-xs"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 ml-4">
+              <Switch
+                id="specific-urls-inline"
+                checked={specificUrls}
+                onCheckedChange={setSpecificUrls}
+                disabled={disabled}
+                size="sm"
+              />
+              <Label
+                htmlFor="specific-urls-inline"
+                className="text-xs font-medium cursor-pointer flex items-center gap-1"
+              >
+                Exact URLs only
+                <TooltipProvider delay={0}>
+                  <Tooltip>
+                    <TooltipTrigger
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      <Info className="size-3" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-50 text-center">
+                        Scrape exact URLs only — no deep crawl or pagination.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </Label>
+            </div>
           </div>
+          <TooltipProvider delay={0}>
+            <Tooltip>
+              <TooltipTrigger
+                type="button"
+                className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors"
+                onClick={() => router.push('/settings?section=search-web')}
+              >
+                <Settings className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs text-xs">
+                <p>
+                  Customize your web search provider, or set up a custom proxy to help bypass
+                  scraping blocks.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )}
 
       {/* Results list */}
       {results.length > 0 && (
-        <div className="rounded-lg border border-border">
+        <div className="rounded-lg border border-border mb-9">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <span className="text-xs font-medium text-muted-foreground">
               {results.length} source{results.length === 1 ? '' : 's'} · {selectedUrls.length}{' '}
@@ -855,8 +911,8 @@ export function ScrapePanel({
               </button>
             </div>
           </div>
-          <ul className="max-h-72 divide-y divide-border overflow-y-auto">
-            {results.map((r) => {
+          <ul className="divide-y divide-border overflow-y-auto">
+            {currentDisplayResults.map((r) => {
               const checked = !!selected[r.url];
               return (
                 <li key={r.url}>
@@ -890,7 +946,40 @@ export function ScrapePanel({
             })}
           </ul>
 
-          {/* Pagination footer */}
+          {/* Local Pagination footer */}
+          {results.length > ITEMS_PER_PAGE && (
+            <div className="flex items-center justify-between border-t border-border px-3 py-2 bg-muted/20">
+              <span className="text-xs text-muted-foreground">
+                Showing {(displayPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                {Math.min(displayPage * ITEMS_PER_PAGE, results.length)} of {results.length} sources
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={displayPage === 1}
+                  onClick={() => setDisplayPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-2 px-2 text-xs font-medium">
+                  {displayPage} / {totalDisplayPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={displayPage === totalDisplayPages}
+                  onClick={() => setDisplayPage((p) => Math.min(totalDisplayPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* API Pagination footer */}
           {searchState?.searchProvider === 'serper' &&
             (searchState.hasMore || loadingMore || gatheringAll) && (
               <div className="flex items-center justify-between border-t border-border px-3 py-2">

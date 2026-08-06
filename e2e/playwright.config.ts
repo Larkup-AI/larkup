@@ -35,6 +35,7 @@ export default defineConfig({
     {
       name: 'api',
       testDir: './tests/api',
+      fullyParallel: false,
     },
     {
       name: 'web-ui',

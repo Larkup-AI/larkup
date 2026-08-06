@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { readConfig, writeConfig } from '@larkup/core/config-store';
 import { getVectorStore, validateStoreConfig } from '@larkup/vector-stores/registry';
 import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
+import { getAllModels } from '@larkup/core/models-cache';
 import { runWithServer } from '@larkup/core/workspace';
 import type { RagConfig } from '@larkup/core/types';
 
@@ -71,6 +72,57 @@ export async function PUT(request: Request) {
         { error: `Custom embedding model "${modelName}" not found in customEmbeddings` },
         { status: 400 },
       );
+    }
+  }
+
+  // A configured vision model must be a model that accepts image input. The
+  // provider remains independent from chat because media tools often need a
+  // different capability or credential.
+  if (body.visionProvider && !body.visionModelId && body.visionProvider !== 'custom') {
+    const models = await getAllModels();
+    const hasDefaultVisionModel =
+      body.visionProvider === 'vercel_ai_gateway'
+        ? models.some((model) => model.type === 'language' && model.tags?.includes('vision'))
+        : models.some(
+            (model) =>
+              model.owned_by === body.visionProvider &&
+              model.type === 'language' &&
+              model.tags?.includes('vision'),
+          );
+    if (!hasDefaultVisionModel) {
+      return NextResponse.json(
+        { error: `No vision-capable models are available from ${body.visionProvider}.` },
+        { status: 400 },
+      );
+    }
+  }
+
+  if (body.visionModelId) {
+    if (body.visionModelId.startsWith('custom:')) {
+      const modelName = body.visionModelId.slice('custom:'.length);
+      if (!body.customVisionModels?.some((model) => model.modelName === modelName)) {
+        return NextResponse.json(
+          { error: `Custom vision model "${modelName}" not found in customVisionModels` },
+          { status: 400 },
+        );
+      }
+    } else {
+      const model = (await getAllModels()).find((candidate) => candidate.id === body.visionModelId);
+      const provider = body.visionProvider || body.chatProvider || body.embeddingProvider;
+      const providerMatches =
+        provider === 'vercel_ai_gateway' ||
+        model?.owned_by.toLowerCase() === provider?.toLowerCase();
+      if (
+        !model ||
+        model.type !== 'language' ||
+        !model.tags?.includes('vision') ||
+        !providerMatches
+      ) {
+        return NextResponse.json(
+          { error: `Vision model "${body.visionModelId}" is not available from ${provider}.` },
+          { status: 400 },
+        );
+      }
     }
   }
 

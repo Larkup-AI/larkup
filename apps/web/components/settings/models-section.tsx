@@ -13,6 +13,7 @@ import {
   Clock,
   Plus,
   Mic,
+  ScanEye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,6 +57,16 @@ const PROVIDER_LIST = [
   'nomic',
 ] as const;
 
+const VISION_PROVIDER_LIST = new Set([
+  'vercel_ai_gateway',
+  'openai',
+  'anthropic',
+  'google',
+  'mistral',
+  'cohere',
+  'deepseek',
+]);
+
 export function ModelsSection() {
   const { activeServer } = useWorkspace();
   const serverId = activeServer?.id;
@@ -73,6 +84,7 @@ export function ModelsSection() {
   const [saving, setSaving] = useState<string | null>(null);
   const [showEmbeddingKey, setShowEmbeddingKey] = useState(false);
   const [showChatKey, setShowChatKey] = useState(false);
+  const [showVisionKey, setShowVisionKey] = useState(false);
   const [showToolKeys, setShowToolKeys] = useState<Record<string, boolean>>({});
 
   const currentChatProvider = form.chatProvider || form.embeddingProvider || 'openai';
@@ -82,6 +94,17 @@ export function ModelsSection() {
   const { data: chatStatus } = useSWR(statusKey, (url: string) => fetch(url).then((r) => r.json()));
 
   const embeddingModels: EmbeddingModelDescriptor[] = chatStatus?.availableEmbeddingModels ?? [];
+  const visionModels: Array<{ id: string; label: string; provider: string }> =
+    chatStatus?.availableVisionModels ?? [];
+  const visionProviders = useMemo(
+    () =>
+      [...new Set(visionModels.map((model) => model.provider))].filter(
+        (provider) =>
+          VISION_PROVIDER_LIST.has(provider) &&
+          PROVIDER_META[provider as keyof typeof PROVIDER_META],
+      ),
+    [visionModels],
+  );
   const EMBEDDING_BY_PROVIDER = useMemo(() => {
     return embeddingModels.reduce<Record<string, EmbeddingModelDescriptor[]>>((acc, m) => {
       (acc[m.provider] ??= []).push(m);
@@ -107,6 +130,10 @@ export function ModelsSection() {
         ...data.config,
         chatProvider: data.config.chatProvider || data.config.embeddingProvider,
         chatApiKey: data.config.chatApiKey || data.config.embeddingApiKey,
+        visionProvider:
+          data.config.visionProvider || data.config.chatProvider || data.config.embeddingProvider,
+        visionApiKey:
+          data.config.visionApiKey || data.config.chatApiKey || data.config.embeddingApiKey,
         toolConfigs: data.config.toolConfigs || {},
       });
     }
@@ -123,6 +150,15 @@ export function ModelsSection() {
     form.chatModelId !== data?.config?.chatModelId ||
     form.chatApiKey !== (data?.config?.chatApiKey || data?.config?.embeddingApiKey) ||
     JSON.stringify(form.customChatModels) !== JSON.stringify(data?.config?.customChatModels);
+  const savedVisionProvider =
+    data?.config?.visionProvider || data?.config?.chatProvider || data?.config?.embeddingProvider;
+  const savedVisionApiKey =
+    data?.config?.visionApiKey || data?.config?.chatApiKey || data?.config?.embeddingApiKey;
+  const dirtyVision =
+    form.visionProvider !== savedVisionProvider ||
+    form.visionModelId !== (data?.config?.visionModelId || '') ||
+    form.visionApiKey !== savedVisionApiKey ||
+    JSON.stringify(form.customVisionModels) !== JSON.stringify(data?.config?.customVisionModels);
 
   const clearError = (key: string) => {
     if (errors[key]) {
@@ -204,6 +240,15 @@ export function ModelsSection() {
         newErrors.chatApiKey = 'Required';
         hasError = true;
       }
+    } else if (section === 'vision') {
+      if (!form.visionProvider) {
+        newErrors.visionProvider = 'Required';
+        hasError = true;
+      }
+      if (!form.visionApiKey) {
+        newErrors.visionApiKey = 'Required';
+        hasError = true;
+      }
     } else if (section.startsWith('tool:')) {
       const toolId = section.split(':')[1];
       const tool = toolsData?.tools?.find((t: any) => t.id === toolId);
@@ -244,6 +289,12 @@ export function ModelsSection() {
         if (form.chatModelId !== undefined) payload.chatModelId = form.chatModelId;
         if (form.chatApiKey !== undefined) payload.chatApiKey = form.chatApiKey;
         if (form.customChatModels !== undefined) payload.customChatModels = form.customChatModels;
+      } else if (section === 'vision') {
+        if (form.visionProvider !== undefined) payload.visionProvider = form.visionProvider;
+        if (form.visionModelId !== undefined) payload.visionModelId = form.visionModelId;
+        if (form.visionApiKey !== undefined) payload.visionApiKey = form.visionApiKey;
+        if (form.customVisionModels !== undefined)
+          payload.customVisionModels = form.customVisionModels;
       } else if (section.startsWith('tool:')) {
         payload.toolConfigs = form.toolConfigs;
       }
@@ -259,20 +310,25 @@ export function ModelsSection() {
         verifyPayload.chatApiKey = payload.chatApiKey;
         verifyPayload.chatModelId = payload.chatModelId;
         verifyPayload.customChatModels = payload.customChatModels;
+      } else if (section === 'vision') {
+        // Vision API compatibility is checked from the catalog on save. A
+        // frame request is deliberately not sent just to save preferences.
       } else if (section.startsWith('tool:')) {
         // Skip verification for arbitrary tool configs right now
         // We'll trust the payload
       }
 
-      const verifyRes = await fetch('/api/config/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(verifyPayload),
-      });
+      if (section !== 'vision' && !section.startsWith('tool:')) {
+        const verifyRes = await fetch('/api/config/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(verifyPayload),
+        });
 
-      if (!verifyRes.ok) {
-        const err = await verifyRes.json();
-        throw new Error(err.error || 'Verification failed');
+        if (!verifyRes.ok) {
+          const err = await verifyRes.json();
+          throw new Error(err.error || 'Verification failed');
+        }
       }
 
       const res = await fetch(configUrl, {
@@ -598,6 +654,149 @@ export function ModelsSection() {
             className="gap-1.5"
           >
             {saving === 'embedding' ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Save className="size-3.5" />
+            )}
+            Save
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* Vision-language model — shared by image and media tools. */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <ScanEye className="size-3.5 text-primary" />
+            Vision Model
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Used by video, image, OCR, and future tools that need to understand pixels. Only
+            providers with vision-capable models are shown.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Provider</Label>
+            <Select
+              value={form.visionProvider || ''}
+              onValueChange={(value: string | null) => {
+                if (!value) return;
+                setForm({ ...form, visionProvider: value, visionModelId: '' });
+                clearError('visionProvider');
+              }}
+            >
+              <SelectTrigger
+                className={cn('w-full', errors.visionProvider && 'border-destructive')}
+              >
+                <span className="flex items-center gap-2">
+                  {(() => {
+                    const provider = form.visionProvider || '';
+                    const meta = PROVIDER_META[provider as keyof typeof PROVIDER_META];
+                    return meta ? (
+                      <>
+                        <ProviderIcon
+                          src={meta.iconSrc}
+                          alt={meta.label}
+                          pillBg={meta.pillBg}
+                          size={16}
+                        />
+                        {meta.label}
+                      </>
+                    ) : (
+                      provider || 'Select a vision provider'
+                    );
+                  })()}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {visionProviders.map((provider) => {
+                  const meta = PROVIDER_META[provider as keyof typeof PROVIDER_META];
+                  if (!meta) return null;
+                  return (
+                    <SelectItem key={provider} value={provider}>
+                      <div className="flex items-center gap-2">
+                        <ProviderIcon
+                          src={meta.iconSrc}
+                          alt={meta.label}
+                          pillBg={meta.pillBg}
+                          size={16}
+                        />
+                        <span>{meta.label}</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {!visionProviders.includes(form.visionProvider || '') ? (
+              <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                This provider has no compatible vision model. Choose a provider from the list for
+                video and image tasks.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Model</Label>
+            <Select
+              value={form.visionModelId || 'default'}
+              onValueChange={(value: string | null) => {
+                if (value === null) return;
+                setForm({ ...form, visionModelId: value === 'default' ? '' : value });
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <span className="truncate">{form.visionModelId || 'Default vision model'}</span>
+              </SelectTrigger>
+              <SelectContent className="max-h-[320px]">
+                <SelectItem value="default">Default vision model</SelectItem>
+                {visionModels
+                  .filter(
+                    (model) =>
+                      form.visionProvider === 'vercel_ai_gateway' ||
+                      model.provider === form.visionProvider,
+                  )
+                  .map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.label}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">API Key</Label>
+            <div className="relative">
+              <Input
+                type={showVisionKey ? 'text' : 'password'}
+                value={form.visionApiKey || ''}
+                onChange={(event) => {
+                  setForm({ ...form, visionApiKey: event.target.value });
+                  clearError('visionApiKey');
+                }}
+                placeholder="sk-..."
+                className={cn('pr-10', errors.visionApiKey && 'border-destructive')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowVisionKey(!showVisionKey)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+              >
+                {showVisionKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-end border-t pt-4">
+          <Button
+            size="sm"
+            disabled={saving === 'vision' || !dirtyVision}
+            onClick={() => handleSave('vision')}
+            className="gap-1.5"
+          >
+            {saving === 'vision' ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <Save className="size-3.5" />

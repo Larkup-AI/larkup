@@ -15,8 +15,10 @@ test.describe('Marketplace', () => {
     // Wait for tools to load
     await page.waitForTimeout(2_000);
 
-    // Video & Audio tool should be visible
-    await expect(page.getByText('Video & Audio')).toBeVisible({ timeout: 10_000 });
+    // The media tool is published under its product name.
+    await expect(
+      page.getByRole('heading', { name: 'Video Intelligence', exact: true }),
+    ).toBeVisible({ timeout: 10_000 });
 
     // CLIP tool should be visible with "Coming soon"
     await expect(page.getByText('CLIP Image Search')).toBeVisible({ timeout: 10_000 });
