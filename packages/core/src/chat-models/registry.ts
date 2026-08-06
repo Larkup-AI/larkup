@@ -53,6 +53,29 @@ export function getDefaultChatModel(
   return forProvider.find((m) => m.id === defaultId) ?? forProvider[0];
 }
 
+/**
+ * Picks a vision-capable model for a provider. This is deliberately separate
+ * from the chat default because a text-only provider must never be selected
+ * for a frame, OCR, or image-analysis task.
+ */
+export function getDefaultVisionModel(
+  models: ChatModelDescriptor[],
+  provider: string,
+): ChatModelDescriptor | undefined {
+  const visionModels = models.filter((model) => model.tags?.includes('vision'));
+  const candidates =
+    provider === 'vercel_ai_gateway'
+      ? visionModels
+      : visionModels.filter((model) => model.provider?.toLowerCase() === provider.toLowerCase());
+  const defaults: Record<string, string> = {
+    vercel_ai_gateway: 'openai/gpt-4o-mini',
+    openai: 'openai/gpt-4o-mini',
+    google: 'google/gemini-2.5-flash',
+    mistral: 'mistral/pixtral-12b',
+  };
+  return candidates.find((model) => model.id === defaults[provider]) ?? candidates[0];
+}
+
 /** Find a specific model by id. */
 export function getChatModel(
   models: ChatModelDescriptor[],

@@ -36,6 +36,7 @@ interface MediaDocumentOptions {
   transcriptSource: string;
   transcriptProvider?: string;
   transcriptLanguage?: string;
+  knowledgeRevisionId?: string;
 }
 
 const SYNTHESIS_BATCH_CHARS = 14_000;
@@ -153,6 +154,7 @@ export function buildMediaDocumentInputs(options: MediaDocumentOptions): NewDocu
     transcriptSource: options.transcriptSource,
     transcriptProvider: options.transcriptProvider,
     transcriptLanguage: options.transcriptLanguage,
+    knowledgeRevisionId: options.knowledgeRevisionId,
   };
   const baseUrl = options.originalUrl || options.localUrl;
   const label = options.mediaType === 'video' ? 'Video' : 'Audio';
@@ -175,6 +177,7 @@ export function buildMediaDocumentInputs(options: MediaDocumentOptions): NewDocu
         segmentCount: options.segments.length,
       },
     },
+    ...buildTemporalChapterInputs(options, baseMetadata, baseUrl, label),
     ...options.segments.map((segment) => ({
       title: `${options.title} — ${formatTime(segment.startSecs)}`,
       content: [
@@ -199,6 +202,66 @@ export function buildMediaDocumentInputs(options: MediaDocumentOptions): NewDocu
       },
     })),
   ];
+}
+
+/**
+ * The vector index mirrors the temporal hierarchy: one root summary, bounded
+ * time-frame chapter summaries, then source-linked fine-grained segments.
+ * Chapter documents are retrieval aids only; their child evidence remains the
+ * authority for a factual answer.
+ */
+function buildTemporalChapterInputs(
+  options: MediaDocumentOptions,
+  baseMetadata: Record<string, unknown>,
+  baseUrl: string,
+  label: string,
+): NewDocumentInput[] {
+  const windowSecs =
+    options.durationSecs <= 30 * 60
+      ? 5 * 60
+      : options.durationSecs <= 4 * 60 * 60
+      ? 15 * 60
+      : 30 * 60;
+  const chapters = new Map<number, MediaEvidenceSegment[]>();
+  for (const segment of options.segments) {
+    const index = Math.floor(segment.startSecs / windowSecs);
+    const group = chapters.get(index) ?? [];
+    group.push(segment);
+    chapters.set(index, group);
+  }
+  return [...chapters.entries()].map(([index, segments]) => {
+    const startSecs = index * windowSecs;
+    const endSecs = Math.min(
+      options.durationSecs,
+      Math.max(...segments.map((segment) => segment.endSecs)),
+    );
+    return {
+      title: `${options.title} — Chapter ${index + 1} (${formatTime(startSecs)})`,
+      content: [
+        `${label} timeframe: ${formatTime(startSecs)}–${formatTime(endSecs)}`,
+        '## Timeframe evidence summary',
+        ...segments.map(
+          (segment) =>
+            `[${formatTime(segment.startSecs)}–${formatTime(segment.endSecs)}] ${segment.text.slice(
+              0,
+              1_200,
+            )}`,
+        ),
+      ].join('\n\n'),
+      source: 'media' as const,
+      url: timestampMediaUrl(baseUrl, startSecs),
+      metadata: {
+        ...baseMetadata,
+        contentKind: 'media-chapter',
+        isMediaSummary: false,
+        isTemporalSummary: true,
+        chapterIndex: index,
+        startSecs,
+        endSecs,
+        segmentCount: segments.length,
+      },
+    };
+  });
 }
 
 export function timestampMediaUrl(url: string, startSecs: number): string {
@@ -354,7 +417,7 @@ function buildBatchPrompt(
     options.mediaType
   } titled "${options.title}".${stateContext}
 
-Write compact factual viewing notes that remain useful for later questions. CRITICAL: Every single factual claim, event, score change, or action MUST be prefixed with its exact [HH:MM:SS-HH:MM:SS] timestamp copied strictly from the evidence chunks below. Do not hallucinate timestamps. Preserve exact names, numbers, scores, decisions, winners, results, actions, and timestamps. Connect pronouns and repeated entities when the evidence supports it. Treat later chronological scoreboard/result frames as newer than earlier animation states. For Arabic or other right-to-left text, copy the visible spelling and do not reverse labels. If evidence conflicts or OCR is genuinely ambiguous, record the conflict instead of inventing certainty. Do not add repetitive statements about facts that were not present.
+Write compact factual viewing notes that remain useful for later questions. CRITICAL: Every factual claim, event, state change, or action MUST be prefixed with its exact [HH:MM:SS-HH:MM:SS] timestamp copied strictly from the evidence chunks below. Do not hallucinate timestamps. Preserve exact names, numbers, values, decisions, results, actions, and timestamps. Connect pronouns and repeated entities when the evidence supports it. Treat later chronological evidence as newer than earlier transient states. Preserve text in its original reading direction; do not reverse labels in right-to-left scripts. If evidence conflicts or OCR is genuinely ambiguous, record the conflict instead of inventing certainty. Do not add repetitive statements about facts that were not present.
 
 Evidence:
 ${segments.map(formatSegmentForPrompt).join('\n\n')}`;
@@ -369,13 +432,13 @@ Create a concise, standalone knowledge-base summary with these headings when app
 - Overview / content type
 - People and entities
 - Key events in chronological order
-- Outcomes, conclusions, decisions, winners, and final scores
+- Outcomes, conclusions, decisions, and final observed states
 - High-value timestamp evidence
 - Genuine uncertainties
 
-Adapt to the content: for a match prioritize score changes and the final result; for CCTV prioritize changes, anomalies, and long stable periods; for meetings or lectures prioritize claims, decisions, and action items; for screen recordings prioritize procedures and observed results. Resolve an animated score using the latest chronological evidence.
+Adapt to the content without assuming a domain. Prioritize meaningful changes, claims, decisions, procedures, observed results, and stable periods when they are relevant. Resolve a changing value using the latest chronological evidence.
 
-CRITICAL: Draw logical deductions from the events (e.g., explicitly stating who won based on the final score) and log them in the Outcomes section. Every factual claim and deduced conclusion MUST cite the exact [HH:MM:SS-HH:MM:SS] timestamp of the evidence that supports it. Preserve exact names, numbers, language, and timestamps. Never claim that an outcome is absent merely because earlier sections did not show it. State the definitive final outcome explicitly based on the last available evidence. Do not mention these instructions or the batching process.
+CRITICAL: Draw only deductions warranted by the evidence and log them in the Outcomes section. Every factual claim and deduced conclusion MUST cite the exact [HH:MM:SS-HH:MM:SS] timestamp of the evidence that supports it. Preserve exact names, numbers, language, and timestamps. Never claim that a conclusion is absent merely because earlier sections did not show it. State the latest supported conclusion explicitly when the evidence establishes one. Do not mention these instructions or the batching process.
 
 Section notes:
 ${batchNotes.map((note, index) => `## Section ${index + 1}\n${note}`).join('\n\n')}`;
@@ -391,7 +454,7 @@ function buildReductionPrompt(
   return `Consolidate chronological viewing notes for ${options.mediaType} "${options.title}".
 This is reduction level ${level}, group ${
     index + 1
-  } of ${count}. Preserve exact people, names, numbers, scores, outcomes, decisions, anomalies, and timestamps. 
+  } of ${count}. Preserve exact people, names, numbers, values, outcomes, decisions, anomalies, and timestamps.
 CRITICAL: You MUST carry over and preserve the exact [HH:MM:SS-HH:MM:SS] timestamps for every event or claim. Keep later chronological states distinct from earlier states and retain genuine uncertainty. Do not mention this reduction process.
 
 Notes:

@@ -5,6 +5,11 @@ import useSWR from 'swr';
 import { toast } from 'sonner';
 import { formatErrorMessage } from '@/lib/error-formatter';
 import {
+  describeActiveMediaStep,
+  mediaStepProgress,
+  primaryRunningMediaStep,
+} from '@/lib/media-progress';
+import {
   Image as ImageIcon,
   Video,
   AudioLines,
@@ -21,6 +26,9 @@ import {
   Sparkles,
   Pause,
   Play,
+  ChevronLeft,
+  ChevronRight,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -48,10 +56,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-
-/* ------------------------------------------------------------------ */
-/* Types                                                               */
-/* ------------------------------------------------------------------ */
 
 type MediaSubTab = 'images' | 'video' | 'audio';
 type MediaEntryTab = 'upload' | 'url';
@@ -89,6 +93,9 @@ interface MediaAsset {
   durationSecs?: number;
   indexingInstructions?: string;
   indexingQuality?: number;
+  activeVideoKnowledgeRevisionId?: string;
+  activeVideoKnowledgeManifestId?: string;
+  activeVideoKnowledgeJobId?: string;
 }
 
 interface StagedMedia {
@@ -168,15 +175,17 @@ function qualityFrameEstimate(quality: number, durationSecs: number): number {
 }
 
 function qualityVisionCalls(quality: number, durationSecs: number): number {
-  const windowSecs = durationSecs >= 4 * 60 * 60 ? 15 * 60 : durationSecs > 60 * 60 ? 5 * 60 : 60;
   const frames = qualityFrameEstimate(quality, durationSecs);
-  return Math.max(1, Math.ceil(frames / Math.max(1, Math.floor(windowSecs / 10))));
+  // Backend groups by 12 frames per vision API call
+  return Math.max(1, Math.ceil(frames / 12));
 }
 
 function qualityCostEstimate(quality: number, durationSecs: number): string {
   const calls = qualityVisionCalls(quality, durationSecs);
-  const transcriptionCost = (durationSecs / 60) * 0.006;
-  const visionCost = calls * 0.003;
+  // Transcription buffer (e.g. $0.008/min instead of $0.006)
+  const transcriptionCost = (durationSecs / 60) * 0.008;
+  // Vision buffer (e.g. $0.007/call instead of $0.003 to cover more expensive models)
+  const visionCost = calls * 0.007;
   return (transcriptionCost + visionCost).toFixed(2);
 }
 
@@ -254,11 +263,14 @@ export function MediaPanel({
   const serverQuery = serverId ? `&serverId=${encodeURIComponent(serverId)}` : '';
   const router = useRouter();
 
-  const { data, mutate, isLoading } = useSWR(`/api/media?type=${mediaType}${serverQuery}`, fetcher);
+  const { data, mutate, isLoading } = useSWR(`/api/media?type=all${serverQuery}`, fetcher, {
+    revalidateOnFocus: false,
+    keepPreviousData: true,
+  });
 
   useEffect(() => {
     previousStatusesRef.current = null;
-    const stream = new EventSource(`/api/media/stream?type=${mediaType}${serverQuery}`);
+    const stream = new EventSource(`/api/media/stream?type=all${serverQuery}`);
     let fallbackTimer: ReturnType<typeof setInterval> | undefined;
     const handleUpdate = (event: MessageEvent<string>) => {
       try {
@@ -298,7 +310,10 @@ export function MediaPanel({
               asset.processingStatus === 'failed' &&
               (previousStatus === 'pending' || previousStatus === 'processing')
             ) {
-              const msg = asset.processingMessage || `Failed to index ${asset.fileName}`;
+              const msg =
+                asset.processingError ||
+                asset.processingMessage ||
+                `Failed to index ${asset.fileName}`;
               if (
                 msg.toLowerCase().includes('api key') ||
                 msg.toLowerCase().includes('configuration') ||
@@ -337,6 +352,10 @@ export function MediaPanel({
       void mutate();
       fallbackTimer ??= setInterval(() => void mutate(), 5_000);
     };
+
+    // Removed manual visibilitychange mutate to prevent SWR cache invalidation
+    // The EventSource automatically reconnects and synchronizes state natively.
+
     stream.addEventListener('media-update', handleUpdate);
     return () => {
       if (fallbackTimer) clearInterval(fallbackTimer);
@@ -352,7 +371,7 @@ export function MediaPanel({
     : '/api/config';
   const { data: configData } = useSWR(configUrl, (url) => fetch(url).then((r) => r.json()));
 
-  // Check if Video & Audio tool is installed and enabled
+  // Check if the Video Intelligence tool is installed and enabled.
   const videoAudioTool = toolsData?.tools?.find((t: any) => t.id === 'video-audio');
   const isToolInstalled = videoAudioTool?.status === 'installed';
   const enabledTools = configData?.config?.enabledTools;
@@ -415,7 +434,7 @@ export function MediaPanel({
       {needsTool ? (
         <InstallPrompt
           toolId="video-audio"
-          toolName={videoAudioTool?.name ?? 'Video & Audio'}
+          toolName={videoAudioTool?.name ?? 'Video Intelligence'}
           toolDescription={
             videoAudioTool?.description ??
             'Process video and audio files with transcription and frame analysis.'
@@ -445,7 +464,7 @@ export function MediaPanel({
           onMediaTypeDetected={(type) => setActiveTab(type === 'image' ? 'images' : type)}
           videoAudioToolInstalled={isToolInstalled}
           onToolRequired={() => {
-            toast.error('Video & Audio tool required', {
+            toast.error('Video Intelligence tool required', {
               description: 'Install it to add video or audio.',
               action: {
                 label: 'Install',
@@ -508,7 +527,7 @@ function InstallPrompt({
         throw new Error(err.error || 'Install failed');
       }
       toast.dismiss(toastId);
-      toast.success('Video & Audio installed', {
+      toast.success('Video Intelligence installed', {
         description: 'Choose an audio provider before indexing video or audio.',
         action: {
           label: 'Set up audio',
@@ -571,11 +590,11 @@ function DisabledPrompt() {
         <AlertCircle className="size-6 text-muted-foreground" />
       </div>
       <h3 className="mt-4 text-sm font-medium text-foreground">
-        Video & Audio Processing Disabled
+        Video Intelligence Processing Disabled
       </h3>
       <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
-        The Video & Audio tool is currently disabled in your agent settings. You cannot index new
-        video or audio files until it is re-enabled.
+        The Video Intelligence tool is currently disabled in your agent settings. You cannot index
+        new video or audio files until it is re-enabled.
       </p>
       <Button
         variant="default"
@@ -622,6 +641,9 @@ function MediaContent({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const [libraryTab, setLibraryTab] = useState<MediaSubTab>('images');
+  const [librarySearch, setLibrarySearch] = useState('');
+  const [libraryPage, setLibraryPage] = useState(0);
   const [staged, setStagedState] = useState<StagedMedia[]>(globalStagedMedia[mediaType] || []);
 
   useEffect(() => {
@@ -704,7 +726,7 @@ function MediaContent({
       normalizedMessage.includes('video & audio tool not properly installed') ||
       normalizedMessage.includes('yt-dlp is required for youtube urls')
     ) {
-      toast.error('Update Video & Audio to continue.', {
+      toast.error('Update Video Intelligence to continue.', {
         description:
           'Your installed tool is out of date. Update it, then try adding the media again.',
         duration: 10_000,
@@ -734,17 +756,17 @@ function MediaContent({
   }
 
   async function updateVideoAudioTool() {
-    const toastId = toast.loading('Updating Video & Audio…');
+    const toastId = toast.loading('Updating Video Intelligence…');
     try {
       const response = await fetch('/api/marketplace/video-audio?force=true', { method: 'POST' });
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      if (!response.ok) throw new Error(body?.error || 'Could not update Video & Audio.');
-      toast.success('Video & Audio updated', {
+      if (!response.ok) throw new Error(body?.error || 'Could not update Video Intelligence.');
+      toast.success('Video Intelligence updated', {
         id: toastId,
         description: 'Try adding the media again.',
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not update Video & Audio.', {
+      toast.error(error instanceof Error ? error.message : 'Could not update Video Intelligence.', {
         id: toastId,
       });
     }
@@ -1007,6 +1029,20 @@ function MediaContent({
     remoteEstimates?.reduce((total, estimate) => total + (estimate.durationSecs ?? 0), 0) ?? 0;
   const remoteEstimate = estimateMedia(remoteDuration, mediaType === 'video');
   const activeAssets = assets.filter(isActiveJob);
+  const libraryPageSize = 12;
+  const libraryAssets = assets.filter((asset) => {
+    const matchesType = asset.type === TAB_TO_TYPE[libraryTab];
+    const matchesSearch = asset.fileName.toLowerCase().includes(librarySearch.trim().toLowerCase());
+    return matchesType && matchesSearch;
+  });
+  const libraryTotalPages = Math.max(1, Math.ceil(libraryAssets.length / libraryPageSize));
+  const safeLibraryPage = Math.min(libraryPage, libraryTotalPages - 1);
+  const paginatedLibraryAssets = libraryAssets.slice(
+    safeLibraryPage * libraryPageSize,
+    (safeLibraryPage + 1) * libraryPageSize,
+  );
+  const libraryStart = libraryAssets.length === 0 ? 0 : safeLibraryPage * libraryPageSize + 1;
+  const libraryEnd = Math.min((safeLibraryPage + 1) * libraryPageSize, libraryAssets.length);
   const hasUrls = parsedUrls().length > 0;
 
   function submitUrlMedia() {
@@ -1291,13 +1327,9 @@ function MediaContent({
           <Upload className="size-5 text-muted-foreground" />
           <div className="text-center">
             <p className="text-[13px] font-medium text-foreground">
-              Drop {mediaType} files here or click to browse
+              Drop media files here or click to browse
             </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {mediaType === 'image' && 'PNG, JPG, WebP, GIF, SVG'}
-              {mediaType === 'video' && 'MP4, WebM, MOV, AVI'}
-              {mediaType === 'audio' && 'MP3, WAV, OGG, M4A, FLAC'}
-            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Images, Video, Audio</p>
           </div>
           <input
             ref={inputRef}
@@ -1523,8 +1555,7 @@ function MediaContent({
         <div className="space-y-2">
           <div className="flex items-center justify-between py-2 px-3 rounded-lg border border-border bg-muted/20">
             <h4 className="text-[13px] font-medium text-foreground">
-              {assets.length} Uploaded {mediaType === 'image' ? 'Image' : 'File'}
-              {assets.length !== 1 ? 's' : ''}
+              {assets.length} Uploaded Media
             </h4>
             <Dialog>
               <DialogTrigger
@@ -1534,16 +1565,80 @@ function MediaContent({
                   </Button>
                 }
               />
-              <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0">
-                <DialogHeader className="px-6 py-4 border-b">
-                  <DialogTitle>
-                    Uploaded {mediaType === 'image' ? 'Images' : 'Files'} ({assets.length})
-                  </DialogTitle>
+              <DialogContent className="h-[calc(100vh-2rem)] max-h-190 w-[calc(100vw-2rem)] sm:max-w-5xl lg:max-w-6xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 bg-background">
+                <DialogHeader className="gap-3 px-5 py-4 sm:px-6">
+                  <div>
+                    <DialogTitle>Uploaded media</DialogTitle>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Browse, search, and manage every media upload in one place.
+                    </p>
+                  </div>
+                  <div className="relative w-full">
+                    <Search
+                      aria-hidden="true"
+                      className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      aria-label="Search uploaded media"
+                      value={librarySearch}
+                      onChange={(event) => {
+                        setLibrarySearch(event.target.value);
+                        setLibraryPage(0);
+                      }}
+                      placeholder="Search uploads"
+                      className="h-9 w-full pl-9 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {SUB_TABS.map((subTab) => {
+                      const Icon = subTab.icon;
+                      const isActive = libraryTab === subTab.id;
+                      const count = assets.filter(
+                        (asset) => asset.type === TAB_TO_TYPE[subTab.id],
+                      ).length;
+                      return (
+                        <button
+                          key={subTab.id}
+                          type="button"
+                          onClick={() => {
+                            setLibraryTab(subTab.id);
+                            setLibraryPage(0);
+                          }}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                            isActive
+                              ? 'bg-muted text-foreground'
+                              : 'border border-border bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                          )}
+                        >
+                          <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.75} />
+                          {subTab.label}
+                          <span className="text-[10px] tabular-nums text-muted-foreground">
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </DialogHeader>
-                <div className="flex-1 overflow-y-auto px-6 py-4">
-                  {mediaType === 'image' ? (
+                <div className="min-h-0 overflow-y-auto px-5 py-4 sm:px-6">
+                  {libraryAssets.length === 0 ? (
+                    <div className="flex min-h-48 flex-col items-center justify-center rounded-lg  bg-muted/20 px-6 text-center">
+                      <Search className="size-4 text-muted-foreground" />
+                      <p className="mt-3 text-sm font-medium text-foreground">No uploads found</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {librarySearch
+                          ? `No ${SUB_TABS.find(
+                              (tab) => tab.id === libraryTab,
+                            )?.label.toLowerCase()} match “${librarySearch}”.`
+                          : `There are no ${SUB_TABS.find(
+                              (tab) => tab.id === libraryTab,
+                            )?.label.toLowerCase()} uploads yet.`}
+                      </p>
+                    </div>
+                  ) : libraryTab === 'images' ? (
                     <ImageGallery
-                      assets={assets}
+                      assets={paginatedLibraryAssets}
                       onDelete={(id) =>
                         setAssetToRemove(assets.find((asset) => asset.id === id) ?? null)
                       }
@@ -1551,8 +1646,8 @@ function MediaContent({
                     />
                   ) : (
                     <FileList
-                      assets={assets}
-                      mediaType={mediaType}
+                      assets={paginatedLibraryAssets}
+                      mediaType={TAB_TO_TYPE[libraryTab] as 'video' | 'audio'}
                       onDelete={(id) =>
                         setAssetToRemove(assets.find((asset) => asset.id === id) ?? null)
                       }
@@ -1560,13 +1655,47 @@ function MediaContent({
                     />
                   )}
                 </div>
+                {libraryAssets.length > 0 ? (
+                  <div className="flex items-center justify-between border-t px-5 py-3 text-xs text-muted-foreground sm:px-6">
+                    <span className="tabular-nums">
+                      {libraryStart}–{libraryEnd} of {libraryAssets.length}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Previous uploads page"
+                        disabled={safeLibraryPage === 0}
+                        onClick={() => setLibraryPage((page) => Math.max(0, page - 1))}
+                      >
+                        <ChevronLeft className="size-4" />
+                      </Button>
+                      <span className="min-w-12 text-center tabular-nums">
+                        {safeLibraryPage + 1} / {libraryTotalPages}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Next uploads page"
+                        disabled={safeLibraryPage >= libraryTotalPages - 1}
+                        onClick={() =>
+                          setLibraryPage((page) => Math.min(libraryTotalPages - 1, page + 1))
+                        }
+                      >
+                        <ChevronRight className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </DialogContent>
             </Dialog>
           </div>
         </div>
       ) : staged.length === 0 ? (
         <div className="py-10 text-center">
-          <p className="text-[13px] text-muted-foreground">No {mediaType} files yet</p>
+          <p className="text-[13px] text-muted-foreground">No media files yet</p>
         </div>
       ) : null}
 
@@ -1629,16 +1758,12 @@ function ImageGallery({
   onDelete: (id: string) => void;
   serverId?: string;
 }) {
-  const [visibleCount, setVisibleCount] = useState(12);
   const [expandedAsset, setExpandedAsset] = useState<MediaAsset | null>(null);
 
-  const visibleAssets = assets.slice(0, visibleCount);
-  const hasMore = visibleCount < assets.length;
-
   return (
-    <div className="space-y-6">
+    <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {visibleAssets.map((asset) => (
+        {assets.map((asset) => (
           <div
             key={asset.id}
             onClick={() => setExpandedAsset(asset)}
@@ -1686,6 +1811,11 @@ function ImageGallery({
                 </span>
               </div>
             )}
+            {asset.processingStatus === 'completed' && asset.activeVideoKnowledgeRevisionId ? (
+              <div className="absolute bottom-2 left-2 rounded-sm bg-emerald-600/85 px-2 py-1 text-[9px] text-white">
+                Evidence revision active
+              </div>
+            ) : null}
 
             {/* Hover actions */}
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none">
@@ -1706,18 +1836,6 @@ function ImageGallery({
           </div>
         ))}
       </div>
-
-      {hasMore && (
-        <div className="flex justify-center pt-2 pb-6">
-          <Button
-            variant="outline"
-            onClick={() => setVisibleCount((prev) => prev + 12)}
-            className="text-muted-foreground"
-          >
-            Load More
-          </Button>
-        </div>
-      )}
 
       {/* Lightbox Overlay */}
       {expandedAsset && (
@@ -1795,6 +1913,7 @@ function FileList({
             {isActiveJob(asset) ? (
               <Progress
                 value={asset.processingProgress ?? 1}
+                aria-label="Overall indexing progress"
                 className={cn('mt-2 h-1', INDEXING_PROGRESS_CLASS)}
               />
             ) : null}
@@ -1843,42 +1962,8 @@ function FileList({
 /* Status badge                                                        */
 /* ------------------------------------------------------------------ */
 
-function useETA(status: string, progress: number, createdAt: string) {
-  const [eta, setEta] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (status !== 'processing' && status !== 'pending') {
-      setEta(null);
-      return;
-    }
-    const interval = setInterval(() => {
-      if (progress <= 0 || progress >= 100) {
-        setEta(null);
-        return;
-      }
-      const startTime = new Date(createdAt).getTime();
-      const elapsed = Date.now() - startTime;
-      if (elapsed < 5000) return;
-
-      const estimatedTotal = elapsed / (progress / 100);
-      const remaining = estimatedTotal - elapsed;
-      if (remaining <= 0) {
-        setEta(null);
-        return;
-      }
-
-      const secs = Math.floor(remaining / 1000);
-      setEta(secs < 60 ? `${secs}s left` : `${Math.floor(secs / 60)}m left`);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [status, progress, createdAt]);
-
-  return eta;
-}
-
 function StatusBadge({ asset }: { asset: MediaAsset }) {
   const status = asset.processingStatus;
-  const eta = useETA(status, asset.processingProgress ?? 0, asset.createdAt);
 
   if (status === 'completed') {
     return (
@@ -1898,8 +1983,7 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
         >
           {asset.processingMessage || 'Processing...'}
         </span>
-        <span className="tabular-nums">{Math.round(asset.processingProgress ?? 0)}%</span>
-        {eta && <span className="text-[9px] text-blue-500/80 ml-0.5">({eta})</span>}
+        <span className="tabular-nums">{Math.round(asset.processingProgress ?? 0)}% overall</span>
       </span>
     );
   }
@@ -1911,7 +1995,6 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
           {asset.processingMessage}
         </span>
         <span className="tabular-nums">{Math.round(asset.processingProgress ?? 1)}%</span>
-        {eta && <span className="text-[9px] text-blue-500/80 ml-0.5">({eta})</span>}
       </span>
     );
   }
@@ -1976,7 +2059,7 @@ function ActiveIndexingList({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="shrink-0 text-[10px] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                    {Math.round(progress)}%
+                    Overall {Math.round(progress)}%
                   </span>
                   {asset.type !== 'image' ? (
                     <button
@@ -2008,23 +2091,14 @@ function ActiveIndexingList({
                   </button>
                 </div>
               </div>
-              <Progress
-                value={progress}
-                className={cn(
-                  'h-1.5 **:data-[slot=progress-indicator]:transition-[transform] **:data-[slot=progress-indicator]:duration-500 **:data-[slot=progress-indicator]:ease-out',
-                  INDEXING_PROGRESS_CLASS,
-                )}
-              />
-              <div className="flex items-center gap-1.5">
-                <ElapsedTime startTime={asset.createdAt} />
-                <p className="truncate text-[10px] text-muted-foreground animate-pulse">
-                  {asset.processingPaused
-                    ? 'Paused — resume when you are ready.'
-                    : asset.processingMessage || 'Preparing media indexing...'}
+              <ActiveIndexingDescription asset={asset} />
+              {asset.activeVideoKnowledgeJobId ? (
+                <p
+                  className="truncate text-[9px] text-muted-foreground"
+                  title={asset.activeVideoKnowledgeJobId}
+                >
+                  Knowledge job {asset.activeVideoKnowledgeJobId.slice(0, 8)}
                 </p>
-              </div>
-              {asset.processingSteps?.length ? (
-                <PipelineSteps steps={asset.processingSteps} />
               ) : null}
             </div>
           );
@@ -2034,51 +2108,42 @@ function ActiveIndexingList({
   );
 }
 
-const PIPELINE_STAGE_LABELS: Record<MediaPipelineStage, string> = {
-  download: 'Download media',
-  extract: 'Extract media',
-  transcribe: 'Transcribe audio',
-  vision: 'Understand visuals',
-  synthesize: 'Connect notes',
-  index: 'Search index',
-};
+function ActiveIndexingDescription({ asset }: { asset: MediaAsset }) {
+  const step = primaryRunningMediaStep(asset.processingSteps);
+  const progress = mediaStepProgress(step);
+  const stepDescription = describeActiveMediaStep(step);
 
-function PipelineSteps({ steps }: { steps: MediaProcessingStep[] }) {
   return (
-    <div className="grid gap-1 pt-0.5 sm:grid-cols-2 lg:grid-cols-3">
-      {steps.map((step) => {
-        const hasCount = step.current !== undefined && step.total !== undefined;
-        const label = hasCount
-          ? `${step.current} / ${step.total}${step.unit ? ` ${step.unit}` : ''}`
-          : PIPELINE_STAGE_LABELS[step.stage];
-        const isRunning = step.status === 'running';
-        const isComplete = step.status === 'completed' || step.status === 'skipped';
-
-        return (
-          <div
-            key={step.stage}
-            className={cn(
-              'flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[9px]',
-              isRunning
-                ? 'border-emerald-500 bg-emerald-50/70 text-emerald-700 dark:border-emerald-700/70 dark:bg-emerald-950/40 dark:text-emerald-300'
-                : 'border-border/60 bg-background/40 text-muted-foreground',
-            )}
-          >
-            {isRunning ? (
-              <Loader2 className="size-2.5 shrink-0 animate-spin" aria-hidden="true" />
-            ) : isComplete ? (
-              <Check className="size-2.5 shrink-0 text-emerald-600" aria-hidden="true" />
-            ) : step.status === 'failed' ? (
-              <AlertCircle className="size-2.5 shrink-0 text-destructive" aria-hidden="true" />
-            ) : (
-              <Clock className="size-2.5 shrink-0" aria-hidden="true" />
-            )}
-            <span className="truncate tabular-nums" title={step.message || label}>
-              {label}
-            </span>
+    <div className="min-w-0 space-y-1">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <ElapsedTime startTime={asset.createdAt} />
+        <p className="truncate text-[10px] text-muted-foreground animate-pulse">
+          {asset.processingPaused
+            ? 'Paused — resume when you are ready.'
+            : asset.processingMessage || 'Preparing media indexing...'}
+        </p>
+      </div>
+      {!asset.processingPaused && stepDescription ? (
+        <div className="space-y-1" aria-live="polite">
+          <div className="flex min-w-0 items-center gap-1.5 text-[9px] text-muted-foreground/80">
+            <span className="truncate">{stepDescription}</span>
           </div>
-        );
-      })}
+          {progress === null ? (
+            <div
+              className="h-1 overflow-hidden rounded-full bg-muted"
+              aria-label="Active operation in progress"
+            >
+              <div className="h-full w-1/3 animate-pulse rounded-full bg-emerald-500/70" />
+            </div>
+          ) : (
+            <Progress
+              value={progress}
+              aria-label={`${stepDescription} progress`}
+              className={cn('h-1 bg-muted', INDEXING_PROGRESS_CLASS)}
+            />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

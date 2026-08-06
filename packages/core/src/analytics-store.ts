@@ -6,7 +6,13 @@ import { ALL_MODELS } from './models-list';
 
 export interface UsageEvent {
   id: string;
-  type: 'chat' | 'embedding' | 'server_request' | 'media_processing';
+  type:
+    | 'chat'
+    | 'embedding'
+    | 'server_request'
+    | 'media_processing'
+    | 'media_vision_analysis'
+    | 'media_ocr';
   // Chat-specific
   modelId?: string;
   provider?: string;
@@ -26,6 +32,26 @@ export interface UsageEvent {
   mediaType?: 'image' | 'video' | 'audio';
   durationSecs?: number;
   frameCount?: number;
+  observationCount?: number;
+  blockCount?: number;
+  /** Non-sensitive runtime investigation metrics for video questions. */
+  mediaAssetId?: string;
+  queryKind?: string;
+  cache?: 'hit' | 'miss';
+  evidenceCount?: number;
+  /** Non-sensitive Video Knowledge Engine operation name. */
+  mediaOperation?:
+    | 'acquisition'
+    | 'probe'
+    | 'extraction'
+    | 'transcription'
+    | 'source_transcript'
+    | 'observation'
+    | 'projection'
+    | 'inspection'
+    | 'investigation'
+    | 'completion'
+    | 'partial_failure';
   // Cost
   estimatedCost?: number;
   // Common
@@ -183,11 +209,15 @@ export async function getAnalyticsSummary(days: number): Promise<AnalyticsSummar
         mData.requests += 1;
         modelMap.set(ev.embeddingModelId, mData);
       }
-    } else if (ev.type === 'media_processing') {
+    } else if (
+      ev.type === 'media_processing' ||
+      ev.type === 'media_vision_analysis' ||
+      ev.type === 'media_ocr'
+    ) {
       summary.totalCost += ev.estimatedCost || 0;
       const modelId = ev.modelId || 'media-processing';
       const mData = modelMap.get(modelId) || {
-        type: 'media_processing',
+        type: ev.type,
         tokens: 0,
         cost: 0,
         requests: 0,

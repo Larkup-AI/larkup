@@ -1,0 +1,118 @@
+---
+title: "Media"
+description: "Manage media assets (video, audio, images) and their Video Knowledge processing."
+---
+
+## List media assets
+
+<ParamField path="GET" type="/api/media">
+  Returns all media assets in the current workspace.
+</ParamField>
+
+### Response
+
+```json
+{
+  "assets": [
+    {
+      "id": "abc-123",
+      "type": "video",
+      "fileName": "interview.mp4",
+      "processingStatus": "completed",
+      "durationSecs": 2940,
+      "documentIds": ["doc-1", "doc-2"]
+    }
+  ],
+  "total": 1
+}
+```
+
+## Get a media asset
+
+<ParamField path="GET" type="/api/media/:id">
+  Returns a single media asset by ID, including its processing status and Video Knowledge revision IDs.
+</ParamField>
+
+## Delete a media asset
+
+<ParamField path="DELETE" type="/api/media/:id">
+  Permanently removes a media asset and all associated data: documents, vector entries, Video Knowledge revisions, evidence, jobs, and pending refinements.
+</ParamField>
+
+## Process media
+
+<ParamField path="POST" type="/api/media/process">
+  Starts background processing for a pending media asset. This triggers speech transcription, scene sampling, visual analysis, OCR, and Video Knowledge creation.
+</ParamField>
+
+## Get job status
+
+<ParamField path="GET" type="/api/media/jobs/:id">
+  Returns the current status and checkpoint of a Video Knowledge processing job.
+</ParamField>
+
+### Response
+
+```json
+{
+  "id": "job-456",
+  "status": "extracting",
+  "checkpoint": {
+    "stage": "extracting",
+    "chunkIndex": 2,
+    "completedEvidenceIds": ["ev-1"],
+    "completedProjectionIds": []
+  },
+  "attempt": 1,
+  "createdAt": "2026-08-05T10:00:00Z",
+  "updatedAt": "2026-08-05T10:02:30Z"
+}
+```
+
+## Approve or decline a refinement
+
+<ParamField path="POST" type="/api/media/jobs/:id/approval">
+  Approves or declines a pending background refinement job. Background refinements are created when a query requires more coverage than the per-query budget allows.
+</ParamField>
+
+### Request body
+
+```json
+{
+  "decision": "approve"
+}
+```
+
+The `decision` field must be either `"approve"` or `"decline"`.
+
+- **approve**: transitions the refinement to `queued` for background processing.
+- **decline**: transitions it to `declined` with reason `approval-declined`.
+
+### Response
+
+```json
+{
+  "job": {
+    "id": "ref-789",
+    "status": "queued"
+  }
+}
+```
+
+## Inspect a time range
+
+<ParamField path="POST" type="/api/media/inspect">
+  Extracts frames within a bounded time range for a specific media asset. This is used by the Video Knowledge Engine for bounded source inspections.
+</ParamField>
+
+## Stream media
+
+<ParamField path="GET" type="/api/media/stream?uri=...">
+  Streams media bytes for playback in the embedded player. The `uri` query parameter must point to a stored media asset.
+</ParamField>
+
+## Extract a single frame
+
+<ParamField path="GET" type="/api/media/:id/frame?t=...">
+  Extracts and returns a JPEG frame at the requested timestamp. Used for frame previews in chat citations.
+</ParamField>

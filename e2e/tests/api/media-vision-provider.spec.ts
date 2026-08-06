@@ -4,6 +4,7 @@ import type { RagConfig } from '../../../packages/core/src/types';
 import {
   createChatModel,
   resolveConfiguredChatModel,
+  resolveConfiguredVisionModel,
 } from '../../../apps/web/lib/chat-model-provider';
 
 const catalog: GatewayModel[] = [
@@ -100,5 +101,25 @@ test.describe('Media vision provider routing', () => {
     const model = createChatModel(resolved.provider, resolved.modelId, resolved.apiKey);
     expect(model.provider).toContain('google');
     expect(model.modelId).toBe('gemini-2.5-flash');
+  });
+
+  test('uses the dedicated vision provider and its default VLM independently from chat', () => {
+    const resolved = resolveConfiguredVisionModel(
+      config({
+        chatProvider: 'anthropic',
+        chatModelId: 'anthropic/text-only-model',
+        chatApiKey: 'anthropic_test_key',
+        visionProvider: 'google',
+        visionModelId: '',
+        visionApiKey: 'google_test_key',
+      }),
+      catalog,
+    );
+
+    expect(resolved).toEqual({
+      provider: 'google',
+      modelId: 'google/gemini-2.5-flash',
+      apiKey: 'google_test_key',
+    });
   });
 });

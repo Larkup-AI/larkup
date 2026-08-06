@@ -272,6 +272,8 @@ function defaultConfigFor(
     customEmbeddings: prevConfig.customEmbeddings ?? DEFAULT_CONFIG.customEmbeddings,
     chatApiKey: prevConfig.chatApiKey ?? DEFAULT_CONFIG.chatApiKey,
     customChatModels: prevConfig.customChatModels ?? DEFAULT_CONFIG.customChatModels,
+    visionApiKey: prevConfig.visionApiKey ?? DEFAULT_CONFIG.visionApiKey,
+    customVisionModels: prevConfig.customVisionModels ?? DEFAULT_CONFIG.customVisionModels,
     serperApiKey: prevConfig.serperApiKey ?? DEFAULT_CONFIG.serperApiKey,
     scraperProxyServer: prevConfig.scraperProxyServer ?? DEFAULT_CONFIG.scraperProxyServer,
     scraperProxyUsername: prevConfig.scraperProxyUsername ?? DEFAULT_CONFIG.scraperProxyUsername,

@@ -55,7 +55,9 @@ test.describe('Media knowledge documents', () => {
       transcriptLanguage: 'ar',
     });
 
-    expect(documents).toHaveLength(4);
+    // A video now keeps one coarse chapter summary alongside its overview
+    // and the three independently retrievable evidence segments.
+    expect(documents).toHaveLength(5);
     expect(documents[0].metadata).toMatchObject({
       contentKind: 'video-summary',
       isMediaSummary: true,
@@ -66,7 +68,7 @@ test.describe('Media knowledge documents', () => {
     expect(documents[0].content).toContain('فاز فريق نصوحي بنتيجة 20–19');
 
     expect(
-      documents.slice(1).map((document) => ({
+      documents.slice(2).map((document) => ({
         sequence: document.metadata?.sequence,
         startSecs: document.metadata?.startSecs,
         endSecs: document.metadata?.endSecs,

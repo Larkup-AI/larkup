@@ -1,11 +1,11 @@
 {
   "$schema": "https://hub.larkup.de/schemas/tool-manifest.v1.json",
   "id": "video-audio",
-  "name": "Video & Audio",
-  "description": "Index video and audio files with transcription and frame analysis.",
-  "longDescription": "Process long video and audio files for your knowledge base. Splits oversized Whisper uploads, captures scene-change-aware frames in a bounded pass, and supports local files, bounded direct URL downloads, and YouTube videos/playlists. Includes ffmpeg automatically and prepares the YouTube downloader on first use.",
+  "name": "Video Intelligence",
+  "description": "Build evidence-backed timelines from video and audio with adaptive attention and bounded source rewind.",
+  "longDescription": "An evidence-first video reasoning tool, not a video-to-text indexer. It uses cheap activity and scene signals to focus visual analysis, keeps timestamped source evidence separate from summaries, and lets the chat agent rewind only a bounded range when a complex answer needs stronger proof. Supports local files, direct URLs, YouTube, transcription, OCR, anonymous bounded tracking, and source-backed temporal investigation.",
   "category": "media",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "pricing": "free",
   "emoji": "🎬",
   "icon": "Film",
@@ -17,9 +17,17 @@
     "audio-indexing",
     "transcription",
     "frame-extraction",
-    "youtube-import"
+    "youtube-import",
+    "media-probe",
+    "frame-preview",
+    "source-inspection",
+    "attention-driven-analysis",
+    "temporal-evidence",
+    "bounded-source-rewind",
+    "anonymous-person-tracking",
+    "state-change-detection"
   ],
-  "tags": ["transcription", "ffmpeg", "video", "audio", "whisper"],
+  "tags": ["video intelligence", "temporal reasoning", "transcription", "ffmpeg", "video", "audio", "evidence"],
   "downloads": 0,
   "repositoryUrl": "https://github.com/Larkup-AI/larkup",
   "license": "Apache-2.0",
@@ -27,10 +35,10 @@
   "configSchema": [
     {
       "key": "frameInterval",
-      "label": "Frame extraction interval (seconds)",
+      "label": "Baseline coverage interval (seconds)",
       "type": "text",
       "defaultValue": "10",
-      "help": "Baseline cadence for duration-aware coverage frames; scene changes and a reserved ending pass are added separately."
+      "help": "A maximum gap for cheap coverage anchors. Activity and scene-change triggers automatically add denser evidence; this is not a fixed sampling rate."
     },
     {
       "key": "audioProvider",
@@ -57,6 +65,52 @@
       "label": "Audio API Key",
       "type": "password",
       "help": "Required for the selected provider. This key is used only by the Video & Audio tool."
+    },
+    {
+      "key": "maxDurationSecs",
+      "label": "Maximum video duration (seconds)",
+      "type": "text",
+      "defaultValue": "14400",
+      "help": "Reject videos longer than this duration (default: 4 hours / 14400 seconds). Set 0 for no limit."
+    },
+    {
+      "key": "chunkDurationSecs",
+      "label": "Knowledge chunk duration (seconds)",
+      "type": "text",
+      "defaultValue": "300",
+      "help": "Maximum timeline chunk processed at once. Overlap and checkpointing keep long videos resumable."
+    },
+    {
+      "key": "maxFrames",
+      "label": "Maximum retained frames",
+      "type": "text",
+      "defaultValue": "600",
+      "help": "Hard cap for retained visual evidence. The information-gain policy may retain fewer frames."
+    },
+    {
+      "key": "ocrLanguages",
+      "label": "OCR languages",
+      "type": "text",
+      "defaultValue": "auto",
+      "help": "Comma-separated OCR language hints; use auto when the configured OCR adapter detects language."
+    },
+    {
+      "key": "maxInspectionSpendUsd",
+      "label": "Maximum per-query inspection spend (USD)",
+      "type": "text",
+      "defaultValue": "0.50",
+      "help": "Hard budget for bounded query-time source inspection; larger work requires a background refinement approval."
+    },
+    {
+      "key": "videoKnowledgeEnabled",
+      "label": "Video Knowledge Engine",
+      "type": "select",
+      "defaultValue": "true",
+      "help": "Enable evidence-first video knowledge revisions. Disable only to roll back to the compatible legacy media pipeline.",
+      "options": [
+        { "label": "Enabled", "value": "true" },
+        { "label": "Legacy pipeline only", "value": "false" }
+      ]
     }
   ]
 }

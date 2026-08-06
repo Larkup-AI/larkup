@@ -12,10 +12,15 @@ import type {
   IndexDocumentsOptions,
   IndexProgressEvent,
   LarkupClientOptions,
+  MediaAsset,
+  MediaDeleteResponse,
+  MediaJobStatus,
+  MediaListResponse,
   MutationResponse,
   PaginatedDocuments,
   QueryRequest,
   QueryResponse,
+  RefinementDecisionResponse,
   ScrapeResponse,
 } from './types';
 
@@ -282,5 +287,59 @@ export class LarkupClient {
       text += event.text || '';
     }
     return text;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /*  Media assets                                                     */
+  /* ---------------------------------------------------------------- */
+
+  /** Lists all media assets (images, videos, audio). */
+  async listMedia(): Promise<MediaListResponse> {
+    const response = await this.request('/media');
+    if (!response.ok) throw await errorFor(response);
+    return (await response.json()) as MediaListResponse;
+  }
+
+  /** Fetches a single media asset by ID. */
+  async getMedia(id: string): Promise<MediaAsset> {
+    const response = await this.request(`/media/${encodeURIComponent(id)}`);
+    if (!response.ok) throw await errorFor(response);
+    return (await response.json()) as MediaAsset;
+  }
+
+  /** Deletes a media asset and its associated video knowledge data. */
+  async deleteMedia(id: string): Promise<MediaDeleteResponse> {
+    const response = await this.request(`/media/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw await errorFor(response);
+    return (await response.json()) as MediaDeleteResponse;
+  }
+
+  /** Checks the status of a video knowledge processing job. */
+  async getMediaJobStatus(jobId: string): Promise<MediaJobStatus> {
+    const response = await this.request(`/media/jobs/${encodeURIComponent(jobId)}`);
+    if (!response.ok) throw await errorFor(response);
+    return (await response.json()) as MediaJobStatus;
+  }
+
+  /** Approves a pending background refinement job. */
+  async approveRefinement(jobId: string): Promise<RefinementDecisionResponse> {
+    const response = await this.request(`/media/jobs/${encodeURIComponent(jobId)}/approval`, {
+      method: 'POST',
+      body: JSON.stringify({ decision: 'approve' }),
+    });
+    if (!response.ok) throw await errorFor(response);
+    return (await response.json()) as RefinementDecisionResponse;
+  }
+
+  /** Declines a pending background refinement job. */
+  async declineRefinement(jobId: string): Promise<RefinementDecisionResponse> {
+    const response = await this.request(`/media/jobs/${encodeURIComponent(jobId)}/approval`, {
+      method: 'POST',
+      body: JSON.stringify({ decision: 'decline' }),
+    });
+    if (!response.ok) throw await errorFor(response);
+    return (await response.json()) as RefinementDecisionResponse;
   }
 }

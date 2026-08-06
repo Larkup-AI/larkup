@@ -120,12 +120,30 @@ export interface FfmpegRunOptions {
   onStderr?: (line: string) => void;
   /** Total duration in seconds — used to compute progress percentage. */
   durationSecs?: number;
+  /** Stop the child process when the owning job/request is cancelled. */
+  signal?: AbortSignal;
 }
 
 export function runFfmpeg(options: FfmpegRunOptions): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (options.signal?.aborted) {
+      reject(new Error('FFmpeg operation was cancelled.'));
+      return;
+    }
     const args = ['-y', ...options.args];
     const proc = spawn(resolveFfmpegPath(), args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      options.signal?.removeEventListener('abort', abort);
+      fn();
+    };
+    const abort = () => {
+      proc.kill('SIGTERM');
+      settle(() => reject(new Error('FFmpeg operation was cancelled.')));
+    };
+    options.signal?.addEventListener('abort', abort, { once: true });
     let stderrBuf = '';
 
     proc.stderr.on('data', (data: Uint8Array) => {
@@ -153,11 +171,11 @@ export function runFfmpeg(options: FfmpegRunOptions): Promise<void> {
 
     proc.on('close', (code: number | null) => {
       if (code !== 0) {
-        return reject(new Error(`ffmpeg exited with code ${code}`));
+        return settle(() => reject(new Error(`ffmpeg exited with code ${code}`)));
       }
-      resolve();
+      settle(resolve);
     });
 
-    proc.on('error', reject);
+    proc.on('error', (error) => settle(() => reject(error)));
   });
 }

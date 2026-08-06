@@ -1,13 +1,12 @@
-import { spawn } from 'node:child_process';
+import type { TranscriptionResult, TranscriptChunk } from './audio-processor.js';
 import { createWriteStream, promises as fs } from 'node:fs';
-import path from 'node:path';
-import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { isIP } from 'node:net';
+import { spawn } from 'node:child_process';
 import { lookup } from 'node:dns/promises';
 import { randomUUID } from 'node:crypto';
-
-import type { TranscriptionResult, TranscriptChunk } from './audio-processor.js';
+import { Readable } from 'node:stream';
+import { isIP } from 'node:net';
+import path from 'node:path';
 
 export type MediaType = 'audio' | 'video' | 'unknown';
 export interface ImportedMedia {
@@ -41,6 +40,36 @@ export interface UrlInspection {
 
 const YT_DLP_DOWNLOAD_TIMEOUT_MS = 120_000;
 const managedYtDlpDownloads = new Map<string, Promise<string>>();
+const youtubeTranscriptCache = new Map<string, Promise<TranscriptionResult | undefined>>();
+
+/** Choose an official standalone asset; the generic Unix launcher needs host Python. */
+export function getManagedYtDlpAssetName(platform = process.platform, arch = process.arch): string {
+  if (platform === 'win32') return arch === 'arm64' ? 'yt-dlp_arm64.exe' : 'yt-dlp.exe';
+  if (platform === 'darwin') return 'yt-dlp_macos';
+  if (platform === 'linux') return arch === 'arm64' ? 'yt-dlp_linux_aarch64' : 'yt-dlp_linux';
+  // The platform-independent launcher remains the only official option for
+  // less common systems, where the host must provide a supported Python.
+  return 'yt-dlp';
+}
+
+export function getManagedYtDlpDownloadUrl(
+  platform = process.platform,
+  arch = process.arch,
+): string {
+  return `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${getManagedYtDlpAssetName(
+    platform,
+    arch,
+  )}`;
+}
+
+async function isLegacyPythonYtDlp(binaryPath: string): Promise<boolean> {
+  try {
+    const bytes = await fs.readFile(binaryPath);
+    return /^#!.*\bpython(?:3)?\b/m.test(bytes.subarray(0, 512).toString('utf8'));
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The Video & Audio tool owns its YouTube downloader. The official standalone
@@ -59,7 +88,11 @@ export async function ensureManagedYtDlp(rootDir = process.cwd()): Promise<strin
   const binaryPath = getManagedYtDlpPath(rootDir);
   try {
     await fs.access(binaryPath);
-    return binaryPath;
+    // Previous releases downloaded the platform-independent Unix launcher on
+    // macOS/Linux. It breaks on the older Python shipped by many systems.
+    // Replace it automatically with the official standalone release.
+    if (!(await isLegacyPythonYtDlp(binaryPath))) return binaryPath;
+    await fs.rm(binaryPath, { force: true });
   } catch {
     // Download below. The map prevents simultaneous media jobs from racing to
     // write the same executable on first use.
@@ -69,9 +102,7 @@ export async function ensureManagedYtDlp(rootDir = process.cwd()): Promise<strin
   if (pending) return pending;
 
   const download = (async () => {
-    const downloadUrl =
-      'https://github.com/yt-dlp/yt-dlp/releases/latest/download/' +
-      (process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+    const downloadUrl = getManagedYtDlpDownloadUrl();
     const temporaryPath = `${binaryPath}.${randomUUID()}.download`;
 
     try {
@@ -107,28 +138,33 @@ export async function ensureManagedYtDlp(rootDir = process.cwd()): Promise<strin
 export async function inspectMediaUrl(url: string): Promise<UrlInspection> {
   const parsed = validHttpUrl(url);
   if (isYouTube(parsed)) {
-    const output = await runYtDlp([
-      '--dump-single-json',
-      '--simulate',
-      '--flat-playlist',
-      '--playlist-end',
-      '10',
-      url,
-    ]);
-    const data = JSON.parse(output) as {
-      title?: string;
-      duration?: number;
-      entries?: { duration?: number }[];
-    };
-    const entries = data.entries?.slice(0, 10) ?? [];
-    return {
-      originalUrl: url,
-      title: data.title,
-      durationSecs: data.duration ?? entries.reduce((sum, entry) => sum + (entry.duration ?? 0), 0),
-      entryCount: Math.max(entries.length, 1),
-      mediaType: 'video',
-      isYouTube: true,
-    };
+    try {
+      const output = await runYtDlp([
+        '--dump-single-json',
+        '--simulate',
+        '--flat-playlist',
+        '--playlist-end',
+        '10',
+        url,
+      ]);
+      const data = JSON.parse(output) as {
+        title?: string;
+        duration?: number;
+        entries?: { duration?: number }[];
+      };
+      const entries = data.entries?.slice(0, 10) ?? [];
+      return {
+        originalUrl: url,
+        title: data.title,
+        durationSecs:
+          data.duration ?? entries.reduce((sum, entry) => sum + (entry.duration ?? 0), 0),
+        entryCount: Math.max(entries.length, 1),
+        mediaType: 'video',
+        isYouTube: true,
+      };
+    } catch (error) {
+      throw friendlyVideoDownloadError(error);
+    }
   }
   let response = await fetchPublic(url, { method: 'HEAD' });
   if (response.status === 405 || response.status === 501) {
@@ -190,7 +226,7 @@ export async function importMediaUrl(
         options.onProgress,
       );
     } catch (error) {
-      if (!isVideoHostForbidden(error)) throw error;
+      if (!isVideoHostForbidden(error)) throw friendlyVideoDownloadError(error);
       // Retry once with a freshly resolved URL and lower fragment concurrency.
       options.onProgress?.({ message: 'Source rejected the download; refreshing the video link…' });
       try {
@@ -231,7 +267,7 @@ export async function importMediaUrl(
     return Promise.all(
       imported.map(async (item) => ({
         ...item,
-        sourceTranscript: await fetchYouTubeTranscript(item.originalUrl).catch(() => undefined),
+        sourceTranscript: await getCachedYouTubeTranscript(item.originalUrl),
       })),
     );
   }
@@ -272,6 +308,15 @@ export async function importMediaUrl(
   ];
 }
 
+/** Fetch captions independently from the video bytes and memoize a source URL within this worker. */
+async function getCachedYouTubeTranscript(url: string): Promise<TranscriptionResult | undefined> {
+  const existing = youtubeTranscriptCache.get(url);
+  if (existing) return existing;
+  const pending = fetchYouTubeTranscript(url).catch(() => undefined);
+  youtubeTranscriptCache.set(url, pending);
+  return pending;
+}
+
 function isVideoHostForbidden(error: unknown): boolean {
   return error instanceof Error && /\b(?:403|forbidden)\b/i.test(error.message);
 }
@@ -279,10 +324,30 @@ function isVideoHostForbidden(error: unknown): boolean {
 function friendlyVideoDownloadError(error: unknown): Error {
   if (isVideoHostForbidden(error)) {
     return new Error(
-      'The video host refused this download (HTTP 403) after a safe retry. This is a temporary source restriction, not a problem with your existing index. Try again later, or upload the original video file directly.',
+      'The video host refused this download (HTTP 403). This is a temporary source restriction, not a problem with your index. Try again later, or upload the original video file directly.',
     );
   }
-  return error instanceof Error ? error : new Error('Video download failed. Please try again.');
+  if (error instanceof Error) {
+    let msg = error.message;
+    if (msg.includes('yt-dlp failed')) {
+      const match = msg.match(/ERROR:\s*(.+)/);
+      if (match) {
+        msg = `Video download failed: ${match[1].trim()}`;
+      } else {
+        const detail = msg
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .at(-1);
+        msg = detail
+          ? `Video download failed: ${detail.slice(0, 500)}`
+          : 'Video download failed. The source did not provide a usable error message.';
+      }
+      return new Error(msg);
+    }
+    return error;
+  }
+  return new Error('Video download failed. Please try again.');
 }
 
 async function fetchYouTubeTranscript(url: string): Promise<TranscriptionResult | undefined> {

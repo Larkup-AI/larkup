@@ -209,3 +209,93 @@ export interface LarkupHubClientOptions {
   baseUrl?: string;
   apiKey?: string;
 }
+
+/** Seekable, source-grounded video citation returned by Video Knowledge surfaces. */
+export interface VideoEvidenceCitation {
+  mediaAssetId: string;
+  evidenceId: string;
+  startSecs: number;
+  endSecs: number;
+  precision: 'word' | 'segment' | 'frame' | 'estimated';
+  confidence: {
+    score: number;
+    calibrationStatus: 'calibrated' | 'uncalibrated';
+    uncertaintyReasons: string[];
+  };
+  conflicted?: boolean;
+}
+
+export interface VideoKnowledgeQueryRequest {
+  mediaAssetId: string;
+  query: string;
+  limit?: number;
+}
+
+export interface VideoKnowledgeQueryResponse {
+  success: boolean;
+  evidence: VideoEvidenceCitation[];
+  verification: {
+    status: 'supported' | 'conflicted' | 'insufficient' | 'needs_inspection';
+    reasons: string[];
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Media asset management                                             */
+/* ------------------------------------------------------------------ */
+
+export type MediaType = 'image' | 'video' | 'audio';
+export type MediaProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export interface MediaAsset {
+  id: string;
+  type: MediaType;
+  fileName: string;
+  mimeType: string;
+  storageUri: string;
+  fileSize: number;
+  processingStatus: MediaProcessingStatus;
+  processingProgress?: number;
+  processingError?: string;
+  processingMessage?: string;
+  caption?: string;
+  durationSecs?: number;
+  dimensions?: { width: number; height: number };
+  documentIds: string[];
+  activeVideoKnowledgeRevisionId?: string;
+  activeVideoKnowledgeManifestId?: string;
+  createdAt: string;
+}
+
+export interface MediaListResponse {
+  assets: MediaAsset[];
+  total: number;
+}
+
+export interface MediaDeleteResponse {
+  success: boolean;
+}
+
+export interface MediaJobStatus {
+  id: string;
+  status: string;
+  checkpoint?: {
+    stage: string;
+    chunkIndex?: number;
+    completedEvidenceIds: string[];
+    completedProjectionIds: string[];
+  };
+  attempt: number;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RefinementDecisionResponse {
+  job: {
+    id: string;
+    status: 'queued' | 'running' | 'completed' | 'failed' | 'declined' | 'expired';
+    terminalReason?: string;
+    error?: string;
+  };
+}

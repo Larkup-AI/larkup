@@ -3,7 +3,6 @@ import { readConfig } from '@larkup/core/config-store';
 import { getModelsByType } from '@larkup/core/models-cache';
 import { toChatDescriptor, getDefaultChatModel } from '@larkup/core/chat-models/registry';
 import { listTabularDatasets } from '@larkup/core/tabular-store';
-
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createCohere } from '@ai-sdk/cohere';
@@ -13,9 +12,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGateway } from '@ai-sdk/gateway';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
-
 import { getChatTools } from './tools';
-import { hasPriorKnowledgeBaseEvidence } from '@/lib/retrieval-routing';
 import { gatewayProviderOptions } from '@/lib/gateway-fallbacks';
 
 export const maxDuration = 60;
@@ -68,11 +65,11 @@ const CHAT_POLICY = `
 CHAT SCOPE:
 - Answer only from the user's provided material (documents or datasets).
 - CRITICAL TOOL USAGE: You MUST use a tool (searchKnowledgeBase, queryTabularData, or executeAnalysis) BEFORE attempting to answer ANY substantive question. NEVER answer without fetching the relevant documents or data first, unless you already have the EXACT specific evidence returned in the conversation history. Even if a question sounds like personal trivia or general knowledge (e.g., "what is my favorite food?", "who is the CEO?"), YOU MUST SEARCH THE KNOWLEDGE BASE FIRST. Do not say "I don't know" without executing a search first!
-- Search once before a new substantive question. For a clear follow-up, reuse the evidence already returned in this conversation when it fully supports the answer.
+- Search on every substantive user question. Prior conversation evidence may guide the query, but it is never a substitute for a fresh retrieval.
 - Use only returned evidence or analysis results. If no evidence supports an answer, reply exactly: "I don't know."
 - Do not answer from general knowledge or invent details.
 - Speak naturally and directly. Never mention or imply searching, indexing, a corpus, a database, a knowledge base, retrieved material, source documents, or what information is available.
-- When the user asks to see, watch, play, or hear supporting material, use presentMedia with an exact result returned by searchKnowledgeBase. Otherwise do not call presentMedia.
+- VIDEO EVIDENCE: On EVERY video/audio question, first call searchKnowledgeBase, then call queryVideoKnowledge with the exact mediaAssetId. Its hierarchy is the investigation tree: chapters → scenes → events/states → source evidence. For a complex or weak-evidence question, call planVideoInvestigation to choose a candidate range; if more source evidence is needed, call inspectVideoKnowledge only for that range and queryVideoKnowledge again before answering. Treat only returned active evidence as source truth. State each supporting time range in the answer and do not turn a range into a fabricated exact instant. DO NOT automatically call presentMedia or output raw transcripts. ONLY call presentMedia if the user EXPLICITLY asks to "preview", "see", "show", or "embed" a video moment (use extractFrame=false for video embedding, or true ONLY if they ask for an image frame). For outcome, result, or final questions, examine all relevant evidence chronologically and report the latest supported value.
 `;
 
 function latestUserText(messages: UIMessage[]): string {
@@ -369,6 +366,12 @@ ${fieldLines}`;
   // Provide both RAG tools and Data Analysis tools so the model can handle complex queries (e.g. Excel)
   const tools = {
     searchKnowledgeBase: allTools.searchKnowledgeBase,
+    // Video retrieval is deliberately distinct from ordinary vector search:
+    // the latter finds an asset, while this tool verifies claims against its
+    // active immutable evidence revision and returns seekable citations.
+    queryVideoKnowledge: allTools.queryVideoKnowledge,
+    planVideoInvestigation: allTools.planVideoInvestigation,
+    inspectVideoKnowledge: allTools.inspectVideoKnowledge,
     presentMedia: allTools.presentMedia,
     queryTabularData: allTools.queryTabularData,
     generateVisualization: allTools.generateVisualization,
@@ -403,8 +406,9 @@ ${fieldLines}`;
     system: systemPrompt,
     messages: await convertToModelMessages(safeMessages, { tools }),
     maxOutputTokens: 4096,
-    // Three steps: retrieve → optionally inspect/present media → answer.
-    stopWhen: stepCountIs(3),
+    // Evidence loop: retrieve → verify → bounded inspect/refinement → retrieve
+    // again → answer. The inspection tool itself cannot authorize a claim.
+    stopWhen: stepCountIs(5),
     toolChoice: 'auto',
     onFinish: async ({ usage, response }) => {
       const { trackUsageEvent, estimateCost } = await import('@larkup/core/analytics-store');

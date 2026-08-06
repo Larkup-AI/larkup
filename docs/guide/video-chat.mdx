@@ -1,13 +1,13 @@
 ---
-title: "Chat with Video"
-description: "Import a video or YouTube URL and ask questions. Larkup returns timestamped answers with an embedded player."
+title: 'Video Intelligence'
+description: 'Investigate video with source-backed timeline evidence and bounded rewind.'
 ---
 
-The Video and Audio marketplace tool lets you index a local file, a YouTube video, or an entire playlist, then ask questions about it in Chat. Answers include the exact timestamp and an embedded player that seeks directly to the relevant moment.
+The Video Intelligence marketplace tool lets you investigate a local file, a YouTube video, or an entire playlist in Chat. It creates seekable source evidence rather than relying on a generated summary, then uses a bounded rewind when a complex answer needs stronger proof.
 
 ## Installing the tool
 
-Go to **Settings → Marketplace** and install **Video & Audio**. You only need to do this once.
+Go to **Settings → Marketplace** and install **Video Intelligence**. You only need to do this once.
 
 <Frame caption="The Marketplace inside Settings">
   <img src="/images/new/marketplace.png" alt="Marketplace showing Video and Audio tool" />
@@ -28,14 +28,40 @@ Before the import starts, Larkup shows you the detected duration, expected proce
 Indexing runs in the background and covers:
 
 - Speech transcription with timestamps
-- Scene sampling and visual analysis
+- Adaptive attention: cheap coverage and activity cues, then focused visual analysis
 - OCR on visible text
 - A full video summary plus independent timestamped evidence sections
 
+When a source exposes a usable timestamped transcript—for example YouTube
+manual or automatic captions—Larkup fetches and indexes the complete caption
+timeline directly. This is independent from frame analysis and avoids a paid
+audio-transcription pass. Audio transcription is used only when the source does
+not provide usable timed captions.
+
+For supported Video Knowledge Engine revisions, Larkup keeps source evidence
+separate from search projections. A detailed answer is grounded in a seekable
+transcript, OCR, or visual-evidence range rather than a generated summary.
+Visual anchors are not presented as continuous observation: when the evidence
+cannot establish a detail, the agent can reopen a bounded raw-source range
+instead of guessing.
+
+For every video question, Chat starts a fresh investigation through a temporal
+tree: **chapters → scenes → events and states → source evidence**. Simple
+questions normally resolve from the relevant timeframe summary and its attached
+evidence. For a complex question, Chat selects the best candidate ranges, then
+uses bounded tracking, OCR, comparison, counting, or visual inspection only
+where needed. The timeframe tree is cached briefly per video revision for fast
+follow-ups, but evidence retrieval still runs on every question.
+
 You can watch download, transcription, visual analysis, and embedding progress in real time in the Media panel.
 
+Before importing video, choose a vision-capable model in **Settings → AI Models → Vision Model**. This setting is independent from the chat model, so a workspace can use a specialized VLM for frame analysis while using a different model for conversation.
+
 <Frame caption="Indexing progress for a video">
-  <img src="/images/new/indexing-video-progress.png" alt="Live indexing progress stages for video" />
+  <img
+    src="/images/new/indexing-video-progress.png"
+    alt="Live indexing progress stages for video"
+  />
 </Frame>
 
 ## Asking questions
@@ -43,11 +69,58 @@ You can watch download, transcription, visual analysis, and embedding progress i
 Switch to **Chat**. Ask who said something, what happened at a specific point, or what the outcome was. Larkup retrieves the matching timestamped segments and the answer includes an embedded player positioned at the cited moment.
 
 <Frame caption="Chat answer with an embedded video player and timestamp citation">
-  <img src="/images/new/video-preview-chat-reply.png" alt="Chat reply with embedded video at cited timestamp" />
+  <img
+    src="/images/new/video-preview-chat-reply.png"
+    alt="Chat reply with embedded video at cited timestamp"
+  />
 </Frame>
 
 For YouTube sources the citation also links directly to the video at the matching timestamp.
 
+## Evidence and limits
+
+Larkup can answer facts that are visible, audible, or reliably derivable from
+the authorized video. It does not identify people, infer facts absent from the
+source, or present an approximate timestamp as exact. When the indexed evidence
+is insufficient for a visual detail, Larkup can request a bounded source
+inspection; large scans are kept within configured duration, frame, and spend
+budgets and may require background refinement instead of an unbounded chat run.
+
+For people-counting requests, Larkup reports bounded anonymous tracks (for
+example, `Person A — 00:10–00:25`) with source coverage and occlusion limits.
+It does not identify people, perform facial recognition, or match a person
+between videos.
+
+For a high-resolution OCR, code, visual comparison, or count request, Larkup
+first reserves the request’s pessimistic budget. If the requested coverage is
+larger than the configured cap, it creates a refinement request with an expiry
+time instead of silently scanning the full video. Approving that request is a
+workspace-scoped, spend-affecting action; declining or expiry leaves the
+existing video knowledge available for later questions.
+
+OCR and visual inspection outputs are stored as additional evidence revisions.
+They retain their source ranges and provider provenance and are labelled
+**uncalibrated analysis** until validated against the evaluation corpus. They
+never overwrite the original transcript or frames.
+
+## Rollout and rollback
+
+The **Video Knowledge Engine** setting in **Settings → Marketplace Tools →
+Video Intelligence** controls the evidence-first pipeline. It is enabled by default.
+If a workspace needs a rollback, disable it before starting new processing: the
+existing compatible media pipeline remains available and already-active Video
+Knowledge revisions remain readable. Re-enable it to create a new revision on
+the next processing run; it never mutates a prior revision in place.
+
+## Retention and deletion
+
+Deleting a Media asset removes its stored source, searchable documents, vector
+entries, and all associated Video Knowledge revisions, evidence, jobs, and
+pending refinements within that workspace. Frame derivatives used for a bounded
+inspection are temporary worker artifacts and are removed when the inspection
+finishes or fails.
+
 <Tip>
-  Need to index a video again after changing your transcription provider or language setting? Go to **Data → Media → View Uploads** and select the indexing action for that asset.
+  Need to index a video again after changing your transcription provider or language setting? Go to
+  **Data → Media → View Uploads** and select the indexing action for that asset.
 </Tip>
