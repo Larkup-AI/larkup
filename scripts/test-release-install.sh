@@ -72,8 +72,8 @@ if PATH="$NPM_CONFIG_PREFIX/bin:/usr/bin:/bin" command -v larkup >/dev/null 2>&1
   exit 1
 fi
 
-if [ -e "$NPM_CONFIG_PREFIX/lib/node_modules/larkup" ]; then
-  echo "The global larkup package directory still exists after removal." >&2
+if [ -n "$(find "$NPM_CONFIG_PREFIX/lib/node_modules/larkup" -mindepth 1 -print -quit 2>/dev/null)" ]; then
+  echo "The global larkup package still has files after removal." >&2
   exit 1
 fi
 
