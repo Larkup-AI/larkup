@@ -3,9 +3,11 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-      shm_size: "2gb"
+      shm_size: '2gb'
     ports:
-      - "4567:4567"
+      - '4567:4567'
+      # Generated local RAG servers use this fixed port.
+      - '8081:8081'
     environment:
       - NODE_ENV=production
       - DOCKER_BUILD=1

@@ -1,5 +1,9 @@
 packages:
   - apps/*
+  # This is a separately versioned Git repository with its own npm lockfile.
+  # Keeping it out of the pnpm workspace prevents its incompatible dependency
+  # graph from leaking into root builds and release artifacts.
+  - '!apps/local-chat-connection-larkup'
   - apps/sdk/*
   - packages/*
   - packages/tools/*
