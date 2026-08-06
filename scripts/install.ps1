@@ -81,7 +81,7 @@ function Request-Confirm {
         return $true
     }
     $reply = Read-Host "$Message (y/N)"
-    return ($reply -match "^[Yy]$")
+    return ($reply.Trim() -match "^(?i:y|yes)$")
 }
 
 # ── OS + arch detection ──────────────────────────────────────

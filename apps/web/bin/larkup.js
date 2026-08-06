@@ -2,7 +2,8 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, promises as fs, readFileSync } from 'node:fs';
+import { createInterface } from 'node:readline/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageDir = path.resolve(__dirname, '..');
@@ -46,9 +47,134 @@ if (command === '--version' || command === '-v') {
     if (code === 0) console.log('Larkup is up to date. Restart it to use the new version.');
     process.exit(code ?? 0);
   });
+} else if (command === 'remove' || command === 'delete') {
+  await removeCommand();
 } else {
-  console.error('Usage: larkup <dev|start|update>');
+  console.error('Usage: larkup <dev|start|update|remove>');
   process.exit(1);
+}
+
+async function removeCommand() {
+  console.log(
+    '\x1b[33mWarning: this permanently removes Larkup, its local database, installed tools, and configuration.\x1b[0m',
+  );
+  console.log(`Data directory: ${path.join(packageDir, '.larkup')}`);
+
+  const confirmed = await confirm('Continue? Type y or yes to remove Larkup: ');
+  if (!confirmed) {
+    console.log('Larkup was not removed.');
+    return;
+  }
+
+  const localRoot = getLocalInstallRoot();
+  if (localRoot) {
+    await removeLocalInstall(localRoot);
+    return;
+  }
+
+  await fs.rm(path.join(packageDir, '.larkup'), { recursive: true, force: true });
+  await uninstallGlobalPackage();
+}
+
+async function confirm(message) {
+  if (!process.stdin.isTTY && process.stdin.readableEnded) return false;
+
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await prompt.question(message)).trim().toLowerCase();
+    return answer === 'y' || answer === 'yes';
+  } catch {
+    return false;
+  } finally {
+    prompt.close();
+  }
+}
+
+function getLocalInstallRoot() {
+  for (const candidate of [
+    path.resolve(packageDir, '..', '..', '..'),
+    path.resolve(packageDir, '..', '..', '..', '..'),
+  ]) {
+    const expectedPackageDirs = [
+      path.join(candidate, 'lib', 'node_modules', 'larkup'),
+      path.join(candidate, 'lib', 'lib', 'node_modules', 'larkup'),
+    ];
+    if (
+      path.basename(candidate) === '.larkup' &&
+      expectedPackageDirs.includes(path.resolve(packageDir)) &&
+      existsSync(path.join(candidate, 'node'))
+    ) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function removeLocalInstall(localRoot) {
+  await removeLocalPathEntries(localRoot);
+
+  // The isolated installer is supported on macOS/Linux only. Delay removal so
+  // its bundled Node process can exit before its own files are deleted.
+  const cleaner = spawn('/bin/sh', ['-c', 'sleep 1; rm -rf -- "$1"', 'larkup-remove', localRoot], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  cleaner.unref();
+
+  console.log('Larkup removal has been scheduled. Close this terminal, then open a new one.');
+  console.log('The larkup command will no longer be available.');
+}
+
+async function removeLocalPathEntries(localRoot) {
+  const binDir = path.join(localRoot, 'bin');
+  const home = process.env.HOME;
+  if (!home) return;
+
+  const profiles = [
+    path.join(home, '.zshrc'),
+    path.join(home, '.bashrc'),
+    path.join(home, '.bash_profile'),
+    path.join(home, '.profile'),
+    path.join(home, '.config', 'fish', 'config.fish'),
+  ];
+
+  await Promise.all(
+    profiles.map(async (profile) => {
+      try {
+        const content = await fs.readFile(profile, 'utf8');
+        const lines = content.split('\n');
+        const next = lines.filter(
+          (line, index) =>
+            !line.includes(binDir) &&
+            !(
+              line.trim() === '# Added by Larkup local installer' &&
+              lines[index + 1]?.includes(binDir)
+            ),
+        );
+        if (next.length !== lines.length) await fs.writeFile(profile, next.join('\n'), 'utf8');
+      } catch (error) {
+        if (error?.code !== 'ENOENT') throw error;
+      }
+    }),
+  );
+}
+
+function uninstallGlobalPackage() {
+  return new Promise((resolve, reject) => {
+    const child = spawn('npm', ['uninstall', '-g', 'larkup', '@larkup/cli'], { stdio: 'inherit' });
+    child.once('error', reject);
+    child.once('exit', (code) => {
+      if (code === 0) {
+        console.log(
+          'Larkup and its data were removed. Open a new terminal; `larkup` will be command not found.',
+        );
+        resolve();
+        return;
+      }
+      reject(new Error(`npm uninstall exited with code ${code}`));
+    });
+  });
 }
 
 async function openWhenReady(url) {
