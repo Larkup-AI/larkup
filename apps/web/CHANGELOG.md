@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.68
+
+### Patch Changes
+
+- Make the standalone postbuild compatible with Docker release images.
+
 ## 0.1.67
 
 ### Patch Changes
