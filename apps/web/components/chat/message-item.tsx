@@ -991,10 +991,47 @@ function WebSearchSummary({ parts }: { parts: any[] }) {
   );
 }
 
-function renderMarkdown(text: string): string {
+function normalizeRepeatedOrderedListMarkers(text: string): string {
+  const lines = text.split('\n');
+  let previousRepeatedMarker: number | null = null;
+  let nextNumber = 2;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const marker = lines[index].match(/^(\s*)1\.\s+(.+)$/);
+    if (!marker) {
+      if (/^\s*\d+\.\s+/.test(lines[index])) {
+        previousRepeatedMarker = null;
+        nextNumber = 2;
+      }
+      continue;
+    }
+
+    const onlySupportingListContentSincePrevious =
+      previousRepeatedMarker !== null &&
+      lines
+        .slice(previousRepeatedMarker + 1, index)
+        .every((line) => !line.trim() || /^\s*[-*+]\s+/.test(line));
+
+    if (onlySupportingListContentSincePrevious) {
+      lines[index] = `${marker[1]}${nextNumber}. ${marker[2]}`;
+      nextNumber += 1;
+    } else {
+      nextNumber = 2;
+    }
+
+    previousRepeatedMarker = index;
+  }
+
+  return lines.join('\n');
+}
+
+export function renderMarkdown(text: string): string {
   if (!text) return '';
 
-  let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  let html = normalizeRepeatedOrderedListMarkers(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
   html = html.replace(
     /!\[([^\]]*)\]\([^)]*\)/g,
@@ -1049,11 +1086,11 @@ function renderMarkdown(text: string): string {
   // so they group into a single <ol>.
   html = html.replace(/(^\d+\. .+$)(\n\n)((?=\d+\. ))/gm, '$1\n$3');
 
-  html = html.replace(/^\d+\. (.+)$/gm, '<li class="msg-li-ordered">$1</li>');
-  html = html.replace(
-    /(<li class="msg-li-ordered">.*?<\/li>\n?)+/g,
-    (match) => `<ol class="msg-ol">${match}</ol>`,
-  );
+  html = html.replace(/^(\d+)\. (.+)$/gm, '<li class="msg-li-ordered" data-order="$1">$2</li>');
+  html = html.replace(/(<li class="msg-li-ordered" data-order="\d+">.*?<\/li>\n?)+/g, (match) => {
+    const start = match.match(/data-order="(\d+)"/)?.[1] ?? '1';
+    return `<ol class="msg-ol" start="${start}">${match.replace(/ data-order="\d+"/g, '')}</ol>`;
+  });
 
   // Paragraphs
   html = html.replace(/\n\n/g, '</p><p class="msg-p">');
