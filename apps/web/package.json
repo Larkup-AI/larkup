@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "next dev -p 4567",
     "build": "next build --webpack",
-    "postbuild": "find .next/standalone -type l ! -exec test -e {} \\; -delete 2>/dev/null || true; rm -rf .next/standalone/apps/web/.larkup .next/standalone/apps/web/.larkupdb .next/standalone/apps/web/.env.local .next/standalone/apps/web/public; mkdir -p .next/standalone/apps/web/.next/static .next/standalone/apps/web/public; cp -R .next/static/. .next/standalone/apps/web/.next/static/; cp -R public/. .next/standalone/apps/web/public/; find .next/standalone/node_modules/.pnpm -mindepth 1 -maxdepth 1 -type d \\( -name '@lancedb+lancedb-*' -o -name '@napi-rs+canvas-*' -o -name '@img+sharp-*' -o -name '@img+sharp-libvips-*' \\) -exec rm -rf {} +; find .next/standalone -type l ! -exec test -e {} \\; -delete 2>/dev/null || true; if pnpm exec prettier --version >/dev/null 2>&1; then pnpm exec prettier --write next-env.d.ts; fi",
+    "postbuild": "node scripts/prepare-standalone.mjs && if pnpm exec prettier --version >/dev/null 2>&1; then pnpm exec prettier --write next-env.d.ts; fi",
     "start": "node .next/standalone/apps/web/server.js",
     "lint": "echo \"No lint configured\""
   },
