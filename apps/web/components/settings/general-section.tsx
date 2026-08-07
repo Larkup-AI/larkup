@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/card';
 import { useWorkspace } from '@/components/workspace/workspace-provider';
 import {
+  DEFAULT_THEME,
   useThemeCustomizer,
   type ThemeVariant,
   type LayoutVariant,
@@ -89,7 +90,7 @@ export function GeneralSection() {
 
   useEffect(() => {
     if (isMounted) {
-      setPersistedTheme(localStorage.getItem('app-theme') || 'theme-gaia');
+      setPersistedTheme(localStorage.getItem('app-theme') || DEFAULT_THEME);
       setPersistedLayout(localStorage.getItem('app-layout') || 'sidebar');
     }
   }, [isMounted]);

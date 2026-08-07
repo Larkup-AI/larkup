@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 
 const THEMES: { id: ThemeVariant; name: string; color: string; description: string }[] = [
   { id: 'default', name: 'Default', color: '#000000', description: 'Clean & minimal' },
-  { id: 'theme-gaia', name: 'Larkup', color: '#F5F4ED', description: 'Warm ivory & dark' },
+  { id: 'theme-gaia', name: 'Warm Ivory', color: '#F5F4ED', description: 'Warm ivory & dark' },
 ];
 
 export function ThemeSwitcher({ floating = true }: { floating?: boolean }) {

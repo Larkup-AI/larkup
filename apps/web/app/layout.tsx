@@ -22,10 +22,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="bg-transparent">
-      <body suppressHydrationWarning className="font-sans antialiased ">
+      <body suppressHydrationWarning className="theme-gaia font-sans antialiased">
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('app-theme');var d=document.body;if(t&&t!=='default')d.classList.add(t);}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('app-theme');var d=document.body;if(!t)return;d.classList.remove('theme-larkup','theme-gaia','theme-linear');if(t!=='default')d.classList.add(t);}catch(e){}})();`,
           }}
         />
         <ThemeProvider
