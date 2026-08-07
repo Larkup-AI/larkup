@@ -6,6 +6,9 @@ export type ThemeVariant = 'default' | 'theme-larkup' | 'theme-gaia' | 'theme-li
 
 export type LayoutVariant = 'sidebar' | 'topnav' | 'collapsed';
 
+/** The theme used for new workspaces that do not have a saved preference yet. */
+export const DEFAULT_THEME: ThemeVariant = 'theme-gaia';
+
 interface ThemeCustomizerContextValue {
   theme: ThemeVariant;
   setTheme: (theme: ThemeVariant, persist?: boolean) => void;
@@ -26,7 +29,7 @@ export function useThemeCustomizer() {
 
 export function ThemeCustomizerProvider({ children }: { children: React.ReactNode }) {
   const [isMounted, setIsMounted] = useState(false);
-  const [theme, setThemeState] = useState<ThemeVariant>('theme-gaia');
+  const [theme, setThemeState] = useState<ThemeVariant>(DEFAULT_THEME);
   const [layout, setLayoutState] = useState<LayoutVariant>('sidebar');
 
   const setTheme = (newTheme: ThemeVariant, persist = true) => {
