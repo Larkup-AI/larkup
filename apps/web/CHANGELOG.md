@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.71
+
+### Patch Changes
+
+- 81c7c57: Improve media setup guidance and YouTube URL previews, and preserve ordered-list numbering in chat replies.
+
 ## 0.1.70
 
 ### Patch Changes
