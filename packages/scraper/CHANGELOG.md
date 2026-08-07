@@ -1,5 +1,11 @@
 # @larkup/scraper
 
+## 0.1.37
+
+### Patch Changes
+
+- @larkup/core@0.4.1
+
 ## 0.1.36
 
 ### Patch Changes
