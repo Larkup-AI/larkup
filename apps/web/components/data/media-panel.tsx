@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -112,6 +113,7 @@ interface RemoteEstimate {
   durationSecs?: number;
   entryCount?: number;
   mediaType: 'video' | 'audio' | 'unknown';
+  isYouTube?: boolean;
 }
 
 interface MediaApiResponse {
@@ -151,6 +153,71 @@ function getMediaType(file: File): 'image' | 'video' | 'audio' | null {
   if (file.type.startsWith('video/')) return 'video';
   if (file.type.startsWith('audio/')) return 'audio';
   return null;
+}
+
+function getYouTubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+    if (host === 'youtu.be') return parsed.pathname.split('/').filter(Boolean)[0] ?? null;
+    if (host !== 'youtube.com' && !host.endsWith('.youtube.com')) return null;
+
+    return (
+      parsed.searchParams.get('v') ??
+      parsed.pathname.match(/^\/(?:embed|shorts|live)\/([^/?#]+)/)?.[1] ??
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+function YouTubeUrlPreview({ estimate }: { estimate: RemoteEstimate }) {
+  const [thumbnailUnavailable, setThumbnailUnavailable] = useState(false);
+  const videoId = getYouTubeVideoId(estimate.originalUrl);
+  const thumbnailUrl = videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/20">
+      <div className="relative flex aspect-video items-center justify-center overflow-hidden bg-black/90">
+        {thumbnailUrl && !thumbnailUnavailable ? (
+          <img
+            src={thumbnailUrl}
+            alt="YouTube video thumbnail"
+            className="size-full object-cover opacity-90"
+            onError={() => setThumbnailUnavailable(true)}
+          />
+        ) : (
+          <Video className="size-8 text-white/70" aria-hidden="true" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <span className="absolute bottom-3 left-3 rounded-md bg-black/70 px-2 py-1 text-[11px] font-medium text-white">
+          YouTube video
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3">
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-medium text-foreground">
+            {estimate.title || 'Preview this video on YouTube'}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            YouTube may block embedded playback. Open the source to preview it reliably.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0 gap-1.5 text-xs"
+          render={
+            <a href={estimate.originalUrl} target="_blank" rel="noreferrer">
+              Open on YouTube
+              <ExternalLink className="size-3" />
+            </a>
+          }
+        />
+      </div>
+    </div>
+  );
 }
 
 function estimateMedia(durationSecs: number, isVideo: boolean) {
@@ -256,6 +323,7 @@ export function MediaPanel({
 }) {
   const [activeTab, setActiveTab] = useState<MediaSubTab>('images');
   const [entryTab, setEntryTab] = useState<MediaEntryTab>('upload');
+  const [videoAudioToolJustInstalled, setVideoAudioToolJustInstalled] = useState(false);
   const mediaType = TAB_TO_TYPE[activeTab];
   const previousStatusesRef = useRef<Map<string, MediaAsset['processingStatus']> | null>(null);
   const { activeServer } = useWorkspace();
@@ -364,7 +432,11 @@ export function MediaPanel({
     };
   }, [mediaType, mutate, onIndexed, serverQuery]);
 
-  const { data: toolsData, mutate: mutateTools } = useSWR('/api/marketplace', toolFetcher);
+  const {
+    data: toolsData,
+    mutate: mutateTools,
+    isLoading: toolsLoading,
+  } = useSWR('/api/marketplace', toolFetcher);
 
   const configUrl = serverId
     ? `/api/config?serverId=${encodeURIComponent(serverId)}`
@@ -373,7 +445,7 @@ export function MediaPanel({
 
   // Check if the Video Intelligence tool is installed and enabled.
   const videoAudioTool = toolsData?.tools?.find((t: any) => t.id === 'video-audio');
-  const isToolInstalled = videoAudioTool?.status === 'installed';
+  const isToolInstalled = videoAudioTool?.status === 'installed' || videoAudioToolJustInstalled;
   const enabledTools = configData?.config?.enabledTools;
   const videoAudioConfig = configData?.config?.toolConfigs?.['video-audio'] ?? {};
   const audioProvider =
@@ -463,6 +535,7 @@ export function MediaPanel({
           entryTab={entryTab}
           onMediaTypeDetected={(type) => setActiveTab(type === 'image' ? 'images' : type)}
           videoAudioToolInstalled={isToolInstalled}
+          videoAudioToolLoading={toolsLoading}
           onToolRequired={() => {
             toast.error('Video Intelligence tool required', {
               description: 'Install it to add video or audio.',
@@ -474,8 +547,16 @@ export function MediaPanel({
                     const res = await fetch('/api/marketplace/video-audio', { method: 'POST' });
                     const body = await res.json();
                     if (!res.ok) throw new Error(body.error || 'Install failed');
-                    toast.success('Video tool installed', { id: toastId });
-                    void mutateTools();
+                    setVideoAudioToolJustInstalled(true);
+                    await mutateTools();
+                    toast.success('Video Intelligence installed', {
+                      id: toastId,
+                      description: 'Choose an audio provider before indexing video or audio.',
+                      action: {
+                        label: 'Set up audio',
+                        onClick: () => router.push('/settings?section=tool-settings'),
+                      },
+                    });
                   } catch (error) {
                     toast.error(error instanceof Error ? error.message : 'Install failed', {
                       id: toastId,
@@ -620,6 +701,7 @@ function MediaContent({
   entryTab,
   onMediaTypeDetected,
   videoAudioToolInstalled,
+  videoAudioToolLoading,
   onToolRequired,
   onActionChange,
 }: {
@@ -636,6 +718,7 @@ function MediaContent({
   entryTab: MediaEntryTab;
   onMediaTypeDetected: (type: 'image' | 'video' | 'audio') => void;
   videoAudioToolInstalled: boolean;
+  videoAudioToolLoading: boolean;
   onToolRequired: () => void;
   onActionChange?: (action: DataPrimaryAction | null) => void;
 }) {
@@ -774,6 +857,12 @@ function MediaContent({
 
   function ensureAudioConfiguration(type = mediaType): boolean {
     if (type === 'image') return true;
+    if (videoAudioToolLoading) {
+      toast.message('Checking Video Intelligence…', {
+        description: 'Please wait a moment, then try again.',
+      });
+      return false;
+    }
     if (!videoAudioToolInstalled) {
       onToolRequired();
       return false;
@@ -1260,36 +1349,13 @@ function MediaContent({
                           </div>
                         );
                       }
-                      let embedUrl = est.originalUrl;
                       if (est.isYouTube) {
-                        try {
-                          const u = new URL(est.originalUrl);
-                          const v = u.hostname.includes('youtu.be')
-                            ? u.pathname.slice(1)
-                            : u.searchParams.get('v');
-                          embedUrl = `https://www.youtube.com/embed/${v}`;
-                        } catch (e) {
-                          // ignore
-                        }
-                        return (
-                          <div
-                            key={i}
-                            className="relative w-full overflow-hidden rounded-xl aspect-video 35 border border-border/50 ring-1 ring-border/20 bg-black"
-                          >
-                            <iframe
-                              src={embedUrl}
-                              className="absolute inset-0 w-full h-full"
-                              frameBorder="0"
-                              allowFullScreen
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            />
-                          </div>
-                        );
+                        return <YouTubeUrlPreview key={i} estimate={est} />;
                       } else {
                         return (
                           <video
                             key={i}
-                            src={embedUrl}
+                            src={est.originalUrl}
                             controls
                             className="w-full max-w-sm rounded-md aspect-video bg-muted object-cover 35 border border-border"
                           />
