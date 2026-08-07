@@ -501,6 +501,92 @@ test.describe.serial('Data Page', () => {
     }
   });
 
+  test('installed Video Intelligence directs missing audio setup to Installed Tools', async ({
+    page,
+  }) => {
+    await page.route('**/api/marketplace', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          tools: [{ id: 'video-audio', name: 'Video Intelligence', status: 'installed' }],
+        }),
+      });
+    });
+    await page.route('**/api/config**', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ config: { enabledTools: [], toolConfigs: { 'video-audio': {} } } }),
+      });
+    });
+
+    await page.goto('/add?subtab=media');
+    await expect(page.getByRole('heading', { name: 'Add Media', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'From URL' }).click();
+    await page
+      .getByRole('textbox', { name: 'Import media URL' })
+      .fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    await page.getByRole('button', { name: 'Check URL' }).click();
+
+    await expect(page.getByText('Set up an audio provider to index video or audio.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Set up audio' })).toBeVisible();
+    await expect(page.getByText('Video Intelligence tool required')).toHaveCount(0);
+  });
+
+  test('YouTube URL review uses a reliable source preview instead of an embedded player', async ({
+    page,
+  }) => {
+    await page.route('**/api/marketplace', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          tools: [{ id: 'video-audio', name: 'Video Intelligence', status: 'installed' }],
+        }),
+      });
+    });
+    await page.route('**/api/config**', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          config: {
+            enabledTools: [],
+            toolConfigs: { 'video-audio': { audioProvider: 'local' } },
+          },
+        }),
+      });
+    });
+    await page.route('**/api/media**', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          estimates: [
+            {
+              originalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+              title: 'A reliable YouTube preview',
+              durationSecs: 213,
+              mediaType: 'video',
+              isYouTube: true,
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto('/add?subtab=media');
+    await page.getByRole('button', { name: 'From URL' }).click();
+    await page
+      .getByRole('textbox', { name: 'Import media URL' })
+      .fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    await page.getByRole('button', { name: 'Check URL' }).click();
+
+    await expect(page.getByText('A reliable YouTube preview')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open on YouTube' })).toBeVisible();
+    await expect(page.locator('iframe[src*="youtube.com/embed"]')).toHaveCount(0);
+  });
+
   test('upload image to media tab', async ({ page }) => {
     test.setTimeout(60_000);
 
