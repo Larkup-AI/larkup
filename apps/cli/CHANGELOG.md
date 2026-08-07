@@ -1,5 +1,15 @@
 # @larkup/cli
 
+## 0.2.24
+
+### Patch Changes
+
+- c12b4ec: Pin Apache Arrow to the range supported by LanceDB to prevent npm peer-dependency warnings during installation. Include public images in the standalone server bundle so logos and icons load after installing Larkup from npm.
+- Updated dependencies [c12b4ec]
+  - @larkup/vector-stores@0.1.25
+  - @larkup/core@0.4.1
+  - @larkup/marketplace@0.1.24
+
 ## 0.2.23
 
 ### Patch Changes

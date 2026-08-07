@@ -1,5 +1,11 @@
 # @larkup/tool-doc-editor
 
+## 0.2.14
+
+### Patch Changes
+
+- @larkup/core@0.4.1
+
 ## 0.2.13
 
 ### Patch Changes
