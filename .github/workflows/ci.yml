@@ -52,8 +52,13 @@ jobs:
             patchelf \
             libfuse2
 
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
       - name: Lint
-        run: pnpm turbo lint --filter="!@larkup/desktop"
+        run: pnpm turbo lint
 
       - name: Create dummy sidecar binary for Tauri build
         run: |
@@ -62,4 +67,4 @@ jobs:
           chmod +x apps/desktop/src-tauri/binaries/larkup-server-x86_64-unknown-linux-gnu
 
       - name: Build
-        run: pnpm turbo build --filter="!@larkup/desktop"
+        run: pnpm turbo build
