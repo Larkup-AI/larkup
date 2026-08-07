@@ -13,3 +13,5 @@ node_modules/
 tsconfig.tsbuildinfo
 .env
 .env.*
+.next/standalone/node_modules/
+.next/standalone/apps/web/node_modules/
