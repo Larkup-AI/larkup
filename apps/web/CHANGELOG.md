@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.69
+
+### Patch Changes
+
+- 4fb5aba: Fix standalone native runtime bindings for E2E and production.
+
 ## 0.1.68
 
 ### Patch Changes
