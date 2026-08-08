@@ -18,7 +18,7 @@ Larkup brings files, websites, text, structured data, and media into one searcha
 ### Docker
 
 ```bash
-docker run -d -p 4567:4567 -p 8081:8081 \
+docker run -d -p 4567:4567 -p 8080:8080 \
   -e OPENAI_API_KEY=your_key \
   aboneda/larkup:latest
 ```
@@ -48,7 +48,7 @@ Open [http://localhost:4567](http://localhost:4567) after Larkup starts.
 2. Open **Data** and add a website, integration, CSV, PDF, or video.
 3. Open **Chat** and ask a question about the indexed content.
 
-Larkup opens its local web app at `http://localhost:4567`. Start generated servers from the app when you need an API endpoint; Docker users can reach that server at `http://localhost:8081`.
+Larkup opens its local web app at `http://localhost:4567`. Start a regular generated server from **Settings → Server** when you need an API endpoint; Docker users can reach its API and reference at `http://localhost:8080` and `http://localhost:8080/reference`.
 
 <img src="./docs/images/new/chat-sidebar-on.png" alt="Larkup Chat with the sources panel open" width="900" />
 

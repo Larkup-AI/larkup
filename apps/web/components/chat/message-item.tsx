@@ -919,14 +919,15 @@ function renderToolPart(
       }
 
       default:
-        return (
-          <div key={index} className="mb-2 w-full">
-            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate max-w-62.5 sm:max-w-100">Used {toolName}</span>
-            </div>
-          </div>
-        );
+        return;
+      // return (
+      //   <div key={index} className="mb-2 w-full">
+      //     <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
+      //       <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+      //       <span className="truncate max-w-62.5 sm:max-w-100">Used {toolName}</span>
+      //     </div>
+      //   </div>
+      // );
     }
   }
 

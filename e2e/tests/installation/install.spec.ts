@@ -79,6 +79,28 @@ test.describe('Installation Methods', () => {
     }
   });
 
+  test('Docker settings server port — exposes the generated RAG server on :8080', () => {
+    const dockerfile = fs.readFileSync(path.join(REPO_ROOT, 'docker/Dockerfile'), 'utf-8');
+    const developmentCompose = fs.readFileSync(
+      path.join(REPO_ROOT, 'docker/docker-compose.dev.yml'),
+      'utf-8',
+    );
+    const productionCompose = fs.readFileSync(
+      path.join(REPO_ROOT, 'docker/docker-compose-prod.yaml'),
+      'utf-8',
+    );
+    const readme = fs.readFileSync(path.join(REPO_ROOT, 'README.md'), 'utf-8');
+
+    // ServerSection uses the workspace's primary generated-server port (8080).
+    // Keep every Docker entry point aligned so /reference works from the host.
+    expect(dockerfile).toContain('EXPOSE 4567 8080');
+    expect(developmentCompose).toContain("- '8080:8080'");
+    expect(productionCompose).toContain('- "8080:8080"');
+    expect(readme).toContain('docker run -d -p 4567:4567 -p 8080:8080');
+    expect(readme).toContain('http://localhost:8080/reference');
+    console.log('  ✓ Docker exposes the Settings RAG server and API reference on :8080');
+  });
+
   test('start.sh — script exists and is executable', async () => {
     const startSh = path.join(REPO_ROOT, 'scripts/start.sh');
     expect(fs.existsSync(startSh)).toBe(true);

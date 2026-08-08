@@ -6,8 +6,8 @@ services:
       shm_size: '2gb'
     ports:
       - '4567:4567'
-      # Generated local RAG servers use this fixed port.
-      - '8081:8081'
+      # The regular generated RAG server launched from Settings uses 8080.
+      - '8080:8080'
     environment:
       - NODE_ENV=production
       - DOCKER_BUILD=1
