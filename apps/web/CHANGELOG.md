@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.74
+
+### Patch Changes
+
+- 71bf56f: Resolve the Nano ID denial-of-service advisory by requiring a patched Nano ID release.
+
 ## 0.1.73
 
 ### Patch Changes
