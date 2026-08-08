@@ -32,11 +32,8 @@ const CLOUD_PROVIDERS: { key: EmbeddingProvider; recommended?: boolean }[] = [
   { key: 'vercel_ai_gateway', recommended: true },
   { key: 'openai' },
   { key: 'google' },
+  { key: 'cohere' },
   { key: 'mistral' },
-  { key: 'voyage' },
-  { key: 'jina' },
-  { key: 'nomic' },
-  { key: 'deepseek' },
 ];
 
 /**
@@ -46,12 +43,9 @@ const CLOUD_PROVIDERS: { key: EmbeddingProvider; recommended?: boolean }[] = [
 const DEFAULT_EMBEDDING_MODEL: Partial<Record<EmbeddingProvider, string>> = {
   openai: 'openai/text-embedding-3-large',
   vercel_ai_gateway: 'openai/text-embedding-3-large',
-  google: 'google/gemini-embedding-001',
+  google: 'google/gemini-embedding-2',
+  cohere: 'cohere/embed-english-v3.0',
   mistral: 'mistral/mistral-embed',
-  voyage: 'voyage/voyage-3',
-  jina: 'jina/jina-embeddings-v3',
-  nomic: 'nomic/nomic-embed-text-v1.5',
-  deepseek: 'openai/text-embedding-3-large',
 };
 
 export function SimpleSetup({ onBack }: SimpleSetupProps) {

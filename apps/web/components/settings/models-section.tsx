@@ -46,15 +46,23 @@ import { EMBEDDING_DIMENSIONS } from '@larkup/core/embeddings/registry';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
-const PROVIDER_LIST = [
+const EMBEDDING_PROVIDER_LIST = [
   'vercel_ai_gateway',
   'openai',
   'google',
   'deepseek',
   'mistral',
-  'voyage',
-  'jina',
-  'nomic',
+  'cohere',
+] as const;
+
+const CHAT_PROVIDER_LIST = [
+  'vercel_ai_gateway',
+  'openai',
+  'anthropic',
+  'google',
+  'deepseek',
+  'mistral',
+  'cohere',
 ] as const;
 
 const VISION_PROVIDER_LIST = new Set([
@@ -466,7 +474,7 @@ export function ModelsSection() {
                   </span>
                 </SelectTrigger>
                 <SelectContent>
-                  {PROVIDER_LIST.filter(
+                  {EMBEDDING_PROVIDER_LIST.filter(
                     (key) =>
                       (EMBEDDING_BY_PROVIDER[key] && EMBEDDING_BY_PROVIDER[key].length > 0) ||
                       key === 'vercel_ai_gateway',
@@ -853,7 +861,7 @@ export function ModelsSection() {
                   </span>
                 </SelectTrigger>
                 <SelectContent>
-                  {PROVIDER_LIST.map((key) => {
+                  {CHAT_PROVIDER_LIST.map((key) => {
                     const meta = PROVIDER_META[key as keyof typeof PROVIDER_META];
                     if (!meta) return null;
                     return (

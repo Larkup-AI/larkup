@@ -14,8 +14,8 @@ export const EMBEDDING_DIMENSIONS: Record<string, { dimensions: number; maxInput
     'openai/text-embedding-ada-002': { dimensions: 1536, maxInputTokens: 8191 },
     // Google
 
-    'google/gemini-embedding-2': { dimensions: 768, maxInputTokens: 2048 },
-    'google/gemini-embedding-001': { dimensions: 768, maxInputTokens: 2048 },
+    'google/gemini-embedding-2': { dimensions: 3072, maxInputTokens: 8192 },
+    'google/gemini-embedding-001': { dimensions: 3072, maxInputTokens: 2048 },
     // Cohere
     'cohere/embed-english-v3.0': { dimensions: 1024, maxInputTokens: 512 },
     'cohere/embed-multilingual-v3.0': { dimensions: 1024, maxInputTokens: 512 },
@@ -98,15 +98,15 @@ export const EMBEDDING_MODELS: EmbeddingModelDescriptor[] = [
     id: 'google/gemini-embedding-2',
     label: 'gemini-embedding-2',
     provider: 'google',
-    dimensions: 768,
-    maxInputTokens: 2048,
+    dimensions: 3072,
+    maxInputTokens: 8192,
     description: 'Current Gemini embedding model with multilingual retrieval support.',
   },
   {
     id: 'google/gemini-embedding-001',
     label: 'gemini-embedding-001',
     provider: 'google',
-    dimensions: 768,
+    dimensions: 3072,
     maxInputTokens: 2048,
     description: 'Gemini embedding 001.',
   },

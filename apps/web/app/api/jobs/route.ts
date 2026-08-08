@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { readJobs, saveJob } from '@larkup/core/jobs-store';
 import { isFirecrawlConfigured } from '@larkup/scraper/firecrawl';
 import { readDocuments } from '@larkup/core/documents-store';
+import { readConfig } from '@larkup/core/config-store';
 import type { CrawlJob, CrawlScope, CrawlTarget } from '@larkup/core/types';
 
 export const runtime = 'nodejs';
@@ -19,6 +20,13 @@ export async function GET() {
  * Body: { keywords, targets: [{ url, scope }], pageLimit }
  */
 export async function POST(req: Request) {
+  const config = await readConfig();
+  if (config.embeddingProvider !== 'custom' && !config.embeddingApiKey?.trim()) {
+    return NextResponse.json(
+      { error: 'Configure an embedding provider API key before adding data.' },
+      { status: 409 },
+    );
+  }
   if (!(await isFirecrawlConfigured())) {
     return NextResponse.json(
       {

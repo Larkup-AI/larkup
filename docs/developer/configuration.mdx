@@ -20,9 +20,13 @@ Use **Settings → AI Models** to select the providers and models used for embed
 
 The embedding model turns loaded content and search queries into vectors. Choose a provider, model, and API key, then save the configuration.
 
+Larkup keeps direct providers and **Vercel AI Gateway** separate: selecting a direct provider sends requests only through that provider's SDK and API key, while selecting the gateway keeps its model routing and fallback behavior. The **Add Data** page stays locked until an embedding key is configured, so content is never staged as unindexed data that cannot be searched.
+
 ### Chat model
 
 The chat model generates answers from retrieved context. It can use the same provider as embeddings or a separate provider and key.
+
+For a direct Google API key, the model picker offers current Gemini models with function-calling support. Retired or gateway-only Gemini IDs are not used for direct Google requests.
 
 ### Vision model
 

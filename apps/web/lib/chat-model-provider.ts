@@ -9,6 +9,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import {
   getDefaultChatModel,
   getDefaultVisionModel,
+  normalizeNativeChatModelId,
   toChatDescriptor,
 } from '@larkup/core/chat-models/registry';
 import type { GatewayModel } from '@larkup/core/models-cache';
@@ -17,7 +18,7 @@ import type { CustomModelConfig, RagConfig } from '@larkup/core/types';
 const FALLBACK_CHAT_MODELS: Record<string, string> = {
   openai: 'openai/gpt-4o-mini',
   anthropic: 'anthropic/claude-3-5-sonnet-latest',
-  google: 'google/gemini-2.5-flash',
+  google: 'google/gemini-3.6-flash',
   cohere: 'cohere/command-r-plus',
   mistral: 'mistral/mistral-large-latest',
   deepseek: 'deepseek/deepseek-chat',
@@ -62,6 +63,7 @@ export function resolveConfiguredChatModel(
     throw new Error('No gateway model is available. Choose a chat model before processing media.');
   }
 
+  modelId = normalizeNativeChatModelId(provider, modelId);
   modelId ||= FALLBACK_CHAT_MODELS[provider] || FALLBACK_CHAT_MODELS.openai;
 
   return {
@@ -104,7 +106,7 @@ export function resolveConfiguredVisionModel(
     (provider === chatProvider ? config.chatApiKey : undefined) ||
     (provider === config.embeddingProvider ? config.embeddingApiKey : undefined);
 
-  return { provider, modelId, apiKey };
+  return { provider, modelId: normalizeNativeChatModelId(provider, modelId)!, apiKey };
 }
 
 export function createChatModel(
