@@ -488,6 +488,26 @@ test.describe.serial('Data Page', () => {
   });
 
   test('corpus exposes a clear-all reset action', async ({ page }) => {
+    await page.route('**/api/documents', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          documents: [
+            {
+              id: 'fixture-document',
+              title: 'Fixture document',
+              content: 'Fixture content',
+              source: 'text',
+              charCount: 15,
+              status: 'unindexed',
+              createdAt: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+          stats: { docCount: 1, charCount: 15, bySource: { text: 1 } },
+        }),
+      });
+    });
     await page.goto('/data');
 
     await expect(page.getByRole('button', { name: 'Clear all files' })).toBeVisible();
