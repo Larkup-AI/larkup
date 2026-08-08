@@ -60,14 +60,8 @@ export async function POST(req: Request) {
 async function saveMedia(req: Request) {
   try {
     const config = await readConfig();
-    if (config.embeddingProvider !== 'custom' && !config.embeddingApiKey?.trim()) {
-      return NextResponse.json(
-        { error: 'Configure an embedding provider API key before adding data.' },
-        { status: 409 },
-      );
-    }
     if (req.headers.get('content-type')?.includes('application/json')) {
-      return await importRemoteMedia(req);
+      return await importRemoteMedia(req, config);
     }
 
     const formData = await req.formData();
@@ -78,6 +72,13 @@ async function saveMedia(req: Request) {
 
     if (files.length === 0) {
       return NextResponse.json({ error: 'No files provided.' }, { status: 400 });
+    }
+
+    if (config.embeddingProvider !== 'custom' && !config.embeddingApiKey?.trim()) {
+      return NextResponse.json(
+        { error: 'Configure an embedding provider API key before adding data.' },
+        { status: 409 },
+      );
     }
 
     const storage = createStorageProvider();
@@ -120,7 +121,7 @@ async function saveMedia(req: Request) {
   }
 }
 
-async function importRemoteMedia(req: Request) {
+async function importRemoteMedia(req: Request, config: Awaited<ReturnType<typeof readConfig>>) {
   const body = (await req.json()) as {
     urls?: string[];
     estimateOnly?: boolean;
@@ -129,6 +130,16 @@ async function importRemoteMedia(req: Request) {
   const urls = [...new Set(body.urls?.map((url) => url.trim()).filter(Boolean) ?? [])];
   if (urls.length === 0 || urls.length > 10) {
     return NextResponse.json({ error: 'Provide between 1 and 10 media URLs.' }, { status: 400 });
+  }
+  if (
+    !body.estimateOnly &&
+    config.embeddingProvider !== 'custom' &&
+    !config.embeddingApiKey?.trim()
+  ) {
+    return NextResponse.json(
+      { error: 'Configure an embedding provider API key before adding data.' },
+      { status: 409 },
+    );
   }
   if (body.mediaType === 'image') {
     try {
