@@ -1,5 +1,11 @@
 # larkup
 
+## 0.1.73
+
+### Patch Changes
+
+- f44fa11: Preserve request validation errors while blocking data ingestion until an embedding provider is configured.
+
 ## 0.1.72
 
 ### Patch Changes
