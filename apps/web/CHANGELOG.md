@@ -1,5 +1,17 @@
 # larkup
 
+## 0.1.72
+
+### Patch Changes
+
+- aa75e4b: Route native AI providers independently from Vercel AI Gateway, refresh the direct Gemini tool-call catalog, correct Gemini embedding metadata, and prevent ingestion before embeddings are configured.
+- Updated dependencies [aa75e4b]
+  - @larkup/core@0.4.2
+  - @larkup/marketplace@0.1.25
+  - @larkup/scraper@0.1.38
+  - @larkup/tool-doc-editor@0.2.15
+  - @larkup/tool-video-audio@0.5.0
+
 ## 0.1.71
 
 ### Patch Changes
