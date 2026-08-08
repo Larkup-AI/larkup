@@ -156,6 +156,34 @@ async function isHealthy(endpoint: string): Promise<boolean> {
 }
 
 /**
+ * Install a generated server's dependencies without retaining npm's download
+ * cache in the durable workspace volume. The installed node_modules directory
+ * is kept for the running server; the cache is only an install by-product and
+ * can otherwise grow on every restart or be left corrupt after an ENOSPC error.
+ */
+async function installGeneratedServerDependencies(dir: string): Promise<void> {
+  const cacheDir = path.join(dir, '.npm-cache');
+
+  // Clear a partial cache from an interrupted install before npm reads it.
+  await fs.rm(cacheDir, { recursive: true, force: true }).catch(() => {});
+
+  try {
+    await execAsync('npm install --omit=dev --no-audit --no-fund', {
+      cwd: dir,
+      timeout: 240_000,
+      env: {
+        ...process.env,
+        HOME: process.env.HOME || dir,
+        npm_config_cache: cacheDir,
+      },
+    });
+  } finally {
+    // node_modules is the runtime dependency tree. The cache is disposable.
+    await fs.rm(cacheDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
  * Launch the generated server locally.
  */
 export async function startServer(
@@ -178,17 +206,9 @@ export async function startServer(
   const runtimeConfig = await withActiveVectorTable(config);
   const dir = await emitToDisk(runtimeConfig);
 
-  // Install minimal deps (idempotent).
+  // Install minimal deps (idempotent) without growing the persisted workspace.
   try {
-    await execAsync('npm install --omit=dev', {
-      cwd: dir,
-      timeout: 240_000,
-      env: {
-        ...process.env,
-        HOME: process.env.HOME || dir,
-        npm_config_cache: path.join(dir, '.npm-cache'),
-      },
-    });
+    await installGeneratedServerDependencies(dir);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'npm install failed';
     return writeState({ ...emptyState(port), lastError: message });
@@ -355,15 +375,7 @@ export async function startAgentServer(
   const dir = await emitAgentToDisk(config);
 
   try {
-    await execAsync('npm install --omit=dev', {
-      cwd: dir,
-      timeout: 240_000,
-      env: {
-        ...process.env,
-        HOME: process.env.HOME || dir,
-        npm_config_cache: path.join(dir, '.npm-cache'),
-      },
-    });
+    await installGeneratedServerDependencies(dir);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'npm install failed';
     return writeAgentState({ ...emptyState(port), lastError: message });
