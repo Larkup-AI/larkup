@@ -60,7 +60,7 @@ async function removeCommand() {
   );
   console.log(`Data directory: ${path.join(packageDir, '.larkup')}`);
 
-  const confirmed = await confirm('Continue? Type y or yes to remove Larkup: ');
+  const confirmed = await confirm('Continue? Type y or yes to confirm ');
   if (!confirmed) {
     console.log('Larkup was not removed.');
     return;

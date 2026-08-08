@@ -2,11 +2,9 @@
 
 import {
   Settings2,
-  Sparkles,
+  CpuIcon,
   Server,
-  MessageSquareText,
   Search,
-  Palette,
   Database,
   Plug,
   Store,
@@ -47,7 +45,7 @@ const SECTION_GROUPS: SectionGroup[] = [
     label: 'Larkup Settiings',
     items: [
       { id: 'general', label: 'General', icon: Settings2 },
-      { id: 'models', label: 'AI Models', icon: Sparkles },
+      { id: 'models', label: 'AI Models', icon: CpuIcon },
       { id: 'storage', label: 'Storage', icon: Database },
       { id: 'search-web', label: 'Search & Scraping', icon: Globe },
       { id: 'connections', label: 'Connections', icon: Plug },
