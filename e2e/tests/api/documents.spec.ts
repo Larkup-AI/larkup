@@ -1,10 +1,35 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 import { TEST_PASTE_TEXT } from '../../utils/fixtures';
+
+async function isDataAddingBlocked(request: APIRequestContext) {
+  const status = await request.get('/api/index');
+  return (await status.json()).blockers?.includes('MISSING_EMBEDDING_API_KEY') ?? false;
+}
 
 test.describe('Documents API (/api/documents)', () => {
   let createdDocId: string | null = null;
 
+  test('POST /api/documents — blocks valid documents without embedding credentials', async ({
+    request,
+  }) => {
+    test.skip(
+      !(await isDataAddingBlocked(request)),
+      'Embedding credentials are configured for this run',
+    );
+
+    const res = await request.post('/api/documents', {
+      data: { title: 'Blocked document', content: TEST_PASTE_TEXT, source: 'paste' },
+    });
+
+    expect(res.status()).toBe(409);
+    expect((await res.json()).error).toContain('embedding provider API key');
+  });
+
   test('POST /api/documents — add a document', async ({ request }) => {
+    test.skip(
+      await isDataAddingBlocked(request),
+      'Embedding credentials are required before adding data',
+    );
     const res = await request.post('/api/documents', {
       data: {
         title: 'E2E API Test Document',
@@ -51,6 +76,10 @@ test.describe('Documents API (/api/documents)', () => {
   });
 
   test('PATCH /api/documents — update a document', async ({ request }) => {
+    test.skip(
+      await isDataAddingBlocked(request),
+      'Embedding credentials are required before adding data',
+    );
     // First create a doc to update
     const createRes = await request.post('/api/documents', {
       data: {
@@ -90,6 +119,10 @@ test.describe('Documents API (/api/documents)', () => {
   });
 
   test('DELETE /api/documents?id=x — delete one document', async ({ request }) => {
+    test.skip(
+      await isDataAddingBlocked(request),
+      'Embedding credentials are required before adding data',
+    );
     // Create a doc to delete
     const createRes = await request.post('/api/documents', {
       data: {
@@ -108,6 +141,10 @@ test.describe('Documents API (/api/documents)', () => {
   });
 
   test('DELETE /api/documents?ids=a,b — delete multiple', async ({ request }) => {
+    test.skip(
+      await isDataAddingBlocked(request),
+      'Embedding credentials are required before adding data',
+    );
     // Create two docs
     const doc1 = await (
       await request.post('/api/documents', {

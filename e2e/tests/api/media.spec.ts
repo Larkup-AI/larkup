@@ -1,4 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
+
+async function isDataAddingBlocked(request: APIRequestContext) {
+  const status = await request.get('/api/index');
+  return (await status.json()).blockers?.includes('MISSING_EMBEDDING_API_KEY') ?? false;
+}
 
 function createSilentWav(durationSecs = 1, sampleRate = 8_000): Buffer {
   const dataLength = durationSecs * sampleRate * 2;
@@ -22,7 +27,31 @@ test.describe('Media API (/api/media)', () => {
   let assetId: string | undefined;
   const fileName = `e2e-audio-${Date.now()}.wav`;
 
+  test('blocks media uploads without embedding credentials', async ({ request }) => {
+    test.skip(
+      !(await isDataAddingBlocked(request)),
+      'Embedding credentials are configured for this run',
+    );
+
+    const upload = await request.post('/api/media', {
+      multipart: {
+        file: {
+          name: fileName,
+          mimeType: 'audio/wav',
+          buffer: createSilentWav(),
+        },
+      },
+    });
+
+    expect(upload.status()).toBe(409);
+    expect((await upload.json()).error).toContain('embedding provider API key');
+  });
+
   test('uploads audio, lists metadata, and serves byte ranges', async ({ request }) => {
+    test.skip(
+      await isDataAddingBlocked(request),
+      'Embedding credentials are required before adding data',
+    );
     const upload = await request.post('/api/media', {
       multipart: {
         file: {
@@ -69,6 +98,10 @@ test.describe('Media API (/api/media)', () => {
   });
 
   test('refuses deletion while a media worker owns the asset', async ({ request }) => {
+    test.skip(
+      await isDataAddingBlocked(request),
+      'Embedding credentials are required before adding data',
+    );
     const upload = await request.post('/api/media', {
       multipart: {
         file: {
@@ -99,6 +132,10 @@ test.describe('Media API (/api/media)', () => {
   });
 
   test('persists indexing instructions and quality when uploading media', async ({ request }) => {
+    test.skip(
+      await isDataAddingBlocked(request),
+      'Embedding credentials are required before adding data',
+    );
     const upload = await request.post('/api/media', {
       multipart: {
         file: {

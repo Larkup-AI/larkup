@@ -140,7 +140,7 @@ test.describe.serial('Server Page', () => {
     await expect(runningIndicator).toBeVisible();
     await expect(page.getByRole('button', { name: 'Connect to Server SDK' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Try it (cURL)' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'API reference', exact: true })).toHaveAttribute(
+    await expect(page.getByText('API reference', { exact: true })).toHaveAttribute(
       'href',
       `http://localhost:${state.port}/reference`,
     );
