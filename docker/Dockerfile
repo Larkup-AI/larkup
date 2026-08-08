@@ -74,10 +74,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 # Install LanceDB native binding directly for the target platform.
 RUN npm install --no-save @lancedb/lancedb@0.31.0 fluent-ffmpeg@2.1.3 @napi-rs/canvas@0.1.80 && \
     chown -R nextjs:nodejs node_modules/@lancedb node_modules/@napi-rs node_modules/apache-arrow node_modules/reflect-metadata && \
-    mkdir -p /app/.larkup /app/.tmp && \
-    chown -R nextjs:nodejs /app/.larkup /app/.tmp
+    mkdir -p /app/apps/web/.larkup /app/.tmp && \
+    chown -R nextjs:nodejs /app/apps/web/.larkup /app/.tmp
 
-VOLUME ["/app/.larkup"]
+# Next.js runs the standalone app from /app/apps/web, so its workspace state
+# must be mounted at the same path used by the generated-server runtime.
+VOLUME ["/app/apps/web/.larkup"]
 
 USER nextjs
 

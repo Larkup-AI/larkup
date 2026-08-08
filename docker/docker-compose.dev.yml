@@ -14,7 +14,7 @@ services:
       - TMPDIR=/app/.tmp
     volumes:
       # All configs, corpus records, media, LanceDB indexes, and installed tools.
-      - larkup_data:/app/.larkup
+      - larkup_data:/app/apps/web/.larkup
       # Keep large transient frame/audio files out of the container layer.
       - media_tmp:/app/.tmp
     restart: unless-stopped

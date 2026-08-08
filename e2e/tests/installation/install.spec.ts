@@ -96,9 +96,32 @@ test.describe('Installation Methods', () => {
     expect(dockerfile).toContain('EXPOSE 4567 8080');
     expect(developmentCompose).toContain("- '8080:8080'");
     expect(productionCompose).toContain('- "8080:8080"');
-    expect(readme).toContain('docker run -d -p 4567:4567 -p 8080:8080');
+    expect(dockerfile).toContain('VOLUME ["/app/apps/web/.larkup"]');
+    expect(developmentCompose).toContain('larkup_data:/app/apps/web/.larkup');
+    expect(productionCompose).toContain('larkup_data:/app/apps/web/.larkup');
+    expect(readme).toContain(
+      'docker run -d -p 4567:4567 -p 8080:8080 -v larkup_data:/app/apps/web/.larkup',
+    );
     expect(readme).toContain('http://localhost:8080/reference');
     console.log('  ✓ Docker exposes the Settings RAG server and API reference on :8080');
+  });
+
+  test('generated-server install cache — is cleaned from durable workspace storage', () => {
+    const runtime = fs.readFileSync(
+      path.join(REPO_ROOT, 'packages/core/src/generator/server-runtime.ts'),
+      'utf-8',
+    );
+
+    // Generated node_modules is needed at runtime, but npm's download cache is
+    // disposable. Keeping it in .larkup can fill a Docker named volume and make
+    // a later install fail with ENOSPC/EEXIST.
+    expect(runtime).toContain('async function installGeneratedServerDependencies');
+    expect(runtime).toContain("'npm install --omit=dev --no-audit --no-fund'");
+    expect(runtime).toContain('finally');
+    expect(runtime).toContain(
+      'await fs.rm(cacheDir, { recursive: true, force: true }).catch(() => {});',
+    );
+    console.log('  ✓ Generated-server npm caches are cleared after each install');
   });
 
   test('start.sh — script exists and is executable', async () => {
