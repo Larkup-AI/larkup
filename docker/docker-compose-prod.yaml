@@ -9,8 +9,8 @@ services:
     restart: unless-stopped
     ports:
       - "4567:4567"
-      # Generated local RAG servers use the first workspace port (8080).
-      - "8080:8080"
+      # Generated RAG servers use incremental ports starting at 8080.
+      - "8080-8090:8080-8090"
     volumes:
       # Complete durable application state: media, corpus, config, tools, and LanceDB.
       - larkup_data:/app/apps/web/.larkup
