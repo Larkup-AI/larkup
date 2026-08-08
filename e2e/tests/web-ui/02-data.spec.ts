@@ -36,17 +36,32 @@ test.describe.serial('Data Page', () => {
     ).toBeVisible();
   });
 
-  test('keeps the primary add action in the tab bar', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Add website' })).toBeDisabled();
+  test('blocks all add actions until an embedding API key is configured', async ({ page }) => {
+    await page.route('**/api/index', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          unindexedCount: 0,
+          running: false,
+          run: null,
+          blockers: ['MISSING_EMBEDDING_API_KEY'],
+        }),
+      });
+    });
+    await page.reload();
 
-    await page.getByRole('button', { name: 'Files', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Add files' })).toBeDisabled();
+    await expect(
+      page.getByRole('heading', { name: 'Set an embedding API key first' }),
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open AI model settings' })).toHaveAttribute(
+      'href',
+      '/settings',
+    );
 
-    await page.getByRole('button', { name: 'Text', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Add text' })).toBeDisabled();
-
-    await page.getByRole('button', { name: 'Media', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Add media' })).toBeDisabled();
+    for (const action of ['Add website', 'Add files', 'Add text', 'Add media']) {
+      await expect(page.getByRole('button', { name: action })).toHaveCount(0);
+    }
   });
 
   test('keeps the six available providers above Google integrations awaiting verification', async ({
