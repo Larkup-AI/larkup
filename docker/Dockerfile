@@ -81,7 +81,9 @@ VOLUME ["/app/.larkup"]
 
 USER nextjs
 
-EXPOSE 4567 8081
+# The dashboard runs on 4567. The regular generated RAG server launched from
+# Settings uses the first workspace port, 8080.
+EXPOSE 4567 8080
 
 ENV PORT=4567
 

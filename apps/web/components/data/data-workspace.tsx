@@ -408,7 +408,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
             {/* ─── Tab content ─── */}
             <div className="relative " key={resetKey}>
               {dataAddBlocked ? (
-                <div className="mx-auto flex min-h-72 max-w-xl flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 text-center">
+                <div className="mx-auto flex min-h-72 max-w-xl mt-5 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 text-center">
                   <div className="mb-4 rounded-full bg-primary/10 p-3 text-primary">
                     <KeyRound className="size-5" />
                   </div>
@@ -418,7 +418,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
                     embedding provider and API key, then return here to add data.
                   </p>
                   <Link
-                    href="/settings"
+                    href="/settings?section=models"
                     className="mt-5 inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
                     Open AI model settings
