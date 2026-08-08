@@ -59,6 +59,13 @@ export async function POST(req: Request) {
 
 async function saveMedia(req: Request) {
   try {
+    const config = await readConfig();
+    if (config.embeddingProvider !== 'custom' && !config.embeddingApiKey?.trim()) {
+      return NextResponse.json(
+        { error: 'Configure an embedding provider API key before adding data.' },
+        { status: 409 },
+      );
+    }
     if (req.headers.get('content-type')?.includes('application/json')) {
       return await importRemoteMedia(req);
     }

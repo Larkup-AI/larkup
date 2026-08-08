@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import useSWR, { useSWRConfig } from 'swr';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -16,6 +17,7 @@ import {
   ChevronDown,
   Loader2,
   Plus,
+  KeyRound,
 } from 'lucide-react';
 import { ScrapePanel } from '@/components/data/scrape-panel';
 import { PastePanel } from '@/components/data/paste-panel';
@@ -170,11 +172,17 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
     unindexedCount: number;
     running: boolean;
     run: IndexRun | null;
+    blockers: string[];
   }>('/api/index', fetcher, {
     refreshInterval: (d) => (d?.running ? 2000 : 0),
   });
   const indexRunning = indexQuery.data?.running ?? false;
+  const dataAddBlocked = indexQuery.data?.blockers?.includes('MISSING_EMBEDDING_API_KEY') ?? false;
   const { mutate: mutateIndex } = indexQuery;
+
+  useEffect(() => {
+    if (dataAddBlocked) setPrimaryAction(null);
+  }, [dataAddBlocked]);
 
   const prevIndexRunning = useRef(indexRunning);
   useEffect(() => {
@@ -340,7 +348,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
                 <Button
                   size="default"
                   onClick={primaryAction.onClick}
-                  disabled={primaryAction.disabled || primaryAction.loading}
+                  disabled={dataAddBlocked || primaryAction.disabled || primaryAction.loading}
                 >
                   {primaryAction.loading ? (
                     <Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -399,15 +407,34 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
           <div className="w-full">
             {/* ─── Tab content ─── */}
             <div className="relative " key={resetKey}>
-              {activeSubTab === 'website' && (
-                <div className="w-full flex flex-col gap-8 animate-in fade-in duration-200">
-                  <div>
-                    <ScrapePanel
-                      onStarted={handleScrapeStarted}
-                      onActionChange={registerPrimaryAction}
-                    />
+              {dataAddBlocked ? (
+                <div className="mx-auto flex min-h-72 max-w-xl flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 text-center">
+                  <div className="mb-4 rounded-full bg-primary/10 p-3 text-primary">
+                    <KeyRound className="size-5" />
                   </div>
-                  {/* {jobs.length > 0 && !showJobsDrawer && (
+                  <h2 className="text-base font-semibold">Set an embedding API key first</h2>
+                  <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                    Data is kept out of the Knowledge Base until it can be indexed. Configure an
+                    embedding provider and API key, then return here to add data.
+                  </p>
+                  <Link
+                    href="/settings"
+                    className="mt-5 inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    Open AI model settings
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  {activeSubTab === 'website' && (
+                    <div className="w-full flex flex-col gap-8 animate-in fade-in duration-200">
+                      <div>
+                        <ScrapePanel
+                          onStarted={handleScrapeStarted}
+                          onActionChange={registerPrimaryAction}
+                        />
+                      </div>
+                      {/* {jobs.length > 0 && !showJobsDrawer && (
                     <div className="pt-8 border-t border-border">
                       <h3 className="text-lg font-semibold tracking-tight mb-4">
                         Recent Scrape Jobs
@@ -415,35 +442,43 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
                       <JobsPanel jobs={jobs} onChanged={refreshAll} />
                     </div>
                   )} */}
-                </div>
-              )}
+                    </div>
+                  )}
 
-              {activeSubTab === 'files' && (
-                <div className="animate-in fade-in duration-200">
-                  <UploadPanel onAdded={handleDataAdded} onActionChange={registerPrimaryAction} />
-                </div>
-              )}
+                  {activeSubTab === 'files' && (
+                    <div className="animate-in fade-in duration-200">
+                      <UploadPanel
+                        onAdded={handleDataAdded}
+                        onActionChange={registerPrimaryAction}
+                      />
+                    </div>
+                  )}
 
-              {activeSubTab === 'text' && (
-                <div className=" animate-in fade-in duration-200">
-                  <PastePanel onAdded={handleDataAdded} onActionChange={registerPrimaryAction} />
-                </div>
-              )}
+                  {activeSubTab === 'text' && (
+                    <div className=" animate-in fade-in duration-200">
+                      <PastePanel
+                        onAdded={handleDataAdded}
+                        onActionChange={registerPrimaryAction}
+                      />
+                    </div>
+                  )}
 
-              {activeSubTab === 'media' && (
-                <div className="animate-in fade-in duration-200">
-                  <MediaPanel
-                    onAdded={refreshAll}
-                    onIndexed={handleMediaIndexed}
-                    onActionChange={registerPrimaryAction}
-                  />
-                </div>
-              )}
+                  {activeSubTab === 'media' && (
+                    <div className="animate-in fade-in duration-200">
+                      <MediaPanel
+                        onAdded={refreshAll}
+                        onIndexed={handleMediaIndexed}
+                        onActionChange={registerPrimaryAction}
+                      />
+                    </div>
+                  )}
 
-              {activeSubTab === 'notion' && (
-                <div className="animate-in fade-in duration-200">
-                  <IntegrationsPanel onAdded={handleDataAdded} />
-                </div>
+                  {activeSubTab === 'notion' && (
+                    <div className="animate-in fade-in duration-200">
+                      <IntegrationsPanel onAdded={handleDataAdded} />
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

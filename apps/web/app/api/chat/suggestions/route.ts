@@ -6,13 +6,14 @@ import { createAdapter } from '@larkup/vector-stores/factory';
 import { embedQuery } from '@larkup/core/indexing/embedder';
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import { getChatModel, toChatDescriptor } from '@larkup/core/chat-models/registry';
+import { toChatDescriptor } from '@larkup/core/chat-models/registry';
 import { getModelsByType } from '@larkup/core/models-cache';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createCohere } from '@ai-sdk/cohere';
 import { createMistral } from '@ai-sdk/mistral';
 import { createDeepSeek } from '@ai-sdk/deepseek';
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGateway } from '@ai-sdk/gateway';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
@@ -55,11 +56,14 @@ function createChatModel(
       return createMistral({ apiKey: key })(modelName);
     case 'deepseek':
       return createDeepSeek({ apiKey: key })(modelName);
+    case 'anthropic':
+      return createAnthropic({ apiKey: key })(modelName);
     case 'vercel_ai_gateway':
       return createGateway({ apiKey: key })(modelId);
     case 'openai':
-    default:
       return createOpenAI({ apiKey: key })(modelName);
+    default:
+      throw new Error(`Unsupported chat provider "${provider}".`);
   }
 }
 
@@ -94,9 +98,7 @@ export async function POST(req: Request) {
       const chatModelId = config.chatModelId || 'openai/gpt-4o-mini';
       const gatewayModels = await getModelsByType('language');
       const allChatModels = gatewayModels.map(toChatDescriptor);
-      const descriptor = getChatModel(allChatModels, chatModelId);
-      const resolvedProvider =
-        provider === 'vercel_ai_gateway' ? 'vercel_ai_gateway' : descriptor?.provider || provider;
+      const resolvedProvider = provider;
 
       const aiModel = createChatModel(
         resolvedProvider,

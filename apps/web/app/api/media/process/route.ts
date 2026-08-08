@@ -109,6 +109,13 @@ async function enqueueMediaProcessing(
   serverId?: string,
 ): Promise<NextResponse> {
   try {
+    const config = await readConfig();
+    if (config.embeddingProvider !== 'custom' && !config.embeddingApiKey?.trim()) {
+      return NextResponse.json(
+        { error: 'Configure an embedding provider API key before adding data.' },
+        { status: 409 },
+      );
+    }
     // A process restart can leave a leased job behind. Recover its durable
     // checkpoint before accepting more work; a new worker may then claim it.
     await recoverStaleVideoKnowledgeJobs();

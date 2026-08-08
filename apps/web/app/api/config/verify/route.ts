@@ -12,13 +12,14 @@ import { createGateway } from '@ai-sdk/gateway';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
 import { formatErrorMessage } from '@/lib/error-formatter';
+import { normalizeNativeChatModelId } from '@larkup/core/chat-models/registry';
 
 export const runtime = 'nodejs';
 
 const DEFAULT_CHAT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-sonnet-4-20250514',
-  google: 'gemini-2.0-flash',
+  google: 'gemini-3.6-flash',
   mistral: 'mistral-small-latest',
   deepseek: 'deepseek-chat',
   cohere: 'command-r',
@@ -68,8 +69,9 @@ function createChatModel(
     case 'openai':
       return createOpenAI({ apiKey })(modelName);
     case 'vercel_ai_gateway':
-    default:
       return createGateway({ apiKey })(modelId);
+    default:
+      throw new Error(`Unsupported chat provider "${provider}".`);
   }
 }
 
@@ -204,6 +206,7 @@ export async function POST(request: Request) {
             : `${resolvedProvider}/${DEFAULT_CHAT_MODELS[resolvedProvider] || 'gpt-4o-mini'}`;
       }
 
+      modelId = normalizeNativeChatModelId(resolvedProvider, modelId) || modelId;
       const model = createChatModel(resolvedProvider, modelId, chatApiKey, customChatModels) as any;
 
       try {

@@ -1345,17 +1345,7 @@ export function ConfigureForm({
                   </span>
                 </SelectTrigger>
                 <SelectContent>
-                  {[
-                    'vercel_ai_gateway',
-                    'openai',
-                    'google',
-                    // "cohere",
-                    'voyage',
-                    'mistral',
-                    'jina',
-                    'nomic',
-                    'custom',
-                  ]
+                  {['vercel_ai_gateway', 'openai', 'google', 'cohere', 'mistral', 'custom']
                     .filter(
                       (key) =>
                         (EMBEDDING_BY_PROVIDER[key] && EMBEDDING_BY_PROVIDER[key].length > 0) ||

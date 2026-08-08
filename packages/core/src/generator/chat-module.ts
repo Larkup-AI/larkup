@@ -69,7 +69,7 @@ export function resolveChatModel(
   }
   const defaults: Record<string, string> = {
     openai: 'openai/gpt-4o-mini',
-    google: 'google/gemini-2.5-flash',
+    google: 'google/gemini-3.6-flash',
     cohere: 'cohere/command-r-plus',
     mistral: 'mistral/mistral-large-latest',
     deepseek: 'deepseek/deepseek-chat',

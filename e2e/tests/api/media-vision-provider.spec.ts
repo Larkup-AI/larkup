@@ -96,11 +96,11 @@ test.describe('Media vision provider routing', () => {
     );
 
     expect(resolved.provider).toBe('google');
-    expect(resolved.modelId).toBe('google/gemini-2.5-flash');
+    expect(resolved.modelId).toBe('google/gemini-3.6-flash');
 
     const model = createChatModel(resolved.provider, resolved.modelId, resolved.apiKey);
     expect(model.provider).toContain('google');
-    expect(model.modelId).toBe('gemini-2.5-flash');
+    expect(model.modelId).toBe('gemini-3.6-flash');
   });
 
   test('uses the dedicated vision provider and its default VLM independently from chat', () => {
@@ -118,7 +118,7 @@ test.describe('Media vision provider routing', () => {
 
     expect(resolved).toEqual({
       provider: 'google',
-      modelId: 'google/gemini-2.5-flash',
+      modelId: 'google/gemini-3.6-flash',
       apiKey: 'google_test_key',
     });
   });

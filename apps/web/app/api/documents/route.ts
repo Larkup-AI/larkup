@@ -56,6 +56,13 @@ import path from 'path';
  */
 export async function POST(req: Request) {
   try {
+    const config = await readConfig();
+    if (config.embeddingProvider !== 'custom' && !config.embeddingApiKey?.trim()) {
+      return NextResponse.json(
+        { error: 'Configure an embedding provider API key before adding data.' },
+        { status: 409 },
+      );
+    }
     const body = (await req.json()) as {
       title?: string;
       content?: string;

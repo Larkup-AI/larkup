@@ -1,7 +1,11 @@
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { readConfig } from '@larkup/core/config-store';
 import { getModelsByType } from '@larkup/core/models-cache';
-import { toChatDescriptor, getDefaultChatModel } from '@larkup/core/chat-models/registry';
+import {
+  toChatDescriptor,
+  getDefaultChatModel,
+  normalizeNativeChatModelId,
+} from '@larkup/core/chat-models/registry';
 import { listTabularDatasets } from '@larkup/core/tabular-store';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -55,8 +59,9 @@ function createChatModel(
     case 'openai':
       return createOpenAI({ apiKey })(modelName);
     case 'vercel_ai_gateway':
-    default:
       return createGateway({ apiKey })(modelId);
+    default:
+      throw new Error(`Unsupported chat provider "${provider}".`);
   }
 }
 
@@ -119,15 +124,16 @@ export async function POST(req: Request) {
   const gatewayModels = await getModelsByType('language');
   const allChatModels = gatewayModels.map(toChatDescriptor);
 
+  const configuredModelId = requestedModelId || config.chatModelId;
   const chatModelId =
-    requestedModelId ||
-    config.chatModelId ||
+    normalizeNativeChatModelId(provider, configuredModelId) ||
     getDefaultChatModel(allChatModels, provider)?.id ||
     'openai/gpt-4o-mini';
 
-  const modelProvider = chatModelId.split('/')[0];
-  const resolvedProvider =
-    provider === 'vercel_ai_gateway' ? 'vercel_ai_gateway' : modelProvider || provider;
+  // The configured provider is authoritative. In particular, a direct Google
+  // key must never be routed through the gateway because a model ID has a
+  // vendor prefix.
+  const resolvedProvider = provider;
 
   const apiKey = config.chatApiKey || config.embeddingApiKey || undefined;
   const model = createChatModel(

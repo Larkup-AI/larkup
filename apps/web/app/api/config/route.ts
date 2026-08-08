@@ -3,6 +3,11 @@ import { readConfig, writeConfig } from '@larkup/core/config-store';
 import { getVectorStore, validateStoreConfig } from '@larkup/vector-stores/registry';
 import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
 import { getAllModels } from '@larkup/core/models-cache';
+import {
+  getChatModelsForProvider,
+  normalizeNativeChatModelId,
+  toChatDescriptor,
+} from '@larkup/core/chat-models/registry';
 import { runWithServer } from '@larkup/core/workspace';
 import type { RagConfig } from '@larkup/core/types';
 
@@ -56,6 +61,13 @@ export async function PUT(request: Request) {
     }
   }
 
+  if (body.chatProvider === 'google') {
+    body.chatModelId = normalizeNativeChatModelId(body.chatProvider, body.chatModelId);
+  }
+  if (body.visionProvider === 'google') {
+    body.visionModelId = normalizeNativeChatModelId(body.visionProvider, body.visionModelId);
+  }
+
   // Validate the embedding model exists.
   const isCustom = body.embeddingModelId.startsWith('custom:');
   if (!isCustom && !getEmbeddingModel(body.embeddingModelId)) {
@@ -83,12 +95,10 @@ export async function PUT(request: Request) {
     const hasDefaultVisionModel =
       body.visionProvider === 'vercel_ai_gateway'
         ? models.some((model) => model.type === 'language' && model.tags?.includes('vision'))
-        : models.some(
-            (model) =>
-              model.owned_by === body.visionProvider &&
-              model.type === 'language' &&
-              model.tags?.includes('vision'),
-          );
+        : getChatModelsForProvider(
+            models.filter((model) => model.type === 'language').map(toChatDescriptor),
+            body.visionProvider,
+          ).some((model) => model.tags?.includes('vision'));
     if (!hasDefaultVisionModel) {
       return NextResponse.json(
         { error: `No vision-capable models are available from ${body.visionProvider}.` },
@@ -107,15 +117,21 @@ export async function PUT(request: Request) {
         );
       }
     } else {
-      const model = (await getAllModels()).find((candidate) => candidate.id === body.visionModelId);
+      const models = await getAllModels();
+      const model = models.find((candidate) => candidate.id === body.visionModelId);
       const provider = body.visionProvider || body.chatProvider || body.embeddingProvider;
+      const nativeModel = getChatModelsForProvider(
+        models.filter((candidate) => candidate.type === 'language').map(toChatDescriptor),
+        provider,
+      ).find((candidate) => candidate.id === body.visionModelId);
       const providerMatches =
         provider === 'vercel_ai_gateway' ||
-        model?.owned_by.toLowerCase() === provider?.toLowerCase();
+        model?.owned_by.toLowerCase() === provider?.toLowerCase() ||
+        nativeModel?.provider === provider;
       if (
-        !model ||
-        model.type !== 'language' ||
-        !model.tags?.includes('vision') ||
+        (!model && !nativeModel) ||
+        (model && model.type !== 'language') ||
+        !(model?.tags?.includes('vision') || nativeModel?.tags?.includes('vision')) ||
         !providerMatches
       ) {
         return NextResponse.json(
