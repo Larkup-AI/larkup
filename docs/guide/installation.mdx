@@ -128,10 +128,11 @@ If you see a version number, you're good. Head to the [Quickstart](/guide/quicks
 
 <Tabs>
   <Tab title="Docker" icon="docker">
-    The Docker image runs the Larkup web app.
+    The Docker image runs the Larkup web app on Linux AMD64 and ARM64 hosts. Docker Desktop selects the right image automatically on macOS and Windows.
 
     ```bash
-    docker run --platform linux/amd64 -d --name larkup -p 4567:4567 -v larkup-data:/app/.larkup aboneda/larkup:latest && sleep 5 && open http://localhost:4567
+    docker pull aboneda/larkup:latest
+    docker run -d --name larkup -p 4567:4567 -v larkup-data:/app/apps/web/.larkup aboneda/larkup:latest
     ```
 
     The `larkup-data` volume keeps your configuration, knowledge base, uploaded files, and Marketplace tool installs when the container is recreated.
@@ -247,11 +248,18 @@ command in your terminal.
 
 <Tabs>
   <Tab title="Docker" icon="docker">
-    Update to the latest version with a single command:
+    Pull the latest image, then recreate the container while retaining its data volume:
 
     ```bash
-    docker compose pull && docker compose up -d
+    docker pull aboneda/larkup:latest
+    docker stop larkup
+    docker rm larkup
+    docker run -d --name larkup -p 4567:4567 -v larkup-data:/app/apps/web/.larkup aboneda/larkup:latest
     ```
+
+    <Warning>
+      Images released before 0.1.76 stored generated-server data inside the container instead of the volume. To intentionally discard that old data and start clean, run `docker rm -f larkup` followed by `docker volume rm larkup-data` before starting the command above.
+    </Warning>
 
     For **automatic updates**, add [Watchtower](https://containrrr.dev/watchtower/) to your `docker-compose.yml`:
 
