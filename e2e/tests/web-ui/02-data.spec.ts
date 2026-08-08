@@ -9,6 +9,21 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 
 test.describe.serial('Data Page', () => {
   test.beforeEach(async ({ page }) => {
+    // These UI tests exercise the available data-source controls. CI intentionally
+    // has no provider credentials, so make the index status explicit instead of
+    // letting the missing-embedding guard hide every control under test.
+    await page.route('**/api/index', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          unindexedCount: 0,
+          running: false,
+          run: null,
+          blockers: [],
+        }),
+      });
+    });
     // The add workspace defaults to Files. Select the Website panel explicitly
     // so this suite does not depend on state left by another browser session.
     await page.goto('/add?subtab=website');
