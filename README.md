@@ -18,7 +18,7 @@ Larkup brings files, websites, text, structured data, and media into one searcha
 ### Docker
 
 ```bash
-docker run -d -p 4567:4567 -p 8080:8080 -v larkup_data:/app/apps/web/.larkup \
+docker run -d -p 4567:4567 -p 8080-8090:8080-8090 -v larkup_data:/app/apps/web/.larkup \
   -e OPENAI_API_KEY=your_key \
   aboneda/larkup:latest
 ```
