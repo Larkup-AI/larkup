@@ -117,7 +117,7 @@ export function SdkConnectDialog({
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl flex flex-col max-h-[90dvh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Code2 className="size-5 text-primary" />
@@ -128,58 +128,61 @@ export function SdkConnectDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Tabs */}
-        <div className="flex gap-1 rounded-lg border bg-muted/40 p-1">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
-                activeTab === tab.id
-                  ? 'bg-background text-foreground '
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Code block */}
-        <div className="relative rounded-lg border bg-slate-50 overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2 bg-slate-100/50">
-            <span className="text-xs text-slate-500 font-mono">
-              {activeTab === 'python'
-                ? 'main.py'
-                : activeTab === 'typescript'
-                ? 'index.ts'
-                : 'connect.ts'}
-            </span>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-200 hover:text-slate-900"
-            >
-              {copied ? (
-                <>
-                  <Check className="size-3.5" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="size-3.5" />
-                  Copy
-                </>
-              )}
-            </button>
+        {/* Scrollable body: tabs + code */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+          {/* Tabs */}
+          <div className="flex gap-1 rounded-lg border bg-muted/40 p-1">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
+                  activeTab === tab.id
+                    ? 'bg-background text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-          <CodeViewer
-            value={currentSnippet}
-            language={activeTab === 'python' ? 'python' : 'javascript'}
-            height="auto"
-          />
+
+          {/* Code block */}
+          <div className="relative overflow-hidden rounded-lg border bg-slate-50">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100/50 px-4 py-2">
+              <span className="font-mono text-xs text-slate-500">
+                {activeTab === 'python'
+                  ? 'main.py'
+                  : activeTab === 'typescript'
+                  ? 'index.ts'
+                  : 'connect.ts'}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-200 hover:text-slate-900"
+              >
+                {copied ? (
+                  <>
+                    <Check className="size-3.5" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-3.5" />
+                    Copy
+                  </>
+                )}
+              </button>
+            </div>
+            <CodeViewer
+              value={currentSnippet}
+              language={activeTab === 'python' ? 'python' : 'javascript'}
+              height="auto"
+            />
+          </div>
         </div>
 
         {/* Docs link */}
@@ -191,7 +194,7 @@ export function SdkConnectDialog({
             </code>
           </span>
           <a
-            href="https://www.larkup.de/sdk/overview"
+            href="https://www.larkup.de/documentation/sdk/overview"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-primary hover:underline"

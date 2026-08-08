@@ -1,87 +1,62 @@
-"use client"
+'use client';
 
-import { useMemo } from "react"
-import CodeMirror, { EditorView, type Extension } from "@uiw/react-codemirror"
-import { javascript } from "@codemirror/lang-javascript"
-import { json } from "@codemirror/lang-json"
-import { markdown } from "@codemirror/lang-markdown"
-import { yaml } from "@codemirror/lang-yaml"
-import { python } from "@codemirror/lang-python"
-import { githubLight, githubDark } from "@uiw/codemirror-theme-github"
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { githubGist, atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
-/** Map a generated file's language hint to a CodeMirror language extension. */
-function languageExtension(language: string): Extension[] {
+/** Map a generic language hint to a highlight.js language identifier. */
+function languageId(language: string): string {
   switch (language) {
-    case "javascript":
-      return [javascript({ jsx: true })]
-    case "json":
-      return [json()]
-    case "markdown":
-      return [markdown()]
-    case "yaml":
-      return [yaml()]
-    case "python":
-      return [python()]
+    case 'javascript':
+      return 'javascript';
+    case 'typescript':
+      return 'typescript';
+    case 'json':
+      return 'json';
+    case 'markdown':
+      return 'markdown';
+    case 'yaml':
+      return 'yaml';
+    case 'python':
+      return 'python';
     default:
-      return []
+      return 'plaintext';
   }
 }
 
-/** Blend CodeMirror into the card surface instead of its own white sheet. */
-const surfaceTheme = EditorView.theme({
-  "&": {
-    backgroundColor: "transparent",
-    fontSize: "12px",
-  },
-  ".cm-gutters": {
-    backgroundColor: "transparent",
-    border: "none",
-    color: "var(--muted-foreground)",
-  },
-  ".cm-activeLine": { backgroundColor: "transparent" },
-  ".cm-activeLineGutter": { backgroundColor: "transparent" },
-  ".cm-scroller": {
-    fontFamily: "var(--font-mono), ui-monospace, monospace",
-    lineHeight: "1.6",
-  },
-})
-
 /**
- * Read-only, syntax-highlighted file viewer used by the Server stage. Replaces
- * the plain <pre> preview with proper tokenized highlighting.
+ * Read-only, syntax-highlighted file viewer using react-syntax-highlighter.
  */
 export function CodeViewer({
   value,
   language,
-  height = "26rem",
-  theme = "light",
+  height = '26rem',
+  theme = 'light',
 }: {
-  value: string
-  language: string
-  height?: string
-  theme?: "light" | "dark"
+  value: string;
+  language: string;
+  height?: string;
+  theme?: 'light' | 'dark';
 }) {
-  const extensions = useMemo(
-    () => [...languageExtension(language), surfaceTheme, EditorView.lineWrapping],
-    [language],
-  )
-
   return (
-    <CodeMirror
-      value={value}
-      height={height}
-      readOnly
-      editable={false}
-      theme={theme === "dark" ? githubDark : githubLight}
-      extensions={extensions}
-      basicSetup={{
-        lineNumbers: true,
-        foldGutter: false,
-        highlightActiveLine: false,
-        highlightActiveLineGutter: false,
-        highlightSelectionMatches: false,
-        searchKeymap: false,
-      }}
-    />
-  )
+    <div style={{ height, overflowY: 'auto' }} className="w-full text-xs font-mono">
+      <SyntaxHighlighter
+        language={languageId(language)}
+        style={theme === 'dark' ? atomOneDark : githubGist}
+        customStyle={{
+          margin: 0,
+          padding: '1rem',
+          background: 'transparent',
+          fontSize: '12px',
+          lineHeight: '1.6',
+          fontFamily:
+            'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+          height: '100%',
+        }}
+        showLineNumbers
+        wrapLongLines
+      >
+        {value}
+      </SyntaxHighlighter>
+    </div>
+  );
 }

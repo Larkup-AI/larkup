@@ -137,7 +137,7 @@ export function IntegrationResourcesPanel({
             <p className="mt-1 text-sm text-muted-foreground">
               Read and import selected knowledge into your corpus.
             </p>
-            {data?.error && <p className="mt-2 text-xs text-destructive">{data.error}</p>}
+            {/* {data?.error && <p className="mt-2 text-xs text-destructive">{data.error}</p>} */}
           </div>
           <Button onClick={() => connect(integration)}>Connect {name}</Button>
         </div>

@@ -439,6 +439,7 @@ export function ServerSection() {
                   render={
                     <a href={apiReferenceUrl(state.endpoint)} target="_blank" rel="noreferrer" />
                   }
+                  nativeButton={false}
                   className="h-8 gap-1.5 text-xs"
                 >
                   <ExternalLink className="size-3" />

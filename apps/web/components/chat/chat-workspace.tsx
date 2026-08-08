@@ -564,7 +564,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
 
     if (provider !== 'local' && !apiKeys[provider]) {
       toast.error('Web Search API key is missing. Please configure it in Settings.');
-      router.push('/settings?section=general');
+      router.push('/settings?section=search-web');
       return;
     }
 
