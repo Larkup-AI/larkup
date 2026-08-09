@@ -104,15 +104,16 @@ export function ModelsSection() {
   const embeddingModels: EmbeddingModelDescriptor[] = chatStatus?.availableEmbeddingModels ?? [];
   const visionModels: Array<{ id: string; label: string; provider: string }> =
     chatStatus?.availableVisionModels ?? [];
-  const visionProviders = useMemo(
-    () =>
-      [...new Set(visionModels.map((model) => model.provider))].filter(
-        (provider) =>
-          VISION_PROVIDER_LIST.has(provider) &&
-          PROVIDER_META[provider as keyof typeof PROVIDER_META],
-      ),
-    [visionModels],
-  );
+  const visionProviders = useMemo(() => {
+    const providers = new Set(visionModels.map((model) => model.provider));
+    if (visionModels.length > 0) {
+      providers.add('vercel_ai_gateway');
+    }
+    return [...providers].filter(
+      (provider) =>
+        VISION_PROVIDER_LIST.has(provider) && PROVIDER_META[provider as keyof typeof PROVIDER_META],
+    );
+  }, [visionModels]);
   const EMBEDDING_BY_PROVIDER = useMemo(() => {
     return embeddingModels.reduce<Record<string, EmbeddingModelDescriptor[]>>((acc, m) => {
       (acc[m.provider] ??= []).push(m);
@@ -546,7 +547,7 @@ export function ModelsSection() {
               <SelectTrigger className="w-full">
                 <span>{form.embeddingModelId || 'Default'}</span>
               </SelectTrigger>
-              <SelectContent className="max-h-[320px]">
+              <SelectContent className="max-h-80">
                 {Object.entries(EMBEDDING_BY_PROVIDER)
                   .filter(
                     ([provider]) =>
@@ -757,7 +758,7 @@ export function ModelsSection() {
               <SelectTrigger className="w-full">
                 <span className="truncate">{form.visionModelId || 'Default vision model'}</span>
               </SelectTrigger>
-              <SelectContent className="max-h-[320px]">
+              <SelectContent className="max-h-80">
                 <SelectItem value="default">Default vision model</SelectItem>
                 {visionModels
                   .filter(
@@ -922,7 +923,7 @@ export function ModelsSection() {
               <SelectTrigger className="w-full">
                 <span className="truncate">{form.chatModelId || 'Default'}</span>
               </SelectTrigger>
-              <SelectContent className="max-h-[320px]">
+              <SelectContent className="max-h-80">
                 {chatStatus?.availableModels ? (
                   <SelectGroup>
                     {chatStatus.availableModels.map((m: any) => (
