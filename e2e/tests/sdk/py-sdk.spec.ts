@@ -4,12 +4,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 
+import { getWebUIUrl, rewriteLocalUrl } from '../../utils/env';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PY_SDK_DIR = path.resolve(__dirname, '../../../apps/sdk/py-sdk');
 const PY_TEST_SCRIPT = path.resolve(__dirname, 'py_sdk_test.py');
 
-const WEB_API = 'http://localhost:4567';
-let RAG_SERVER = 'http://localhost:8080';
+const WEB_API = getWebUIUrl();
+let RAG_SERVER = rewriteLocalUrl('http://localhost:8080');
 const sdkApiKey = process.env.AI_GATEWAY_APIKEY?.trim() || process.env.OPENAI_API_KEY?.trim() || '';
 
 /**
@@ -24,7 +26,7 @@ test.describe('Python SDK — larkup', () => {
       const statusRes = await request.get(`${WEB_API}/api/server/local`);
       const { state } = await statusRes.json();
       if (state.endpoint) {
-        RAG_SERVER = state.endpoint;
+        RAG_SERVER = rewriteLocalUrl(state.endpoint);
       }
     } catch (e) {
       // fallback
