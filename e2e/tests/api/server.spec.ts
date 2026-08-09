@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { rewriteLocalUrl } from '../../utils/env';
 
 test.describe.serial('Server API (/api/server)', () => {
   test('GET /api/server/generate — returns generated server manifest', async ({ request }) => {
@@ -90,9 +91,12 @@ test.describe.serial('Server API (/api/server)', () => {
       // Wait a moment and verify it's actually reachable
       await new Promise((r) => setTimeout(r, 3_000));
       try {
-        const healthRes = await fetch(`http://localhost:${body.state.port}/health`, {
-          signal: AbortSignal.timeout(5_000),
-        });
+        const healthRes = await fetch(
+          rewriteLocalUrl(`http://localhost:${body.state.port}/health`),
+          {
+            signal: AbortSignal.timeout(5_000),
+          },
+        );
         expect(healthRes.ok).toBe(true);
         console.log('  ✓ RAG server health check passed');
       } catch {

@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { LarkupClient } from '../../../apps/sdk/js-sdk/src/index';
 
-const WEB_API = 'http://localhost:4567';
-let ragServer = 'http://localhost:8080';
+import { getWebUIUrl, rewriteLocalUrl } from '../../utils/env';
+
+const WEB_API = getWebUIUrl();
+let ragServer = rewriteLocalUrl('http://localhost:8080');
 let client: LarkupClient;
 const sdkApiKey = process.env.AI_GATEWAY_APIKEY?.trim() || process.env.OPENAI_API_KEY?.trim() || '';
 
@@ -36,7 +38,7 @@ test.describe.serial('JavaScript SDK', () => {
     });
     const startBody = await startResponse.json();
     expect(startBody.state?.running, startBody.state?.lastError).toBe(true);
-    if (startBody.state?.endpoint) ragServer = startBody.state.endpoint;
+    if (startBody.state?.endpoint) ragServer = rewriteLocalUrl(startBody.state.endpoint);
 
     let ready = false;
     for (let attempt = 0; attempt < 90; attempt += 1) {

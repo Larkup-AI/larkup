@@ -27,13 +27,15 @@ export async function waitForServer(
   );
 }
 
+import { getWebUIUrl, rewriteLocalUrl } from './env';
+
 /**
  * Wait for the web UI dev server on port 4567.
  */
 export async function waitForWebUI(timeout = 120_000): Promise<void> {
-  return waitForServer('http://localhost:4567', {
+  return waitForServer(getWebUIUrl(), {
     timeout,
-    label: 'Web UI (4567)',
+    label: 'Web UI',
   });
 }
 
@@ -41,8 +43,8 @@ export async function waitForWebUI(timeout = 120_000): Promise<void> {
  * Wait for the generated RAG server on port 8080.
  */
 export async function waitForRAGServer(timeout = 60_000): Promise<void> {
-  return waitForServer('http://localhost:8080/health', {
+  return waitForServer(rewriteLocalUrl('http://localhost:8080/health'), {
     timeout,
-    label: 'RAG Server (8080)',
+    label: 'RAG Server',
   });
 }

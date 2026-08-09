@@ -5,13 +5,15 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import os from 'os';
 
+import { getWebUIUrl } from '../../utils/env';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../..');
 
 test.describe('Installation Methods', () => {
   test('pnpm dev — web UI starts on port 4567', async () => {
     // This is already verified by global setup, but let's explicitly test
-    const res = await fetch('http://localhost:4567', {
+    const res = await fetch(getWebUIUrl(), {
       signal: AbortSignal.timeout(10_000),
     });
     expect(res.ok).toBe(true);
@@ -93,17 +95,17 @@ test.describe('Installation Methods', () => {
 
     // ServerSection uses the workspace's primary generated-server port (8080).
     // Keep every Docker entry point aligned so /reference works from the host.
-    expect(dockerfile).toContain('EXPOSE 4567 8080');
-    expect(developmentCompose).toContain("- '8080:8080'");
-    expect(productionCompose).toContain('- "8080:8080"');
+    expect(dockerfile).toContain('EXPOSE 4567 8080-8090');
+    expect(developmentCompose).toContain("- '8080-8090:8080-8090'");
+    expect(productionCompose).toContain('- "8080-8090:8080-8090"');
     expect(dockerfile).toContain('VOLUME ["/app/apps/web/.larkup"]');
     expect(developmentCompose).toContain('larkup_data:/app/apps/web/.larkup');
     expect(productionCompose).toContain('larkup_data:/app/apps/web/.larkup');
     expect(readme).toContain(
-      'docker run -d -p 4567:4567 -p 8080:8080 -v larkup_data:/app/apps/web/.larkup',
+      'docker run -d -p 4567:4567 -p 8080-8090:8080-8090 -v larkup_data:/app/apps/web/.larkup',
     );
     expect(readme).toContain('http://localhost:8080/reference');
-    console.log('  ✓ Docker exposes the Settings RAG server and API reference on :8080');
+    console.log('  ✓ Docker exposes the Settings RAG server and API reference on :8080-8090');
   });
 
   test('generated-server install cache — is cleaned from durable workspace storage', () => {
