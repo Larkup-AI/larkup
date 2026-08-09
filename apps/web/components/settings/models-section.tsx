@@ -41,6 +41,7 @@ import { PROVIDER_META, ProviderIcon } from '@/components/ui/provider-icon';
 import { ServerFormDialog } from '@/components/workspace/server-form-dialog';
 
 import { CustomModelModal } from '@/components/configure/custom-model-modal';
+import { ModelCombobox } from './model-combobox';
 import type { RagConfig, CustomModelConfig, EmbeddingModelDescriptor } from '@larkup/core/types';
 import { EMBEDDING_DIMENSIONS } from '@larkup/core/embeddings/registry';
 
@@ -530,93 +531,26 @@ export function ModelsSection() {
 
           <div className="space-y-1.5">
             <Label className="text-xs">Model</Label>
-            <Select
-              value={isOtherEmbedding ? 'other' : form.embeddingModelId || ''}
-              onValueChange={(v: string | null) => {
-                if (!v) return;
-                if (v === 'other') {
-                  setIsOtherEmbedding(true);
-                  return;
-                }
+            <ModelCombobox
+              value={form.embeddingModelId || ''}
+              onValueChange={(v) => {
                 if (!canUseEmbeddingModel(v)) return;
-                setIsOtherEmbedding(false);
                 setForm({ ...form, embeddingModelId: v });
                 clearError('embeddingModelId');
               }}
-            >
-              <SelectTrigger className="w-full">
-                <span>{form.embeddingModelId || 'Default'}</span>
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {Object.entries(EMBEDDING_BY_PROVIDER)
-                  .filter(
-                    ([provider]) =>
-                      form.embeddingProvider === 'vercel_ai_gateway' ||
-                      provider === form.embeddingProvider ||
-                      provider === 'deepseek',
-                  )
-                  .map(([provider, models]) => {
-                    const meta = PROVIDER_META[provider as keyof typeof PROVIDER_META];
-                    return (
-                      <SelectGroup key={provider}>
-                        <SelectLabel className="flex items-center gap-2 py-1.5">
-                          {meta && (
-                            <ProviderIcon
-                              src={meta.iconSrc}
-                              alt={meta.label}
-                              pillBg={meta.pillBg}
-                              size={18}
-                            />
-                          )}
-                          <span className="font-medium">{meta?.label ?? provider}</span>
-                        </SelectLabel>
-                        {models.map((m) => (
-                          <SelectItem key={m.id} value={m.id} className="pl-8">
-                            <span className="flex items-center gap-2">
-                              <span>{m.label}</span>
-                              <span className="text-[10px] text-muted-foreground font-mono">
-                                {m.dimensions}d
-                              </span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    );
-                  })}
-                {(form.customEmbeddings ?? []).length > 0 && (
-                  <SelectGroup>
-                    <SelectLabel className="flex items-center gap-2 py-1.5">
-                      <ProviderIcon
-                        src={PROVIDER_META.custom.iconSrc}
-                        alt="Custom"
-                        pillBg={PROVIDER_META.custom.pillBg}
-                        size={18}
-                      />
-                      <span className="font-medium">Custom</span>
-                    </SelectLabel>
-                    {(form.customEmbeddings ?? []).map((m) => (
-                      <SelectItem
-                        key={`custom:${m.modelName}`}
-                        value={`custom:${m.modelName}`}
-                        className="pl-8"
-                      >
-                        <span className="flex items-center gap-2">
-                          <span>{m.modelName}</span>
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            {m.dimensions}d
-                          </span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                )}
-                <SelectGroup>
-                  <SelectItem value="other" className="pl-8">
-                    Other...
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+              groups={Object.fromEntries(
+                Object.entries(EMBEDDING_BY_PROVIDER).filter(
+                  ([provider]) =>
+                    form.embeddingProvider === 'vercel_ai_gateway' ||
+                    provider === form.embeddingProvider ||
+                    provider === 'deepseek',
+                ),
+              )}
+              customModels={form.customEmbeddings}
+              isOther={isOtherEmbedding}
+              onOtherChange={(val) => setIsOtherEmbedding(val)}
+              placeholder="Default"
+            />
             {isOtherEmbedding && (
               <Input
                 placeholder="Enter custom model ID"
@@ -748,31 +682,21 @@ export function ModelsSection() {
 
           <div className="space-y-1.5">
             <Label className="text-xs">Model</Label>
-            <Select
+            <ModelCombobox
               value={form.visionModelId || 'default'}
-              onValueChange={(value: string | null) => {
-                if (value === null) return;
-                setForm({ ...form, visionModelId: value === 'default' ? '' : value });
+              onValueChange={(v) => {
+                setForm({ ...form, visionModelId: v === 'default' ? '' : v });
               }}
-            >
-              <SelectTrigger className="w-full">
-                <span className="truncate">{form.visionModelId || 'Default vision model'}</span>
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                <SelectItem value="default">Default vision model</SelectItem>
-                {visionModels
-                  .filter(
-                    (model) =>
-                      form.visionProvider === 'vercel_ai_gateway' ||
-                      model.provider === form.visionProvider,
-                  )
-                  .map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.label}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+              items={[
+                { id: 'default', label: 'Default vision model' },
+                ...visionModels.filter(
+                  (model) =>
+                    form.visionProvider === 'vercel_ai_gateway' ||
+                    model.provider === form.visionProvider,
+                ),
+              ]}
+              placeholder="Default vision model"
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -908,62 +832,17 @@ export function ModelsSection() {
 
           <div className="space-y-1.5">
             <Label className="text-xs">Model</Label>
-            <Select
-              value={isOtherChat ? 'other' : form.chatModelId || ''}
-              onValueChange={(v: string | null) => {
-                if (!v) return;
-                if (v === 'other') {
-                  setIsOtherChat(true);
-                  return;
-                }
-                setIsOtherChat(false);
+            <ModelCombobox
+              value={form.chatModelId || ''}
+              onValueChange={(v) => {
                 setForm({ ...form, chatModelId: v });
               }}
-            >
-              <SelectTrigger className="w-full">
-                <span className="truncate">{form.chatModelId || 'Default'}</span>
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {chatStatus?.availableModels ? (
-                  <SelectGroup>
-                    {chatStatus.availableModels.map((m: any) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        <span>{m.label}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ) : (
-                  <div className="p-2 text-sm text-muted-foreground">Loading models...</div>
-                )}
-                {(form.customChatModels ?? []).length > 0 && (
-                  <SelectGroup>
-                    <SelectLabel className="flex items-center gap-2 py-1.5">
-                      <ProviderIcon
-                        src={PROVIDER_META.custom.iconSrc}
-                        alt="Custom"
-                        pillBg={PROVIDER_META.custom.pillBg}
-                        size={18}
-                      />
-                      <span className="font-medium">Custom</span>
-                    </SelectLabel>
-                    {(form.customChatModels ?? []).map((m) => (
-                      <SelectItem
-                        key={`custom:${m.modelName}`}
-                        value={`custom:${m.modelName}`}
-                        className="pl-8"
-                      >
-                        <span>{m.modelName}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                )}
-                <SelectGroup>
-                  <SelectItem value="other" className="pl-8">
-                    Other...
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+              items={chatStatus?.availableModels || []}
+              customModels={form.customChatModels}
+              isOther={isOtherChat}
+              onOtherChange={setIsOtherChat}
+              placeholder="Default"
+            />
             {isOtherChat && (
               <Input
                 placeholder="Enter custom model ID"
