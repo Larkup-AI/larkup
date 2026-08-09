@@ -51,18 +51,18 @@
     "./video-knowledge/deletion-store": "./src/video-knowledge/deletion-store.ts"
   },
   "dependencies": {
-    "@ai-sdk/cohere": "^4.0.15",
-    "@ai-sdk/deepseek": "^3.0.16",
-    "@ai-sdk/gateway": "^4.0.32",
-    "@ai-sdk/google": "^4.0.28",
-    "@ai-sdk/mistral": "^4.0.17",
-    "@ai-sdk/openai": "^4.0.24",
-    "@ai-sdk/openai-compatible": "^3.0.17",
+    "@ai-sdk/cohere": "^4.0.22",
+    "@ai-sdk/deepseek": "^3.0.23",
+    "@ai-sdk/gateway": "^4.0.42",
+    "@ai-sdk/google": "^4.0.35",
+    "@ai-sdk/mistral": "^4.0.24",
+    "@ai-sdk/openai": "^4.0.31",
+    "@ai-sdk/openai-compatible": "^3.0.24",
     "@larkup/vector-stores": "workspace:*",
-    "ai": "^7.0.42"
+    "ai": "^7.0.54"
   },
   "devDependencies": {
     "@types/node": "^26",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }
