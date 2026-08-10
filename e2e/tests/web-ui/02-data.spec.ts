@@ -222,7 +222,7 @@ test.describe.serial('Data Page', () => {
       .click();
     await expect(page.getByText('GitHub connected')).toBeVisible();
     const disconnect = page.getByRole('button', { name: 'Disconnect' });
-    await expect(disconnect).toHaveClass(/bg-red-500/);
+    await expect(disconnect).toHaveClass(/destructive/);
     await disconnect.click();
     await expect(
       page.locator('[data-integration-id="github"]').getByRole('button', { name: 'Connect' }),
