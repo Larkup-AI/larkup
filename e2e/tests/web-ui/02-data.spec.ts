@@ -71,7 +71,7 @@ test.describe.serial('Data Page', () => {
     ).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open AI model settings' })).toHaveAttribute(
       'href',
-      '/settings',
+      '/settings?section=models',
     );
 
     for (const action of ['Add website', 'Add files', 'Add text', 'Add media']) {
