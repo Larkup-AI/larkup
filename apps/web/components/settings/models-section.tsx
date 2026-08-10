@@ -180,18 +180,6 @@ export function ModelsSection() {
     }
   };
 
-  function handleStructuralChangeBlock() {
-    toast('Cannot modify configuration', {
-      description:
-        'This project already has indexed data. You must create a new project to change this setting.',
-      duration: Number.POSITIVE_INFINITY,
-      action: {
-        label: 'New Project',
-        onClick: () => setNewServerModalOpen(true),
-      },
-    });
-  }
-
   function getEmbeddingDimensions(modelId: string | undefined): number | undefined {
     if (!modelId) return undefined;
     return (
@@ -563,13 +551,11 @@ export function ModelsSection() {
 
           <div className="space-y-1.5">
             <Label className="text-xs">API Key</Label>
-            <div className="relative" onClick={() => indexedRun && handleStructuralChangeBlock()}>
+            <div className="relative">
               <Input
                 type={showEmbeddingKey ? 'text' : 'password'}
                 value={form.embeddingApiKey || ''}
-                readOnly={!!indexedRun}
                 onChange={(e) => {
-                  if (indexedRun) return;
                   setForm({
                     ...form,
                     embeddingApiKey: e.target.value,
