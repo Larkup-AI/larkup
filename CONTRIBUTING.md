@@ -162,6 +162,7 @@ Key architectural decisions are documented in `docs/adrs/`:
 | [ADR-010](docs/adrs/adr-010-channels-execution-and-deployment.md) | Channels, execution environments, and the Agent Runtime bundle |
 | [ADR-011](docs/adrs/adr-011-agent-rate-limiting.md) | Agent rate limiting (requests/minute, messages/session, daily token ceiling) |
 | [ADR-012](docs/adrs/adr-012-marketplace-hub-on-postgres.md) | Marketplace (Hub) catalog on Postgres via Drizzle |
+| [ADR-013](docs/adrs/adr-013-larkup-proxy-boundary.md) | `larkup-proxy` stays a Knowledge Integration OAuth Proxy |
 
 Read the relevant ADR before making changes that touch architectural boundaries.
 
