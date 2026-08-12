@@ -1,0 +1,33 @@
+# Local Postgres for Marketplace/Hub development — TASK 03 (plan §7.4).
+#
+# A contributor never needs a Neon account or the production DATABASE_URL to
+# work on the Marketplace: `apps/hub/.env` is gitignored and reachable only
+# by the deployed service, so this throwaway container is the whole local
+# story.
+#
+#   docker compose -f docker/hub-db.yml up -d
+#   cp packages/hub-db/.env.example packages/hub-db/.env
+#   pnpm --filter @larkup/hub-db push
+#   pnpm --filter @larkup/hub-db seed
+#
+# Port 5433 (not 5432) so this never collides with a Postgres a contributor
+# already has running locally for something else.
+services:
+  hub-db:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=larkup
+      - POSTGRES_PASSWORD=larkup
+      - POSTGRES_DB=larkup_hub
+    ports:
+      - '5433:5432'
+    volumes:
+      - hub_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U larkup -d larkup_hub']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  hub_db_data:

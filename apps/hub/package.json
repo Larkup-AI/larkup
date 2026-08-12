@@ -7,16 +7,21 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "deploy": "vercel deploy"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.12",
+    "@larkup/hub-db": "workspace:*",
     "hono": "^4.12.30"
   },
   "devDependencies": {
     "@types/node": "^26",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
     "tsx": "^4.23.5",
     "typescript": "^7.0.2",
-    "vercel": "58.7.1"
+    "vercel": "58.7.1",
+    "vitest": "^4.1.10"
   }
 }

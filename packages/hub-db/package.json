@@ -1,0 +1,35 @@
+{
+  "name": "@larkup/hub-db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Marketplace/Hub schema, migrations, and typed Postgres client (Drizzle). apps/hub owns no SQL.",
+  "exports": {
+    ".": "./src/client.ts",
+    "./schema": "./src/schema/index.ts",
+    "./repo": "./src/repo.ts",
+    "./validate": "./src/validate.ts",
+    "./builtin-tools": "./src/builtin-tools.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "push": "drizzle-kit push",
+    "migrate": "drizzle-kit migrate",
+    "studio": "drizzle-kit studio",
+    "seed": "tsx src/seed.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.5",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
