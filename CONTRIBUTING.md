@@ -112,6 +112,34 @@ Future packages (created by upcoming tasks):
 - Root `.env: DATABASE_URL` → Reserved for future Cloud control plane. See [ADR-008](docs/adrs/adr-008-hub-neon-ownership.md).
 - Use descriptive placeholder values in `.env.example` files (e.g., `YOUR_API_KEY_HERE`).
 
+## Marketplace: local Postgres, no Neon account needed
+
+`apps/hub`'s catalog is durable Postgres (`packages/hub-db`, Drizzle), but
+`apps/hub/.env`'s `DATABASE_URL` is gitignored and reachable only by the
+deployed service — nobody gets that credential, and you don't need it to work
+on the Marketplace:
+
+```bash
+docker compose -f docker/hub-db.yml up -d          # throwaway local Postgres, port 5433
+cp packages/hub-db/.env.example packages/hub-db/.env
+pnpm --filter @larkup/hub-db migrate               # apply committed migrations
+pnpm --filter @larkup/hub-db seed                  # publish the built-in tools
+pnpm --filter @larkup/hub-db test                  # repository-layer tests
+pnpm --filter @larkup/hub test                     # /v1/* route contract tests
+pnpm --filter @larkup/hub dev                      # local Hub on :3456
+```
+
+Schema changes go in `packages/hub-db/src/schema/*.ts`; run `pnpm --filter
+@larkup/hub-db generate` to produce a migration file in `packages/hub-db/drizzle/`
+and commit it alongside the schema change — migrations are reviewed like code,
+not applied ad hoc. `apps/hub` owns no SQL: every query lives in
+`packages/hub-db/src/repo.ts` as a typed function.
+
+PR previews that touch the Hub use Neon branching instead of this container —
+see the TASK 03 card in `plan.md` §15 for the branch-per-PR flow. That needs
+`NEON_API_KEY`/CI secrets a maintainer provisions separately; it is not part
+of the local contributor path above.
+
 ## Architecture Overview
 
 Refer to `.agents/skills/architecture-overview/SKILL.md` for a high-level overview of the monorepo structure, package responsibilities, and core technologies.
@@ -133,6 +161,7 @@ Key architectural decisions are documented in `docs/adrs/`:
 | [ADR-009](docs/adrs/adr-009-widget-isolation-and-origins.md) | Widget isolation (Shadow DOM) and origin policy |
 | [ADR-010](docs/adrs/adr-010-channels-execution-and-deployment.md) | Channels, execution environments, and the Agent Runtime bundle |
 | [ADR-011](docs/adrs/adr-011-agent-rate-limiting.md) | Agent rate limiting (requests/minute, messages/session, daily token ceiling) |
+| [ADR-012](docs/adrs/adr-012-marketplace-hub-on-postgres.md) | Marketplace (Hub) catalog on Postgres via Drizzle |
 
 Read the relevant ADR before making changes that touch architectural boundaries.
 

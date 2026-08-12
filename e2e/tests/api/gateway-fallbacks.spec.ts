@@ -3,7 +3,7 @@ import {
   GATEWAY_FALLBACK_MODELS,
   gatewayProviderOptions,
 } from '../../../apps/web/lib/gateway-fallbacks';
-import { getHubTool, seedRegistry } from '../../../apps/hub/src/store';
+import { BUILTIN_TOOLS } from '../../../packages/hub-db/src/builtin-tools';
 
 test('Vercel AI Gateway uses provider-diverse backups without retrying its primary model', () => {
   const primary = 'alibaba/qwen-3-14b';
@@ -19,8 +19,7 @@ test('Vercel AI Gateway uses provider-diverse backups without retrying its prima
 });
 
 test('the Hub advertises bundled video processing without a system ffmpeg dependency', () => {
-  seedRegistry();
-  const videoTool = getHubTool('video-audio')?.manifest;
+  const videoTool = BUILTIN_TOOLS.find((tool) => tool.id === 'video-audio');
 
   expect(videoTool).toMatchObject({
     version: '0.3.6',
