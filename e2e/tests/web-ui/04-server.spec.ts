@@ -43,14 +43,20 @@ test.describe.serial('Server Page', () => {
   });
 
   test('page loads with correct heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Server', exact: true })).toBeVisible();
+    // The section was renamed to "Knowledge Server" to match the TASK 01
+    // boundary: this page deploys the data plane, not an Agent.
     await expect(
-      page.getByText('Test locally, then deploy one retrieval and chat server anywhere.'),
+      page.getByRole('heading', { name: 'Knowledge Server', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Test locally, then deploy your Knowledge Server anywhere.'),
     ).toBeVisible();
   });
 
   test('server generation panel loads', async ({ page }) => {
-    await expect(page.getByText('Local Server').first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText('Local Knowledge Server').first()).toBeVisible({
+      timeout: 60_000,
+    });
   });
 
   test('cloud deployments link directly to their API reference', async ({ page }) => {
@@ -60,7 +66,13 @@ test.describe.serial('Server Page', () => {
       const data = await res.json();
       const serverId = data.activeServerId || 'default';
 
-      localStorage.setItem('rag_server_api_key', 'sk-cloud-api-key-test');
+      // The server API key is server-side credential storage now (ADR-004),
+      // not localStorage — seed it through the same API the app writes to.
+      await fetch('/api/config/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverApiKey: 'sk-cloud-api-key-test' }),
+      });
       localStorage.setItem(`larkup_api_key_version_${serverId}`, '1');
       localStorage.setItem(
         `larkup_deployments_${serverId}`,
@@ -108,7 +120,11 @@ test.describe.serial('Server Page', () => {
       const serverId = data.activeServerId || 'default';
       localStorage.removeItem(`larkup_deployments_${serverId}`);
       localStorage.removeItem(`larkup_api_key_version_${serverId}`);
-      localStorage.removeItem('rag_server_api_key');
+      await fetch('/api/config/credentials', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keys: ['serverApiKey'] }),
+      });
     });
   });
 

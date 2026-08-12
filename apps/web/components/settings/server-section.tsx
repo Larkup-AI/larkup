@@ -135,19 +135,22 @@ export function ServerSection() {
   const reconciledVercelDeployments = useRef(new Set<string>());
 
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('rag_server_api_key');
-    if (savedApiKey) setApiKey(savedApiKey);
+    // Load API key and Vercel token from server-side credential store (ADR-004)
+    fetch('/api/config/credentials')
+      .then((r) => r.json())
+      .then((creds) => {
+        if (creds.serverApiKey) setApiKey(creds.serverApiKey);
+      })
+      .catch(() => {}); // Graceful degradation
     setApiKeyVersion(getApiKeyVersion(serverId));
     setDeployments(getDeployments(serverId));
     reconciledVercelDeployments.current.clear();
   }, [serverId]);
 
   useEffect(() => {
-    const token = localStorage.getItem('vercel_token');
-    // Also reconcile ready deployments once: older records may have persisted
-    // the generated deployment hostname instead of the production domain.
+    // Load Vercel token from server-side credential store for deployment status polling
     const vercelDeployments = deployments.filter((deployment) => deployment.provider === 'vercel');
-    if (!token || vercelDeployments.length === 0) return;
+    if (vercelDeployments.length === 0) return;
 
     const deploymentsToRefresh = vercelDeployments.filter(
       (deployment) =>
@@ -158,34 +161,51 @@ export function ServerSection() {
     if (deploymentsToRefresh.length === 0) return;
 
     let cancelled = false;
-    const refreshVercelStatuses = async () => {
-      const updates = await Promise.all(
-        deploymentsToRefresh.map(async (deployment) => ({
-          deployment,
-          result: await getVercelDeploymentStatus(token, deployment.project),
-        })),
-      );
-      if (cancelled) return;
-      for (const { deployment, result } of updates) {
-        if (result.status === 'ready') reconciledVercelDeployments.current.add(deployment.id);
-        const url = result.hasProductionAlias ? result.url : undefined;
-        if (
-          result.status === 'unknown' ||
-          (deployment.status === result.status && (!url || deployment.url === url))
-        ) {
-          continue;
-        }
-        setDeployments(updateDeployment(serverId, deployment.id, { status: result.status, url }));
-      }
-    };
+    // `window.setInterval` resolves to DOM's `number` at the call site, but
+    // `ReturnType<typeof window.setInterval>` picks up @types/node's merged
+    // `Timeout` overload instead — type this directly as `number`.
+    let interval: number | undefined;
 
-    void refreshVercelStatuses();
-    const hasPendingDeployment = deploymentsToRefresh.some(
-      (deployment) => deployment.status === 'queued' || deployment.status === 'building',
-    );
-    const interval = hasPendingDeployment
-      ? window.setInterval(() => void refreshVercelStatuses(), 8_000)
-      : undefined;
+    fetch('/api/config/credentials')
+      .then((r) => r.json())
+      .then((creds) => {
+        if (cancelled) return;
+        const token = creds.vercelToken || '';
+        if (!token) return;
+
+        const refreshVercelStatuses = async () => {
+          const updates = await Promise.all(
+            deploymentsToRefresh.map(async (deployment) => ({
+              deployment,
+              result: await getVercelDeploymentStatus(token, deployment.project),
+            })),
+          );
+          if (cancelled) return;
+          for (const { deployment, result } of updates) {
+            if (result.status === 'ready') reconciledVercelDeployments.current.add(deployment.id);
+            const url = result.hasProductionAlias ? result.url : undefined;
+            if (
+              result.status === 'unknown' ||
+              (deployment.status === result.status && (!url || deployment.url === url))
+            ) {
+              continue;
+            }
+            setDeployments(
+              updateDeployment(serverId, deployment.id, { status: result.status, url }),
+            );
+          }
+        };
+
+        void refreshVercelStatuses();
+        const hasPendingDeployment = deploymentsToRefresh.some(
+          (deployment) => deployment.status === 'queued' || deployment.status === 'building',
+        );
+        if (hasPendingDeployment) {
+          interval = window.setInterval(() => void refreshVercelStatuses(), 8_000);
+        }
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
       if (interval) window.clearInterval(interval);
@@ -231,7 +251,10 @@ export function ServerSection() {
     );
 
     try {
-      const currentApiKey = localStorage.getItem('rag_server_api_key') || '';
+      // Load API key from server-side credential store (ADR-004)
+      const credsRes = await fetch('/api/config/credentials');
+      const creds = credsRes.ok ? await credsRes.json() : {};
+      const currentApiKey = creds.serverApiKey || '';
       const res = await fetch('/api/server/local', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -260,14 +283,18 @@ export function ServerSection() {
   }
 
   function handleApiKeyChange(v: string) {
-    const previousKey = localStorage.getItem('rag_server_api_key') || '';
     setApiKey(v);
-    localStorage.setItem('rag_server_api_key', v);
-    if (v !== previousKey) setApiKeyVersion(incrementApiKeyVersion(serverId));
+    // Persist to server-side credential store (ADR-004)
+    fetch('/api/config/credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serverApiKey: v }),
+    }).catch(() => {});
+    setApiKeyVersion(incrementApiKeyVersion(serverId));
   }
 
   function requestApiKeyChange(v: string) {
-    if (deployments.length > 0 && v !== (localStorage.getItem('rag_server_api_key') || '')) {
+    if (deployments.length > 0 && v !== apiKey) {
       setPendingApiKey(v);
       setApiKeyChangeOpen(true);
       return false;
@@ -324,9 +351,9 @@ export function ServerSection() {
   return (
     <main className="mx-auto w-full max-w-5xl px-6  ">
       <header className="mb-12">
-        <h2 className="text-lg font-semibold tracking-tight">Server</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Knowledge Server</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Test locally, then deploy one retrieval and chat server anywhere.
+          Test locally, then deploy your Knowledge Server anywhere.
         </p>
       </header>
 
@@ -334,7 +361,7 @@ export function ServerSection() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Terminal className="size-4 text-muted-foreground" />
-            <h3 className="text-sm font-medium">Local server</h3>
+            <h3 className="text-sm font-medium">Local Knowledge Server</h3>
           </div>
           <span className="flex items-center gap-2 text-xs">
             {state?.running ? (
@@ -357,8 +384,8 @@ export function ServerSection() {
           </span>
         </div>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Start the server locally to test your AI endpoints. Your configuration and API keys are
-          applied automatically.
+          Start the Knowledge Server locally to test retrieval and chat endpoints. Your
+          configuration and API keys are applied automatically.
         </p>
 
         {state?.lastError && !state.running && (
@@ -401,7 +428,7 @@ export function ServerSection() {
                     <DialogHeader>
                       <DialogTitle>cURL Example</DialogTitle>
                       <DialogDescription>
-                        You can use this command to test your RAG server endpoint.
+                        You can use this command to test your Knowledge Server endpoint.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="relative rounded-md bg-muted p-4 mt-2 border border-border/50">
@@ -483,7 +510,7 @@ export function ServerSection() {
             <h3 className="text-sm font-medium">Deploy to cloud</h3>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            Deploy your AI server to Vercel for production use.
+            Deploy your Knowledge Server for production use.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             <DeployButton
@@ -506,7 +533,7 @@ export function ServerSection() {
         <section>
           <div className="flex items-center gap-2">
             <KeyRound className="size-4 text-muted-foreground" />
-            <h3 className="text-sm font-medium">Server API key</h3>
+            <h3 className="text-sm font-medium">Knowledge Server API key</h3>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
             Clients must send this key in the{' '}
@@ -785,7 +812,8 @@ export function ServerSection() {
               className={'mr-auto'}
               size={'sm'}
               onClick={() => {
-                setApiKey(localStorage.getItem('rag_server_api_key') || '');
+                // Revert to current key (already in React state, synced with server store)
+                setApiKey(apiKey);
                 setPendingApiKey(null);
               }}
             >
