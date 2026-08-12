@@ -7,6 +7,7 @@
  * extension loader instead — `registerChannel` is that seam.
  */
 
+import { slackChannel } from './adapters/slack';
 import { telegramChannel } from './adapters/telegram';
 import { webhookChannel } from './adapters/webhook';
 import type { ChannelAdapter } from './types';
@@ -21,12 +22,13 @@ export function getChannel(id: string): ChannelAdapter | undefined {
   return registry.get(id);
 }
 
-/** Delivery order from plan §9: Widget, Webhook, Telegram, then the rest. */
+/** Delivery order from plan §9: Widget, Webhook, Telegram, Slack, then the rest. */
 export function listChannels(): ChannelAdapter[] {
   return [...registry.values()];
 }
 
 registerChannel(webhookChannel);
 registerChannel(telegramChannel);
+registerChannel(slackChannel);
 
-export { webhookChannel, telegramChannel };
+export { webhookChannel, telegramChannel, slackChannel };

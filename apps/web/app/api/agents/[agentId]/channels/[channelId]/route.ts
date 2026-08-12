@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readAgent, writeAgent } from '@larkup/core/agent-store';
 import { runAgentTurn } from '@larkup/core/agent-runtime';
 import { appendToSession, readSession } from '@larkup/core/session-store';
-import { dispatchInbound, getChannel, type ChannelEvent } from '@larkup/channels-core';
+import {
+  dispatchInbound,
+  getChannel,
+  slackUrlVerificationChallenge,
+  type ChannelEvent,
+} from '@larkup/channels-core';
 
 export const maxDuration = 60;
 
@@ -61,6 +66,25 @@ export async function POST(req: NextRequest, { params }: Params) {
     headers[key.toLowerCase()] = value;
   });
 
+  const inboundRequest = {
+    method: req.method,
+    headers,
+    rawBody,
+    body: parsedBody,
+    query: Object.fromEntries(req.nextUrl.searchParams.entries()),
+  };
+
+  // Slack's one-time url_verification handshake (fired when an operator
+  // saves the Events API Request URL) needs `{ challenge }` echoed back —
+  // not a message, nothing to dispatch. `dispatchInbound`'s fixed
+  // `{ ok, error?, detail? }` result was never meant to carry it, so this
+  // intercepts after the same signature check dispatchInbound would run,
+  // before anything else. See slack.ts's module doc for the full reasoning.
+  const challenge = slackUrlVerificationChallenge(parsedBody);
+  if (challenge && adapter.verify(inboundRequest, channel.settings ?? {}).ok) {
+    return NextResponse.json(challenge);
+  }
+
   const events: ChannelEvent[] = [];
   let answer = '';
 
@@ -68,13 +92,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     adapter,
     agentId,
     settings: channel.settings ?? {},
-    request: {
-      method: req.method,
-      headers,
-      rawBody,
-      body: parsedBody,
-      query: Object.fromEntries(req.nextUrl.searchParams.entries()),
-    },
+    request: inboundRequest,
     onEvent: (event) => {
       events.push(event);
       console.log(`[channel:${channelId}] ${event.type}`, JSON.stringify(event));

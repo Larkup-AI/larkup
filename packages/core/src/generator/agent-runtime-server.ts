@@ -435,6 +435,42 @@ function parseChannelMessage(channelId, settings, headers, rawBody, body) {
     };
   }
 
+  if (channelId === 'slack') {
+    const secret = settings.signingSecret || '';
+    if (!secret) return { error: { status: 403, message: 'Channel has no signing secret.' } };
+
+    const timestamp = headers['x-slack-request-timestamp'];
+    const signature = headers['x-slack-signature'];
+    if (!timestamp || !signature) return { error: { status: 401, message: 'Missing Slack signature headers.' } };
+    if (Math.abs(Date.now() - Number(timestamp) * 1000) > 300000) {
+      return { error: { status: 401, message: 'Signature timestamp is stale.' } };
+    }
+    const expected = 'v0=' + createHmac('sha256', secret).update('v0:' + timestamp + ':' + rawBody).digest('hex');
+    if (!safeEqual(expected, String(signature).trim())) {
+      return { error: { status: 401, message: 'Signature does not match.' } };
+    }
+
+    // One-time handshake when an operator saves the Events API Request URL —
+    // nothing to answer, just echo the challenge back.
+    if (body?.type === 'url_verification' && typeof body.challenge === 'string') {
+      return { challenge: body.challenge };
+    }
+
+    const event = body?.event;
+    if (!event || event.type !== 'message' || event.subtype || event.bot_id) return { message: null };
+    const text = (event.text || '').trim();
+    if (!text || !event.channel || !event.user || !event.ts) return { message: null };
+
+    return {
+      message: {
+        id: body.event_id || event.channel + ':' + event.ts,
+        conversationId: event.channel,
+        text,
+        reply: { kind: 'slack', channel: event.channel },
+      },
+    };
+  }
+
   if (channelId === 'telegram') {
     const expected = settings.webhookSecret || '';
     if (!expected) return { error: { status: 403, message: 'Channel has no webhook secret.' } };
@@ -476,6 +512,25 @@ async function deliverChannelReply(reply, settings, text) {
         signal: AbortSignal.timeout(15000),
       });
       if (!res.ok) return { ok: false, error: 'Telegram API returned HTTP ' + res.status };
+    }
+  }
+
+  if (reply.kind === 'slack') {
+    const token = settings.botToken;
+    if (!token) return { ok: false, error: 'No bot token configured.' };
+    // Slack's Web API answers HTTP 200 even on failure; the real result is
+    // in the JSON body's ok field.
+    for (let i = 0; i < text.length; i += 39000) {
+      const res = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ channel: reply.channel, text: text.slice(i, i + 39000) }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) {
+        return { ok: false, error: 'Slack API error: ' + (payload?.error || 'HTTP ' + res.status) };
+      }
     }
   }
   return { ok: true };
@@ -600,6 +655,8 @@ const server = createServer(async (req, res) => {
       emit('security.auth_failed', { channelId }, { payload: { reason: parsed.error.message } });
       return json(res, parsed.error.status, { error: parsed.error.message });
     }
+    // Slack's one-time url_verification handshake — nothing to dispatch.
+    if (parsed.challenge) return json(res, 200, { challenge: parsed.challenge });
     if (!parsed.message) return json(res, 200, { ok: true, detail: 'ignored' });
 
     const key = channelId + ':' + parsed.message.id;
