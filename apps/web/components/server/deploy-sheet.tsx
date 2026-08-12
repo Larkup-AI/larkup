@@ -2,24 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import useSWR from 'swr';
-import {
-  Rocket,
-  Loader2,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  Dices,
-  Copy,
-  ShieldAlert,
-  AlertTriangle,
-  BadgeCheck,
-  Clock,
-  PlugZap,
-  Upload,
-  ChevronDown,
-  Settings2,
-  Cloud,
-} from 'lucide-react';
+import { Loader2, Eye, Dices, BadgeCheck, PlugZap, Settings2, Cloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,7 +13,7 @@ import {
   SheetTitle,
   SheetFooter,
 } from '@/components/ui/sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -49,25 +32,95 @@ import type { IndexType, RagConfig, VectorStoreId } from '@larkup/core/types';
 import { deployToVercel, getServerEnvRequirements } from '@/app/actions/vercel';
 import { incrementApiKeyVersion, saveDeployment } from '@/lib/deployments';
 
-const GLOBAL_TOKEN_KEY = 'vercel_token';
-function projectKey(serverId: string) {
-  return `vercel_project_${serverId}`;
-}
-function deployedUrlKey(serverId: string) {
-  return `vercel_deployed_url_${serverId}`;
-}
-function deployedProviderKey(serverId: string) {
-  return `vercel_deployed_provider_${serverId}`;
-}
-function serverEnvKey(serverId: string) {
-  return `rag_server_env_vars_${serverId}`;
+/**
+ * Credential helpers — all persistence via server-side API (ADR-004).
+ * localStorage is only used as a migration source (read once, then cleared).
+ */
+async function loadCredentials(): Promise<{
+  vercelToken: string;
+  serverApiKey: string;
+  serverEnvVars: Record<string, Record<string, string>>;
+  vercelProjects: Record<string, string>;
+  deployedUrls: Record<string, string>;
+  migratedFromLocalStorage: boolean;
+}> {
+  const res = await fetch('/api/config/credentials');
+  if (!res.ok)
+    return {
+      vercelToken: '',
+      serverApiKey: '',
+      serverEnvVars: {},
+      vercelProjects: {},
+      deployedUrls: {},
+      migratedFromLocalStorage: false,
+    };
+  return res.json();
 }
 
-function persistApiKey(serverId: string, apiKey: string) {
-  const previousKey = localStorage.getItem('rag_server_api_key') || '';
-  if (apiKey !== previousKey) incrementApiKeyVersion(serverId);
-  if (apiKey) localStorage.setItem('rag_server_api_key', apiKey);
-  else localStorage.removeItem('rag_server_api_key');
+async function saveCredentials(patch: {
+  vercelToken?: string;
+  serverApiKey?: string;
+  serverEnvVars?: Record<string, Record<string, string>>;
+  vercelProjects?: Record<string, string>;
+  deployedUrls?: Record<string, string>;
+  isMigration?: boolean;
+}): Promise<void> {
+  await fetch('/api/config/credentials', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+}
+
+/**
+ * Persists the server API key to server-side credential storage (ADR-004).
+ *
+ * `StoredCredentials.serverApiKey` is a single flat value for the workspace,
+ * not keyed per server — `actuallyDeployToVercel` already treats it this way
+ * (`saveCredentials({ serverApiKey: apiKey })`, no server id). This mirrors
+ * that rather than implying per-server key support the store doesn't have.
+ */
+async function persistApiKey(apiKey: string): Promise<void> {
+  await saveCredentials({ serverApiKey: apiKey });
+}
+
+/**
+ * One-time migration: read legacy localStorage values, persist to server, clear localStorage.
+ * Safe to call multiple times — no-ops if already migrated.
+ */
+async function migrateLocalStorageCredentials(serverId: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const creds = await loadCredentials();
+  if (creds.migratedFromLocalStorage) return; // already migrated
+  const vercelToken = localStorage.getItem('vercel_token') || '';
+  const serverApiKey = localStorage.getItem('rag_server_api_key') || '';
+  const envVarsStr = localStorage.getItem(`rag_server_env_vars_${serverId}`);
+  const envVars = envVarsStr ? (JSON.parse(envVarsStr) as Record<string, string>) : {};
+  const vercelProject = localStorage.getItem(`vercel_project_${serverId}`) || '';
+  const deployedUrl = localStorage.getItem(`vercel_deployed_url_${serverId}`) || '';
+  if (!vercelToken && !serverApiKey && !vercelProject) {
+    // Nothing to migrate — mark done
+    await saveCredentials({ isMigration: true });
+    return;
+  }
+  await saveCredentials({
+    vercelToken: vercelToken || undefined,
+    serverApiKey: serverApiKey || undefined,
+    serverEnvVars: envVars && Object.keys(envVars).length ? { [serverId]: envVars } : undefined,
+    vercelProjects: vercelProject ? { [serverId]: vercelProject } : undefined,
+    deployedUrls: deployedUrl ? { [serverId]: deployedUrl } : undefined,
+    isMigration: true,
+  });
+  // Clear legacy localStorage keys
+  const legacyKeys = [
+    'vercel_token',
+    'rag_server_api_key',
+    `rag_server_env_vars_${serverId}`,
+    `vercel_project_${serverId}`,
+    `vercel_deployed_url_${serverId}`,
+    `vercel_deployed_provider_${serverId}`,
+  ];
+  for (const key of legacyKeys) localStorage.removeItem(key);
 }
 
 const fetcher = (url: string) => fetch(url).then((response) => response.json());
@@ -206,18 +259,22 @@ export function DeploySheet({ open, onOpenChange, target, serverId }: DeployShee
     );
     setEmbeddingModelId(config.embeddingModelId);
 
-    getServerEnvRequirements(serverId).then((reqs) => {
+    getServerEnvRequirements(serverId).then(async (reqs) => {
       setRequiredEnv(reqs);
-      const savedEnvStr = localStorage.getItem(serverEnvKey(serverId));
-      const savedEnv = savedEnvStr ? JSON.parse(savedEnvStr) : {};
+
+      // Migrate localStorage → server-side storage (one-time, safe to repeat)
+      await migrateLocalStorageCredentials(serverId);
+
+      // Load credentials from server-side storage
+      const creds = await loadCredentials();
+      const savedEnv = creds.serverEnvVars?.[serverId] ?? {};
       const initialVals: Record<string, string> = {};
       for (const req of reqs) initialVals[req.key] = savedEnv[req.key] || req.defaultValue || '';
       setEnvValues(initialVals);
 
-      const savedToken = localStorage.getItem(GLOBAL_TOKEN_KEY);
-      const savedProject = localStorage.getItem(projectKey(serverId));
-      const savedApiKey = localStorage.getItem('rag_server_api_key');
-      if (savedApiKey) setApiKey(savedApiKey);
+      if (creds.serverApiKey) setApiKey(creds.serverApiKey);
+      const savedToken = creds.vercelToken;
+      const savedProject = creds.vercelProjects?.[serverId];
       if (savedToken) {
         setVercelToken(savedToken);
         setTokenWasSaved(true);
@@ -377,9 +434,13 @@ export function DeploySheet({ open, onOpenChange, target, serverId }: DeployShee
 
   async function handleDeploy() {
     if (target === 'env') {
-      // Just save environment
-      persistApiKey(serverId, apiKey);
-      localStorage.setItem(serverEnvKey(serverId), JSON.stringify(envValues));
+      // Save credentials server-side (ADR-004 — no localStorage)
+      const previousKey = apiKey;
+      if (previousKey !== apiKey) incrementApiKeyVersion(serverId);
+      await saveCredentials({
+        serverApiKey: apiKey,
+        serverEnvVars: { [serverId]: envValues },
+      });
       onOpenChange(false);
       toast.success('Environment configuration saved.', { position: 'bottom-left' });
       return;
@@ -416,13 +477,15 @@ export function DeploySheet({ open, onOpenChange, target, serverId }: DeployShee
       }
     }
 
-    // Validate Storage Settings
-    if (requiresCloudStorage) {
+    // Vercel durability gate (ADR-004): block Vercel deploy with local LanceDB
+    // Docker/VPS is fine with local storage (uses persistent volumes)
+    if (target === 'vercel' && requiresCloudStorage) {
       setActiveTab('general');
       setTabError('general');
-      toast.error('You must configure a cloud vector store (e.g. Pinecone) to deploy.', {
-        position: 'bottom-left',
-      });
+      toast.error(
+        'Vercel uses ephemeral storage — local LanceDB data will not persist. Configure S3-compatible (LANCEDB_MODE=s3) or LanceDB Cloud (LANCEDB_MODE=cloud) storage before deploying to Vercel.',
+        { position: 'bottom-left', duration: 8000 },
+      );
       return;
     }
 
@@ -452,15 +515,18 @@ export function DeploySheet({ open, onOpenChange, target, serverId }: DeployShee
     try {
       const finalEnvVars = { ...envValues };
       if (apiKey) {
-        finalEnvVars['SERVER_API_KEY'] = apiKey;
-        persistApiKey(sid, apiKey);
+        finalEnvVars['SERVER_API_KEYS'] = `admin:${apiKey}`;
+        incrementApiKeyVersion(sid);
+        await saveCredentials({ serverApiKey: apiKey });
       }
       const res = await deployToVercel(vercelToken, vercelProject, sid, finalEnvVars);
       if (res.success) {
-        localStorage.setItem(GLOBAL_TOKEN_KEY, vercelToken);
-        localStorage.setItem(projectKey(sid), vercelProject);
-        localStorage.setItem(deployedUrlKey(sid), res.url!);
-        localStorage.setItem(deployedProviderKey(sid), 'vercel');
+        // Persist Vercel credentials server-side (ADR-004)
+        await saveCredentials({
+          vercelToken,
+          vercelProjects: { [sid]: vercelProject },
+          deployedUrls: { [sid]: res.url! },
+        });
         saveDeployment(sid, {
           provider: 'vercel',
           project: res.projectName ?? vercelProject,
@@ -510,16 +576,16 @@ export function DeploySheet({ open, onOpenChange, target, serverId }: DeployShee
       type: sshAuthType,
       value: sshKeyOrPassword,
     };
-    const deployEnv =
-      pendingDeployRef.current?.envVars ||
-      (() => {
-        const finalEnvVars = { ...envValues };
-        if (apiKey) {
-          finalEnvVars['SERVER_API_KEY'] = apiKey;
-          persistApiKey(sid, apiKey);
-        }
-        return finalEnvVars;
-      })();
+    let deployEnv = pendingDeployRef.current?.envVars;
+    if (!deployEnv) {
+      const finalEnvVars = { ...envValues };
+      if (apiKey) {
+        finalEnvVars['SERVER_API_KEY'] = apiKey;
+        // Awaited so the deploy request never races the credential write.
+        await persistApiKey(apiKey);
+      }
+      deployEnv = finalEnvVars;
+    }
 
     try {
       const bodyPayload: Record<string, any> = {
@@ -573,8 +639,8 @@ export function DeploySheet({ open, onOpenChange, target, serverId }: DeployShee
                   });
                 } else if (data.type === 'done') {
                   if (data.success) {
-                    localStorage.setItem(deployedUrlKey(sid), data.url!);
-                    localStorage.setItem(deployedProviderKey(sid), 'hetzner');
+                    // Persist SSH deploy URL server-side (ADR-004)
+                    await saveCredentials({ deployedUrls: { [sid]: data.url! } });
                     saveDeployment(sid, {
                       provider: 'hetzner',
                       project: deployHost,

@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
 import { LarkupClient } from '../../../apps/sdk/js-sdk/src/index';
-
 import { getWebUIUrl, rewriteLocalUrl } from '../../utils/env';
 
 const WEB_API = getWebUIUrl();
