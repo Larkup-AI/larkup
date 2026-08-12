@@ -1,6 +1,23 @@
-# Larkup Proxy
+# Larkup Proxy — Knowledge Integration OAuth Proxy
 
-This is the centralized OAuth proxy for Larkup. It securely handles OAuth for the read-only knowledge sources in `@larkup/integrations`: Notion, Google Analytics, Calendar, Docs, Drive, My Maps, Meet, Sheets, Slides, Slack, GitHub, Jira, Linear, and Confluence.
+This is the centralized OAuth proxy for Larkup (plan §10; see
+[ADR-013](../../docs/adrs/adr-013-larkup-proxy-boundary.md) for the boundary
+decision). It securely handles OAuth for the read-only knowledge sources in
+`@larkup/integrations`: Notion, Google Analytics, Calendar, Docs, Drive, My
+Maps, Meet, Sheets, Slides, Slack, GitHub, Jira, Linear, and Confluence.
+
+**Scope, deliberately narrow.** This proxy answers exactly one question —
+"exchange this OAuth code for a read-only knowledge-source token" — for
+whichever provider the request names. It has no concept of an Agent, a
+channel, a chat session, or a webhook, and it must never grow one. Slack
+appears in the list above as a *read-only knowledge source* (public channel
+history for a Knowledge Server); it has nothing to do with the Slack
+*channel* adapter that lets an Agent send and receive chat messages
+(plan §9, `packages/channels-core`) — same provider, two unrelated
+integrations, on purpose. See
+[the deployment guide](../../docs/deploy/larkup-proxy/README.md) and
+[the threat model](../../docs/deploy/larkup-proxy/threat-model.md) for the
+full boundary and redirect-origin policy.
 
 ## Setup & Deployment
 

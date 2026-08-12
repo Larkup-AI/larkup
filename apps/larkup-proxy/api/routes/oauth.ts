@@ -1,53 +1,28 @@
+/**
+ * Knowledge Integration OAuth Proxy — OAuth routes (plan §10).
+ *
+ * Every provider here reads into a Knowledge Server: Notion, the Google
+ * workspace apps, Slack (public channel history), GitHub, Jira, Linear,
+ * Confluence. This proxy has no concept of an Agent, a channel, a chat
+ * session, or a webhook — see `docs/deploy/larkup-proxy/threat-model.md` for
+ * the boundary this is deliberately narrow about. A provider that needs
+ * anything beyond "redirect here, exchange this code for a token" (a Slack
+ * *bot* connection for the §9 channel adapter, for example) does not belong
+ * in this file, however similar its name looks.
+ *
+ * Registry-driven: every provider's OAuth config (`authorizationUrl`,
+ * `tokenUrl`, `scopes`, credential env var names) comes from
+ * `@larkup/integrations`'s catalog — nothing here hard-codes a provider.
+ * Adding a provider is a registry entry plus README instructions (see
+ * `docs/deploy/larkup-proxy/README.md`'s "Provider registration checklist"),
+ * not a code change to this file.
+ */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Hono } from 'hono';
 import { getIntegration } from '@larkup/integrations';
-import type { OAuthIntegrationDefinition } from '@larkup/integrations';
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const app = new Hono();
-
-// Atlassian replaces an account's existing grant when the same OAuth client
-// receives new consent. Both product flows must therefore request this shared
-// read-only scope set or connecting Jira would remove Confluence access (and
-// vice versa).
-const atlassianReadScopes = ['read:jira-work', 'read:page:confluence', 'offline_access'];
-
-/**
- * Keep OAuth working while the proxy consumes a separately published registry
- * package. The Atlassian entries also preserve the shared-scope rule if that
- * package predates the Jira and Confluence fix.
- */
-const proxyOAuthOverrides: Record<string, OAuthIntegrationDefinition> = {
-  jira: {
-    authorizationUrl: 'https://auth.atlassian.com/authorize',
-    tokenUrl: 'https://auth.atlassian.com/oauth/token',
-    scopes: atlassianReadScopes,
-    clientIdEnv: 'ATLASSIAN_CLIENT_ID',
-    clientSecretEnv: 'ATLASSIAN_CLIENT_SECRET',
-    accessTokenEnv: 'JIRA_ACCESS_TOKEN',
-    clientAuthentication: 'body',
-    authorizationParams: { audience: 'api.atlassian.com', prompt: 'consent' },
-  },
-  confluence: {
-    authorizationUrl: 'https://auth.atlassian.com/authorize',
-    tokenUrl: 'https://auth.atlassian.com/oauth/token',
-    scopes: atlassianReadScopes,
-    clientIdEnv: 'ATLASSIAN_CLIENT_ID',
-    clientSecretEnv: 'ATLASSIAN_CLIENT_SECRET',
-    accessTokenEnv: 'CONFLUENCE_ACCESS_TOKEN',
-    clientAuthentication: 'body',
-    authorizationParams: { audience: 'api.atlassian.com', prompt: 'consent' },
-  },
-  linear: {
-    authorizationUrl: 'https://linear.app/oauth/authorize',
-    tokenUrl: 'https://api.linear.app/oauth/token',
-    scopes: ['read'],
-    clientIdEnv: 'LINEAR_CLIENT_ID',
-    clientSecretEnv: 'LINEAR_CLIENT_SECRET',
-    accessTokenEnv: 'LINEAR_ACCESS_TOKEN',
-    clientAuthentication: 'body',
-  },
-};
 
 /**
  * Centralized OAuth broker for all registry integrations. The app that starts
@@ -57,7 +32,7 @@ const proxyOAuthOverrides: Record<string, OAuthIntegrationDefinition> = {
 app.get('/:integration', (c) => {
   const integrationId = c.req.param('integration');
   const redirectTo = c.req.query('redirect_to');
-  const integration = getOAuthIntegration(integrationId);
+  const integration = getIntegration(integrationId);
   if (!integration || !redirectTo) return c.text('Unknown integration or missing redirect_to', 400);
   if (!isAllowedCallback(redirectTo, integrationId))
     return c.text('Unapproved OAuth callback URL', 400);
@@ -90,8 +65,7 @@ app.get('/:integration/callback', async (c) => {
   const code = c.req.query('code');
   const signedState = c.req.query('state');
   const oauthError = c.req.query('error');
-  if (!getOAuthIntegration(integrationId) || !signedState)
-    return c.text('Invalid OAuth callback', 400);
+  if (!getIntegration(integrationId) || !signedState) return c.text('Invalid OAuth callback', 400);
 
   const state = verifyState(signedState);
   if (
@@ -103,7 +77,7 @@ app.get('/:integration/callback', async (c) => {
   if (oauthError || !code)
     return redirectResult(state.redirectTo, { error: oauthError ?? 'missing_code' });
 
-  const integration = getOAuthIntegration(integrationId)!;
+  const integration = getIntegration(integrationId)!;
   const clientId = process.env[integration.oauth.clientIdEnv];
   const clientSecret = process.env[integration.oauth.clientSecretEnv];
   if (!clientId || !clientSecret)
@@ -131,7 +105,12 @@ app.get('/:integration/callback', async (c) => {
   }
 
   const response = await fetch(integration.oauth.tokenUrl, { method: 'POST', headers, body });
-  if (!response.ok) return redirectResult(state.redirectTo, { error: 'token_exchange_failed' });
+  if (!response.ok) {
+    // Provider and status only — never the response body, which for some
+    // providers echoes request parameters that can include the client secret.
+    console.error(`[larkup-proxy] token exchange failed: ${integrationId} -> ${response.status}`);
+    return redirectResult(state.redirectTo, { error: 'token_exchange_failed' });
+  }
   const token = ((await response.json()) as { access_token?: string }).access_token;
   if (!token) return redirectResult(state.redirectTo, { error: 'missing_access_token' });
   return redirectResult(state.redirectTo, { token });
@@ -139,16 +118,6 @@ app.get('/:integration/callback', async (c) => {
 
 function getProxyCallback(requestUrl: string, integrationId: string): string {
   return `${new URL(requestUrl).origin}/api/oauth/${integrationId}/callback`;
-}
-
-function getOAuthIntegration(
-  integrationId: string,
-): { oauth: OAuthIntegrationDefinition } | undefined {
-  const oauth = proxyOAuthOverrides[integrationId];
-  if (oauth) return { oauth };
-  const integration = getIntegration(integrationId);
-  if (integration?.status === 'ready') return integration;
-  return undefined;
 }
 
 function redirectResult(redirectTo: string, parameters: Record<string, string>): Response {
