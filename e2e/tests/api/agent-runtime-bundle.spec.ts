@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
 
 /**
@@ -190,6 +194,38 @@ test.describe.serial('Agent Runtime bundle (TASK 08)', () => {
     // Origin gating travels with the bundle, not just the dashboard.
     expect(server).toContain('allowedOrigins');
     expect(server).toContain('Access-Control-Allow-Origin');
+  });
+
+  test('server.mjs is syntactically valid JavaScript', async ({ request }) => {
+    // The generator builds server.mjs as one large `String.raw` template
+    // literal (`agent-runtime-server.ts`) — TypeScript has zero compile-time
+    // visibility into its contents, so a stray backtick inside a "JS"
+    // comment (which prematurely closes the *outer* template literal) is
+    // invisible to `tsc` and to every other assertion in this file, which
+    // only checks for substrings. This actually parses the emitted file.
+    const bundle = await (await request.get(`/api/agents/${agentId}/bundle`)).json();
+    const server = fileMap(bundle.files)['server.mjs'];
+
+    const dir = mkdtempSync(join(tmpdir(), 'larkup-bundle-syntax-'));
+    const file = join(dir, 'server.mjs');
+    try {
+      writeFileSync(file, server, 'utf8');
+      expect(() => execFileSync('node', ['--check', file], { stdio: 'pipe' })).not.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('carries the Slack channel adapter (plan §9), including the url_verification handshake', async ({
+    request,
+  }) => {
+    const bundle = await (await request.get(`/api/agents/${agentId}/bundle`)).json();
+    const server = fileMap(bundle.files)['server.mjs'];
+
+    expect(server).toContain("channelId === 'slack'");
+    expect(server).toContain('x-slack-signature');
+    expect(server).toContain('url_verification');
+    expect(server).toContain('chat.postMessage');
   });
 
   test('carries the rate-limiting logic (plan §8.5), not just the dashboard', async ({

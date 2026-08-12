@@ -163,6 +163,7 @@ Key architectural decisions are documented in `docs/adrs/`:
 | [ADR-011](docs/adrs/adr-011-agent-rate-limiting.md) | Agent rate limiting (requests/minute, messages/session, daily token ceiling) |
 | [ADR-012](docs/adrs/adr-012-marketplace-hub-on-postgres.md) | Marketplace (Hub) catalog on Postgres via Drizzle |
 | [ADR-013](docs/adrs/adr-013-larkup-proxy-boundary.md) | `larkup-proxy` stays a Knowledge Integration OAuth Proxy |
+| [ADR-014](docs/adrs/adr-014-slack-channel.md) | Slack channel — the `url_verification` handshake boundary |
 
 Read the relevant ADR before making changes that touch architectural boundaries.
 

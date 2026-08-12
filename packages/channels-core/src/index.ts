@@ -36,8 +36,10 @@ export {
   getChannel,
   listChannels,
   registerChannel,
+  slackChannel,
   telegramChannel,
   webhookChannel,
 } from './registry';
 export { computeWebhookSignature } from './adapters/webhook';
 export { splitForTelegram } from './adapters/telegram';
+export { slackUrlVerificationChallenge, splitForSlack } from './adapters/slack';

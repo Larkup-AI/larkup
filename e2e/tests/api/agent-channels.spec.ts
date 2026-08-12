@@ -12,6 +12,7 @@ import { test, expect } from '@playwright/test';
 
 const SECRET = 'whsec_e2e_secret';
 const REDACTED = '__larkup_secret_set__';
+const SLACK_SIGNING_SECRET = 'slack_e2e_signing_secret';
 
 let agentId = '';
 
@@ -19,6 +20,15 @@ function sign(body: string, timestamp = String(Date.now())) {
   return {
     timestamp,
     signature: createHmac('sha256', SECRET).update(`${timestamp}.${body}`).digest('hex'),
+  };
+}
+
+function signSlack(body: string, timestamp = String(Math.floor(Date.now() / 1000))) {
+  return {
+    timestamp,
+    signature:
+      'v0=' +
+      createHmac('sha256', SLACK_SIGNING_SECRET).update(`v0:${timestamp}:${body}`).digest('hex'),
   };
 }
 
@@ -238,5 +248,103 @@ test.describe.serial('Agent channels (TASK 06)', () => {
   test('404s an unknown channel id', async ({ request }) => {
     const res = await request.post(`/api/agents/${agentId}/channels/carrier-pigeon`, { data: {} });
     expect(res.status()).toBe(404);
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* Slack (plan §9)                                                    */
+  /* ---------------------------------------------------------------- */
+
+  test('lists Slack with its config schema and no automatic registration', async ({ request }) => {
+    const res = await request.get(`/api/agents/${agentId}/channels`);
+    const slack = (await res.json()).channels.find((c: { id: string }) => c.id === 'slack');
+
+    expect(slack).toBeTruthy();
+    expect(slack.configFields.map((f: { key: string }) => f.key)).toEqual([
+      'botToken',
+      'signingSecret',
+    ]);
+    // Unlike Telegram's setWebhook, Slack has no API to set the Events API
+    // Request URL — an operator pastes it into the Slack app dashboard by hand.
+    expect(slack.supportsRegistration).toBe(false);
+  });
+
+  test('enables the Slack channel and never returns its secrets again', async ({ request }) => {
+    const enable = await request.put(`/api/agents/${agentId}/channels`, {
+      data: {
+        channelId: 'slack',
+        enabled: true,
+        settings: { botToken: 'xoxb-e2e-fake', signingSecret: SLACK_SIGNING_SECRET },
+      },
+    });
+    expect(enable.status()).toBe(200);
+    expect((await enable.json()).settings.signingSecret).toBe(REDACTED);
+
+    const list = await request.get(`/api/agents/${agentId}/channels`);
+    const slack = (await list.json()).channels.find((c: { id: string }) => c.id === 'slack');
+    expect(slack.enabled).toBe(true);
+    expect(slack.settings.botToken).toBe(REDACTED);
+  });
+
+  test('rejects an inbound Slack request with a wrong signature before the agent runs', async ({
+    request,
+  }) => {
+    const body = JSON.stringify({ type: 'event_callback', event: { type: 'message' } });
+    const res = await request.post(`/api/agents/${agentId}/channels/slack`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-slack-request-timestamp': String(Math.floor(Date.now() / 1000)),
+        'x-slack-signature': 'v0=0000000000000000000000000000000000000000000000000000000000000000',
+      },
+      data: body,
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test('answers the url_verification handshake with the challenge, bypassing dispatch entirely', async ({
+    request,
+  }) => {
+    const body = JSON.stringify({ type: 'url_verification', challenge: 'e2e-challenge-value' });
+    const { timestamp, signature } = signSlack(body);
+
+    const res = await request.post(`/api/agents/${agentId}/channels/slack`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-slack-request-timestamp': timestamp,
+        'x-slack-signature': signature,
+      },
+      data: body,
+    });
+    expect(res.status()).toBe(200);
+    expect(await res.json()).toEqual({ challenge: 'e2e-challenge-value' });
+  });
+
+  test('acknowledges a correctly signed non-message event without dispatching it', async ({
+    request,
+  }) => {
+    // A bot-authored message (subtype set) is a real, validly signed Slack
+    // payload with nothing to answer — it must be acknowledged, not treated
+    // as an error, or Slack retries it forever.
+    const body = JSON.stringify({
+      type: 'event_callback',
+      event: { type: 'message', subtype: 'bot_message', channel: 'C1', text: 'ignore me' },
+    });
+    const { timestamp, signature } = signSlack(body);
+
+    const res = await request.post(`/api/agents/${agentId}/channels/slack`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-slack-request-timestamp': timestamp,
+        'x-slack-signature': signature,
+      },
+      data: body,
+    });
+    expect(res.status()).toBe(200);
+    expect((await res.json()).detail).toBe('ignored');
+  });
+
+  test('Slack has no automatic webhook registration, unlike Telegram', async ({ request }) => {
+    const res = await request.post(`/api/agents/${agentId}/channels/slack/health`, { data: {} });
+    expect(res.status()).toBe(400);
+    expect((await res.json()).detail).toMatch(/does not support automatic registration/i);
   });
 });
