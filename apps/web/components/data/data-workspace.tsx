@@ -315,9 +315,9 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
               </button>
             )}
           </div>
-          <div className="mb-4 mt-9 flex items-center justify-between border-b border-border">
+          <div className="mb-4 pb-1 mt-9 flex items-center justify-between border-b border-border">
             <div
-              className={cn('-mb-2 flex items-center gap-1', activeSubTab === 'notion' && 'mb-0')}
+              className={cn('-mb-2 flex items-center gap-1', activeSubTab === 'notion' && 'pb-1')}
             >
               {SUB_TABS.map((tab) => {
                 const isActive = activeSubTab === tab.id;
@@ -404,9 +404,9 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
 
       <div>
         {activeTab === 'add' && (
-          <div className="w-full">
+          <div className="w-full ">
             {/* ─── Tab content ─── */}
-            <div className="relative " key={resetKey}>
+            <div className="relative" key={resetKey}>
               {dataAddBlocked ? (
                 <div className="mx-auto flex min-h-72 max-w-xl mt-5 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 text-center">
                   <div className="mb-4 rounded-full bg-primary/10 p-3 text-primary">

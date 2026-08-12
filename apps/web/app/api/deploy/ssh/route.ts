@@ -357,11 +357,36 @@ export async function POST(req: NextRequest) {
         }
 
         ssh.dispose();
-        log(`🎉 Deployment completed successfully!`);
+        log(`🎉 Container started — verifying server health...`);
+
+        // Poll /health until the server responds (up to 60 s)
+        const serverUrl = `http://${host}:8080`;
+        let healthy = false;
+        for (let attempt = 1; attempt <= 12; attempt++) {
+          await new Promise((r) => setTimeout(r, 5000));
+          try {
+            const hRes = await fetch(`${serverUrl}/health`, { signal: AbortSignal.timeout(4000) });
+            if (hRes.ok) {
+              healthy = true;
+              break;
+            }
+          } catch {
+            /* still starting */
+          }
+          log(`  Health check ${attempt}/12…`);
+        }
+
+        if (!healthy) {
+          log(
+            '⚠️  Server did not respond to /health within 60 s. It may still be starting — check logs on the VPS.',
+          );
+        } else {
+          log('✅ Knowledge Server is healthy and accepting requests.');
+        }
 
         done({
           success: true,
-          url: `http://${host}:8080`,
+          url: serverUrl,
           newPassword: updatedPassword || undefined,
         });
       } catch (error: any) {

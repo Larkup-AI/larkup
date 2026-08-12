@@ -52,6 +52,7 @@
           {
             "group": "Developer Guide",
             "pages": [
+              "developer/agent-widget",
               "developer/cli",
               "developer/deploy",
               "developer/configuration"

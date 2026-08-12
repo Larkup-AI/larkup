@@ -1,0 +1,49 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - '-t'
+      - '$_IMAGE_NAME'
+      - '.'
+    id: build
+
+  # Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - '$_IMAGE_NAME'
+    id: push
+    waitFor: [build]
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '$_SERVICE_NAME'
+      - '--image=$_IMAGE_NAME'
+      - '--region=$_REGION'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--set-env-vars=NODE_ENV=production'
+      - '--update-secrets=EMBEDDING_API_KEY=embedding-api-key:latest,SERVER_API_KEYS=server-api-keys:latest,CHAT_API_KEY=chat-api-key:latest'
+    id: deploy
+    waitFor: [push]
+
+substitutions:
+  _SERVICE_NAME: larkup-knowledge-server
+  _REGION: us-central1
+  _IMAGE_NAME: us-central1-docker.pkg.dev/${PROJECT_ID}/larkup/${_SERVICE_NAME}:${SHORT_SHA}
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - '$_IMAGE_NAME'

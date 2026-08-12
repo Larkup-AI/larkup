@@ -43,6 +43,8 @@ apps/web/webui.log
 
 # ── App-Specific ─────────────────────────────────
 apps/web/demo
+# Built by scripts/copy-widget.mjs from packages/agent-widget/dist
+apps/web/public/widget/
 apps/local-chat-connection-larkup
 local-chat-connection-larkup
 # ── Desktop Binaries ─────────────────────────────
@@ -65,3 +67,4 @@ apps/api*.log
 
 
 notes.txt
+plan.md

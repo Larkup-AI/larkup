@@ -60,6 +60,9 @@ jobs:
       - name: Lint
         run: pnpm turbo lint
 
+      - name: Type check
+        run: pnpm turbo type-check
+
       - name: Create dummy sidecar binary for Tauri build
         run: |
           mkdir -p apps/desktop/src-tauri/binaries
@@ -68,3 +71,18 @@ jobs:
 
       - name: Build
         run: pnpm turbo build
+
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog secret scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified

@@ -66,7 +66,7 @@ export function PastePanel({
         <Input
           id="paste-title"
           placeholder="Demo Title"
-          className="w-full"
+          className="w-full h-10 bg-white"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
@@ -76,7 +76,7 @@ export function PastePanel({
         <Textarea
           id="paste-content"
           placeholder="Paste any text, markdown, or notes here…"
-          className="min-h-48 placeholder:text-muted-foreground/50 placeholder:text-xs font-mono text-xs leading-relaxed bg-white"
+          className="min-h-48 placeholder:text-muted-foreground/50 placeholder:text-xs font-mono text-xs leading-relaxed "
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />

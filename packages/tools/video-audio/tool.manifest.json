@@ -1,5 +1,7 @@
 {
-  "$schema": "https://hub.larkup.de/schemas/tool-manifest.v1.json",
+  "$schema": "https://hub.larkup.de/schemas/tool-manifest.v2.json",
+  "manifestVersion": "2.0",
+  "kind": "tool",
   "id": "video-audio",
   "name": "Video Intelligence",
   "description": "Build evidence-backed timelines from video and audio with adaptive attention and bounded source rewind.",
@@ -112,5 +114,12 @@
         { "label": "Legacy pipeline only", "value": "false" }
       ]
     }
-  ]
+  ],
+  "trustLevel": "elevated",
+  "permissions": {
+    "fsRead": true,
+    "fsWrite": true,
+    "exec": true,
+    "httpAllow": ["youtube.com", "www.youtube.com", "youtu.be", "api.openai.com", "api.groq.com", "api.deepgram.com", "api.elevenlabs.io"]
+  }
 }
