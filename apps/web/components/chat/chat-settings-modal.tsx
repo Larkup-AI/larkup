@@ -235,7 +235,7 @@ export function ChatSettingsModal() {
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="Leave blank to use environment variable"
-                    className="w-full rounded-lg border border-border bg-card px-3 py-2 pr-10 text-sm text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2 pr-10 text-sm text-foreground outline-none transition focus:border-primary  focus:ring-primary"
                   />
                   <button
                     type="button"
@@ -257,7 +257,7 @@ export function ChatSettingsModal() {
                   value={systemPrompt}
                   onChange={(e) => setSystemPrompt(e.target.value)}
                   placeholder="Leave blank to use default system prompt"
-                  className="w-full min-h-35 rounded-lg border bg-card border-border  px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="w-full min-h-35 rounded-lg border bg-card border-border  px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary  focus:ring-primary"
                 />
                 <p className="text-xs text-muted-foreground">
                   Override the default instructions given to the agent.

@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "dev": "next dev -p 4567",
+    "prebuild": "node scripts/copy-widget.mjs",
     "build": "next build --webpack",
     "postbuild": "node scripts/prepare-standalone.mjs && if pnpm exec prettier --version >/dev/null 2>&1; then pnpm exec prettier --write next-env.d.ts; fi",
     "start": "node .next/standalone/apps/web/server.js",
@@ -29,6 +30,9 @@
     "@ai-sdk/react": "4.0.57",
     "@base-ui/react": "^1.5.0",
     "@lancedb/lancedb": "^0.33.0",
+    "@larkup/agent-contracts": "workspace:*",
+    "@larkup/agent-widget": "workspace:*",
+    "@larkup/channels-core": "workspace:*",
     "@larkup/core": "workspace:*",
     "@larkup/integrations": "workspace:*",
     "@larkup/marketplace": "workspace:*",

@@ -669,7 +669,7 @@ export function ScrapePanel({
                   placeholder='Search for websites, e.g. "Who is the best player in the world?"'
                   value={query}
                   disabled={disabled}
-                  className="pl-9 pr-22"
+                  className="pl-9 h-11 pr-22  bg-white"
                   onChange={(e) => {
                     setQuery(e.target.value);
                     setShowDropdown(true);
@@ -720,7 +720,7 @@ export function ScrapePanel({
                   placeholder="Paste URLs (comma or space separated)"
                   value={manualUrl}
                   disabled={disabled}
-                  className="pl-9 pr-16"
+                  className="pl-9 h-11 pr-16  bg-white"
                   onChange={(e) => setManualUrl(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addManual()}
                 />

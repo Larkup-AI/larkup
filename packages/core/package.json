@@ -48,7 +48,11 @@
     "./video-knowledge/inspection-store": "./src/video-knowledge/inspection-store.ts",
     "./video-knowledge/conflict-store": "./src/video-knowledge/conflict-store.ts",
     "./video-knowledge/evaluation": "./src/video-knowledge/evaluation.ts",
-    "./video-knowledge/deletion-store": "./src/video-knowledge/deletion-store.ts"
+    "./video-knowledge/deletion-store": "./src/video-knowledge/deletion-store.ts",
+    "./agent-store": "./src/agent-store.ts",
+    "./agent-runtime": "./src/agent-runtime.ts",
+    "./session-store": "./src/session-store.ts",
+    "./generator/generate-agent-runtime": "./src/generator/generate-agent-runtime.ts"
   },
   "dependencies": {
     "@ai-sdk/cohere": "^4.0.22",
@@ -58,6 +62,7 @@
     "@ai-sdk/mistral": "^4.0.24",
     "@ai-sdk/openai": "^4.0.31",
     "@ai-sdk/openai-compatible": "^3.0.24",
+    "@larkup/agent-contracts": "workspace:*",
     "@larkup/vector-stores": "workspace:*",
     "ai": "^7.0.54"
   },

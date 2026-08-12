@@ -43,6 +43,17 @@ async function errorFor(response: Response): Promise<LarkupApiError> {
   return new LarkupApiError(response.status, message);
 }
 
+/**
+ * Client for the Larkup **Knowledge Server** (data plane).
+ *
+ * Connects to a deployed or local Knowledge Server for semantic retrieval,
+ * document management, and corpus operations. Use a scoped API key
+ * (retrieval / ingest / admin) to control what operations are permitted.
+ *
+ * For the Agent (execution plane), use `LarkupAgentClient` instead.
+ *
+ * @see {@link https://docs.larkup.de/sdk/js Knowledge Server SDK docs}
+ */
 export class LarkupClient {
   private readonly baseUrl: string;
   private readonly apiKey?: string;
@@ -76,9 +87,23 @@ export class LarkupClient {
     return (await this.request(path, options)).json() as Promise<T>;
   }
 
-  /** Returns the deployed server health and service name. */
+  /** Returns the deployed Knowledge Server health and service name. */
   health(): Promise<HealthResponse> {
     return this.json('/health');
+  }
+
+  /**
+   * Checks whether the Knowledge Server's vector store connection is live.
+   * Returns `{ ready: true, vectorStore: "connected", documents: N }` on success,
+   * or throws with a 503 if the store is unreachable.
+   */
+  readiness(): Promise<{
+    ready: boolean;
+    vectorStore: string;
+    documents?: number;
+    error?: string;
+  }> {
+    return this.json('/readiness');
   }
 
   /** Returns the generated OpenAPI schema. */

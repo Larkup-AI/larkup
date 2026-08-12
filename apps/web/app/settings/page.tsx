@@ -14,6 +14,7 @@ import { ConnectionsSection } from '@/components/settings/connections-section';
 import { DeploymentSection } from '@/components/settings/deployment-section';
 import { MarketplaceSection } from '@/components/settings/marketplace-section';
 import { MarketplaceToolsSettings } from '@/components/settings/marketplace-tools-settings';
+import { AgentSection } from '@/components/settings/agent-section';
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
 
 function SettingsContent() {
@@ -28,9 +29,6 @@ function SettingsContent() {
     return 'general';
   };
 
-  // Keep an immediate local selection as well as the URL. A slow Installed
-  // Tools request must never make the rest of the settings navigation feel
-  // frozen while Next finishes a route transition.
   const [activeSection, setActiveSection] = useState<SettingsSection>(resolveSection);
 
   useEffect(() => {
@@ -38,7 +36,6 @@ function SettingsContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    // Normalize legacy `?ai-models` param to `?section=models`
     if (searchParams.has('ai-models')) {
       const params = new URLSearchParams(searchParams.toString());
       params.delete('ai-models');
@@ -51,9 +48,6 @@ function SettingsContent() {
     setActiveSection(newSection);
     const nextUrl = `${pathname}?section=${newSection}`;
     window.history.replaceState(null, '', nextUrl);
-    // Keep Next's route state in sync in the background. The local state above
-    // is intentionally updated first so this remains responsive if a section
-    // has a slow request in flight.
     router.replace(nextUrl, { scroll: false });
   };
 
@@ -67,6 +61,7 @@ function SettingsContent() {
       {activeSection === 'deployment' && <DeploymentSection />}
       {activeSection === 'marketplace' && <MarketplaceSection />}
       {activeSection === 'tool-settings' && <MarketplaceToolsSettings />}
+      {activeSection === 'agents' && <AgentSection />}
       {activeSection === 'prompts' && <PromptsSection />}
       {activeSection === 'playground' && <PlaygroundSection />}
       {activeSection === 'search-web' && <SearchIntegrationsSection />}

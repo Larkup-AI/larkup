@@ -6,6 +6,8 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: [
+    '@larkup/agent-contracts',
+    '@larkup/channels-core',
     '@larkup/core',
     '@larkup/vector-stores',
     '@larkup/scraper',

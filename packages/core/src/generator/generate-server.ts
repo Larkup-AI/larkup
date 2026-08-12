@@ -370,9 +370,50 @@ import * as cheerio from "cheerio"
 const PORT = process.env.PORT || 8080
 const DEFAULT_TOP_K = Number(process.env.TOP_K || ${config.topK})
 
+/* ── Scoped API key auth (ADR-004) ────────────────────────────── */
+// SERVER_API_KEYS format: "scope:key,scope:key,..."
+// Scopes: retrieval (query/chat), ingest (documents/scrape/media), admin (everything)
+// Backward compat: SERVER_API_KEY without scope prefix = admin
+const KEY_MAP = new Map()
+const rawKeys = process.env.SERVER_API_KEYS || process.env.SERVER_API_KEY || ""
+if (rawKeys) {
+  for (const entry of rawKeys.split(",").map(s => s.trim()).filter(Boolean)) {
+    const colonIdx = entry.indexOf(":")
+    if (colonIdx > 0) {
+      KEY_MAP.set(entry.slice(colonIdx + 1), entry.slice(0, colonIdx))
+    } else {
+      // Legacy single key without scope = admin
+      KEY_MAP.set(entry, "admin")
+    }
+  }
+}
+const AUTH_ENABLED = KEY_MAP.size > 0
 console.log('[${
     config.projectName
-  }] SERVER_API_KEY:', process.env.SERVER_API_KEY ? 'SET ('+process.env.SERVER_API_KEY.length+' chars, starts with: '+process.env.SERVER_API_KEY.slice(0,8)+'...)' : 'NOT SET (open access)')
+  }] Auth:', AUTH_ENABLED ? \`\${KEY_MAP.size} scoped key(s) configured\` : 'DISABLED (open access)')
+
+// Endpoint-to-scope access table per ADR-004
+const SCOPE_TABLE = {
+  retrieval: new Set(["/query", "/chat"]),
+  ingest: new Set(["/query", "/chat", "/documents", "/scrape", "/media"]),
+  admin: null, // admin = all endpoints
+}
+
+function resolveScope(token) {
+  return KEY_MAP.get(token) || null
+}
+
+function scopeAllows(scope, pathname) {
+  if (!scope) return false
+  if (scope === "admin") return true
+  const allowed = SCOPE_TABLE[scope]
+  if (!allowed) return false
+  // Check if the pathname starts with any allowed prefix
+  for (const p of allowed) {
+    if (pathname === p || pathname.startsWith(p + "/")) return true
+  }
+  return false
+}
 
 function send(res, status, body) {
   const json = JSON.stringify(body)
@@ -416,25 +457,37 @@ const server = createServer(async (req, res) => {
     } catch {}
   }
 
-  const expectedKey = process.env.SERVER_API_KEY
-  
-  if (expectedKey) {
+  // Public endpoints: no auth required
+  const isPublic = url.pathname === "/" || url.pathname === "/health" || url.pathname === "/readiness" || url.pathname === "/openapi.json" || url.pathname === "/reference"
+
+  if (AUTH_ENABLED && !isPublic) {
     const auth = req.headers.authorization
-    const isPublic = url.pathname === "/" || url.pathname === "/health" || url.pathname === "/openapi.json" || url.pathname === "/reference"
-    if (!isPublic) {
-      if (!auth) {
-        return send(res, 401, { error: "Missing Authorization header. Expected Bearer token." })
-      }
-      const token = auth.replace(/^Bearer\\s+/i, "").trim()
-      if (token !== expectedKey.trim()) {
-        console.error('[AUTH] Token mismatch. Got:', token.slice(0,20), '| Expected starts with:', expectedKey.trim().slice(0,20))
-        return send(res, 403, { error: "Invalid API key." })
-      }
+    if (!auth) {
+      return send(res, 401, { error: "Missing Authorization header. Use 'Authorization: Bearer <key>'." })
+    }
+    const token = auth.replace(/^Bearer\\s+/i, "").trim()
+    const scope = resolveScope(token)
+    if (!scope) {
+      return send(res, 401, { error: "Invalid API key." })
+    }
+    if (!scopeAllows(scope, url.pathname)) {
+      return send(res, 403, { error: \`Insufficient permissions. Your '\${scope}' key cannot access \${url.pathname}.\` })
     }
   }
 
   if (req.method === "GET" && url.pathname === "/health") {
-    return send(res, 200, { ok: true, service: ${JSON.stringify(config.projectName)} })
+    return send(res, 200, { ok: true, service: ${JSON.stringify(
+      config.projectName,
+    )}, type: "knowledge-server" })
+  }
+
+  if (req.method === "GET" && url.pathname === "/readiness") {
+    try {
+      const t = await store.list({ page: 1, limit: 1 })
+      return send(res, 200, { ready: true, vectorStore: "connected", documents: t.total ?? 0 })
+    } catch (err) {
+      return send(res, 503, { ready: false, vectorStore: "error", error: String(err?.message || err) })
+    }
   }
 
   if (req.method === "GET" && url.pathname === "/") {
@@ -1047,9 +1100,10 @@ npm-debug.log
 function dockerCompose(projectName: string, usesLocalLance: boolean): string {
   const volume = usesLocalLance
     ? `    volumes:
-      - ./.larkup:/app/.larkup
+      - larkup_data:/app/.larkup
 `
     : '';
+  const volumes = usesLocalLance ? `\nvolumes:\n  larkup_data:\n    driver: local\n` : '';
   return `services:
   ${projectName}:
     build: .
@@ -1059,7 +1113,13 @@ function dockerCompose(projectName: string, usesLocalLance: boolean): string {
       - "8080:8080"
     env_file:
       - .env
-${volume}`;
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+${volume}${volumes}`;
 }
 
 function vercelJson(): string {
@@ -1087,7 +1147,7 @@ function readme(config: RagConfig, server: GeneratedServer): string {
     .join('\n');
   return `# ${config.projectName}
 
-A lightweight RAG retrieval server generated by **larkup**.
+A Larkup **Knowledge Server** — lightweight RAG retrieval API.
 
 - **Vector store:** ${store.label}
 - **Embedding model:** ${config.embeddingModelId}
@@ -1110,9 +1170,24 @@ node demo.mjs "your question here"
 # or
 curl -X POST http://localhost:8080/query \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer <your-key>" \\
+  -H "Authorization: Bearer <your-retrieval-key>" \\
   -d '{"query":"your question","topK":${config.topK}}'
 \`\`\`
+
+## Authentication
+
+Set \`SERVER_API_KEYS\` with scoped keys:
+\`\`\`bash
+SERVER_API_KEYS=retrieval:rk_your_key,ingest:ik_your_key,admin:ak_your_key
+\`\`\`
+
+| Scope | Can do |
+|-------|--------|
+| \`retrieval\` | Query, chat |
+| \`ingest\` | Query, chat, add/update/delete documents, scrape, media |
+| \`admin\` | Everything including corpus export |
+
+A single key without a scope prefix is treated as \`admin\` for backward compatibility.
 
 ## Deploy
 
@@ -1121,25 +1196,32 @@ curl -X POST http://localhost:8080/query \\
 docker compose up -d --build
 \`\`\`
 
+Data persists in a Docker named volume (\`larkup_data\`).
+
 ### Vercel
 \`\`\`bash
 vercel deploy
 \`\`\`
 
+> **Important:** Vercel uses ephemeral storage. You must configure S3-compatible
+> (\`LANCEDB_MODE=s3\`) or LanceDB Cloud (\`LANCEDB_MODE=cloud\`) storage for
+> production. Local LanceDB data will not persist between invocations.
+
 ## API
-- \`GET  /health\`           → \`{ ok: true }\`
+- \`GET  /health\`           → \`{ ok: true, type: "knowledge-server" }\`
+- \`GET  /readiness\`        → \`{ ready: true, vectorStore: "connected" }\`
 - \`GET  /reference\`        → Scalar API docs UI
-- \`POST /query\`            → \`{ query, hits: [{ id, score, title, url, text, documentId }] }\`
-- \`POST /chat\`             → SSE stream of retrieval-grounded assistant text
-- \`GET  /documents\`        → list all documents (paginated)
-- \`GET  /documents/:id\`    → get a single document
-- \`POST /documents\`        → add a document
-- \`PUT  /documents/:id\`    → update a document
-- \`DELETE /documents/:id\`  → delete a document
-- \`POST /scrape\`           → scrape a URL and ingest into the corpus
-- \`GET  /corpus/summary\`   → get corpus statistics (counts by source/status)
-- \`POST /corpus\`           → get corpus documents with optional filtering
-- \`POST /corpus/export\`    → export full corpus as CSV or JSONL
+- \`POST /query\`            → \`{ query, hits: [...] }\` (retrieval scope)
+- \`POST /chat\`             → SSE stream (retrieval scope)
+- \`GET  /documents\`        → list documents (ingest scope)
+- \`GET  /documents/:id\`    → get a document (ingest scope)
+- \`POST /documents\`        → add a document (ingest scope)
+- \`PUT  /documents/:id\`    → update a document (ingest scope)
+- \`DELETE /documents/:id\`  → delete a document (ingest scope)
+- \`POST /scrape\`           → scrape and ingest URL (ingest scope)
+- \`GET  /corpus/summary\`   → corpus stats (admin scope)
+- \`POST /corpus\`           → corpus documents (admin scope)
+- \`POST /corpus/export\`    → export as CSV/JSONL (admin scope)
 `;
 }
 
@@ -1189,9 +1271,9 @@ export function generateServer(config: RagConfig): GeneratedServer {
       help: 'Port to listen on (default 8080).',
     },
     {
-      key: 'SERVER_API_KEY',
+      key: 'SERVER_API_KEYS',
       required: false,
-      help: "Bearer token to secure your server endpoints. If set, requests must include 'Authorization: Bearer <key>'.",
+      help: "Scoped API keys. Format: 'scope:key,scope:key,...' where scope is retrieval, ingest, or admin. Example: 'retrieval:rk_abc,ingest:ik_def,admin:ak_ghi'. A single key without scope prefix is treated as admin for backward compatibility.",
     },
     {
       key: 'TOP_K',
@@ -1309,7 +1391,7 @@ export function generateServer(config: RagConfig): GeneratedServer {
     version: '1.0.0',
     private: true,
     type: 'module',
-    description: `Lightweight RAG server (${store.label}) generated by larkup`,
+    description: `Larkup Knowledge Server (${store.label})`,
     scripts: {
       start: 'node --env-file=.env server.mjs',
       demo: 'node demo.mjs',

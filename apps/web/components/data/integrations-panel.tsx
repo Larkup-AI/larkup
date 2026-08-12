@@ -169,7 +169,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
               placeholder="Search integrations..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="h-9 bg-background pl-9"
+              className="h-9 pl-9  bg-white"
             />
           </div>
           <Button

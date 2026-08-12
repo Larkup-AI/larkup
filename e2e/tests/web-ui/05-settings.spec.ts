@@ -16,9 +16,13 @@ test.describe('Settings Page', () => {
   test('server section is accessible', async ({ page }) => {
     await page.getByRole('button', { name: 'Larkup Server', exact: true }).click();
 
-    await expect(page.getByRole('heading', { name: 'Server', exact: true })).toBeVisible();
+    // The section was renamed to "Knowledge Server" to match the TASK 01
+    // boundary: this page deploys the data plane, not an Agent.
     await expect(
-      page.getByText('Test locally, then deploy one retrieval and chat server anywhere.'),
+      page.getByRole('heading', { name: 'Knowledge Server', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Test locally, then deploy your Knowledge Server anywhere.'),
     ).toBeVisible();
   });
 
