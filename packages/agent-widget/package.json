@@ -27,11 +27,11 @@
     "@larkup/agent-contracts": "workspace:*",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@vitejs/plugin-react": "^6.0.5",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
-    "vite": "^6.4.3",
+    "vite": "^8.2.1",
     "vitest": "^4.1.10"
   }
 }
