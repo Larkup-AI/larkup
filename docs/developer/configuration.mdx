@@ -1,115 +1,46 @@
 ---
 title: 'Configuration Reference'
-description: 'Configure models, storage, web search, installed tools, and agent access.'
+description: 'Configure models, storage, installed tools, and agent access.'
 ---
 
 Open **Settings** to configure the active Larkup workspace. Changes apply to Chat, indexing, and the generated server.
 
 ## AI Models
 
-Use **Settings → AI Models** to select the providers and models used for embeddings, chat, and vision tasks.
+Use **Settings → AI Models** to choose the provider and model for embeddings, chat, and vision.
 
-<Frame caption="Embedding and chat model settings">
-  <img
-    src="/images/new/ai-models-settings.png"
-    alt="AI Models settings with embedding and chat providers"
-  />
+<Frame caption="AI Models settings">
+  <img src="/images/configuration/configuration-page.png" alt="AI Models settings with embedding and vision providers" />
 </Frame>
 
-### Embedding model
-
-The embedding model turns loaded content and search queries into vectors. Choose a provider, model, and API key, then save the configuration.
-
-Larkup keeps direct providers and **Vercel AI Gateway** separate: selecting a direct provider sends requests only through that provider's SDK and API key, while selecting the gateway keeps its model routing and fallback behavior. The **Add Data** page stays locked until an embedding key is configured, so content is never staged as unindexed data that cannot be searched.
-
-### Chat model
-
-The chat model generates answers from retrieved context. It can use the same provider as embeddings or a separate provider and key.
-
-For a direct Google API key, the model picker offers current Gemini models with function-calling support. Retired or gateway-only Gemini IDs are not used for direct Google requests.
-
-### Vision model
-
-The vision model powers image descriptions, video-frame analysis, OCR, and other tools that need to understand pixels. It has its own provider, model, and API key, so it can be different from the chat model. The picker only offers providers with compatible vision models; leaving the model on **Default** selects the appropriate vision-language model for that provider.
-
-<Note>
-  Changing the embedding model requires indexing existing content again so stored vectors use the
-  same model as future queries.
-</Note>
+The embedding model turns content and queries into vectors; changing it requires indexing existing content again. The chat model answers from retrieved context and can use a different provider than embeddings. The vision model powers video, image, and OCR tools and can also differ from the chat model.
 
 ## Storage and retrieval
 
-Use **Settings → Storage** to choose the indexing strategy and storage engine.
+Use **Settings → Storage** to choose Semantic, Lexical, or Hybrid retrieval and the storage engine. LanceDB runs from a local path, LanceDB Cloud, or S3 compatible storage; use a persistent remote mode before deploying to a serverless platform.
 
-<Frame caption="Indexing strategy and storage engine settings">
-  <img
-    src="/images/new/storage-settings.png"
-    alt="Storage settings with Hybrid retrieval and LanceDB configuration"
-  />
+## General
+
+Use **Settings → General** to name the workspace and set its theme.
+
+<Frame caption="General settings">
+  <img src="/images/configuration/general-settings.png" alt="General settings with workspace name and appearance" />
 </Frame>
 
-<AccordionGroup>
-  <Accordion title="Semantic Search" icon="brain">
-    Finds content by meaning. This works well when the question and source use different wording.
-  </Accordion>
-  <Accordion title="Lexical Search" icon="magnifying-glass">
-    Finds exact terms such as names, product codes, identifiers, and specialized vocabulary.
-  </Accordion>
-  <Accordion title="Hybrid Search" icon="layer-group">
-    Combines semantic and lexical retrieval. This is a strong default for mixed business and
-    technical content.
-  </Accordion>
-</AccordionGroup>
-
-LanceDB can run from a local path, LanceDB Cloud, or S3 compatible storage. Use local mode for development. Choose a persistent remote mode before deploying a knowledge base to a serverless platform.
-
-## General settings
-
-Use **Settings → General** to name the workspace and configure optional web search.
-
-<Frame caption="Workspace and web search settings">
-  <img
-    src="/images/new/general-settings.png"
-    alt="General settings with workspace name and web search provider"
-  />
-</Frame>
-
-Web search can enrich answers with current information. Select a supported provider and store its API key from this page.
+Web search is configured separately under **Settings → Search & Scraping**, covered in [Web Crawl at Scale](/guide/data-loading).
 
 ## Installed tool settings
 
-Marketplace tools can add their own provider and processing settings. Open **Settings → Installed Tools** after installing a tool.
+Marketplace tools add their own settings under **Settings → Installed Tools**.
 
-<Frame caption="Settings for the installed Video and Audio tool">
-  <img
-    src="/images/new/marketplace-tools-settings.png"
-    alt="Installed tool settings for video transcription and frame analysis"
-  />
+<Frame caption="Installed Tools: Video Intelligence">
+  <img src="/images/configuration/marketplace-tools-settings.png" alt="Installed tool settings for Video Intelligence" />
 </Frame>
-
-For example, the Video and Audio tool lets you choose an audio provider, verify its API key, and control the frame extraction interval.
 
 ## Agent tools
 
-Use **Settings → Agent Customization** to control which capabilities the assistant can call.
-
-<Frame caption="Choose the tools available to the assistant">
-  <img
-    src="/images/new/agent-tools.png"
-    alt="Agent tool controls for search, charts, analysis, forms, and document editing"
-  />
-</Frame>
-
-Available tools can include:
-
-- Semantic search over the knowledge base
-- Tabular data queries and chart generation
-- Python analysis over selected or complete corpus data
-- Form filling
-- Document editing and signing
-
-Only enable tools that the agent needs for its role.
+Use **Settings → Agent Customization** to control the prompt, tools, skills, MCP connections, and sandbox the assistant can use. See [Agent Server API](/developer/agent-runtime-api).
 
 ## Server configuration
 
-After configuring models, storage, and tools, open **Settings → Larkup Server** to launch or deploy the API. See [Deploy Your Server](/developer/deploy) for the current workflow.
+After configuring models, storage, and tools, open **Settings → Larkup Server** to launch or deploy the API. See [Deploy Your Server](/developer/deploy).

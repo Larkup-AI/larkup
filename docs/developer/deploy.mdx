@@ -12,7 +12,7 @@ Larkup can run the retrieval and chat API locally or deploy it to a cloud provid
     Go to **Settings → Larkup Server**. When the server is stopped, select **Launch server**.
 
     <Frame caption="Larkup Server before the local API is launched">
-      <img src="/images/new/server-off.png" alt="Larkup Server settings with the local server stopped" />
+      <img src="/images/deploy/server-off.png" alt="Larkup Server settings with the local server stopped" />
     </Frame>
   </Step>
 
@@ -20,7 +20,7 @@ Larkup can run the retrieval and chat API locally or deploy it to a cloud provid
     After launch, the page shows the local endpoint, server API key, SDK connection action, test action, and interactive API reference.
 
     <Frame caption="A running local server with connection actions">
-      <img src="/images/new/server-on.png" alt="Running Larkup server with endpoint and API key controls" />
+      <img src="/images/deploy/server-on.png" alt="Running Larkup server with endpoint and API key controls" />
     </Frame>
 
     The app assigns an available workspace port starting at `8080`. A generated standalone server uses `8080` by default.
@@ -40,7 +40,7 @@ Larkup can run the retrieval and chat API locally or deploy it to a cloud provid
 Select **Deploy** to choose Vercel, Hetzner, Azure, AWS, GCP, DigitalOcean, or another available target.
 
 <Frame caption="Choose a cloud target from Larkup Server settings">
-  <img src="/images/new/server-click-deploy.png" alt="Deployment provider menu in Larkup Server settings" />
+  <img src="/images/deploy/server-click-deploy.png" alt="Deployment provider menu in Larkup Server settings" />
 </Frame>
 
 ### Vercel
@@ -50,11 +50,19 @@ Select **Deploy** to choose Vercel, Hetzner, Azure, AWS, GCP, DigitalOcean, or a
     Select **Deploy → Vercel** from the server page.
   </Step>
 
-  <Step title="Configure the server">
-    Choose whether to include the knowledge base, select a storage provider, enter its credentials, and confirm the embedding model.
+  <Step title="Provider settings">
+    Paste your Vercel token and a project name, then verify the connection.
 
-    <Frame caption="Configure storage and environment values for Vercel">
-      <img src="/images/new/deploy-settings.png" alt="Vercel deployment settings with vector storage and environment values" />
+    <Frame caption="Vercel provider settings">
+      <img src="/images/deploy/deploy1.png" alt="Vercel token and project name form" />
+    </Frame>
+  </Step>
+
+  <Step title="Server configuration">
+    Confirm the embedding model, then choose the **AI chat runtime** for this deployment. It uses the Project provider by default and can be overridden with OpenAI, DeepSeek, Google, Mistral, Cohere, or Vercel AI Gateway. Review the environment values, including the server API key.
+
+    <Frame caption="Server configuration for a Vercel deployment">
+      <img src="/images/deploy/deploy2.png" alt="Embedding model, AI chat runtime, and environment variables" />
     </Frame>
 
     <Warning>
@@ -62,12 +70,8 @@ Select **Deploy** to choose Vercel, Hetzner, Azure, AWS, GCP, DigitalOcean, or a
     </Warning>
   </Step>
 
-  <Step title="Add provider details">
-    Open the **Provider** tab, enter the Vercel project details, then review the environment values required by your selected models and storage.
-  </Step>
-
   <Step title="Deploy">
-    Select **Deploy**. The finished deployment appears in the cloud deployments table with its API endpoint and API reference.
+    Select **Deploy Server**. Larkup opens the **Cloud deployments** tab when the request is accepted, where you can follow the provider status and open the API endpoint.
   </Step>
 </Steps>
 
@@ -112,3 +116,85 @@ larkup test --endpoint https://your-server.example.com \
 - Test the health, query, chat, and API reference endpoints.
 
 The generated output is a standard Node.js server and includes a `Dockerfile` and `vercel.json`.
+
+## Create a chat assistant for your website in minutes
+
+Once your server is running, open **Settings → Larkup Server → Connections → Chat Widget → Customize**.
+
+### Customize the appearance
+
+Set the title, welcome message, placeholder, accent colour, position, and dark mode. Save, then restart the local runtime or redeploy to publish the update.
+
+<Frame caption="Chat widget appearance settings with a live preview">
+  <img src="/images/chat-widget.png" alt="Chat widget appearance form with a live preview" />
+</Frame>
+
+This is what it looks like running on a page:
+
+<Frame caption="The widget open on a live site">
+  <img src="/images/demo-widget-preview.png" alt="Chat widget open and answering a question on a demo site" />
+</Frame>
+
+### Embed it
+
+The same page gives you a ready to copy script using your server's URL:
+
+```html
+<script
+  async
+  src="https://your-agent.example.com/widget.js"
+  data-api-key="YOUR_SERVER_API_KEY"
+  data-position="bottom-right"
+  data-theme="light"
+></script>
+```
+
+The generated server owns `/widget.js` and `/chat`, so the widget works the same locally, in Docker, and after deployment. It renders inside a Shadow DOM to keep its styles separate from the host site.
+
+Individual embeds can override the generated defaults:
+
+```html
+<script
+  async
+  src="https://your-agent.example.com/widget.js"
+  data-api-key="YOUR_SERVER_API_KEY"
+  data-title="Sales questions"
+  data-primary-color="#0ea5e9"
+  data-position="bottom-left"
+  data-theme="dark"
+  data-class="fixed z-50"
+></script>
+```
+
+`data-class` is applied to the widget's outer mount. The chat interface itself is intentionally isolated, so host Tailwind classes cannot accidentally break the embedded UI.
+
+### Security
+
+`data-api-key` is readable by every visitor to the page. Use a scoped, low-privilege retrieval key for a browser widget, or put a small authenticated proxy in front of the Agent server for production sites. Never embed an admin, ingest, model-provider, sandbox, or Marketplace credential in client code.
+
+The same key is available behind a reveal/copy control in the Larkup Server screen only for the current browser session. Use it server side for production calls, where the key stays private.
+
+### React
+
+Load the same script once in a client component:
+
+```tsx
+'use client';
+
+import { useEffect } from 'react';
+
+export function SupportWidget() {
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = 'https://your-agent.example.com/widget.js';
+    script.dataset.apiKey = process.env.NEXT_PUBLIC_LARKUP_WIDGET_KEY!;
+    document.body.appendChild(script);
+    return () => window.LarkupWidget?.destroy();
+  }, []);
+
+  return null;
+}
+```
+
+Prefer a proxy or a purpose-made retrieval key rather than exposing a general server key through a `NEXT_PUBLIC_*` variable.
