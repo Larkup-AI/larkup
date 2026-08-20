@@ -1,7 +1,9 @@
 ---
-title: "Build Your First RAG Server"
+title: "Build Your RAG Server"
 description: "Generate, launch, and deploy a complete RAG backend."
 ---
+
+<Badge color="blue">Developer</Badge>
 
 The core power of Larkup is turning your raw data into a deployable, high performance RAG API in minutes. You can build your server using either our visual Web UI or the CLI.
 
@@ -9,26 +11,30 @@ The core power of Larkup is turning your raw data into a deployable, high perfor
   <Tab title="Web UI" icon="browser">
     <Steps>
       <Step title="Configure Vector Store & Embedding Model">
-        Start by configuring your preferred **Vector Store** (e.g., LanceDB, Pinecone) and **Embedding Model** (e.g., OpenAI, Cohere) in the Configuration tab.
-        
+        Start by configuring your preferred **Vector Store** (e.g., LanceDB, Pinecone) and **Embedding Model** (e.g., OpenAI, Cohere) in AI Models.
+
         <Frame>
-          <img src="/images/configuration-page.png" alt="Configuration Page" />
+          <img src="/images/rag/llm-embedding-providers.png" alt="Embedding provider picker" />
         </Frame>
       </Step>
 
       <Step title="Ingest Your Documents">
-        Navigate to the **Data** tab to upload files, paste raw text, or scrape websites. These sources will queue up as ingestion jobs.
-      </Step>
-
-      <Step title="Run Indexing">
-        In the **Index** tab, click **Run Indexing Job**. This process will automatically chunk your text and generate vector embeddings to store in your chosen database.
+        Navigate to the **Data** tab to upload files, paste raw text, scrape websites, or connect an integration. These sources queue up as ingestion jobs and index automatically.
       </Step>
 
       <Step title="Launch the Server">
-        Finally, go to the **Server** tab and click **Launch Server** to test the generated retrieval API locally. The deploy flow produces the full agent server with streamed chat and a website widget.
-        
+        Go to **Larkup Server** and select **Launch server** to test the generated retrieval API locally. The deploy flow produces the full agent server with streamed chat and a website widget.
+
         <Frame>
-          <img src="/images/server-scalar-api.png" alt="Server Launch Interface" />
+          <img src="/images/rag/launch-rag-server.png" alt="Larkup Server running locally" />
+        </Frame>
+      </Step>
+
+      <Step title="Explore the API">
+        Every server ships an interactive reference at `/reference`.
+
+        <Frame>
+          <img src="/images/rag/scalar-api2.png" alt="Interactive Scalar API reference" />
         </Frame>
       </Step>
     </Steps>
@@ -36,39 +42,24 @@ The core power of Larkup is turning your raw data into a deployable, high perfor
 
   <Tab title="CLI" icon="terminal">
     <Steps>
-      <Step title="Initialize the Workspace">
-        Create a new workspace project:
-        ```bash
-        larkup init my-larkup
-        ```
-      </Step>
-
-      <Step title="Configure Providers (Optional)">
-        By default, the CLI uses a local LanceDB instance. If you want to configure external stores or OpenAI embeddings, run:
-        ```bash
-        larkup config
-        ```
-      </Step>
-
-      <Step title="Add Documents">
-        Add multiple files or URLs to your workspace:
-        ```bash
-        larkup add-doc --file ./docs/manual.pdf
-        larkup add-doc --url https://example.com/docs
-        ```
-      </Step>
-
-      <Step title="Index Data">
-        Run the indexing job to chunk and embed your data:
-        ```bash
-        larkup index
-        ```
-      </Step>
-
-      <Step title="Launch the Server">
-        Spin up the backend in the foreground:
+      <Step title="Start a workspace">
         ```bash
         larkup dev
+        ```
+        The first run asks for a project name, then creates the workspace and starts its local server.
+      </Step>
+
+      <Step title="Add and index your data">
+        ```bash
+        larkup index ./knowledge
+        ```
+        Loads files and folders, then builds the vector index.
+      </Step>
+
+      <Step title="Test it">
+        ```bash
+        larkup query "What is in my knowledge base?"
+        larkup chat
         ```
       </Step>
     </Steps>
@@ -77,7 +68,7 @@ The core power of Larkup is turning your raw data into a deployable, high perfor
 
 ## The Generated Server
 
-When you launch your server, Larkup creates an optimized backend output directory . It contains everything you need and absolutely nothing you don't:
+When you launch your server, Larkup creates an optimized backend output directory. It contains everything you need and nothing you don't:
 
 - **Zero Bloat**: Only dependencies for your specific Vector Store are bundled.
 - **No Build Step**: Runs directly as a Node ESM backend (`node server.mjs`).
@@ -95,50 +86,10 @@ After deployment, copy the widget snippet from **Settings → Larkup Server** to
 
 ## SDK Usage
 
-Because Larkup exposes an OpenAI compatible API, you can easily connect to it using your favorite AI tools and SDKs.
-
-<Tabs>
-  <Tab title="Vercel AI SDK">
-    Use the `ai` and `@ai-sdk/openai` packages to connect to your local RAG server.
-
-    ```typescript
-    import { createOpenAI } from '@ai-sdk/openai';
-    import { generateText } from 'ai';
-
-    const larkup = createOpenAI({
-      baseURL: 'http://localhost:8080/v1',
-      apiKey: 'not-needed-for-local',
-    });
-
-    const { text } = await generateText({
-      model: larkup('rag-model'), // The model name doesn't matter for local RAG
-      prompt: 'What is Larkup?',
-    });
-
-    console.log(text);
-    ```
-  </Tab>
-  <Tab title="LangChain (Python)">
-    Use `langchain-openai` to connect via Python.
-
-    ```python
-    from langchain_openai import ChatOpenAI
-
-    llm = ChatOpenAI(
-        openai_api_base="http://localhost:8080/v1",
-        openai_api_key="not-needed-for-local",
-        model_name="rag-model"
-    )
-
-    response = llm.invoke("What is Larkup?")
-    print(response.content)
-    ```
-  </Tab>
-</Tabs>
+Because Larkup exposes an OpenAI compatible API, you can connect with your favorite AI tools and SDKs. See [Vercel AI SDK](/sdk/integrations/ai-sdk) and [LangChain](/sdk/integrations/langchain) for ready to use snippets in TypeScript and Python.
 
 ## Next Steps
 
-Your server is now live at `http://localhost:8080`. 
+Your server is now live at `http://localhost:8080`.
 
-- [**Deploy your server**](/developer/deploy) to Vercel, Docker, or a VPS.
-- [**Build a frontend chatbot**](/guide/instant-chatbot) using your new API.
+- [**Deploy your server**](/developer/deploy) to Vercel, Docker, or a VPS, then add a chat widget to your website using your new API.

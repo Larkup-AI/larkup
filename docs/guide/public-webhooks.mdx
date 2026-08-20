@@ -1,0 +1,77 @@
+---
+title: 'Talk to Your Custom AI from Social Media'
+sidebarTitle: 'AI in Social Media'
+description: 'Launch your Agent Server, then connect it to Telegram, Slack, or Discord.'
+---
+
+## Launch the Agent Server
+
+Open **Settings → Larkup Server → Server**, switch the toggle to **Agent**, and select **Launch server**.
+
+<Frame caption="Launching the Agent Server">
+  <img src="/images/deploy/launch-agent-server.png" alt="Larkup Server settings with the Agent Server ready to launch" />
+</Frame>
+
+If the Agent runs on your computer, it needs a public HTTPS address for a channel provider to reach it. Larkup can start a free ngrok tunnel for you when you connect a channel below.
+
+## Connect a channel
+
+Open **Settings → Larkup Server → Connections** and choose Telegram, Slack, or Discord. Every channel starts the same way: pick the Agent that should answer, then connect the provider.
+
+<Frame caption="Connections tab with Telegram, Slack, and Discord">
+  <img src="/images/connections/connection-view.png" alt="Connections tab showing available channels" />
+</Frame>
+
+<Tabs>
+  <Tab title="Telegram">
+    1. Open [@BotFather](https://t.me/BotFather) in Telegram, create a bot, and copy its token.
+    2. Select **Telegram**, choose the Agent that should answer, paste the token, and save.
+       Larkup registers the webhook automatically.
+
+    <Frame caption="Configuring the Telegram connection">
+      <img src="/images/connections/connect-telegram.png" alt="Configure Telegram panel" />
+    </Frame>
+
+    3. Larkup shows an **Open Telegram bot** button once it verifies the bot. Send it a message.
+
+    <Frame caption="Chatting with the Agent through Telegram">
+      <img src="/images/connections/telegram-chat-demo.png" alt="Telegram conversation with the Agent" />
+    </Frame>
+  </Tab>
+
+  <Tab title="Slack">
+    1. Select **Slack**, choose the Agent, and set its endpoint. Use **Use ngrok** if the Agent runs locally.
+    2. Choose **OAuth**, then **Connect with Slack** and approve the app for your workspace. A workspace admin approves it once; nobody needs to copy a token.
+
+    <Frame caption="Configuring the Slack connection">
+      <img src="/images/connections/connect-slack.png" alt="Configure Slack panel" />
+    </Frame>
+
+    3. Mention the bot in a channel, or message it directly.
+
+    <Frame caption="Chatting with the Agent in Slack">
+      <img src="/images/connections/slack-chat-demo.png" alt="Slack conversation with the Agent" />
+    </Frame>
+
+    Want your own Slack app, name, and icon? Choose **Credentials** instead and paste your app's bot token and signing secret.
+  </Tab>
+
+  <Tab title="Discord">
+    1. Select **Discord**, choose the Agent, and set its endpoint. Use **Use ngrok** if the Agent runs locally.
+    2. Choose **OAuth**, then add Larkup's Discord app to one server.
+
+    <Frame caption="Configuring the Discord connection">
+      <img src="/images/connections/connect-discord.png" alt="Configure Discord panel" />
+    </Frame>
+
+    3. Mention the bot in a channel.
+
+    <Frame caption="Chatting with the Agent in Discord">
+      <img src="/images/connections/discord-chat-demo.png" alt="Discord conversation with the Agent" />
+    </Frame>
+
+    Want your own Discord app? Choose **Credentials** and paste its application public key.
+  </Tab>
+</Tabs>
+
+For a deployed Agent, Larkup uses its stable deployment URL automatically. No tunnel is needed.

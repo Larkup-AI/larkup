@@ -1,96 +1,93 @@
 ---
-title: 'Web Crawling & Data Loading'
-description: 'Scrape websites, upload files, and build your knowledge corpus'
+title: 'Web Crawl at Scale'
+description: 'Crawl websites, upload files, pull integrations, and track every ingestion job.'
 ---
 
-Larkup gives you a complete data pipeline out of the box. Crawl entire domains, upload local documents, or paste raw text then track every ingestion job in real time. Everything runs through a single **Data** tab with three views: **Add Data**, **Corpus**, and **ETL Jobs**.
+Larkup gives you one **Data** page for every source. Add content once, and Larkup indexes it in the background.
 
-## Adding Data
-
-The **Add Data** tab is your starting point for loading content into the pipeline. You can choose from three ingestion modes:
-
-- **Web Scrape**: Crawl websites by keyword search or direct URL. The built-in local crawler works immediately; Firecrawl Cloud is available for JavaScript-heavy or protected sites.
-- **Paste Text**: Drop in raw text or a single URL for quick ingestion.
-- **Upload Files**: Drag and drop files directly. Supported formats include PDF, Word (`.docx`), Markdown, CSV, JSON, Excel, and plain text.
-- **Media**: Upload images, video, or audio. The optional **Video & Audio** marketplace tool also imports direct media URLs, YouTube videos, and playlists (up to 10 items per batch).
-
-### Video and audio indexing
-
-Before an upload or URL import starts, Larkup shows the detected duration, expected processing time, and estimated transcription cost. Transcription and vision pricing depend on the providers selected in **Settings → Marketplace Tools** and **Settings → Models**; local Whisper has no API charge.
-
-Video indexing combines adaptive scene sampling, a reserved dense ending pass, chronological visual analysis, OCR, and timestamped speech. It stores a concise full video summary plus independent timestamped evidence sections, so chat can connect people and events while still retrieving the exact ending, decision, winner, or score. Short edited videos use detailed windows. Long camera and screen recordings use sparse seeked anchors and lightweight keyframe change detection to avoid repeatedly analyzing unchanged frames.
-
-The configured Audio Provider handles speech transcription. There is no silent OpenAI fallback. Deepgram uses Nova 3 and accepts an **Audio language** code such as `ar` or `ar-EG`. With **Auto**, Deepgram detects the language. Manual YouTube captions can be used directly. Automatic captions remain a fallback and do not silently bypass the configured provider.
-
-The Media panel persists separate live stages for download, extraction, transcription, visual analysis, note synthesis, and search indexing. Parallel transcription and visual work show their own counts, and embedding reports real processed and total chunks. Completed assets are already embedded and searchable. No separate index build is required.
-
-Use **View Uploads** to index an existing video or audio asset again after changing its provider, language, or analysis settings.
-
-Search retrieves more semantic candidates for media and expands a matching moment with its immediately preceding and following timeline segments. This gives the answering agent enough before → event → after context for questions about outcomes, actions, or a specific scene in a long recording.
-
-After indexing, matching chat sources include an embedded player and seek to the cited time range. YouTube citations also link to the original video at the matching timestamp. Direct URL imports reject private or local network addresses.
-
-<Frame caption="Upload files by dragging them into the UI, PDF, Word, JSON, and more">
-  <img src="/images/data/upload-files.png" alt="File upload interface" />
+<Frame caption="The Data page, with a tab for every source">
+  <img src="/images/add/website-tab.png" alt="Data page with Files, Text, Website, Media, and Integrations tabs" />
 </Frame>
 
-## Your Corpus
+<Tabs>
+  <Tab title="Website">
+    Search by keyword or paste a direct URL. The built in local crawler works immediately; switch to the Cloud web crawler in Settings for JavaScript heavy or protected sites.
 
-Once data is ingested, every document lands in the **Corpus**, your central knowledge base. The corpus view shows all loaded documents with their source type (scraped, pasted, uploaded), character count, and actions to edit or delete.
+    <Frame caption="Starting a crawl by keyword">
+      <img src="/images/crawl/crawl-start.png" alt="Website search results ready to add" />
+    </Frame>
 
-<Frame caption="The Corpus table, browse, edit, or remove any document in your knowledge base">
-  <img src="/images/data/corpus-table.png" alt="Corpus table view" />
+    Jobs run in the background. Track pages processed and status right in the tab.
+
+    <Frame caption="A running crawl job">
+      <img src="/images/crawl/crawl-jobs-view.png" alt="Running crawl job with page count and status" />
+    </Frame>
+  </Tab>
+
+  <Tab title="Files">
+    Drop in PDF, Word, CSV, JSON, Excel, or plain text. Structured files get a column and schema preview before you confirm.
+
+    <Frame caption="Files staged with a schema preview">
+      <img src="/images/add/files-tab2.png" alt="Files tab with a PDF and an Excel schema preview" />
+    </Frame>
+  </Tab>
+
+  <Tab title="Text">
+    Paste notes, transcripts, or any text you want to search, with a title.
+
+    <Frame caption="Adding raw text directly">
+      <img src="/images/add/text-tab.png" alt="Add Text tab with a title and content field" />
+    </Frame>
+  </Tab>
+
+  <Tab title="Media">
+    Upload images, video, or audio, or paste a YouTube URL. Install the Video Intelligence marketplace tool for transcription and frame analysis. See [Chat with Video](/guide/video-chat).
+
+    <Frame caption="Importing a video from a URL">
+      <img src="/images/add/media-tab.png" alt="Add Media tab with a YouTube URL import" />
+    </Frame>
+  </Tab>
+
+  <Tab title="Integrations">
+    Connect Notion, Google Drive, Slack, Jira, and more. Choose **Configure** or **Connect**, authorize through OAuth or an API key, and Larkup pulls the content in and indexes it.
+
+    <Frame caption="Available integrations">
+      <img src="/images/add/integrations-tab.png" alt="Integrations tab with Notion, GitHub, Jira, Slack, and more" />
+    </Frame>
+
+    | Service | Category | What gets indexed |
+    | --- | --- | --- |
+    | Notion | Documentation | Pages, databases, and knowledge bases |
+    | Google Drive | Documentation | Files and shared drives |
+    | Slack | Communication | Channels, messages, and DMs |
+    | Confluence | Documentation | Pages, spaces, and knowledge bases |
+    | Jira | Project management | Issues, sprints, and projects |
+    | Linear | Project management | Issues, projects, and roadmaps |
+    | GitHub | Engineering | Repositories and README knowledge |
+    | Salesforce | CRM | Accounts, contacts, and opportunities |
+
+    Don't see what you need? Select **Ask for integration**. Sync again anytime to pull fresh content.
+  </Tab>
+</Tabs>
+
+## Your corpus
+
+Every loaded document lands in **Data → All Data**, with its source, status, and character count.
+
+<Frame caption="All Data, every indexed document in one table">
+  <img src="/images/add/data-table-view.png" alt="All Data table with indexed documents" />
 </Frame>
 
-## Tracking ETL Jobs
+## Scraping settings
 
-Large scraping and upload operations run as background **ETL Jobs**. The ETL Jobs tab gives you live visibility into every job, including target count, pages processed, and completion status.
+Configure the web scraper and web search provider under **Settings → Search & Scraping**. No `.env` editing required.
 
-<Frame caption="Monitor all ingestion jobs, see page counts, status, and completion in real time">
-  <img src="/images/data/etl-jobs.png" alt="ETL Jobs table" />
+<Frame caption="Search & Scraping settings">
+  <img src="/images/crawl/search-scraping-settings.png" alt="Web search and web scraper provider settings" />
 </Frame>
 
-## Scraping Configuration
+Prefer hosted crawling? Add a Firecrawl or Serper.dev API key here instead of running the local crawler. Organizations that route traffic through a proxy can set it here too.
 
-Larkup supports both **local** and **cloud** scraping. You can configure everything from the **Global Settings** panel, no `.env` editing required.
-
-### Built-in Local Crawler
-
-The local crawler is ready by default in curl, npm, desktop, and Docker installs. It does not require Docker, a browser binary, an account, an API key, or a separate launch step. Paste a URL into **Add Data → Website** and start scraping.
-
-It retrieves server-rendered HTML. For sites that require a browser, have strong anti-bot protection, or render all content in JavaScript, choose **Cloud web crawler** in Settings and add a Firecrawl API key.
-
-### Optional Self-hosted Firecrawl
-
-The built-in crawler remains the default. If you need the optional browser-based Firecrawl stack in a Docker deployment, start the crawler profile from the repository:
-
-```bash
-docker compose -f docker/docker-compose-prod.yaml --profile crawler up -d
-```
-
-Alternatively, configure a Firecrawl cloud API key in Settings.
-
-### Cloud API Keys
-
-If you prefer the hosted Firecrawl or Serper.dev services, enter your API keys in Global Settings:
-
-- **Firecrawl API Key (Cloud)**: for web crawling in the cloud
-- **Serper.dev API Key**: for programmatic Google search ingestion
-
-<Frame caption="Global Settings, configure Firecrawl cloud API key and Serper.dev key">
-  <img src="/images/data/set-firecrawl-serper-cloud-apikey.png" alt="API key settings" />
+<Frame caption="Proxy settings for secure scraping">
+  <img src="/images/crawl/proxy-settings.png" alt="Proxy server, username, and password fields" />
 </Frame>
-
-### Proxy Settings
-
-For organizations that route traffic through a proxy, such as for higher request limits or secure scraping, the settings panel exposes proxy configuration fields:
-
-- **Proxy Server**: e.g. `http://proxy.example.com:8080`
-- **Proxy Username**
-- **Proxy Password**
-
-<Frame caption="Proxy settings for secure scraping environments">
-  <img src="/images/data/set-firecrawl-cloud.png" alt="Proxy settings in Global Settings" />
-</Frame>
-
-Larkup routes built-in local crawling and local web search through the saved proxy immediately. The same settings take priority over a legacy `proxies.txt` pool when starting the optional self-hosted Firecrawl stack.
