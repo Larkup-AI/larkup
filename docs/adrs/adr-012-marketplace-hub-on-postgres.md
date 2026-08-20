@@ -7,14 +7,14 @@
 
 ## Context
 
-`apps/hub`'s catalog — publisher identity, extension versions, install
-counts — lived in a `Map` inside `apps/hub/src/store.ts`. Every restart lost
+`apps/marketplace`'s catalog — publisher identity, extension versions, install
+counts — lived in a `Map` inside `apps/marketplace/src/store.ts`. Every restart lost
 the catalog, every install count, and every published manifest. TASK 03's
 job was to give it durable storage without breaking the `/v1/*` contract the
 CLI and both SDKs call directly, and without inventing a second way for
 contributors to reach a database they should never hold credentials for.
 
-ADR-008 already settled *where* the data lives (Neon/Postgres, separate from
+ADR-008 already settled _where_ the data lives (Neon/Postgres, separate from
 the future Cloud control-plane database) and the collaboration model (no
 contributor gets the production connection string). What was still open: the
 schema, the ORM, and how much of plan §7.4's entity list to build now versus
@@ -30,23 +30,23 @@ schema diff into a committed SQL migration a reviewer reads like any other
 code change. This was already the agreed direction per the TASK 03 card;
 this ADR is where it becomes the record.
 
-### 2. `packages/hub-db` owns every query; `apps/hub` owns none
+### 2. `packages/marketplace/src/db` owns every query
 
 ```
-packages/hub-db/
-  src/schema/*.ts     tables — publishers, extensions, extension_versions,
+packages/marketplace/
+  src/db/schema/*.ts  tables — publishers, extensions, extension_versions,
                        extension_workspace_grants, workspace_installations,
                        audit_events
-  src/repo.ts          every query the API needs, typed
-  src/validate.ts       manifest validation (was: unchecked beyond id+packageName)
-  src/client.ts         lazy connection factory (see §4)
-  drizzle/*.sql         generated, committed migrations
-apps/hub/
+  src/db/repo.ts        every query the API needs, typed
+  src/db/validate.ts    manifest validation
+  src/db/client.ts      lazy connection factory (see §4)
+  db/drizzle/*.sql      generated, committed migrations
+apps/marketplace/
   src/index.ts          HTTP routes only — calls repo.ts, no SQL
 ```
 
 A contributor reviews a schema change and its access pattern in one package.
-`apps/hub`'s route handlers are a thin translation layer: parse the request,
+`apps/marketplace`'s route handlers are a thin translation layer: parse the request,
 call a `repo.ts` function, shape the response.
 
 ### 3. Six tables now, not eleven
@@ -80,17 +80,17 @@ represent; commercial/entitled distribution is TASK 09).
 
 ### 4. Connection: lazy, TCP, `postgres.js`
 
-`apps/hub/vercel.json` declares no edge runtime, so `apps/hub` runs as a
+`apps/marketplace/vercel.json` declares no edge runtime, so `apps/marketplace` runs as a
 standard Vercel Node.js function — a plain TCP Postgres connection
 (`postgres.js`) works there and against local Docker identically, unlike the
 HTTP-based Neon serverless driver, which would have forced two different
 client implementations for local versus deployed.
 
-`getHubDb()` is a lazy, cached factory, not a module-level connection
+`getMarketplaceDb()` is a lazy, cached factory, not a module-level connection
 established on import. This is not just tidiness: a module-level `const db =
-getHubDb()` at the top of `apps/hub/src/index.ts` reads `DATABASE_URL` the
+getMarketplaceDb()` at the top of `apps/marketplace/src/index.ts` reads `DATABASE_URL` the
 instant anything imports that file — including a test file that needs to
-load a *different*, explicitly local env file first (see `apps/hub/src/index.test.ts`'s
+load a _different_, explicitly local env file first (see `apps/marketplace/src/index.test.ts`'s
 comment) before any connection is attempted. Making the read lazy turned a
 fragile import-order dependency into a non-issue.
 
@@ -149,9 +149,8 @@ change required.
 
 - Restart-safe: publish, install counts, and version history survive a
   redeploy — the literal problem this task existed to fix.
-- A contributor with no Neon account runs `packages/hub-db`'s and
-  `apps/hub`'s full test suites against a throwaway container
-  (`docker/hub-db.yml`).
+- A contributor with no Neon account runs the Marketplace database and Hub
+  tests against a throwaway container (`docker/marketplace-db.yml`).
 - Manifest validation and version immutability are new, real guarantees the
   in-memory store never had.
 
@@ -161,9 +160,9 @@ change required.
   integrity, not authentication, between publishers — acceptable while the
   Hub has no external publishers yet (plan §7's "do not accept third-party
   submissions until TASK 03 is complete" is about durability, and closing
-  the loop on *who* may publish is `publisher_keys`, explicitly deferred).
+  the loop on _who_ may publish is `publisher_keys`, explicitly deferred).
 - Neon branch-per-PR automation (the TASK 03 card's `neon branches create`
-  flow) needs `NEON_API_KEY`, which is not in `apps/hub/.env` yet. Documented
+  flow) needs `NEON_API_KEY`, which is not in `apps/marketplace/.env` yet. Documented
   as the next step in CONTRIBUTING.md; not blocking, since the local-Postgres
   path needs no Neon access at all.
 - Five §7.4 entities do not exist. Each is named above with the task that

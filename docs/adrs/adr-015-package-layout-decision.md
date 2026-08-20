@@ -9,14 +9,14 @@
 
 Plan §3 sketched a package layout for the Agent Platform side of the
 monorepo: `packages/agent-contracts`, `packages/agent-runtime`,
-`packages/agent-sdk`, `packages/agent-widget`, `packages/agent-react`, and
+`packages/agent-sdk`, the now-archived widget package, `packages/agent-react`, and
 one `packages/channel-*` per transport. TASK 04–06 shipped the
 functionality that layout described — an Agent Runtime, a widget, three
 channel adapters — but not the package boundaries. The runtime, release
 store, and session store landed inside `packages/core` (alongside the
 Knowledge Server, which §3's own diagram called "Knowledge Server only").
 Every channel adapter is a file inside one package,
-`packages/channels-core/src/adapters/`, not a package of its own.
+`packages/connections/src/adapters/`, not a package of its own.
 `agent-sdk` and `agent-react` were never started at all.
 
 Plan §3 itself carries the product owner's own hesitation about the
@@ -39,7 +39,7 @@ rather than the original sketch — done alongside this ADR.
   Knowledge Server, or a third party builds against `@larkup/agent-sdk`
   directly. Neither is true: `packages/core`'s only consumer is `apps/web`,
   in the same repo, which already imports both halves.
-- **The adapters are not large enough to be lost.** `packages/channels-core/src/adapters/`
+- **The adapters are not large enough to be lost.** `packages/connections/src/adapters/`
   holds three files, roughly 250–310 lines each including their doc
   comments. A contributor finding "the Slack adapter" opens one file in one
   package; a `packages/channel-slack` package would add a `package.json`,
@@ -56,10 +56,10 @@ Plan §1.1's real requirement is behavioral, not structural: a channel never
 reaches a Knowledge Server directly, and an Agent's retrieval access is
 read-only. Both hold today without a package boundary enforcing them:
 
-- Every channel goes through `dispatchInbound` (`packages/channels-core/src/dispatch.ts`),
+- Every channel goes through `dispatchInbound` (`packages/connections/src/dispatch.ts`),
   which calls `runAgent` — never a Knowledge Server URL. An adapter has no
   Knowledge Server client to misuse even if it wanted to.
-- `AgentKnowledgeSource.retrievalKey` (`packages/agent-contracts/src/agent.ts`)
+- `AgentKnowledgeSource.retrievalKey` (historically `packages/agent-contracts/src/agent.ts`)
   is a scoped credential, checked against the Knowledge Server's own
   `retrieval`/`ingest`/`admin` key scopes (ADR-004) — an Agent holding a
   `retrieval`-scoped key cannot index or administer regardless of which
@@ -75,7 +75,7 @@ Extract when a real trigger appears, not preemptively:
 
 - A consumer outside this monorepo needs `@larkup/agent-runtime` (or any of
   the others) as an independently versioned npm dependency.
-- `packages/channels-core/src/adapters/` grows past the point where finding
+- `packages/connections/src/adapters/` grows past the point where finding
   one adapter among many is real friction — WhatsApp and Discord (next in
   plan §9's delivery order) are unlikely to trigger this alone; a dozen
   marketplace-contributed channels might.
