@@ -68,7 +68,7 @@ and themed through custom properties.
 
 `AgentDefinition.allowedOrigins` is enforced on every browser-reachable agent
 endpoint before any work happens. The matcher lives in
-`@larkup/agent-contracts/origin` so the dashboard, generated agent servers, and
+the archived `agent-contracts/origin` module so the dashboard, generated agent servers, and
 future channel adapters cannot drift apart.
 
 | Case                          | Result  | Why                                                                        |
@@ -101,7 +101,7 @@ Supporting decisions:
 ### 4. The widget parses the stream protocol itself
 
 The widget does not depend on `@ai-sdk/react`. It reads the UI Message Stream
-frames directly in `packages/agent-widget/src/lib/ui-message-stream.ts`.
+frames directly in the archived `agent-widget/src/lib/ui-message-stream.ts`.
 
 - **Size:** roughly a third of the bundle, on someone else's page.
 - **Version independence:** the widget is deployed on customer sites and updated

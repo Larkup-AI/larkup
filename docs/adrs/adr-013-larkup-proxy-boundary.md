@@ -25,20 +25,20 @@ The proxy is genuinely useful, general-purpose OAuth-broker infrastructure —
 signed/expiring state, redirect-origin validation, a registry-driven provider
 list. It stays in the monorepo as `apps/larkup-proxy` / `@larkup/proxy`.
 
-What changed is what it is *documented* as: every entry point now opens with
+What changed is what it is _documented_ as: every entry point now opens with
 "Knowledge Integration OAuth Proxy" and a one-line statement of what it
 never becomes (`api/index.ts`, `api/routes/oauth.ts`, `README.md`). The
 package name and directory are unchanged — a rename would touch the deployed
 Vercel project, `NEXT_PUBLIC_INTEGRATIONS_PROXY_URL` on every consumer, and
 every provider's registered callback URL, for a purely cosmetic gain. The
 same "don't blind-rename a working, referenced identity" reasoning plan's
-Marketplace naming decision already applies to `apps/hub` applies here.
+Marketplace naming decision already applies to `apps/marketplace` here.
 
 ### 2. The Slack-in-two-places ambiguity is named, not hidden
 
 `@larkup/integrations`'s Slack entry (public channel history, an OAuth
-user-token app) and the Slack *channel* adapter (plan §9,
-`packages/channels-core`, a bot-token app that sends and receives chat
+user-token app) and the Slack _channel_ adapter (plan §9,
+`packages/connections`, a bot-token app that sends and receives chat
 messages) are unrelated integrations that happen to share a provider name.
 Nothing enforces this at the type level — a future contributor could plausibly
 wire channel-adapter code through this proxy because "Slack already has an
@@ -89,6 +89,20 @@ reaches the browser. What it does not and cannot cover: an actual round trip
 against a live provider's OAuth server, which needs real credentials and a
 human consenting once. The deployment guide's provider registration checklist
 says so explicitly rather than implying full automated coverage exists.
+
+## Amendment — 2026-08-16: managed channel setup is a distinct proxy surface
+
+The product now distributes Larkup as a local application, so requiring every
+installation to hold a Slack OAuth client secret is not acceptable. The proxy
+therefore exposes `/api/channels` alongside — not inside — the existing
+registry-backed `/api/oauth` routes. Its Slack route is limited to the OAuth
+code exchange and validation of Slack's signed request bytes. It does not
+store a workspace token, accept a conversation, route an event, or call an
+Agent. Those responsibilities remain with `apps/web` and
+`packages/connections`.
+
+This preserves the meaningful part of the original separation: knowledge
+OAuth and channel OAuth cannot share scopes, callbacks, or route policies.
 
 ## Consequences
 

@@ -16,7 +16,7 @@ anywhere except the dashboard's own process.
 
 ### 1. One dispatch pipeline, adapters supply four functions (TASK 06)
 
-`packages/channels-core` owns the sequence every transport shares:
+`packages/connections` owns the sequence every transport shares:
 
 ```
 inbound → verify → parse → idempotency claim → run agent → deliver (retry) → ack
@@ -83,7 +83,7 @@ origins — which is what makes a deployment reproduce what was tested locally.
 
 **The bundle runs on a bare Node image.** No `@larkup/*` dependency: the origin
 matcher, wire protocol, and observability emitter are emitted as plain
-JavaScript. This duplicates logic that also lives in `@larkup/agent-contracts`,
+JavaScript. This duplicated logic formerly lived in `@larkup/agent-contracts`,
 which is a real cost — the E2E suite asserts the generated server exposes the
 same behaviour, and the packages remain the source of truth.
 
@@ -123,7 +123,7 @@ against the plan's own acceptance criteria rather than against the code:
 **Negative**
 
 - The generated `server.mjs` duplicates contract logic. Mitigated by tests;
-  properly fixed when `@larkup/agent-contracts` ships a built artifact that a
+  properly fixed if the archived `@larkup/agent-contracts` package returns as a built artifact that a
   standalone bundle can depend on.
 - Channel sessions are in memory in the deployed bundle, so a restart or a
   scale-to-zero loses conversation history.

@@ -27,12 +27,12 @@ convenience; this one bounds money.
 | Messages/session | same visitor key (no session id exists yet — see below) | 50, no refill | One visitor grinding a conversation. |
 | Daily token ceiling | agent | operator-set, **off by default** | The bill — the only one of the three that bounds money rather than traffic. |
 
-All three are the same **token bucket** (`packages/agent-contracts/src/rate-limit.ts`),
+All three were the same **token bucket** (`archive/other/agent-contracts/src/rate-limit.ts`),
 sized differently, keyed differently. One primitive rather than three because a
 fixed window lets a caller spend a whole window's budget in the first second
 and again at the boundary; a token bucket refills smoothly and can report an
 honest `Retry-After`. `MemoryRateLimiter` mirrors the shape of
-`IdempotencyStore` in `packages/channels-core` on purpose: process-local by
+`IdempotencyStore` in `packages/connections` on purpose: process-local by
 default, an interface everywhere else, so a shared Redis/Postgres
 implementation swaps in later (TASK 09's control-plane store) without
 touching a call site.

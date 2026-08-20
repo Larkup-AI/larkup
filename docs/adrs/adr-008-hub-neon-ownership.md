@@ -2,12 +2,13 @@
 
 **Status:** Accepted  
 **Date:** 2026-08-10  
-**Decision makers:** Product owner, maintainers  
+**Decision makers:** Product owner, maintainers
 
 ## Context
 
 The monorepo has two `DATABASE_URL` variables in different locations:
-- `apps/hub/.env` → intended for the Marketplace/Hub catalog
+
+- `apps/marketplace/.env` → intended for the Marketplace catalog
 - Root `.env` → intended for the future Larkup Cloud control plane
 
 These are **separate databases** serving separate concerns. Mixing them would create coupling between the open-source Marketplace and the commercial Cloud service.
@@ -18,14 +19,14 @@ These are **separate databases** serving separate concerns. Mixing them would cr
 
 ### Database ownership
 
-| Database | Owner | Location | Purpose |
-|----------|-------|----------|---------|
-| Marketplace DB | `apps/hub` | `apps/hub/.env: DATABASE_URL` | Publisher identity, extension catalog, versions, installations, audit events, webhook deliveries |
-| Cloud control-plane DB | Future `apps/cloud-control-plane` | Root `.env: DATABASE_URL` | Hosted deployments, teams, usage, billing metadata |
+| Database               | Owner                             | Location                              | Purpose                                                                                          |
+| ---------------------- | --------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Marketplace DB         | `apps/marketplace`                | `apps/marketplace/.env: DATABASE_URL` | Publisher identity, extension catalog, versions, installations, audit events, webhook deliveries |
+| Cloud control-plane DB | Future `apps/cloud-control-plane` | Root `.env: DATABASE_URL`             | Hosted deployments, teams, usage, billing metadata                                               |
 
 ### Rules
 
-1. `apps/hub` validates its `DATABASE_URL` at startup. If missing, it fails with a clear error — it does not fall back to the root `.env`.
+1. `apps/marketplace` validates its `DATABASE_URL` at startup. If missing, it fails with a clear error — it does not fall back to the root `.env`.
 2. Root `DATABASE_URL` is reserved for the future Cloud service (TASK 08/09). No other app or package reads it.
 3. Each database has its own migration directory, schema, and deployment lifecycle.
 4. No cross-database joins or references. If the Cloud service needs Marketplace data, it calls the Hub API.
