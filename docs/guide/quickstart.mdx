@@ -10,7 +10,7 @@ Larkup gets out of your way. There is no server to configure, no pipeline to bui
     When you open Larkup for the first time you will see the onboarding screen. Paste your API key from any supported provider, including OpenAI, Anthropic, Google, and DeepSeek, then click **Save**. The key is stored locally in your browser and used for chat and embedding calls.
 
     <Frame caption="Choose a provider and save your API key">
-      <img src="/images/new/onboard.png" alt="Larkup onboarding screen with AI provider settings" />
+      <img src="/images/onboard-screen.png" alt="Larkup onboarding screen with AI provider settings" />
     </Frame>
 
     <Note>
@@ -26,7 +26,15 @@ Larkup gets out of your way. There is no server to configure, no pipeline to bui
         Paste a page or domain URL. You can crawl it directly or search for pages by keyword.
 
         <Frame caption="Add content from a website">
-          <img src="/images/new/data-website-scraper-off.png" alt="Website source options in the Data page" />
+          <img src="/images/add/website-tab.png" alt="Website source options in the Data page" />
+        </Frame>
+      </Tab>
+
+      <Tab title="Text">
+        Paste notes, transcripts, or any text you want to search, with a title.
+
+        <Frame caption="Adding raw text directly">
+          <img src="/images/add/text-tab.png" alt="Add Text tab with a title and content field" />
         </Frame>
       </Tab>
 
@@ -34,7 +42,7 @@ Larkup gets out of your way. There is no server to configure, no pipeline to bui
         Open **Integrations**, choose Notion or another source, then select **Configure** or **Connect**. After authorization, Larkup adds the selected content to your knowledge base.
 
         <Frame caption="Choose Notion or another connected data source">
-          <img src="/images/new/data-integrations-tab.png" alt="Data integrations including Notion, Google Drive, Slack, and Jira" />
+          <img src="/images/add/integrations-tab.png" alt="Data integrations including Notion, Google Drive, Slack, and Jira" />
         </Frame>
       </Tab>
 
@@ -42,7 +50,7 @@ Larkup gets out of your way. There is no server to configure, no pipeline to bui
         Open **Files** and upload a CSV or Excel file. Larkup previews the columns and rows before indexing.
 
         <Frame caption="Review structured data before indexing">
-          <img src="/images/new/upload-excel-data.png" alt="CSV and Excel preview in the Files tab" />
+          <img src="/images/add/upload-excel-data.png" alt="CSV and Excel preview in the Files tab" />
         </Frame>
       </Tab>
 
@@ -50,7 +58,7 @@ Larkup gets out of your way. There is no server to configure, no pipeline to bui
         Open **Files** and drop in a PDF. You can add one file or stage several files together.
 
         <Frame caption="Add a PDF from the Files tab">
-          <img src="/images/new/upload-pdf.png" alt="PDF staged for upload in the Data page" />
+          <img src="/images/add/files-tab.png" alt="PDF staged for upload in the Data page" />
         </Frame>
       </Tab>
 
@@ -58,7 +66,7 @@ Larkup gets out of your way. There is no server to configure, no pipeline to bui
         Open **Media** to upload a video or import a YouTube URL. Review the duration and estimated processing cost before you confirm.
 
         <Frame caption="Review a YouTube video before import">
-          <img src="/images/new/upload-video-data-page.png" alt="YouTube video ready to import from the Media tab" />
+          <img src="/images/add/upload-video-data-page.png" alt="YouTube video ready to import from the Media tab" />
         </Frame>
       </Tab>
     </Tabs>
@@ -66,7 +74,7 @@ Larkup gets out of your way. There is no server to configure, no pipeline to bui
     Once you confirm, Larkup indexes the content in the background. You can watch progress in real time. There is no separate indexing step.
 
     <Frame caption="Indexing progress for a PDF upload">
-      <img src="/images/new/indexing-pdf-progress.png" alt="PDF indexing progress" />
+      <img src="/images/add/indexing-pdf-progress.png" alt="PDF indexing progress" />
     </Frame>
   </Step>
 
@@ -74,7 +82,7 @@ Larkup gets out of your way. There is no server to configure, no pipeline to bui
     Click **Chat** in the sidebar. Select an LLM from the dropdown at the top and ask anything about your data. Answers are grounded in what you loaded, with source citations shown in the sidebar.
 
     <Frame caption="Chat with sources visible in the side panel">
-      <img src="/images/new/chat-sidebar-on.png" alt="Chat page with sources panel open" />
+      <img src="/images/chat/chat-sidebar-on.png" alt="Chat page with sources panel open" />
     </Frame>
   </Step>
 </Steps>
@@ -86,7 +94,9 @@ Your data is indexed and your server is already running. A few directions to exp
 - [Chat with a video](/guide/video-chat) and get answers with timestamps.
 - [Analyze a spreadsheet](/guide/data-analysis) with charts and summaries in Chat.
 - [Sign or fill a document](/guide/document-editor) with a live preview.
-- [Connect an AI agent](/developer/agent-knowledge-base) through the SDK or REST API.
+- [Talk to your Agent](/guide/public-webhooks) from Telegram, Slack, or Discord.
+- [Add a chat widget](/developer/deploy) to your website.
+- [Connect an AI agent](/developer/agent-runtime-api) through the SDK or REST API.
 
 <Tip>
   Prefer the terminal? The CLI covers the same workflow. See the [CLI Reference](/developer/cli).
