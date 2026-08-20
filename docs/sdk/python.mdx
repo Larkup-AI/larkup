@@ -109,6 +109,60 @@ async with AsyncLarkupClient(options) as client:
 
 The asynchronous client also exposes `index_documents()` as an async iterator.
 
+### Agent Server
+
+Use `LarkupAgentClient` when the Larkup Server toggle is set to **Agent**. It lists loaded
+tools and consumes the Agent's AI SDK UI-message stream.
+
+```python
+import os
+
+from larkup import LarkupAgentClient
+
+agent = LarkupAgentClient(
+    base_url="http://localhost:8080",
+    api_key=os.environ["LARKUP_API_KEY"],
+)
+for capability in agent.capabilities():
+    print(capability.name, capability.tools)
+print(agent.configuration().systemPrompt)
+print(agent.sandbox())
+for text in agent.stream_text("What can you do?"):
+    print(text, end="", flush=True)
+```
+
+Use `capabilities()` to inspect grouped integrations—selected built-ins, skills, sandbox, one entry per MCP connection, and plugins. A capability marked `configured` is selected in the Project but is not executable by this runtime; `active` entries are loaded. `tools()` remains available when you need the raw tool list. `configuration()` returns the UI prompt, selected tools, skills, and sandbox configuration; `sandbox()` checks readiness without exposing credentials. `chat_text()` collects through the streaming path, so slow tool calls do not hit the buffered-response timeout. Agent clients use a 120-second timeout by default; pass `timeout=` to adjust it. `chat()` exposes the raw HTTP response.
+
+### Choose a chat model
+
+Every generated runtime exposes `GET /models`. Inspect its available choices
+through the SDK, then use `modelId` for one request without changing the
+deployment default.
+
+```python
+from larkup import AgentChatRequest
+
+catalog = agent.chat_model_catalog()
+print(agent.chat_providers())
+
+models = agent.chat_models("anthropic")
+if models:
+    answer = agent.chat_text(
+        AgentChatRequest(
+            messages=[{"role": "user", "content": "Summarize the project."}],
+            # Optional. Omit it to use catalog.configuredProvider.
+            provider=catalog.configuredProvider,
+            modelId=models[0].id,
+        )
+    )
+    print(answer)
+```
+
+An AI Gateway runtime can select any language model listed by its catalog. A
+runtime configured with a direct provider accepts only that provider's model
+IDs, so its configured API key is never used with another vendor. Browse the
+current catalog and provider capabilities in the [Vercel AI Gateway model catalog](https://vercel.com/ai-gateway/models).
+
 ### Corpus Inspection and Export
 
 ```python
@@ -123,6 +177,15 @@ corpus = client.corpus(
     )
 )
 jsonl = client.export_corpus("jsonl")
+```
+
+### Media
+
+```python
+media_list = client.list_media()
+media = client.get_media("media-1")
+job_status = client.get_media_job_status("job-1")
+client.delete_media("media-1")
 ```
 
 ### Marketplace Hub
@@ -143,18 +206,25 @@ larkup marketplace install video-audio
 
 ## API Coverage
 
-| SDK method                                | RAG server operation                  |
-| ----------------------------------------- | ------------------------------------- |
-| `health()`                                | `GET /health`                         |
-| `open_api()`                              | `GET /openapi.json`                   |
-| `query()`                                 | `POST /query`                         |
-| `chat()` / `chat_text()`                  | `POST /chat`                          |
-| `list_documents()` / `get_document()`     | `GET /documents`                      |
-| `add_document()` / `index_documents()`    | `POST /documents`                     |
-| `update_document()` / `delete_document()` | `PUT` / `DELETE /documents/:id`       |
-| `scrape()`                                | `POST /scrape`                        |
-| `corpus_summary()` / `corpus()`           | `GET /corpus/summary`, `POST /corpus` |
-| `export_corpus()`                         | `POST /corpus/export`                 |
+| SDK method                                                   | RAG server operation                  |
+| ------------------------------------------------------------ | ------------------------------------- |
+| `health()`                                                   | `GET /health`                         |
+| `open_api()`                                                 | `GET /openapi.json`                   |
+| `query()`                                                    | `POST /query`                         |
+| `chat()` / `chat_text()`                                     | `POST /chat`                          |
+| `list_documents()` / `get_document()`                        | `GET /documents`                      |
+| `add_document()` / `index_documents()`                       | `POST /documents`                     |
+| `update_document()` / `delete_document()`                    | `PUT` / `DELETE /documents/:id`       |
+| `scrape()`                                                   | `POST /scrape`                        |
+| `corpus_summary()` / `corpus()`                              | `GET /corpus/summary`, `POST /corpus` |
+| `export_corpus()`                                            | `POST /corpus/export`                 |
+| `list_media()` / `get_media()` / `delete_media()`          | `GET /media`, `GET /media/:id`, `DELETE /media/:id` |
+| `get_media_job_status()`                                   | `GET /media/jobs/:id`                 |
+| `LarkupAgentClient.tools()`                                  | `GET /agent/tools`                    |
+| `LarkupAgentClient.capabilities()`                           | `GET /agent/capabilities`             |
+| `LarkupAgentClient.configuration()`                          | `GET /agent/configuration` (admin)    |
+| `LarkupAgentClient.sandbox()`                                | `GET /agent/sandbox` (admin)          |
+| `LarkupAgentClient.chat()` / `stream_text()` / `chat_text()` | `POST /chat` (Agent profile)          |
 
 ## Local Demo
 
