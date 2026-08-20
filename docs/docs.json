@@ -9,8 +9,8 @@
   },
   "background": {
     "color": {
-      "light": "#FCFCFB",
-      "dark": "#0a0a0a"
+      "light": "#fcf7ef",
+      "dark": "#1e1b16"
     }
   },
   "favicon": "/images/favicon.ico",
