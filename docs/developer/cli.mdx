@@ -3,7 +3,7 @@ title: "CLI Reference"
 description: "Build, index, test, and deploy Larkup servers from the terminal."
 ---
 
-The CLI manages the same server workspaces used by the Web UI. Commands operate on the active server unless you pass `--server <id>`.
+The CLI manages the same server workspaces used by the Web UI. Commands operate on the active server unless you pass `--project <id>`.
 
 ## Installation
 
@@ -75,7 +75,7 @@ larkup chat
 larkup chat --model openai/gpt-4o-mini
 ```
 
-`query` prints retrieved chunks. `chat` opens an interactive conversation grounded in retrieved content and streams the answer as it is generated.
+`query` prints retrieved chunks. `chat` opens an interactive conversation grounded in retrieved content and streams the answer as it is generated. `--model` selects a model for that command only; it must be available through the project's configured chat provider. Use `larkup settings` to change the provider or its default model. When the project uses Vercel AI Gateway, provider-prefixed IDs such as `anthropic/claude-sonnet-4` are supported.
 
 Generated servers also expose `POST /query` and the streaming `POST /chat` endpoint, so the same features are available through the TypeScript and Python SDKs.
 
@@ -142,8 +142,8 @@ larkup update
 | --- | --- |
 | `larkup dev [name]` | First run: create a workspace and run its local server. Later: run the active workspace. Pass a name to create another workspace. |
 | `larkup init [name]` | Create and activate a server workspace. |
-| `larkup servers` | List server workspaces. |
-| `larkup use <id>` | Switch the active server. |
+| `larkup projects` | List all Projects. |
+| `larkup use <projectId>` | Switch the active Project. |
 | `larkup config` | Show configuration and status. |
 | `larkup add-doc` | Add a file or inline text with optional source URL metadata. |
 | `larkup documents` | List, show, update, remove, or export corpus documents. |

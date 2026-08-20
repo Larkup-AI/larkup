@@ -1,0 +1,118 @@
+---
+title: 'Agent Server API'
+description: 'Launch a Larkup Agent Server, customize it, and connect through REST, the SDK, or Scalar.'
+---
+
+<Badge color="blue">Developer</Badge>
+
+## Launch locally
+
+Open **Settings → Larkup Server**, switch the toggle to **Agent**, and select **Launch server**. Restart it after changing the Agent's prompt, skills, or tools so the generated runtime picks up the new configuration.
+
+<Frame caption="Settings → Larkup Server showing the local endpoint and API key">
+  <img src="/images/deploy/server-on.png" alt="Larkup Server settings with a running server and API key" />
+</Frame>
+
+Copy the endpoint and **Server API key** from this page. Every request must include the key in the `Authorization` header.
+
+## Customize the Agent
+
+Open **Settings → Agent Customization**. It has five tabs that control what the Agent knows and can do.
+
+<Tabs>
+  <Tab title="Prompt">
+    Write the system prompt the Agent follows. Larkup combines it with its own retrieval and tool safety rules.
+
+    <Frame caption="Agent Customization: Prompt tab">
+      <img src="/images/customize-agent/customize-prompt.png" alt="System prompt editor" />
+    </Frame>
+  </Tab>
+
+  <Tab title="Tools">
+    Turn built in tools on or off: semantic search, tabular data queries, chart generation, the Python sandbox, indexed data lookup, corpus analysis, and form filling.
+
+    <Frame caption="Agent Customization: Tools tab">
+      <img src="/images/customize-agent/customize-tools.png" alt="Built in tools with enable toggles" />
+    </Frame>
+  </Tab>
+
+  <Tab title="Skills">
+    Add a Skill in the open `SKILL.md` format: metadata plus task instructions and optional resources. Upload a local file or add a remote one.
+
+    <Frame caption="Agent Customization: Skills tab">
+      <img src="/images/customize-agent/customize-skills1.png" alt="Add an Agent skill dialog" />
+    </Frame>
+  </Tab>
+
+  <Tab title="MCP">
+    Connect a remote [Model Context Protocol](https://modelcontextprotocol.io/) server. Add its URL, test it to discover its tools, then enable it. Its tools become available to this Agent, namespaced by connection so they never override a built in tool.
+
+    <Frame caption="Agent Customization: MCP tab">
+      <img src="/images/customize-agent/customize-mcp.png" alt="MCP connections list" />
+    </Frame>
+  </Tab>
+
+  <Tab title="Sandbox">
+    Give your Agent access to a computer, so it can run code instead of just describing it. Run it locally with Local Sandbox or Local Docker, or hand it to a remote provider such as E2B, Vercel Sandbox, Modal, Daytona, Fly.io Sprites, or Northflank. A remote sandbox is required for a serverless deployment that needs code execution.
+
+    <Frame caption="Agent Customization: Sandbox tab">
+      <img src="/images/customize-agent/customize-sandbox1.png" alt="Sandbox provider picker" />
+    </Frame>
+
+    Select **Verify** after saving to confirm the chosen sandbox is reachable.
+  </Tab>
+</Tabs>
+
+## Endpoints
+
+Every generated server serves an interactive reference at `GET /reference` and a machine readable contract at `GET /openapi.json`.
+
+<Frame caption="The interactive API reference for a running Larkup server">
+  <img src="/images/rag/scalar-api2.png" alt="Scalar API reference for the Larkup server" />
+</Frame>
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /agent` | Read the Agent name, profile, and loaded tools. |
+| `GET /agent/tools` | List every loaded tool. |
+| `GET /agent/capabilities` | List enabled skills, sandbox, MCP connections, and plugins. |
+| `POST /chat` or `POST /agent/chat` | Stream a response using the AI SDK message protocol. |
+| `POST /v1/chat/completions` | OpenAI compatible chat completions, streamed by default. |
+| `POST /query` | Retrieve the most relevant chunks for a query. |
+
+## Connect
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST http://localhost:8080/chat \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Summarize the Q3 report"}]}'
+```
+
+```typescript TypeScript SDK
+import { LarkupAgentClient } from '@larkup/sdk';
+
+const agent = new LarkupAgentClient({ baseUrl: 'http://localhost:8080', apiKey: 'your-api-key' });
+console.log(await agent.chatText('What can you find in our knowledge base?'));
+```
+
+```python Python SDK
+from larkup import LarkupAgentClient
+
+agent = LarkupAgentClient(base_url="http://localhost:8080", api_key="your-api-key")
+print(agent.chat_text("What can you find in our knowledge base?"))
+```
+
+</CodeGroup>
+
+The full endpoint list is in the [API Reference](/api-reference/overview) tab. To connect from the Vercel AI SDK, see [Vercel AI SDK](/sdk/integrations/ai-sdk).
+
+## Authentication
+
+`/health`, `/readiness`, `/reference`, and `/openapi.json` stay public for operations and discovery. Every other Knowledge and Agent request needs `Authorization: Bearer <key>`.
+
+## Deploy and connect remotely
+
+Open **Settings → Larkup Server → Server** and select **Deploy** to choose a cloud provider. Larkup generates the runtime from the same Agent configuration used locally, including skills, MCP connections, and model settings. Use the same SDK client with the deployed URL. See [Deploy Your Server](/developer/deploy) for provider details.
