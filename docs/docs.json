@@ -43,18 +43,20 @@
           {
             "group": "Use Cases",
             "pages": [
+              "guide/build-rag-server",
+              "guide/data-loading",
               "guide/video-chat",
+              "guide/public-webhooks",
               "guide/document-editor",
-              "guide/data-analysis",
-              "developer/agent-knowledge-base"
+              "guide/data-analysis"
             ]
           },
           {
             "group": "Developer Guide",
             "pages": [
-              "developer/agent-widget",
-              "developer/cli",
+              "developer/agent-runtime-api",
               "developer/deploy",
+              "developer/cli",
               "developer/configuration"
             ]
           }
@@ -90,10 +92,7 @@
           },
           {
             "group": "Querying",
-            "pages": [
-              "api-reference/endpoints/query",
-              "api-reference/endpoints/chat"
-            ]
+            "pages": ["api-reference/endpoints/query", "api-reference/endpoints/chat"]
           },
           {
             "group": "Documents",

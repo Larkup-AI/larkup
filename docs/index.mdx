@@ -26,37 +26,101 @@ title: "Introduction"
 
 There is no pipeline to configure before you start. Open the app, provide your API key, load content from the Data page, and start chatting. Indexing, the RAG server, and model selection run behind the scenes.
 
-### Who it is for
+### What you can do with Larkup
 
-**Business users** can load documents, connect tools like Notion or Google Drive, and start asking questions without writing code.
+Turn any data, files, websites, databases, or connected tools, into a smart search engine you can chat with, regardless of where it lives. Larkup runs locally and connects to the AI provider you choose, so your data stays under your control, and it is built with GDPR compliance in mind.
 
-**Developers and teams** get a running RAG server with a full REST API, official TypeScript and Python SDKs, and support for AI SDK and LangChain in the same workspace.
+Customize and extend what your AI can do: give it Skills, enable built in Tools, or connect an MCP server for even more power.
 
 ### How it works
 
 <Steps>
   <Step title="Enter your API key">
     On first launch you will see an onboarding screen. Paste an OpenAI, Anthropic, or other provider key and Larkup is ready to go.
+
+    <Frame caption="Onboarding: connect your AI provider">
+      <img src="/images/onboard-screen.png" alt="Larkup onboarding screen with AI provider settings" />
+    </Frame>
   </Step>
+
   <Step title="Load your data">
-    Go to the **Data** page and pick a source: upload files, scrape a website, paste text, import media, or connect an integration such as Notion, Google Drive, or Slack.
+    Go to the **Data** page and pick a source.
+
+    <Tabs>
+      <Tab title="Website">
+        <Frame caption="Crawl a website">
+          <img src="/images/add/website-tab.png" alt="Website source options in the Data page" />
+        </Frame>
+      </Tab>
+      <Tab title="Files">
+        <Frame caption="Upload PDF, Word, CSV, JSON, or Excel">
+          <img src="/images/add/files-tab2.png" alt="Files tab with a PDF and an Excel schema preview" />
+        </Frame>
+      </Tab>
+      <Tab title="Text">
+        <Frame caption="Paste notes, transcripts, or any text">
+          <img src="/images/add/text-tab.png" alt="Add Text tab with a title and content field" />
+        </Frame>
+      </Tab>
+      <Tab title="Media">
+        <Frame caption="Upload a video or import a YouTube URL">
+          <img src="/images/add/media-tab.png" alt="Add Media tab with a YouTube URL import" />
+        </Frame>
+      </Tab>
+      <Tab title="Integrations">
+        <Frame caption="Connect Notion, Google Drive, Slack, and more">
+          <img src="/images/add/integrations-tab.png" alt="Data integrations including Notion, Google Drive, Slack, and Jira" />
+        </Frame>
+      </Tab>
+    </Tabs>
+
+    See the full walkthrough in [Quickstart](/guide/quickstart).
   </Step>
+
   <Step title="Start chatting">
-    Open the **Chat** page. Larkup indexes your data automatically and grounds every answer in what you loaded. Responses include source citations, embedded video players, inline charts, and more depending on your content.
+    Open the **Chat** page. Larkup indexes your data automatically and grounds every answer in what you loaded, with source citations, embedded video players, and inline charts.
+
+    <Frame caption="Chat answering a question from an uploaded spreadsheet">
+      <img src="/images/chat/chat-with-csv-chart.png" alt="Chat generating a bar chart from a CSV upload" />
+    </Frame>
+  </Step>
+
+  <Step title="Talk to it from social media">
+    Connect the same Agent to Telegram, Slack, or Discord and answer questions right where your team already talks.
+
+    <Tabs>
+      <Tab title="Telegram">
+        <Frame caption="Chatting with the Agent through Telegram">
+          <img src="/images/connections/telegram-chat-demo.png" alt="Telegram conversation with the Agent" />
+        </Frame>
+      </Tab>
+      <Tab title="Slack">
+        <Frame caption="Chatting with the Agent in Slack">
+          <img src="/images/connections/slack-chat-demo.png" alt="Slack conversation with the Agent" />
+        </Frame>
+      </Tab>
+      <Tab title="Discord">
+        <Frame caption="Chatting with the Agent in Discord">
+          <img src="/images/connections/discord-chat-demo.png" alt="Discord conversation with the Agent" />
+        </Frame>
+      </Tab>
+    </Tabs>
+
+    See [Talk to Your Custom AI from Social Media](/guide/public-webhooks) to connect a channel.
   </Step>
 </Steps>
-
+{/* 
 ## Choose what happens next
 
 <CardGroup cols={2}>
-  <Card title="Connect an AI Agent" icon="plug" href="/developer/agent-knowledge-base">
+  <Card title="Connect an AI Agent" icon="plug" href="/developer/agent-runtime-api">
     Launch the API server, copy its endpoint and API key, then connect your agent through REST, TypeScript, or Python.
   </Card>
 
   <Card title="Use AI Tools" icon="wrench" href="/developer/configuration">
     Fill and sign documents, analyze tabular data, generate charts, search media, and control which tools your assistant can use.
   </Card>
-</CardGroup>
+</CardGroup> */}
 
 {/*
 <Tip>
@@ -79,7 +143,8 @@ There is no pipeline to configure before you start. Open the app, provide your A
     Upload a spreadsheet and get charts and summaries inline in chat.
   </Card>
 
-  <Card title="Sign and Fill Documents" icon="file-signature" href="/guide/document-editor">
-    Fill forms, place signatures, preview changes, and export the finished document.
+
+  <Card title="AI in Social Media" icon="comments" href="/guide/public-webhooks">
+    Connect your Agent to Telegram, Slack, or Discord and chat right there.
   </Card>
 </CardGroup>
