@@ -81,12 +81,12 @@ Larkup gets out of your way. There is no server to configure, no pipeline to bui
   <Step title="Open Chat and start asking">
     Click **Chat** in the sidebar. Select an LLM from the dropdown at the top and ask anything about your data. Answers are grounded in what you loaded, with source citations shown in the sidebar.
 
-    <Frame caption="Chat with sources visible in the side panel">
-      <img src="/images/chat/chat-sidebar-on.png" alt="Chat page with sources panel open" />
+    <Frame caption="Chat answering a question from an uploaded spreadsheet">
+      <img src="/images/chat/chat-with-csv-chart.png" alt="Chat generating a bar chart from a CSV upload" />
     </Frame>
   </Step>
 
-  <Step title="Talk to it from social media">
+  <Step title="OR: Talk to it from social media">
     Connect the same Agent to Telegram, Slack, or Discord and answer questions right where your team already talks.
 
     <Tabs>
@@ -110,24 +110,45 @@ Larkup gets out of your way. There is no server to configure, no pipeline to bui
     See [Talk to Your Custom AI from Social Media](/guide/public-webhooks) to connect a channel.
   </Step>
 
-  <Step title="Launch & Deploy" icon="server" badge="Developer">
-    Launch your custom AI Agent server, connect to it via the SDK or REST API, and deploy it to production. Customize your Agent exactly to your needs:
+  <Step title="(Optional) Launch & Deploy" icon="server" badge="Developer">
+    Launch your custom AI Agent server, connect to it via the SDK or REST API, and deploy it to production.
+
+    <Frame caption="Settings → Larkup Server showing the local endpoint and API key">
+      <img src="/images/deploy/server-on.png" alt="Larkup Server settings with a running server and API key" />
+    </Frame>
+
+    Customize your Agent exactly to your needs from **Settings → Agent Customization**:
 
     <Tabs>
-      <Tab title="General">
-        Brand your assistant with a custom name, avatar, and description.
-      </Tab>
-      <Tab title="Instructions">
-        Define system prompts, behavior, and specific response rules.
-      </Tab>
-      <Tab title="Data Integrations">
-        Connect specific knowledge bases, websites, and files for context.
+      <Tab title="Prompt">
+        Write the system prompt the Agent follows.
+        <Frame caption="Agent Customization: Prompt tab">
+          <img src="/images/customize-agent/customize-prompt.png" alt="System prompt editor" />
+        </Frame>
       </Tab>
       <Tab title="Tools">
-        Equip your agent with capabilities like web scraping and code execution.
+        Turn built in tools on or off (e.g. semantic search, CSV analysis, form filling).
+        <Frame caption="Agent Customization: Tools tab">
+          <img src="/images/customize-agent/customize-tools.png" alt="Built in tools with enable toggles" />
+        </Frame>
       </Tab>
-      <Tab title="Runtime">
-        Configure authentication, rate limits, and deployment environments.
+      <Tab title="Skills">
+        Add custom Skills to extend the Agent's instructions and resources.
+        <Frame caption="Agent Customization: Skills tab">
+          <img src="/images/customize-agent/customize-skills1.png" alt="Add an Agent skill dialog" />
+        </Frame>
+      </Tab>
+      <Tab title="MCP">
+        Connect a remote Model Context Protocol server.
+        <Frame caption="Agent Customization: MCP tab">
+          <img src="/images/customize-agent/customize-mcp.png" alt="MCP connections list" />
+        </Frame>
+      </Tab>
+      <Tab title="Sandbox">
+        Give your Agent access to a remote computer for code execution.
+        <Frame caption="Agent Customization: Sandbox tab">
+          <img src="/images/customize-agent/customize-sandbox1.png" alt="Sandbox provider picker" />
+        </Frame>
       </Tab>
     </Tabs>
 
