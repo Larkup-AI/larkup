@@ -21,7 +21,7 @@ session store, no cache.
 - **Not a channel runtime.** It has no concept of an Agent, a chat session, a
   webhook, or an outbound message. A provider appearing in its registry
   (Slack, for read-only channel history) has no relationship to that same
-  provider's channel adapter elsewhere in the codebase (`packages/channels-core`,
+  provider's channel adapter elsewhere in the codebase (`packages/connections`,
   plan §9) — different OAuth application, different scopes, different trust
   boundary, coincidentally the same company's API.
 - **Not a token store.** The access token is handed to the caller's callback
