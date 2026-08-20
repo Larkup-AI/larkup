@@ -16,13 +16,14 @@ stays this narrow.
    are enabling. Two variables are required regardless of which providers you
    enable:
 
-   | Variable | Purpose |
-   | --- | --- |
-   | `OAUTH_STATE_SECRET` | HMAC key that signs the OAuth `state` parameter. Generate with `openssl rand -hex 32`. Rotating it invalidates every in-flight OAuth attempt (10-minute TTL) — safe, not disruptive to a completed connection. |
+   | Variable                          | Purpose                                                                                                                                                                                                                                    |
+   | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | `OAUTH_STATE_SECRET`              | HMAC key that signs the OAuth `state` parameter. Generate with `openssl rand -hex 32`. Rotating it invalidates every in-flight OAuth attempt (10-minute TTL) — safe, not disruptive to a completed connection.                             |
    | `LARKUP_ALLOWED_REDIRECT_ORIGINS` | Comma-separated list of origins the proxy is allowed to hand a token back to. Must include the deployed Larkup web app's origin (e.g. `https://larkup.de`), **not** the proxy's own origin. See the threat model's redirect-origin policy. |
 
    Every other variable is one provider's `<PROVIDER>_CLIENT_ID` /
    `<PROVIDER>_CLIENT_SECRET` pair, only needed for the providers you enable.
+
 3. **Deploy to Vercel** (or any Node-compatible host — the app is a plain
    Hono handler with no Vercel-specific API beyond `hono/vercel`'s adapter):
 
@@ -30,11 +31,63 @@ stays this narrow.
    cd apps/larkup-proxy
    npx vercel deploy --prod
    ```
+
 4. **Point the web app at this proxy.** In the Larkup web app's environment:
 
    ```env
    NEXT_PUBLIC_INTEGRATIONS_PROXY_URL="https://<proxy-domain>/api/oauth"
    ```
+
+   Managed channels use Larkup's hosted proxy by default and require no web
+   environment variable. Set `NEXT_PUBLIC_CHANNELS_PROXY_URL` only when
+   deliberately operating a self-hosted managed-channel proxy.
+
+## Managed Agent channels
+
+Managed channels are a separate provider surface from knowledge integrations.
+Use a dedicated provider app and the `CONNECTION_<PROVIDER>_<CREDENTIAL>`
+environment convention in the proxy. For Slack, configure only these values:
+
+| Variable                          | Required for                              | Where it belongs      |
+| --------------------------------- | ----------------------------------------- | --------------------- |
+| `CONNECTION_SLACK_CLIENT_ID`      | Starts Slack bot OAuth                    | Proxy deployment only |
+| `CONNECTION_SLACK_CLIENT_SECRET`  | Exchanges the OAuth code                  | Proxy deployment only |
+| `CONNECTION_SLACK_SIGNING_SECRET` | Verifies every inbound Slack request      | Proxy deployment only |
+| `DATABASE_URL`                    | Stores managed workspace-to-tunnel routes | Proxy deployment only |
+
+Register the exact OAuth redirect URL
+`https://<proxy-domain>/api/channels/slack/oauth/callback`. Add the bot scopes
+`chat:write`, `app_mentions:read`, `channels:history`, `groups:history`,
+`im:history`, and `im:read`. Enable Slack Event Subscriptions once, set its
+Request URL to `https://<proxy-domain>/api/channels/slack/events`, and
+subscribe to `app_mention` and `message.im`. After changing scopes or event
+subscriptions, reinstall the app to the workspace.
+
+### Local is production; localhost is not public
+
+A local Larkup installation is a valid production target and must not contain
+shared provider client secrets. It still needs public HTTPS ingress; Slack
+cannot post to `localhost`. Larkup starts the user's tunnel first, then after
+OAuth registers that route with the proxy. The proxy verifies each Slack event
+and relays it to the matching workspace tunnel. It stores only the workspace
+id, public tunnel URL, and a hash of a per-installation relay secret — never a
+bot token or Agent key.
+
+### Discord
+
+Users only select a server through **Connect with Discord**. Configure these
+proxy-only values: `CONNECTION_DISCORD_CLIENT_ID`,
+`CONNECTION_DISCORD_CLIENT_SECRET`, `CONNECTION_DISCORD_PUBLIC_KEY`,
+`CONNECTION_DISCORD_BOT_TOKEN`, and `DATABASE_URL`.
+
+In Discord's Developer Portal register
+`https://<proxy-domain>/api/channels/discord/oauth/callback`, set the
+Interactions Endpoint URL to
+`https://<proxy-domain>/api/channels/discord/interactions`, and enable **Bot
+Require Code Grant**. The installer receives `bot` and
+`applications.commands`; the proxy adds `/ask` to the selected server. It
+keeps the bot token in the proxy and relays only verified interactions to the
+matching local tunnel.
 
 ## Provider registration checklist
 
@@ -59,7 +112,7 @@ see `packages/integrations/src/catalog.ts`'s `readyIntegrations` array and
    - Grant only the scopes from step 1 — nothing this proxy doesn't request.
    - If the provider issues one client for multiple product surfaces sharing
      a token (Atlassian's Jira/Confluence is the example already in this
-     codebase — re-consenting replaces the *entire* prior grant), request the
+     codebase — re-consenting replaces the _entire_ prior grant), request the
      union of every product's scopes on every flow, not just the one being
      connected. See `oauth.ts`'s Jira/Confluence handling for the pattern.
 4. **Add `<PROVIDER>_CLIENT_ID` / `<PROVIDER>_CLIENT_SECRET`** to
@@ -70,7 +123,7 @@ see `packages/integrations/src/catalog.ts`'s `readyIntegrations` array and
    consuming app, to `LARKUP_ALLOWED_REDIRECT_ORIGINS` on the proxy.
 6. **Test the full round trip** against a disposable/test account: start the
    flow, consent, confirm the token lands at the consuming app's callback,
-   and confirm a *denied* consent (cancel on the provider's screen) redirects
+   and confirm a _denied_ consent (cancel on the provider's screen) redirects
    back with an `error` query param instead of hanging or erroring server-side.
    `e2e/tests/api/larkup-proxy.spec.ts` has the contract-level version of this
    for the state/redirect-validation half; the live-provider round trip still
