@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hub.larkup.de/schemas/tool-manifest.v3.json",
+  "title": "Larkup Tool Manifest (v3)",
+  "type": "object",
+  "required": [
+    "manifestVersion",
+    "kind",
+    "id",
+    "name",
+    "description",
+    "category",
+    "version",
+    "pricing",
+    "icon",
+    "packageName",
+    "installSize",
+    "author",
+    "capabilities",
+    "entrypoints",
+    "runtime"
+  ],
+  "properties": {
+    "manifestVersion": { "const": "3.0" },
+    "kind": { "const": "tool" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "category": { "type": "string" },
+    "version": { "type": "string" },
+    "pricing": { "enum": ["free", "pro", "enterprise"] },
+    "icon": { "type": "string" },
+    "packageName": { "type": "string" },
+    "installSize": { "type": "string" },
+    "author": { "type": "string" },
+    "capabilities": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "entrypoints": {
+      "type": "object",
+      "required": ["server"],
+      "properties": {
+        "server": { "type": "string" },
+        "agent": { "type": "string" },
+        "ui": { "type": "string" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["protocolVersion", "defaultMode", "modes"],
+      "properties": {
+        "protocolVersion": { "type": "string" },
+        "defaultMode": { "enum": ["local-docker", "managed-cloud", "custom-remote"] },
+        "modes": { "type": "array", "minItems": 1 }
+      }
+    },
+    "billing": { "type": "object" },
+    "ui": { "type": "object" },
+    "configSchema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "options": { "type": "array", "items": { "type": "object", "properties": { "label": { "type": "string" }, "value": { "type": "string" }, "description": { "type": "string" }, "icon": { "type": "string" }, "image": { "type": "string" } } } },
+          "verification": { "type": "object", "required": ["endpoint"], "properties": { "endpoint": { "type": "string" }, "method": { "enum": ["POST", "PUT"] }, "fields": { "type": "object" } } }
+        }
+      }
+    }
+  }
+}

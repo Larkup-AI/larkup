@@ -6,29 +6,12 @@ import { getInstalledTool } from './tool-installer';
 
 /**
  * Dynamic tool loader — loads an installed tool's module at runtime.
- *
- * Resolution strategy:
- * ─────────────────────────────────────────────────────────────────────
- * 1. Check if the tool is recorded in `installed.json`
- * 2. Use the `resolvedPath` from the install record:
- *    - For `local` (workspace): points to the monorepo package
- *    - For `registry` (npm): points to `.larkup/tools/node_modules/...`
- *    - For `sandbox`: points to the sandbox's tool directory
- * 3. Dynamic `import()` the resolved path
- * 4. Cache the module for the lifetime of the process
- * ─────────────────────────────────────────────────────────────────────
- *
- * Heavy dependencies (ffmpeg bindings, whisper, pdf-lib, etc.) are
- * only loaded when the tool is actually invoked via this loader.
  */
 
 const moduleCache = new Map<string, any>();
 
 /**
  * Load a tool's exported API. Returns `null` if the tool is not installed.
- *
- * The returned object is whatever the tool's entry point exports —
- * each tool defines its own public surface.
  */
 export async function loadTool<T = any>(toolId: string): Promise<T | null> {
   // Check cache first
@@ -51,26 +34,27 @@ export async function loadTool<T = any>(toolId: string): Promise<T | null> {
 
 /**
  * Resolve the import path for a tool based on its install source.
- *
- * - `local` (workspace): import by package name (Node resolves via workspace symlink)
- * - `registry` (npm): import from the isolated node_modules via absolute path
- * - `sandbox`: import from the sandbox tool path
  */
 async function resolveImportPath(installed: InstalledTool): Promise<string> {
   switch (installed.source) {
-    case 'local':
-      // In monorepo, the package name resolves via pnpm workspace linking
-      return installed.packageName;
+    case 'local': {
+      // Workspace tools are recorded with their absolute package directory so
+      // Next.js can load them even when pnpm has not linked the package into
+      // the app's node_modules tree yet. Older manifests still fall back to
+      // the package specifier.
+      try {
+        await fs.access(path.join(installed.resolvedPath, 'package.json'));
+        return resolvePackageEntry(installed.resolvedPath);
+      } catch {
+        return installed.packageName;
+      }
+    }
 
     case 'registry':
     case 'sandbox':
-      // Node ESM cannot import a package directory by absolute path. Resolve
-      // the package's declared ESM entry so isolated marketplace installs work
-      // the same way as a normal package-name import.
       return resolvePackageEntry(installed.resolvedPath);
 
     default:
-      // Fallback: try package name (backwards compat)
       return installed.packageName;
   }
 }

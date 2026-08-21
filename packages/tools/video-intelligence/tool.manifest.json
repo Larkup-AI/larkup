@@ -1,0 +1,155 @@
+{
+  "$schema": "https://hub.larkup.de/schemas/tool-manifest.v3.json",
+  "manifestVersion": "3.0",
+  "kind": "tool",
+  "id": "video-intelligence",
+  "name": "Video Intelligence (New)",
+  "description": "Index video locally or in Larkup Cloud with timestamped speech, OCR, objects, tracks, and state evidence.",
+  "longDescription": "A removable vertical marketplace tool. The npm package contains typed clients and UI contributions; expensive media operators run in one portable Docker image locally, in a custom endpoint, or on Larkup Cloud.",
+  "category": "media",
+  "version": "0.1.0",
+  "pricing": "free",
+  "emoji": "🎥",
+  "icon": "Film",
+  "packageName": "@larkup/tool-video-intelligence",
+  "installSize": "~120 KB client; ~8 GB optional runtime image",
+  "systemDeps": ["docker"],
+  "requiresSandbox": true,
+  "author": "Larkup",
+  "capabilities": [
+    "video-indexing",
+    "video-indexing-brief",
+    "full-frame-coverage",
+    "local-video-runtime",
+    "cloud-video-runtime",
+    "timestamped-transcription",
+    "ocr",
+    "object-detection",
+    "anonymous-object-tracking",
+    "usage-metering"
+  ],
+  "entrypoints": {
+    "server": ".",
+    "agent": ".",
+    "ui": "./ui"
+  },
+  "runtime": {
+    "protocolVersion": "1",
+    "defaultMode": "managed-cloud",
+    "healthPath": "/v1/health",
+    "modes": [
+      {
+        "id": "local-docker",
+        "label": "Local Docker",
+        "description": "Keep the source and evidence on this computer.",
+        "image": "ghcr.io/larkup-ai/video-intelligence:0.1.0",
+        "composeFile": "compose.yaml",
+        "requiresGpu": false
+      },
+      {
+        "id": "managed-cloud",
+        "label": "Larkup Cloud",
+        "description": "Use quota-controlled managed GPU workers in the configured EU region.",
+        "endpointConfigKey": "cloudEndpoint",
+        "credentialConfigKey": "cloudApiKey",
+        "requiresGpu": true
+      },
+      {
+        "id": "custom-remote",
+        "label": "Custom endpoint",
+        "description": "Connect the tool to your own deployment of the same Docker runtime.",
+        "endpointConfigKey": "cloudEndpoint",
+        "credentialConfigKey": "cloudApiKey",
+        "requiresGpu": false
+      }
+    ]
+  },
+  "billing": {
+    "model": "hybrid",
+    "entitlementVersion": "1",
+    "meters": [
+      {
+        "id": "source-minute",
+        "unit": "minute",
+        "description": "Minutes of source media indexed."
+      },
+      {
+        "id": "deep-inspection-minute",
+        "unit": "minute",
+        "description": "Minutes decoded with deep or full coverage."
+      },
+      { "id": "gpu-second", "unit": "second", "description": "GPU worker time used." },
+      { "id": "ocr-frame", "unit": "frame", "description": "Frames sent through OCR." }
+    ]
+  },
+  "ui": {
+    "isolation": "sandboxed-iframe",
+    "surfaces": [
+      {
+        "id": "video-indexing-brief",
+        "slot": "data-indexing",
+        "title": "Guide video indexing",
+        "entrypoint": "./ui"
+      },
+      {
+        "id": "video-evidence-result",
+        "slot": "chat-result",
+        "title": "Video evidence",
+        "entrypoint": "./ui"
+      }
+    ]
+  },
+  "configSchema": [
+    {
+      "key": "runtimeMode",
+      "label": "Runtime",
+      "type": "select",
+      "group": "Compute",
+      "defaultValue": "managed-cloud",
+      "options": [
+        { "label": "Local Docker", "value": "local-docker" },
+        { "label": "Larkup Cloud", "value": "managed-cloud" },
+        { "label": "Custom endpoint", "value": "custom-remote" }
+      ]
+    },
+    {
+      "key": "localEndpoint",
+      "label": "Local endpoint",
+      "type": "text",
+      "group": "Compute",
+      "defaultValue": "http://127.0.0.1:8787"
+    },
+    { "key": "cloudEndpoint", "label": "Cloud endpoint", "type": "text", "group": "Compute" },
+    {
+      "key": "cloudApiKey",
+      "label": "Cloud API key",
+      "type": "password",
+      "group": "Compute"
+    },
+    {
+      "key": "defaultIndexingMode",
+      "label": "Default indexing mode",
+      "type": "select",
+      "group": "Indexing",
+      "defaultValue": "balanced",
+      "options": [
+        { "label": "Fast", "value": "fast" },
+        { "label": "Balanced", "value": "balanced" },
+        { "label": "Deep", "value": "deep" },
+        { "label": "Full coverage", "value": "full-coverage" }
+      ]
+    }
+  ],
+  "tags": ["video", "ocr", "tracking", "local", "gpu", "aws", "gdpr"],
+  "downloads": 0,
+  "repositoryUrl": "https://github.com/Larkup-AI/larkup",
+  "license": "Apache-2.0",
+  "updatedAt": "2026-08-20",
+  "trustLevel": "elevated",
+  "permissions": {
+    "fsRead": true,
+    "fsWrite": true,
+    "exec": true,
+    "httpAllow": ["127.0.0.1", "localhost", "video.larkup.de"]
+  }
+}

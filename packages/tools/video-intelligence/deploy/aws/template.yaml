@@ -1,0 +1,230 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Larkup Video Intelligence control plane with hidden RunPod Secure Cloud GPU workers.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedPattern: '[a-z0-9-]+'
+  RunpodEndpointId:
+    Type: String
+    Description: Queue-based RunPod Serverless endpoint ID in an EU Secure Cloud data center.
+  RunpodApiKey:
+    Type: String
+    NoEcho: true
+    Description: RunPod API key used only by the Larkup Cloud control plane.
+  AllowedOrigin:
+    Type: String
+    Default: https://app.larkup.de
+  ProcessingEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+
+Resources:
+  DataKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub Larkup video ${Environment} source and evidence encryption
+      EnableKeyRotation: true
+      PendingWindowInDays: 14
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AccountAdministration
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: '*'
+
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !GetAtt DataKey.Arn
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteUnretainedSources
+            Prefix: sources/
+            Status: Enabled
+            ExpirationInDays: 1
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+          - Id: DeleteEvidence
+            Prefix: results/
+            Status: Enabled
+            ExpirationInDays: 30
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Ref AllowedOrigin]
+            AllowedMethods: [PUT, GET]
+            AllowedHeaders: ['*']
+            ExposedHeaders: [ETag]
+            MaxAge: 300
+
+  AdminSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub Admin token for Larkup Video Intelligence ${Environment} access codes
+      KmsKeyId: !GetAtt DataKey.Arn
+      GenerateSecretString:
+        PasswordLength: 48
+        ExcludePunctuation: true
+
+  DataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt DataBucket.Arn
+              - !Sub ${DataBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+  StateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !GetAtt DataKey.Arn
+      TimeToLiveSpecification:
+        AttributeName: expiresAtEpoch
+        Enabled: true
+
+  RunpodSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub RunPod API key for Larkup Video Intelligence ${Environment}
+      KmsKeyId: !GetAtt DataKey.Arn
+      SecretString: !Ref RunpodApiKey
+
+  ControlPlaneRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: VideoControlPlane
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  [
+                    dynamodb:GetItem,
+                    dynamodb:PutItem,
+                    dynamodb:UpdateItem,
+                    dynamodb:TransactWriteItems,
+                  ]
+                Resource: !GetAtt StateTable.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub ${DataBucket.Arn}/*
+              - Effect: Allow
+                Action: [kms:Decrypt, kms:Encrypt, kms:GenerateDataKey]
+                Resource: !GetAtt DataKey.Arn
+              - Effect: Allow
+                Action: s3:DeleteObject
+                Resource: !Sub ${DataBucket.Arn}/*
+
+  ApiAccessLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+
+  CloudApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins: [!Ref AllowedOrigin]
+        AllowMethods: [GET, POST, DELETE, OPTIONS]
+        AllowHeaders: [authorization, content-type, x-larkup-admin-token]
+        MaxAge: 300
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 100
+        ThrottlingRateLimit: 50
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogs.Arn
+        Format: '{"requestId":"$context.requestId","status":"$context.status","route":"$context.routeKey","latency":"$context.responseLatency"}'
+
+  ControlPlane:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: control_plane/
+      Handler: handler.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt ControlPlaneRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref StateTable
+          BUCKET_NAME: !Ref DataBucket
+          RUNPOD_ENDPOINT_ID: !Ref RunpodEndpointId
+          RUNPOD_API_KEY: !Sub '{{resolve:secretsmanager:${RunpodSecret}:SecretString}}'
+          PROCESSING_ENABLED: !Ref ProcessingEnabled
+          ADMIN_TOKEN: !Sub '{{resolve:secretsmanager:${AdminSecret}:SecretString}}'
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CloudApi
+            Path: /v1/{proxy+}
+            Method: ANY
+
+Outputs:
+  ApiEndpoint:
+    Value: !Sub https://${CloudApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+  BucketName:
+    Value: !Ref DataBucket
+  TableName:
+    Value: !Ref StateTable
+  RunpodEndpointId:
+    Value: !Ref RunpodEndpointId
+  AdminSecretArn:
+    Value: !Ref AdminSecret

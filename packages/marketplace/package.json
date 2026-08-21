@@ -10,14 +10,38 @@
     "./registry": "./src/tool-registry.ts",
     "./installer": "./src/tool-installer.ts",
     "./loader": "./src/tool-loader.ts",
+    "./extension": "./src/tool-extension.ts",
+    "./output": "./src/output-sanitizer.ts",
     "./storage": "./src/storage-provider.ts",
-    "./manifest": "./src/tool-manifest.schema.ts"
+    "./manifest": "./src/tool-manifest.schema.ts",
+    "./db": "./src/db/client.ts",
+    "./db/schema": "./src/db/schema/index.ts",
+    "./db/repo": "./src/db/repo.ts",
+    "./db/validate": "./src/db/validate.ts",
+    "./db/builtin-tools": "./src/db/builtin-tools.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "db:build": "tsc -p db/tsconfig.build.json",
+    "db:generate": "drizzle-kit generate --config db/drizzle.config.ts",
+    "db:push": "drizzle-kit push --config db/drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config db/drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config db/drizzle.config.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:typecheck": "tsc --noEmit",
+    "db:test": "vitest run --config db/vitest.config.ts"
   },
   "dependencies": {
-    "@larkup/core": "workspace:*"
+    "@larkup/core": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/node": "^26",
-    "typescript": "^7.0.2"
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.5",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
