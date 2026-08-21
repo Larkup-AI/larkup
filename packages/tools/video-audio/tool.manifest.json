@@ -13,6 +13,7 @@
   "icon": "Film",
   "packageName": "@larkup/tool-video-audio",
   "installSize": "~15 MB",
+  "requiresSandbox": true,
   "author": "Larkup",
   "capabilities": [
     "video-indexing",
@@ -29,49 +30,72 @@
     "anonymous-person-tracking",
     "state-change-detection"
   ],
-  "tags": ["video intelligence", "temporal reasoning", "transcription", "ffmpeg", "video", "audio", "evidence"],
+  "tags": [
+    "video intelligence",
+    "temporal reasoning",
+    "transcription",
+    "ffmpeg",
+    "video",
+    "audio",
+    "evidence"
+  ],
   "downloads": 0,
   "repositoryUrl": "https://github.com/Larkup-AI/larkup",
   "license": "Apache-2.0",
   "updatedAt": "2026-08-03",
   "configSchema": [
     {
-      "key": "frameInterval",
-      "label": "Baseline coverage interval (seconds)",
-      "type": "text",
-      "defaultValue": "10",
-      "help": "A maximum gap for cheap coverage anchors. Activity and scene-change triggers automatically add denser evidence; this is not a fixed sampling rate."
-    },
-    {
       "key": "audioProvider",
       "label": "Audio Provider",
       "type": "select",
+      "group": "Transcription",
+      "layout": "full",
       "help": "Choose the provider that should transcribe both audio files and video audio tracks.",
       "options": [
-        { "label": "OpenAI", "value": "openai" },
-        { "label": "Groq", "value": "groq" },
-        { "label": "Deepgram", "value": "deepgram" },
-        { "label": "ElevenLabs", "value": "elevenlabs" },
-        { "label": "Local Whisper", "value": "local" }
+        { "label": "OpenAI", "value": "openai", "icon": "/icons/openai.svg", "description": "Hosted transcription through OpenAI." },
+        { "label": "Groq", "value": "groq", "icon": "/icons/grok.png", "description": "Fast hosted Whisper inference." },
+        { "label": "Deepgram", "value": "deepgram", "icon": "/icons/deepgram.png", "description": "Speech-to-text with language features." },
+        { "label": "ElevenLabs", "value": "elevenlabs", "icon": "/icons/elevenlabs.png", "description": "ElevenLabs speech-to-text provider." },
+        { "label": "Local Whisper", "value": "local", "icon": "/icons/audio.png", "description": "Runs transcription locally and does not need an API key." }
       ]
     },
     {
-      "key": "audioLanguage",
-      "label": "Transcription language",
+      "key": "frameInterval",
+      "label": "Baseline coverage interval (seconds)",
       "type": "text",
-      "defaultValue": "auto",
-      "help": "Use auto for provider language detection, or enter a language code such as ar, ar-EG, en, or de to override it."
+      "group": "Evidence coverage",
+      "layout": "full",
+      "defaultValue": "10",
+      "help": "A maximum gap for cheap coverage anchors. Activity and scene-change triggers automatically add denser evidence; this is not a fixed sampling rate."
     },
     {
       "key": "audioApiKey",
       "label": "Audio API Key",
       "type": "password",
+      "group": "Transcription",
+      "verification": {
+        "endpoint": "/api/config/verify",
+        "method": "POST",
+        "fields": { "audioProvider": "audioProvider", "audioApiKey": "audioApiKey" }
+      },
+      "layout": "full",
       "help": "Required for the selected provider. This key is used only by the Video & Audio tool."
+    },
+    {
+      "key": "audioLanguage",
+      "label": "Transcription language",
+      "type": "text",
+      "group": "Transcription",
+      "layout": "full",
+      "defaultValue": "auto",
+      "help": "Use auto for provider language detection, or enter a language code such as ar, ar-EG, en, or de to override it."
     },
     {
       "key": "maxDurationSecs",
       "label": "Maximum video duration (seconds)",
       "type": "text",
+      "group": "Processing limits",
+      "layout": "half",
       "defaultValue": "14400",
       "help": "Reject videos longer than this duration (default: 4 hours / 14400 seconds). Set 0 for no limit."
     },
@@ -79,6 +103,8 @@
       "key": "chunkDurationSecs",
       "label": "Knowledge chunk duration (seconds)",
       "type": "text",
+      "group": "Processing limits",
+      "layout": "half",
       "defaultValue": "300",
       "help": "Maximum timeline chunk processed at once. Overlap and checkpointing keep long videos resumable."
     },
@@ -86,6 +112,8 @@
       "key": "maxFrames",
       "label": "Maximum retained frames",
       "type": "text",
+      "group": "Evidence coverage",
+      "layout": "half",
       "defaultValue": "600",
       "help": "Hard cap for retained visual evidence. The information-gain policy may retain fewer frames."
     },
@@ -93,6 +121,8 @@
       "key": "ocrLanguages",
       "label": "OCR languages",
       "type": "text",
+      "group": "Evidence coverage",
+      "layout": "half",
       "defaultValue": "auto",
       "help": "Comma-separated OCR language hints; use auto when the configured OCR adapter detects language."
     },
@@ -100,6 +130,8 @@
       "key": "maxInspectionSpendUsd",
       "label": "Maximum per-query inspection spend (USD)",
       "type": "text",
+      "group": "Query-time inspection",
+      "layout": "full",
       "defaultValue": "0.50",
       "help": "Hard budget for bounded query-time source inspection; larger work requires a background refinement approval."
     },
@@ -107,6 +139,8 @@
       "key": "videoKnowledgeEnabled",
       "label": "Video Knowledge Engine",
       "type": "select",
+      "group": "Compatibility",
+      "layout": "full",
       "defaultValue": "true",
       "help": "Enable evidence-first video knowledge revisions. Disable only to roll back to the compatible legacy media pipeline.",
       "options": [
@@ -120,6 +154,14 @@
     "fsRead": true,
     "fsWrite": true,
     "exec": true,
-    "httpAllow": ["youtube.com", "www.youtube.com", "youtu.be", "api.openai.com", "api.groq.com", "api.deepgram.com", "api.elevenlabs.io"]
+    "httpAllow": [
+      "youtube.com",
+      "www.youtube.com",
+      "youtu.be",
+      "api.openai.com",
+      "api.groq.com",
+      "api.deepgram.com",
+      "api.elevenlabs.io"
+    ]
   }
 }
