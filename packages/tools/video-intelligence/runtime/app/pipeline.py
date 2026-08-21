@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -12,6 +13,8 @@ from typing import Any, Callable, Iterator
 
 import cv2
 import numpy as np
+
+from .ranges import normalized_important_ranges
 
 
 ProgressCallback = Callable[[str, int, str], None]
@@ -25,6 +28,7 @@ COCO_LABELS = (
     "bed dining-table toilet tv laptop mouse remote keyboard cell-phone microwave oven toaster sink "
     "refrigerator book clock vase scissors teddy-bear hair-drier toothbrush"
 ).split()
+SCORE_PATTERN = re.compile(r"(?<!\d)(\d{1,2})\s*[-:]\s*(\d{1,2})(?!\d)")
 
 
 @dataclass(frozen=True)
@@ -324,6 +328,21 @@ def _sampling_interval(mode: str) -> float:
     return {"fast": 5.0, "balanced": 2.0, "deep": 0.75}[mode]
 
 
+def _score_candidates(ocr_lines: list[dict[str, Any]], time_ms: int) -> list[dict[str, Any]]:
+    """Returns OCR-backed score candidates; callers must still treat them as evidence to verify."""
+    candidates: list[dict[str, Any]] = []
+    for line in ocr_lines:
+        for match in SCORE_PATTERN.finditer(str(line.get("text") or "")):
+            candidates.append(
+                {
+                    "timeMs": time_ms,
+                    "score": f"{match.group(1)}-{match.group(2)}",
+                    "confidence": round(float(line.get("confidence") or 0), 4),
+                }
+            )
+    return candidates
+
+
 def _iter_frames(
     path: Path,
     probe: Probe,
@@ -340,22 +359,36 @@ def _iter_frames(
         else max(1, round(probe.fps * _sampling_interval(brief["indexingMode"])))
     )
     total_frames = max(1, int(capture.get(cv2.CAP_PROP_FRAME_COUNT)))
-    frame_index = 0
+    important_ranges = normalized_important_ranges(brief, probe.duration_seconds)
+    ranges = important_ranges or [(0.0, probe.duration_seconds)]
+    requested_frames = max(
+        1,
+        sum(max(0, round((end - start) * probe.fps)) for start, end in ranges),
+    )
+    processed_frames = 0
     try:
-        while True:
-            ok, frame = capture.read()
-            if not ok:
-                break
-            if frame_index % interval_frames == 0:
-                yield round(frame_index / probe.fps * 1_000), frame, frame_index, total_frames
-            frame_index += 1
-            if frame_index % max(round(probe.fps * 15), 1) == 0:
-                percent = 42 + round(min(frame_index / total_frames, 1) * 13)
-                progress(
-                    "decode",
-                    percent,
-                    f"Decoded {min(frame_index, total_frames):,}/{total_frames:,} frames",
-                )
+        for start_secs, end_secs in ranges:
+            capture.set(cv2.CAP_PROP_POS_MSEC, start_secs * 1_000)
+            range_frame = 0
+            while True:
+                ok, frame = capture.read()
+                if not ok:
+                    break
+                timestamp_secs = float(capture.get(cv2.CAP_PROP_POS_MSEC)) / 1_000
+                if timestamp_secs > end_secs + (1 / max(probe.fps, 1)):
+                    break
+                if range_frame % interval_frames == 0:
+                    frame_index = max(0, round(timestamp_secs * probe.fps))
+                    yield round(timestamp_secs * 1_000), frame, frame_index, total_frames
+                range_frame += 1
+                processed_frames += 1
+                if processed_frames % max(round(probe.fps * 15), 1) == 0:
+                    percent = 42 + round(min(processed_frames / requested_frames, 1) * 13)
+                    progress(
+                        "decode",
+                        percent,
+                        f"Decoded {min(processed_frames, requested_frames):,}/{requested_frames:,} requested frames",
+                    )
     finally:
         capture.release()
 
@@ -438,16 +471,20 @@ def run_pipeline(
 
     transcript: list[dict[str, Any]] = []
     detected_language: str | None = None
-    if probe.has_audio:
+    if probe.has_audio and not brief.get("skipTranscription"):
         progress("transcribe", 8, "Transcribing speech with word timestamps")
         transcript, detected_language = operators.transcribe(
             path, None if brief.get("language") == "auto" else brief.get("language")
         )
+    elif probe.has_audio:
+        progress("transcribe", 8, "Using the selected external transcription provider")
     progress("decode", 42, "Selecting visual evidence")
 
     observations: list[dict[str, Any]] = []
     label_counts: Counter[str] = Counter()
     text_occurrences: defaultdict[str, list[int]] = defaultdict(list)
+    scoreboard_states: list[dict[str, Any]] = []
+    previous_score: str | None = None
     tracker = AnonymousTracker()
     analyzed_frames = 0
     decoded_frames = max(1, round(probe.duration_seconds * probe.fps))
@@ -470,6 +507,11 @@ def run_pipeline(
             label_counts[detection["label"]] += 1
         for line in ocr_lines:
             text_occurrences[line["text"]].append(time_ms)
+        if brief.get("contentType") == "sports":
+            for candidate in _score_candidates(ocr_lines, time_ms):
+                if candidate["score"] != previous_score:
+                    scoreboard_states.append(candidate)
+                    previous_score = candidate["score"]
         if detections or ocr_lines or brief["indexingMode"] == "full-coverage":
             observations.append(
                 {"timeMs": time_ms, "objects": detections, "ocr": ocr_lines}
@@ -489,6 +531,7 @@ def run_pipeline(
         "detectedLanguage": detected_language,
         "visualObservations": observations,
         "tracks": tracker.summaries(),
+        "scoreboardStates": scoreboard_states,
         "entities": [
             {"name": label, "kind": "object", "mentions": count}
             for label, count in label_counts.most_common()

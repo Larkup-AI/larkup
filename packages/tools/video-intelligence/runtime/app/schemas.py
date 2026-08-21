@@ -26,6 +26,7 @@ class VideoIndexingBrief(ApiModel):
     indexing_mode: Literal["fast", "balanced", "deep", "full-coverage"] = "balanced"
     processing_authority_confirmed: bool = False
     retain_source_hours: int = Field(default=0, ge=0, le=720)
+    skip_transcription: bool = False
 
     @field_validator("goal", "language")
     @classmethod
