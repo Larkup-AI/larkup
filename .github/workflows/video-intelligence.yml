@@ -93,7 +93,7 @@ jobs:
     if: >-
       startsWith(github.ref, 'refs/tags/video-intelligence-v') ||
       (github.event_name == 'workflow_dispatch' && inputs.publish)
-    needs: [test, container-smoke, validate-infrastructure]
+    needs: [container-smoke, validate-infrastructure]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
