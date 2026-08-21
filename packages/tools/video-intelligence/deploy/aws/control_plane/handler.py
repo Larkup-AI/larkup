@@ -149,9 +149,9 @@ def update_progress(item: dict[str, Any], stage: str, percent: int, message: str
 def settle(item: dict[str, Any], status: str, actual: float, result_key: str | None = None, error: str | None = None) -> None:
     estimate = float(item["estimatedSourceMinutes"])
     values: dict[str, Any] = {":status": {"S": status}, ":updated": {"S": now_iso()}, ":progress": {"S": json.dumps({"stage": "complete" if status == "completed" else "queued", "percent": 100 if status == "completed" else 0, "message": "Index ready" if status == "completed" else error or status})}, ":queued": {"S": "queued"}, ":running": {"S": "running"}, ":estimate": {"N": str(-estimate)}, ":actual": {"N": str(actual)}, ":available": {"N": str(estimate - actual)}, ":one": {"N": "-1"}}
-    expression, names = "SET #status = :status, progressJson = :progress, updatedAt = :updated", {"#status": "status", "#error": "error"}
+    expression, names = "SET #status = :status, progressJson = :progress, updatedAt = :updated", {"#status": "status"}
     if result_key: expression += ", resultKey = :result"; values[":result"] = {"S": result_key}
-    if error: expression += ", #error = :error"; values[":error"] = {"S": error[:2000]}
+    if error: expression += ", #error = :error"; names["#error"] = "error"; values[":error"] = {"S": error[:2000]}
     try:
         boto3.client("dynamodb", region_name=REGION).transact_write_items(TransactItems=[{"Update": {"TableName": TABLE_NAME, "Key": {"pk": {"S": item["pk"]}, "sk": {"S": "JOB"}}, "UpdateExpression": expression, "ConditionExpression": "#status IN (:queued, :running)", "ExpressionAttributeNames": names, "ExpressionAttributeValues": values}}, {"Update": {"TableName": TABLE_NAME, "Key": {"pk": {"S": f"USAGE#{item['principalId']}#{item['period']}"}, "sk": {"S": "USAGE"}}, "UpdateExpression": "ADD reservedSourceMinutes :estimate, sourceMinutesUsed :actual, availableSourceMinutes :available, activeJobs :one", "ExpressionAttributeValues": {key: values[key] for key in (":estimate", ":actual", ":available", ":one")}}}])
     except ClientError as error_obj:
