@@ -109,10 +109,10 @@ jobs:
         id: image
         env:
           REGISTRY: ghcr.io
-          REPOSITORY: ${{ github.repository_owner }}/video-intelligence
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          image_uri="${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}"
+          repository="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')/video-intelligence"
+          image_uri="${REGISTRY}/${repository}:${IMAGE_TAG}"
           docker buildx build \
             --platform linux/amd64 \
             --target runtime \
