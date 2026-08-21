@@ -5,23 +5,14 @@ import { DEFAULT_HUB_URL } from './types';
 
 /**
  * Tool registry — resolves tool descriptors from multiple sources.
- *
- * Resolution order:
- * 1. Local `tool.manifest.json` files from workspace packages
- * 2. Hub API (remote catalog) when available
- * 3. Hardcoded fallback for offline / development
- *
- * In the monorepo, tools under `packages/tools/` ship their own
- * `tool.manifest.json`. This registry reads those at startup.
- * When the Hub API is live, it supplements with remotely-published tools.
  */
-
-/* ------------------------------------------------------------------ */
-/* Local manifest discovery                                            */
-/* ------------------------------------------------------------------ */
 
 /** Cached registry — populated on first access. */
 let cachedRegistry: Record<string, ToolDescriptor> | null = null;
+
+function normalizeToolDescriptor(descriptor: ToolDescriptor): ToolDescriptor {
+  return { ...descriptor, requiresSandbox: descriptor.requiresSandbox !== false };
+}
 
 /**
  * Compare the numeric portions of two semver versions. Marketplace manifests
@@ -63,11 +54,6 @@ export function mergeToolDescriptors(
   return merged;
 }
 
-/**
- * Scan workspace tool directories for `tool.manifest.json` files.
- * This is used in monorepo development and in Docker builds where
- * tools are bundled at build time.
- */
 async function discoverLocalManifests(): Promise<Record<string, ToolDescriptor>> {
   const registry: Record<string, ToolDescriptor> = {};
 
@@ -92,7 +78,7 @@ async function discoverLocalManifests(): Promise<Record<string, ToolDescriptor>>
         const manifestPath = path.join(searchPath, entry.name, 'tool.manifest.json');
         try {
           const raw = await fs.readFile(manifestPath, 'utf8');
-          const manifest = JSON.parse(raw) as ToolDescriptor;
+          const manifest = normalizeToolDescriptor(JSON.parse(raw) as ToolDescriptor);
           if (manifest.id) {
             registry[manifest.id] = manifest;
           }
@@ -107,10 +93,6 @@ async function discoverLocalManifests(): Promise<Record<string, ToolDescriptor>>
 
   return registry;
 }
-
-/* ------------------------------------------------------------------ */
-/* Hub API fetching                                                    */
-/* ------------------------------------------------------------------ */
 
 /**
  * Fetch the full tool catalog from the remote Hub API.
@@ -133,7 +115,7 @@ async function fetchHubCatalog(hubUrl?: string): Promise<Record<string, ToolDesc
     const data = (await res.json()) as { tools: ToolDescriptor[] };
     const registry: Record<string, ToolDescriptor> = {};
     for (const tool of data.tools ?? []) {
-      if (tool.id) registry[tool.id] = tool;
+      if (tool.id) registry[tool.id] = normalizeToolDescriptor(tool);
     }
     return registry;
   } catch {
@@ -168,14 +150,9 @@ export async function fetchToolFromHub(
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* Hardcoded fallback (offline safety net)                              */
-/* ------------------------------------------------------------------ */
-
 /**
  * Minimal hardcoded registry for offline / first-run scenarios
- * where neither manifests nor Hub are available. This ensures the
- * marketplace always has something to show.
+ * where neither manifests nor Hub are available.
  */
 const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
   'video-audio': {
@@ -190,6 +167,7 @@ const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
     icon: 'Film',
     packageName: '@larkup/tool-video-audio',
     installSize: '~15 MB',
+    requiresSandbox: true,
     author: 'Larkup',
     capabilities: [
       'video-indexing',
@@ -254,6 +232,7 @@ const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
     icon: 'ScanEye',
     packageName: '@larkup/tool-clip-embeddings',
     installSize: '~200 MB',
+    requiresSandbox: true,
     author: 'Larkup',
     capabilities: ['clip-embeddings', 'image-similarity'],
     tags: ['clip', 'siglip', 'image-search', 'visual-similarity'],
@@ -276,6 +255,7 @@ const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
     packageName: '@larkup/tool-doc-editor',
     installSize: '~5 MB',
     systemDeps: ['docker'],
+    requiresSandbox: true,
     author: 'Larkup',
     capabilities: ['document-editing', 'form-filling', 'document-preview'],
     tags: ['pdf', 'docx', 'pptx', 'form', 'canvas', 'editor', 'fill'],
@@ -286,34 +266,37 @@ const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
   },
 };
 
-/* ------------------------------------------------------------------ */
-/* Public API                                                          */
-/* ------------------------------------------------------------------ */
-
 /**
- * Build the full tool registry by merging sources.
- * Priority: local manifests > Hub API > hardcoded fallback.
+ * Build the full tool registry by merging sources. The deployed Hub is the
+ * source of truth in normal operation; local manifests are a development and
+ * offline recovery path, never a silent production override.
  * Cached after first call for the process lifetime.
  */
 export async function buildRegistry(opts?: {
   hubUrl?: string;
   skipHub?: boolean;
+  preferLocal?: boolean;
 }): Promise<Record<string, ToolDescriptor>> {
   if (cachedRegistry) return cachedRegistry;
 
   // Start with hardcoded fallback.
   let registry = { ...FALLBACK_REGISTRY };
 
-  // Layer Hub API catalog over the offline fallback.
+  // Layer Hub API catalog over the offline fallback. A non-empty response is
+  // authoritative so every client sees the Neon-backed catalog consistently.
+  let hubAvailable = false;
   if (!opts?.skipHub) {
     const hubCatalog = await fetchHubCatalog(opts?.hubUrl);
-    registry = mergeToolDescriptors(registry, hubCatalog);
+    if (Object.keys(hubCatalog).length > 0) {
+      registry = mergeToolDescriptors(registry, hubCatalog);
+      hubAvailable = true;
+    }
   }
 
-  // A local workspace manifest wins on equal versions, while an older
-  // installed package cannot hide a newer catalog release that repairs it.
-  const localManifests = await discoverLocalManifests();
-  registry = mergeToolDescriptors(registry, localManifests);
+  if (!hubAvailable || opts?.preferLocal) {
+    const localManifests = await discoverLocalManifests();
+    registry = mergeToolDescriptors(registry, localManifests);
+  }
 
   cachedRegistry = registry;
   return registry;

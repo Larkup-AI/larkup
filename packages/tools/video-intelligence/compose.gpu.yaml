@@ -1,0 +1,14 @@
+services:
+  video-intelligence:
+    build:
+      target: runtime
+    environment:
+      LARKUP_VIDEO_DEVICE: cuda
+      LARKUP_VIDEO_OCR_ENGINE: PaddleOCR
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

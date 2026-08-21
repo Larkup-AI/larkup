@@ -2,12 +2,12 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { StorageProvider, StorageStats } from './types';
 import { STORAGE_WARNING_THRESHOLDS } from './types';
-import { getDataDir, requireDataDir } from '@larkup/core/workspace';
+import { requireProjectDataDir } from '@larkup/core/project-store';
 
 /**
  * Local file-based storage provider for media assets.
  *
- * Stores files under `.larkup/servers/<activeServer>/media/`.
+ * Stores files under `.larkup/projects/<activeProject>/media/`.
  * Designed to be swappable with cloud providers (S3, UploadThing, GCS)
  * in the future via the StorageProvider interface.
  */
@@ -17,7 +17,7 @@ export class LocalStorageProvider implements StorageProvider {
   readonly name = 'Local Storage';
 
   private async mediaDir(): Promise<string> {
-    const dataDir = await requireDataDir();
+    const dataDir = await requireProjectDataDir();
     const dir = path.join(dataDir, 'media');
     await fs.mkdir(dir, { recursive: true });
     return dir;
@@ -78,10 +78,6 @@ export class LocalStorageProvider implements StorageProvider {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-
 async function computeDirStats(dir: string): Promise<StorageStats> {
   let usedBytes = 0;
   let fileCount = 0;
@@ -102,9 +98,7 @@ async function computeDirStats(dir: string): Promise<StorageStats> {
           const stat = await fs.stat(full);
           usedBytes += stat.size;
           fileCount++;
-        } catch {
-          // skip
-        }
+        } catch {}
       }
     }
   }

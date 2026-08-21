@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import type { Dirent } from 'node:fs';
 import path from 'node:path';
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -12,11 +13,19 @@ import type {
 } from './types';
 import { getToolById, invalidateRegistryCache } from './tool-registry';
 
+const installingTools = new Set<string>();
+const uninstallingTools = new Set<string>();
+
+export function getOngoingOperations() {
+  return {
+    installing: Array.from(installingTools),
+    uninstalling: Array.from(uninstallingTools),
+  };
+}
+
 const execAsync = promisify(execCb);
 
-// npm mutates a shared node_modules tree. Serializing those mutations prevents
-// double-clicks or concurrent API requests from colliding during npm's rename
-// phase (the source of the ENOTEMPTY failures seen in installed applications).
+// npm mutates a shared node_modules tree.
 let packageMutationChain: Promise<unknown> = Promise.resolve();
 function serializePackageMutation<T>(fn: () => Promise<T>): Promise<T> {
   const run = packageMutationChain.then(fn, fn);
@@ -26,26 +35,7 @@ function serializePackageMutation<T>(fn: () => Promise<T>): Promise<T> {
 
 /**
  * Tool installer — manages installing / uninstalling marketplace tools.
- *
- * Architecture:
- * ─────────────────────────────────────────────────────────────────────
- * Tools are installed into an ISOLATED directory:
- *   `.larkup/tools/node_modules/@larkup/tool-*`
- *
- * This design:
- * - Keeps the user's project package.json clean (no pollution)
- * - Makes tools portable — copy `.larkup/tools/` to any machine
- * - Enables per-agent tool sets (future: each agent has its own tools dir)
- * - Works identically across local, Docker, and sandbox deployments
- *
- * The installer tracks state in `.larkup/tools/installed.json`.
- * The loader resolves modules from the isolated node_modules.
- * ─────────────────────────────────────────────────────────────────────
  */
-
-/* ------------------------------------------------------------------ */
-/* Paths                                                               */
-/* ------------------------------------------------------------------ */
 
 /** Root directory for tool installations. */
 function getToolsDir(): string {
@@ -61,10 +51,6 @@ function getManifestPath(): string {
 export function getToolsNodeModulesDir(): string {
   return path.join(getToolsDir(), 'node_modules');
 }
-
-/* ------------------------------------------------------------------ */
-/* Manifest persistence                                                */
-/* ------------------------------------------------------------------ */
 
 async function ensureDir() {
   await fs.mkdir(getToolsDir(), { recursive: true });
@@ -99,16 +85,8 @@ async function writeManifest(manifest: InstalledToolsManifest) {
   await fs.writeFile(getManifestPath(), JSON.stringify(manifest, null, 2), 'utf8');
 }
 
-/* ------------------------------------------------------------------ */
-/* Public query API                                                    */
-/* ------------------------------------------------------------------ */
-
 export async function getInstalledTools(): Promise<InstalledTool[]> {
   const manifest = await readManifest();
-  // A package being bundled with the application only makes it *available* to
-  // install. It must not silently enable an optional capability or make the
-  // Marketplace claim it was installed. The manifest is the single source of
-  // truth, which also makes uninstall immediately reflect in the UI.
   return [...manifest.tools];
 }
 
@@ -127,10 +105,6 @@ export async function getDownloadCounts(): Promise<Record<string, number>> {
   const manifest = await readManifest();
   return manifest.downloadCounts;
 }
-
-/* ------------------------------------------------------------------ */
-/* System dependency checks                                            */
-/* ------------------------------------------------------------------ */
 
 /** Known install commands per dependency per platform. */
 const INSTALL_HINTS: Record<string, Record<string, string>> = {
@@ -151,10 +125,6 @@ function detectPlatform(): string {
   return 'linux';
 }
 
-/**
- * Attempt to auto-install a system dependency using the platform package manager.
- * Returns true if the dependency is available after the attempt.
- */
 async function tryAutoInstallDep(
   dep: string,
   onProgress?: (message: string) => void,
@@ -254,13 +224,7 @@ export async function checkSystemDeps(toolId: string): Promise<string[]> {
   const missing: string[] = [];
   for (const dep of descriptor.systemDeps) {
     // Video & Audio ships a platform binary via @ffmpeg-installer/ffmpeg.
-    // Older Hub manifests still advertise ffmpeg as a host prerequisite; do
-    // not let that stale metadata block installation.
     if (toolId === 'video-audio' && dep === 'ffmpeg') continue;
-    // A container cannot normally talk to the host Docker daemon. Do not block
-    // installation of tools that use Docker only for optional capabilities
-    // (for example DOCX/PPTX editing); those capabilities report their own
-    // actionable error when actually used.
     if (target === 'docker' && dep === 'docker') continue;
     try {
       await execAsync(`which ${dep}`);
@@ -270,10 +234,6 @@ export async function checkSystemDeps(toolId: string): Promise<string[]> {
   }
   return missing;
 }
-
-/* ------------------------------------------------------------------ */
-/* Install execution — the core logic                                  */
-/* ------------------------------------------------------------------ */
 
 /**
  * Detect the current deployment target from environment.
@@ -468,18 +428,11 @@ async function resolveManifest(toolId: string): Promise<ToolDescriptor> {
 
 /**
  * Determine the install source based on the environment.
- * In the monorepo (development), tools are already available as workspace packages.
- * Outside the monorepo, tools are downloaded from npm.
  */
 async function isWorkspaceTool(packageName: string): Promise<boolean> {
   return Boolean(await resolveWorkspaceToolPath(packageName));
 }
 
-/**
- * Return the real package root for a pnpm/workspace-linked tool. This must not
- * rely on CommonJS `require.resolve`: Next.js route handlers run as ESM and
- * can otherwise mistake a bundled workspace tool for a remote npm package.
- */
 async function resolveWorkspaceToolPath(packageName: string): Promise<string | undefined> {
   try {
     const linkedPath = path.join(process.cwd(), 'node_modules', ...packageName.split('/'));
@@ -489,38 +442,60 @@ async function resolveWorkspaceToolPath(packageName: string): Promise<string | u
     ) as {
       name?: string;
     };
-    // Registry packages resolve inside node_modules; a pnpm workspace link
-    // resolves to the repository package directory outside of it.
     return manifest.name === packageName &&
       !packageRoot.includes(`${path.sep}node_modules${path.sep}`)
       ? packageRoot
       : undefined;
   } catch {
+    // A newly scaffolded workspace tool may not be linked into root
+    // node_modules until the next pnpm install. Resolve it from the workspace
+    // package directory so Marketplace development never falls through to npm.
+  }
+
+  let workspaceRoot = process.cwd();
+  while (true) {
+    try {
+      await fs.access(path.join(workspaceRoot, 'pnpm-workspace.yaml'));
+      break;
+    } catch {
+      const parent = path.dirname(workspaceRoot);
+      if (parent === workspaceRoot) return undefined;
+      workspaceRoot = parent;
+    }
+  }
+
+  const toolsRoot = path.join(workspaceRoot, 'packages', 'tools');
+  let entries: Dirent[];
+  try {
+    entries = await fs.readdir(toolsRoot, { withFileTypes: true });
+  } catch {
     return undefined;
   }
-}
 
-/* ------------------------------------------------------------------ */
-/* Install / uninstall public API                                      */
-/* ------------------------------------------------------------------ */
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const packageRoot = path.join(toolsRoot, entry.name);
+    try {
+      const manifest = JSON.parse(
+        await fs.readFile(path.join(packageRoot, 'package.json'), 'utf8'),
+      ) as { name?: string };
+      if (manifest.name === packageName) return packageRoot;
+    } catch {
+      // Ignore incomplete workspace folders and keep searching.
+    }
+  }
+
+  return undefined;
+}
 
 /**
  * Install a marketplace tool.
- *
- * The install process:
- * 1. Resolve the tool manifest (local → Hub → fallback)
- * 2. Check system dependencies (ffmpeg, docker, etc.)
- * 3. Determine install strategy:
- *    - Workspace tool (monorepo dev)? → resolve path, no download needed
- *    - Remote tool? → `npm install` into `.larkup/tools/node_modules/`
- * 4. Record in `installed.json`
- * 5. Notify Hub API (fire-and-forget install counter)
- * 6. Refresh registry cache
  */
 export async function installTool(
   toolId: string,
   onProgress?: (progress: InstallProgress) => void,
 ): Promise<void> {
+  installingTools.add(toolId);
   const report = (stage: InstallProgress['stage'], percent: number, message: string) => {
     onProgress?.({ toolId, stage, percent, message });
   };
@@ -628,34 +603,41 @@ export async function installTool(
     const message = err instanceof Error ? err.message : 'Installation failed.';
     report('failed', 0, message);
     throw err;
+  } finally {
+    installingTools.delete(toolId);
   }
 }
 
 export async function uninstallTool(toolId: string): Promise<void> {
-  const manifest = await readManifest();
-  const tool = manifest.tools.find((t) => t.id === toolId);
+  uninstallingTools.add(toolId);
+  try {
+    const manifest = await readManifest();
+    const tool = manifest.tools.find((t) => t.id === toolId);
 
-  // Remove from manifest
-  manifest.tools = manifest.tools.filter((t) => t.id !== toolId);
-  await writeManifest(manifest);
+    // Remove from manifest
+    manifest.tools = manifest.tools.filter((t) => t.id !== toolId);
+    await writeManifest(manifest);
 
-  // If it was installed from npm, remove from isolated node_modules
-  if (tool?.source === 'registry' && tool.packageName) {
-    try {
-      const toolsDir = getToolsDir();
-      await execAsync(`npm uninstall ${tool.packageName} --prefix "${toolsDir}"`, {
-        cwd: toolsDir,
-        timeout: 30_000,
-      });
-    } catch {
-      // Best-effort cleanup
+    // If it was installed from npm, remove from isolated node_modules
+    if (tool?.source === 'registry' && tool.packageName) {
+      try {
+        const toolsDir = getToolsDir();
+        await execAsync(`npm uninstall ${tool.packageName} --prefix "${toolsDir}"`, {
+          cwd: toolsDir,
+          timeout: 30_000,
+        });
+      } catch {
+        // Best-effort cleanup
+      }
     }
-  }
 
-  // Refresh registry cache
-  invalidateRegistryCache();
-  const { unloadTool } = await import('./tool-loader');
-  unloadTool(toolId);
+    // Refresh registry cache
+    invalidateRegistryCache();
+    const { unloadTool } = await import('./tool-loader');
+    unloadTool(toolId);
+  } finally {
+    uninstallingTools.delete(toolId);
+  }
 }
 
 export async function updateToolConfig(toolId: string, config: Record<string, any>): Promise<void> {
@@ -666,14 +648,6 @@ export async function updateToolConfig(toolId: string, config: Record<string, an
   await writeManifest(manifest);
 }
 
-/* ------------------------------------------------------------------ */
-/* Hub notification                                                    */
-/* ------------------------------------------------------------------ */
-
-/**
- * Notify the Hub API that a tool was installed (increment counter).
- * This is fire-and-forget — never blocks the install flow.
- */
 async function notifyHubInstall(toolId: string): Promise<void> {
   const hubUrl = process.env.LARKUP_HUB_URL ?? 'https://hub.larkup.de';
   try {
@@ -690,10 +664,6 @@ async function notifyHubInstall(toolId: string): Promise<void> {
     // Silently fail — not critical
   }
 }
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
 
 function buildDefaultConfig(descriptor: {
   configSchema?: { key: string; defaultValue?: string }[];

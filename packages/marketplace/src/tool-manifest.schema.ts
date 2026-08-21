@@ -2,19 +2,9 @@ import type { ToolDescriptor, ToolCategory, ToolPricing } from './types';
 
 /**
  * Tool manifest schema validation.
- *
- * Provides a validation utility for `tool.manifest.json` files.
- * Contributors creating new tools can validate their manifest
- * against this schema to ensure correctness before publishing.
- *
- * Schema version: 1.0
  */
 
-/* ------------------------------------------------------------------ */
-/* Constants                                                           */
-/* ------------------------------------------------------------------ */
-
-export const MANIFEST_SCHEMA_VERSION = '1.0';
+export const MANIFEST_SCHEMA_VERSION = '3.0';
 
 export const VALID_CATEGORIES: ToolCategory[] = [
   'media',
@@ -31,33 +21,14 @@ export const VALID_PRICING_TIERS: ToolPricing[] = ['free', 'pro', 'enterprise'];
 
 export const VALID_CONFIG_FIELD_TYPES = ['text', 'password', 'select', 'toggle'] as const;
 
-/* ------------------------------------------------------------------ */
-/* Validation result                                                   */
-/* ------------------------------------------------------------------ */
-
 export interface ManifestValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
 }
 
-/* ------------------------------------------------------------------ */
-/* Validator                                                           */
-/* ------------------------------------------------------------------ */
-
 /**
  * Validate a tool manifest object against the ToolDescriptor schema.
- *
- * @example
- * ```typescript
- * import { validateToolManifest } from "@larkup/marketplace/manifest"
- * import manifest from "./tool.manifest.json"
- *
- * const result = validateToolManifest(manifest)
- * if (!result.valid) {
- *   console.error("Manifest errors:", result.errors)
- * }
- * ```
  */
 export function validateToolManifest(manifest: Record<string, unknown>): ManifestValidationResult {
   const errors: string[] = [];
@@ -127,6 +98,37 @@ export function validateToolManifest(manifest: Record<string, unknown>): Manifes
     }
   }
 
+  if (manifest.requiresSandbox !== undefined && typeof manifest.requiresSandbox !== 'boolean') {
+    errors.push(`"requiresSandbox" must be a boolean`);
+  }
+
+  if (manifest.manifestVersion === '3.0') {
+    if (manifest.kind !== 'tool') errors.push(`v3 manifests must set "kind" to "tool"`);
+    const entrypoints = manifest.entrypoints as Record<string, unknown> | undefined;
+    if (!entrypoints || typeof entrypoints.server !== 'string') {
+      errors.push(`v3 manifests must declare "entrypoints.server"`);
+    }
+    const runtime = manifest.runtime as Record<string, unknown> | undefined;
+    if (
+      !runtime ||
+      typeof runtime.protocolVersion !== 'string' ||
+      typeof runtime.defaultMode !== 'string' ||
+      !Array.isArray(runtime.modes) ||
+      runtime.modes.length === 0
+    ) {
+      errors.push(
+        `v3 manifests must declare runtime.protocolVersion, runtime.defaultMode, and runtime.modes`,
+      );
+    }
+    const billing = manifest.billing as Record<string, unknown> | undefined;
+    if (
+      billing &&
+      (typeof billing.entitlementVersion !== 'string' || !Array.isArray(billing.meters))
+    ) {
+      errors.push(`"billing" must declare entitlementVersion and meters`);
+    }
+  }
+
   if (manifest.configSchema !== undefined) {
     if (!Array.isArray(manifest.configSchema)) {
       errors.push(`"configSchema" must be an array`);
@@ -140,6 +142,12 @@ export function validateToolManifest(manifest: Record<string, unknown>): Manifes
           errors.push(
             `configSchema[${i}].type must be one of: ${VALID_CONFIG_FIELD_TYPES.join(', ')}`,
           );
+        }
+        if (field.verification !== undefined) {
+          const verification = field.verification as Record<string, unknown>;
+          if (typeof verification.endpoint !== 'string' || !verification.endpoint.startsWith('/')) {
+            errors.push(`configSchema[${i}].verification.endpoint must be an app-relative path`);
+          }
         }
       }
     }
@@ -168,7 +176,6 @@ export function validateToolManifest(manifest: Record<string, unknown>): Manifes
 
 /**
  * Generate a minimal tool manifest template.
- * Useful for bootstrapping new tool packages.
  */
 export function generateManifestTemplate(toolId: string): Partial<ToolDescriptor> {
   return {
