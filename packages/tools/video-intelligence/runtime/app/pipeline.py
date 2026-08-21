@@ -166,7 +166,7 @@ class Operators:
                             use_textline_orientation=True,
                         ),
                     )
-                except ImportError:
+                except Exception:
                     from rapidocr_onnxruntime import RapidOCR
 
                     self._ocr = ("rapid", RapidOCR())
