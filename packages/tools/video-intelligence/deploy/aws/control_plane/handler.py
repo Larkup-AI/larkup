@@ -153,7 +153,10 @@ def settle(item: dict[str, Any], status: str, actual: float, result_key: str | N
     if result_key: expression += ", resultKey = :result"; values[":result"] = {"S": result_key}
     if error: expression += ", #error = :error"; names["#error"] = "error"; values[":error"] = {"S": error[:2000]}
     try:
-        boto3.client("dynamodb", region_name=REGION).transact_write_items(TransactItems=[{"Update": {"TableName": TABLE_NAME, "Key": {"pk": {"S": item["pk"]}, "sk": {"S": "JOB"}}, "UpdateExpression": expression, "ConditionExpression": "#status IN (:queued, :running)", "ExpressionAttributeNames": names, "ExpressionAttributeValues": values}}, {"Update": {"TableName": TABLE_NAME, "Key": {"pk": {"S": f"USAGE#{item['principalId']}#{item['period']}"}, "sk": {"S": "USAGE"}}, "UpdateExpression": "ADD reservedSourceMinutes :estimate, sourceMinutesUsed :actual, availableSourceMinutes :available, activeJobs :one", "ExpressionAttributeValues": {key: values[key] for key in (":estimate", ":actual", ":available", ":one")}}}])
+        job_values = {key: values[key] for key in (":status", ":updated", ":progress", ":queued", ":running")}
+        if result_key: job_values[":result"] = values[":result"]
+        if error: job_values[":error"] = values[":error"]
+        boto3.client("dynamodb", region_name=REGION).transact_write_items(TransactItems=[{"Update": {"TableName": TABLE_NAME, "Key": {"pk": {"S": item["pk"]}, "sk": {"S": "JOB"}}, "UpdateExpression": expression, "ConditionExpression": "#status IN (:queued, :running)", "ExpressionAttributeNames": names, "ExpressionAttributeValues": job_values}}, {"Update": {"TableName": TABLE_NAME, "Key": {"pk": {"S": f"USAGE#{item['principalId']}#{item['period']}"}, "sk": {"S": "USAGE"}}, "UpdateExpression": "ADD reservedSourceMinutes :estimate, sourceMinutesUsed :actual, availableSourceMinutes :available, activeJobs :one", "ExpressionAttributeValues": {key: values[key] for key in (":estimate", ":actual", ":available", ":one")}}}])
     except ClientError as error_obj:
         if error_obj.response.get("Error", {}).get("Code") != "TransactionCanceledException": raise
     if int(item.get("retainSourceHours", 0)) == 0: s3.delete_object(Bucket=BUCKET, Key=item["sourceKey"])
