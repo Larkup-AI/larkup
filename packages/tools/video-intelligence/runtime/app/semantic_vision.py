@@ -22,6 +22,7 @@ class SemanticVision:
         self.device = device
         self._model: Any = None
         self._processor: Any = None
+        self.last_error: str | None = None
 
     def describe(
         self, frames: list[tuple[int, Any]], brief: dict[str, Any]
@@ -30,10 +31,14 @@ class SemanticVision:
             return []
         try:
             self._load()
-            return self._describe(frames, brief)
-        except Exception:
+            observations = self._describe(frames, brief)
+            self.last_error = None
+            return observations
+        except Exception as error:
             # Object/OCR evidence remains useful when a semantic model cannot
-            # be loaded on a constrained worker. Do not fail an entire index.
+            # be loaded on a constrained worker. Do not fail an entire index,
+            # but preserve a bounded diagnostic for cloud operations.
+            self.last_error = f"{type(error).__name__}: {error}"[:500]
             return []
 
     def _load(self) -> None:
