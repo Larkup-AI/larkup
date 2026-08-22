@@ -242,6 +242,7 @@ export async function inspectMedia(req: Request) {
         inspectionDecision: decision,
         actualRange: { startSecs, endSecs },
         revisionId: refinement.revision.id,
+        cloudDiagnostics: evidence.semanticDiagnostics,
         evidence: refinement.built.evidenceIds.map((evidenceId, index) => ({
           evidenceId,
           startSecs: evidenceInputs[index].timeRange.startSecs,

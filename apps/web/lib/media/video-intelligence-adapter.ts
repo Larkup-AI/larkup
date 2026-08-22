@@ -72,6 +72,10 @@ interface VideoEvidence {
     text: string;
     confidence: number;
   }>;
+  semanticDiagnostics?: {
+    attempted?: boolean;
+    error?: string | null;
+  };
   detectedLanguage?: string;
   answeringGuide: {
     goal?: string;
