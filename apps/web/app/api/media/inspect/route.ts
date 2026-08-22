@@ -30,6 +30,7 @@ import { createAnalysisBundle } from '@/lib/media/video/analysis-bundle';
 import { analyzeBundle } from '@/lib/media/video/sandbox-analysis';
 import {
   evidenceToRefinementInputs,
+  hasUnlimitedVideoIntelligenceAccess,
   runInstalledVideoIntelligence,
 } from '@/lib/media/video-intelligence-adapter';
 
@@ -95,18 +96,35 @@ export async function inspectMedia(req: Request) {
     // calibration estimate; optional inspection remains conservative.
     lowerResolutionProbability: purpose === 'verify-visual' || purpose === 'compare' ? 0.65 : 0,
   };
-  const decision = decideInspection({
-    required: ['high-res-ocr', 'count', 'track', 'code'].includes(purpose),
-    plausibleRange: endSecs > startSecs,
-    estimate,
-    budget: {
-      remainingDurationSecs: 180 - reserved.durationSecs,
-      remainingBytes: 1024 * 1024 * 1024 - reserved.bytes,
-      remainingSandboxSeconds: 600 - reserved.sandboxSeconds,
-      remainingSpendUsd: 0.5 - reserved.spendUsd,
-      usedBundleRuns: 0,
-    },
-  });
+  const hasCloudVideoIntelligence = await isToolInstalled('video-intelligence');
+  const hasUnlimitedCloudAccess = hasCloudVideoIntelligence
+    ? await hasUnlimitedVideoIntelligenceAccess().catch(() => false)
+    : false;
+  const decision = hasUnlimitedCloudAccess
+    ? {
+        decision: ['high-res-ocr', 'count', 'track', 'code'].includes(purpose)
+          ? ('required' as const)
+          : ('optional' as const),
+        reason: 'managed-cloud-entitlement',
+        committed: {
+          durationSecs: estimate.durationSecs,
+          bytes: estimate.bytes,
+          sandboxSeconds: estimate.sandboxSeconds,
+          spendUsd: estimate.spendUsd,
+        },
+      }
+    : decideInspection({
+        required: ['high-res-ocr', 'count', 'track', 'code'].includes(purpose),
+        plausibleRange: endSecs > startSecs,
+        estimate,
+        budget: {
+          remainingDurationSecs: 180 - reserved.durationSecs,
+          remainingBytes: 1024 * 1024 * 1024 - reserved.bytes,
+          remainingSandboxSeconds: 600 - reserved.sandboxSeconds,
+          remainingSpendUsd: 0.5 - reserved.spendUsd,
+          usedBundleRuns: 0,
+        },
+      });
   if (decision.decision === 'denied') {
     return NextResponse.json(
       { error: decision.reason, inspectionDecision: decision },
@@ -146,7 +164,6 @@ export async function inspectMedia(req: Request) {
       { status: 404 },
     );
   }
-  const hasCloudVideoIntelligence = await isToolInstalled('video-intelligence');
   const hasLegacyVideoAudio = await isToolInstalled('video-audio');
   if (!hasCloudVideoIntelligence && !hasLegacyVideoAudio) {
     return NextResponse.json({ error: 'Video & Audio tool is not installed.' }, { status: 503 });
