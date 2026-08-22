@@ -17,7 +17,9 @@ class SemanticVision:
     """Lazy, GPU-only semantic reading over a small ordered frame set."""
 
     def __init__(self, enabled: bool, model_name: str, device: str, disabled: bool) -> None:
-        self.enabled = enabled and not disabled
+        # Detection/OCR can be disabled independently; semantic VLM analysis
+        # remains available on the managed GPU when explicitly enabled.
+        self.enabled = enabled
         self.model_name = model_name
         self.device = device
         self._model: Any = None
@@ -79,10 +81,12 @@ class SemanticVision:
             prompt += f" Investigation goal: {focus[:1200]}."
         if questions:
             prompt += " Questions to resolve: " + " | ".join(questions[:4])[:1600] + "."
-        images = [
-            Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            for _, frame in frames
-        ]
+        selected = _uniform_sample(frames, limit=6)
+        images = []
+        for _, frame in selected:
+            image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            image.thumbnail((512, 512), Image.Resampling.LANCZOS)
+            images.append(image)
         content: list[dict[str, Any]] = [
             {"type": "image", "image": image} for image in images
         ] + [{"type": "text", "text": prompt}]
@@ -105,11 +109,17 @@ class SemanticVision:
         return [
             SemanticObservation(
                 start_ms=frames[0][0],
-                end_ms=frames[-1][0],
+                end_ms=selected[-1][0],
                 text=text_value,
                 confidence=confidence,
             )
         ]
+
+
+def _uniform_sample(frames: list[tuple[int, Any]], limit: int) -> list[tuple[int, Any]]:
+    if len(frames) <= limit:
+        return frames
+    return [frames[round(index * (len(frames) - 1) / (limit - 1))] for index in range(limit)]
 
 
 def _normalize_response(raw: str) -> tuple[str, float]:

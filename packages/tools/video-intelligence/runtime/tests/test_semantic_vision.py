@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.semantic_vision import _normalize_response
+from app.semantic_vision import _normalize_response, _uniform_sample
 
 
 class SemanticVisionTests(unittest.TestCase):
@@ -23,6 +23,15 @@ class SemanticVisionTests(unittest.TestCase):
 
         self.assertEqual(text, "No final outcome is visibly established.")
         self.assertEqual(confidence, 0.5)
+
+    def test_downsamples_frames_without_losing_the_temporal_endpoints(self) -> None:
+        frames = [(index, object()) for index in range(12)]
+
+        selected = _uniform_sample(frames, limit=6)
+
+        self.assertEqual(len(selected), 6)
+        self.assertEqual(selected[0][0], 0)
+        self.assertEqual(selected[-1][0], 11)
 
 
 if __name__ == "__main__":
