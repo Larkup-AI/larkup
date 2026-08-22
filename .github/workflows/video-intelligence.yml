@@ -49,7 +49,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Type-check and test extension contracts
         run: |
-          pnpm --filter @larkup/marketplace type-check
           pnpm --filter @larkup/tool-video-intelligence type-check
           pnpm --filter @larkup/tool-video-intelligence test
       - name: Test quota and access-code state

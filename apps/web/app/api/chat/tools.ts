@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { readConfig } from '@larkup/core/config-store';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import { embedQuery } from '@larkup/core/indexing/embedder';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import { getTabularDataset, queryTabular } from '@larkup/core/tabular-store';
 import {
   getCorpusDocuments,
@@ -12,10 +12,12 @@ import {
   type CorpusFilter,
 } from '@larkup/core/corpus-retriever';
 import { SandboxManager } from '@larkup/sandbox';
+import type { SandboxBackend } from '@larkup/sandbox/types';
 import { applyFieldEdits, applyContentEdits } from '@larkup/tool-doc-editor';
 import { loadTool } from '@larkup/marketplace/loader';
 import { getInstalledTools } from '@larkup/marketplace/installer';
 import { readDocuments } from '@larkup/core/documents-store';
+import { readGroups } from '@larkup/core/groups-store';
 import { readMediaAssets } from '@larkup/core/media-store';
 import {
   searchVideoKnowledge,
@@ -31,9 +33,34 @@ import {
   normalizeMediaCitationRange,
   queryAwareExcerpt,
   timestampMediaUrl,
-} from '@/lib/media-knowledge';
+} from '@/lib/media/knowledge';
+import { rankKnowledgeHits } from '@/lib/chat/retrieval-ranking';
+import { createTabularVisualization } from '@/lib/chat/tabular-visualization';
+import { executeEnterpriseTool, getEnterpriseTools } from '@/lib/enterprise-client';
 
 const queryVideoKnowledgeCache = new Map<string, { expiresAt: number; value: any }>();
+const sandboxAvailabilityCache = new Map<string, { expiresAt: number; ready: boolean }>();
+
+/**
+ * Do not offer an unavailable sandbox to the model: a factual answer should
+ * still use retrieval or tabular data when the local runtime is unavailable.
+ */
+async function isSandboxReady(config: any): Promise<boolean> {
+  const { backend, credentials } = resolveSandboxConfig(config);
+  const cacheKey = backend;
+  const cached = sandboxAvailabilityCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.ready;
+
+  try {
+    const health = await new SandboxManager({ backend, credentials }).healthCheck();
+    const ready = health.status === 'ready';
+    sandboxAvailabilityCache.set(cacheKey, { ready, expiresAt: Date.now() + 30_000 });
+    return ready;
+  } catch {
+    sandboxAvailabilityCache.set(cacheKey, { ready: false, expiresAt: Date.now() + 30_000 });
+    return false;
+  }
+}
 
 function documentEditModelOutput({ output }: { output: any }) {
   return {
@@ -59,17 +86,28 @@ function documentEditModelOutput({ output }: { output: any }) {
 /**
  * Retrieves documents from the knowledge base
  */
-export async function queryKnowledgeBase(query: string, topK: number, serverId: string | null) {
+export async function queryKnowledgeBase(query: string, topK: number, projectId: string | null) {
   const doRetrieve = async () => {
     const config = await readConfig();
     // Retrieve a small diverse pool. Sending a very large candidate set into
     // the answer model noticeably delays the first streamed token without
     // helping the user-facing source list.
-    const candidateCount = Math.max(topK * 6, 24);
+    // Keep a wider candidate pool internal, then return only the compact,
+    // diverse evidence set to the model. This substantially improves recall
+    // for exact labels in visual PDFs without inflating prompt size.
+    const candidateCount = Math.min(Math.max(topK * 16, 64), 100);
     // Document status is more precise than the last index-run summary: a later
     // partial run can be marked failed even though earlier uploaded and scraped
     // documents were successfully indexed and remain queryable.
-    const documents = await readDocuments();
+    const [allDocuments, groups] = await Promise.all([readDocuments(), readGroups()]);
+    const assistantDisabledGroups = new Set(
+      groups.filter((group) => !group.assistantEnabled).map((group) => group.id),
+    );
+    const documents = allDocuments.filter(
+      (document) =>
+        document.enabled !== false &&
+        (!document.groupId || !assistantDisabledGroups.has(document.groupId)),
+    );
     if (!documents.some((document) => document.status === 'indexed')) {
       return { query, hits: [] };
     }
@@ -88,7 +126,7 @@ export async function queryKnowledgeBase(query: string, topK: number, serverId: 
     }
   };
 
-  return serverId ? runWithServer(serverId, doRetrieve) : doRetrieve();
+  return projectId ? runWithProject(projectId, doRetrieve) : doRetrieve();
 }
 
 async function formatKnowledgeHits(
@@ -101,16 +139,19 @@ async function formatKnowledgeHits(
   const documents = indexedDocuments ?? storedDocuments;
   const documentsById = new Map(documents.map((document) => [document.id, document]));
   const activeMediaDocumentIds = new Set(mediaAssets.flatMap((asset) => asset.documentIds));
-  const hydrated = rawHits.map((hit) => {
-    const document = documentsById.get(hit.documentId);
-    return {
-      ...hit,
-      title: hit.title || document?.title || 'Untitled',
-      url: hit.url || document?.url || '',
-      text: hit.text || document?.content || '',
-      metadata: { ...document?.metadata, ...hit.metadata },
-    };
-  });
+  const hydrated = rankKnowledgeHits(
+    query,
+    rawHits.map((hit) => {
+      const document = documentsById.get(hit.documentId);
+      return {
+        ...hit,
+        title: hit.title || document?.title || 'Untitled',
+        url: hit.url || document?.url || '',
+        text: hit.text || document?.content || '',
+        metadata: { ...document?.metadata, ...hit.metadata },
+      };
+    }),
+  );
 
   const selected: any[] = [];
   const hitsPerDocument = new Map<string, number>();
@@ -317,14 +358,25 @@ async function formatKnowledgeHits(
   };
 }
 
+/** Builds the SandboxManager config from the workspace's configured default sandbox provider. */
+function resolveSandboxConfig(config: any): {
+  backend: SandboxBackend;
+  credentials?: Record<string, string>;
+} {
+  const backend = (config?.defaultSandboxProvider as SandboxBackend) || 'local';
+  return { backend, credentials: config?.sandboxProviderConfigs?.[backend] };
+}
+
 export async function getChatTools(context: {
-  serverId?: string;
+  projectId?: string;
   docSessionId?: string;
   config?: any;
+  requestText?: string;
   /** Public origin of the incoming chat request, used for local media URLs. */
   origin?: string;
 }) {
-  const { serverId, docSessionId, config, origin } = context;
+  const { projectId, docSessionId, config, origin, requestText } = context;
+  const sandboxReady = await isSandboxReady(config);
 
   const builtInTools: Record<string, any> = {
     searchKnowledgeBase: tool({
@@ -334,30 +386,32 @@ export async function getChatTools(context: {
         query: z.string().describe('The search query for the knowledge base.'),
       }),
       execute: async ({ query }) => {
-        return queryKnowledgeBase(query, 4, serverId ?? null);
+        return queryKnowledgeBase(query, 4, projectId ?? null);
       },
     }),
 
     queryVideoKnowledge: tool({
       description:
-        'Use this for every factual question about an indexed video or audio asset after searchKnowledgeBase identifies its mediaAssetId. It performs a fresh hierarchical investigation (chapters → scenes → events/states → active source evidence) on every call, returns seekable ranges, and highlights unresolved conflicts. Use it for simple, temporal, comparative, exact-text, counting, and outcome questions before answering; do not infer a claim beyond these records.',
+        'Use this for every factual question about an indexed video or audio asset after searchKnowledgeBase identifies its mediaAssetId. It performs a fresh hierarchical investigation (chapters → scenes → events/states → active source evidence) on every call, returns seekable ranges, and highlights unresolved conflicts. Treat only returned active evidence as source truth. Use it for simple, temporal, comparative, exact-text, counting, and outcome questions before answering; do not infer a claim beyond these records. When verification says evidence is insufficient or inspection is required, inspect the bounded candidate range and query again before saying the answer is unknown.',
       inputSchema: z.object({
         mediaAssetId: z.string().describe('Exact mediaAssetId returned by searchKnowledgeBase.'),
         query: z.string().describe('The user’s focused question or sub-question about this media.'),
         limit: z.number().int().min(1).max(12).optional(),
       }),
       execute: async ({ mediaAssetId, query, limit }) => {
-        const run = async () => {
+        const run = async (allowAutomaticInspection = true): Promise<any> => {
           const asset = (await readMediaAssets()).find(
             (candidate) => candidate.id === mediaAssetId,
           );
           if (!asset || asset.processingStatus !== 'completed') {
             return { success: false, error: 'That indexed media asset is no longer available.' };
           }
-          const cacheKey = `${serverId ?? 'default'}:${mediaAssetId}:${query
-            .normalize('NFKC')
-            .toLocaleLowerCase()
-            .trim()}`;
+          // The active revision changes after a bounded cloud inspection. Keep
+          // the cache revision-scoped so a follow-up query cannot return stale
+          // pre-inspection evidence.
+          const cacheKey = `${projectId ?? 'default'}:${mediaAssetId}:${
+            asset.activeVideoKnowledgeRevisionId ?? 'none'
+          }:${query.normalize('NFKC').toLocaleLowerCase().trim()}`;
           const cached = queryVideoKnowledgeCache.get(cacheKey);
           if (cached && cached.expiresAt > Date.now()) {
             return cached.value;
@@ -379,18 +433,71 @@ export async function getChatTools(context: {
             queryPlan: plan,
             videoDurationSecs: asset.durationSecs,
           });
+          // Every video question receives a compact tail view. It lets the
+          // agent reason about an ending/state transition when relevant,
+          // without encoding a sports, meeting, surveillance, or language
+          // specific workflow in the runtime.
+          const tailRange = asset.durationSecs
+            ? {
+                startSecs: Math.max(0, asset.durationSecs - 30),
+                endSecs: asset.durationSecs,
+              }
+            : undefined;
+          const tailEvidence = tailRange
+            ? await searchVideoKnowledge(mediaAssetId, '', 12, {
+                modalities: plan.modalities,
+                minimumRangeDistanceSecs: 0,
+                queryPlan: plan,
+                videoDurationSecs: asset.durationSecs,
+                timeRange: tailRange,
+              })
+            : [];
           const verification = await verifyMediaEvidence({
             mediaAssetId,
             evidenceIds: hits.map((hit) => hit.evidence.id),
             requiresFramePrecision: /\b(exact|precisely|frame|at\s+\d{1,2}:\d{2})\b/i.test(query),
           });
+          const requiresCorroboration = plan.kinds.some((kind) =>
+            ['outcome', 'state-change', 'comparison', 'counting', 'computation'].includes(kind),
+          );
+          // A terminal claim is verified from the terminal source window;
+          // every other claim begins with the highest-ranked hierarchy range.
+          // These are claim semantics, not rules for a particular domain.
+          const requestedRange =
+            plan.kinds.includes('outcome') && asset.durationSecs
+              ? {
+                  startSecs: Math.max(0, asset.durationSecs - 180),
+                  endSecs: asset.durationSecs,
+                }
+              : plan.kinds.includes('outcome')
+              ? tailRange ?? investigation?.candidateRanges[0]
+              : investigation?.candidateRanges[0] ?? tailRange;
+          const recommendedInspection = requestedRange
+            ? {
+                startSecs: requestedRange.startSecs,
+                endSecs: Math.min(
+                  requestedRange.endSecs,
+                  requestedRange.startSecs + (plan.kinds.includes('outcome') ? 180 : 30),
+                ),
+                purpose: plan.kinds.includes('counting')
+                  ? 'count'
+                  : plan.kinds.includes('exact-ocr')
+                  ? 'high-res-ocr'
+                  : plan.kinds.includes('comparison') || plan.kinds.includes('state-change')
+                  ? 'compare'
+                  : 'verify-visual',
+              }
+            : undefined;
           const inspectionDecision = decideInspection({
             required:
-              plan.requiresInspectionWhenInsufficient &&
-              ['insufficient', 'needs_inspection'].includes(verification.status),
-            plausibleRange: hits.length > 0 || Boolean(asset.durationSecs),
+              requiresCorroboration ||
+              (plan.requiresInspectionWhenInsufficient &&
+                ['insufficient', 'needs_inspection'].includes(verification.status)),
+            plausibleRange: Boolean(recommendedInspection),
             estimate: {
-              durationSecs: 30,
+              durationSecs: recommendedInspection
+                ? recommendedInspection.endSecs - recommendedInspection.startSecs
+                : 30,
               bytes: 64 * 1024 * 1024,
               sandboxSeconds: 30,
               spendUsd: 0,
@@ -404,6 +511,79 @@ export async function getChatTools(context: {
               usedBundleRuns: 0,
             },
           });
+          let autoInspection:
+            | {
+                status: 'completed' | 'failed';
+                range: { startSecs: number; endSecs: number };
+                purpose: string;
+                evidenceCount?: number;
+                error?: string;
+              }
+            | undefined;
+          if (
+            allowAutomaticInspection &&
+            inspectionDecision.decision === 'required' &&
+            recommendedInspection &&
+            origin
+          ) {
+            const inspectionUrl = new URL('/api/media/inspect', origin);
+            if (projectId) inspectionUrl.searchParams.set('projectId', projectId);
+            try {
+              const response = await fetch(inspectionUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  mediaAssetId,
+                  startSecs: recommendedInspection.startSecs,
+                  endSecs: recommendedInspection.endSecs,
+                  purpose: recommendedInspection.purpose,
+                  queryId: `chat-verification:${mediaAssetId}:${query}`.slice(0, 128),
+                  question: query,
+                  maxFrames: 24,
+                }),
+              });
+              const inspectionResult = await response.json().catch(() => ({}));
+              if (response.ok) {
+                const refined = await run(false);
+                return {
+                  ...refined,
+                  autoInspection: {
+                    status: 'completed' as const,
+                    range: {
+                      startSecs: recommendedInspection.startSecs,
+                      endSecs: recommendedInspection.endSecs,
+                    },
+                    purpose: recommendedInspection.purpose,
+                    evidenceCount: Array.isArray(inspectionResult.evidence)
+                      ? inspectionResult.evidence.length
+                      : 0,
+                  },
+                };
+              }
+              autoInspection = {
+                status: 'failed',
+                range: {
+                  startSecs: recommendedInspection.startSecs,
+                  endSecs: recommendedInspection.endSecs,
+                },
+                purpose: recommendedInspection.purpose,
+                error:
+                  typeof inspectionResult.error === 'string'
+                    ? inspectionResult.error
+                    : `Inspection returned HTTP ${response.status}.`,
+              };
+            } catch (error) {
+              autoInspection = {
+                status: 'failed',
+                range: {
+                  startSecs: recommendedInspection.startSecs,
+                  endSecs: recommendedInspection.endSecs,
+                },
+                purpose: recommendedInspection.purpose,
+                error: error instanceof Error ? error.message : 'Cloud inspection failed.',
+              };
+            }
+          }
           void trackUsageEvent({
             type: 'media_processing',
             mediaOperation: 'investigation',
@@ -418,14 +598,39 @@ export async function getChatTools(context: {
             mediaAssetId: asset.id,
             fileName: asset.fileName,
             sourceUrl: `/api/media/${asset.id}${
-              serverId ? `?serverId=${encodeURIComponent(serverId)}` : ''
+              projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
             }`,
             originalUrl: asset.originalUrl,
             verification,
             plan,
             investigation,
+            ...(tailRange
+              ? {
+                  claimVerification: {
+                    tailRange,
+                    claimKinds: plan.kinds,
+                    requiresCorroboration,
+                    ...(recommendedInspection ? { recommendedInspection } : {}),
+                    rule: 'Match the evidence range to the claim being made. When requiresCorroboration is true, run the recommended bounded inspection before answering, then query this tool again. Never promote a local observation into a broader conclusion.',
+                    tailEvidence: tailEvidence.map((hit) => ({
+                      evidenceId: hit.evidence.id,
+                      modality: hit.evidence.modality,
+                      text:
+                        typeof hit.evidence.payload === 'object' &&
+                        hit.evidence.payload &&
+                        'text' in hit.evidence.payload
+                          ? String((hit.evidence.payload as { text?: unknown }).text ?? '')
+                          : JSON.stringify(hit.evidence.payload),
+                      startSecs: hit.evidence.timeRange.startSecs,
+                      endSecs: hit.evidence.timeRange.endSecs,
+                      confidence: hit.evidence.confidence,
+                    })),
+                  },
+                }
+              : {}),
             retrievalCapabilities: videoKnowledgeRetrievalCapabilities(),
             inspectionDecision,
+            ...(autoInspection ? { autoInspection } : {}),
             evidence: hits.map((hit) => {
               const rawText =
                 typeof hit.evidence.payload === 'object' &&
@@ -451,7 +656,7 @@ export async function getChatTools(context: {
           });
           return result;
         };
-        return serverId ? runWithServer(serverId, run) : run();
+        return projectId ? runWithProject(projectId, run) : run();
       },
     }),
 
@@ -483,33 +688,50 @@ export async function getChatTools(context: {
           });
           return { success: true, ...investigation };
         };
-        return serverId ? runWithServer(serverId, run) : run();
+        return projectId ? runWithProject(projectId, run) : run();
       },
     }),
 
     inspectVideoKnowledge: tool({
       description:
-        'Use only after queryVideoKnowledge returns needs_inspection or a required/optional inspection decision. This performs one bounded, authorized source rewind and persists only validated OCR/visual evidence. After a successful inspection, call queryVideoKnowledge again with the same focused sub-question to verify the newly active evidence before answering. Never request an unbounded whole-video scan.',
+        'Use when queryVideoKnowledge returns claimVerification.requiresCorroboration or an inspection decision requiring it. Copy claimVerification.recommendedInspection range and purpose unless a more precise hierarchy range is returned. When Video Intelligence is installed, this dispatches bounded deep GPU re-analysis for fresh OCR, detection, and anonymous tracking evidence; it never performs an unbounded whole-video scan. After a successful inspection, call queryVideoKnowledge again with the same focused sub-question to verify the newly active evidence before answering.',
       inputSchema: z.object({
         mediaAssetId: z.string(),
         startSecs: z.number().nonnegative(),
         endSecs: z.number().nonnegative(),
         purpose: z.enum(['verify-visual', 'high-res-ocr', 'compare', 'count', 'track', 'code']),
         queryId: z.string().min(1).max(128),
+        question: z.string().min(1).max(2_000).optional(),
         maxFrames: z.number().int().min(1).max(24).optional(),
       }),
-      execute: async ({ mediaAssetId, startSecs, endSecs, purpose, queryId, maxFrames }) => {
+      execute: async ({
+        mediaAssetId,
+        startSecs,
+        endSecs,
+        purpose,
+        queryId,
+        question,
+        maxFrames,
+      }) => {
         if (!origin)
           return {
             success: false,
             error: 'Source inspection is unavailable without a request origin.',
           };
         const url = new URL('/api/media/inspect', origin);
-        if (serverId) url.searchParams.set('serverId', serverId);
+        if (projectId) url.searchParams.set('projectId', projectId);
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mediaAssetId, startSecs, endSecs, purpose, queryId, maxFrames }),
+          body: JSON.stringify({
+            mediaAssetId,
+            startSecs,
+            endSecs,
+            purpose,
+            queryId,
+            question: question ?? queryId,
+            maxFrames,
+          }),
         });
         const result = await response
           .json()
@@ -597,7 +819,7 @@ export async function getChatTools(context: {
             startSecs,
             endSecs,
           );
-          const serverQuery = serverId ? `?serverId=${encodeURIComponent(serverId)}` : '';
+          const serverQuery = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
           const mediaUrl = `/api/media/${asset.id}${serverQuery}`;
           const sourceUrl =
             range.startSecs !== undefined
@@ -611,7 +833,7 @@ export async function getChatTools(context: {
           if (extractFrame && asset.type === 'video' && range.startSecs !== undefined) {
             const frameQuery = new URLSearchParams();
             frameQuery.set('t', String(range.startSecs));
-            if (serverId) frameQuery.set('serverId', serverId);
+            if (projectId) frameQuery.set('projectId', projectId);
             framePreviewUrl = `/api/media/${asset.id}/frame?${frameQuery.toString()}`;
           }
 
@@ -628,7 +850,7 @@ export async function getChatTools(context: {
           };
         };
 
-        return serverId ? runWithServer(serverId, resolvePresentation) : resolvePresentation();
+        return projectId ? runWithProject(projectId, resolvePresentation) : resolvePresentation();
       },
     }),
 
@@ -668,7 +890,9 @@ export async function getChatTools(context: {
       }),
       execute: async (params) => {
         try {
-          return await queryTabular(params);
+          const result = await queryTabular(params);
+          const visualization = createTabularVisualization(requestText, result);
+          return visualization ? { ...result, visualization } : result;
         } catch (err: any) {
           return {
             columns: [],
@@ -744,7 +968,7 @@ export async function getChatTools(context: {
       }),
       execute: async ({ code, datasetId }) => {
         try {
-          const sandboxManager = new SandboxManager({ backend: 'docker' });
+          const sandboxManager = new SandboxManager(resolveSandboxConfig(config));
           const files: { name: string; content: string }[] = [];
 
           if (datasetId) {
@@ -758,7 +982,9 @@ export async function getChatTools(context: {
                     .map((c) => {
                       const v = row[c];
                       const s = String(v ?? '');
-                      return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+                      return s.includes(',') || s.includes('"') || s.includes('\n')
+                        ? `"${s.replace(/"/g, '""')}"`
+                        : s;
                     })
                     .join(','),
                 );
@@ -771,6 +997,11 @@ export async function getChatTools(context: {
           }
 
           let finalCode = code;
+          // Clean up any markdown blocks LLMs might mistakenly wrap the code in
+          finalCode = finalCode.replace(/^```python\s*\n?/m, '');
+          finalCode = finalCode.replace(/^```\s*\n?/m, '');
+          finalCode = finalCode.replace(/```\s*$/m, '');
+
           let result = await sandboxManager.execute({
             code: finalCode,
             language: 'python',
@@ -882,7 +1113,7 @@ export async function getChatTools(context: {
           }
         };
 
-        return serverId ? runWithServer(serverId, analyzeIndexedImage) : analyzeIndexedImage();
+        return projectId ? runWithProject(projectId, analyzeIndexedImage) : analyzeIndexedImage();
       },
     }),
 
@@ -977,7 +1208,7 @@ export async function getChatTools(context: {
       }),
       execute: async ({ code, format }) => {
         try {
-          const sandboxManager = new SandboxManager({ backend: 'docker' });
+          const sandboxManager = new SandboxManager(resolveSandboxConfig(config));
 
           // Export corpus in the requested format
           const corpusData =
@@ -1181,7 +1412,7 @@ export async function getChatTools(context: {
       execute: async ({ query }) => {
         const knowledgeBaseFallback = async (error: string) => {
           try {
-            const knowledge = await queryKnowledgeBase(query, 5, serverId ?? null);
+            const knowledge = await queryKnowledgeBase(query, 5, projectId ?? null);
             return {
               error,
               results: [],
@@ -1273,6 +1504,7 @@ export async function getChatTools(context: {
   // 1. Add enabled built-in tools
   for (const [id, toolDef] of Object.entries(builtInTools)) {
     if (id === 'webSearch') continue; // Handled separately
+    if ((id === 'executeAnalysis' || id === 'analyzeCorpusWithCode') && !sandboxReady) continue;
 
     if (
       isEnabled(id) ||
@@ -1319,15 +1551,32 @@ export async function getChatTools(context: {
     for (const t of installed) {
       if (isEnabled(t.id)) {
         const mod = await loadTool(t.id);
-        if (mod && mod.default) {
+        // Extension-style tools (for example Video Intelligence) export a
+        // metadata object as default, not an AI SDK tool factory. They are
+        // available through first-party chat tools above and must not crash
+        // chat setup merely because they are enabled in Marketplace settings.
+        if (mod && typeof mod.default === 'function') {
           finalTools[t.id] = mod.default(context);
-        } else if (mod && mod.tool) {
+        } else if (mod && typeof mod.tool === 'function') {
           finalTools[t.id] = mod.tool(context);
         }
       }
     }
   } catch (err) {
     console.error('[marketplace] Failed to load marketplace tools for chat:', err);
+  }
+
+  // Enterprise tools never touch the public Marketplace catalog. Their
+  // descriptors and handlers stay in the private EE dashboard, and only an
+  // enrolled client with an explicitly installed tool receives them here.
+  for (const enterpriseTool of await getEnterpriseTools(config)) {
+    finalTools[enterpriseTool.id] = tool({
+      description: `${enterpriseTool.description} Use this only when it directly helps the Enterprise user's request.`,
+      inputSchema: z.object({
+        query: z.string().describe('The focused request for this private tool.'),
+      }),
+      execute: async ({ query }) => executeEnterpriseTool(config, enterpriseTool.id, { query }),
+    });
   }
 
   return finalTools;

@@ -17,7 +17,7 @@ import { decideInspection } from '@larkup/core/video-knowledge/inspection-policy
 import type { FrameArtifact, InspectionPurpose } from '@larkup/tool-video-audio';
 import type { MetadataValue } from '@larkup/core/video-knowledge/types';
 import { trackUsageEvent } from '@larkup/core/analytics-store';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import { createStorageProvider } from '@larkup/marketplace/storage';
 import { isToolInstalled } from '@larkup/marketplace/installer';
 import { loadTool } from '@larkup/marketplace/loader';
@@ -25,9 +25,13 @@ import {
   createConfiguredOcrAdapter,
   createConfiguredPersonTracker,
   createConfiguredVisionAdapter,
-} from '@/lib/video-intelligence/model-adapters';
-import { createAnalysisBundle } from '@/lib/video-intelligence/analysis-bundle';
-import { analyzeBundle } from '@/lib/video-intelligence/sandbox-analysis';
+} from '@/lib/media/video/model-adapters';
+import { createAnalysisBundle } from '@/lib/media/video/analysis-bundle';
+import { analyzeBundle } from '@/lib/media/video/sandbox-analysis';
+import {
+  evidenceToRefinementInputs,
+  runInstalledVideoIntelligence,
+} from '@/lib/media/video-intelligence-adapter';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,7 +46,7 @@ const purposes = new Set(['verify-visual', 'high-res-ocr', 'compare', 'count', '
 export async function POST(req: Request) {
   const serverId = new URL(req.url).searchParams.get('serverId');
   const handler = () => inspectMedia(req);
-  return serverId ? runWithServer(serverId, handler) : handler();
+  return serverId ? runWithProject(serverId, handler) : handler();
 }
 
 export async function inspectMedia(req: Request) {
@@ -65,6 +69,10 @@ export async function inspectMedia(req: Request) {
     typeof body.queryId === 'string' && body.queryId.trim()
       ? body.queryId.trim().slice(0, 128)
       : `${mediaAssetId}:${purpose ?? 'inspection'}:${startSecs}:${endSecs}`;
+  const question =
+    typeof body.question === 'string' && body.question.trim()
+      ? body.question.trim().slice(0, 2_000)
+      : queryId;
   if (
     !mediaAssetId ||
     !Number.isFinite(startSecs) ||
@@ -79,7 +87,7 @@ export async function inspectMedia(req: Request) {
   }
   const reserved = await getReservedInspectionBudget(mediaAssetId, queryId);
   const estimate = {
-    durationSecs: Math.min(30, endSecs - startSecs),
+    durationSecs: Math.min(180, endSecs - startSecs),
     bytes: 64 * 1024 * 1024,
     sandboxSeconds: 0,
     spendUsd: 0,
@@ -138,11 +146,13 @@ export async function inspectMedia(req: Request) {
       { status: 404 },
     );
   }
-  if (!(await isToolInstalled('video-audio'))) {
+  const hasCloudVideoIntelligence = await isToolInstalled('video-intelligence');
+  const hasLegacyVideoAudio = await isToolInstalled('video-audio');
+  if (!hasCloudVideoIntelligence && !hasLegacyVideoAudio) {
     return NextResponse.json({ error: 'Video & Audio tool is not installed.' }, { status: 503 });
   }
-  const tool = await loadTool<any>('video-audio');
-  if (!tool?.inspectTimeRange && !tool?.inspectBoundedSource) {
+  const tool = hasCloudVideoIntelligence ? undefined : await loadTool<any>('video-audio');
+  if (!hasCloudVideoIntelligence && !tool?.inspectTimeRange && !tool?.inspectBoundedSource) {
     return NextResponse.json(
       { error: 'Installed Video & Audio tool does not support bounded inspection.' },
       { status: 503 },
@@ -165,7 +175,68 @@ export async function inspectMedia(req: Request) {
     const sourcePath =
       local || path.join(tmpDir, `source.${asset.fileName.split('.').pop() || 'mp4'}`);
     if (!local) await fs.writeFile(sourcePath, await storage.retrieve(asset.storageUri));
-    const inspect = tool.inspectBoundedSource ?? tool.inspectTimeRange;
+    if (hasCloudVideoIntelligence) {
+      const { evidence } = await runInstalledVideoIntelligence({
+        asset,
+        mediaPath: sourcePath,
+        reportStage: async () => undefined,
+        // The worker is constrained by importantRanges below. Reserve the
+        // matching source duration instead of charging the full local video.
+        sourceDurationSecs: endSecs - startSecs,
+        briefOverride: {
+          goal: `Bounded ${purpose} verification for: ${question}`,
+          expectedQuestions: [question],
+          importantRanges: [{ startSecs, endSecs, note: purpose }],
+          indexingMode: 'deep',
+          // Re-check speech for outcome/comparison verification. A legacy
+          // transcript can be incomplete or low quality, while count/OCR
+          // inspections keep the bounded worker focused on visual evidence.
+          skipTranscription: !['verify-visual', 'compare'].includes(purpose),
+          retainSourceHours: 0,
+        },
+      });
+      const evidenceInputs = evidenceToRefinementInputs(evidence);
+      if (evidenceInputs.length === 0) {
+        return NextResponse.json(
+          {
+            error: 'Cloud inspection produced no validated evidence.',
+            inspectionDecision: decision,
+          },
+          { status: 422 },
+        );
+      }
+      const refinement = await appendVideoKnowledgeRefinement({
+        mediaAssetId,
+        evidence: evidenceInputs,
+      });
+      await updateMediaAsset(mediaAssetId, {
+        activeVideoKnowledgeRevisionId: refinement.revision.id,
+        activeVideoKnowledgeManifestId: refinement.manifest.id,
+      });
+      void trackUsageEvent({
+        type: 'media_processing',
+        mediaType: 'video',
+        mediaOperation: 'cloud_inspection',
+        durationSecs: endSecs - startSecs,
+        frameCount: evidence.visualObservations.length,
+        timestamp: new Date().toISOString(),
+      });
+      return NextResponse.json({
+        inspectionDecision: decision,
+        actualRange: { startSecs, endSecs },
+        revisionId: refinement.revision.id,
+        evidence: refinement.built.evidenceIds.map((evidenceId, index) => ({
+          evidenceId,
+          startSecs: evidenceInputs[index].timeRange.startSecs,
+          endSecs: evidenceInputs[index].timeRange.endSecs,
+          precision: evidenceInputs[index].timeRange.precision,
+        })),
+      });
+    }
+    const inspect = tool?.inspectBoundedSource ?? tool?.inspectTimeRange;
+    if (!inspect) {
+      throw new Error('Installed Video & Audio tool does not support bounded inspection.');
+    }
     const result = (await inspect({
       mediaPath: sourcePath,
       startSecs,

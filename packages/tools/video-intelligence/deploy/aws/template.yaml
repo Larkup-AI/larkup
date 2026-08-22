@@ -21,6 +21,27 @@ Parameters:
     Type: String
     Default: 'false'
     AllowedValues: ['true', 'false']
+  AutoProvisioningEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable automatic, device-scoped pilot access keys. Enable only with a deliberately small allowance.
+  AutoProvisionedSourceMinutes:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 120
+    Description: Monthly minutes included with each automatically provisioned device key.
+  RequestsPerMinute:
+    Type: Number
+    Default: 120
+    MinValue: 30
+    MaxValue: 600
+  TestingDeviceHashes:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Comma-separated SHA-256 device hashes granted temporary owner-only test access. Leave empty in normal operation.
 
 Resources:
   DataKey:
@@ -66,7 +87,7 @@ Resources:
           - Id: DeleteEvidence
             Prefix: results/
             Status: Enabled
-            ExpirationInDays: 30
+            ExpirationInDays: 1
             NoncurrentVersionExpiration:
               NoncurrentDays: 1
       CorsConfiguration:
@@ -208,6 +229,10 @@ Resources:
           RUNPOD_ENDPOINT_ID: !Ref RunpodEndpointId
           RUNPOD_API_KEY: !Sub '{{resolve:secretsmanager:${RunpodSecret}:SecretString}}'
           PROCESSING_ENABLED: !Ref ProcessingEnabled
+          AUTO_PROVISIONING_ENABLED: !Ref AutoProvisioningEnabled
+          AUTO_PROVISIONED_SOURCE_MINUTES: !Ref AutoProvisionedSourceMinutes
+          REQUESTS_PER_MINUTE: !Ref RequestsPerMinute
+          TESTING_DEVICE_HASHES: !Ref TestingDeviceHashes
           ADMIN_TOKEN: !Sub '{{resolve:secretsmanager:${AdminSecret}:SecretString}}'
       Events:
         Api:

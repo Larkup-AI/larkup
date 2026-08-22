@@ -14,6 +14,8 @@ export interface VideoIndexingBrief {
   /** Confirms authority or another lawful basis; it is not necessarily GDPR consent. */
   processingAuthorityConfirmed: boolean;
   retainSourceHours: number;
+  /** The app supplies transcript evidence itself, so the cloud GPU skips speech decoding. */
+  skipTranscription?: boolean;
 }
 
 export interface VideoSource {
@@ -104,6 +106,13 @@ export interface VisualObservation {
   ocr: OcrEvidence[];
 }
 
+/** OCR-derived score readings, retained as candidates until the agent verifies them. */
+export interface ScoreboardState {
+  timeMs: number;
+  score: string;
+  confidence: number;
+}
+
 export interface VideoEvidenceBundle {
   schemaVersion: 1;
   jobId: string;
@@ -114,6 +123,7 @@ export interface VideoEvidenceBundle {
   detectedLanguage?: string;
   visualObservations: VisualObservation[];
   tracks: TrackEvidence[];
+  scoreboardStates?: ScoreboardState[];
   entities: Array<{
     name: string;
     kind: 'object' | 'visible-text';
@@ -153,6 +163,11 @@ export interface VideoServiceUsage {
 
 export interface VideoIntelligenceClientContract {
   health(): Promise<{ status: string; version: string; operators: Record<string, string> }>;
+  /** Creates or rotates the opaque cloud credential for one local Larkup installation. */
+  provisionDeviceAccess(installationId: string): Promise<{
+    apiKey: string;
+    entitlement: VideoServiceEntitlement;
+  }>;
   upload(file: Blob, fileName: string): Promise<{ uploadId: string }>;
   submitJob(request: SubmitVideoJobRequest): Promise<VideoJob>;
   getJob(jobId: string): Promise<VideoJob>;
