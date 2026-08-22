@@ -483,6 +483,7 @@ def run_pipeline(
 ) -> tuple[dict[str, Any], float]:
     progress("probe", 3, "Reading video metadata")
     probe = probe_video(path)
+    important_ranges = normalized_important_ranges(brief, probe.duration_seconds)
     operators = Operators(
         model_dir,
         device,
@@ -498,6 +499,13 @@ def run_pipeline(
         transcript, detected_language = operators.transcribe(
             path, None if brief.get("language") == "auto" else brief.get("language")
         )
+        if important_ranges:
+            transcript = [
+                segment
+                for segment in transcript
+                if segment["endMs"] / 1_000 >= important_ranges[0][0]
+                and segment["startMs"] / 1_000 <= important_ranges[-1][1]
+            ]
     elif probe.has_audio:
         progress("transcribe", 8, "Using the selected external transcription provider")
     progress("decode", 42, "Selecting visual evidence")
@@ -526,7 +534,7 @@ def run_pipeline(
         detections = operators.detect(frame)
         tracker.update(detections, time_ms)
         ocr_lines = operators.read_text(frame)
-        if semantic_vision_enabled and not disable_heavy_operators:
+        if semantic_vision_enabled:
             _retain_semantic_frame(semantic_frames, time_ms, frame, limit=12)
         for detection in detections:
             label_counts[detection["label"]] += 1
@@ -569,7 +577,7 @@ def run_pipeline(
             for observation in semantic_observations
         ],
         "semanticDiagnostics": {
-            "attempted": bool(semantic_vision_enabled and not disable_heavy_operators and semantic_frames),
+            "attempted": bool(semantic_vision_enabled and semantic_frames),
             "error": operators.semantic_vision.last_error,
         },
         "entities": [
