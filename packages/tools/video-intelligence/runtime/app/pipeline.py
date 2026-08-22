@@ -568,6 +568,10 @@ def run_pipeline(
             }
             for observation in semantic_observations
         ],
+        "semanticDiagnostics": {
+            "attempted": bool(semantic_vision_enabled and not disable_heavy_operators and semantic_frames),
+            "error": operators.semantic_vision.last_error,
+        },
         "entities": [
             {"name": label, "kind": "object", "mentions": count}
             for label, count in label_counts.most_common()
