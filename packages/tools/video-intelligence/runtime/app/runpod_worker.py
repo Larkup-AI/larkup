@@ -34,6 +34,8 @@ def handler(event: dict[str, Any]) -> dict[str, Any]:
             settings.device,
             lambda *_: None,
             settings.disable_heavy_operators,
+            settings.semantic_vision_enabled,
+            settings.semantic_vision_model,
         )
     return {"result": result, "actualSourceMinutes": actual_minutes}
 

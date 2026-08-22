@@ -57,6 +57,8 @@ def main() -> None:
                     },
                 ),
                 settings.disable_heavy_operators,
+                settings.semantic_vision_enabled,
+                settings.semantic_vision_model,
             )
             result["jobId"] = job_id
             result_key = f"results/{job['principalId']}/{job_id}.json"

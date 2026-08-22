@@ -15,6 +15,7 @@ import cv2
 import numpy as np
 
 from .ranges import normalized_important_ranges
+from .semantic_vision import SemanticVision
 
 
 ProgressCallback = Callable[[str, int, str], None]
@@ -104,7 +105,14 @@ def _probe_video_with_av(path: Path) -> Probe:
 
 
 class Operators:
-    def __init__(self, model_dir: Path, device: str, disabled: bool = False):
+    def __init__(
+        self,
+        model_dir: Path,
+        device: str,
+        disabled: bool = False,
+        semantic_vision_enabled: bool = True,
+        semantic_vision_model: str = "Qwen/Qwen2.5-VL-3B-Instruct",
+    ):
         self.model_dir = model_dir
         self.device = _resolve_device(device)
         self.disabled = disabled
@@ -112,6 +120,12 @@ class Operators:
         self._whisper: Any = None
         self._ocr: Any = None
         self._detector: Any = None
+        self.semantic_vision = SemanticVision(
+            semantic_vision_enabled,
+            semantic_vision_model,
+            self.device,
+            disabled,
+        )
 
     def transcribe(
         self, path: Path, language_hint: str | None
@@ -464,10 +478,18 @@ def run_pipeline(
     device: str,
     progress: ProgressCallback,
     disable_heavy_operators: bool = False,
+    semantic_vision_enabled: bool = True,
+    semantic_vision_model: str = "Qwen/Qwen2.5-VL-3B-Instruct",
 ) -> tuple[dict[str, Any], float]:
     progress("probe", 3, "Reading video metadata")
     probe = probe_video(path)
-    operators = Operators(model_dir, device, disable_heavy_operators)
+    operators = Operators(
+        model_dir,
+        device,
+        disable_heavy_operators,
+        semantic_vision_enabled,
+        semantic_vision_model,
+    )
 
     transcript: list[dict[str, Any]] = []
     detected_language: str | None = None
@@ -486,6 +508,7 @@ def run_pipeline(
     scoreboard_states: list[dict[str, Any]] = []
     previous_score: str | None = None
     tracker = AnonymousTracker()
+    semantic_frames: list[tuple[int, np.ndarray]] = []
     analyzed_frames = 0
     decoded_frames = max(1, round(probe.duration_seconds * probe.fps))
     last_reported_percent = -1
@@ -503,6 +526,8 @@ def run_pipeline(
         detections = operators.detect(frame)
         tracker.update(detections, time_ms)
         ocr_lines = operators.read_text(frame)
+        if semantic_vision_enabled and not disable_heavy_operators:
+            _retain_semantic_frame(semantic_frames, time_ms, frame, limit=12)
         for detection in detections:
             label_counts[detection["label"]] += 1
         for line in ocr_lines:
@@ -517,6 +542,8 @@ def run_pipeline(
                 {"timeMs": time_ms, "objects": detections, "ocr": ocr_lines}
             )
 
+    progress("synthesize", 88, "Interpreting selected frames on the GPU")
+    semantic_observations = operators.semantic_vision.describe(semantic_frames, brief)
     progress("synthesize", 93, "Building timestamped evidence")
     result = {
         "schemaVersion": 1,
@@ -532,6 +559,15 @@ def run_pipeline(
         "visualObservations": observations,
         "tracks": tracker.summaries(),
         "scoreboardStates": scoreboard_states,
+        "semanticObservations": [
+            {
+                "startMs": observation.start_ms,
+                "endMs": observation.end_ms,
+                "text": observation.text,
+                "confidence": observation.confidence,
+            }
+            for observation in semantic_observations
+        ],
         "entities": [
             {"name": label, "kind": "object", "mentions": count}
             for label, count in label_counts.most_common()
@@ -560,4 +596,31 @@ def run_pipeline(
             "instruction": "Answer using timestamped evidence first; use general knowledge only when clearly labeled as an inference.",
         },
     }
-    return result, probe.duration_seconds / 60
+    inspected_ranges = normalized_important_ranges(brief, probe.duration_seconds)
+    processed_seconds = (
+        sum(end - start for start, end in inspected_ranges)
+        if inspected_ranges
+        else probe.duration_seconds
+    )
+    return result, processed_seconds / 60
+
+
+def _retain_semantic_frame(
+    frames: list[tuple[int, np.ndarray]], time_ms: int, frame: np.ndarray, limit: int
+) -> None:
+    """Keep an ordered, evenly distributed sample without retaining full video frames."""
+    candidate = (time_ms, frame.copy())
+    if len(frames) < limit:
+        frames.append(candidate)
+        return
+    # Replace an interior sample only when this timestamp is farther from its
+    # nearest neighbour than the current densest pair. This keeps both ends
+    # while spreading a bounded set across any inspected range.
+    candidates = frames + [candidate]
+    candidates.sort(key=lambda item: item[0])
+    gaps = [candidates[index + 1][0] - candidates[index][0] for index in range(len(candidates) - 1)]
+    if not gaps:
+        return
+    remove_index = min(range(1, len(candidates) - 1), key=lambda index: gaps[index - 1] + gaps[index])
+    del candidates[remove_index]
+    frames[:] = candidates
