@@ -40,6 +40,17 @@ export class VideoIntelligenceClient implements VideoIntelligenceClientContract 
     );
   }
 
+  provisionDeviceAccess(installationId: string): Promise<{
+    apiKey: string;
+    entitlement: VideoServiceEntitlement;
+  }> {
+    return this.request('/v1/device-keys', {
+      method: 'POST',
+      body: JSON.stringify({ installationId }),
+      anonymous: true,
+    });
+  }
+
   async upload(file: Blob, fileName: string): Promise<{ uploadId: string }> {
     if (this.mode === 'managed-cloud') {
       const initialized = await this.request<{
@@ -77,6 +88,10 @@ export class VideoIntelligenceClient implements VideoIntelligenceClientContract 
       const response = await this.fetcher(job.resultUrl);
       if (!response.ok) throw new Error(`Video result returned HTTP ${response.status}.`);
       job.result = (await response.json()) as VideoJob['result'];
+      await this.request(`/v1/jobs/${encodeURIComponent(jobId)}/result/ack`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
     }
     return job;
   }

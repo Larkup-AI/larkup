@@ -1,11 +1,23 @@
 import { openAsBlob } from 'node:fs';
 import { getInstalledTool } from '@larkup/marketplace/installer';
 import { loadToolExtension } from '@larkup/marketplace/extension';
-import { readConfig } from '@larkup/core/config-store';
 import type { MediaAsset, MediaPipelineStage } from '@larkup/core/types';
+import { processAudio } from '@larkup/tool-video-audio';
+import type { OfflineKnowledgeEvidenceInput } from '@larkup/core/video-knowledge/knowledge-builder';
 import type { MediaEvidenceSegment } from './knowledge';
+import { resolveVideoIntelligenceConnection } from './video-intelligence-connection';
 
 interface VideoClient {
+  health(): Promise<unknown>;
+  provisionDeviceAccess(installationId: string): Promise<{
+    apiKey: string;
+    entitlement: {
+      plan: string;
+      sourceMinutesPerMonth: number | null;
+      maxConcurrentJobs: number;
+      allowFullCoverage: boolean;
+    };
+  }>;
   upload(file: Blob, fileName: string): Promise<{ uploadId: string }>;
   submitJob(request: Record<string, unknown>): Promise<VideoJob>;
   getJob(jobId: string): Promise<VideoJob>;
@@ -35,6 +47,14 @@ interface VideoEvidence {
     startMs: number;
     endMs: number;
     observations: number;
+    confidence?: number;
+  }>;
+  scoreboardStates?: Array<{ timeMs: number; score: string; confidence: number }>;
+  semanticObservations?: Array<{
+    startMs: number;
+    endMs: number;
+    text: string;
+    confidence: number;
   }>;
   detectedLanguage?: string;
   answeringGuide: {
@@ -54,6 +74,9 @@ export async function runInstalledVideoIntelligence(input: {
   asset: MediaAsset;
   mediaPath: string;
   reportStage: ReportStage;
+  briefOverride?: Record<string, unknown>;
+  /** Bounded cloud inspection reserves only the requested source range. */
+  sourceDurationSecs?: number;
 }): Promise<{
   evidence: VideoEvidence;
   segments: MediaEvidenceSegment[];
@@ -62,28 +85,32 @@ export async function runInstalledVideoIntelligence(input: {
   if (!installed) throw new Error('Install Video Intelligence (New) before indexing this video.');
   const extension = await loadToolExtension<VideoClient>('video-intelligence');
   if (!extension) throw new Error('The installed Video Intelligence tool could not be loaded.');
-  const globalConfig = await readConfig();
-  const config = {
-    ...installed.config,
-    ...(globalConfig.toolConfigs?.['video-intelligence'] ?? {}),
-  };
+  const { config } = await resolveVideoIntelligenceConnection(extension, installed.config);
   const context = { config, fetch: globalThis.fetch };
   await input.reportStage('extract', {
     status: 'running',
     percent: 1,
-    message: 'Starting the selected Video Intelligence runtime...',
+    message: 'Connecting to the managed Video Intelligence GPU service...',
   });
-  await extension.ensureRuntime?.(context);
   const client = extension.createClient(context);
+  // Video Intelligence is cloud-only in the product. Do not delegate runtime
+  // startup to an older installed extension: it may start a local Docker
+  // worker, which violates the local-media/remote-compute boundary.
+  await client.health();
+  const externalAudio = await transcribeWithSelectedProvider(input, config);
   const file = await openAsBlob(input.mediaPath, { type: input.asset.mimeType });
   const uploaded = await client.upload(file, input.asset.fileName);
-  const brief = normalizeBrief(input.asset);
+  const brief = {
+    ...normalizeBrief(input.asset),
+    ...(input.briefOverride ?? {}),
+    ...(externalAudio ? { skipTranscription: true } : {}),
+  };
   let job = await client.submitJob({
     source: {
       uploadId: uploaded.uploadId,
       fileName: input.asset.fileName,
       mimeType: input.asset.mimeType,
-      durationSecs: input.asset.durationSecs,
+      durationSecs: input.sourceDurationSecs ?? input.asset.durationSecs,
     },
     brief,
   });
@@ -104,6 +131,14 @@ export async function runInstalledVideoIntelligence(input: {
   if (job.status !== 'completed' || !job.result) {
     throw new Error(job.error || `Video indexing ended with status ${job.status}.`);
   }
+  if (externalAudio) {
+    job.result.transcript = externalAudio.chunks.map((chunk) => ({
+      startMs: Math.round(chunk.startSecs * 1_000),
+      endMs: Math.round(chunk.endSecs * 1_000),
+      text: chunk.text,
+    }));
+    job.result.detectedLanguage = externalAudio.language ?? job.result.detectedLanguage;
+  }
   await input.reportStage('vision', {
     status: 'completed',
     percent: 100,
@@ -115,6 +150,225 @@ export async function runInstalledVideoIntelligence(input: {
     message: `Transcribed ${job.result.transcript.length} timestamped speech sections.`,
   });
   return { evidence: job.result, segments: evidenceToSegments(job.result) };
+}
+
+async function transcribeWithSelectedProvider(
+  input: Pick<
+    Parameters<typeof runInstalledVideoIntelligence>[0],
+    'asset' | 'mediaPath' | 'reportStage'
+  >,
+  config: Record<string, unknown>,
+) {
+  const provider = typeof config.audioProvider === 'string' ? config.audioProvider : 'larkup-cloud';
+  if (provider === 'larkup-cloud') return null;
+  const apiKey = typeof config.audioApiKey === 'string' ? config.audioApiKey.trim() : '';
+  if (!apiKey) {
+    throw new Error(`Add and verify an API key for ${provider} in Video Intelligence settings.`);
+  }
+  const supportedProvider = new Set(['openai', 'groq', 'deepgram', 'elevenlabs']);
+  if (!supportedProvider.has(provider)) {
+    throw new Error(`Audio provider ${provider} is not supported for Video Intelligence.`);
+  }
+  return processAudio(input.mediaPath, {
+    provider,
+    apiKey,
+    language: 'auto',
+    context: input.asset.fileName,
+    onProgress: async (current, total, message) => {
+      await input.reportStage('transcribe', {
+        status: 'running',
+        percent: total ? Math.round((current / total) * 100) : 0,
+        message,
+      });
+    },
+  });
+}
+
+/**
+ * Preserve source-level cloud observations for the investigation engine. The
+ * 30-second RAG segments above are useful navigation projections, but they
+ * must never be the only evidence used for an exact score or count.
+ */
+export function evidenceToKnowledgeInputs(evidence: VideoEvidence) {
+  const visualObservations = [
+    ...evidence.visualObservations.flatMap((observation) => {
+      if (!observation.objects.length) return [];
+      const timestampSecs = observation.timeMs / 1_000;
+      const objects = observation.objects.map((object) => ({
+        label: object.label,
+        trackId: object.trackId,
+        confidence: object.confidence,
+      }));
+      return [
+        {
+          startSecs: timestampSecs,
+          endSecs: timestampSecs,
+          observations: [
+            {
+              kind: 'object' as const,
+              value: `Detected objects: ${objects
+                .map((object) => `${object.label} (track ${object.trackId})`)
+                .join(', ')}`,
+              frameTimestamps: [timestampSecs],
+              confidence:
+                objects.reduce((total, object) => total + object.confidence, 0) /
+                Math.max(1, objects.length),
+              uncertaintyReasons: ['Object labels are produced by the video detector.'],
+            },
+          ],
+        },
+      ];
+    }),
+    ...(evidence.scoreboardStates ?? []).map((state) => ({
+      startSecs: state.timeMs / 1_000,
+      endSecs: state.timeMs / 1_000,
+      observations: [
+        {
+          kind: 'state' as const,
+          value: JSON.stringify({ subject: 'scoreboard', property: 'score', value: state.score }),
+          frameTimestamps: [state.timeMs / 1_000],
+          confidence: state.confidence,
+          uncertaintyReasons: [
+            'Score candidate extracted from OCR; verify it against adjacent evidence before answering.',
+          ],
+        },
+      ],
+    })),
+    ...(evidence.semanticObservations ?? [])
+      .filter((observation) => observation.text.trim())
+      .map((observation) => ({
+        startSecs: observation.startMs / 1_000,
+        endSecs: observation.endMs / 1_000,
+        observations: [
+          {
+            kind: 'action' as const,
+            value: observation.text,
+            frameTimestamps: [observation.startMs / 1_000, observation.endMs / 1_000],
+            confidence: Math.min(1, Math.max(0, observation.confidence)),
+            uncertaintyReasons: [
+              'Semantic VLM interpretation is grounded in a bounded sequence of cloud-analyzed frames.',
+            ],
+          },
+        ],
+      })),
+  ];
+  const ocrEvidence = evidence.visualObservations.flatMap((observation) => {
+    const timestampSecs = observation.timeMs / 1_000;
+    return observation.ocr
+      .filter((line) => line.text.trim() && line.confidence >= 0.35)
+      .map((line) => ({
+        modality: 'ocr' as const,
+        timeRange: {
+          startSecs: timestampSecs,
+          endSecs: timestampSecs,
+          precision: 'estimated' as const,
+        },
+        payload: {
+          text: line.text,
+          blocks: [{ text: line.text, confidence: line.confidence }],
+        },
+        source: { kind: 'provider' as const, provider: 'video-intelligence-ocr' },
+        confidence: {
+          score: Math.min(1, Math.max(0, line.confidence)),
+          source: 'provider' as const,
+          calibrationStatus: 'uncalibrated' as const,
+          uncertaintyReasons: ['OCR derived from a timestamped cloud analysis frame.'],
+        },
+        observation: { kind: 'ocr' as const, value: { text: line.text } },
+      }));
+  });
+  return {
+    transcriptChunks: evidence.transcript.map((segment) => ({
+      text: segment.text,
+      startSecs: segment.startMs / 1_000,
+      endSecs: segment.endMs / 1_000,
+    })),
+    visualObservations,
+    ocrEvidence,
+  };
+}
+
+/** Converts a bounded cloud re-analysis result into immutable refinement evidence. */
+export function evidenceToRefinementInputs(
+  evidence: VideoEvidence,
+): OfflineKnowledgeEvidenceInput[] {
+  const inputs = evidenceToKnowledgeInputs(evidence);
+  const transcript: OfflineKnowledgeEvidenceInput[] = inputs.transcriptChunks.map((chunk) => ({
+    modality: 'transcript',
+    timeRange: { startSecs: chunk.startSecs, endSecs: chunk.endSecs, precision: 'segment' },
+    payload: { text: chunk.text },
+    source: { kind: 'provider', provider: 'video-intelligence-stt' },
+    confidence: {
+      score: 0.8,
+      source: 'provider',
+      calibrationStatus: 'uncalibrated',
+      uncertaintyReasons: ['Timestamped transcript returned by bounded cloud analysis.'],
+    },
+    observation: { kind: 'speech', value: { text: chunk.text } },
+  }));
+  const visual: OfflineKnowledgeEvidenceInput[] = inputs.visualObservations.flatMap((sequence) =>
+    (sequence.observations ?? []).map((observation) => ({
+      modality: 'visual' as const,
+      timeRange: {
+        startSecs: sequence.startSecs,
+        endSecs: sequence.endSecs,
+        precision: 'estimated' as const,
+      },
+      payload: { text: observation.value },
+      source: { kind: 'provider' as const, provider: 'video-intelligence-vision' },
+      confidence: {
+        score: observation.confidence,
+        source: 'provider' as const,
+        calibrationStatus: 'uncalibrated' as const,
+        uncertaintyReasons: observation.uncertaintyReasons,
+      },
+      observation: { kind: observation.kind, value: observation.value },
+    })),
+  );
+  const trackedPeople = evidence.tracks.filter((track) => track.label.toLowerCase() === 'person');
+  const tracking: OfflineKnowledgeEvidenceInput[] = trackedPeople.length
+    ? [
+        {
+          modality: 'computed',
+          timeRange: {
+            startSecs: Math.min(...trackedPeople.map((track) => track.startMs / 1_000)),
+            endSecs: Math.max(...trackedPeople.map((track) => track.endMs / 1_000)),
+            precision: 'estimated',
+          },
+          payload: {
+            method: 'video-intelligence-anonymous-person-tracking',
+            tracks: trackedPeople.map((track) => ({
+              id: track.trackId,
+              startSecs: track.startMs / 1_000,
+              endSecs: track.endMs / 1_000,
+              observations: track.observations,
+              confidence: track.confidence ?? null,
+            })),
+          },
+          source: { kind: 'provider', provider: 'video-intelligence-tracking' },
+          confidence: {
+            score:
+              trackedPeople.reduce((total, track) => total + (track.confidence ?? 0.65), 0) /
+              trackedPeople.length,
+            source: 'provider',
+            calibrationStatus: 'uncalibrated',
+            uncertaintyReasons: [
+              'This is an anonymous track count within the inspected range, not person identity.',
+              'Occlusion and re-entry can cause an undercount or duplicate track.',
+            ],
+          },
+          observation: {
+            kind: 'computed',
+            value: {
+              count: trackedPeople.length,
+              label: 'person',
+              method: 'anonymous-bounded-tracking',
+            },
+          },
+        },
+      ]
+    : [];
+  return [...transcript, ...visual, ...inputs.ocrEvidence, ...tracking];
 }
 
 function normalizeBrief(asset: MediaAsset): Record<string, unknown> {
