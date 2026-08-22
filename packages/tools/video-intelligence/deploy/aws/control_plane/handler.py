@@ -133,7 +133,9 @@ def auto_entitlement(device_hash: str) -> dict[str, Any]:
         # concurrent work and disables full-frame coverage.
         return {
             "sourceMinutesPerMonth": None,
-            "maxConcurrentJobs": 1,
+            # Owner-device testing can recover from an interrupted browser
+            # poll without blocking the next bounded diagnostic request.
+            "maxConcurrentJobs": 2,
             "allowFullCoverage": False,
             "unlimitedRequests": True,
             "plan": "owner-device-testing",
@@ -311,7 +313,12 @@ def reconcile_active_jobs(principal_id: str) -> None:
 
 
 def usage(principal: dict[str, Any]) -> dict[str, Any]:
-    reconcile_active_jobs(principal["id"])
+    try:
+        reconcile_active_jobs(principal["id"])
+    except Exception:
+        # A usage read must never become unavailable because background
+        # reconciliation had a transient provider or table failure.
+        pass
     period, period_start, period_end = billing_period(); item = table.get_item(Key={"pk": f"USAGE#{principal['id']}#{period}", "sk": "USAGE"}).get("Item", {}); entitlement = principal["entitlement"]
     return response(200, {"periodStart": period_start, "periodEnd": period_end, "sourceMinutesUsed": item.get("sourceMinutesUsed", 0), "sourceMinutesLimit": entitlement.get("sourceMinutesPerMonth"), "activeJobs": item.get("activeJobs", 0), "concurrentJobsLimit": entitlement.get("maxConcurrentJobs", 1), "allowFullCoverage": entitlement.get("allowFullCoverage", False)})
 
