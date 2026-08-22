@@ -23,6 +23,8 @@ class Settings:
     allow_local_paths: bool
     max_upload_bytes: int
     disable_heavy_operators: bool
+    semantic_vision_enabled: bool
+    semantic_vision_model: str
     allowed_origins: tuple[str, ...]
 
     @classmethod
@@ -44,6 +46,10 @@ class Settings:
                 int(os.getenv("LARKUP_VIDEO_MAX_UPLOAD_BYTES", str(20 * 1024**3))),
             ),
             disable_heavy_operators=_bool("LARKUP_VIDEO_DISABLE_HEAVY_OPERATORS", False),
+            semantic_vision_enabled=_bool("LARKUP_VIDEO_SEMANTIC_VISION", True),
+            semantic_vision_model=os.getenv(
+                "LARKUP_VIDEO_SEMANTIC_VISION_MODEL", "Qwen/Qwen2.5-VL-3B-Instruct"
+            ),
             allowed_origins=tuple(
                 origin.strip()
                 for origin in os.getenv(

@@ -10,4 +10,7 @@ rapidocr-onnxruntime==1.4.4
 python-multipart==0.0.20
 requests==2.32.4
 runpod==1.7.10
+accelerate==1.10.1
+Pillow==12.3.0
+transformers==4.49.0
 uvicorn[standard]==0.35.0

@@ -55,6 +55,7 @@ FROM system AS runtime
 COPY requirements.txt ./requirements.txt
 RUN python3 -m pip install --no-cache-dir --upgrade pip \
     && python3 -m pip install --no-cache-dir paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/ \
+    && python3 -m pip install --no-cache-dir torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124 \
     && python3 -m pip install --no-cache-dir -r requirements.txt
 
 RUN mkdir -p /models /data \
@@ -66,6 +67,7 @@ ENV PYTHONUNBUFFERED=1 \
     LARKUP_VIDEO_DATA_DIR=/data \
     LARKUP_VIDEO_MODEL_DIR=/models \
     LARKUP_VIDEO_DEVICE=auto \
+    LARKUP_VIDEO_SEMANTIC_VISION=true \
     LARKUP_VIDEO_REQUIRE_AUTH=false
 
 EXPOSE 8787

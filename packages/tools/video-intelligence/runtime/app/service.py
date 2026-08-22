@@ -36,6 +36,8 @@ class JobService:
                     job_id, stage, percent, message
                 ),
                 self.settings.disable_heavy_operators,
+                self.settings.semantic_vision_enabled,
+                self.settings.semantic_vision_model,
             )
             result["jobId"] = job_id
             self.store.finish_job(job_id, result, actual_minutes)
