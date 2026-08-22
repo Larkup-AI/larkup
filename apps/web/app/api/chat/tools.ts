@@ -34,6 +34,7 @@ import {
   queryAwareExcerpt,
   timestampMediaUrl,
 } from '@/lib/media/knowledge';
+import { hasUnlimitedVideoIntelligenceAccess } from '@/lib/media/video-intelligence-adapter';
 import { rankKnowledgeHits } from '@/lib/chat/retrieval-ranking';
 import { createTabularVisualization } from '@/lib/chat/tabular-visualization';
 import { executeEnterpriseTool, getEnterpriseTools } from '@/lib/enterprise-client';
@@ -488,29 +489,48 @@ export async function getChatTools(context: {
                   : 'verify-visual',
               }
             : undefined;
-          const inspectionDecision = decideInspection({
-            required:
-              requiresCorroboration ||
-              (plan.requiresInspectionWhenInsufficient &&
-                ['insufficient', 'needs_inspection'].includes(verification.status)),
-            plausibleRange: Boolean(recommendedInspection),
-            estimate: {
-              durationSecs: recommendedInspection
-                ? recommendedInspection.endSecs - recommendedInspection.startSecs
-                : 30,
-              bytes: 64 * 1024 * 1024,
-              sandboxSeconds: 30,
-              spendUsd: 0,
-              lowerResolutionProbability: hits.length > 0 ? 0.65 : 0,
-            },
-            budget: {
-              remainingDurationSecs: 180,
-              remainingBytes: 1024 * 1024 * 1024,
-              remainingSandboxSeconds: 600,
-              remainingSpendUsd: 0.5,
-              usedBundleRuns: 0,
-            },
-          });
+          // Device entitlements are evaluated by the managed cloud control
+          // plane. An unlimited plan may inspect the bounded range directly;
+          // every other installation keeps the conservative browser budget.
+          const hasUnlimitedCloudAccess = await hasUnlimitedVideoIntelligenceAccess().catch(
+            () => false,
+          );
+          const inspectionDecision = hasUnlimitedCloudAccess
+            ? {
+                decision: requiresCorroboration ? ('required' as const) : ('optional' as const),
+                reason: 'managed-cloud-entitlement',
+                committed: {
+                  durationSecs: recommendedInspection
+                    ? recommendedInspection.endSecs - recommendedInspection.startSecs
+                    : 30,
+                  bytes: 64 * 1024 * 1024,
+                  sandboxSeconds: 30,
+                  spendUsd: 0,
+                },
+              }
+            : decideInspection({
+                required:
+                  requiresCorroboration ||
+                  (plan.requiresInspectionWhenInsufficient &&
+                    ['insufficient', 'needs_inspection'].includes(verification.status)),
+                plausibleRange: Boolean(recommendedInspection),
+                estimate: {
+                  durationSecs: recommendedInspection
+                    ? recommendedInspection.endSecs - recommendedInspection.startSecs
+                    : 30,
+                  bytes: 64 * 1024 * 1024,
+                  sandboxSeconds: 30,
+                  spendUsd: 0,
+                  lowerResolutionProbability: hits.length > 0 ? 0.65 : 0,
+                },
+                budget: {
+                  remainingDurationSecs: 180,
+                  remainingBytes: 1024 * 1024 * 1024,
+                  remainingSandboxSeconds: 600,
+                  remainingSpendUsd: 0.5,
+                  usedBundleRuns: 0,
+                },
+              });
           let autoInspection:
             | {
                 status: 'completed' | 'failed';
