@@ -298,7 +298,13 @@ def reconcile_active_jobs(principal_id: str) -> None:
         page = table.scan(**request)
         for candidate in page.get("Items", []):
             if candidate.get("runpodJobId"):
-                sync_runpod(candidate)
+                try:
+                    sync_runpod(candidate)
+                except Exception:
+                    # Usage must remain available if a concurrent status poll
+                    # settled this job first or an individual provider check
+                    # is temporarily unavailable.
+                    continue
         start_key = page.get("LastEvaluatedKey")
         if not start_key:
             return
