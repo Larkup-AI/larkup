@@ -280,7 +280,32 @@ def runpod(path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     return parsed
 
 
+def reconcile_active_jobs(principal_id: str) -> None:
+    """Settle completed RunPod work even if a browser disconnected mid-poll."""
+    start_key: dict[str, Any] | None = None
+    while True:
+        request: dict[str, Any] = {
+            "FilterExpression": "principalId = :principal AND #status IN (:queued, :running)",
+            "ExpressionAttributeNames": {"#status": "status"},
+            "ExpressionAttributeValues": {
+                ":principal": principal_id,
+                ":queued": "queued",
+                ":running": "running",
+            },
+        }
+        if start_key:
+            request["ExclusiveStartKey"] = start_key
+        page = table.scan(**request)
+        for candidate in page.get("Items", []):
+            if candidate.get("runpodJobId"):
+                sync_runpod(candidate)
+        start_key = page.get("LastEvaluatedKey")
+        if not start_key:
+            return
+
+
 def usage(principal: dict[str, Any]) -> dict[str, Any]:
+    reconcile_active_jobs(principal["id"])
     period, period_start, period_end = billing_period(); item = table.get_item(Key={"pk": f"USAGE#{principal['id']}#{period}", "sk": "USAGE"}).get("Item", {}); entitlement = principal["entitlement"]
     return response(200, {"periodStart": period_start, "periodEnd": period_end, "sourceMinutesUsed": item.get("sourceMinutesUsed", 0), "sourceMinutesLimit": entitlement.get("sourceMinutesPerMonth"), "activeJobs": item.get("activeJobs", 0), "concurrentJobsLimit": entitlement.get("maxConcurrentJobs", 1), "allowFullCoverage": entitlement.get("allowFullCoverage", False)})
 
