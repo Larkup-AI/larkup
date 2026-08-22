@@ -34,7 +34,10 @@ def handler(event: dict[str, Any]) -> dict[str, Any]:
             settings.device,
             lambda *_: None,
             settings.disable_heavy_operators,
-            settings.semantic_vision_enabled,
+            # Managed RunPod jobs are explicitly requested for cloud video
+            # investigation. Keep semantic VLM evidence on even if a stale
+            # platform-level environment variable leaks into a worker.
+            True,
             settings.semantic_vision_model,
         )
     return {"result": result, "actualSourceMinutes": actual_minutes}
