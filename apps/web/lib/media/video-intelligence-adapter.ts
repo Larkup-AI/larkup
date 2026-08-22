@@ -9,6 +9,7 @@ import { resolveVideoIntelligenceConnection } from './video-intelligence-connect
 
 interface VideoClient {
   health(): Promise<unknown>;
+  getUsage(): Promise<{ sourceMinutesLimit: number | null }>;
   provisionDeviceAccess(installationId: string): Promise<{
     apiKey: string;
     entitlement: {
@@ -22,6 +23,21 @@ interface VideoClient {
   submitJob(request: Record<string, unknown>): Promise<VideoJob>;
   getJob(jobId: string): Promise<VideoJob>;
   cancelJob(jobId: string): Promise<VideoJob>;
+}
+
+/**
+ * The inspection policy has its own conservative interactive budget. A cloud
+ * entitlement with no source-minute cap has already been authorized by the
+ * control plane, so it may proceed without an extra browser approval prompt.
+ */
+export async function hasUnlimitedVideoIntelligenceAccess(): Promise<boolean> {
+  const installed = await getInstalledTool('video-intelligence');
+  if (!installed) return false;
+  const extension = await loadToolExtension<VideoClient>('video-intelligence');
+  if (!extension) return false;
+  const { config } = await resolveVideoIntelligenceConnection(extension, installed.config);
+  const client = extension.createClient({ config, fetch: globalThis.fetch });
+  return (await client.getUsage()).sourceMinutesLimit === null;
 }
 
 interface VideoJob {
