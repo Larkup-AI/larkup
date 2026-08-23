@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.semantic_vision import _normalize_response, _uniform_sample
+from app.semantic_vision import SemanticVision, _normalize_response, _uniform_sample
 
 
 class SemanticVisionTests(unittest.TestCase):
@@ -32,6 +32,18 @@ class SemanticVisionTests(unittest.TestCase):
         self.assertEqual(len(selected), 6)
         self.assertEqual(selected[0][0], 0)
         self.assertEqual(selected[-1][0], 11)
+
+    def test_retries_on_cpu_only_for_cuda_kernel_incompatibility(self) -> None:
+        vision = SemanticVision(True, "test/model", "cuda", False)
+
+        self.assertTrue(
+            vision._can_retry_on_cpu(RuntimeError("CUDA error: no kernel image is available"))
+        )
+        self.assertFalse(vision._can_retry_on_cpu(RuntimeError("out of memory")))
+        vision.execution_device = "cpu"
+        self.assertFalse(
+            vision._can_retry_on_cpu(RuntimeError("no kernel image is available"))
+        )
 
 
 if __name__ == "__main__":

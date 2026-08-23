@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -25,6 +26,8 @@ class SemanticVision:
         self._model: Any = None
         self._processor: Any = None
         self.last_error: str | None = None
+        self.execution_device = device
+        self.fallback_reason: str | None = None
 
     def describe(
         self, frames: list[tuple[int, Any]], brief: dict[str, Any]
@@ -37,11 +40,43 @@ class SemanticVision:
             self.last_error = None
             return observations
         except Exception as error:
+            if self._can_retry_on_cpu(error):
+                return self._describe_on_cpu(frames, brief, error)
             # Object/OCR evidence remains useful when a semantic model cannot
             # be loaded on a constrained worker. Do not fail an entire index,
             # but preserve a bounded diagnostic for cloud operations.
             self.last_error = f"{type(error).__name__}: {error}"[:500]
             return []
+
+    def _can_retry_on_cpu(self, error: Exception) -> bool:
+        return self.execution_device == "cuda" and "no kernel image is available" in str(error).lower()
+
+    def _describe_on_cpu(
+        self, frames: list[tuple[int, Any]], brief: dict[str, Any], error: Exception
+    ) -> list[SemanticObservation]:
+        self.fallback_reason = f"{type(error).__name__}: {error}"[:500]
+        self._release_model()
+        self.execution_device = "cpu"
+        try:
+            self._load()
+            observations = self._describe(frames, brief)
+            self.last_error = None
+            return observations
+        except Exception as fallback_error:
+            self.last_error = f"{type(fallback_error).__name__}: {fallback_error}"[:500]
+            return []
+
+    def _release_model(self) -> None:
+        self._model = None
+        self._processor = None
+        gc.collect()
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
 
     def _load(self) -> None:
         if self._model is not None:
@@ -49,15 +84,16 @@ class SemanticVision:
         import torch
         from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 
-        dtype = torch.bfloat16 if self.device == "cuda" and torch.cuda.is_available() else torch.float32
+        use_cuda = self.execution_device == "cuda" and torch.cuda.is_available()
+        dtype = torch.bfloat16 if use_cuda else torch.float32
         self._processor = AutoProcessor.from_pretrained(self.model_name)
         self._model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             self.model_name,
             torch_dtype=dtype,
-            device_map="auto" if self.device == "cuda" and torch.cuda.is_available() else None,
+            device_map="auto" if use_cuda else None,
             low_cpu_mem_usage=True,
         )
-        if not (self.device == "cuda" and torch.cuda.is_available()):
+        if not use_cuda:
             self._model.to("cpu")
         self._model.eval()
 
