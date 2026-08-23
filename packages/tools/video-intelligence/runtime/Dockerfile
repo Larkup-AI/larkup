@@ -71,5 +71,7 @@ ENV PYTHONUNBUFFERED=1 \
     LARKUP_VIDEO_REQUIRE_AUTH=false
 
 EXPOSE 8787
-HEALTHCHECK --interval=15s --timeout=5s --retries=10 CMD curl -fsS http://127.0.0.1:8787/v1/health || exit 1
+# RunPod overrides the command with app.runpod_worker. An HTTP healthcheck
+# here would then mark a healthy serverless worker unhealthy because no HTTP
+# process listens on 8787; RunPod performs worker readiness itself.
 CMD ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8787"]
