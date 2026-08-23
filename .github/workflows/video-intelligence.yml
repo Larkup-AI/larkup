@@ -114,7 +114,7 @@ jobs:
           image_uri="${REGISTRY}/${repository}:${IMAGE_TAG}"
           docker buildx build \
             --platform linux/amd64 \
-            --target runtime \
+            --target runpod \
             --push \
             --tag "${image_uri}" \
             packages/tools/video-intelligence/runtime
