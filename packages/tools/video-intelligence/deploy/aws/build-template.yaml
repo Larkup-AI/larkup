@@ -77,7 +77,7 @@ Resources:
                 - aws ecr get-login-password | docker login --username AWS --password-stdin "$REGISTRY"
             build:
               commands:
-                - docker build --target runtime --tag "$IMAGE_URI" .
+                - docker build --target runpod --tag "$IMAGE_URI" .
             post_build:
               commands:
                 - docker push "$IMAGE_URI"

@@ -9,14 +9,14 @@ from app.remote_source import extract_bounded_remote_clip
 
 
 class BoundedRunPodWorkerTests(unittest.TestCase):
-    def test_serverless_runtime_does_not_define_an_http_healthcheck(self) -> None:
+    def test_serverless_image_starts_worker_without_an_http_healthcheck(self) -> None:
         dockerfile = (
             Path(__file__).resolve().parents[1] / "Dockerfile"
         ).read_text(encoding="utf-8")
-        runtime_stage = dockerfile.split("FROM system AS runtime", maxsplit=1)[1]
+        runpod_stage = dockerfile.split("FROM runtime AS runpod", maxsplit=1)[1]
 
-        self.assertNotIn("HEALTHCHECK", runtime_stage)
-        self.assertIn('CMD ["python3", "-m", "uvicorn"', runtime_stage)
+        self.assertIn("HEALTHCHECK NONE", runpod_stage)
+        self.assertIn('CMD ["python3", "-m", "app.runpod_worker"]', runpod_stage)
 
     def test_seeks_signed_source_before_input_and_never_uses_http_downloader(self) -> None:
         with TemporaryDirectory() as temporary:
