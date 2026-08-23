@@ -16,6 +16,7 @@ import numpy as np
 
 from .ranges import normalized_important_ranges
 from .semantic_vision import SemanticVision
+from .timeline import rebase_result_timestamps
 
 
 ProgressCallback = Callable[[str, int, str], None]
@@ -480,6 +481,8 @@ def run_pipeline(
     disable_heavy_operators: bool = False,
     semantic_vision_enabled: bool = True,
     semantic_vision_model: str = "Qwen/Qwen2.5-VL-3B-Instruct",
+    timestamp_offset_secs: float = 0.0,
+    source_duration_secs: float | None = None,
 ) -> tuple[dict[str, Any], float]:
     progress("probe", 3, "Reading video metadata")
     probe = probe_video(path)
@@ -555,7 +558,7 @@ def run_pipeline(
     progress("synthesize", 93, "Building timestamped evidence")
     result = {
         "schemaVersion": 1,
-        "durationMs": round(probe.duration_seconds * 1_000),
+        "durationMs": round((source_duration_secs or probe.duration_seconds) * 1_000),
         "video": {
             "width": probe.width,
             "height": probe.height,
@@ -608,6 +611,8 @@ def run_pipeline(
             "instruction": "Answer using timestamped evidence first; use general knowledge only when clearly labeled as an inference.",
         },
     }
+    if timestamp_offset_secs:
+        rebase_result_timestamps(result, timestamp_offset_secs)
     inspected_ranges = normalized_important_ranges(brief, probe.duration_seconds)
     processed_seconds = (
         sum(end - start for start, end in inspected_ranges)
