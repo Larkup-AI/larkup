@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import math
 import os
 import secrets
 import urllib.error
@@ -163,6 +164,18 @@ def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, 
     except ClientError as error: raise ApiError(409, "upload has not completed") from error
     duration_seconds = float(source.get("durationSecs") or 0)
     if duration_seconds <= 0: raise ApiError(400, "source.durationSecs is required for cloud quota reservation")
+    # A bounded inspection sends its short billable duration here, while its
+    # timestamps remain on the original source timeline. Give the worker a
+    # horizon that includes every requested range without charging that full
+    # timeline duration against quota.
+    timeline_duration_seconds = duration_seconds
+    for candidate in brief.get("importantRanges") or []:
+        try:
+            candidate_end = float(candidate.get("endSecs"))
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if math.isfinite(candidate_end):
+            timeline_duration_seconds = max(timeline_duration_seconds, candidate_end)
     if brief.get("indexingMode") == "full-coverage" and not principal["entitlement"].get("allowFullCoverage", False): raise ApiError(403, "full-frame analysis is not enabled for this API key")
     estimate, (period, period_start, period_end) = max(0.01, duration_seconds / 60), billing_period()
     job_id, created_at = "job_" + secrets.token_hex(12), now_iso()
@@ -178,7 +191,16 @@ def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, 
     )
     boto3.client("dynamodb", region_name=REGION).transact_write_items(TransactItems=[{"Put": {"TableName": TABLE_NAME, "Item": job_item}}, {"Update": {"TableName": TABLE_NAME, "Key": {"pk": {"S": usage_key}, "sk": {"S": "USAGE"}}, "UpdateExpression": "SET periodStart = :start, periodEnd = :end, sourceMinutesLimit = :limit, availableSourceMinutes = if_not_exists(availableSourceMinutes, :available) - :estimate ADD reservedSourceMinutes :estimate, activeJobs :one", "ConditionExpression": "(attribute_not_exists(activeJobs) OR activeJobs < :concurrency)" + quota_condition, "ExpressionAttributeValues": {":start": {"S": period_start}, ":end": {"S": period_end}, ":limit": {"N": str(source_limit) if source_limit is not None else "-1"}, ":available": {"N": str(available)}, ":estimate": {"N": str(estimate)}, ":one": {"N": "1"}, ":concurrency": {"N": str(principal["entitlement"].get("maxConcurrentJobs", 1))}}}}])
     try:
-        remote = runpod("/run", {"input": {"sourceUrl": source_url, "brief": brief}})
+        remote = runpod(
+            "/run",
+            {
+                "input": {
+                    "sourceUrl": source_url,
+                    "sourceDurationSecs": timeline_duration_seconds,
+                    "brief": brief,
+                }
+            },
+        )
         runpod_job_id = str(remote.get("id") or "")
         if not runpod_job_id: raise RuntimeError("RunPod did not return a job ID")
         table.update_item(Key={"pk": f"JOB#{job_id}", "sk": "JOB"}, UpdateExpression="SET runpodJobId = :runpod", ExpressionAttributeValues={":runpod": runpod_job_id})
