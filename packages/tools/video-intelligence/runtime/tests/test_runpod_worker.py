@@ -35,6 +35,9 @@ class BoundedRunPodWorkerTests(unittest.TestCase):
             self.assertLess(command.index("-ss"), command.index("-i"))
             self.assertEqual(command[command.index("-ss") + 1], "600.000")
             self.assertEqual(command[command.index("-t") + 1], "30.000")
+            self.assertEqual(
+                command[command.index("-avoid_negative_ts") + 1], "make_zero"
+            )
             self.assertIn("h264_nvenc", command)
 
 

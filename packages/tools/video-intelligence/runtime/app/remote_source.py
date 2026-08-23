@@ -32,6 +32,11 @@ def extract_bounded_remote_clip(
         "0:v:0",
         "-map",
         "0:a?",
+        # A fast remote seek can decode from a preceding keyframe. Transcoding
+        # discards that pre-roll, but B-frame timestamps may remain negative.
+        # Normalize them so clip-relative zero is the requested source time.
+        "-avoid_negative_ts",
+        "make_zero",
         "-movflags",
         "+faststart",
         "-y",

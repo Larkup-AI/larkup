@@ -582,6 +582,8 @@ def run_pipeline(
         "semanticDiagnostics": {
             "attempted": bool(semantic_vision_enabled and semantic_frames),
             "error": operators.semantic_vision.last_error,
+            "executionDevice": operators.semantic_vision.execution_device,
+            "fallbackReason": operators.semantic_vision.fallback_reason,
         },
         "entities": [
             {"name": label, "kind": "object", "mentions": count}
