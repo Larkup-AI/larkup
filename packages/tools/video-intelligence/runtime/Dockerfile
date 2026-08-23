@@ -71,7 +71,12 @@ ENV PYTHONUNBUFFERED=1 \
     LARKUP_VIDEO_REQUIRE_AUTH=false
 
 EXPOSE 8787
-# RunPod overrides the command with app.runpod_worker. An HTTP healthcheck
-# here would then mark a healthy serverless worker unhealthy because no HTTP
-# process listens on 8787; RunPod performs worker readiness itself.
+HEALTHCHECK --interval=15s --timeout=5s --retries=10 CMD curl -fsS http://127.0.0.1:8787/v1/health || exit 1
 CMD ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8787"]
+
+FROM runtime AS runpod
+
+# This stage is the immutable serverless image. Do not rely on a template
+# command override: it must start the worker even when deployed as-is.
+HEALTHCHECK NONE
+CMD ["python3", "-m", "app.runpod_worker"]
