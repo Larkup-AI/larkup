@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hub.larkup.de/schemas/tool-manifest.v2.json",
+  "title": "Larkup Tool Manifest (v2)",
+  "description": "Adds manifestVersion/kind, a trustLevel, and a declared permissions block to the v1 manifest shape. Served by apps/marketplace's Hono app at /schemas/tool-manifest.v2.json — this file is kept only as an in-repo reference copy.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "description",
+    "category",
+    "version",
+    "pricing",
+    "icon",
+    "packageName",
+    "installSize",
+    "author",
+    "capabilities",
+    "manifestVersion",
+    "kind"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "longDescription": { "type": "string" },
+    "category": { "type": "string" },
+    "version": { "type": "string" },
+    "pricing": { "type": "string" },
+    "emoji": { "type": "string" },
+    "iconUrl": { "type": "string" },
+    "icon": { "type": "string" },
+    "packageName": { "type": "string" },
+    "installSize": { "type": "string" },
+    "systemDeps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "requiresSandbox": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the tool must execute in an isolated sandbox. Defaults to true; set false only for host-safe tools."
+    },
+    "author": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "downloads": { "type": "integer" },
+    "repositoryUrl": { "type": "string" },
+    "license": { "type": "string" },
+    "changelog": { "type": "string" },
+    "minLarkupVersion": { "type": "string" },
+    "updatedAt": { "type": "string" },
+    "comingSoon": { "type": "boolean" },
+    "manifestVersion": { "type": "string", "const": "2.0" },
+    "kind": { "enum": ["tool"] },
+    "trustLevel": {
+      "enum": ["sandboxed", "elevated"],
+      "description": "Declares whether the tool needs elevated host permissions beyond the sandbox default."
+    },
+    "permissions": {
+      "type": "object",
+      "description": "Capabilities the tool requires when trustLevel is \"elevated\".",
+      "properties": {
+        "fsRead": { "type": "boolean" },
+        "fsWrite": { "type": "boolean" },
+        "exec": { "type": "boolean" },
+        "httpAllow": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Allowlisted outbound hostnames."
+        }
+      }
+    },
+    "configSchema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "type"],
+        "properties": {
+          "key": { "type": "string" },
+          "label": { "type": "string" },
+          "type": { "enum": ["text", "password", "select", "toggle"] },
+          "defaultValue": { "type": "string" },
+          "help": { "type": "string" },
+          "required": { "type": "boolean" },
+          "group": { "type": "string", "description": "Settings-page grouping label for this field." },
+          "layout": { "enum": ["full", "half"], "description": "Column width hint on the settings page." },
+          "verify": {
+            "type": "boolean",
+            "description": "Whether the settings UI should offer a \"verify\" action for this field."
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["label", "value"],
+              "properties": {
+                "label": { "type": "string" },
+                "value": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

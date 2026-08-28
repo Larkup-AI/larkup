@@ -1,0 +1,4 @@
+interface:
+  display_name: "Connections & Channels"
+  short_description: "Build secure, extensible Agent channels"
+  default_prompt: "Use $connections-and-channels to add or change an Agent connection safely."

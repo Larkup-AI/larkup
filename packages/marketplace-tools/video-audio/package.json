@@ -1,0 +1,51 @@
+{
+  "name": "@larkup/tool-video-audio",
+  "version": "0.5.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "description": "Larkup marketplace tool: evidence-first video intelligence with adaptive attention, source rewind, and audio analysis.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "tool.manifest.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --outDir dist",
+    "type-check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@larkup/marketplace": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@larkup/marketplace": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2"
+  },
+  "devDependencies": {
+    "@larkup/marketplace": "workspace:*",
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Larkup-AI/larkup",
+    "directory": "packages/marketplace-tools/video-audio"
+  }
+}

@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Scoped remote container builder for Larkup Video Intelligence.
+
+Parameters:
+  RepositoryName:
+    Type: String
+    Default: larkup-video-intelligence
+  PublicRegistryAlias:
+    Type: String
+    Description: Public Amazon ECR registry alias that RunPod can pull without credentials.
+  PublicRepositoryName:
+    Type: String
+    Default: larkup-video-intelligence
+  ImageTag:
+    Type: String
+    Default: 0.1.0
+
+Resources:
+  BuildSourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteBuildSources
+            Status: Enabled
+            ExpirationInDays: 7
+
+  BuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: codebuild.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BuildAndPushOneRepository
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/larkup-video-intelligence*
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub ${BuildSourceBucket.Arn}/*
+              - Effect: Allow
+                Action: ecr-public:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr-public:BatchCheckLayerAvailability
+                  - ecr-public:CompleteLayerUpload
+                  - ecr-public:InitiateLayerUpload
+                  - ecr-public:PutImage
+                  - ecr-public:UploadLayerPart
+                Resource: !Sub arn:${AWS::Partition}:ecr-public::${AWS::AccountId}:repository/${PublicRepositoryName}
+
+  ContainerBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: larkup-video-intelligence
+      ServiceRole: !GetAtt BuildRole.Arn
+      TimeoutInMinutes: 90
+      QueuedTimeoutInMinutes: 30
+      Source:
+        Type: S3
+        Location: !Sub ${BuildSourceBucket}/runtime.zip
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+            build:
+              commands:
+                - docker build --target runpod --tag "$IMAGE_URI" .
+            post_build:
+              commands:
+                - docker push "$IMAGE_URI"
+          artifacts:
+            files: []
+      Artifacts: { Type: NO_ARTIFACTS }
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_LARGE
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: REGISTRY
+            Value: public.ecr.aws
+          - Name: IMAGE_URI
+            Value: !Sub public.ecr.aws/${PublicRegistryAlias}/${PublicRepositoryName}:${ImageTag}
+      Cache:
+        Type: LOCAL
+        Modes: [LOCAL_DOCKER_LAYER_CACHE]
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: /aws/codebuild/larkup-video-intelligence
+          StreamName: runtime
+
+Outputs:
+  BuildSourceBucketName:
+    Value: !Ref BuildSourceBucket
+  ProjectName:
+    Value: !Ref ContainerBuild
+  ImageUri:
+    Value: !Sub public.ecr.aws/${PublicRegistryAlias}/${PublicRepositoryName}:${ImageTag}

@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "larkup-video-intelligence-runtime"
+version = "0.1.0"
+description = "Portable FastAPI runtime for Larkup Video Intelligence"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+license = "Apache-2.0"
+authors = [{ name = "Larkup" }]
+dependencies = [
+  "boto3==1.40.1",
+  "fastapi==0.116.1",
+  "numpy==1.26.4",
+  "opencv-python-headless==4.11.0.86",
+  "pydantic==2.11.7",
+  "python-multipart==0.0.20",
+  "requests==2.32.4",
+  "scenedetect==0.6.5",
+  "uvicorn[standard]==0.35.0",
+]
+
+[project.optional-dependencies]
+cpu = [
+  "faster-whisper==1.1.1",
+  "onnxruntime==1.22.0",
+  "pyclipper==1.4.0",
+  "rapidocr-onnxruntime==1.4.4",
+  "Shapely==2.1.2",
+  "six==1.17.0",
+]
+gpu = [
+  "faster-whisper==1.1.1",
+  "onnxruntime-gpu==1.22.0",
+  "paddleocr==3.0.3",
+  "rapidocr-onnxruntime==1.4.4",
+  "runpod==1.7.10",
+]
+test = ["httpx==0.28.1"]
+
+[project.scripts]
+larkup-video-runtime = "app.__main__:main"
+larkup-video-runtime-worker = "app.worker:main"
+
+[project.urls]
+Repository = "https://github.com/Larkup-AI/larkup/tree/main/packages/marketplace-tools/video-intelligence"
+
+[tool.setuptools]
+packages = ["app", "app.api", "app.db", "app.services", "app.utils"]
+
+[tool.uv]
+package = true

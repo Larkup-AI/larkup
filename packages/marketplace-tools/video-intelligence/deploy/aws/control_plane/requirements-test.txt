@@ -1,0 +1,7 @@
+# Test-only dependencies for handler.py's unit tests. boto3/botocore ship
+# with the Lambda runtime itself in production, so they are not part of any
+# deployed package -- only needed here, and in CI, to run the tests.
+boto3==1.40.1
+botocore==1.40.1
+moto[dynamodb,s3]==5.0.24
+pytest==8.3.4

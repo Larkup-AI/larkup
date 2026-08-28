@@ -1,0 +1,287 @@
+{
+  "$schema": "https://hub.larkup.de/schemas/tool-manifest.v3.json",
+  "manifestVersion": "3.0",
+  "kind": "tool",
+  "id": "video-intelligence",
+  "name": "Video Intelligence",
+  "description": "Help your AI understand your videos, so you can ask questions and get answers from the right moments.",
+  "longDescription": "Turn videos into knowledge your AI can understand. It listens to what is said, reads what appears on screen, and helps you find the moments that matter.",
+  "category": "media",
+  "version": "0.1.0",
+  "pricing": "free",
+  "emoji": "🎥",
+  "icon": "Film",
+  "packageName": "@larkup/tool-video-intelligence",
+  "installSize": "~120 KB client; ~8 GB optional runtime image",
+  "requiresSandbox": false,
+  "author": "Larkup",
+  "capabilities": [
+    "video-indexing",
+    "video-indexing-brief",
+    "full-frame-coverage",
+    "cloud-video-runtime",
+    "timestamped-transcription",
+    "ocr",
+    "object-detection",
+    "anonymous-object-tracking",
+    "usage-metering"
+  ],
+  "entrypoints": {
+    "server": ".",
+    "agent": ".",
+    "ui": "./ui"
+  },
+  "runtime": {
+    "protocolVersion": "1",
+    "defaultMode": "managed-cloud",
+    "healthPath": "/v1/health",
+    "modes": [
+      {
+        "id": "managed-cloud",
+        "label": "Larkup Cloud",
+        "description": "Index with managed private GPU capacity and your Larkup Cloud allowance.",
+        "requiresGpu": true
+      },
+      {
+        "id": "local-docker",
+        "label": "Local Docker runtime",
+        "icon": "/docker.png",
+        "description": "Run the Video Intelligence image on this computer or your private network.",
+        "endpointConfigKey": "localRuntimeUrl",
+        "credentialConfigKey": "localRuntimeApiKey",
+        "image": "ghcr.io/larkup-ai/video-intelligence:0.1.0",
+        "composeFile": "compose.yaml",
+        "setupNotice": "The optional runtime image is about 8 GB and Docker Desktop must be installed. The service binds to the configured URL; protect it before sharing it on your network."
+      },
+      {
+        "id": "custom-remote",
+        "label": "Custom runtime",
+        "description": "Connect a compatible Video Intelligence deployment you operate.",
+        "endpointConfigKey": "customRuntimeUrl",
+        "credentialConfigKey": "customRuntimeApiKey",
+        "requiresGpu": true
+      }
+    ]
+  },
+  "billing": {
+    "model": "hybrid",
+    "entitlementVersion": "1",
+    "meters": [
+      {
+        "id": "source-minute",
+        "unit": "minute",
+        "description": "Minutes of source media indexed."
+      },
+      {
+        "id": "deep-inspection-minute",
+        "unit": "minute",
+        "description": "Minutes decoded with deep or full coverage."
+      },
+      { "id": "gpu-second", "unit": "second", "description": "GPU worker time used." },
+      { "id": "ocr-frame", "unit": "frame", "description": "Frames sent through OCR." }
+    ]
+  },
+  "usage": {
+    "label": "Usage this month",
+    "visibleWhenRuntimeMode": ["managed-cloud"],
+    "fields": [
+      { "key": "sourceMinutesUsed", "label": "Used", "format": "minutes" },
+      { "key": "sourceMinutesLimit", "label": "Included", "format": "minutes" },
+      { "key": "activeJobs", "label": "Active jobs", "format": "number" }
+    ]
+  },
+  "ui": {
+    "isolation": "sandboxed-iframe",
+    "surfaces": [
+      {
+        "id": "video-indexing-brief",
+        "slot": "data-indexing",
+        "title": "Guide video indexing",
+        "entrypoint": "./ui"
+      },
+      {
+        "id": "video-evidence-result",
+        "slot": "chat-result",
+        "title": "Video evidence",
+        "entrypoint": "./ui"
+      }
+    ]
+  },
+  "configSchema": [
+    {
+      "key": "runtimeMode",
+      "label": "Runtime",
+      "type": "select",
+      "group": "Runtime",
+      "defaultValue": "managed-cloud",
+      "help": "Choose the managed Larkup Cloud service, a local Docker runtime, or your own compatible deployment.",
+      "options": [
+        {
+          "label": "Larkup Cloud",
+          "value": "managed-cloud",
+          "icon": "/logo.png",
+          "description": "Managed GPU capacity and automatic device access."
+        },
+        {
+          "label": "Local Docker runtime",
+          "value": "local-docker",
+          "icon": "/docker.png",
+          "description": "Run the optional image on this computer."
+        },
+        {
+          "label": "Custom runtime",
+          "value": "custom-remote",
+          "icon": "/icons/cloudflare.png",
+          "description": "Use your compatible deployment URL and key."
+        }
+      ]
+    },
+    {
+      "key": "localRuntimeUrl",
+      "label": "Local runtime URL",
+      "type": "text",
+      "group": "Local runtime",
+      "defaultValue": "http://127.0.0.1:8787",
+      "help": "Use this machine's LAN address instead of 127.0.0.1 when another Larkup user should connect to it.",
+      "verification": {
+        "endpoint": "/api/tools/video-intelligence/verify",
+        "method": "POST",
+        "fields": {
+          "localRuntimeUrl": "localRuntimeUrl",
+          "localRuntimeApiKey": "localRuntimeApiKey",
+          "runtimeMode": "runtimeMode"
+        }
+      },
+      "visibleWhen": { "field": "runtimeMode", "equals": "local-docker" }
+    },
+    {
+      "key": "localRuntimeApiKey",
+      "label": "Shared local API key",
+      "type": "password",
+      "group": "Local runtime",
+      "help": "Optional bearer key to use when your local runtime authentication is enabled. Share it only with trusted users on your private network.",
+      "visibleWhen": { "field": "runtimeMode", "equals": "local-docker" }
+    },
+    {
+      "key": "customRuntimeUrl",
+      "label": "Custom runtime URL",
+      "type": "text",
+      "group": "Custom runtime",
+      "required": true,
+      "help": "HTTPS URL of a compatible Video Intelligence /v1 runtime.",
+      "verification": {
+        "endpoint": "/api/tools/video-intelligence/verify",
+        "method": "POST",
+        "fields": {
+          "customRuntimeUrl": "customRuntimeUrl",
+          "customRuntimeApiKey": "customRuntimeApiKey",
+          "runtimeMode": "runtimeMode"
+        }
+      },
+      "visibleWhen": { "field": "runtimeMode", "equals": "custom-remote" }
+    },
+    {
+      "key": "customRuntimeApiKey",
+      "label": "Custom runtime API key",
+      "type": "password",
+      "group": "Custom runtime",
+      "required": true,
+      "visibleWhen": { "field": "runtimeMode", "equals": "custom-remote" }
+    },
+    {
+      "key": "audioProvider",
+      "label": "Audio provider",
+      "type": "select",
+      "group": "Audio",
+      "defaultValue": "larkup-cloud",
+      "help": "Select the speech service used for the managed Larkup Cloud audio track.",
+      "visibleWhen": { "field": "runtimeMode", "equals": "managed-cloud" },
+      "options": [
+        {
+          "label": "Larkup Cloud (recommended)",
+          "value": "larkup-cloud",
+          "icon": "/logo.png",
+          "description": "Managed multilingual transcription on the video GPU pipeline."
+        },
+        {
+          "label": "OpenAI",
+          "value": "openai",
+          "icon": "/icons/openai.svg",
+          "description": "Use your OpenAI transcription allowance."
+        },
+        {
+          "label": "Groq",
+          "value": "groq",
+          "icon": "https://models.dev/logos/groq.svg",
+          "description": "Fast hosted Whisper inference."
+        },
+        {
+          "label": "Deepgram",
+          "value": "deepgram",
+          "icon": "/icons/deepgram.png",
+          "description": "Speech-to-text with language features."
+        },
+        {
+          "label": "ElevenLabs",
+          "value": "elevenlabs",
+          "icon": "/icons/elevenlabs.png",
+          "description": "Use your ElevenLabs speech-to-text account."
+        }
+      ]
+    },
+    {
+      "key": "audioApiKey",
+      "label": "Audio provider API key",
+      "type": "password",
+      "group": "Audio",
+      "help": "Only required when you select your own provider. It stays separate from the managed Larkup Cloud connection.",
+      "verification": {
+        "endpoint": "/api/config/verify",
+        "method": "POST",
+        "fields": { "audioProvider": "audioProvider", "audioApiKey": "audioApiKey" }
+      },
+      "visibleWhen": {
+        "field": "audioProvider",
+        "equals": ["openai", "groq", "deepgram", "elevenlabs"]
+      }
+    },
+    {
+      "key": "defaultIndexingMode",
+      "label": "Default indexing mode",
+      "type": "select",
+      "group": "Indexing",
+      "defaultValue": "balanced",
+      "options": [
+        { "label": "Fast", "value": "fast" },
+        { "label": "Balanced", "value": "balanced" },
+        { "label": "Deep", "value": "deep" },
+        { "label": "Full coverage", "value": "full-coverage" }
+      ]
+    },
+    {
+      "key": "cloudAccessKey",
+      "label": "Managed cloud access key",
+      "type": "password",
+      "group": "Managed cloud connection",
+      "help": "Provisioned automatically on first use; never entered or shown to a client.",
+      "serverManaged": true
+    },
+    {
+      "key": "cloudInstallationId",
+      "label": "Managed cloud installation ID",
+      "type": "text",
+      "group": "Managed cloud connection",
+      "help": "Provisioned automatically on first use; never entered or shown to a client.",
+      "serverManaged": true
+    }
+  ],
+  "tags": ["video", "ocr", "tracking", "cloud", "gpu", "private", "gdpr"],
+  "downloads": 0,
+  "repositoryUrl": "https://github.com/Larkup-AI/larkup",
+  "license": "Apache-2.0",
+  "updatedAt": "2026-08-20",
+  "trustLevel": "elevated",
+  "permissions": {
+    "httpAllow": ["video.larkup.de"]
+  }
+}
