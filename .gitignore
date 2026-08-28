@@ -47,6 +47,12 @@ apps/web/demo
 apps/web/public/widget/
 apps/local-chat-connection-larkup
 local-chat-connection-larkup
+# Private Enterprise control plane. It is deployed with Vercel CLI, never Git.
+apps/ee/
+# Private video-intelligence cloud deploy: AWS control plane (Lambda/API
+# Gateway/DynamoDB) and GPU provider dispatch/worker entrypoints. Deployed
+# directly via sam/docker, never Git -- see deploy/README.md.
+packages/tools/video-intelligence/deploy/
 # ── Desktop Binaries ─────────────────────────────
 apps/desktop/src-tauri/binaries/
 apps/desktop/src-tauri/target/
@@ -68,3 +74,8 @@ apps/api*.log
 
 notes.txt
 plan.md
+test.py
+test.ts
+widget-demo
+.vercel
+copy.sh
