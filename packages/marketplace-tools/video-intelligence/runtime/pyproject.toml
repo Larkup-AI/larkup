@@ -12,6 +12,7 @@ license = "Apache-2.0"
 authors = [{ name = "Larkup" }]
 dependencies = [
   "boto3==1.40.1",
+  "cryptography>=46.0.7",
   "fastapi>=0.115.6",
   "numpy==1.26.4",
   "opencv-python-headless==4.11.0.86",
@@ -37,7 +38,7 @@ gpu = [
   "onnxruntime-gpu==1.22.0",
   "paddleocr==3.0.3",
   "rapidocr-onnxruntime==1.4.4",
-  "runpod==1.7.10",
+  "runpod>=1.7.14",
 ]
 test = ["httpx==0.28.1"]
 
