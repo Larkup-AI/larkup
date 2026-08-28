@@ -6,7 +6,7 @@ settings:
 
 overrides:
   typescript: ^6.0.3
-  undici: ^8.10.0
+  undici: ^6.28.0
   body-parser: ^2.3.0
   esbuild: ^0.25.0
   minimatch: ^9.0.4
@@ -533,6 +533,18 @@ importers:
         specifier: ^4.1.10
         version: 4.1.11(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(vite@8.2.2(@types/node@26.2.0)(esbuild@0.25.12)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
 
+  packages/connections:
+    devDependencies:
+      '@types/node':
+        specifier: ^26
+        version: 26.2.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.11(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(vite@8.2.2(@types/node@26.2.0)(esbuild@0.25.12)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
+
   packages/core:
     dependencies:
       '@ai-sdk/cohere':
@@ -663,8 +675,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       undici:
-        specifier: ^8.10.0
-        version: 8.10.0
+        specifier: ^6.28.0
+        version: 6.28.0
     devDependencies:
       '@types/node':
         specifier: ^26.1.2
@@ -6460,9 +6472,9 @@ packages:
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
-  undici@8.10.0:
-    resolution: {integrity: sha512-HvltHd7avK13QIw/oLe4qoOLyoVSoafqJ2jYOrtMRBkbYT31eiBQ8O0ehRKZiEZCMEyLFQNIADpgCWC5fALvYQ==}
-    engines: {node: '>=22.19.0'}
+  undici@6.28.0:
+    resolution: {integrity: sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA==}
+    engines: {node: '>=18.17'}
 
   unicorn-magic@0.3.0:
     resolution: {integrity: sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==}
@@ -6888,7 +6900,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
-      undici: 8.10.0
+      undici: 6.28.0
       zod: 4.4.3
 
   '@ai-sdk/provider-utils@5.0.29(zod@4.4.3)':
@@ -6897,7 +6909,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
-      undici: 8.10.0
+      undici: 6.28.0
       zod: 4.4.3
 
   '@ai-sdk/provider@4.0.7':
@@ -9082,7 +9094,7 @@ snapshots:
       is-buffer: 2.0.5
       is-node-process: 1.2.0
       throttleit: 2.1.0
-      undici: 8.10.0
+      undici: 6.28.0
 
   '@vercel/build-utils@14.1.1':
     dependencies:
@@ -9297,7 +9309,7 @@ snapshots:
       ts-morph: 12.0.0
       tsx: 4.21.0
       typescript: 6.0.3
-      undici: 8.10.0
+      undici: 6.28.0
     transitivePeerDependencies:
       - encoding
       - rollup
@@ -9369,7 +9381,7 @@ snapshots:
       ms: 2.1.3
       picocolors: 1.1.1
       tar-stream: 3.1.7
-      undici: 8.10.0
+      undici: 6.28.0
       xdg-app-paths: 5.1.0
       zod: 4.4.3
     transitivePeerDependencies:
@@ -11821,7 +11833,7 @@ snapshots:
       tailwind-merge: 3.6.0
       ts-morph: 26.0.0
       tsconfig-paths: 4.2.0
-      undici: 8.10.0
+      undici: 6.28.0
       validate-npm-package-name: 7.0.2
       zod: 3.25.76
       zod-to-json-schema: 3.25.2(zod@3.25.76)
@@ -12271,7 +12283,7 @@ snapshots:
 
   undici-types@8.3.0: {}
 
-  undici@8.10.0: {}
+  undici@6.28.0: {}
 
   unicorn-magic@0.3.0: {}
 
@@ -12361,7 +12373,7 @@ snapshots:
       luxon: 3.7.2
       sandbox: 3.4.0
       smol-toml: 1.8.0
-      undici: 8.10.0
+      undici: 6.28.0
       uuid: 14.0.1
       zod: 4.1.11
     optionalDependencies:
