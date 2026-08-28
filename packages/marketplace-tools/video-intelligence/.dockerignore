@@ -1,0 +1,25 @@
+node_modules
+dist
+.turbo
+.pytest_cache
+src
+test
+scripts
+deploy/aws
+# The runpod/cloud-worker Dockerfile stages COPY these specific worker
+# entrypoints (and the helpers they import) into the image at build time --
+# see runtime/Dockerfile. Everything else here (the provider clients, the
+# control-plane dispatch logic, tests) has no reason to be in the build
+# context and stays excluded so an internal vendor choice never leaks into
+# a published image.
+deploy/gpu_providers
+!deploy/gpu_providers/runpod_worker_entrypoint.py
+!deploy/gpu_providers/cloud_worker_entrypoint.py
+!deploy/gpu_providers/remote_source.py
+!deploy/gpu_providers/progress.py
+runtime/data
+runtime/models
+runtime/tests
+.env
+.env.*
+*.log

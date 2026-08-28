@@ -1,0 +1,49 @@
+services:
+  video-intelligence:
+    build:
+      context: .
+      dockerfile: runtime/Dockerfile
+      target: cpu
+    image: ${LARKUP_VIDEO_IMAGE:-ghcr.io/larkup-ai/video-intelligence:0.1.0}
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - '${LARKUP_VIDEO_PORT:-8787}:8787'
+    # .env is the single source of runtime and provider configuration. The
+    # explicit values here establish safe container defaults; all other keys
+    # from .env are passed through by env_file.
+    environment:
+      LARKUP_VIDEO_DATA_DIR: /data
+      LARKUP_VIDEO_MODEL_DIR: /models
+      LARKUP_VIDEO_REQUIRE_AUTH: ${LARKUP_VIDEO_REQUIRE_AUTH:-false}
+      LARKUP_VIDEO_SHARED_API_KEY: ${LARKUP_VIDEO_SHARED_API_KEY:-}
+      LARKUP_VIDEO_ADMIN_TOKEN: ${LARKUP_VIDEO_ADMIN_TOKEN:-}
+      LARKUP_VIDEO_WORKERS: ${LARKUP_VIDEO_WORKERS:-1}
+      LARKUP_VIDEO_DEVICE: ${LARKUP_VIDEO_DEVICE:-auto}
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+      LARKUP_VIDEO_SEMANTIC_VISION_MODEL: ${LARKUP_VIDEO_SEMANTIC_VISION_MODEL:-alibaba/qwen3.8-27b}
+      LARKUP_VIDEO_REASONING_VISION_MODEL: ${LARKUP_VIDEO_REASONING_VISION_MODEL:-alibaba/qwen3-vl-235b-a22b-instruct}
+      LARKUP_VIDEO_TRANSCRIPTION_PROVIDER: ${LARKUP_VIDEO_TRANSCRIPTION_PROVIDER:-whisper}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
+      LARKUP_VIDEO_EMBEDDING_PROVIDER: ${LARKUP_VIDEO_EMBEDDING_PROVIDER:-gateway-gemini-embedding-2}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+    volumes:
+      - video-intelligence-data:/data
+      - video-intelligence-models:/models
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python3',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/v1/health', timeout=4)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  video-intelligence-data:
+  video-intelligence-models:

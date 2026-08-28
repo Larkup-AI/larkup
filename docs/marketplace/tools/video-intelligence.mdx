@@ -1,0 +1,47 @@
+---
+title: 'Video Intelligence'
+description: 'Index video into timestamped evidence for accurate chat answers.'
+icon: 'video'
+---
+
+Video Intelligence turns a video into searchable evidence. It transcribes speech, reads visible text, detects objects and anonymous tracks, and preserves timestamps so chat can point back to the relevant moment.
+
+## Install the tool
+
+Open **Settings → Marketplace**, install **Video Intelligence (New)**, then open **Data → Media → Video**. Before indexing, the guide can collect an optional goal, known entities, and questions you expect to ask.
+
+## What the index contains
+
+- Timestamped multilingual speech from faster-whisper.
+- Visible text from slides, code, scoreboards, signs, and captions.
+- Objects and anonymous motion tracks detected across the video.
+- Coverage metadata and an answering guide used to ground chat responses.
+
+Balanced mode is the normal choice. Use Fast for speech-heavy video, Deep for dense visual changes, and Analyze every frame only when a short-lived detail is important and you are authorized to process the complete footage.
+
+## Choose where it runs
+
+<Tabs>
+  <Tab title="Local Docker">
+    Use this when you want processing to remain on your machine. Install Docker, select **Local Docker** in the tool settings, and upload a video from Media. The runtime starts on `127.0.0.1` and the source copy inside the runtime is deleted after successful indexing by default.
+
+    An NVIDIA GPU can accelerate the local runtime, but it is optional. The CPU runtime still performs speech, OCR, object detection, and evidence generation.
+
+  </Tab>
+  <Tab title="Larkup Cloud">
+    Use this when you want Larkup to run the video job for you. Select **Larkup Cloud** in the tool settings and connect your Larkup Cloud access. The app uploads the source securely, tracks progress in Media, and returns the same timestamped evidence contract as Local Docker.
+
+    The tool does not expose the underlying GPU provider to your browser. You can ask chat questions while preserving the video timestamps in each answer.
+
+  </Tab>
+  <Tab title="Custom deployment">
+    Use this when your team operates its own compatible runtime. Deploy the Video Intelligence Docker runtime behind your authentication boundary, then select **Custom endpoint** and enter its URL and API key in the tool settings.
+
+    The custom runtime must implement the same `/v1/uploads`, `/v1/jobs`, and `/v1/jobs/{id}` protocol, so the Media UI and evidence results work without a separate integration.
+
+  </Tab>
+</Tabs>
+
+## Ask questions in chat
+
+After indexing, ask direct or indirect questions such as “What changed near the end?”, “Which steps were shown before the error?”, or “Summarize the argument and the evidence on screen.” Larkup retrieves the timestamped video evidence first. If an answer uses general knowledge beyond the video, it labels that part as an inference.

@@ -1,0 +1,14 @@
+fastapi==0.116.1
+faster-whisper==1.1.1
+numpy==1.26.4
+onnxruntime==1.22.0
+opencv-python-headless==4.11.0.86
+pyclipper==1.4.0
+pydantic==2.11.7
+python-multipart==0.0.20
+PyYAML==6.0.3
+requests==2.32.4
+scenedetect==0.6.5
+Shapely==2.1.2
+six==1.17.0
+uvicorn[standard]==0.35.0

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Larkup Proxy">
+  <rect width="64" height="64" rx="16" fill="#111827"/>
+  <path fill="#ffffff" d="M18 16h8v24h20v8H18z"/>
+  <path fill="#a78bfa" d="M30 16h16v8H30zM30 28h16v8H30z"/>
+</svg>

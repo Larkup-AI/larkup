@@ -1,0 +1,24 @@
+{
+  "name": "@larkup/connections",
+  "version": "0.1.0",
+  "description": "Provider adapters and shared inbound message dispatch for Larkup connections",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./dispatch": "./src/dispatch.ts",
+    "./registry": "./src/registry.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

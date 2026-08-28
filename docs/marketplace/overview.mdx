@@ -1,0 +1,46 @@
+---
+title: 'Marketplace'
+description: 'Install, run, and share optional Larkup tools.'
+icon: 'store'
+---
+
+<img
+  src="/images/marketplace-hero.png"
+  alt="Connected tools around a central Larkup marketplace hub"
+  className="w-full rounded-xl border"
+/>
+
+Larkup Marketplace is where optional capabilities live. A tool can add an indexing workflow, a chat result view, a local runtime, or a compatible cloud service without making the core application heavier for everyone else.
+
+## How tools work
+
+Every tool has a small installable package and a human-readable manifest. The manifest describes what the tool contributes, what permissions it needs, and where it can run. Heavy software such as OCR engines, video codecs, and GPU models stays inside the tool's own Docker runtime.
+
+<CardGroup cols={3}>
+  <Card title="Discover" icon="compass" href="/marketplace/installing-tools">
+    Find a tool in the Marketplace and review what it does before installing it.
+  </Card>
+  <Card title="Install" icon="download" href="/marketplace/installing-tools">
+    Install tools into an isolated directory so your project dependencies stay clean.
+  </Card>
+  <Card title="Run anywhere" icon="server">
+    A tool can run locally, through Larkup Cloud, or through a compatible endpoint you operate.
+  </Card>
+</CardGroup>
+
+## Built for sharing
+
+Tool authors can ship a manifest, documentation, versioned package, and runtime configuration together. Installing a shared tool never transfers the author's provider credentials. Each installation connects with its own local runtime, Larkup Cloud account, or custom endpoint.
+
+<Note>
+  A tool is removable. Uninstalling it removes its isolated installation and disables its optional
+  surfaces without changing your normal Larkup data.
+</Note>
+
+## Available tools
+
+<CardGroup cols={2}>
+  <Card title="Video Intelligence" icon="video" href="/marketplace/tools/video-intelligence">
+    Turn video into timestamped speech, OCR, object, and scene evidence for chat.
+  </Card>
+</CardGroup>

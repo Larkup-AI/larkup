@@ -1,0 +1,5 @@
+# Pinned to a version whose Image/Function/FunctionCall API surface has
+# been verified directly against a real local install (see
+# modal_worker_entrypoint.py and modal_provider.py's docstrings).
+modal==1.5.4
+requests==2.32.4

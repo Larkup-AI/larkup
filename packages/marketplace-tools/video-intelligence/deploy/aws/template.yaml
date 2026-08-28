@@ -1,0 +1,324 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Larkup Video Intelligence control plane with hidden RunPod Secure Cloud GPU workers.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedPattern: '[a-z0-9-]+'
+  RunpodEndpointId:
+    Type: String
+    Default: ''
+    Description: Queue-based RunPod Serverless endpoint ID in an EU Secure Cloud data center. Optional when GpuProvider is modal (the default); required to actually dispatch jobs when GpuProvider is runpod.
+  RunpodApiKey:
+    Type: String
+    NoEcho: true
+    # AWS::SecretsManager::Secret's SecretString rejects an empty string, so
+    # this needs a non-empty placeholder, not ''. Not a real credential.
+    Default: 'not-configured'
+    Description: RunPod API key used only by the Larkup Cloud control plane. Optional when GpuProvider is modal (the default).
+  ModalTokenId:
+    Type: String
+    NoEcho: true
+    Description: Modal token ID used only by the Larkup Cloud control plane.
+  ModalTokenSecret:
+    Type: String
+    NoEcho: true
+    Description: Modal token secret used only by the Larkup Cloud control plane.
+  GpuProvider:
+    Type: String
+    Default: modal
+    AllowedValues: [modal, runpod]
+    Description: Which GPU provider handles new jobs; see deploy/gpu_providers.
+  AllowedOrigin:
+    Type: String
+    Default: https://app.larkup.de
+  ProcessingEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+  AutoProvisioningEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable automatic, device-scoped pilot access keys. Enable only with a deliberately small allowance.
+  AutoProvisionedSourceMinutes:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 120
+    Description: Monthly minutes included with each automatically provisioned device key.
+  RequestsPerMinute:
+    Type: Number
+    Default: 120
+    MinValue: 30
+    MaxValue: 600
+  TestingDeviceHashes:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Comma-separated SHA-256 device hashes granted temporary owner-only test access. Leave empty in normal operation.
+  WebhookSigningSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Optional. Signs outbound job-completion webhooks (X-Larkup-Signature) so a receiver can verify delivery. Leave empty to disable signing.
+  StaleJobTimeoutHours:
+    Type: Number
+    Default: 6
+    MinValue: 1
+    MaxValue: 24
+    Description: A queued/running job older than this is force-failed by the periodic reconcile sweep, releasing its reserved quota and any owned source object.
+
+Resources:
+  DataKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub Larkup video ${Environment} source and evidence encryption
+      EnableKeyRotation: true
+      PendingWindowInDays: 14
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AccountAdministration
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: '*'
+
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !GetAtt DataKey.Arn
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      # `canonical/` (the web app's durable canonical video store, written by
+      # S3StorageProvider) deliberately has NO expiration rule here: its
+      # retention is governed only by the web app's own retainSourceHours
+      # deletion, never a bucket-wide lifecycle policy, so a future
+      # watch_original call always finds its source. `sources/`/`results/`
+      # are this stack's own short-lived per-job processing scratch space.
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteUnretainedSources
+            Prefix: sources/
+            Status: Enabled
+            ExpirationInDays: 1
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+          - Id: DeleteEvidence
+            Prefix: results/
+            Status: Enabled
+            ExpirationInDays: 1
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+          - Id: ExpireOldCanonicalVersions
+            Prefix: canonical/
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Ref AllowedOrigin]
+            AllowedMethods: [PUT, GET]
+            AllowedHeaders: ['*']
+            ExposedHeaders: [ETag]
+            MaxAge: 300
+
+  AdminSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub Admin token for Larkup Video Intelligence ${Environment} access codes
+      KmsKeyId: !GetAtt DataKey.Arn
+      GenerateSecretString:
+        PasswordLength: 48
+        ExcludePunctuation: true
+
+  DataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt DataBucket.Arn
+              - !Sub ${DataBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+  StateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !GetAtt DataKey.Arn
+      TimeToLiveSpecification:
+        AttributeName: expiresAtEpoch
+        Enabled: true
+
+  RunpodSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub RunPod API key for Larkup Video Intelligence ${Environment}
+      KmsKeyId: !GetAtt DataKey.Arn
+      SecretString: !Ref RunpodApiKey
+
+  ModalSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub Modal token for Larkup Video Intelligence ${Environment}
+      KmsKeyId: !GetAtt DataKey.Arn
+      SecretString: !Sub '{"tokenId":"${ModalTokenId}","tokenSecret":"${ModalTokenSecret}"}'
+
+  ControlPlaneRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: VideoControlPlane
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  [
+                    dynamodb:GetItem,
+                    dynamodb:PutItem,
+                    dynamodb:UpdateItem,
+                    dynamodb:TransactWriteItems,
+                    dynamodb:Scan,
+                  ]
+                Resource: !GetAtt StateTable.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub ${DataBucket.Arn}/*
+              - Effect: Allow
+                Action: [kms:Decrypt, kms:Encrypt, kms:GenerateDataKey]
+                Resource: !GetAtt DataKey.Arn
+              - Effect: Allow
+                Action: s3:DeleteObject
+                Resource: !Sub ${DataBucket.Arn}/*
+
+  ApiAccessLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+
+  CloudApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins: [!Ref AllowedOrigin]
+        AllowMethods: [GET, POST, DELETE, OPTIONS]
+        AllowHeaders: [authorization, content-type, x-larkup-admin-token]
+        MaxAge: 300
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 100
+        ThrottlingRateLimit: 50
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogs.Arn
+        Format: '{"requestId":"$context.requestId","status":"$context.status","route":"$context.routeKey","latency":"$context.responseLatency"}'
+
+  ControlPlane:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      CodeUri: control_plane/
+      Handler: handler.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt ControlPlaneRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref StateTable
+          BUCKET_NAME: !Ref DataBucket
+          LARKUP_VIDEO_GPU_PROVIDER: !Ref GpuProvider
+          RUNPOD_ENDPOINT_ID: !Ref RunpodEndpointId
+          RUNPOD_API_KEY: !Sub '{{resolve:secretsmanager:${RunpodSecret}:SecretString}}'
+          MODAL_TOKEN_ID: !Sub '{{resolve:secretsmanager:${ModalSecret}:SecretString:tokenId}}'
+          MODAL_API_KEY: !Sub '{{resolve:secretsmanager:${ModalSecret}:SecretString:tokenSecret}}'
+          PROCESSING_ENABLED: !Ref ProcessingEnabled
+          AUTO_PROVISIONING_ENABLED: !Ref AutoProvisioningEnabled
+          AUTO_PROVISIONED_SOURCE_MINUTES: !Ref AutoProvisionedSourceMinutes
+          REQUESTS_PER_MINUTE: !Ref RequestsPerMinute
+          TESTING_DEVICE_HASHES: !Ref TestingDeviceHashes
+          ADMIN_TOKEN: !Sub '{{resolve:secretsmanager:${AdminSecret}:SecretString}}'
+          WEBHOOK_SIGNING_SECRET: !Ref WebhookSigningSecret
+          STALE_JOB_TIMEOUT_HOURS: !Ref StaleJobTimeoutHours
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CloudApi
+            Path: /v1/{proxy+}
+            Method: ANY
+        # Sweeps every active job, not just the ones whose owner is still
+        # polling -- settles orphaned jobs, releases their reserved quota,
+        # and cleans up any source object this stack owns. See
+        # reconcile_stale_jobs() in handler.py.
+        ReconcileSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(10 minutes)
+            Enabled: true
+
+Outputs:
+  ApiEndpoint:
+    Value: !Sub https://${CloudApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+  BucketName:
+    Value: !Ref DataBucket
+  # The web app's canonical media store: LARKUP_MEDIA_STORAGE=s3,
+  # LARKUP_MEDIA_S3_BUCKET=<this value>, LARKUP_MEDIA_S3_KMS_KEY_ID=<KmsKeyArn>.
+  CanonicalBucketName:
+    Value: !Ref DataBucket
+  KmsKeyArn:
+    Value: !GetAtt DataKey.Arn
+  TableName:
+    Value: !Ref StateTable
+  RunpodEndpointId:
+    Value: !Ref RunpodEndpointId
+  AdminSecretArn:
+    Value: !Ref AdminSecret

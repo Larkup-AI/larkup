@@ -1,0 +1,11 @@
+# Deployment source must never include local credentials or build artifacts.
+.env
+.env.*
+!.env.example
+.vercel
+node_modules
+dist
+coverage
+*.log
+api/**/*.test.ts
+vitest.config.ts

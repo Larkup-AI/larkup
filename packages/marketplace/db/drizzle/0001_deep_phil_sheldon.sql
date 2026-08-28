@@ -1,0 +1,1 @@
+ALTER TABLE "extensions" ADD COLUMN "requires_sandbox" boolean DEFAULT true NOT NULL;
