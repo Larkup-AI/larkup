@@ -46,12 +46,12 @@ jobs:
           version=$(node -p "require('./apps/web/package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           tarball="https://registry.npmjs.org/larkup/-/larkup-${version}.tgz"
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 120); do
             if curl --fail --silent --show-error --head "$tarball" >/dev/null; then
               echo "larkup@$version tarball is available."
               exit 0
             fi
-            echo "Waiting for npm tarball propagation ($attempt/60)..."
+            echo "Waiting for npm tarball propagation ($attempt/120)..."
             sleep 10
           done
           echo "larkup@$version metadata was published, but its tarball is still unavailable." >&2
