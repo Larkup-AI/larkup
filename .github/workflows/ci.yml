@@ -10,39 +10,189 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Turborepo prunes work to what actually changed; keep its log readable in CI.
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
 jobs:
-  lint-and-build:
-    name: Lint & Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+  # Lint, type-check and unit-test everything on Linux. This is the job that
+  # gates a pull request; the matrix below only re-checks portability.
+  quality:
+    name: Lint, type-check & test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    services:
+      # The Marketplace Hub contract tests run against a real Postgres. Without
+      # one they skip themselves, which would silently drop coverage in CI.
+      marketplace-db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: larkup
+          POSTGRES_PASSWORD: larkup
+          POSTGRES_DB: larkup_hub
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U larkup -d larkup_hub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v7
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.11.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: '22'
+          cache: pnpm
 
       - name: Cache Turborepo
         uses: actions/cache@v6
         with:
           path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.ref_name }}-${{ github.sha }}
+          # Restore from the newest cache for this branch, then any branch, so a
+          # pull request starts warm instead of rebuilding everything.
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-turbo-${{ github.ref_name }}-
             ${{ runner.os }}-turbo-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Linux dependencies
+      - name: Prepare the Marketplace database
+        run: |
+          cp packages/marketplace/.env.example packages/marketplace/.env
+          pnpm --filter @larkup/marketplace db:migrate
+
+      - name: Lint
+        run: pnpm turbo lint
+
+      - name: Type check
+        run: pnpm turbo type-check
+
+      - name: Test
+        run: pnpm turbo test
+
+      - name: Fail if the Hub contract tests skipped themselves
+        run: |
+          # `db:migrate` above succeeded, so a skip here means the probe in
+          # apps/marketplace/src/index.test.ts stopped seeing the database.
+          if pnpm --filter @larkup/hub test 2>&1 | grep -q 'skipping Marketplace contract tests'; then
+            echo "::error::Hub contract tests skipped despite a running database."
+            exit 1
+          fi
+
+  # apps/web's build is the slowest step and does not need the OS matrix.
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Cache Turborepo
+        uses: actions/cache@v6
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-build-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-build-
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The desktop app is a Tauri/Rust build worth ~20 minutes. It is covered
+      # by the `desktop` job below when its own sources change, and by
+      # desktop-release.yml on a release.
+      - name: Build
+        run: pnpm turbo build --filter='!@larkup/desktop'
+
+  # Publishable packages must install and run on the platforms users are on.
+  # Linux is already covered by `quality`, so this matrix is macOS and Windows.
+  cross-platform:
+    name: Packages (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-14
+          - name: Windows
+            os: windows-2025
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test and type-check packages
+        run: pnpm --filter './packages/**' --if-present test && pnpm --filter './packages/**' --if-present type-check
+
+      - name: Verify the JavaScript SDK
+        run: pnpm --filter @larkup/sdk test && pnpm --filter @larkup/sdk type-check && pnpm --filter @larkup/sdk build
+
+      - name: Verify the CLI runs
+        run: pnpm --filter @larkup/cli type-check && pnpm --filter @larkup/cli build && node apps/cli/dist/index.js --help
+
+  # Tauri needs a Rust toolchain and GTK/WebKit system libraries. Only pay for
+  # that when something the desktop build reads has actually changed.
+  desktop:
+    name: Desktop build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether the desktop app needs building
+        id: changed
+        run: |
+          base='${{ github.event.pull_request.base.sha }}'
+          if [ -z "${base}" ]; then base="$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"; fi
+          if git diff --name-only "${base}" HEAD \
+            | grep -qE '^(apps/desktop/|apps/web/|packages/|pnpm-lock\.yaml|turbo\.json|\.github/workflows/ci\.yml)'; then
+            echo "run=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "run=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - uses: pnpm/action-setup@v6
+        if: steps.changed.outputs.run == 'true'
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v7
+        if: steps.changed.outputs.run == 'true'
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install Linux build dependencies
+        if: steps.changed.outputs.run == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -53,24 +203,25 @@ jobs:
             libfuse2
 
       - name: Cache Rust
+        if: steps.changed.outputs.run == 'true'
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri
 
-      - name: Lint
-        run: pnpm turbo lint
+      - name: Install dependencies
+        if: steps.changed.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
 
-      - name: Type check
-        run: pnpm turbo type-check
-
-      - name: Create dummy sidecar binary for Tauri build
+      - name: Create a placeholder sidecar binary
+        if: steps.changed.outputs.run == 'true'
         run: |
           mkdir -p apps/desktop/src-tauri/binaries
           touch apps/desktop/src-tauri/binaries/larkup-server-x86_64-unknown-linux-gnu
           chmod +x apps/desktop/src-tauri/binaries/larkup-server-x86_64-unknown-linux-gnu
 
-      - name: Build
-        run: pnpm turbo build
+      - name: Build the desktop app
+        if: steps.changed.outputs.run == 'true'
+        run: pnpm turbo build --filter=@larkup/desktop
 
   secret-scanning:
     name: Secret Scanning
