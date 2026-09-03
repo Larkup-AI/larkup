@@ -1,4 +1,4 @@
-import type { ToolDescriptor, ToolCategory, ToolPricing } from './types';
+import type { ToolDescriptor, ToolCategory, ToolDistribution, ToolPricing } from './types';
 
 /**
  * Tool manifest schema validation.
@@ -18,6 +18,7 @@ export const VALID_CATEGORIES: ToolCategory[] = [
 ];
 
 export const VALID_PRICING_TIERS: ToolPricing[] = ['free', 'pro', 'enterprise'];
+export const VALID_DISTRIBUTIONS: ToolDistribution[] = ['public', 'private'];
 
 export const VALID_CONFIG_FIELD_TYPES = ['text', 'password', 'select', 'toggle'] as const;
 
@@ -64,6 +65,13 @@ export function validateToolManifest(manifest: Record<string, unknown>): Manifes
   // pricing
   if (!manifest.pricing || !VALID_PRICING_TIERS.includes(manifest.pricing as ToolPricing)) {
     errors.push(`"pricing" must be one of: ${VALID_PRICING_TIERS.join(', ')}`);
+  }
+
+  if (
+    manifest.distribution !== undefined &&
+    !VALID_DISTRIBUTIONS.includes(manifest.distribution as ToolDistribution)
+  ) {
+    errors.push(`"distribution" must be one of: ${VALID_DISTRIBUTIONS.join(', ')}`);
   }
 
   // version semver-ish check
@@ -147,6 +155,46 @@ export function validateToolManifest(manifest: Record<string, unknown>): Manifes
           const verification = field.verification as Record<string, unknown>;
           if (typeof verification.endpoint !== 'string' || !verification.endpoint.startsWith('/')) {
             errors.push(`configSchema[${i}].verification.endpoint must be an app-relative path`);
+          }
+        }
+        if (field.serverManaged !== undefined && typeof field.serverManaged !== 'boolean') {
+          errors.push(`configSchema[${i}].serverManaged must be a boolean`);
+        }
+        if (field.readOnly !== undefined && typeof field.readOnly !== 'boolean') {
+          errors.push(`configSchema[${i}].readOnly must be a boolean`);
+        }
+        if (field.providerField !== undefined && typeof field.providerField !== 'string') {
+          errors.push(`configSchema[${i}].providerField must be a string`);
+        }
+        if (
+          field.defaultValueByProvider !== undefined &&
+          (typeof field.defaultValueByProvider !== 'object' ||
+            Array.isArray(field.defaultValueByProvider))
+        ) {
+          errors.push(`configSchema[${i}].defaultValueByProvider must be an object`);
+        }
+        if (
+          field.globalConfigKey !== undefined &&
+          !['visionProvider', 'chatProvider'].includes(String(field.globalConfigKey))
+        ) {
+          errors.push(`configSchema[${i}].globalConfigKey must name a supported AI provider field`);
+        }
+        if (
+          field.defaultFromGlobalConfigKey !== undefined &&
+          !['visionProvider', 'chatProvider'].includes(String(field.defaultFromGlobalConfigKey))
+        ) {
+          errors.push(
+            `configSchema[${i}].defaultFromGlobalConfigKey must name a supported AI provider field`,
+          );
+        }
+        if (field.visibleWhen !== undefined) {
+          const visibleWhen = field.visibleWhen as Record<string, unknown>;
+          if (
+            typeof visibleWhen.field !== 'string' ||
+            !('equals' in visibleWhen) ||
+            !['string', 'boolean', 'object'].includes(typeof visibleWhen.equals)
+          ) {
+            errors.push(`configSchema[${i}].visibleWhen must declare field and equals`);
           }
         }
       }

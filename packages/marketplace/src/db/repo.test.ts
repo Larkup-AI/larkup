@@ -5,15 +5,21 @@ import { getMarketplaceDb, type MarketplaceDb } from './client';
 import {
   getExtension,
   grantWorkspaceAccess,
+  InvalidAccessKeyError,
+  issueAccessKey,
+  listAccessKeys,
   listExtensions,
   ManifestInvalidError,
+  NotAuthorizedError,
   NotOwnerError,
   publishExtension,
   recordInstall,
+  redeemAccessKey,
+  revokeAccessKey,
   VersionExistsError,
 } from './repo';
 import { auditEvents } from './schema/audit';
-import { extensionWorkspaceGrants, extensions } from './schema/extensions';
+import { extensionAccessKeys, extensionWorkspaceGrants, extensions } from './schema/extensions';
 import { extensionVersions } from './schema/versions';
 import { workspaceInstallations } from './schema/installations';
 import { publishers } from './schema/publishers';
@@ -55,6 +61,7 @@ afterAll(async () => {
   if (ids.length) {
     await db.delete(auditEvents).where(inArray(auditEvents.extensionId, ids));
     await db.delete(workspaceInstallations).where(inArray(workspaceInstallations.extensionId, ids));
+    await db.delete(extensionAccessKeys).where(inArray(extensionAccessKeys.extensionId, ids));
     await db
       .delete(extensionWorkspaceGrants)
       .where(inArray(extensionWorkspaceGrants.extensionId, ids));
@@ -153,20 +160,42 @@ describe('listExtensions / visibility', () => {
     expect(entries.some((e) => e.id === result.extensionId)).toBe(true);
   });
 
-  it('hides a private extension from a workspace with no grant, shows it to one that has a grant', async () => {
+  it('hides a private extension from browse/search for a workspace with no grant', async () => {
+    const id = extId('private-search');
+    await publish({ id, name: 'Unlisted Widget', distribution: 'private' });
+
+    const anonymous = await listExtensions(db, { search: 'Unlisted Widget' });
+    expect(anonymous.entries.some((e) => e.id === id)).toBe(false);
+
+    const ungranted = await listExtensions(db, {
+      search: 'Unlisted Widget',
+      workspaceId: 'ws-ungranted-search',
+    });
+    expect(ungranted.entries.some((e) => e.id === id)).toBe(false);
+
+    await grantWorkspaceAccess(db, id, 'ws-granted-search');
+    const granted = await listExtensions(db, {
+      search: 'Unlisted Widget',
+      workspaceId: 'ws-granted-search',
+    });
+    expect(granted.entries.some((e) => e.id === id)).toBe(true);
+  });
+
+  it('reveals a private extension by exact id even with no grant, but marks it unauthorized', async () => {
     const id = extId('private-listed');
-    await publish({ id, name: 'Secret Widget' });
-    await db.update(extensions).set({ distribution: 'private' }).where(eq(extensions.id, id));
+    await publish({ id, name: 'Secret Widget', distribution: 'private' });
 
     const anonymous = await getExtension(db, id);
-    expect(anonymous).toBeNull();
+    expect(anonymous?.entry.id).toBe(id);
+    expect(anonymous?.authorized).toBe(false);
 
     const ungranted = await getExtension(db, id, { workspaceId: 'ws-no-grant' });
-    expect(ungranted).toBeNull();
+    expect(ungranted?.authorized).toBe(false);
 
     await grantWorkspaceAccess(db, id, 'ws-granted');
     const granted = await getExtension(db, id, { workspaceId: 'ws-granted' });
     expect(granted?.entry.id).toBe(id);
+    expect(granted?.authorized).toBe(true);
   });
 
   it('filters by category', async () => {
@@ -188,5 +217,93 @@ describe('recordInstall', () => {
     await recordInstall(db, result.extensionId, 'ws-a');
     const after = await recordInstall(db, result.extensionId, 'ws-b');
     expect(after?.installs).toBe(2);
+  });
+
+  it('rejects installing a private extension without a grant', async () => {
+    const id = extId('private-install');
+    await publish({ id, distribution: 'private' });
+    await expect(recordInstall(db, id, 'ws-ungranted')).rejects.toBeInstanceOf(NotAuthorizedError);
+  });
+
+  it('allows installing a private extension once granted', async () => {
+    const id = extId('private-install-granted');
+    await publish({ id, distribution: 'private' });
+    await grantWorkspaceAccess(db, id, 'ws-authorized');
+    const result = await recordInstall(db, id, 'ws-authorized');
+    expect(result?.installs).toBe(1);
+  });
+});
+
+describe('access keys', () => {
+  it('issues a key and redeems it into a usable grant', async () => {
+    const id = extId('key-flow');
+    await publish({ id, distribution: 'private' });
+
+    const { accessKey } = await issueAccessKey(db, {
+      extensionId: id,
+      scope: 'organization',
+      scopeId: 'org-1',
+      createdBy: 'test-admin',
+    });
+
+    await expect(recordInstall(db, id, 'ws-redeemer')).rejects.toBeInstanceOf(NotAuthorizedError);
+
+    await redeemAccessKey(db, id, accessKey, 'ws-redeemer');
+    const result = await recordInstall(db, id, 'ws-redeemer');
+    expect(result?.installs).toBe(1);
+
+    const keys = await listAccessKeys(db, id);
+    expect(keys[0].installCount).toBe(1);
+  });
+
+  it('rejects an unknown or garbage key', async () => {
+    const id = extId('key-garbage');
+    await publish({ id, distribution: 'private' });
+    await expect(redeemAccessKey(db, id, 'lk_key_not-a-real-key', 'ws-1')).rejects.toBeInstanceOf(
+      InvalidAccessKeyError,
+    );
+  });
+
+  it('rejects an expired key', async () => {
+    const id = extId('key-expired');
+    await publish({ id, distribution: 'private' });
+    const { accessKey } = await issueAccessKey(db, {
+      extensionId: id,
+      scope: 'workspace',
+      expiresAt: new Date(Date.now() - 1000),
+      createdBy: 'test-admin',
+    });
+    await expect(redeemAccessKey(db, id, accessKey, 'ws-1')).rejects.toBeInstanceOf(
+      InvalidAccessKeyError,
+    );
+  });
+
+  it('enforces a maxInstalls cap across redemptions', async () => {
+    const id = extId('key-capped');
+    await publish({ id, distribution: 'private' });
+    const { accessKey } = await issueAccessKey(db, {
+      extensionId: id,
+      scope: 'workspace',
+      maxInstalls: 1,
+      createdBy: 'test-admin',
+    });
+    await redeemAccessKey(db, id, accessKey, 'ws-first');
+    await expect(redeemAccessKey(db, id, accessKey, 'ws-second')).rejects.toBeInstanceOf(
+      InvalidAccessKeyError,
+    );
+  });
+
+  it('rejects redemption once a key is revoked', async () => {
+    const id = extId('key-revoked');
+    await publish({ id, distribution: 'private' });
+    const { id: keyId, accessKey } = await issueAccessKey(db, {
+      extensionId: id,
+      scope: 'workspace',
+      createdBy: 'test-admin',
+    });
+    await revokeAccessKey(db, id, keyId, 'test-admin');
+    await expect(redeemAccessKey(db, id, accessKey, 'ws-1')).rejects.toBeInstanceOf(
+      InvalidAccessKeyError,
+    );
   });
 });

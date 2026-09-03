@@ -6,6 +6,9 @@ export const AUDIT_ACTIONS = [
   'extension.grant_added',
   'extension.grant_removed',
   'extension.deprecated',
+  'extension.key_issued',
+  'extension.key_redeemed',
+  'extension.key_revoked',
 ] as const;
 
 /** Catalog audit trail. */

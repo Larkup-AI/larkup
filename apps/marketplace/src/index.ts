@@ -1,48 +1,44 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { getHubDb } from '@larkup/hub-db';
+import { getMarketplaceDb } from '@larkup/marketplace/db';
 import {
   getExtension,
+  InvalidAccessKeyError,
+  issueAccessKey,
+  listAccessKeys,
   listExtensions,
   ManifestInvalidError,
+  NotAuthorizedError,
   NotOwnerError,
   publishExtension,
   recordInstall,
+  redeemAccessKey,
+  revokeAccessKey,
   VersionExistsError,
-} from '@larkup/hub-db/repo';
-import type { CatalogEntry } from '@larkup/hub-db/repo';
+} from '@larkup/marketplace/db/repo';
+import type { CatalogEntry } from '@larkup/marketplace/db/repo';
 import type {
   ToolDescriptor,
   ToolDetailResponse,
   ToolListResponse,
   PublishRequest,
 } from './types.js';
+import { toolManifestV1Schema, toolManifestV2Schema, toolManifestV3Schema } from './schemas.js';
 
-/* ------------------------------------------------------------------ */
-/* App setup                                                           */
-/* ------------------------------------------------------------------ */
+// App setup                                                           */
 
 const app = new Hono();
 
-// `getHubDb()` is called per-request rather than once at module load: a
-// module-level connection would be established (and DATABASE_URL read) the
-// moment anything imports this file, including tests that need to load a
-// non-default env file first. `getHubDb()` caches internally either way, so
-// this costs nothing per request beyond the cache lookup.
-
-// CORS — allow any Larkup client
+// Allow requests from Larkup clients.
 app.use('*', cors());
 
-/**
- * Reconstruct the pre-migration `ToolDescriptor` response shape from a
- * catalog entry. `entry.manifest` is the exact JSON the publisher submitted
- * (see `packages/hub-db/src/repo.ts`'s `extension_versions.manifest`), so
- * every route that returned a `ToolDescriptor` before this migration keeps
- * returning byte-identical shapes — only `downloads` is computed live now,
- * from real per-workspace installs instead of a static seed number.
- */
+/** Builds the public tool descriptor. */
 function toDescriptor(entry: CatalogEntry): ToolDescriptor {
-  return { ...(entry.manifest as ToolDescriptor), downloads: entry.installs };
+  return {
+    ...(entry.manifest as ToolDescriptor),
+    requiresSandbox: entry.requiresSandbox,
+    downloads: entry.installs,
+  };
 }
 
 function slugifyPublisherId(author: string): string {
@@ -53,10 +49,7 @@ function slugifyPublisherId(author: string): string {
     .replace(/^-+|-+$/g, '');
   return slug || 'unknown-publisher';
 }
-
-/* ------------------------------------------------------------------ */
-/* Health                                                              */
-/* ------------------------------------------------------------------ */
+// Health                                                              */
 
 app.get('/', (c) => {
   return c.json({
@@ -67,9 +60,7 @@ app.get('/', (c) => {
   });
 });
 
-/* ------------------------------------------------------------------ */
-/* Tool catalog                                                        */
-/* ------------------------------------------------------------------ */
+// Tool catalog                                                        */
 
 /**
  * GET /v1/tools — List all available tools.
@@ -87,7 +78,7 @@ app.get('/v1/tools', async (c) => {
   const page = Math.max(1, parseInt(c.req.query('page') ?? '1', 10) || 1);
   const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10) || 50, 100);
 
-  const db = getHubDb();
+  const db = getMarketplaceDb();
   const { entries, total } = await listExtensions(db, {
     category,
     search,
@@ -109,7 +100,7 @@ app.get('/v1/tools', async (c) => {
 app.get('/v1/tools/:id', async (c) => {
   const toolId = c.req.param('id');
   const workspaceId = c.req.query('workspaceId');
-  const found = await getExtension(getHubDb(), toolId, { workspaceId });
+  const found = await getExtension(getMarketplaceDb(), toolId, { workspaceId });
 
   if (!found) {
     return c.json({ error: 'Tool not found' }, 404);
@@ -122,15 +113,14 @@ app.get('/v1/tools/:id', async (c) => {
       version: v.version,
       publishedAt: v.publishedAt.toISOString(),
     })),
+    authorized: found.authorized,
   };
 
   c.header('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
   return c.json(response);
 });
 
-/* ------------------------------------------------------------------ */
-/* Install tracking                                                    */
-/* ------------------------------------------------------------------ */
+// Install tracking
 
 /**
  * POST /v1/tools/:id/installed — Track an install.
@@ -147,17 +137,119 @@ app.post('/v1/tools/:id/installed', async (c) => {
   const body = await c.req.json().catch(() => ({} as { workspaceId?: string }));
   const workspaceId = body.workspaceId || 'anonymous';
 
-  const result = await recordInstall(getHubDb(), toolId, workspaceId);
-  if (!result) {
-    return c.json({ error: 'Tool not found' }, 404);
+  try {
+    const result = await recordInstall(getMarketplaceDb(), toolId, workspaceId);
+    if (!result) {
+      return c.json({ error: 'Tool not found' }, 404);
+    }
+    return c.json({ toolId, installs: result.installs });
+  } catch (err) {
+    if (err instanceof NotAuthorizedError) {
+      return c.json({ error: err.message }, 403);
+    }
+    throw err;
   }
-
-  return c.json({ toolId, installs: result.installs });
 });
 
-/* ------------------------------------------------------------------ */
-/* curl install script                                                 */
-/* ------------------------------------------------------------------ */
+// Private tool access keys                                            */
+
+/** Hub-side publisher/admin auth, shared by every access-key management route. */
+function requireHubAdminKey(c: import('hono').Context): Response | null {
+  const expectedKey = process.env.HUB_PUBLISH_KEY;
+  if (process.env.VERCEL_ENV === 'production' && !expectedKey) {
+    return c.json({ error: 'Marketplace publishing is not configured.' }, 503);
+  }
+  const received = c.req.header('x-hub-admin-key');
+  if (expectedKey && received !== expectedKey) {
+    return c.json({ error: 'Invalid API key' }, 401);
+  }
+  return null;
+}
+
+/**
+ * POST /v1/tools/:id/access-keys — issue a new private-tool access key.
+ * Admin-authenticated (same HUB_PUBLISH_KEY used by /v1/tools/publish).
+ */
+app.post('/v1/tools/:id/access-keys', async (c) => {
+  const denied = requireHubAdminKey(c);
+  if (denied) return denied;
+
+  const toolId = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as {
+    scope?: 'workspace' | 'organization' | 'user';
+    scopeId?: string;
+    maxInstalls?: number;
+    expiresAt?: string;
+    createdBy?: string;
+  };
+  if (!body.scope) return c.json({ error: '"scope" is required.' }, 400);
+
+  try {
+    const result = await issueAccessKey(getMarketplaceDb(), {
+      extensionId: toolId,
+      scope: body.scope,
+      scopeId: body.scopeId,
+      maxInstalls: body.maxInstalls,
+      expiresAt: body.expiresAt ? new Date(body.expiresAt) : undefined,
+      createdBy: body.createdBy || 'hub-admin',
+    });
+    return c.json(result, 201);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : 'Could not issue key' }, 400);
+  }
+});
+
+/** GET /v1/tools/:id/access-keys — list issued keys (hashes never returned). */
+app.get('/v1/tools/:id/access-keys', async (c) => {
+  const denied = requireHubAdminKey(c);
+  if (denied) return denied;
+  const keys = await listAccessKeys(getMarketplaceDb(), c.req.param('id'));
+  return c.json({ keys });
+});
+
+/** POST /v1/tools/:id/access-keys/:keyId/revoke — revoke a key. */
+app.post('/v1/tools/:id/access-keys/:keyId/revoke', async (c) => {
+  const denied = requireHubAdminKey(c);
+  if (denied) return denied;
+  try {
+    await revokeAccessKey(
+      getMarketplaceDb(),
+      c.req.param('id'),
+      c.req.param('keyId'),
+      c.req.header('x-hub-admin-key') || 'hub-admin',
+    );
+    return c.json({ revoked: true });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : 'Could not revoke key' }, 400);
+  }
+});
+
+/**
+ * POST /v1/tools/:id/redeem-key — the only public access-key route. Turns a
+ * valid, unexpired, unrevoked key into a standing workspace grant.
+ */
+app.post('/v1/tools/:id/redeem-key', async (c) => {
+  const toolId = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as {
+    accessKey?: string;
+    workspaceId?: string;
+  };
+  if (!body.accessKey || !body.workspaceId) {
+    return c.json({ error: '"accessKey" and "workspaceId" are required.' }, 400);
+  }
+
+  try {
+    await redeemAccessKey(getMarketplaceDb(), toolId, body.accessKey, body.workspaceId);
+    return c.json({ authorized: true });
+  } catch (err) {
+    if (err instanceof InvalidAccessKeyError) {
+      return c.json({ error: err.message }, 403);
+    }
+    throw err;
+  }
+});
+
+// curl install script
 
 /**
  * GET /v1/tools/:id/install.sh — Returns a shell script that installs the tool.
@@ -166,7 +258,7 @@ app.post('/v1/tools/:id/installed', async (c) => {
  */
 app.get('/v1/tools/:id/install.sh', async (c) => {
   const toolId = c.req.param('id');
-  const found = await getExtension(getHubDb(), toolId);
+  const found = await getExtension(getMarketplaceDb(), toolId);
 
   if (!found) {
     return c.text('echo "Error: Tool not found"; exit 1', 404);
@@ -248,30 +340,7 @@ echo "   Location: $TOOLS_DIR/node_modules/${manifest.packageName}"
   return c.text(script);
 });
 
-/* ------------------------------------------------------------------ */
-/* Publishing (CI webhook)                                             */
-/* ------------------------------------------------------------------ */
-
-/**
- * POST /v1/tools/publish — Publish or update a tool.
- *
- * Called by CI after `npm publish`. Protected by API key.
- *
- * Body: { manifest: ToolDescriptor, apiKey?: string }
- *
- * The request/response shape is unchanged from before this migration. What
- * changed underneath: the manifest is now actually validated (previously
- * only `id` and `packageName` were checked), publishing is durable across a
- * restart, and a publish under an id someone else already owns is rejected
- * rather than silently overwriting their listing.
- *
- * Publisher identity: there is no per-publisher key yet (`HUB_PUBLISH_KEY`
- * is one shared secret, unchanged from before) — the publisher id is
- * derived from `manifest.author`. This keeps the request shape stable and
- * gives real ownership/attribution today; a rotatable per-publisher key is
- * `publisher_keys`, deferred to TASK 09 alongside entitlements (see
- * ADR-012).
- */
+/** Publishes a Marketplace tool from CI. */
 app.post('/v1/tools/publish', async (c) => {
   let body: PublishRequest;
   try {
@@ -281,6 +350,10 @@ app.post('/v1/tools/publish', async (c) => {
   }
 
   const expectedKey = process.env.HUB_PUBLISH_KEY;
+  if (process.env.VERCEL_ENV === 'production' && !expectedKey) {
+    console.error('[marketplace] HUB_PUBLISH_KEY is not configured for production publishing');
+    return c.json({ error: 'Marketplace publishing is not configured.' }, 503);
+  }
   if (expectedKey && body.apiKey !== expectedKey) {
     return c.json({ error: 'Invalid API key' }, 401);
   }
@@ -292,7 +365,7 @@ app.post('/v1/tools/publish', async (c) => {
   const publisherId = slugifyPublisherId(body.manifest.author ?? '');
 
   try {
-    const result = await publishExtension(getHubDb(), {
+    const result = await publishExtension(getMarketplaceDb(), {
       manifest: body.manifest as unknown as Record<string, unknown>,
       publisherId,
       publisherName: body.manifest.author,
@@ -316,78 +389,40 @@ app.post('/v1/tools/publish', async (c) => {
   }
 });
 
-/* ------------------------------------------------------------------ */
-/* JSON Schema for tool.manifest.json                                  */
-/* ------------------------------------------------------------------ */
+// JSON Schema for tool.manifest.json                                  */
 
 app.get('/v1/schema/tool-manifest.v1', (c) => {
   c.header('Cache-Control', 'public, s-maxage=3600');
-  return c.json({
-    $schema: 'http://json-schema.org/draft-07/schema#',
-    title: 'Larkup Tool Manifest',
-    description: 'Schema for tool.manifest.json files.',
-    type: 'object',
-    required: [
-      'id',
-      'name',
-      'description',
-      'category',
-      'version',
-      'pricing',
-      'icon',
-      'packageName',
-      'installSize',
-      'author',
-      'capabilities',
-    ],
-    properties: {
-      id: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*[a-z0-9]$' },
-      name: { type: 'string' },
-      description: { type: 'string' },
-      longDescription: { type: 'string' },
-      category: {
-        type: 'string',
-        enum: [
-          'media',
-          'search',
-          'analytics',
-          'integration',
-          'embedding',
-          'ai',
-          'automation',
-          'utility',
-        ],
-      },
-      version: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+' },
-      pricing: { type: 'string', enum: ['free', 'pro', 'enterprise'] },
-      emoji: { type: 'string' },
-      iconUrl: { type: 'string', format: 'uri' },
-      icon: { type: 'string' },
-      packageName: { type: 'string' },
-      installSize: { type: 'string' },
-      systemDeps: { type: 'array', items: { type: 'string' } },
-      author: { type: 'string' },
-      capabilities: { type: 'array', items: { type: 'string' }, minItems: 1 },
-      configSchema: { type: 'array' },
-      tags: { type: 'array', items: { type: 'string' } },
-      downloads: { type: 'number' },
-      repositoryUrl: { type: 'string', format: 'uri' },
-      license: { type: 'string' },
-      updatedAt: { type: 'string' },
-      comingSoon: { type: 'boolean' },
-    },
-  });
+  return c.json(toolManifestV1Schema);
 });
 
-/* ------------------------------------------------------------------ */
-/* Export                                                               */
-/* ------------------------------------------------------------------ */
+/**
+ * These are the exact URLs every tool.manifest.json points to via `$schema`
+ * (https://hub.larkup.de/schemas/tool-manifest.v{1,2}.json). The catch-all
+ * Vercel rewrite in vercel.json routes every path to this Hono app, so a copy
+ * under `public/schemas/` alone never gets served — it must be an explicit
+ * route here.
+ */
+app.get('/schemas/tool-manifest.v1.json', (c) => {
+  c.header('Cache-Control', 'public, s-maxage=3600');
+  return c.json(toolManifestV1Schema);
+});
+
+app.get('/schemas/tool-manifest.v2.json', (c) => {
+  c.header('Cache-Control', 'public, s-maxage=3600');
+  return c.json(toolManifestV2Schema);
+});
+
+app.get('/schemas/tool-manifest.v3.json', (c) => {
+  c.header('Cache-Control', 'public, s-maxage=3600');
+  return c.json(toolManifestV3Schema);
+});
+
+// Export                                                               */
 
 export default app;
 
-/* ------------------------------------------------------------------ */
-/* Local dev server (tsx watch)                                        */
-/* ------------------------------------------------------------------ */
+// Local dev server (tsx watch)
 
 if (!process.env.VERCEL && !process.env.VITEST) {
   import('@hono/node-server').then(({ serve }) => {

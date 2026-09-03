@@ -15,13 +15,23 @@ export type ToolCategory =
   | 'utility';
 
 export type ToolPricing = 'free' | 'pro' | 'enterprise';
+/** Controls who can discover and install a published Marketplace tool. */
+export type ToolDistribution = 'public' | 'private';
 
-export type ToolRuntimeMode = 'local-docker' | 'managed-cloud' | 'custom-remote';
+/** A native process is a local runtime launched without a container engine. */
+export type ToolRuntimeMode =
+  | 'local'
+  | 'local-docker'
+  | 'local-process'
+  | 'managed-cloud'
+  | 'custom-remote';
 
 export interface ToolRuntimeModeDescriptor {
   id: ToolRuntimeMode;
   label: string;
   description: string;
+  /** Optional visual mark shown by host runtime pickers. */
+  icon?: string;
   /** Config field that contains the remote endpoint for remote modes. */
   endpointConfigKey?: string;
   /** Config field that contains the bearer credential for remote modes. */
@@ -31,6 +41,8 @@ export interface ToolRuntimeModeDescriptor {
   /** Relative path to a compose file shipped by the npm package. */
   composeFile?: string;
   requiresGpu?: boolean;
+  /** Shown before a local runtime is enabled, e.g. its image download size. */
+  setupNotice?: string;
 }
 
 export interface ToolRuntimeDescriptor {
@@ -62,11 +74,80 @@ export interface ToolBillingDescriptor {
   entitlementVersion: string;
 }
 
+export interface ToolUsageField {
+  key: string;
+  label: string;
+  format?: 'number' | 'minutes';
+}
+
+export interface ToolUsageVisualization {
+  usedKey: string;
+  limitKey: string;
+}
+
+/** Tool-declared support request metadata rendered by the generic host UI. */
+export interface ToolUsageSupport {
+  contactLabel?: string;
+  description?: string;
+  /** Config key containing the safe-to-share installation identifier. */
+  userIdConfigKey?: string;
+}
+
+/** Declarative usage values a tool client exposes through the host. */
+export interface ToolUsageDescriptor {
+  label?: string;
+  fields: ToolUsageField[];
+  /** Limit a metered usage panel to the runtime modes where it applies. */
+  visibleWhenRuntimeMode?: ToolRuntimeMode[];
+  visualization?: ToolUsageVisualization;
+  support?: ToolUsageSupport;
+}
+
 export interface ToolUiSurface {
   id: string;
   slot: 'data-indexing' | 'settings' | 'chat-result' | 'asset-actions';
   title: string;
+  description?: string;
   entrypoint?: string;
+  /** Media kinds a data-indexing surface can collect inputs for. */
+  appliesTo?: Array<'image' | 'video' | 'audio'>;
+  /** Declarative form rendered by the host; tool code and copy stay with the tool. */
+  form?: {
+    submitLabel?: string;
+    fields: Array<{
+      key: string;
+      type: 'textarea' | 'select' | 'checkbox';
+      label: string;
+      description?: string;
+      placeholder?: string;
+      defaultValue?: string | boolean;
+      options?: Array<{
+        label: string;
+        value: string;
+        description?: string;
+        /** Declarative companion values selected with this option. */
+        setValues?: Record<string, string | boolean>;
+      }>;
+      requiredWhen?: { field: string; equals: string | boolean };
+    }>;
+  };
+  /**
+   * Optional, tool-declared workload estimates. The host supplies the source
+   * duration and renders these provider-neutral values in its generic form.
+   */
+  estimate?: {
+    modeField: string;
+    variants: Array<{
+      value: string;
+      analyzedFramesPerSourceMinute: number;
+      ocrFramesPerSourceMinute: number;
+      processingSecondsPerSourceMinute: number;
+      maxProcessingSecondsPerSourceMinute?: number;
+      fixedOverheadSeconds?: number;
+      maxFixedOverheadSeconds?: number;
+      creditsPerSourceMinute: number;
+    }>;
+  };
 }
 
 export interface ToolUiDescriptor {
@@ -99,6 +180,8 @@ export interface ToolDescriptor {
   version: string;
   /** Current pricing tier — "free" for all launch tools */
   pricing: ToolPricing;
+  /** Public tools are catalog-visible; private tools require a Hub workspace grant. */
+  distribution?: ToolDistribution;
 
   /** Emoji icon for lightweight display (e.g., "🎬"). Primary choice. */
   emoji?: string;
@@ -154,6 +237,8 @@ export interface ToolDescriptor {
   runtime?: ToolRuntimeDescriptor;
   /** Provider-neutral metering contract for subscriptions and pay-as-you-go. */
   billing?: ToolBillingDescriptor;
+  /** Optional, manifest-driven usage summary for installed-tool settings. */
+  usage?: ToolUsageDescriptor;
   /** UI surfaces contributed by the installed tool. */
   ui?: ToolUiDescriptor;
 }
@@ -166,12 +251,33 @@ export interface ToolConfigField {
   help?: string;
   required?: boolean;
   options?: ToolConfigOption[];
+  /** For a model selector, the provider field used to filter its options. */
+  providerField?: string;
+  /** Provider-specific defaults used when the saved model belongs to another provider. */
+  defaultValueByProvider?: Record<string, string>;
+  /** Optional host AI Models key used as this field's unsaved default. */
+  globalConfigKey?: 'visionProvider' | 'chatProvider';
+  /** Uses a workspace AI provider as an initial value without writing to it. */
+  defaultFromGlobalConfigKey?: 'visionProvider' | 'chatProvider';
   /** Optional visual group. Settings forms render each group in its own card. */
   group?: string;
   /** Declarative verification request. Omit it to hide Verify for this field. */
   verification?: ToolConfigVerification;
   /** Preferred desktop width in a schema-driven settings grid. */
   layout?: 'full' | 'half';
+  /** Render this field only when another configuration field has a matching value. */
+  visibleWhen?: {
+    field: string;
+    equals: string | boolean | Array<string | boolean>;
+  };
+  /**
+   * Set by the tool's own backend (e.g. device provisioning), never by the
+   * client. Settings forms must not render an input for it, and config
+   * saves must not let a client request overwrite or clear it.
+   */
+  serverManaged?: boolean;
+  /** Render a server-managed value as a non-editable status value. */
+  readOnly?: boolean;
 }
 
 export interface ToolConfigOption {
@@ -255,6 +361,15 @@ export interface StorageProvider {
   retrieve(uri: string): Promise<Buffer>;
   /** Resolve a URI to a local file without buffering it in memory, when supported. */
   resolvePath?(uri: string): Promise<string | undefined>;
+  /**
+   * A short-lived, range-capable HTTPS URL for this file, when the backing
+   * store supports direct remote access (S3). A bounded caller (FFmpeg
+   * seeking a range for watch_original, a remote GPU worker) can fetch just
+   * the bytes it needs through this URL instead of a full local download.
+   * Absent for stores with no such notion (local disk) -- callers fall back
+   * to resolvePath/retrieve.
+   */
+  getReadUrl?(uri: string, expiresInSecs: number): Promise<string | undefined>;
   /** Delete a file by its storage URI */
   delete(uri: string): Promise<void>;
   /** Get storage usage stats */
