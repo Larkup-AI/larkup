@@ -9,6 +9,7 @@
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "test": "turbo test",
+    "version-packages": "changeset version && node scripts/sync-tool-manifest-versions.mjs",
     "rag": "pnpm --filter @larkup/cli rag",
     "test:publish": "pnpm build && pnpm publish -r --dry-run --no-git-checks",
     "prepare": "husky"

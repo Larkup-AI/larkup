@@ -7,7 +7,7 @@
   "description": "Help your AI understand your videos, so you can ask questions and get answers from the right moments.",
   "longDescription": "Turn videos into knowledge your AI can understand. It listens to what is said, reads what appears on screen, and helps you find the moments that matter.",
   "category": "media",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "pricing": "free",
   "emoji": "🎥",
   "icon": "Film",
@@ -77,13 +77,23 @@
         "unit": "minute",
         "description": "Minutes inspected with Thorough agent coverage."
       },
-      { "id": "gpu-second", "unit": "second", "description": "GPU worker time used." },
-      { "id": "ocr-frame", "unit": "frame", "description": "Frames sent through OCR." }
+      {
+        "id": "gpu-second",
+        "unit": "second",
+        "description": "GPU worker time used."
+      },
+      {
+        "id": "ocr-frame",
+        "unit": "frame",
+        "description": "Frames sent through OCR."
+      }
     ]
   },
   "usage": {
     "label": "Usage this month",
-    "visibleWhenRuntimeMode": ["managed-cloud"],
+    "visibleWhenRuntimeMode": [
+      "managed-cloud"
+    ],
     "visualization": {
       "usedKey": "sourceMinutesUsed",
       "limitKey": "sourceMinutesLimit"
@@ -94,9 +104,21 @@
       "userIdConfigKey": "cloudInstallationId"
     },
     "fields": [
-      { "key": "sourceMinutesUsed", "label": "Used", "format": "minutes" },
-      { "key": "sourceMinutesLimit", "label": "Included", "format": "minutes" },
-      { "key": "activeJobs", "label": "Active jobs", "format": "number" }
+      {
+        "key": "sourceMinutesUsed",
+        "label": "Used",
+        "format": "minutes"
+      },
+      {
+        "key": "sourceMinutesLimit",
+        "label": "Included",
+        "format": "minutes"
+      },
+      {
+        "key": "activeJobs",
+        "label": "Active jobs",
+        "format": "number"
+      }
     ]
   },
   "ui": {
@@ -107,7 +129,9 @@
         "slot": "data-indexing",
         "title": "Let your AI understand this video",
         "entrypoint": "./ui",
-        "appliesTo": ["video"],
+        "appliesTo": [
+          "video"
+        ],
         "description": "Choose how deeply to analyze it and optionally point it to what matters most.",
         "estimate": {
           "modeField": "indexingMode",
@@ -163,19 +187,25 @@
                   "label": "Fast",
                   "value": "fast",
                   "description": "Sample key frames for a quick overview.",
-                  "setValues": { "processingAuthorityConfirmed": false }
+                  "setValues": {
+                    "processingAuthorityConfirmed": false
+                  }
                 },
                 {
                   "label": "Balanced",
                   "value": "balanced",
                   "description": "Sample visual and OCR evidence across the video.",
-                  "setValues": { "processingAuthorityConfirmed": false }
+                  "setValues": {
+                    "processingAuthorityConfirmed": false
+                  }
                 },
                 {
                   "label": "Thorough",
                   "value": "thorough",
                   "description": "Let the agent inspect denser evidence around subtle or infrequent details.",
-                  "setValues": { "processingAuthorityConfirmed": false }
+                  "setValues": {
+                    "processingAuthorityConfirmed": false
+                  }
                 }
               ]
             }
@@ -235,7 +265,10 @@
           "runtimeMode": "runtimeMode"
         }
       },
-      "visibleWhen": { "field": "runtimeMode", "equals": "local" }
+      "visibleWhen": {
+        "field": "runtimeMode",
+        "equals": "local"
+      }
     },
     {
       "key": "localRuntimeApiKey",
@@ -243,7 +276,10 @@
       "type": "password",
       "group": "Local runtime",
       "help": "Optional bearer key to use when your local runtime authentication is enabled. Share it only with trusted users on your private network.",
-      "visibleWhen": { "field": "runtimeMode", "equals": "local" }
+      "visibleWhen": {
+        "field": "runtimeMode",
+        "equals": "local"
+      }
     },
     {
       "key": "videoVisionProvider",
@@ -425,7 +461,10 @@
           "runtimeMode": "runtimeMode"
         }
       },
-      "visibleWhen": { "field": "runtimeMode", "equals": "custom-remote" }
+      "visibleWhen": {
+        "field": "runtimeMode",
+        "equals": "custom-remote"
+      }
     },
     {
       "key": "customRuntimeApiKey",
@@ -433,7 +472,10 @@
       "type": "password",
       "group": "Custom runtime",
       "required": true,
-      "visibleWhen": { "field": "runtimeMode", "equals": "custom-remote" }
+      "visibleWhen": {
+        "field": "runtimeMode",
+        "equals": "custom-remote"
+      }
     },
     {
       "key": "audioProvider",
@@ -486,7 +528,12 @@
       },
       "visibleWhen": {
         "field": "audioProvider",
-        "equals": ["openai", "groq", "deepgram", "elevenlabs"]
+        "equals": [
+          "openai",
+          "groq",
+          "deepgram",
+          "elevenlabs"
+        ]
       }
     },
     {
@@ -504,14 +551,26 @@
       },
       "help": "Required for every runtime. The model runs on your audio-provider account.",
       "options": [
-        { "label": "OpenAI Whisper 1", "value": "whisper-1", "icon": "/icons/openai.svg" },
+        {
+          "label": "OpenAI Whisper 1",
+          "value": "whisper-1",
+          "icon": "/icons/openai.svg"
+        },
         {
           "label": "Groq Whisper Large v3 Turbo",
           "value": "whisper-large-v3-turbo",
           "icon": "https://models.dev/logos/groq.svg"
         },
-        { "label": "Deepgram Nova 3", "value": "nova-3", "icon": "/icons/deepgram.png" },
-        { "label": "ElevenLabs Scribe v2", "value": "scribe_v2", "icon": "/icons/elevenlabs.png" }
+        {
+          "label": "Deepgram Nova 3",
+          "value": "nova-3",
+          "icon": "/icons/deepgram.png"
+        },
+        {
+          "label": "ElevenLabs Scribe v2",
+          "value": "scribe_v2",
+          "icon": "/icons/elevenlabs.png"
+        }
       ]
     },
     {
@@ -521,9 +580,18 @@
       "group": "Indexing",
       "defaultValue": "balanced",
       "options": [
-        { "label": "Fast", "value": "fast" },
-        { "label": "Balanced", "value": "balanced" },
-        { "label": "Thorough", "value": "thorough" }
+        {
+          "label": "Fast",
+          "value": "fast"
+        },
+        {
+          "label": "Balanced",
+          "value": "balanced"
+        },
+        {
+          "label": "Thorough",
+          "value": "thorough"
+        }
       ]
     },
     {
@@ -532,7 +600,10 @@
       "type": "password",
       "group": "Managed cloud connection",
       "help": "Paste the key Larkup provides for managed cloud access. Leave this empty only when automatic project provisioning is enabled.",
-      "visibleWhen": { "field": "runtimeMode", "equals": "managed-cloud" }
+      "visibleWhen": {
+        "field": "runtimeMode",
+        "equals": "managed-cloud"
+      }
     },
     {
       "key": "cloudInstallationId",
@@ -543,13 +614,23 @@
       "serverManaged": true
     }
   ],
-  "tags": ["video", "ocr", "tracking", "cloud", "gpu", "private", "gdpr"],
+  "tags": [
+    "video",
+    "ocr",
+    "tracking",
+    "cloud",
+    "gpu",
+    "private",
+    "gdpr"
+  ],
   "downloads": 0,
   "repositoryUrl": "https://github.com/Larkup-AI/larkup",
   "license": "Apache-2.0",
   "updatedAt": "2026-08-20",
   "trustLevel": "elevated",
   "permissions": {
-    "httpAllow": ["video.larkup.de"]
+    "httpAllow": [
+      "video.larkup.de"
+    ]
   }
 }
