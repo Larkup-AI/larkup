@@ -13,10 +13,12 @@ import {
   reserveInspectionBudget,
   settleInspectionBudget,
 } from '@larkup/core/video-knowledge/inspection-store';
-import { decideInspection } from '@larkup/core/video-knowledge/inspection-policy';
-import type { FrameArtifact, InspectionPurpose } from '@larkup/tool-video-audio';
+import { decideInspection, LIMITS } from '@larkup/core/video-knowledge/inspection-policy';
+import { chunkTimeRange } from '@larkup/core/video-knowledge/inspection-chunking';
+import { clearGpuActivity, writeGpuActivity } from '@larkup/core/gpu-activity-store';
 import type { MetadataValue } from '@larkup/core/video-knowledge/types';
 import { trackUsageEvent } from '@larkup/core/analytics-store';
+import { readConfig } from '@larkup/core/config-store';
 import { runWithProject } from '@larkup/core/project-store';
 import { createStorageProvider } from '@larkup/marketplace/storage';
 import { isToolInstalled } from '@larkup/marketplace/installer';
@@ -30,14 +32,52 @@ import { createAnalysisBundle } from '@/lib/media/video/analysis-bundle';
 import { analyzeBundle } from '@/lib/media/video/sandbox-analysis';
 import {
   evidenceToRefinementInputs,
-  hasUnlimitedVideoIntelligenceAccess,
+  hasVideoIntelligenceCapacity,
   runInstalledVideoIntelligence,
+  VideoWorkerTimeoutError,
 } from '@/lib/media/video-intelligence-adapter';
+
+type InspectionPurpose = 'verify-visual' | 'high-res-ocr' | 'compare' | 'count' | 'track' | 'code';
+type FrameArtifact = {
+  path: string;
+  timestampSecs: number;
+  timestampPrecision?: 'frame' | 'estimated';
+};
+
+// A live chat turn is waiting on this call -- it must fail fast and clearly
+// if the GPU provider never picks the job up, not hang for the multi-hour
+// window that's appropriate for unattended full-video indexing.
+// Fast interactive passes normally complete well before this. Leave enough
+// headroom for a live worker to finish rather than cancelling valid evidence
+// at the old 90-second deadline and making chat fall back to stale retrieval.
+// A cold serverless image may legitimately need a few minutes to provision.
+// Keep the live progress state truthful throughout that wait instead of
+// cancelling a healthy job just before it starts; warm bounded passes finish
+// far sooner because they decode only the selected clip.
+// A retained worker makes normal interactive passes quick. This ceiling is
+// deliberately longer than a rare provider reallocation so the first request
+// does not cancel a worker just after it begins producing evidence.
+const BOUNDED_INSPECTION_MAX_WAIT_MS = 480_000;
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 480;
 
 const purposes = new Set(['verify-visual', 'high-res-ocr', 'compare', 'count', 'track', 'code']);
+
+// User-facing stages for chat. Short and deliberately non-descriptive: these
+// name the *phase* of a wait, not what the pipeline is doing to the source.
+// Naming the mechanism ("finding the right moments", "reading frames") invites
+// the reader to reason about internals that are ours to change, and it reads
+// as a progress claim the stage cannot actually make. The animated treatment
+// in the chat row is what conveys that work is ongoing.
+const STAGE_LABELS: Record<string, string> = {
+  extract: 'Warming up',
+  transcribe: 'Tuning in',
+  vision: 'Perceiving',
+  synthesize: 'Composing',
+};
+const WAKING_LABEL = 'Waking up';
 
 /**
  * Authenticated, bounded rewind. It decodes only a clamped source range and
@@ -45,7 +85,11 @@ const purposes = new Set(['verify-visual', 'high-res-ocr', 'compare', 'count', '
  * URI is returned to the browser or chat model.
  */
 export async function POST(req: Request) {
-  const serverId = new URL(req.url).searchParams.get('serverId');
+  const url = new URL(req.url);
+  // Chat requests are Project-scoped, while older Media clients use serverId.
+  // Accept both names so an automatic evidence inspection stays in the same
+  // project as the source asset and never falls back to the active workspace.
+  const serverId = url.searchParams.get('projectId') ?? url.searchParams.get('serverId');
   const handler = () => inspectMedia(req);
   return serverId ? runWithProject(serverId, handler) : handler();
 }
@@ -74,6 +118,34 @@ export async function inspectMedia(req: Request) {
     typeof body.question === 'string' && body.question.trim()
       ? body.question.trim().slice(0, 2_000)
       : queryId;
+  // The installed evidence tool chooses the required verification strength.
+  // This adapter merely validates and forwards that generic execution option.
+  const analysisMode =
+    body.analysisMode === 'fast' ||
+    body.analysisMode === 'balanced' ||
+    body.analysisMode === 'thorough'
+      ? body.analysisMode
+      : undefined;
+  const continuousSequence = body.continuousSequence === true;
+  const includeSpeech = body.includeSpeech === true;
+  const knownEntities = Array.isArray(body.knownEntities)
+    ? body.knownEntities
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.trim().slice(0, 200))
+        .filter(Boolean)
+        .slice(0, 20)
+    : [];
+  // When the chat route dispatched this (queryVideoKnowledge / inspectVideoKnowledge),
+  // it's the id of the specific tool call waiting on this inspection -- lets the chat
+  // UI match live progress to that exact message part instead of showing it floating.
+  const toolCallId = typeof body.toolCallId === 'string' ? body.toolCallId : undefined;
+  // A live chat turn carries its own remaining budget. Honour it -- clamped so
+  // a caller can shorten this wait but never extend it past the hard ceiling
+  // or cut it so short that a warm worker is cancelled mid-pass.
+  const requestedWaitMs = Number(body.maxWaitMs);
+  const maxWaitMs = Number.isFinite(requestedWaitMs)
+    ? Math.min(BOUNDED_INSPECTION_MAX_WAIT_MS, Math.max(30_000, Math.floor(requestedWaitMs)))
+    : BOUNDED_INSPECTION_MAX_WAIT_MS;
   if (
     !mediaAssetId ||
     !Number.isFinite(startSecs) ||
@@ -96,11 +168,28 @@ export async function inspectMedia(req: Request) {
     // calibration estimate; optional inspection remains conservative.
     lowerResolutionProbability: purpose === 'verify-visual' || purpose === 'compare' ? 0.65 : 0,
   };
-  const hasCloudVideoIntelligence = await isToolInstalled('video-intelligence');
-  const hasUnlimitedCloudAccess = hasCloudVideoIntelligence
-    ? await hasUnlimitedVideoIntelligenceAccess().catch(() => false)
+  const hasVideoIntelligenceRuntime = await isToolInstalled('video-intelligence');
+  // Installation and execution mode are separate concerns. A locally selected
+  // runtime must never be routed through the managed worker merely because the
+  // Video Intelligence package is installed for this project.
+  const projectConfig = await readConfig();
+  const runtimeMode = projectConfig.toolConfigs?.['video-intelligence']?.runtimeMode;
+  const usesManagedCloudRuntime = runtimeMode === undefined || runtimeMode === 'managed-cloud';
+  const hasManagedCloudVideoIntelligence = hasVideoIntelligenceRuntime && usesManagedCloudRuntime;
+  const hasCloudVideoIntelligenceCapacity = hasManagedCloudVideoIntelligence
+    ? await hasVideoIntelligenceCapacity().catch(() => null)
     : false;
-  const decision = hasUnlimitedCloudAccess
+  if (hasManagedCloudVideoIntelligence && hasCloudVideoIntelligenceCapacity === false) {
+    return NextResponse.json(
+      {
+        error:
+          'Video analysis is already working on another request. Wait for that analysis to finish, then ask again.',
+        serviceBusy: true,
+      },
+      { status: 429, headers: { 'Retry-After': '15' } },
+    );
+  }
+  const decision = hasCloudVideoIntelligenceCapacity
     ? {
         decision: ['high-res-ocr', 'count', 'track', 'code'].includes(purpose)
           ? ('required' as const)
@@ -165,11 +254,11 @@ export async function inspectMedia(req: Request) {
     );
   }
   const hasLegacyVideoAudio = await isToolInstalled('video-audio');
-  if (!hasCloudVideoIntelligence && !hasLegacyVideoAudio) {
+  if (!hasVideoIntelligenceRuntime && !hasLegacyVideoAudio) {
     return NextResponse.json({ error: 'Video & Audio tool is not installed.' }, { status: 503 });
   }
-  const tool = hasCloudVideoIntelligence ? undefined : await loadTool<any>('video-audio');
-  if (!hasCloudVideoIntelligence && !tool?.inspectTimeRange && !tool?.inspectBoundedSource) {
+  const tool = hasVideoIntelligenceRuntime ? undefined : await loadTool<any>('video-audio');
+  if (!hasVideoIntelligenceRuntime && !tool?.inspectTimeRange && !tool?.inspectBoundedSource) {
     return NextResponse.json(
       { error: 'Installed Video & Audio tool does not support bounded inspection.' },
       { status: 503 },
@@ -188,35 +277,140 @@ export async function inspectMedia(req: Request) {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'larkup-video-inspection-'));
   try {
     const storage = createStorageProvider();
-    const local = await storage.resolvePath?.(asset.storageUri);
+    // A durable canonical copy (S3StorageProvider) lets the GPU worker fetch
+    // its own bounded byte range directly from a presigned URL -- this
+    // request never touches the source file at all, local or otherwise,
+    // which is what keeps watch_original working long after the original
+    // upload's short-lived key has expired. Only local disk needs the
+    // legacy resolvePath/retrieve fallback.
+    let remoteReadUrl: string | undefined;
+    try {
+      remoteReadUrl = hasManagedCloudVideoIntelligence
+        ? await storage.getReadUrl?.(asset.storageUri, 3_600)
+        : undefined;
+    } catch (error) {
+      throw new Error(
+        `Video source access failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
+    const local = remoteReadUrl ? undefined : await storage.resolvePath?.(asset.storageUri);
     const sourcePath =
-      local || path.join(tmpDir, `source.${asset.fileName.split('.').pop() || 'mp4'}`);
-    if (!local) await fs.writeFile(sourcePath, await storage.retrieve(asset.storageUri));
-    if (hasCloudVideoIntelligence) {
+      local ||
+      (remoteReadUrl
+        ? ''
+        : path.join(tmpDir, `source.${asset.fileName.split('.').pop() || 'mp4'}`));
+    if (!local && !remoteReadUrl)
+      await fs.writeFile(sourcePath, await storage.retrieve(asset.storageUri));
+    if (hasVideoIntelligenceRuntime) {
+      // Chat-triggered inspection has no dedicated progress panel the way
+      // indexing does, so this used to discard every progress tick and
+      // leave the chat turn looking silently stalled during a slow cold
+      // start. Surface it through the same file-backed activity
+      // (gpu-activity-store.ts): while the worker hasn't picked the job up
+      // yet, the global bottom-right indicator shows it; once it's actually
+      // analyzing, the chat transcript's own tool-call row shows it instead
+      // (matched by toolCallId) -- never both, and never the raw
+      // "frame N/M" text the worker reports internally.
+      const activityId = queryId;
+      // `submitJob` can itself wait for a serverless control plane during a
+      // cold start. Publish the activity before it begins so the user sees a
+      // truthful live state from the first second, not only after a job id
+      // has been allocated and the worker starts reporting progress.
+      await writeGpuActivity({
+        id: activityId,
+        toolCallId,
+        phase: hasManagedCloudVideoIntelligence ? 'waking-up' : 'analyzing',
+        label: hasManagedCloudVideoIntelligence ? 'Video worker' : 'Local Video Intelligence',
+        message: WAKING_LABEL,
+        percent: 0,
+      }).catch(() => undefined);
       const { evidence } = await runInstalledVideoIntelligence({
         asset,
         mediaPath: sourcePath,
-        reportStage: async () => undefined,
+        sourceUrl: remoteReadUrl,
+        reportStage: async (stage, patch) => {
+          const wakingUp = patch.jobStatus === 'queued';
+          await writeGpuActivity({
+            id: activityId,
+            toolCallId,
+            phase: hasManagedCloudVideoIntelligence && wakingUp ? 'waking-up' : 'analyzing',
+            label:
+              hasManagedCloudVideoIntelligence && wakingUp
+                ? 'Video worker'
+                : hasManagedCloudVideoIntelligence
+                  ? 'Video Intelligence'
+                  : 'Local Video Intelligence',
+            message:
+              hasManagedCloudVideoIntelligence && wakingUp
+                ? WAKING_LABEL
+                : (STAGE_LABELS[stage] ?? 'Perceiving'),
+            percent: Math.round(patch.percent ?? 0),
+          }).catch(() => undefined);
+        },
         // The worker is constrained by importantRanges below. Reserve the
         // matching source duration instead of charging the full local video.
         sourceDurationSecs: endSecs - startSecs,
+        maxWaitMs,
         briefOverride: {
           goal: `Bounded ${purpose} verification for: ${question}`,
           expectedQuestions: [question],
+          knownEntities,
           importantRanges: [{ startSecs, endSecs, note: purpose }],
-          indexingMode: 'deep',
-          // Re-check speech for outcome/comparison verification. A legacy
-          // transcript can be incomplete or low quality, while count/OCR
-          // inspections keep the bounded worker focused on visual evidence.
-          skipTranscription: !['verify-visual', 'compare'].includes(purpose),
+          // Chat begins with a broad semantic pass. Claims whose answer is a
+          // visible state/result use balanced sampling so a brief scorecard
+          // or end-card is not skipped; the generic fast path is retained
+          // for other conversational investigations. Offline work remains
+          // balanced too. A later thorough pass is reserved for an unresolved
+          // precision verification, not the first answer.
+          indexingMode:
+            analysisMode ??
+            (toolCallId ? 'fast' : knownEntities.length > 0 ? 'thorough' : 'balanced'),
+          // The managed control plane can route a bounded chat look to a
+          // latency-oriented worker that performs the focused visual read
+          // without the general whole-source planning and synthesis passes.
+          interactive: Boolean(analysisMode),
+          // Clip embeddings are valuable while indexing a whole source, but
+          // this evidence is appended as a refinement and does not consume
+          // those vectors. Never make a live answer wait for a second
+          // serverless embedding worker after vision has found the evidence.
+          skipVideoEmbeddings: true,
+          requireSemanticVision: true,
+          continuousSequence,
+          maxFrames: Math.max(1, Math.min(maxFrames, 24)),
+          // The local runtime keeps decode/OCR/detection on the user's own
+          // computer. It may additionally call the user's selected direct
+          // vision provider, but never a Larkup-managed worker.
+          skipHeavyOperators:
+            hasManagedCloudVideoIntelligence && !['count', 'high-res-ocr'].includes(purpose),
+          // The installed evidence action selects an analysis mode when it
+          // has already narrowed a visual question to a bounded source
+          // range.  Keep that fast path visual; a caller that needs speech
+          // leaves the mode unset and retains the normal transcription path.
+          // This prevents a full-source transcript from delaying a tiny
+          // visual verification before the worker is even dispatched.
+          skipTranscription: includeSpeech
+            ? false
+            : Boolean(analysisMode) && purpose !== 'high-res-ocr'
+              ? true
+              : !['verify-visual', 'compare', 'high-res-ocr'].includes(purpose),
           retainSourceHours: 0,
         },
+      }).finally(() => {
+        void clearGpuActivity(activityId);
       });
       const evidenceInputs = evidenceToRefinementInputs(evidence);
+      if (continuousSequence) {
+        // The range was read as one chronology rather than as separate
+        // clips, so each reading covers the whole span it was drawn from.
+        for (const input of evidenceInputs) {
+          if (input.modality !== 'visual') continue;
+          input.confidence = { ...input.confidence, coverage: endSecs - startSecs };
+        }
+      }
       if (evidenceInputs.length === 0) {
         return NextResponse.json(
           {
-            error: 'Cloud inspection produced no validated evidence.',
+            error: 'Video inspection produced no validated evidence.',
             inspectionDecision: decision,
           },
           { status: 422 },
@@ -233,7 +427,7 @@ export async function inspectMedia(req: Request) {
       void trackUsageEvent({
         type: 'media_processing',
         mediaType: 'video',
-        mediaOperation: 'cloud_inspection',
+        mediaOperation: hasManagedCloudVideoIntelligence ? 'cloud_inspection' : 'inspection',
         durationSecs: endSecs - startSecs,
         frameCount: evidence.visualObservations.length,
         timestamp: new Date().toISOString(),
@@ -269,8 +463,7 @@ export async function inspectMedia(req: Request) {
     // deliberate capability boundary: no source file, storage URI, host path,
     // or generated code is ever given to the sandbox.
     let bundleEvidence:
-      | Parameters<typeof appendVideoKnowledgeRefinement>[0]['evidence'][number]
-      | undefined;
+      Parameters<typeof appendVideoKnowledgeRefinement>[0]['evidence'][number] | undefined;
     if ((purpose === 'count' || purpose === 'track') && result.frames.length > 0) {
       const bundle = await createAnalysisBundle({
         mediaAssetId,
@@ -499,7 +692,14 @@ export async function inspectMedia(req: Request) {
       })),
     });
   } catch (error) {
+    console.error('[video-inspection] failed:', error);
     await settleInspectionBudget(reservation.id, 'released').catch(() => {});
+    // Distinguish "the analysis service itself didn't respond" from every
+    // other failure -- the model must tell the user the check couldn't run,
+    // not imply the video was checked and doesn't show the answer.
+    if (error instanceof VideoWorkerTimeoutError) {
+      return NextResponse.json({ error: error.message, workerTimeout: true }, { status: 504 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Inspection failed.' },
       { status: 500 },
@@ -521,8 +721,11 @@ export async function executeApprovedBackgroundRefinement(jobId: string) {
   try {
     let sequence = 0;
     for (const item of job.coveragePlan) {
-      for (let startSecs = item.startSecs; startSecs < item.endSecs; startSecs += 30) {
-        const endSecs = Math.min(item.endSecs, startSecs + 30);
+      for (const { startSecs, endSecs } of chunkTimeRange(
+        item.startSecs,
+        item.endSecs,
+        LIMITS.durationSecs,
+      )) {
         const response = await inspectMedia(
           new Request('http://larkup.internal/api/media/inspect', {
             method: 'POST',

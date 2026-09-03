@@ -10,7 +10,7 @@ import {
   checkDockerSibling,
   connectDockerSibling,
 } from '@larkup/scraper/local-runtime';
-import { getRuntimeEnv } from '@/lib/env-utils';
+import { getRuntimeEnv } from '@/lib/runtime/environment';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

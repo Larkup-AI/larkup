@@ -13,8 +13,8 @@ import {
   ChevronRight,
   AlertTriangle,
   Copy,
-  XIcon,
   Square,
+  Briefcase,
 } from 'lucide-react';
 import type { CrawlJob, CrawlJobStatus } from '@larkup/core/types';
 import { Badge } from '@/components/ui/badge';
@@ -184,10 +184,13 @@ export function JobsPanel({ jobs, onChanged }: { jobs: CrawlJob[]; onChanged: ()
 
   if (jobs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-10 text-center">
-        <p className="text-sm text-muted-foreground">No ETL jobs yet.</p>
+      <div className="flex flex-col items-center justify-center rounded-lg  py-10 text-center">
+        <div className="bg-background p-1  mb-2 border border-border rounded-md">
+          <Briefcase className="size-5" />
+        </div>
+        <p className="text-sm text-muted-foreground">No current running jobs yet.</p>
         <p className="mt-1 text-xs text-muted-foreground/60">
-          Start a web scrape to aggregate sources here.
+          Start a web scrape to see its progress here. Cron tasks are coming soon.
         </p>
       </div>
     );
@@ -203,7 +206,7 @@ export function JobsPanel({ jobs, onChanged }: { jobs: CrawlJob[]; onChanged: ()
     <>
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="mb-2 flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-1.5">
+        <div className="mb-2 flex items-center justify-between rounded-md  bg-muted/40 px-3 py-1.5">
           <span className="text-xs text-muted-foreground">{selected.size} selected</span>
           <Button
             size="sm"

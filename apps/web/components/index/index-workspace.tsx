@@ -10,12 +10,9 @@ import {
   Cpu,
   Database,
   FileText,
-  Hash,
-  Info,
   Layers,
   Loader2,
   Play,
-  RotateCcw,
   Scissors,
 } from 'lucide-react';
 import type { ChunkingParams, IndexRun, IndexType, VectorStoreId } from '@larkup/core/types';
@@ -28,18 +25,6 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { DialogFooter } from '../ui/dialog';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -67,6 +52,7 @@ export function IndexWorkspace({
   automatic = false,
 }: { onDone?: () => void; onClose?: () => void; automatic?: boolean } = {}) {
   const [starting, setStarting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [isIndexing, setIsIndexing] = useState(false);
 
   const { data, isLoading, mutate } = useSWR<IndexStatus>('/api/index', fetcher, {
@@ -148,6 +134,24 @@ export function IndexWorkspace({
     }
   }
 
+  async function cancelIndexing() {
+    setCancelling(true);
+    try {
+      const res = await fetch('/api/index', { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Indexing cancelled.');
+        mutate();
+        onClose?.();
+      } else {
+        toast.error('Could not cancel indexing.');
+      }
+    } catch {
+      toast.error('Could not cancel indexing.');
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {!ready && (
@@ -165,6 +169,7 @@ export function IndexWorkspace({
                         variant="outline"
                         size="sm"
                         render={<Link href="/settings">Go to AI Models in Settings</Link>}
+                        nativeButton={false}
                       />
                     </li>
                   );
@@ -236,16 +241,31 @@ export function IndexWorkspace({
       )} */}
 
       {automatic ? (
-        <div className="flex justify-end pt-2">
-          <Button onClick={() => onClose?.()} variant="outline">
+        <div className="flex justify-between w-full pt-2">
+          {running ? (
+            <Button onClick={cancelIndexing} variant="destructive" disabled={cancelling}>
+              {cancelling && <Loader2 className="mr-2 size-3.5 animate-spin" />}
+              Cancel indexing
+            </Button>
+          ) : (
+            <div />
+          )}
+          <Button onClick={() => onClose?.()} variant="default">
             Continue working
           </Button>
         </div>
       ) : (
         <div className="flex w-full items-center justify-between pt-4 mt-2">
-          <Button onClick={() => onClose?.()} size="lg" variant="outline">
-            Cancel
-          </Button>
+          {running ? (
+            <Button onClick={cancelIndexing} size="lg" variant="destructive" disabled={cancelling}>
+              {cancelling && <Loader2 className="mr-2 size-3.5 animate-spin" />}
+              Cancel indexing
+            </Button>
+          ) : (
+            <Button onClick={() => onClose?.()} size="lg" variant="outline">
+              Close
+            </Button>
+          )}
           <Button
             onClick={() => build(Boolean(run))}
             disabled={
@@ -261,8 +281,8 @@ export function IndexWorkspace({
             {running
               ? 'Indexing…'
               : run
-              ? `Index new documents (${unindexedCount})`
-              : `Start indexing (${unindexedCount})`}
+                ? `Index new documents (${unindexedCount})`
+                : `Start indexing (${unindexedCount})`}
           </Button>
         </div>
       )}
@@ -285,31 +305,13 @@ function ConfigSummary({
   const items = [
     {
       icon: Cpu,
-      label: 'Embedding model',
+      label: 'AI Model',
       value: model?.label ?? config.embeddingModelId,
-      hint: model ? `${model.dimensions} dims` : undefined,
-    },
-    {
-      icon: Database,
-      label: 'Vector store',
-      value: store?.label ?? config.vectorStore,
-    },
-    {
-      icon: Boxes,
-      label: 'Index type',
-      value: config.indexType.toUpperCase(),
-    },
-    {
-      icon: Scissors,
-      label: 'Chunking',
-      value: `${config.chunking.chunkSize} / ${config.chunking.chunkOverlap}`,
-      hint: 'size / overlap',
     },
     {
       icon: FileText,
-      label: 'Corpus',
-      value: `${docCount.toLocaleString()} docs`,
-      hint: `${charCount.toLocaleString()} chars`,
+      label: 'Data sources',
+      value: `${docCount.toLocaleString()} items`,
     },
   ];
 
@@ -322,21 +324,14 @@ function ConfigSummary({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-5">
           {items.map((it) => (
             <div key={it.label} className="flex flex-col gap-1.5">
               <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <it.icon className="size-3.5" />
                 {it.label}
               </dt>
-              <dd className="text-sm font-medium leading-tight">
-                {it.value}
-                {it.hint && (
-                  <span className="ml-1.5 font-mono text-[11px] font-normal text-muted-foreground">
-                    {it.hint}
-                  </span>
-                )}
-              </dd>
+              <dd className="text-sm font-medium leading-tight">{it.value}</dd>
             </div>
           ))}
         </dl>
@@ -364,8 +359,8 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
     run.totalChunks > 0
       ? Math.round((run.processedChunks / run.totalChunks) * 100)
       : running
-      ? 5
-      : 0;
+        ? 5
+        : 0;
 
   return (
     <Card>

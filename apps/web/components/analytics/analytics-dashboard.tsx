@@ -78,12 +78,13 @@ function formatCost(cost: number): string {
 export function AnalyticsDashboard() {
   const [activeTab, setActiveTab] = useState('indexing');
   const [timeframe, setTimeframe] = useState('14d');
+  const [runtime, setRuntime] = useState<'all' | 'local' | 'remote'>('all');
 
   const {
     data: summary,
     isLoading,
     error,
-  } = useSWR<AnalyticsSummary>(`/api/analytics?timeframe=${timeframe}`, fetcher);
+  } = useSWR<AnalyticsSummary>(`/api/analytics?timeframe=${timeframe}&runtime=${runtime}`, fetcher);
 
   if (isLoading) {
     return (
@@ -190,7 +191,17 @@ export function AnalyticsDashboard() {
               Server Traffic
             </TabsTrigger>
           </TabsList>
-          <div className="flex items-center">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={runtime} onValueChange={(value) => setRuntime(value as typeof runtime)}>
+              <SelectTrigger className="h-10! w-32 bg-white text-sm dark:bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All runtimes</SelectItem>
+                <SelectItem value="local">Local</SelectItem>
+                <SelectItem value="remote">Remote</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={timeframe} onValueChange={(val) => val && setTimeframe(val)}>
               <SelectTrigger className="w-35 h-10! text-sm bg-white dark:bg-background focus:ring-0 focus:border-input data-[state=open]:ring-0 data-[state=open]:border-input outline-none focus:outline-none">
                 <SelectValue placeholder="Select timeframe">
@@ -221,7 +232,7 @@ export function AnalyticsDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent className="px-2 sm:p-6">
-              <div className="h-[300px] w-full relative">
+              <div className="h-75 w-full relative">
                 {isServerEmpty && (
                   <DummyOverlay
                     title="No Server Traffic Yet"
@@ -310,7 +321,7 @@ export function AnalyticsDashboard() {
               <CardDescription>Daily tokens processed for document indexing.</CardDescription>
             </CardHeader>
             <CardContent className="px-2 sm:p-6">
-              <div className="h-[300px] w-full relative">
+              <div className="h-75 w-full relative">
                 {isIndexingEmpty && (
                   <DummyOverlay
                     title="No Indexing Data Yet"
@@ -409,7 +420,7 @@ export function AnalyticsDashboard() {
               <CardDescription>Daily tokens processed for chat completions.</CardDescription>
             </CardHeader>
             <CardContent className="px-2 sm:p-6">
-              <div className="h-[300px] w-full relative">
+              <div className="h-75 w-full relative">
                 {isChatEmpty && (
                   <DummyOverlay
                     title="No Chat Data Yet"

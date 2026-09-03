@@ -2,15 +2,84 @@ import { generateText } from 'ai';
 import { readConfig } from '@larkup/core/config-store';
 import { trackUsageEvent } from '@larkup/core/analytics-store';
 import { getModelsByType } from '@larkup/core/models-cache';
-import {
-  validateOcrResult,
-  validateVisualObservations,
-  parseStructuredJsonObject,
-  type OcrAdapter,
-  type OcrResult,
-  type VisionAnalysisAdapter,
-} from '@larkup/tool-video-audio';
 import { createChatModel, resolveConfiguredVisionModel } from '@/lib/chat/model-provider';
+
+type VisualObservation = {
+  kind: 'object' | 'action' | 'ui' | 'chart' | 'relationship' | 'state';
+  value: string;
+  frameTimestamps: number[];
+  confidence: number;
+  uncertaintyReasons: string[];
+};
+type VisionAnalysisAdapter = {
+  analyze(input: {
+    frames: Array<{ path: string; timestampSecs: number }>;
+    previousContext?: string;
+    signal?: AbortSignal;
+  }): Promise<{ observations: VisualObservation[] }>;
+};
+type OcrResult = {
+  blocks: Array<{
+    text: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    confidence: number;
+    language?: string;
+    direction?: 'ltr' | 'rtl' | 'ttb';
+  }>;
+  provider?: string;
+  model?: string;
+};
+type OcrAdapter = {
+  recognize(input: {
+    imagePath: string;
+    languages?: string[];
+    signal?: AbortSignal;
+  }): Promise<OcrResult>;
+};
+
+function parseStructuredJsonObject(text: string): Record<string, unknown> {
+  const candidate = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '');
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  if (start < 0 || end < start) throw new Error('Expected a JSON object.');
+  const parsed = JSON.parse(candidate.slice(start, end + 1));
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    throw new Error('Expected a JSON object.');
+  return parsed as Record<string, unknown>;
+}
+
+function validateVisualObservations(value: VisualObservation[]): VisualObservation[] {
+  return value.filter(
+    (observation) =>
+      observation.value.trim().length > 0 &&
+      observation.frameTimestamps.length > 0 &&
+      Number.isFinite(observation.confidence) &&
+      observation.confidence >= 0 &&
+      observation.confidence <= 1,
+  );
+}
+
+function validateOcrResult(value: OcrResult): OcrResult {
+  if (!Array.isArray(value?.blocks)) throw new Error('OCR adapter returned no blocks.');
+  return {
+    ...value,
+    blocks: value.blocks.filter(
+      (block) =>
+        typeof block?.text === 'string' &&
+        [block.left, block.top, block.width, block.height, block.confidence].every(
+          Number.isFinite,
+        ) &&
+        block.confidence >= 0 &&
+        block.confidence <= 1,
+    ),
+  };
+}
 
 /**
  * Server-only VLM adapter.
@@ -41,10 +110,10 @@ export function createConfiguredVisionAdapter(): VisionAnalysisAdapter {
         'CRITICAL RULES:',
         '- Only report source-visible facts. Every frameTimestamps entry must be one of the supplied timestamps.',
         '- Do not identify people or infer identity.',
-        '- For a state observation, value must be a plain source-visible fact (for example, "Scoreboard score is 2-1"). Do not embed JSON or quoted JSON fragments inside value.',
+        '- For a state observation, value must be a plain source-visible fact (for example, "The displayed value is 2-1"). Do not embed JSON or quoted JSON fragments inside value.',
         '',
         'STATE TRACKING (very important):',
-        '- Track any evolving on-screen state: scores, counters, timers, progress bars, text overlays, UI elements, labels, numbers.',
+        '- Track any evolving on-screen state: counters, timers, progress bars, text overlays, UI elements, labels, numbers.',
         '- When a tracked value changes from what was previously reported, explicitly note the transition with a state observation.',
         "- Always report the CURRENT value you see on screen, even if it was reported before — the latest frame's value is what matters.",
         '',

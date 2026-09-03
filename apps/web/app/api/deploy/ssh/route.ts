@@ -1,402 +1,291 @@
+import { randomUUID } from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { NextRequest } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-import { getActiveServer } from '@larkup/core/workspace';
 import { NodeSSH } from 'node-ssh';
-import crypto from 'crypto';
+import { readConfig, writeConfig } from '@larkup/core/config-store';
+import { saveDeployment } from '@larkup/core/deployments-store';
+import { prepareAgentRuntime } from '@larkup/core/generator/server-runtime';
+import { generateServer, type GeneratedFile } from '@larkup/core/generator/generate-server';
+import type { RagConfig } from '@larkup/core/types';
+import {
+  applyDeploymentStorageSettings,
+  deploymentEndpointForHost,
+  getDeploymentTarget,
+} from '@/lib/deployments';
 
-function getFilesRecursively(dir: string, baseDir: string): any[] {
-  let results: any[] = [];
-  if (!fs.existsSync(dir)) return results;
-  const list = fs.readdirSync(dir);
-  for (const file of list) {
-    if (file === 'node_modules' || file === '.git' || file === 'server.log') continue;
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    if (stat && stat.isDirectory()) {
-      results = results.concat(getFilesRecursively(filePath, baseDir));
-    } else {
-      const data = fs.readFileSync(filePath);
-      const relativePath = path.relative(baseDir, filePath).replace(/\\/g, '/');
-      results.push({ file: relativePath, data: data.toString('utf8') });
-    }
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+function envFile(values: Record<string, string>) {
+  return Object.entries(values)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}=${v}`)
+    .join('\n');
+}
+
+function envFromFile(file: GeneratedFile | undefined) {
+  const values: Record<string, string> = {};
+  for (const line of file?.contents.split('\n') ?? []) {
+    const idx = line.indexOf('=');
+    if (idx > 0) values[line.slice(0, idx)] = line.slice(idx + 1);
   }
-  return results;
+  return values;
+}
+
+function sseMessage(data: object) {
+  return `data: ${JSON.stringify(data)}\n\n`;
+}
+
+async function execStream(
+  ssh: NodeSSH,
+  command: string,
+  onLine: (line: string) => void,
+): Promise<{ code: number; stderr: string }> {
+  return new Promise((resolve) => {
+    let stderr = '';
+    (ssh.connection as any).exec(command, { pty: true }, (err: Error | undefined, stream: any) => {
+      if (err) {
+        resolve({ code: 1, stderr: err.message });
+        return;
+      }
+      stream.on('data', (chunk: Buffer) => {
+        for (const line of chunk.toString().split(/\r?\n/)) {
+          if (line.trim()) onLine(line);
+        }
+      });
+      stream.stderr?.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
+      stream.on('close', (exitCode: number) => resolve({ code: exitCode ?? 0, stderr }));
+    });
+  });
+}
+
+async function deployViaSSH(opts: {
+  target: NonNullable<ReturnType<typeof getDeploymentTarget>>;
+  host: string;
+  username: string;
+  authType: 'key' | 'password';
+  secret: string;
+  newPassword?: string;
+  files: GeneratedFile[];
+  env: Record<string, string>;
+  emit: (data: object) => void;
+}): Promise<{ endpoint: string; deploymentId: string }> {
+  const { host, username, authType, secret, newPassword, files, env, emit } = opts;
+  const log = (msg: string) => emit({ type: 'log', message: msg });
+  const ssh = new NodeSSH();
+  const temporaryDir = await fs.mkdtemp(path.join(os.tmpdir(), 'larkup-vps-'));
+
+  try {
+    log(`Connecting to ${username}@${host} via SSH...`);
+    try {
+      await ssh.connect({
+        host,
+        username,
+        [authType === 'key' ? 'privateKey' : 'password']: secret,
+        readyTimeout: 20_000,
+      });
+    } catch (err: any) {
+      const msg: string = (err?.message || err?.level || '').toLowerCase();
+      if (
+        msg.includes('password') &&
+        (msg.includes('expired') || msg.includes('change') || msg.includes('must'))
+      ) {
+        emit({ type: 'password_change_required' });
+        throw new Error('password_change_required');
+      }
+      throw err;
+    }
+    log('Connected successfully.');
+
+    if (newPassword) {
+      log('Changing server password...');
+      const r = await ssh.execCommand(`echo "${username}:${newPassword}" | sudo chpasswd`);
+      if (r.code !== 0)
+        await ssh.execCommand(`echo -e "${secret}\n${newPassword}\n${newPassword}" | passwd`);
+      log('Password changed successfully.');
+      emit({ type: 'password_changed', newPassword });
+      ssh.dispose();
+      log('Reconnecting with new password...');
+      await ssh.connect({ host, username, password: newPassword, readyTimeout: 20_000 });
+      log('Reconnected successfully.');
+    }
+
+    log('Checking for Docker...');
+    const dockerCheck = await ssh.execCommand('docker --version');
+    if (dockerCheck.code !== 0) {
+      log('Docker not found. Installing Docker Engine (this may take a few minutes)...');
+      log('$ curl -fsSL https://get.docker.com | sh');
+      const { code, stderr } = await execStream(ssh, 'curl -fsSL https://get.docker.com | sh', log);
+      if (code !== 0) throw new Error(`Docker install failed: ${stderr || 'unknown error'}`);
+      log('Docker Engine installed.');
+    } else {
+      log(`Docker found: ${dockerCheck.stdout.trim()}`);
+    }
+
+    log('Checking for Docker Compose...');
+    const composeCheck = await ssh.execCommand('docker compose version');
+    if (composeCheck.code !== 0) {
+      log('Docker Compose not found. Installing...');
+      const { code } = await execStream(
+        ssh,
+        'apt-get update -qq && apt-get install -y -qq docker-compose-plugin',
+        log,
+      );
+      if (code !== 0) {
+        log('Trying standalone Compose binary...');
+        await execStream(
+          ssh,
+          `curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose`,
+          log,
+        );
+      }
+      log('Docker Compose installed.');
+    } else {
+      log(`Docker Compose found: ${composeCheck.stdout.trim()}`);
+    }
+
+    log('Preparing Agent runtime files...');
+    for (const file of files.filter((f) => f.path !== '.env')) {
+      const dest = path.join(temporaryDir, file.path);
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.writeFile(
+        dest,
+        file.encoding === 'base64' ? Buffer.from(file.contents, 'base64') : file.contents,
+      );
+    }
+    await fs.writeFile(path.join(temporaryDir, '.env'), envFile(env), 'utf8');
+
+    const homeResult = await ssh.execCommand(`printf %s "$HOME"`);
+    if (homeResult.code !== 0 || !homeResult.stdout.trim())
+      throw new Error('Could not resolve SSH home directory.');
+    const deploymentId = randomUUID();
+    const remoteDir = path.posix.join(
+      homeResult.stdout.trim(),
+      '.larkup',
+      'deployments',
+      deploymentId,
+    );
+    log('Creating deployment directory on server...');
+    const mkResult = await ssh.execCommand(`mkdir -p ${remoteDir}`);
+    if (mkResult.code !== 0)
+      throw new Error(mkResult.stderr || 'Could not create deployment directory.');
+
+    log('Uploading runtime files to server...');
+    const uploaded = await ssh.putDirectory(temporaryDir, remoteDir, {
+      recursive: true,
+      concurrency: 4,
+      validate: () => true, // Allow dotfiles like .env
+    });
+    if (!uploaded) throw new Error('Could not upload Agent runtime files.');
+    log('Files uploaded successfully.');
+
+    log('Starting Agent runtime...');
+    log('$ docker compose up -d --build');
+    const { code: startCode, stderr: startStderr } = await execStream(
+      ssh,
+      `cd ${remoteDir} && docker compose up -d --build`,
+      log,
+    );
+    if (startCode !== 0) throw new Error(startStderr || 'Docker Compose failed to start.');
+    log('Agent runtime is live!');
+
+    return { endpoint: deploymentEndpointForHost(host), deploymentId };
+  } finally {
+    ssh.dispose();
+    await fs.rm(temporaryDir, { recursive: true, force: true });
+  }
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  let {
-    serverId,
-    host,
-    username,
-    privateKeyOrPassword,
-    envVars,
-    newPassword: userNewPassword,
-  } = body;
+  const body = (await req.json().catch(() => null)) as any;
+  const target = getDeploymentTarget(body?.provider);
+  if (!target || target.kind !== 'vps') {
+    return new Response(
+      sseMessage({ type: 'error', error: 'Invalid or non-VPS deployment target.' }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'text/event-stream' },
+      },
+    );
+  }
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      function sendEvent(data: any) {
-        try {
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`));
-        } catch (e) {}
-      }
-      function log(msg: string) {
-        sendEvent({ type: 'log', message: msg });
-      }
-      function done(result: any) {
-        sendEvent({ type: 'done', ...result });
-        try {
-          controller.close();
-        } catch (e) {}
-      }
-      function errorMsg(err: string) {
-        sendEvent({ type: 'error', error: err });
-        try {
-          controller.close();
-        } catch (e) {}
-      }
+  const encoder = new TextEncoder();
+  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = writable.getWriter();
+  const emit = (data: object) => writer.write(encoder.encode(sseMessage(data))).catch(() => {});
 
-      let activeId = serverId;
-      if (activeId === 'default') {
-        const server = await getActiveServer();
-        if (server) activeId = server.id;
-      }
+  (async () => {
+    try {
+      const config = (await readConfig()) as RagConfig;
+      const dc = body?.deployConfig;
+      const requested = applyDeploymentStorageSettings(config, dc);
+      const prepared = await prepareAgentRuntime(
+        { ...requested, runtimeProfile: body?.profile === 'assistant' ? 'assistant' : 'knowledge' },
+        { mcpConnectionIds: dc?.enabledMcp ?? [], portable: true },
+      );
+      const generated = generateServer(prepared.config);
+      generated.files.push(...prepared.pluginFiles);
+      const env: Record<string, string> = {
+        ...envFromFile(generated.files.find((f) => f.path === '.env')),
+        ...prepared.env,
+        ...(dc?.envValues ?? {}),
+        ...(dc?.apiKey ? { SERVER_API_KEY: dc.apiKey } : {}),
+      };
 
-      if (!host || !username || !privateKeyOrPassword.value) {
-        return errorMsg('Host, username, and credentials are required.');
-      }
-
-      try {
-        log(`Preparing deployment for server ${activeId}...`);
-        const cwd = process.cwd();
-        let config: any = null;
-        const configCandidates = [
-          path.join(cwd, '.larkup', 'servers', activeId, 'config.json'),
-          path.join(cwd, '.larkup', 'config.json'),
-        ];
-        for (const cfgPath of configCandidates) {
-          if (fs.existsSync(cfgPath)) {
-            try {
-              config = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
-              break;
-            } catch {}
-          }
-        }
-
-        if (!config) {
-          return errorMsg('Configuration not found. Please save your settings first.');
-        }
-
-        const { generateServer } = await import('@larkup/core/generator/generate-server');
-        const generated = generateServer(config);
-
-        const filesToUpload: { localPath?: string; contents?: string; remotePath: string }[] = [];
-
-        for (const f of generated.files) {
-          filesToUpload.push({ contents: f.contents, remotePath: f.path });
-        }
-
-        const envLines = Object.entries(envVars).map(([k, v]) => `${k}=${v}`);
-        const isLanceLocal =
-          config.vectorStore === 'lancedb' && (config.storeConfig?.mode ?? 'local') === 'local';
-        if (isLanceLocal) {
-          envLines.push('LANCEDB_PATH=./.larkup/lancedb');
-        }
-        filesToUpload.push({ contents: envLines.join('\n'), remotePath: '.env' });
-
-        if (isLanceLocal) {
-          const lancedbDir = path.join(cwd, '.larkup', 'servers', activeId, 'lancedb');
-          if (fs.existsSync(lancedbDir)) {
-            const lancedbFiles = getFilesRecursively(
-              lancedbDir,
-              path.join(cwd, '.larkup', 'servers', activeId),
-            );
-            for (const f of lancedbFiles) {
-              filesToUpload.push({
-                localPath: path.join(cwd, '.larkup', 'servers', activeId, f.file),
-                remotePath: f.file,
-              });
-            }
-          }
-        }
-
-        let updatedPassword = userNewPassword || '';
-        let ssh = new NodeSSH();
-        log(`Connecting to ${username}@${host} via SSH...`);
-
-        const connectOpts = {
-          host,
-          username,
-          privateKey: privateKeyOrPassword.type === 'key' ? privateKeyOrPassword.value : undefined,
-          password:
-            privateKeyOrPassword.type === 'password' ? privateKeyOrPassword.value : undefined,
-          readyTimeout: 20000,
-          tryKeyboard: true,
-          onKeyboardInteractive: (
-            _name: string,
-            _instructions: string,
-            _instructionsLang: string,
-            prompts: any[],
-            finish: (responses: string[]) => void,
-          ) => {
-            if (prompts.length > 0 && privateKeyOrPassword.type === 'password') {
-              const answers = prompts.map((p) => {
-                return privateKeyOrPassword.value;
-              });
-              finish(answers);
-            } else {
-              finish([]);
-            }
-          },
-        };
-
-        await ssh.connect(connectOpts);
-        log(`Connected successfully.`);
-
-        // Helper to run commands and stream output
-        const runCommand = async (cmd: string, opts?: { cwd?: string; ignoreErrors?: boolean }) => {
-          log(`$ ${cmd}`);
-          const res = await ssh.execCommand(cmd, {
-            cwd: opts?.cwd,
-            onStdout: (chunk: Buffer) => log(chunk.toString('utf8').trimEnd()),
-            onStderr: (chunk: Buffer) => log(chunk.toString('utf8').trimEnd()),
-          });
-          const combined = `${res.stdout} ${res.stderr}`.toLowerCase();
-          if (
-            combined.includes('password change required') ||
-            combined.includes('password has expired')
-          ) {
-            throw new Error('PASSWORD_EXPIRED');
-          }
-          if (res.code !== 0 && !opts?.ignoreErrors) {
-            throw new Error(`Command failed (exit ${res.code}): ${cmd}\n${res.stderr}`);
-          }
-          return res;
-        };
-
-        const remoteDir = `/opt/buddyhere-rag-${activeId}`;
-
-        let needsPasswordChange = false;
-        try {
-          await runCommand('echo ok');
-        } catch (err: any) {
-          if (err.message === 'PASSWORD_EXPIRED') {
-            needsPasswordChange = true;
-          } else {
-            throw err;
-          }
-        }
-
-        if (needsPasswordChange) {
-          if (!updatedPassword) {
-            log(`⚠️ Password has expired! A new password is required.`);
-            sendEvent({ type: 'password_change_required' });
-            try {
-              controller.close();
-            } catch (e) {}
-            return;
-          }
-
-          log(`⚠️ Password has expired! Changing password...`);
-
-          await new Promise<void>((resolve, reject) => {
-            const timeout = setTimeout(() => {
-              reject(new Error('Password change timed out after 30 seconds.'));
-            }, 30000);
-
-            ssh
-              .requestShell({ term: 'xterm' })
-              .then((shell) => {
-                let buffer = '';
-                let stage = 0; // 0=waiting for current, 1=waiting for new, 2=waiting for retype, 3=done
-
-                shell.on('data', (data: Buffer) => {
-                  const text = data.toString('utf8');
-                  buffer += text;
-                  const clean = text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim();
-                  if (clean) log(clean);
-
-                  const lower = buffer.toLowerCase();
-
-                  if (stage === 0) {
-                    if (
-                      (lower.includes('current') || lower.includes('old')) &&
-                      lower.includes('password')
-                    ) {
-                      shell.write(privateKeyOrPassword.value + '\n');
-                      buffer = '';
-                      stage = 1;
-                    } else if (lower.includes('new') && lower.includes('password')) {
-                      // Hetzner sometimes skips asking for the current password
-                      shell.write(updatedPassword + '\n');
-                      buffer = '';
-                      stage = 2;
-                    }
-                  } else if (stage === 1 && lower.includes('new') && lower.includes('password')) {
-                    shell.write(updatedPassword + '\n');
-                    buffer = '';
-                    stage = 2;
-                  } else if (
-                    stage === 2 &&
-                    (lower.includes('retype') ||
-                      lower.includes('re-enter') ||
-                      lower.includes('confirm') ||
-                      (lower.includes('new') && lower.includes('password')))
-                  ) {
-                    shell.write(updatedPassword + '\n');
-                    buffer = '';
-                    stage = 3;
-                  } else if (
-                    stage === 3 &&
-                    (lower.includes('updated successfully') ||
-                      lower.includes('password changed') ||
-                      lower.includes('$') ||
-                      lower.includes('#'))
-                  ) {
-                    clearTimeout(timeout);
-                    shell.end();
-                    resolve();
-                  }
-                });
-
-                shell.on('close', () => {
-                  clearTimeout(timeout);
-                  resolve();
-                });
-                shell.on('error', (err: Error) => {
-                  clearTimeout(timeout);
-                  reject(err);
-                });
-              })
-              .catch((err: Error) => {
-                clearTimeout(timeout);
-                reject(err);
-              });
-          });
-
-          log('✅ Password changed successfully.');
-          sendEvent({ type: 'password_changed', newPassword: updatedPassword });
-
-          // Disconnect and reconnect with the new password
-          ssh.dispose();
-          log('Reconnecting with new password...');
-          ssh = new NodeSSH();
-          await ssh.connect({
-            ...connectOpts,
-            password: updatedPassword,
-            onKeyboardInteractive: (
-              _name: string,
-              _instructions: string,
-              _instructionsLang: string,
-              prompts: any[],
-              finish: (responses: string[]) => void,
-            ) => {
-              if (prompts.length > 0) {
-                finish(prompts.map(() => updatedPassword));
-              } else {
-                finish([]);
-              }
-            },
-          });
-          log('Reconnected successfully.');
-        }
-
-        // ── Step 3: Ensure Docker is installed ──
-        log('Checking for Docker...');
-        const dockerCheck = await runCommand('docker --version', { ignoreErrors: true });
-        if (dockerCheck.code !== 0) {
-          log('Docker not found. Installing Docker (this may take a few minutes)...');
-          await runCommand(
-            'curl -fsSL https://get.docker.com -o /tmp/get-docker.sh && sh /tmp/get-docker.sh',
-          );
-        }
-
-        // ── Step 4: Upload files ──
-        log(`Creating remote directory ${remoteDir}...`);
-        await runCommand(`mkdir -p ${remoteDir}`);
-
-        log(`Uploading ${filesToUpload.length} files...`);
-        for (const f of filesToUpload) {
-          const dir = path.posix.dirname(f.remotePath);
-          if (dir && dir !== '.') {
-            await runCommand(`mkdir -p ${remoteDir}/${dir}`, { ignoreErrors: true });
-          }
-
-          const target = `${remoteDir}/${f.remotePath}`;
-          if (f.localPath) {
-            log(`  ↑ ${f.remotePath}`);
-            await ssh.putFile(f.localPath, target);
-          } else if (f.contents) {
-            log(`  ↑ ${f.remotePath}`);
-            const tempPath = path.join(
-              '/tmp',
-              `buddyhere-upload-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-            );
-            fs.writeFileSync(tempPath, f.contents);
-            await ssh.putFile(tempPath, target);
-            fs.unlinkSync(tempPath);
-          }
-        }
-
-        // ── Step 5: Docker Compose ──
-        log(`Starting Docker containers...`);
-        await runCommand('docker compose down 2>/dev/null || true', {
-          cwd: remoteDir,
-          ignoreErrors: true,
+      if (dc?.saveStorageSettings !== false) {
+        await writeConfig({
+          ...config,
+          vectorStore: prepared.config.vectorStore,
+          storeConfig: prepared.config.storeConfig,
+          embeddingModelId: prepared.config.embeddingModelId,
         });
-
-        const composeRes = await runCommand('docker compose up -d --build', {
-          cwd: remoteDir,
-          ignoreErrors: true,
-        });
-        if (composeRes.code !== 0) {
-          log('docker compose v2 failed, trying docker-compose v1...');
-          await runCommand('docker-compose up -d --build', { cwd: remoteDir });
-        }
-
-        ssh.dispose();
-        log(`🎉 Container started — verifying server health...`);
-
-        // Poll /health until the server responds (up to 60 s)
-        const serverUrl = `http://${host}:8080`;
-        let healthy = false;
-        for (let attempt = 1; attempt <= 12; attempt++) {
-          await new Promise((r) => setTimeout(r, 5000));
-          try {
-            const hRes = await fetch(`${serverUrl}/health`, { signal: AbortSignal.timeout(4000) });
-            if (hRes.ok) {
-              healthy = true;
-              break;
-            }
-          } catch {
-            /* still starting */
-          }
-          log(`  Health check ${attempt}/12…`);
-        }
-
-        if (!healthy) {
-          log(
-            '⚠️  Server did not respond to /health within 60 s. It may still be starting — check logs on the VPS.',
-          );
-        } else {
-          log('✅ Knowledge Server is healthy and accepting requests.');
-        }
-
-        done({
-          success: true,
-          url: serverUrl,
-          newPassword: updatedPassword || undefined,
-        });
-      } catch (error: any) {
-        console.error('SSH Deploy Error:', error);
-        errorMsg(error.message || 'Failed to deploy via SSH.');
       }
-    },
-  });
 
-  return new Response(stream, {
+      const creds = dc?.credentials ?? {};
+      const host = (creds.sshHost ?? '').trim();
+      const username = (creds.sshUsername ?? 'root').trim();
+      const authType: 'key' | 'password' = creds.sshAuthType ?? 'password';
+      const secret = creds.sshKeyOrPassword ?? '';
+      if (!host || !secret) {
+        emit({ type: 'error', error: 'SSH host and credentials are required.' });
+        return;
+      }
+
+      const { endpoint, deploymentId } = await deployViaSSH({
+        target,
+        host,
+        username,
+        authType,
+        secret,
+        newPassword: creds.newPassword,
+        files: generated.files,
+        env,
+        emit,
+      });
+
+      await saveDeployment({
+        name: `${target.label} ${body?.profile === 'assistant' ? 'Agent' : 'Knowledge'}`,
+        provider: target.id,
+        profile: body?.profile ?? 'knowledge',
+        endpoint,
+        remoteId: deploymentId,
+      });
+
+      emit({ type: 'done', success: true, url: endpoint });
+    } catch (err: any) {
+      if (err?.message !== 'password_change_required') {
+        emit({ type: 'error', error: err?.message || 'Deployment failed.' });
+      }
+    } finally {
+      writer.close().catch(() => {});
+    }
+  })();
+
+  return new Response(readable, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',

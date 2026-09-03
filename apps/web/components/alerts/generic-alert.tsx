@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import * as React from "react";
+import * as React from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,8 +10,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 
 export interface GenericAlertProps {
   open: boolean;
@@ -21,7 +21,7 @@ export interface GenericAlertProps {
   cancelText?: React.ReactNode;
   actionText?: React.ReactNode;
   onAction?: () => void;
-  variant?: "default" | "destructive";
+  variant?: 'default' | 'destructive';
   icon?: React.ReactNode;
   contentClassName?: string;
 }
@@ -31,10 +31,10 @@ export function GenericAlert({
   onOpenChange,
   title,
   description,
-  cancelText = "Cancel",
-  actionText = "Continue",
+  cancelText = 'Cancel',
+  actionText = 'Continue',
   onAction,
-  variant = "default",
+  variant = 'default',
   icon,
   contentClassName,
 }: GenericAlertProps) {
@@ -46,11 +46,13 @@ export function GenericAlert({
             {icon}
             {title}
           </AlertDialogTitle>
-          {description && (
-            <AlertDialogDescription className={typeof description === "string" ? "whitespace-pre-wrap" : "space-y-2"}>
+          {typeof description === 'string' ? (
+            <AlertDialogDescription className="whitespace-pre-wrap">
               {description}
             </AlertDialogDescription>
-          )}
+          ) : description ? (
+            <div className="space-y-2 text-sm text-muted-foreground">{description}</div>
+          ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelText}</AlertDialogCancel>
@@ -61,8 +63,8 @@ export function GenericAlert({
               onOpenChange(false);
             }}
             className={cn(
-              variant === "destructive" &&
-                "bg-destructive text-white hover:bg-destructive/90 gap-2"
+              variant === 'destructive' &&
+                'bg-destructive text-white hover:bg-destructive/90 gap-2',
             )}
           >
             {actionText}

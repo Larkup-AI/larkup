@@ -43,10 +43,6 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Summary stats mini-cards                                            */
-/* ------------------------------------------------------------------ */
-
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex flex-col rounded-md bg-secondary/50 px-2.5 py-1.5">
@@ -61,10 +57,6 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* Main preview component                                              */
-/* ------------------------------------------------------------------ */
 
 interface TabularPreviewProps {
   rows: Record<string, any>[];

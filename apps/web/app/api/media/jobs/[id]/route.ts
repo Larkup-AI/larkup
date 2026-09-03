@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import {
   getVideoKnowledgeJob,
   requestVideoKnowledgeJobCancellation,
@@ -18,7 +18,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       ? NextResponse.json({ job })
       : NextResponse.json({ error: 'Video knowledge job not found.' }, { status: 404 });
   };
-  return serverId ? runWithServer(serverId, handler) : handler();
+  return serverId ? runWithProject(serverId, handler) : handler();
 }
 
 export async function DELETE(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -30,5 +30,5 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
       ? NextResponse.json({ job })
       : NextResponse.json({ error: 'Video knowledge job cannot be cancelled.' }, { status: 409 });
   };
-  return serverId ? runWithServer(serverId, handler) : handler();
+  return serverId ? runWithProject(serverId, handler) : handler();
 }

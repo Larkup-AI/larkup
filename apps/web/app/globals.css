@@ -96,7 +96,7 @@
   --panel: #141414;
   --panel-foreground: #fafafa;
   --popover: #1c1c1c;
-  --popover-foreground: #fafafa;
+  --popover-foreground: #ffffff;
   --primary: #ffffff;
   --primary-foreground: #000000;
   --secondary: #1a1a1a;
@@ -338,4 +338,69 @@
 
 .assistant-text-content .msg-link:hover {
   opacity: 0.75;
+}
+
+/* Live tool progress
+   -----------------
+   A video pass runs for minutes with long gaps between real updates, so the
+   waiting state has to carry the sense of ongoing work by itself. The label
+   sweeps a highlight across its own text, and once progress passes the point
+   where a percentage is meaningful the bar stops claiming a position and
+   shuttles instead. Both are paused for reduced-motion. */
+
+@keyframes larkup-shimmer-sweep {
+  0% {
+    background-position: 180% 0;
+  }
+  100% {
+    background-position: -80% 0;
+  }
+}
+
+.larkup-shimmer-text {
+  background-image: linear-gradient(
+    100deg,
+    var(--muted-foreground) 0%,
+    var(--muted-foreground) 38%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 62%,
+    var(--muted-foreground) 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: larkup-shimmer-sweep 2.6s linear infinite;
+}
+
+@keyframes larkup-progress-shuttle {
+  0% {
+    transform: translateX(-105%) scaleX(0.55);
+  }
+  50% {
+    transform: translateX(35%) scaleX(1);
+  }
+  100% {
+    transform: translateX(190%) scaleX(0.55);
+  }
+}
+
+.larkup-progress-shuttle {
+  width: 55%;
+  transform-origin: left center;
+  animation: larkup-progress-shuttle 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .larkup-shimmer-text {
+    animation: none;
+    background-image: none;
+    color: var(--foreground);
+  }
+
+  .larkup-progress-shuttle {
+    width: 100%;
+    animation: none;
+  }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readConfig } from '@larkup/core/config-store';
 import { readRun } from '@larkup/core/index-store';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import { getModelsByType } from '@larkup/core/models-cache';
 import {
   toChatDescriptor,
@@ -16,13 +16,13 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
-  return serverId ? runWithServer(serverId, fn) : fn();
+function withProject<T>(projectId: string | null, fn: () => Promise<T>) {
+  return projectId ? runWithProject(projectId, fn) : fn();
 }
 
 export async function GET(req: Request) {
-  const serverId = new URL(req.url).searchParams.get('serverId');
-  return withServer(serverId, async () => {
+  const projectId = new URL(req.url).searchParams.get('projectId');
+  return withProject(projectId, async () => {
     const config = await readConfig();
     const run = await readRun();
 
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
       getModelsByType('embedding'),
     ]);
 
-    // ── Chat models ───────────────────────────────────────────────────
+    // Chat models.
     const allChatModels = languageModels.map(toChatDescriptor);
     const chatModels = getChatModelsForProvider(allChatModels, provider);
 
@@ -66,7 +66,7 @@ export async function GET(req: Request) {
         : defaultModel?.id) ||
       'openai/gpt-4o-mini';
 
-    // ── Embedding models ──────────────────────────────────────────────
+    // Embedding models.
     const dynamicEmbeddingModels = embeddingGatewayModels.map(toEmbeddingDescriptor);
 
     const embeddingIds = new Set(dynamicEmbeddingModels.map((m) => m.id));
