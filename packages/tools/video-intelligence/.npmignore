@@ -1,5 +1,0 @@
-runtime/data/
-runtime/models/
-deploy/aws/.aws-sam/
-test/
-*.log
