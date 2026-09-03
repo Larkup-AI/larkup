@@ -46,7 +46,15 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: packages/marketplace-tools/video-intelligence/runtime/requirements-smoke.txt
       - run: pnpm install --frozen-lockfile
+      # Without these the runtime tests cannot import cv2 or numpy, so
+      # unittest reports them as load errors and the step fails. It also only
+      # ever discovered 48 of the 159 tests, because a module that fails to
+      # import contributes none of its cases.
+      - name: Install the runtime's Python dependencies
+        run: pip install -r packages/marketplace-tools/video-intelligence/runtime/requirements-smoke.txt
       - name: Type-check and test extension contracts
         run: |
           pnpm --filter @larkup/tool-video-intelligence type-check
