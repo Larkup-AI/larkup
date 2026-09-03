@@ -42,14 +42,14 @@ PORT=4568 larkup start >"$TEST_ROOT/larkup.log" 2>&1 &
 SERVER_PID=$!
 
 for _ in $(seq 1 60); do
-  if curl --fail --silent --show-error "http://127.0.0.1:4568/api/servers" >/dev/null; then
+  if curl --fail --silent --show-error "http://127.0.0.1:4568/" >/dev/null; then
     echo "Installed Larkup server is healthy."
     break
   fi
   sleep 1
 done
 
-if ! curl --fail --silent --show-error "http://127.0.0.1:4568/api/servers" >/dev/null; then
+if ! curl --fail --silent --show-error "http://127.0.0.1:4568/" >/dev/null; then
   echo "Installed Larkup server did not become healthy. Log follows:" >&2
   tail -n 100 "$TEST_ROOT/larkup.log" >&2 || true
   exit 1

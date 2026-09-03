@@ -41,7 +41,7 @@ try {
     $ServerProcess = Start-Process -FilePath 'larkup.cmd' -ArgumentList 'start' -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
         try {
-            $response = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:4568/api/servers' -TimeoutSec 2
+            $response = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:4568/' -TimeoutSec 2
             if ($response.StatusCode -lt 500) {
                 Write-Host 'Installed Larkup server is healthy.'
                 exit 0
