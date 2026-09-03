@@ -6,7 +6,7 @@ async function globalSetup() {
   console.log('  Loading .env...');
 
   // Verify critical env vars exist
-  const requiredVars = ['AI_GATEWAY_APIKEY'];
+  const requiredVars = ['AI_GATEWAY_API_KEY'];
   const missing = requiredVars.filter((key) => !process.env[key]);
   if (missing.length > 0) {
     console.warn(`  ⚠ Missing env vars (some tests may be skipped): ${missing.join(', ')}`);

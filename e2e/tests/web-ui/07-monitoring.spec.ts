@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Analytics Page', () => {
+test.describe('Monitoring Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/settings?section=analytics');
-    await page.waitForSelector('text=Analytics', { timeout: 60_000 });
+    await page.goto('/settings?section=monitoring');
+    await page.waitForSelector('text=Monitoring', { timeout: 60_000 });
   });
 
   test('page loads with correct heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Analytics', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Monitoring', exact: true })).toBeVisible();
   });
 
   test('overview tab shows metrics', async ({ page }) => {

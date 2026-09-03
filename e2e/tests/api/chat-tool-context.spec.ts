@@ -4,6 +4,8 @@ import {
   createTabularVisualization,
   requestsVisualization,
 } from '../../../apps/web/lib/chat/tabular-visualization';
+import { inferTabularPlan } from '../../../apps/web/lib/chat/tabular-query-plan';
+import { hasRetrievedPdfEvidence } from '../../../apps/web/lib/chat/visual-routing';
 
 test('bounds retrieved source payloads before the next model step', () => {
   const compacted = compactToolContextForModel([
@@ -51,4 +53,54 @@ test('creates a chart from a queried grouped result without another model tool c
     xAxisKey: 'Region',
     series: [{ dataKey: 'sum_Net Revenue' }],
   });
+});
+
+test('plans the CSV demo questions as bounded table queries', () => {
+  const dataset = {
+    id: 'sales-data',
+    fileName: 'sales.csv',
+    columns: [
+      { name: 'Date', type: 'date', nullCount: 0, uniqueCount: 364 },
+      { name: 'Region', type: 'string', nullCount: 0, uniqueCount: 4 },
+      { name: 'Sales Rep', type: 'string', nullCount: 0, uniqueCount: 12 },
+      { name: 'Net Revenue', type: 'number', nullCount: 0, uniqueCount: 364 },
+    ],
+    rows: [],
+    summary: {
+      totalRows: 364,
+      totalColumns: 4,
+      numericColumns: 1,
+      categoricalColumns: 2,
+      dateColumns: 1,
+    },
+    rowCount: 364,
+    createdAt: '2025-01-01T00:00:00.000Z',
+  } as const;
+
+  const monthly = inferTabularPlan("What's the monthly revenue trend for 2025?", dataset as any, {
+    datasetId: dataset.id,
+  });
+  expect(monthly.request).toMatchObject({
+    timeBucket: { column: 'Date', grain: 'month' },
+    groupBy: ['Date_month'],
+    aggregations: [{ column: 'Net Revenue', op: 'sum' }],
+  });
+
+  const distribution = inferTabularPlan('show me distribution over sales by area', dataset as any, {
+    datasetId: dataset.id,
+    groupBy: ['Region'],
+    aggregations: [{ column: 'Sales Rep', op: 'sum' }],
+  });
+  expect(distribution.request).toMatchObject({
+    groupBy: ['Region'],
+    aggregations: [{ column: 'Net Revenue', op: 'sum' }],
+  });
+});
+
+test('routes a PDF retrieval to live local page inspection even without indexed images', () => {
+  expect(
+    hasRetrievedPdfEvidence({
+      hits: [{ documentId: 'pdf-1', title: 'source.pdf', url: '/api/uploads/source.pdf' }],
+    }),
+  ).toBe(true);
 });

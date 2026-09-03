@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   type SearchVerificationProvider,
   verifySearchProvider,
-} from '../../../apps/web/lib/search-provider-verification';
+} from '../../../apps/web/lib/search/provider-verification';
 
 test.describe('Search verification API (/api/search/verify)', () => {
   test('rejects missing credentials', async ({ request }) => {

@@ -10,19 +10,15 @@ test.describe('Settings Page', () => {
 
   test('settings page loads with correct heading', async ({ page }) => {
     await expect(page).toHaveURL(/\/settings/);
-    await expect(page.getByText('Workspace and integration settings.')).toBeVisible();
+    await expect(page.getByText('Project settings and preferences.')).toBeVisible();
   });
 
   test('server section is accessible', async ({ page }) => {
     await page.getByRole('button', { name: 'Larkup Server', exact: true }).click();
 
-    // The section was renamed to "Knowledge Server" to match the TASK 01
-    // boundary: this page deploys the data plane, not an Agent.
+    await expect(page.getByRole('heading', { name: 'Larkup Server', exact: true })).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Knowledge Server', exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Test locally, then deploy your Knowledge Server anywhere.'),
+      page.getByText('Test locally, then deploy one retrieval and chat server anywhere.'),
     ).toBeVisible();
   });
 
@@ -31,12 +27,6 @@ test.describe('Settings Page', () => {
 
     await expect(page.getByRole('heading', { name: 'Marketplace', exact: true })).toBeVisible();
     await expect(page.getByText('Extend Larkup with optional tools').first()).toBeVisible();
-  });
-
-  test('connections section is accessible', async ({ page }) => {
-    await page.getByRole('button', { name: 'Connections', exact: true }).click();
-
-    await expect(page.getByRole('heading', { name: 'Connections', exact: true })).toBeVisible();
   });
 
   test('navigation stays responsive while Installed Tools is loading', async ({ page }) => {
@@ -55,30 +45,57 @@ test.describe('Settings Page', () => {
 
   test('all settings navigation sections render their content', async ({ page }) => {
     const sections = [
-      ['AI Models', 'AI Models'],
-      ['Storage', 'Storage'],
-      ['Search & Scraping', 'Search & Scraping'],
-      ['Agent Customization', 'Agent Customization'],
-      ['Playground', 'Playground'],
+      ['AI Models', 'AI Models', 'models'],
+      ['Storage & indexing', 'Storage', 'storage'],
+      ['Search & Scraping', 'Search & Scraping', 'search-web'],
+      ['Marketplace', 'Marketplace', 'marketplace'],
+      ['Agent Customization', 'Agent Customization', 'agent-customization'],
+      ['Larkup Server', 'Larkup Server', 'runtime'],
+      ['Monitor', 'Monitoring', 'monitoring'],
     ] as const;
 
-    for (const [navigationName, headingName] of sections) {
+    for (const [navigationName, headingName, sectionId] of sections) {
       await page.getByRole('button', { name: navigationName, exact: true }).click();
       await expect(page.getByRole('heading', { name: headingName, exact: true })).toBeVisible();
-      await expect(page).toHaveURL(
-        new RegExp(
-          `section=${encodeURIComponent(
-            navigationName === 'AI Models'
-              ? 'models'
-              : navigationName === 'Search & Scraping'
-              ? 'search-web'
-              : navigationName === 'Agent Customization'
-              ? 'prompts'
-              : navigationName.toLowerCase(),
-          )}`,
-        ),
-      );
+      await expect(page).toHaveURL(new RegExp(`section=${sectionId}`));
     }
+  });
+
+  test('Agent Customization can disable an added skill', async ({ page }) => {
+    const skill = {
+      id: 'release-checklist',
+      name: 'Release checklist',
+      description: 'Prepare releases safely.',
+      source: 'inline',
+      content: '# Release checklist',
+      enabled: true,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    let savedSkills: Array<typeof skill> | undefined;
+
+    await page.route('/api/config', async (route) => {
+      if (route.request().method() === 'PUT') {
+        const body = route.request().postDataJSON() as { skills?: Array<typeof skill> };
+        savedSkills = body.skills;
+      }
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ config: { skills: savedSkills ?? [skill] } }),
+      });
+    });
+
+    // The shared beforeEach has already loaded the live config, so reload
+    // after installing the route to render this test's isolated skill.
+    await page.reload();
+
+    await page.getByRole('button', { name: 'Agent Customization', exact: true }).click();
+    await page.getByRole('button', { name: 'Skills', exact: true }).click();
+
+    const toggle = page.getByRole('switch', { name: 'Toggle Release checklist' });
+    await expect(toggle).toBeChecked();
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+    await expect.poll(() => savedSkills?.[0]?.enabled).toBe(false);
   });
 
   test('AI Models exposes an independent vision model card', async ({ page }) => {
@@ -156,7 +173,7 @@ test.describe('Settings Page', () => {
       await page.getByRole('option').filter({ hasText: provider.option }).click();
       await webSearchCard.getByPlaceholder(provider.placeholder).fill(provider.apiKey);
       await webSearchCard.getByRole('button', { name: 'Verify', exact: true }).click();
-      await expect(webSearchCard.getByText('✓ Verified')).toBeVisible();
+      await expect(webSearchCard.getByText('✓ API Key Verified')).toBeVisible();
 
       expect(verificationRequests.at(-1)).toEqual({
         provider: provider.provider,
@@ -165,109 +182,40 @@ test.describe('Settings Page', () => {
     }
   });
 
-  test('video-audio provider verification', async ({ page }) => {
-    // Intercept /api/marketplace to ensure video-audio is considered installed
-    await page.route('/api/marketplace', async (route) => {
-      const response = await route.fetch();
-      let json: { tools: any[] } = { tools: [] };
-      try {
-        json = await response.json();
-      } catch (e) {}
+  test('installed tool audio provider verification', async ({ page }) => {
+    const verificationRequests: Array<Record<string, unknown>> = [];
 
-      if (!json.tools) json.tools = [];
-      const vaTool = json.tools.find((t: any) => t.id === 'video-audio');
-      if (vaTool) {
-        vaTool.status = 'installed';
-      } else {
-        json.tools.push({
-          id: 'video-audio',
-          name: 'Video & Audio',
-          status: 'installed',
-          configSchema: [
-            {
-              key: 'audioProvider',
-              type: 'select',
-              options: [
-                { label: 'Deepgram', value: 'deepgram' },
-                { label: 'Groq', value: 'groq' },
-              ],
-            },
-            { key: 'audioApiKey', type: 'password' },
-          ],
-        });
-      }
-      await route.fulfill({ response, json });
+    // The tool declares this endpoint in its manifest's configSchema; the key
+    // itself is never sent anywhere real from a test.
+    await page.route('/api/tools/video-intelligence/verify', async (route) => {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      verificationRequests.push(body);
+      await route.fulfill({
+        status: body.audioProvider && body.audioApiKey ? 200 : 400,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          body.audioProvider && body.audioApiKey
+            ? { success: true }
+            : { error: 'Missing provider or key' },
+        ),
+      });
     });
 
-    // Intercept /api/config/verify endpoint
-    await page.route('/api/config/verify', async (route) => {
-      const body = JSON.parse(route.request().postData() || '{}');
-      if (body.audioProvider && body.audioApiKey) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ success: true }),
-        });
-      } else {
-        await route.fulfill({
-          status: 400,
-          contentType: 'application/json',
-          body: JSON.stringify({ error: 'Missing provider or key' }),
-        });
-      }
+    await page.getByRole('button', { name: 'Installed Tools', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Audio', exact: true })).toBeVisible({
+      timeout: 30_000,
     });
 
-    const toolsLink = page.getByText('Installed Tools', { exact: true }).first();
-    if (await toolsLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await toolsLink.click();
-      await page.waitForTimeout(500);
+    await page.getByRole('textbox', { name: 'Audio provider API key' }).fill('dummy-audio-key');
+    await page.getByRole('button', { name: 'Verify Audio provider API key' }).click();
 
-      // Verify the Video & Audio tool exists
-      const toolCard = page.locator('.border', { hasText: 'Video & Audio' }).first();
-      await expect(toolCard).toBeVisible({ timeout: 5_000 });
-
-      // There should be a combobox inside this card
-      const providerSelect = toolCard.getByRole('combobox').first();
-      if (await providerSelect.isVisible()) {
-        await providerSelect.click();
-
-        // Select Deepgram
-        const deepgramOption = page.getByRole('option', { name: 'Deepgram', exact: true }).first();
-        if (await deepgramOption.isVisible()) {
-          await deepgramOption.click();
-
-          // Enter dummy API key
-          const apiKeyInput = toolCard.locator('input[type="password"]').first();
-          await apiKeyInput.fill('dummy-deepgram-key');
-
-          // Click Verify
-          const verifyBtn = toolCard.getByRole('button', { name: 'Verify' }).first();
-          await verifyBtn.click();
-
-          // Check if verification succeeded
-          await expect(toolCard.getByText('✓ Verified').first()).toBeVisible({ timeout: 5_000 });
-        }
-
-        // Test Groq
-        await providerSelect.click({ force: true });
-        const groqOption = page.getByRole('option', { name: 'Groq', exact: true }).first();
-        if (await groqOption.isVisible()) {
-          await groqOption.click();
-
-          // Enter dummy API key
-          const groqKeyInput = toolCard.locator('input[type="password"]').first();
-          await groqKeyInput.fill('dummy-groq-key');
-
-          // Click Verify
-          const verifyBtn = toolCard.getByRole('button', { name: 'Verify' }).first();
-          await verifyBtn.click();
-
-          // Check if verification succeeded
-          await expect(toolCard.getByText('✓ Verified').first()).toBeVisible({ timeout: 5_000 });
-        }
-      }
-    }
+    // The banner and the toast carry the same copy.
+    await expect(page.getByText('Connection verified successfully.').first()).toBeVisible({
+      timeout: 15_000,
+    });
+    expect(verificationRequests.at(-1)).toMatchObject({ audioApiKey: 'dummy-audio-key' });
   });
+
   test('smart proxy parsing', async ({ page }) => {
     const generalLink = page.getByText('General', { exact: true }).first();
     if (await generalLink.isVisible({ timeout: 5_000 }).catch(() => false)) {

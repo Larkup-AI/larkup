@@ -76,6 +76,12 @@ test.describe('Media API (/api/media)', () => {
     const listBody = await list.json();
     expect(listBody.assets.some((asset: { id: string }) => asset.id === assetId)).toBe(true);
 
+    const allMedia = await request.get('/api/media?type=all');
+    expect(allMedia.ok()).toBe(true);
+    expect(
+      (await allMedia.json()).assets.some((asset: { id: string }) => asset.id === assetId),
+    ).toBe(true);
+
     const range = await request.get(`/api/media/${assetId}`, {
       headers: { Range: 'bytes=0-43' },
     });
@@ -83,6 +89,40 @@ test.describe('Media API (/api/media)', () => {
     expect(range.headers()['accept-ranges']).toBe('bytes');
     expect(range.headers()['content-range']).toContain('/');
     expect((await range.body()).length).toBe(44);
+  });
+
+  test('keeps an uploaded media source linked to its selected group', async ({ request }) => {
+    test.skip(
+      await isDataAddingBlocked(request),
+      'Embedding credentials are required before adding data',
+    );
+
+    const groupResponse = await request.post('/api/groups', {
+      data: { name: `E2E media group ${Date.now()}`, icon: '◆' },
+    });
+    expect(groupResponse.status()).toBe(201);
+    const group = (await groupResponse.json()).group as { id: string };
+
+    let groupedAssetId: string | undefined;
+    try {
+      const upload = await request.post('/api/media', {
+        multipart: {
+          file: {
+            name: `e2e-grouped-${Date.now()}.wav`,
+            mimeType: 'audio/wav',
+            buffer: createSilentWav(),
+          },
+          groupId: group.id,
+        },
+      });
+      expect(upload.status()).toBe(201);
+      const asset = (await upload.json()).assets[0] as { id: string; groupId: string };
+      groupedAssetId = asset.id;
+      expect(asset.groupId).toBe(group.id);
+    } finally {
+      if (groupedAssetId) await request.delete(`/api/media?id=${groupedAssetId}`).catch(() => {});
+      await request.delete(`/api/groups?id=${group.id}`).catch(() => {});
+    }
   });
 
   test('rejects remote URL imports larger than the batch limit', async ({ request }) => {
@@ -95,6 +135,21 @@ test.describe('Media API (/api/media)', () => {
     });
     expect(response.status()).toBe(400);
     expect((await response.json()).error).toContain('between 1 and 10');
+  });
+
+  test('rejects private media URLs during URL estimation', async ({ request }) => {
+    const response = await request.post('/api/media', {
+      data: {
+        mediaType: 'video',
+        estimateOnly: true,
+        urls: ['http://127.0.0.1/private-video.mp4'],
+      },
+    });
+    if (response.status() === 409) {
+      test.skip(true, 'Video Intelligence is not installed for this E2E project.');
+    }
+    expect(response.status()).toBe(400);
+    expect((await response.json()).error).toContain('Private or local media URLs');
   });
 
   test('refuses deletion while a media worker owns the asset', async ({ request }) => {

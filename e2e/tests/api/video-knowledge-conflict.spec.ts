@@ -165,7 +165,7 @@ test.describe('M4 — Cross-modality conflict lifecycle', () => {
       knowledgeRevisionId: revision.id,
       modality: 'transcript',
       timeRange: { startSecs: 0, endSecs: 30, precision: 'segment' },
-      payload: 'They won the match.',
+      payload: { text: 'They won the match.' },
       source: { kind: 'provider', provider: 'deepgram' },
       confidence: {
         score: 0.9,
@@ -180,7 +180,7 @@ test.describe('M4 — Cross-modality conflict lifecycle', () => {
       knowledgeRevisionId: revision.id,
       modality: 'visual',
       timeRange: { startSecs: 0, endSecs: 30, precision: 'frame' },
-      payload: 'The opposing team is celebrating.',
+      payload: { text: 'The opposing team is celebrating.' },
       source: { kind: 'provider', provider: 'gemini' },
       confidence: {
         score: 0.7,
@@ -271,7 +271,7 @@ test.describe('M4 — Computed evidence reuse', () => {
       knowledgeRevisionId: revision.id,
       modality: 'transcript',
       timeRange: { startSecs: 0, endSecs: 60, precision: 'word' },
-      payload: 'Original transcript evidence.',
+      payload: { text: 'Original transcript evidence.' },
       source: { kind: 'provider', provider: 'deepgram' },
       confidence: {
         score: 0.95,

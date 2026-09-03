@@ -42,6 +42,11 @@ export default defineConfig({
       testDir: './tests/web-ui',
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['api'],
+      // Every spec drives one dashboard backed by one workspace: documents,
+      // installed tools, Project config and the runtime are all shared. Run in
+      // parallel and specs delete each other's fixtures and race the runtime,
+      // which showed up as a different handful of failures on every run.
+      fullyParallel: false,
     },
     {
       name: 'sdk-js',

@@ -1,6 +1,175 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Video Intelligence', () => {
+  test('shows locally cached media URLs when the URL field is focused', async ({ page }) => {
+    const recentUrl = 'https://example.com/previous-demo.mp4';
+    await page.addInitScript((url) => {
+      localStorage.setItem('media_recent_urls', JSON.stringify([url]));
+    }, recentUrl);
+
+    await page.goto('/add?subtab=media');
+    await page.getByRole('button', { name: 'From URL' }).click();
+
+    const input = page.getByLabel('Import media URL');
+    await input.focus();
+    await expect(page.getByText('Recent URLs')).toBeVisible();
+    await expect(page.getByText(recentUrl, { exact: true })).toBeVisible();
+
+    await page.getByText(recentUrl, { exact: true }).click();
+    await expect(input).toHaveValue(recentUrl);
+
+    await input.focus();
+    await page.getByRole('button', { name: `Remove ${recentUrl} from recent URLs` }).click();
+    await expect(page.getByText(recentUrl, { exact: true })).not.toBeVisible();
+  });
+
+  test('estimates and imports only the selected video from a playlist watch URL', async ({
+    page,
+  }) => {
+    const playlistUrl = 'https://www.youtube.com/watch?v=chosen-video&list=long-playlist&index=16';
+    let importedUrls: string[] | undefined;
+
+    await page.route('**/api/marketplace', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          tools: [
+            {
+              id: 'video-intelligence',
+              name: 'Video Intelligence',
+              status: 'installed',
+              ui: {
+                surfaces: [
+                  {
+                    id: 'video-indexing-brief',
+                    slot: 'data-indexing',
+                    title: 'Let your AI understand this video',
+                    appliesTo: ['video'],
+                    estimate: {
+                      modeField: 'indexingMode',
+                      variants: [
+                        {
+                          value: 'fast',
+                          analyzedFramesPerSourceMinute: 5,
+                          ocrFramesPerSourceMinute: 3,
+                          processingSecondsPerSourceMinute: 4,
+                          maxProcessingSecondsPerSourceMinute: 5,
+                          fixedOverheadSeconds: 60,
+                          maxFixedOverheadSeconds: 60,
+                          creditsPerSourceMinute: 1,
+                        },
+                      ],
+                    },
+                    form: {
+                      submitLabel: 'Start indexing',
+                      fields: [
+                        {
+                          key: 'indexingMode',
+                          type: 'select',
+                          label: 'Coverage',
+                          defaultValue: 'fast',
+                          options: [{ label: 'Fast', value: 'fast' }],
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      }),
+    );
+    await page.route('**/api/config**', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          config: {
+            enabledTools: ['video-intelligence'],
+            toolConfigs: { 'video-intelligence': { runtimeMode: 'managed-cloud' } },
+          },
+        }),
+      }),
+    );
+    await page.route('**/api/tools/video-intelligence/usage**', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          sourceMinutesUsed: 0,
+          sourceMinutesLimit: 10_000,
+          activeJobs: 0,
+          concurrentJobsLimit: 1,
+        }),
+      }),
+    );
+    await page.route(/\/api\/media(?:\?.*)?$/, async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            assets: [],
+            stats: { total: 0, byType: {}, byStatus: {}, totalBytes: 0 },
+            storage: { usedBytes: 0, fileCount: 0 },
+          }),
+        });
+        return;
+      }
+      const body = route.request().postDataJSON() as { estimateOnly?: boolean; urls?: string[] };
+      if (body.estimateOnly) {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            estimates: [
+              {
+                originalUrl: playlistUrl,
+                title: 'Selected match inside a long playlist',
+                durationSecs: 87_540,
+                singleItemDurationSecs: 3_600,
+                singleItemUrl: 'https://www.youtube.com/watch?v=chosen-video',
+                entryCount: 24,
+                mediaType: 'video',
+                isYouTube: true,
+              },
+            ],
+          }),
+        });
+        return;
+      }
+      importedUrls = body.urls;
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          assets: [
+            {
+              id: 'selected-video',
+              type: 'video',
+              fileName: 'Importing URL...',
+              processingStatus: 'pending',
+            },
+          ],
+          count: 1,
+        }),
+      });
+    });
+    await page.route('**/api/media/process', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify({ queued: true }) }),
+    );
+
+    await page.goto('/add?subtab=media');
+    await page.getByRole('button', { name: 'From URL' }).click();
+    await page.getByRole('textbox', { name: 'Import media URL' }).fill(playlistUrl);
+    await page.getByRole('button', { name: 'Check URL' }).click();
+    await page.getByRole('button', { name: 'Add media', exact: true }).click();
+    await page.getByRole('button', { name: 'Single Video' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Let your AI understand this video' });
+    await expect(dialog.getByText('~5–6 min')).toBeVisible();
+    await expect(dialog.getByText('~60', { exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Start indexing' }).click();
+    await expect.poll(() => importedUrls).toEqual(['https://www.youtube.com/watch?v=chosen-video']);
+  });
+
   test('renders manifest-driven runtimes and provider branding', async ({ page }) => {
     await page.route('**/api/marketplace', (route) =>
       route.fulfill({
@@ -13,17 +182,26 @@ test.describe('Video Intelligence', () => {
               description: 'Timestamped video evidence.',
               emoji: '🎥',
               status: 'installed',
-              usage: { label: 'Usage this month', fields: [] },
+              usage: {
+                label: 'Usage this month',
+                visualization: { usedKey: 'sourceMinutesUsed', limitKey: 'sourceMinutesLimit' },
+                support: {
+                  contactLabel: 'Request more usage',
+                  userIdConfigKey: 'cloudInstallationId',
+                },
+                fields: [
+                  { key: 'sourceMinutesUsed', label: 'Used', format: 'minutes' },
+                  { key: 'sourceMinutesLimit', label: 'Included', format: 'minutes' },
+                ],
+              },
               runtime: {
                 defaultMode: 'managed-cloud',
                 modes: [
                   { id: 'managed-cloud', label: 'Larkup Cloud', description: 'Managed GPU.' },
                   {
-                    id: 'local-docker',
-                    label: 'Local Docker runtime',
-                    icon: '/docker.png',
-                    description: 'Local.',
-                    setupNotice: 'The optional runtime image is about 8 GB.',
+                    id: 'local',
+                    label: 'Local runtime',
+                    description: 'Auto-detect Docker or native.',
                   },
                   { id: 'custom-remote', label: 'Custom runtime', description: 'Remote.' },
                 ],
@@ -36,7 +214,7 @@ test.describe('Video Intelligence', () => {
                   defaultValue: 'managed-cloud',
                   options: [
                     { label: 'Larkup Cloud', value: 'managed-cloud', icon: '/logo.png' },
-                    { label: 'Local Docker runtime', value: 'local-docker', icon: '/docker.png' },
+                    { label: 'Local runtime', value: 'local' },
                     { label: 'Custom runtime', value: 'custom-remote' },
                   ],
                 },
@@ -45,11 +223,61 @@ test.describe('Video Intelligence', () => {
                   label: 'Audio provider',
                   type: 'select',
                   defaultValue: 'larkup-cloud',
-                  visibleWhen: { field: 'runtimeMode', equals: 'managed-cloud' },
+                  visibleWhen: { field: 'runtimeMode', equals: ['managed-cloud', 'local'] },
                   options: [
+                    { label: 'Local transcription', value: 'local', icon: '/logo.png' },
                     { label: 'Larkup Cloud', value: 'larkup-cloud', icon: '/icons/audio.png' },
                     { label: 'OpenAI', value: 'openai', icon: '/icons/openai.svg' },
                   ],
+                },
+                {
+                  key: 'videoVisionProvider',
+                  label: 'Vision provider',
+                  type: 'select',
+                  defaultValue: 'auto',
+                  visibleWhen: { field: 'runtimeMode', equals: 'local' },
+                  options: [{ label: 'Use AI Models', value: 'auto' }],
+                },
+                {
+                  key: 'semanticVisionModel',
+                  label: 'Video vision model',
+                  type: 'select',
+                  defaultValue: 'auto',
+                  verification: {
+                    endpoint: '/api/tools/video-intelligence/verify',
+                    fields: {
+                      videoVisionProvider: 'videoVisionProvider',
+                      semanticVisionModel: 'semanticVisionModel',
+                    },
+                  },
+                  visibleWhen: { field: 'runtimeMode', equals: 'local' },
+                  options: [{ label: 'Use AI Models vision model', value: 'auto' }],
+                },
+                {
+                  key: 'videoAgentProvider',
+                  label: 'Agent provider',
+                  type: 'select',
+                  defaultValue: 'auto',
+                  visibleWhen: { field: 'runtimeMode', equals: 'local' },
+                  options: [{ label: 'Use AI Models', value: 'auto' }],
+                },
+                {
+                  key: 'agentModel',
+                  label: 'Agent / tool-brain model',
+                  type: 'select',
+                  defaultValue: 'auto',
+                  verification: {
+                    endpoint: '/api/tools/video-intelligence/verify',
+                    fields: { agentModel: 'agentModel' },
+                  },
+                  visibleWhen: { field: 'runtimeMode', equals: 'local' },
+                  options: [{ label: 'Use AI Models chat model', value: 'auto' }],
+                },
+                {
+                  key: 'cloudAccessKey',
+                  label: 'Larkup Cloud API key',
+                  type: 'password',
+                  visibleWhen: { field: 'runtimeMode', equals: 'managed-cloud' },
                 },
                 {
                   key: 'audioApiKey',
@@ -70,13 +298,13 @@ test.describe('Video Intelligence', () => {
                     endpoint: '/api/tools/video-intelligence/verify',
                     fields: { localRuntimeUrl: 'localRuntimeUrl', runtimeMode: 'runtimeMode' },
                   },
-                  visibleWhen: { field: 'runtimeMode', equals: 'local-docker' },
+                  visibleWhen: { field: 'runtimeMode', equals: 'local' },
                 },
                 {
                   key: 'localRuntimeApiKey',
                   label: 'Shared local API key',
                   type: 'password',
-                  visibleWhen: { field: 'runtimeMode', equals: 'local-docker' },
+                  visibleWhen: { field: 'runtimeMode', equals: 'local' },
                 },
               ],
             },
@@ -90,13 +318,17 @@ test.describe('Video Intelligence', () => {
         body: JSON.stringify({
           config: {
             toolConfigs: {
-              'video-intelligence': { runtimeMode: 'managed-cloud', audioProvider: 'larkup-cloud' },
+              'video-intelligence': {
+                runtimeMode: 'managed-cloud',
+                audioProvider: 'larkup-cloud',
+                cloudInstallationId: 'device_123',
+              },
             },
           },
         }),
       }),
     );
-    await page.route('**/api/tools/video-intelligence/runtime', (route) =>
+    await page.route('**/api/tools/video-intelligence/runtime**', (route) =>
       route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
@@ -105,8 +337,14 @@ test.describe('Video Intelligence', () => {
         }),
       }),
     );
-    await page.route('**/api/tools/video-intelligence/usage', (route) =>
-      route.fulfill({ contentType: 'application/json', body: JSON.stringify({}) }),
+    await page.route('**/api/tools/video-intelligence/usage**', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ sourceMinutesUsed: 4, sourceMinutesLimit: 5 }),
+      }),
+    );
+    await page.route('**/api/tools/video-intelligence/usage-request', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'sent' }) }),
     );
     await page.route('**/api/tools/video-intelligence/verify', (route) =>
       route.fulfill({
@@ -117,37 +355,73 @@ test.describe('Video Intelligence', () => {
         }),
       }),
     );
+    await page.route('**/api/tools/video-intelligence/host**', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          docker: { cliInstalled: true, daemonRunning: true, imagePulled: false },
+          native: { uvInstalled: true, depsInstalled: false },
+          recommendedKind: 'local-docker',
+          installed: false,
+          running: false,
+          suitability: { level: 'good', message: '8 GB RAM free.' },
+          system: { platform: 'darwin', cpus: 8, totalMemGB: 16, freeMemGB: 8 },
+          modelRequirement: {
+            configured: false,
+            message: 'Video understanding needs an AI Gateway key and a vision model.',
+          },
+        }),
+      }),
+    );
 
     await page.goto('/settings?section=tool-settings');
 
-    await expect(page.getByText('Larkup Cloud connected')).toBeVisible();
-    await expect(page.getByText(/User ID: user_123/)).toBeVisible();
-    await expect(page.locator('img[src="/logo.png"]')).toBeVisible();
+    await expect(page.getByLabel('Larkup Cloud connected')).toBeVisible();
+    await expect(page.getByLabel('Larkup Cloud user ID')).toHaveValue('user_123');
+    await expect(page.getByRole('button', { name: 'Copy user ID' })).toBeVisible();
+    await expect(page.getByText(/API key:/)).toHaveCount(0);
+    await expect(page.getByLabel(/80 percent of monthly allowance used/)).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Larkup Cloud API key' })).toBeVisible();
+    await page.getByRole('button', { name: 'Request more usage' }).click();
+    await expect(page.getByRole('dialog', { name: 'Request more usage' })).toBeVisible();
+    await page.getByLabel('Email').fill('user@example.com');
+    await page.getByRole('button', { name: 'Send request' }).click();
+    await expect(page.getByRole('combobox').first().locator('img[src="/logo.png"]')).toBeVisible();
 
-    await page.getByRole('combobox').click();
+    await page.getByRole('combobox', { name: 'Audio provider' }).click();
     await expect(page.getByRole('option', { name: /OpenAI/ })).toBeVisible();
     await expect(page.locator('img[src="/icons/openai.svg"]')).toBeVisible();
     await page.getByRole('option', { name: /OpenAI/ }).click();
     await expect(page.getByRole('button', { name: 'Verify' })).toBeVisible();
 
-    await page.getByRole('combobox').first().click();
-    await page.getByRole('option', { name: 'Local Docker runtime' }).click();
-    await expect(page.getByRole('dialog', { name: 'Local Docker runtime' })).toBeVisible();
-    await expect(page.getByText('Audio provider')).toHaveCount(0);
+    await page.getByRole('combobox', { name: 'Runtime' }).click();
+    await page.getByRole('option', { name: 'Local runtime' }).click();
     await expect(
-      page.getByRole('combobox').first().locator('img[src="/docker.png"]'),
+      page.getByRole('alertdialog', { name: 'Use the local GPU runtime?' }),
+    ).not.toBeVisible();
+    await expect(page.getByText('Audio provider', { exact: true })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Vision provider' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Video vision model' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Verify Video vision model' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Verify Agent / tool-brain model' }),
     ).toBeVisible();
-    await page.keyboard.press('Escape');
-    await page.getByLabel('Local runtime URL').fill('http://127.0.0.1:65534');
-    await page.getByRole('button', { name: 'Verify' }).click();
+    await expect(page.locator('img[src="/docker.png"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Install local runtime' })).toBeVisible();
+    await page.getByRole('button', { name: 'Install local runtime' }).click();
     await expect(
-      page.getByText('Could not connect. Check the selected runtime and access key.'),
+      page.getByRole('alertdialog', { name: 'Install local GPU runtime?' }),
+    ).toBeVisible();
+    await expect(page.getByText(/CUDA-capable NVIDIA GPU/)).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('textbox', { name: 'Local runtime URL' }).fill('http://127.0.0.1:65534');
+    await page.getByRole('button', { name: 'Verify Local runtime URL' }).click();
+    await expect(
+      page.getByText('Could not connect. Check the selected runtime and access key.').first(),
     ).toBeVisible();
   });
 
-  test('collects an optional indexing brief and explicit full-frame authority', async ({
-    page,
-  }) => {
+  test('collects an optional indexing brief and remembers recent media URLs', async ({ page }) => {
     await page.addInitScript(() => {
       const source = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
       Object.defineProperty(HTMLMediaElement.prototype, 'duration', {
@@ -182,6 +456,64 @@ test.describe('Video Intelligence', () => {
               name: 'Video Intelligence',
               status: 'installed',
               manifestVersion: '3.0',
+              ui: {
+                surfaces: [
+                  {
+                    id: 'video-indexing-brief',
+                    slot: 'data-indexing',
+                    title: 'Let your AI understand this video',
+                    appliesTo: ['video'],
+                    estimate: {
+                      modeField: 'indexingMode',
+                      variants: [
+                        {
+                          value: 'balanced',
+                          analyzedFramesPerSourceMinute: 6,
+                          ocrFramesPerSourceMinute: 6,
+                          processingSecondsPerSourceMinute: 18,
+                          creditsPerSourceMinute: 2,
+                        },
+                        {
+                          value: 'full-coverage',
+                          analyzedFramesPerSourceMinute: 1800,
+                          ocrFramesPerSourceMinute: 1800,
+                          processingSecondsPerSourceMinute: 300,
+                          creditsPerSourceMinute: 24,
+                        },
+                      ],
+                    },
+                    form: {
+                      submitLabel: 'Upload and index',
+                      fields: [
+                        {
+                          key: 'goal',
+                          type: 'textarea',
+                          label: 'What are you looking for?',
+                          placeholder: 'Describe what matters in this video',
+                        },
+                        {
+                          key: 'indexingMode',
+                          type: 'select',
+                          label: 'Coverage',
+                          defaultValue: 'balanced',
+                          options: [
+                            {
+                              label: 'Balanced',
+                              value: 'balanced',
+                              setValues: { processingAuthorityConfirmed: false },
+                            },
+                            {
+                              label: 'Full coverage',
+                              value: 'full-coverage',
+                              setValues: { processingAuthorityConfirmed: true },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
             },
           ],
         }),
@@ -198,19 +530,34 @@ test.describe('Video Intelligence', () => {
         }),
       }),
     );
-    await page.route('**/api/tools/video-intelligence/usage', (route) =>
+    await page.route('**/api/tools/video-intelligence/usage**', (route) =>
       route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
           sourceMinutesUsed: 48,
           sourceMinutesLimit: 60,
-          activeJobs: 0,
+          // Simulate SWR briefly retaining the previous job after the local
+          // media card has already reached a terminal state.
+          activeJobs: 1,
           concurrentJobsLimit: 1,
         }),
       }),
     );
 
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'media_recent_urls',
+        JSON.stringify(['https://example.com/last-video.mp4']),
+      );
+    });
     await page.goto('/add?subtab=media');
+    await page.getByRole('button', { name: 'From URL' }).click();
+    const urlInput = page.getByRole('textbox', { name: 'Import media URL' });
+    await urlInput.focus();
+    await expect(page.getByText('Recent URLs')).toBeVisible();
+    await page.getByText('https://example.com/last-video.mp4').click();
+    await expect(urlInput).toHaveValue('https://example.com/last-video.mp4');
+    await page.getByRole('button', { name: 'Upload', exact: true }).click();
     await page
       .locator('input[type="file"]')
       .first()
@@ -227,20 +574,21 @@ test.describe('Video Intelligence', () => {
     ).toBeVisible();
     await page.getByRole('button', { name: 'Not now' }).click();
 
-    await page.getByText('Guide video indexing', { exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Guide video indexing' });
+    await page.getByRole('button', { name: 'Add media' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Let your AI understand this video' });
     await expect(dialog).toBeVisible();
     await dialog
-      .getByPlaceholder('For example: follow the score, final result, and disputed goals.')
+      .getByPlaceholder('Describe what matters in this video')
       .fill('Track the score and final result.');
-    await dialog.locator('select').selectOption('sports');
-    await dialog.getByPlaceholder('Team A, red car, scoreboard').fill('Team A, scoreboard');
-    await dialog.getByPlaceholder(/One question per line/).fill('What was the final score?');
-
-    const fullFrame = dialog.getByRole('switch', { name: 'Analyze every frame' });
-    await fullFrame.click();
-    await expect(fullFrame).toBeChecked();
-    await expect(dialog.locator('input[type="range"]')).toBeDisabled();
+    await expect(dialog.getByPlaceholder('Describe what matters in this video')).toHaveAttribute(
+      'rows',
+      '5',
+    );
+    await dialog.locator('select').selectOption('full-coverage');
+    await expect(dialog.getByText('Typical range')).toBeVisible();
+    await expect(dialog.getByText('Estimated credits')).toBeVisible();
+    await expect(dialog.getByText('Frame analysis')).toHaveCount(0);
+    await expect(dialog.getByText('OCR extraction')).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: 'Upload and index' })).toBeEnabled();
   });
 
