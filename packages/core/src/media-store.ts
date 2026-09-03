@@ -8,7 +8,10 @@ import type {
   MediaProcessingStep,
   MediaType,
 } from './types';
-import { getDataDir, requireDataDir } from './workspace';
+import {
+  getProjectDataDir as getDataDir,
+  requireProjectDataDir as requireDataDir,
+} from './project-store';
 
 /**
  * File-backed store for media assets, scoped to the active server.
@@ -72,6 +75,7 @@ async function writeAll(assets: MediaAsset[]) {
 
 export const MEDIA_PIPELINE_STAGES = [
   'download',
+  'prepare',
   'extract',
   'transcribe',
   'vision',
@@ -81,6 +85,10 @@ export const MEDIA_PIPELINE_STAGES = [
 
 export const MEDIA_PIPELINE_STAGE_WEIGHTS: Readonly<Record<MediaPipelineStage, number>> = {
   download: 10,
+  // Cloud workers must make a durable, analysis-ready copy before OpenCV can
+  // select evidence. It is real work, so it needs its own live stage rather
+  // than looking like a frozen 5% extraction bar.
+  prepare: 15,
   extract: 15,
   transcribe: 25,
   vision: 30,
@@ -124,7 +132,7 @@ function stepPercent(step: MediaProcessingStep): number {
   return 0;
 }
 
-function weightedProcessingProgress(steps: MediaProcessingStep[]): number {
+export function weightedProcessingProgress(steps: MediaProcessingStep[]): number {
   const applicable = steps.filter((step) => step.status !== 'skipped');
   const totalWeight = applicable.reduce(
     (sum, step) => sum + MEDIA_PIPELINE_STAGE_WEIGHTS[step.stage],
@@ -135,17 +143,15 @@ function weightedProcessingProgress(steps: MediaProcessingStep[]): number {
     (sum, step) => sum + (MEDIA_PIPELINE_STAGE_WEIGHTS[step.stage] * stepPercent(step)) / 100,
     0,
   );
-  return Math.round((completedWeight / totalWeight) * 100);
+  // Preserve tenths so frequent measured worker/download updates visibly move
+  // the overall bar instead of being hidden behind integer rounding.
+  return Math.round((completedWeight / totalWeight) * 100 * 10) / 10;
 }
 
 function nextRevision(asset: MediaAsset): number {
   const current = finiteNonNegative(asset.processingRevision) ?? 0;
   return Math.floor(current) + 1;
 }
-
-/* ------------------------------------------------------------------ */
-/* Create                                                              */
-/* ------------------------------------------------------------------ */
 
 export interface NewMediaAssetInput {
   type: MediaType;
@@ -159,6 +165,8 @@ export interface NewMediaAssetInput {
   durationSecs?: number;
   indexingInstructions?: string;
   indexingQuality?: number;
+  toolInputs?: Record<string, unknown>;
+  groupId?: string;
 }
 
 export function addMediaAsset(input: NewMediaAssetInput): Promise<MediaAsset> {
@@ -178,6 +186,8 @@ export function addMediaAsset(input: NewMediaAssetInput): Promise<MediaAsset> {
       durationSecs: input.durationSecs,
       indexingInstructions: input.indexingInstructions,
       indexingQuality: input.indexingQuality,
+      toolInputs: input.toolInputs,
+      groupId: input.groupId,
       processingStatus: 'pending',
       processingRevision: 0,
       documentIds: [],
@@ -208,6 +218,8 @@ export function addMediaAssets(inputs: NewMediaAssetInput[]): Promise<MediaAsset
       durationSecs: input.durationSecs,
       indexingInstructions: input.indexingInstructions,
       indexingQuality: input.indexingQuality,
+      toolInputs: input.toolInputs,
+      groupId: input.groupId,
       processingStatus: 'pending' as const,
       processingRevision: 0,
       documentIds: [],
@@ -219,10 +231,6 @@ export function addMediaAssets(inputs: NewMediaAssetInput[]): Promise<MediaAsset
     return newAssets;
   });
 }
-
-/* ------------------------------------------------------------------ */
-/* Update                                                              */
-/* ------------------------------------------------------------------ */
 
 export function updateMediaAsset(
   id: string,
@@ -236,6 +244,7 @@ export function updateMediaAsset(
       | 'processingPaused'
       | 'processingSteps'
       | 'processingRevision'
+      | 'processingStartedAt'
       | 'processingHeartbeatAt'
       | 'caption'
       | 'thumbnailUri'
@@ -247,10 +256,13 @@ export function updateMediaAsset(
       | 'activeVideoKnowledgeRevisionId'
       | 'activeVideoKnowledgeManifestId'
       | 'activeVideoKnowledgeJobId'
+      | 'activeVideoIntelligenceJobId'
+      | 'videoRuntimeScope'
       | 'fileName'
       | 'mimeType'
       | 'storageUri'
       | 'fileSize'
+      | 'toolInputs'
     >
   >,
 ): Promise<MediaAsset | undefined> {
@@ -342,6 +354,7 @@ export function updateMediaStage(
       percent,
       current,
       total,
+      ...(isTerminal ? { estimatedRemainingSeconds: undefined } : {}),
       startedAt:
         patch.startedAt ??
         previous.startedAt ??
@@ -395,9 +408,10 @@ export function claimMediaAsset(id: string): Promise<MediaAsset | undefined> {
       processingStatus: 'pending',
       processingError: undefined,
       processingMessage: 'Queued for background processing...',
-      processingProgress: 1,
+      processingProgress: 0,
       processingSteps: initialProcessingSteps(now),
       processingRevision: nextRevision(assets[index]),
+      processingStartedAt: now,
       processingHeartbeatAt: now,
       updatedAt: now,
     };
@@ -452,10 +466,6 @@ export function recoverStaleMediaAssets(maxAgeMs = 5 * 60_000): Promise<number> 
   });
 }
 
-/* ------------------------------------------------------------------ */
-/* Delete                                                              */
-/* ------------------------------------------------------------------ */
-
 export function deleteMediaAsset(id: string): Promise<void> {
   return serialize(async () => {
     const assets = await readMediaAssets();
@@ -470,10 +480,6 @@ export function deleteMediaAssets(ids: string[]): Promise<void> {
     await writeAll(assets.filter((a) => !idSet.has(a.id)));
   });
 }
-
-/* ------------------------------------------------------------------ */
-/* Queries                                                             */
-/* ------------------------------------------------------------------ */
 
 export async function mediaStats(): Promise<{
   total: number;

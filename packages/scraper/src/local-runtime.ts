@@ -132,8 +132,6 @@ function nativeState(startedAt?: string): LocalFirecrawlState {
   };
 }
 
-/* ----------------------------- state io ----------------------------- */
-
 export async function readLocalState(): Promise<LocalFirecrawlState> {
   try {
     const raw = await fs.readFile(STATE_PATH, 'utf8');
@@ -148,8 +146,6 @@ async function writeState(state: LocalFirecrawlState) {
   await fs.writeFile(STATE_PATH, JSON.stringify(state, null, 2), 'utf8');
   return state;
 }
-
-/* --------------------------- docker helpers ------------------------- */
 
 /** Resolve `docker compose` (v2) vs legacy `docker-compose`, or null if absent. */
 async function resolveDocker(): Promise<{
@@ -300,8 +296,6 @@ ${apiEnv}
 `;
 }
 
-/* ------------------------------ actions ----------------------------- */
-
 /** Launch (or re-attach to) a local Firecrawl via docker compose. */
 export async function startLocal(): Promise<LocalFirecrawlState> {
   // The normal CLI/curl/desktop install must work on a computer without
@@ -418,8 +412,6 @@ export async function refreshLocalStatus(): Promise<LocalFirecrawlState> {
   return state;
 }
 
-/* ------------------------------ health ------------------------------ */
-
 async function isHealthy(endpoint: string): Promise<boolean> {
   try {
     const res = await fetch(endpoint, {
@@ -440,8 +432,6 @@ async function waitForHealth(endpoint: string, timeoutMs: number) {
   }
   return false;
 }
-
-/* ---------------------- Docker-sibling detection -------------------- */
 
 /** Whether Larkup is itself running inside a Docker container. */
 export function isInsideDocker(): boolean {

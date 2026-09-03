@@ -1,74 +1,22 @@
-export type VectorStoreId =
-  | 'lancedb'
-  | 'pinecone'
-  | 'weaviate'
-  | 'qdrant'
-  | 'chroma'
-  | 'pgvector'
-  | 'supabase';
+import type {
+  FieldType,
+  IndexType,
+  StoreField,
+  StoreFieldOption,
+  StoreRuntime,
+  VectorStoreDescriptor,
+  VectorStoreId,
+} from '@larkup/vector-stores/types';
 
-/** Where a given store is able to run. */
-export type StoreRuntime = 'local' | 'cloud' | 'both';
-
-/** Primitive kinds a credential/config field can be. */
-export type FieldType = 'text' | 'password' | 'path' | 'select';
-
-export interface StoreFieldOption {
-  label: string;
-  value: string;
-}
-
-/**
- * A single credential/config input a vector store needs.
- * The Configuration form renders these dynamically, and the Phase 4
- * dependency resolver reads the same registry to emit the right deps.
- */
-export interface StoreField {
-  /** key used in the saved config object */
-  key: string;
-  label: string;
-  type: FieldType;
-  placeholder?: string;
-  required: boolean;
-  /** human hint shown under the input */
-  help?: string;
-  /** only for type === "select" */
-  options?: StoreFieldOption[];
-  /** default value */
-  defaultValue?: string;
-  /**
-   * Optional dependency: only show/require this field when another field
-   * (by key) has one of these values. Powers LanceDB local-vs-cloud.
-   */
-  showWhen?: { key: string; equals: string[] };
-  /**
-   * Optional cross-concern dependency: only show/require this field when the
-   * global `indexType` is one of these values. Powers Pinecone sparse model
-   * field (visible only for lexical / hybrid).
-   */
-  showWhenIndexType?: IndexType[];
-  /** mark a field as a secret that should come from an env var on the server */
-  secret?: boolean;
-}
-
-export interface VectorStoreDescriptor {
-  id: VectorStoreId;
-  label: string;
-  description: string;
-  runtime: StoreRuntime;
-  /** Whether this store is pre-installed, installable on demand, or coming soon */
-  installStatus: 'installed' | 'installable' | 'coming-soon';
-  /** npm packages the GENERATED server needs when this store is selected */
-  serverDependencies: Record<string, string>;
-  /** the dynamic config/credential fields */
-  fields: StoreField[];
-  /** docs link for the store */
-  docsUrl?: string;
-}
-
-/* ------------------------------------------------------------------ */
-/* Embeddings                                                          */
-/* ------------------------------------------------------------------ */
+export type {
+  FieldType,
+  IndexType,
+  StoreField,
+  StoreFieldOption,
+  StoreRuntime,
+  VectorStoreDescriptor,
+  VectorStoreId,
+};
 
 export type EmbeddingProvider =
   | 'openai'
@@ -100,12 +48,6 @@ export interface EmbeddingModelDescriptor {
   description: string;
 }
 
-/* ------------------------------------------------------------------ */
-/* Indexing / chunking                                                 */
-/* ------------------------------------------------------------------ */
-
-export type IndexType = 'lexical' | 'semantic' | 'hybrid';
-
 export interface ChunkingParams {
   /** target chunk size in tokens */
   chunkSize: number;
@@ -114,10 +56,6 @@ export interface ChunkingParams {
   /** split strategy */
   strategy: 'recursive' | 'sentence' | 'fixed';
 }
-
-/* ------------------------------------------------------------------ */
-/* The persisted toolkit config                                        */
-/* ------------------------------------------------------------------ */
 
 export interface RagConfig {
   /** project label, used when generating the server */
@@ -147,6 +85,13 @@ export interface RagConfig {
   /** dynamic tool configuration */
   toolConfigs?: Record<string, Record<string, any>>;
 
+  /** Runtime-only package descriptors used when an Agent Server is generated. */
+  agentPlugins?: Array<{ id: string; name?: string; packageName: string; version?: string }>;
+
+  /** Portable Agent Skills available to the Assistant. Inline skills store a
+   * SKILL.md document; remote skills retain their canonical URL. */
+  skills?: AgentSkill[];
+
   chatSuggestions?: string[];
   systemPrompt?: string;
   serperApiKey?: string;
@@ -163,9 +108,56 @@ export interface RagConfig {
   useScraperProxy?: boolean;
   webCrawlerProvider?: 'local' | 'cloud';
   firecrawlApiKey?: string;
+
+  /** Default sandbox backend offered to agents that need code execution (see @larkup/sandbox). */
+  defaultSandboxProvider?: string;
+  /** Per-provider sandbox credentials, keyed by provider id then by that provider's field key. */
+  sandboxProviderConfigs?: Record<string, Record<string, string>>;
+
   updatedAt: string;
-  deployment?: AgentDeploymentConfig;
   enabledTools?: string[];
+  /** Presentation settings for the embeddable Assistant chat widget. */
+  widget?: {
+    title?: string;
+    welcomeMessage?: string;
+    placeholder?: string;
+    primaryColor?: string;
+    position?: 'bottom-right' | 'bottom-left';
+    darkMode?: boolean;
+    customCss?: string;
+    logoUrl?: string;
+  };
+  /** Which profile the unified local Larkup Server exposes. */
+  runtimeProfile?: 'knowledge' | 'assistant';
+  /**
+   * A locally enrolled Enterprise profile. The Dashboard owns its policy and
+   * private tools; this only stores the client credential needed to retrieve it.
+   */
+  enterprise?: {
+    organizationId: string;
+    organizationName: string;
+    dashboardUrl: string;
+    installationId: string;
+    clientKey: string;
+    managedToolIds: string[];
+    enrolledAt: string;
+    /** Last-synced version of the Enterprise Profile (`GET /api/client/config`). `larkup update --ee` compares against this. */
+    configurationVersion?: number;
+  };
+}
+
+export interface AgentSkill {
+  id: string;
+  name: string;
+  description: string;
+  source: 'inline' | 'remote';
+  /** Disabled skills remain configured but are not added to agent instructions. */
+  enabled?: boolean;
+  /** Complete SKILL.md contents for an inline skill. */
+  content?: string;
+  /** Canonical SKILL.md URL for a remote skill. */
+  url?: string;
+  updatedAt: string;
 }
 
 export const DEFAULT_CONFIG: RagConfig = {
@@ -204,7 +196,10 @@ export const DEFAULT_CONFIG: RagConfig = {
   useScraperProxy: false,
   webCrawlerProvider: 'local',
   firecrawlApiKey: '',
+  defaultSandboxProvider: 'local',
+  sandboxProviderConfigs: {},
   toolConfigs: {},
+  skills: [],
   updatedAt: new Date(0).toISOString(),
 };
 
@@ -249,7 +244,7 @@ CRITICAL RULES FOR IMAGES AND KNOWLEDGE BASE:
 - IF A QUESTION PLAUSIBLY REFERS TO CONTENT THE USER INDEXED, search the knowledge base once before answering. Do not search for unrelated general questions, and do not repeat a search when prior results already contain the answer.
 - Questions about the user's preferences, files, database, diagrams, or anything the assistant "has" are always plausibly about indexed content. Search before answering instead of relying on general knowledge.
 - FOR INDEXED AUDIO OR VIDEO: search when the requested fact is not already available in the conversation. For follow-up requests to show or play a known moment, call presentMedia directly with the earlier result's mediaAssetId and timestamps.
-- FOR WINNER, RESULT, OR OUTCOME QUESTIONS: inspect both the semantic matches and any returned endingContext. Prefer an explicit final announcement, final scoreboard, or celebration over an earlier lead; a participant leading mid-match is not proof they won.
+- FOR ANY VIDEO CLAIM: distinguish direct observations (visible text, spoken statements, or directly observed actions) from inferences. Direct evidence is stronger than a reaction, interpretation, or summary. When evidence is incomplete or conflicts, inspect the relevant range and state only what the returned evidence establishes. Present the result naturally; never expose transcript, frame, model, tool, retrieval, or analysis-process terminology unless the user specifically asks.
 - MEDIA CITATIONS: present at most one best media item by default. Use presentMedia when the user explicitly asks for a preview or when one preview materially supports the answer. Never display every media search hit.
 - IF THE KNOWLEDGE BASE SEARCH RETURNS EMPTY OR IRRELEVANT RESULTS, YOU MUST CLEARLY STATE THAT YOU DO NOT HAVE THE INFORMATION. DO NOT HALLUCINATE OR GUESS THE ANSWER BASED ON YOUR PRE-TRAINED KNOWLEDGE UNLESS EXPLICITLY ASKED TO DO SO.
 
@@ -265,12 +260,21 @@ RESPONSE FORMATTING (Analytics Style):
 - DO NOT hallucinate facts; rely strictly on the provided query results.
 - End with a one-sentence synthesis if appropriate, avoiding filler words.`;
 
-/* ------------------------------------------------------------------ */
-/* Data loading / ETL (Phase 2)                                        */
-/* ------------------------------------------------------------------ */
-
 /** How a document entered the corpus. */
 export type DocumentSource = 'text' | 'files' | 'website' | 'media' | 'integrations';
+
+/** A user-facing knowledge group inside one Project. */
+export interface DataGroup {
+  id: string;
+  name: string;
+  description?: string;
+  /** Emoji icon or safe image URL shown on the group card. */
+  icon?: string;
+  /** Disabled groups stay stored and indexed but cannot be retrieved by the Project Assistant. */
+  assistantEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * A single cleaned document in the corpus. This is the unit that Phase 3
@@ -288,16 +292,18 @@ export interface SourceDocument {
   charCount: number;
   /** crawl job that produced this doc, if any */
   jobId?: string;
+  /** The one user-facing Data group that owns this source. */
+  groupId?: string;
+  /** A source can be temporarily excluded without deleting its index data. */
+  enabled?: boolean;
+  /** Parent source id for internal rows/chunks; only the parent is shown in Data. */
+  parentSourceId?: string;
   /** custom metadata fields mapped during ingestion */
   metadata?: Record<string, any>;
   /** indexing status */
   status?: 'indexed' | 'unindexed';
   createdAt: string;
 }
-
-/* ------------------------------------------------------------------ */
-/* Media assets                                                        */
-/* ------------------------------------------------------------------ */
 
 export type MediaType = 'image' | 'video' | 'audio';
 
@@ -306,6 +312,7 @@ export type MediaProcessingStatus = 'pending' | 'processing' | 'completed' | 'fa
 /** Durable stages used by the media ingestion pipeline. */
 export type MediaPipelineStage =
   | 'download'
+  | 'prepare'
   | 'extract'
   | 'transcribe'
   | 'vision'
@@ -327,6 +334,12 @@ export interface MediaProcessingStep {
   current?: number;
   total?: number;
   unit?: string;
+  /** Runtime-supplied ETA for the remaining worker pipeline. */
+  estimatedRemainingSeconds?: number;
+  /** Runtime elapsed time associated with the ETA above. */
+  elapsedSeconds?: number;
+  /** Monotonic worker update id used to distinguish a heartbeat from a stale value. */
+  sequence?: number;
   message?: string;
   startedAt?: string;
   updatedAt: string;
@@ -351,6 +364,8 @@ export interface MediaAsset {
   processingPaused?: boolean;
   processingSteps?: MediaProcessingStep[];
   processingRevision?: number;
+  /** Start time of the current processing attempt; reset on retry/re-index. */
+  processingStartedAt?: string;
   processingHeartbeatAt?: string;
   caption?: string;
   documentIds: string[];
@@ -362,15 +377,19 @@ export interface MediaAsset {
   activeVideoKnowledgeManifestId?: string;
   /** Current/last durable job, used for status, cancellation, and scoped retry. */
   activeVideoKnowledgeJobId?: string;
+  /** Active managed Video Intelligence job, used to cancel cloud work before deletion. */
+  activeVideoIntelligenceJobId?: string;
+  /** Runtime that produced the active video knowledge revision. */
+  videoRuntimeScope?: 'local' | 'cloud';
   indexingInstructions?: string;
   indexingQuality?: number;
+  /** Marketplace-owned, JSON-serializable indexing input keyed by tool id. */
+  toolInputs?: Record<string, unknown>;
+  /** Group the derived searchable source belongs to. */
+  groupId?: string;
   createdAt: string;
   updatedAt: string;
 }
-
-/* ------------------------------------------------------------------ */
-/* Tabular data references                                             */
-/* ------------------------------------------------------------------ */
 
 /** Links a document back to the tabular dataset it originated from. */
 export interface TabularRef {
@@ -411,6 +430,8 @@ export interface CrawlJob {
   pageLimit: number;
   pagesCrawled: number;
   docCount: number;
+  /** Group assigned when the job was queued; applied to every scraped source. */
+  groupId?: string;
   error?: string;
   createdAt: string;
   updatedAt: string;
@@ -422,10 +443,6 @@ export interface SearchResultItem {
   title: string;
   description?: string;
 }
-
-/* ------------------------------------------------------------------ */
-/* Indexing runs (Phase 3)                                             */
-/* ------------------------------------------------------------------ */
 
 export type IndexRunStatus =
   | 'idle'
@@ -469,10 +486,6 @@ export interface IndexRun {
   durationMs?: number;
 }
 
-/* ------------------------------------------------------------------ */
-/* Pipeline stages (drive the sidebar nav + gating)                    */
-/* ------------------------------------------------------------------ */
-
 export type StageId = 'configure' | 'data' | 'server' | 'demo' | 'chat';
 
 export interface StageMeta {
@@ -483,56 +496,3 @@ export interface StageMeta {
   /** phase this stage is delivered in; lets UI mark "coming soon" */
   phase: number;
 }
-
-/* ------------------------------------------------------------------ */
-/* Agent Deployment Types                                              */
-/* ------------------------------------------------------------------ */
-
-export type AgentAuthMode = 'none' | 'api-key' | 'join-code';
-
-export interface AgentWidgetStyle {
-  primaryColor: string;
-  position: 'bottom-right' | 'bottom-left';
-  title: string;
-  welcomeMessage: string;
-  placeholder: string;
-  avatarUrl?: string;
-  darkMode: boolean;
-  borderRadius: 'sm' | 'md' | 'lg' | 'full';
-}
-
-export interface AgentDeploymentConfig {
-  type: 'rag-only' | 'full-agent';
-  authMode: AgentAuthMode;
-  joinCode?: string;
-  enabledToolIds: string[];
-  widgetStyle: AgentWidgetStyle;
-  chatModelId?: string;
-  chatProvider?: string;
-  chatApiKey?: string;
-  systemPrompt?: string;
-  allowedOrigins: string[];
-  webSearchEnabled?: boolean;
-  webSearchApiKey?: string;
-  webSearchProvider?: 'tavily' | 'serper' | 'google' | 'brave' | 'bing' | 'exa' | 'local';
-  /** Vercel Blob token for LanceDB cloud storage */
-  vercelBlobToken?: string;
-}
-
-export const DEFAULT_WIDGET_STYLE: AgentWidgetStyle = {
-  primaryColor: '#000000',
-  position: 'bottom-right',
-  title: 'Chat with AI',
-  welcomeMessage: 'Hi! How can I help you today?',
-  placeholder: 'Type a message...',
-  darkMode: false,
-  borderRadius: 'lg',
-};
-
-export const DEFAULT_DEPLOYMENT_CONFIG: AgentDeploymentConfig = {
-  type: 'rag-only',
-  authMode: 'none',
-  enabledToolIds: [],
-  widgetStyle: DEFAULT_WIDGET_STYLE,
-  allowedOrigins: ['*'],
-};

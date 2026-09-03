@@ -66,7 +66,7 @@ export function getEmbeddingModelsForProvider(
  * Used when the gateway is unreachable.
  */
 export const EMBEDDING_MODELS: EmbeddingModelDescriptor[] = [
-  // ── OpenAI ──────────────────────────────────────────────────────────
+  // OpenAI.
   {
     id: 'openai/text-embedding-3-small',
     label: 'text-embedding-3-small',
@@ -92,7 +92,7 @@ export const EMBEDDING_MODELS: EmbeddingModelDescriptor[] = [
     description: 'Legacy model — kept for backward compatibility.',
   },
 
-  // ── Google ───────────────────────────────────────────────────────────
+  // Google.
 
   {
     id: 'google/gemini-embedding-2',
@@ -111,7 +111,7 @@ export const EMBEDDING_MODELS: EmbeddingModelDescriptor[] = [
     description: 'Gemini embedding 001.',
   },
 
-  // ── Cohere ───────────────────────────────────────────────────────────
+  // Cohere.
   {
     id: 'cohere/embed-english-v3.0',
     label: 'embed-english-v3.0',
@@ -129,7 +129,7 @@ export const EMBEDDING_MODELS: EmbeddingModelDescriptor[] = [
     description: '100+ language multilingual retrieval embeddings.',
   },
 
-  // ── Voyage AI ────────────────────────────────────────────────────────
+  // Voyage AI.
   {
     id: 'voyage/voyage-3',
     label: 'voyage-3',
@@ -155,7 +155,7 @@ export const EMBEDDING_MODELS: EmbeddingModelDescriptor[] = [
     description: 'Specialized for code retrieval tasks.',
   },
 
-  // ── Mistral ──────────────────────────────────────────────────────────
+  // Mistral.
   {
     id: 'mistral/mistral-embed',
     label: 'mistral-embed',
@@ -165,7 +165,7 @@ export const EMBEDDING_MODELS: EmbeddingModelDescriptor[] = [
     description: "Mistral's efficient embedding model for retrieval.",
   },
 
-  // ── Jina AI ──────────────────────────────────────────────────────────
+  // Jina AI.
   {
     id: 'jina/jina-embeddings-v3',
     label: 'jina-embeddings-v3',
@@ -183,7 +183,7 @@ export const EMBEDDING_MODELS: EmbeddingModelDescriptor[] = [
     description: 'Multimodal embeddings for text and images.',
   },
 
-  // ── Nomic ────────────────────────────────────────────────────────────
+  // Nomic.
   {
     id: 'nomic/nomic-embed-text-v1.5',
     label: 'nomic-embed-text-v1.5',

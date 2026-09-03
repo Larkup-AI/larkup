@@ -358,19 +358,129 @@ export async function embedQuery(text) {
 `;
 }
 
+/**
+ * Keep model discovery in the generated runtime so SDK users can inspect the
+ * exact choices available to that deployment without shipping credentials or
+ * maintaining a second provider catalog in their application.
+ */
+function chatModelsSource(config: RagConfig): string {
+  const provider = resolveChatProvider(config);
+  const model = resolveChatModel(config, provider);
+
+  return `const CHAT_PROVIDER = ${JSON.stringify(provider)};
+const CHAT_MODEL = process.env.CHAT_MODEL || ${JSON.stringify(model)};
+const GATEWAY_MODELS_URL = "https://ai-gateway.vercel.sh/v1/models";
+const CACHE_TTL_MS = 15 * 60 * 1000;
+let cachedCatalog = null;
+
+function vendorFromModelId(id) {
+  return typeof id === "string" && id.includes("/") ? id.split("/", 1)[0] : CHAT_PROVIDER;
+}
+
+function configuredFallback() {
+  const provider = vendorFromModelId(CHAT_MODEL);
+  return {
+    configuredProvider: CHAT_PROVIDER,
+    configuredModelId: CHAT_MODEL,
+    providers: [{ id: provider, name: provider, modelCount: 1 }],
+    models: [{ id: CHAT_MODEL, name: CHAT_MODEL, provider }],
+    source: "configured",
+  };
+}
+
+function normalizeGatewayModels(payload) {
+  const raw = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+  return raw
+    .filter((item) => item && (item.type === "language" || item.type === "chat" || !item.type))
+    .map((item) => ({
+      id: item.id,
+      name: item.name || item.id,
+      provider: item.owned_by || item.provider || vendorFromModelId(item.id),
+      contextWindow: item.context_window || item.contextWindow,
+      maxTokens: item.max_tokens || item.maxTokens,
+      tags: Array.isArray(item.tags) ? item.tags : undefined,
+      description: item.description,
+    }))
+    .filter((item) => typeof item.id === "string" && item.id.length > 0);
+}
+
+export async function getChatModelCatalog(requestedProvider) {
+  if (CHAT_PROVIDER !== "vercel_ai_gateway") {
+    const fallback = configuredFallback();
+    if (requestedProvider && requestedProvider !== CHAT_PROVIDER && requestedProvider !== fallback.models[0].provider) {
+      return { ...fallback, providers: [], models: [] };
+    }
+    return fallback;
+  }
+
+  if (!cachedCatalog || Date.now() - cachedCatalog.at > CACHE_TTL_MS) {
+    try {
+      const response = await fetch(GATEWAY_MODELS_URL, { signal: AbortSignal.timeout(5000) });
+      if (!response.ok) throw new Error("Gateway model catalog returned " + response.status);
+      const models = normalizeGatewayModels(await response.json());
+      if (models.length === 0) throw new Error("Gateway model catalog was empty");
+      cachedCatalog = { at: Date.now(), models };
+    } catch (error) {
+      console.warn("[models] Could not refresh AI Gateway catalog:", error instanceof Error ? error.message : String(error));
+      return configuredFallback();
+    }
+  }
+
+  const models = requestedProvider
+    ? cachedCatalog.models.filter((item) => item.provider === requestedProvider)
+    : cachedCatalog.models;
+  const counts = new Map();
+  for (const item of models) counts.set(item.provider, (counts.get(item.provider) || 0) + 1);
+  return {
+    configuredProvider: CHAT_PROVIDER,
+    configuredModelId: CHAT_MODEL,
+    providers: [...counts.entries()]
+      .map(([id, modelCount]) => ({ id, name: id, modelCount }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    models,
+    source: "vercel-ai-gateway",
+  };
+}`;
+}
+
 function serverSource(config: RagConfig): string {
+  const isAgentServer = config.runtimeProfile === 'assistant';
+  const agentTools = ['searchKnowledgeBase', 'getIndexedData']
+    .filter((id) => (config.enabledTools ?? []).length === 0 || config.enabledTools?.includes(id))
+    .map((id) =>
+      id === 'searchKnowledgeBase'
+        ? {
+            id,
+            name: 'Search Knowledge Base',
+            description: 'Search indexed Larkup knowledge-base content.',
+          }
+        : {
+            id,
+            name: 'Get Indexed Data',
+            description: 'List indexed knowledge-base documents.',
+          },
+    );
+
   return `import { createServer } from "node:http"
 import { embedQuery } from "./embed.mjs"
 import * as store from "./store.mjs"
-import { handleChat } from "./chat.mjs"
+import { getChatModelCatalog } from "./models.mjs"
+${isAgentServer ? 'import { widgetScript } from "./widget.mjs"' : ''}
+import { handleChat${
+    isAgentServer
+      ? ', handleAgentChat, handleOpenAIChatCompletions, listAgentCapabilities, listAgentTools, getAgentRuntimeConfiguration, getAgentSandboxStatus'
+      : ''
+  } } from "./chat.mjs"
 import fs from "node:fs"
 import path from "node:path"
 import * as cheerio from "cheerio"
 
 const PORT = process.env.PORT || 8080
 const DEFAULT_TOP_K = Number(process.env.TOP_K || ${config.topK})
+const SERVER_PROFILE = ${JSON.stringify(isAgentServer ? 'agent' : 'knowledge')}
+const AGENT_TOOLS = ${JSON.stringify(agentTools)}
 
-/* ── Scoped API key auth (ADR-004) ────────────────────────────── */
+/* Scoped API-key authentication. */
 // SERVER_API_KEYS format: "scope:key,scope:key,..."
 // Scopes: retrieval (query/chat), ingest (documents/scrape/media), admin (everything)
 // Backward compat: SERVER_API_KEY without scope prefix = admin
@@ -394,8 +504,8 @@ console.log('[${
 
 // Endpoint-to-scope access table per ADR-004
 const SCOPE_TABLE = {
-  retrieval: new Set(["/query", "/chat"]),
-  ingest: new Set(["/query", "/chat", "/documents", "/scrape", "/media"]),
+  retrieval: new Set(["/query", "/chat", "/models", "/agent", "/v1/chat/completions"]),
+  ingest: new Set(["/query", "/chat", "/models", "/agent", "/v1/chat/completions", "/documents", "/scrape", "/media"]),
   admin: null, // admin = all endpoints
 }
 
@@ -406,6 +516,7 @@ function resolveScope(token) {
 function scopeAllows(scope, pathname) {
   if (!scope) return false
   if (scope === "admin") return true
+  if (pathname === "/agent/configuration" || pathname === "/agent/sandbox") return false
   const allowed = SCOPE_TABLE[scope]
   if (!allowed) return false
   // Check if the pathname starts with any allowed prefix
@@ -437,19 +548,19 @@ async function readBody(req) {
   }
 }
 
-const server = createServer(async (req, res) => {
+const handler = async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 204, {})
 
   const url = new URL(req.url, \`http://\${req.headers.host}\`)
 
-  if (req.method === "GET" && url.pathname === "/favicon2.ico") {
+  if (req.method === "GET" && url.pathname === "/favicon.ico") {
     try {
-      const filepath = path.join(process.cwd(), "public", "favicon2.ico")
+      const filepath = path.join(process.cwd(), "public", "favicon.ico")
       if (fs.existsSync(filepath)) {
         res.writeHead(200, { "Content-Type": "image/x-icon" })
         return res.end(fs.readFileSync(filepath))
       }
-      const rootFilepath = path.join(process.cwd(), "favicon2.ico")
+      const rootFilepath = path.join(process.cwd(), "favicon.ico")
       if (fs.existsSync(rootFilepath)) {
         res.writeHead(200, { "Content-Type": "image/x-icon" })
         return res.end(fs.readFileSync(rootFilepath))
@@ -458,7 +569,9 @@ const server = createServer(async (req, res) => {
   }
 
   // Public endpoints: no auth required
-  const isPublic = url.pathname === "/" || url.pathname === "/health" || url.pathname === "/readiness" || url.pathname === "/openapi.json" || url.pathname === "/reference"
+  const isPublic = url.pathname === "/" || url.pathname === "/health" || url.pathname === "/readiness" || url.pathname === "/openapi.json" || url.pathname === "/reference"${
+    isAgentServer ? ' || url.pathname === "/widget.js"' : ''
+  }
 
   if (AUTH_ENABLED && !isPublic) {
     const auth = req.headers.authorization
@@ -478,8 +591,33 @@ const server = createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/health") {
     return send(res, 200, { ok: true, service: ${JSON.stringify(
       config.projectName,
-    )}, type: "knowledge-server" })
+    )}, type: SERVER_PROFILE === "agent" ? "agent-server" : "knowledge-server", profile: SERVER_PROFILE })
   }
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Max-Age": "86400",
+    })
+    return res.end()
+  }
+
+${
+  isAgentServer
+    ? `  if (req.method === "GET" && url.pathname === "/widget.js") {
+    res.writeHead(200, {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "public, max-age=3600",
+      "Access-Control-Allow-Origin": "*",
+      "X-Content-Type-Options": "nosniff",
+    })
+    return res.end(widgetScript)
+  }
+`
+    : ''
+}
 
   if (req.method === "GET" && url.pathname === "/readiness") {
     try {
@@ -488,6 +626,10 @@ const server = createServer(async (req, res) => {
     } catch (err) {
       return send(res, 503, { ready: false, vectorStore: "error", error: String(err?.message || err) })
     }
+  }
+
+  if (req.method === "GET" && url.pathname === "/models") {
+    return send(res, 200, await getChatModelCatalog(url.searchParams.get("provider") || undefined))
   }
 
   if (req.method === "GET" && url.pathname === "/") {
@@ -501,7 +643,7 @@ const server = createServer(async (req, res) => {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>\${${JSON.stringify(config.projectName)}} — Larkup Server</title>
-  <link rel="icon" href="/favicon2.ico" type="image/x-icon" />
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -570,9 +712,46 @@ const server = createServer(async (req, res) => {
     }
   }
 
-  if (req.method === "POST" && url.pathname === "/chat") {
+${
+  isAgentServer
+    ? `  if (req.method === "GET" && url.pathname === "/agent") {
+    return send(res, 200, {
+      name: ${JSON.stringify(config.projectName)},
+      agentId: ${JSON.stringify(config.projectName)},
+      profile: "agent",
+      tools: await listAgentTools(),
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/agent/tools") {
+    return send(res, 200, { tools: await listAgentTools() })
+  }
+
+  if (req.method === "GET" && url.pathname === "/agent/capabilities") {
+    return send(res, 200, { capabilities: await listAgentCapabilities() })
+  }
+
+  if (req.method === "GET" && url.pathname === "/agent/configuration") {
+    return send(res, 200, getAgentRuntimeConfiguration())
+  }
+
+  if (req.method === "GET" && url.pathname === "/agent/sandbox") {
+    return send(res, 200, await getAgentSandboxStatus())
+  }
+
+  if (req.method === "POST" && (url.pathname === "/chat" || url.pathname === "/agent/chat")) {
+    return handleAgentChat(req, res)
+  }
+
+  if (req.method === "POST" && url.pathname === "/v1/chat/completions") {
+    return handleOpenAIChatCompletions(req, res)
+  }
+`
+    : `  if (req.method === "POST" && url.pathname === "/chat") {
     return handleChat(req, res)
   }
+`
+}
 
   if (req.method === "GET" && url.pathname === "/documents") {
     try {
@@ -756,12 +935,25 @@ const server = createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/openapi.json") {
     return send(res, 200, {
       openapi: "3.1.0",
-      info: { title: "Larkup Server", version: "1.0.0" },
+      info: {
+        title: SERVER_PROFILE === "agent" ? "Larkup Agent Server" : "Larkup Knowledge Server",
+        version: "1.0.0",
+        description: SERVER_PROFILE === "agent"
+          ? "Knowledge-base operations plus an AI SDK-compatible Agent API."
+          : "Knowledge-base retrieval and content-management API.",
+      },
       security: [{ bearerAuth: [] }],
+      tags: [
+        { name: "Knowledge", description: "Knowledge base retrieval and management." },
+        ...(SERVER_PROFILE === "agent"
+          ? [{ name: "Agent", description: "Agent chat streaming and loaded tools." }]
+          : []),
+      ],
       paths: {
         "/query": {
           post: {
             summary: "Query the RAG knowledge base",
+            tags: ["Knowledge"],
             security: [{ bearerAuth: [] }],
             requestBody: {
               content: { "application/json": { schema: { type: "object", properties: { query: { type: "string" }, topK: { type: "number" } } } } }
@@ -771,7 +963,8 @@ const server = createServer(async (req, res) => {
         },
         "/chat": {
           post: {
-            summary: "Stream a retrieval-grounded chat response",
+            summary: SERVER_PROFILE === "agent" ? "Stream an Agent chat response" : "Stream a retrieval-grounded chat response",
+            tags: [SERVER_PROFILE === "agent" ? "Agent" : "Knowledge"],
             security: [{ bearerAuth: [] }],
             requestBody: {
               required: true,
@@ -792,7 +985,9 @@ const server = createServer(async (req, res) => {
                           }
                         }
                       },
-                      topK: { type: "integer", minimum: 1 }
+                      topK: { type: "integer", minimum: 1 },
+                      provider: { type: "string", description: "Configured chat runtime provider. Optional; must match this deployment." },
+                      modelId: { type: "string", description: "Model ID to use for this request. Gateway runtimes accept any listed Gateway language model; direct providers accept their own model IDs." }
                     }
                   }
                 }
@@ -800,7 +995,9 @@ const server = createServer(async (req, res) => {
             },
             responses: {
               "200": {
-                description: "Server-sent events containing text-delta and done events",
+                description: SERVER_PROFILE === "agent"
+                  ? "AI SDK UI message stream"
+                  : "Server-sent events containing text-delta and done events",
                 content: { "text/event-stream": {} }
               }
             }
@@ -809,6 +1006,7 @@ const server = createServer(async (req, res) => {
         "/documents": {
           get: {
             summary: "List documents (paginated)",
+            tags: ["Knowledge"],
             security: [{ bearerAuth: [] }],
             parameters: [
               { name: "page",  in: "query", required: false, schema: { type: "integer", default: 1,  minimum: 1 }, description: "Page number (1-indexed)" },
@@ -836,6 +1034,7 @@ const server = createServer(async (req, res) => {
           },
           post: {
             summary: "Add a new document",
+            tags: ["Knowledge"],
             security: [{ bearerAuth: [] }],
             requestBody: {
               content: { "application/json": { schema: { type: "object", properties: { text: { type: "string" }, title: { type: "string" }, url: { type: "string" }, documentId: { type: "string" } } } } }
@@ -846,6 +1045,7 @@ const server = createServer(async (req, res) => {
         "/documents/{id}": {
           get: {
             summary: "Get a single document by ID",
+            tags: ["Knowledge"],
             security: [{ bearerAuth: [] }],
             parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
             responses: {
@@ -855,6 +1055,7 @@ const server = createServer(async (req, res) => {
           },
           put: {
             summary: "Update a document",
+            tags: ["Knowledge"],
             security: [{ bearerAuth: [] }],
             parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
             requestBody: {
@@ -864,6 +1065,7 @@ const server = createServer(async (req, res) => {
           },
           delete: {
             summary: "Delete a document",
+            tags: ["Knowledge"],
             security: [{ bearerAuth: [] }],
             parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
             responses: { "200": { description: "Successful response" } }
@@ -872,6 +1074,7 @@ const server = createServer(async (req, res) => {
         "/scrape": {
           post: {
             summary: "Scrape a URL and ingest into the corpus",
+            tags: ["Knowledge"],
             security: [{ bearerAuth: [] }],
             requestBody: {
               content: { "application/json": { schema: { type: "object", required: ["url"], properties: { url: { type: "string", description: "URL to scrape" } } } } }
@@ -885,12 +1088,30 @@ const server = createServer(async (req, res) => {
         "/health": {
           get: {
             summary: "Health check",
+            tags: ["Knowledge"],
             responses: { "200": { description: "OK" } }
+          }
+        },
+        "/models": {
+          get: {
+            summary: "List chat providers and models available to this runtime",
+            tags: ["Knowledge"],
+            security: [{ bearerAuth: [] }],
+            parameters: [{ name: "provider", in: "query", required: false, schema: { type: "string" }, description: "Filter Gateway models by provider." }],
+            responses: { "200": { description: "Chat provider and model catalog" } }
+          }
+        },
+        "/readiness": {
+          get: {
+            summary: "Check knowledge-store readiness",
+            tags: ["Knowledge"],
+            responses: { "200": { description: "Knowledge store is connected" }, "503": { description: "Knowledge store is unavailable" } }
           }
         },
         "/corpus/summary": {
           get: {
             summary: "Get corpus summary statistics",
+            tags: ["Knowledge"],
             security: [{ bearerAuth: [] }],
             responses: {
               "200": {
@@ -915,6 +1136,7 @@ const server = createServer(async (req, res) => {
         "/corpus": {
           post: {
             summary: "Get corpus documents with optional filtering",
+            tags: ["Knowledge"],
             security: [{ bearerAuth: [] }],
             requestBody: {
               content: { "application/json": { schema: { type: "object", properties: {
@@ -930,13 +1152,98 @@ const server = createServer(async (req, res) => {
         "/corpus/export": {
           post: {
             summary: "Export full corpus as CSV or JSONL",
+            tags: ["Knowledge"],
             security: [{ bearerAuth: [] }],
             requestBody: {
               content: { "application/json": { schema: { type: "object", properties: { format: { type: "string", enum: ["csv", "jsonl"], default: "csv" } } } } }
             },
             responses: { "200": { description: "Corpus data in requested format" } }
           }
-        }
+        },
+        ...(SERVER_PROFILE === "agent" ? {
+          "/agent": {
+            get: {
+              summary: "Get Agent Runtime information",
+              tags: ["Agent"],
+              security: [{ bearerAuth: [] }],
+              responses: { "200": { description: "Agent name, profile, and loaded tools" } },
+            },
+          },
+          "/agent/tools": {
+            get: {
+              summary: "List tools loaded by the Agent",
+              tags: ["Agent"],
+              security: [{ bearerAuth: [] }],
+              responses: { "200": { description: "Available Agent tool manifests" } },
+            },
+          },
+          "/agent/capabilities": {
+            get: {
+              summary: "List grouped Agent capabilities",
+              tags: ["Agent"],
+              security: [{ bearerAuth: [] }],
+              responses: { "200": { description: "Built-in, skills, sandbox, MCP, and plugin capability groups" } },
+            },
+          },
+            "/agent/configuration": {
+            get: {
+              summary: "Get saved Agent prompt and skills",
+              tags: ["Agent"],
+              security: [{ bearerAuth: [] }],
+              responses: { "200": { description: "Saved system prompt and enabled skill metadata; requires an admin key when auth is configured" } },
+            },
+            "/agent/sandbox": {
+              get: {
+                summary: "Check the configured Agent sandbox environment",
+                responses: { "200": { description: "Sanitized sandbox health status" } },
+              },
+            },
+          },
+          "/agent/chat": {
+            post: {
+              summary: "Stream an Agent response using the AI SDK UI message protocol",
+              tags: ["Agent"],
+              security: [{ bearerAuth: [] }],
+              requestBody: {
+                required: true,
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      required: ["messages"],
+                      properties: { messages: { type: "array", items: { type: "object" } } },
+                    },
+                  },
+                },
+              },
+              responses: { "200": { description: "AI SDK UI message stream", content: { "text/event-stream": {} } } },
+            },
+          },
+          "/v1/chat/completions": {
+            post: {
+              summary: "OpenAI-compatible Agent chat completions",
+              tags: ["Agent"],
+              security: [{ bearerAuth: [] }],
+              requestBody: {
+                required: true,
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      required: ["messages"],
+                      properties: {
+                        model: { type: "string" },
+                        stream: { type: "boolean", default: true },
+                        messages: { type: "array", items: { type: "object" } },
+                      },
+                    },
+                  },
+                },
+              },
+              responses: { "200": { description: "OpenAI chat completion or SSE completion stream" } },
+            },
+          },
+        } : {})
       },
       components: {
         securitySchemes: {
@@ -959,7 +1266,7 @@ const server = createServer(async (req, res) => {
           <title>API Reference</title>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <link rel="icon" href="/favicon2.ico" type="image/x-icon" />
+          <link rel="icon" href="/favicon.ico" type="image/x-icon" />
           <style>
             :root {
               --scalar-color-1: #000000;
@@ -1039,9 +1346,18 @@ const server = createServer(async (req, res) => {
   }
 
   return send(res, 404, { error: "Not found" })
-})
+}
 
-server.listen(PORT)
+const IS_SERVERLESS = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME
+
+if (!IS_SERVERLESS) {
+  const server = createServer(handler)
+  server.listen(PORT, () => {
+    console.log(\`Server listening on port \${PORT}\`)
+  })
+}
+
+export default handler;
 `;
 }
 
@@ -1069,6 +1385,40 @@ for (const [i, hit] of data.hits.entries()) {
   console.log(\`   \${hit.text.slice(0, 160).replace(/\\n/g, " ")}...\\n\`)
 }
 `;
+}
+
+function widgetSource(config: RagConfig): string {
+  const settings = {
+    title: config.widget?.title || 'Ask us anything',
+    welcomeMessage: config.widget?.welcomeMessage || 'Hi! How can I help?',
+    placeholder: config.widget?.placeholder || 'Type a message…',
+    primaryColor: config.widget?.primaryColor || '#111827',
+    position: config.widget?.position || 'bottom-right',
+    darkMode: Boolean(config.widget?.darkMode),
+    logoUrl: config.widget?.logoUrl || '',
+  };
+  const browserSource = `(() => {
+  const defaults = ${JSON.stringify(settings)};
+  const script = document.currentScript || document.querySelector('script[data-larkup-widget]') || document.querySelector('script[src*="/widget.js"]');
+  const data = script?.dataset || {};
+  const host = String(data.host || new URL(script?.src || location.href, location.href).origin).replace(/\\/+$/, '');
+  const config = { ...defaults, title: data.title || defaults.title, welcomeMessage: data.welcomeMessage || defaults.welcomeMessage, placeholder: data.placeholder || defaults.placeholder, primaryColor: data.primaryColor || defaults.primaryColor, position: data.position || defaults.position, darkMode: data.theme ? data.theme === 'dark' : defaults.darkMode, logoUrl: data.logoUrl || defaults.logoUrl };
+  const mount = document.createElement('div'); mount.dataset.larkupWidget = ''; if (data.class) mount.className = data.class; document.body.appendChild(mount);
+  const root = mount.attachShadow({ mode: 'open' });
+  root.innerHTML = '<style>:host{all:initial}*{box-sizing:border-box}.w{--a:' + config.primaryColor + ';position:fixed;bottom:20px;z-index:2147483000;font:14px/1.45 ui-sans-serif,system-ui;color:#17191e}.right{right:20px}.left{left:20px}.p{width:min(390px,calc(100vw - 32px));height:min(620px,calc(100vh - 110px));display:none;flex-direction:column;overflow:hidden;background:#fff;border:1px solid #e1e3e8;border-radius:18px;box-shadow:0 20px 60px #11182738}.open .p{display:flex}.dark .p{background:#17191e;border-color:#343946;color:#f4f4f5;box-shadow:0 20px 60px #0009}.h{display:flex;gap:10px;align-items:center;padding:15px 16px;border-bottom:1px solid #e1e3e8}.dark .h{border-color:#343946}.d{width:9px;height:9px;border-radius:99px;background:var(--a)}strong{flex:1}.x,.b,.s{border:0;cursor:pointer}.x{background:transparent;color:inherit;font-size:20px}.m{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:16px}.a,.u,.empty{max-width:86%;padding:10px 12px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere}.a,.empty{align-self:flex-start;background:#f3f4f6}.dark .a,.dark .empty{background:#292d36}.u{align-self:flex-end;background:var(--a);color:#fff;border-bottom-right-radius:4px}.f{display:flex;gap:8px;padding:12px;border-top:1px solid #e1e3e8}.dark .f{border-color:#343946}textarea{flex:1;min-height:42px;resize:none;border:1px solid #d8dbe2;border-radius:12px;padding:10px;background:transparent;color:inherit;font:inherit}.s{width:42px;border-radius:12px;background:var(--a);color:#fff}.b{display:flex;align-items:center;justify-content:center;margin:12px 0 0 auto;width:56px;height:56px;border-radius:99px;background:var(--a);color:#fff;font-size:22px;box-shadow:0 10px 25px #11182740}.left .b{margin-left:0}.err{color:#dc2626}.dark .err{color:#fca5a5}.cb{background:#1e1e1e;color:#d4d4d4;border-radius:8px;overflow:hidden;margin:8px 0;font-family:monospace;font-size:13px;white-space:normal}.cb-h{display:flex;justify-content:space-between;background:#2d2d2d;padding:4px 8px;font-size:11px;color:#a0a0a0}.cb-h button{background:none;border:none;color:inherit;cursor:pointer;padding:0}.cb pre{margin:0;padding:8px;overflow-x:auto;white-space:pre}code{font-family:monospace;background:#0002;padding:2px 4px;border-radius:4px}a{color:var(--a)}@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}</style><div class="w ' + (config.position === 'bottom-left' ? 'left' : 'right') + (config.darkMode ? ' dark' : '') + '"><section class="p" role="dialog"><header class="h"><i class="d"></i><strong></strong><button class="x" aria-label="Close chat">×</button></header><main class="m"><div class="empty"></div></main><form class="f"><textarea rows="1"></textarea><button class="s" aria-label="Send">↑</button></form></section><button class="b" aria-label="Open chat"></button></div>';
+  const shell = root.querySelector('.w'), panel = root.querySelector('.p'), button = root.querySelector('.b'), close = root.querySelector('.x'), list = root.querySelector('.m'), empty = root.querySelector('.empty'), input = root.querySelector('textarea'), form = root.querySelector('form');
+  root.querySelector('strong').textContent = config.title; empty.textContent = config.welcomeMessage; input.placeholder = config.placeholder;
+  const iconNormal = config.logoUrl ? '<img src="' + config.logoUrl + '" style="width:28px;height:28px;border-radius:99px;object-fit:cover">' : '◌';
+  button.innerHTML = iconNormal;
+  const toggle = (open) => { shell.classList.toggle('open', open); button.innerHTML = open ? '×' : iconNormal; }; button.onclick = () => toggle(!shell.classList.contains('open')); close.onclick = () => toggle(false);
+  const add = (name, text) => { const el = document.createElement('div'); el.className = name; el.innerHTML = text; list.appendChild(el); list.scrollTop = list.scrollHeight; return el; };
+  const text = (line) => { try { if (line.startsWith('0:')) { const value = JSON.parse(line.slice(2)); return typeof value === 'string' ? value : ''; } if (!line.startsWith('data:')) return ''; const value = JSON.parse(line.slice(5)); return value?.type === 'text-delta' ? (value.delta || value.text || '') : ''; } catch { return ''; } };
+  const parseMD = (str) => { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\\\`\\\`\\\`(\\w*)\\n([\\s\\S]*?)\\\`\\\`\\\`/g, '<div class="cb"><div class="cb-h"><span>$1</span><button type="button" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.textContent);this.textContent=\\'Copied!\\';setTimeout(()=>this.textContent=\\'Copy\\',2000)">Copy</button></div><pre><code>$2</code></pre></div>').replace(/\\\`([^\`]+)\\\`/g, '<code>$1</code>').replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>').replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" target="_blank">$1</a>'); };
+  input.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } };
+  form.onsubmit = async (event) => { event.preventDefault(); const question = input.value.trim(); if (!question) return; empty.remove(); add('u', parseMD(question)); input.value = ''; const answer = add('a', '<span style="animation:pulse 1s infinite">Thinking...</span>'); try { const response = await fetch(host + '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(data.apiKey ? { Authorization: 'Bearer ' + data.apiKey } : {}) }, body: JSON.stringify({ messages: [{ role: 'user', content: question }] }) }); if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Could not reach the assistant.'); const reader = response.body?.getReader(), decoder = new TextDecoder(); if (!reader) return; let buffer = ''; let fullText = ''; while (true) { const chunk = await reader.read(); buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !chunk.done }); const lines = buffer.split(/\\r?\\n/); buffer = lines.pop() || ''; for (const line of lines) { const t = text(line); if (t) { fullText += t; answer.innerHTML = parseMD(fullText); list.scrollTop = list.scrollHeight; } } if (chunk.done) break; } const t = text(buffer); if (t) { fullText += t; answer.innerHTML = parseMD(fullText); list.scrollTop = list.scrollHeight; } } catch (error) { answer.classList.add('err'); answer.textContent = error instanceof Error ? error.message : 'Could not reach the assistant.'; } };
+  window.LarkupWidget = { destroy: () => mount.remove() };
+})();`;
+  return `export const widgetScript = ${JSON.stringify(browserSource)};\n`;
 }
 
 function dockerfile(): string {
@@ -1142,12 +1492,17 @@ function envExample(server: GeneratedServer): string {
 
 function readme(config: RagConfig, server: GeneratedServer): string {
   const store = getVectorStore(config.vectorStore);
+  const isAgentServer = config.runtimeProfile === 'assistant';
   const deps = Object.entries(server.dependencies)
     .map(([k, v]) => `- \`${k}@${v}\``)
     .join('\n');
   return `# ${config.projectName}
 
-A Larkup **Knowledge Server** — lightweight RAG retrieval API.
+A Larkup **${isAgentServer ? 'Agent Server' : 'Knowledge Server'}** — ${
+    isAgentServer
+      ? 'AI SDK-compatible agent plus RAG knowledge base.'
+      : 'lightweight RAG retrieval API.'
+  }
 
 - **Vector store:** ${store.label}
 - **Embedding model:** ${config.embeddingModelId}
@@ -1211,8 +1566,22 @@ vercel deploy
 - \`GET  /health\`           → \`{ ok: true, type: "knowledge-server" }\`
 - \`GET  /readiness\`        → \`{ ready: true, vectorStore: "connected" }\`
 - \`GET  /reference\`        → Scalar API docs UI
+- \`GET  /models\`           → available chat providers and models
 - \`POST /query\`            → \`{ query, hits: [...] }\` (retrieval scope)
-- \`POST /chat\`             → SSE stream (retrieval scope)
+- \`POST /chat\`             → ${
+    isAgentServer ? 'AI SDK UI message stream (retrieval scope)' : 'SSE stream (retrieval scope)'
+  }
+${
+  isAgentServer
+    ? `- \`GET  /agent\`            → Agent Runtime details
+- \`GET  /agent/tools\`      → loaded Agent tools
+- \`GET  /agent/capabilities\` → grouped Agent capabilities
+- \`GET  /agent/configuration\` → saved prompt and skills (admin scope)
+- \`GET  /agent/sandbox\` → sandbox provider and readiness (admin scope)
+- \`POST /agent/chat\`       → AI SDK UI message stream
+- \`POST /v1/chat/completions\` → OpenAI-compatible Agent chat\n`
+    : ''
+}
 - \`GET  /documents\`        → list documents (ingest scope)
 - \`GET  /documents/:id\`    → get a document (ingest scope)
 - \`POST /documents\`        → add a document (ingest scope)
@@ -1236,6 +1605,19 @@ export function generateServer(config: RagConfig): GeneratedServer {
     cheerio: '^1.0.0',
     ...store.serverDependencies,
   };
+  if (config.runtimeProfile === 'assistant') {
+    dependencies.zod = '^4.4.3';
+    dependencies['@ai-sdk/mcp'] = '2.0.26';
+    dependencies['@larkup/sandbox'] = '^0.1.2';
+    for (const plugin of config.agentPlugins ?? []) {
+      if (
+        plugin.version &&
+        /^(?:@[-a-z0-9~][-_a-z0-9~]*\/)?[-a-z0-9~][-_a-z0-9~]*$/i.test(plugin.packageName)
+      ) {
+        dependencies[plugin.packageName] = plugin.version;
+      }
+    }
+  }
 
   if (config.embeddingModelId.startsWith('custom:')) {
     dependencies['@ai-sdk/openai-compatible'] =
@@ -1298,6 +1680,31 @@ export function generateServer(config: RagConfig): GeneratedServer {
       required: true,
       help: 'OpenAI-compatible base URL used by the chat endpoint.',
     });
+  }
+
+  if (config.runtimeProfile === 'assistant') {
+    envVars.push(
+      {
+        key: 'LARKUP_MCP_CONNECTIONS',
+        required: false,
+        help: 'JSON array of enabled MCP connection records. Configure this as a deployment secret; local runs receive it from Agent Customization automatically.',
+      },
+      {
+        key: 'LARKUP_SANDBOX_BACKEND',
+        required: false,
+        help: 'Sandbox backend for the Agent executeAnalysis tool (default local).',
+      },
+      {
+        key: 'LARKUP_SANDBOX_CREDENTIALS',
+        required: false,
+        help: 'JSON sandbox credentials for LARKUP_SANDBOX_BACKEND. Configure this as a deployment secret.',
+      },
+      {
+        key: 'LARKUP_AGENT_PLUGIN_MODULES',
+        required: false,
+        help: 'JSON array of installed plugin modules that implement the Larkup Agent tool factory contract.',
+      },
+    );
   }
 
   if (config.vectorStore === 'pinecone') {
@@ -1391,7 +1798,9 @@ export function generateServer(config: RagConfig): GeneratedServer {
     version: '1.0.0',
     private: true,
     type: 'module',
-    description: `Larkup Knowledge Server (${store.label})`,
+    description: `Larkup ${config.runtimeProfile === 'assistant' ? 'Agent' : 'Knowledge'} Server (${
+      store.label
+    })`,
     scripts: {
       start: 'node --env-file=.env server.mjs',
       demo: 'node demo.mjs',
@@ -1436,6 +1845,10 @@ export function generateServer(config: RagConfig): GeneratedServer {
     { path: 'package.json', contents: JSON.stringify(pkg, null, 2) + '\n' },
     { path: 'server.mjs', contents: serverSource(config) },
     { path: 'chat.mjs', contents: generateChatModule(config) },
+    { path: 'models.mjs', contents: chatModelsSource(config) },
+    ...(config.runtimeProfile === 'assistant'
+      ? [{ path: 'widget.mjs', contents: widgetSource(config) }]
+      : []),
     { path: 'embed.mjs', contents: embedSource(config) },
     {
       path: 'store.mjs',
@@ -1458,19 +1871,19 @@ export function generateServer(config: RagConfig): GeneratedServer {
   try {
     const fs = require('node:fs');
     const path = require('node:path');
-    const faviconPath = path.resolve(process.cwd(), 'public/favicon2.ico');
+    const faviconPath = path.resolve(process.cwd(), 'public/favicon.ico');
     if (fs.existsSync(faviconPath)) {
       files.push({
-        path: 'public/favicon2.ico',
+        path: 'public/favicon.ico',
         contents: fs.readFileSync(faviconPath).toString('base64'),
         language: 'ico',
         encoding: 'base64',
       });
     } else {
-      const webFaviconPath = path.resolve(process.cwd(), 'apps/web/public/favicon2.ico');
+      const webFaviconPath = path.resolve(process.cwd(), 'apps/web/public/favicon.ico');
       if (fs.existsSync(webFaviconPath)) {
         files.push({
-          path: 'public/favicon2.ico',
+          path: 'public/favicon.ico',
           contents: fs.readFileSync(webFaviconPath).toString('base64'),
           language: 'ico',
           encoding: 'base64',

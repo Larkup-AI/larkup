@@ -15,7 +15,9 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc",
-    "test": "node --import tsx --test tests/*.test.ts"
+    "dev": "tsc --watch --preserveWatchOutput",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "type-check": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

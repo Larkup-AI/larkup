@@ -123,8 +123,6 @@ function safeParse(text: string): unknown {
   }
 }
 
-/* ----------------------------- Search ----------------------------- */
-
 interface FcSearchResponse {
   success: boolean;
   data?: Array<{ url: string; title?: string; description?: string }>;
@@ -143,8 +141,6 @@ export async function searchWeb(query: string, limit = 10): Promise<SearchResult
     description: r.description,
   }));
 }
-
-/* ------------------------- Single-page scrape --------------------- */
 
 export interface ScrapedPage {
   url: string;
@@ -194,8 +190,6 @@ export async function scrapePage(url: string): Promise<ScrapedPage> {
     markdown: d.markdown ?? '',
   };
 }
-
-/* --------------------------- Domain crawl ------------------------- */
 
 interface FcCrawlStartResponse {
   success: boolean;

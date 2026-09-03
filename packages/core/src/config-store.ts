@@ -1,24 +1,23 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_CONFIG, type RagConfig } from './types';
-import { getDataDir, requireDataDir } from './workspace';
+import { requireProjectDataDir } from './project-store';
 
 /**
- * File-backed persistence for a server's RAG configuration.
+ * File-backed persistence for a Project's RAG configuration.
  *
- * Each server (workspace project) keeps its own `config.json` under its data
- * dir; this store resolves "which server" from the active workspace context.
+ * Each Project keeps its own `config.json` under its data directory; this
+ * store resolves the active Project through the Project scope.
  * The same file is read by the CLI and used to generate the deployable server.
  */
 
 export async function readConfig(): Promise<RagConfig> {
-  const dir = await getDataDir();
-  if (!dir) return DEFAULT_CONFIG;
+  const dir = await requireProjectDataDir();
   try {
     const raw = await fs.readFile(path.join(dir, 'config.json'), 'utf8');
     const parsed = JSON.parse(raw) as Partial<RagConfig> & { customEmbedding?: unknown };
 
-    // ── Backward-compatibility migration ──────────────────────────────────────
+    // Backward-compatible migration.
     // working without a manual re-save.
     let migratedEmbeddings = parsed.customEmbeddings;
     let migratedEmbeddingId = parsed.embeddingModelId;
@@ -49,7 +48,7 @@ export async function readConfig(): Promise<RagConfig> {
 }
 
 export async function writeConfig(config: RagConfig): Promise<RagConfig> {
-  const dir = await requireDataDir();
+  const dir = await requireProjectDataDir();
   const next: RagConfig = { ...config, updatedAt: new Date().toISOString() };
   await fs.writeFile(path.join(dir, 'config.json'), JSON.stringify(next, null, 2), 'utf8');
   return next;

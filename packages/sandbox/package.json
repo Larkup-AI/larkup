@@ -27,17 +27,34 @@
       "types": "./dist/sandbox-manager.d.ts",
       "import": "./dist/sandbox-manager.js",
       "default": "./dist/sandbox-manager.js"
+    },
+    "./registry": {
+      "types": "./dist/registry.d.ts",
+      "import": "./dist/registry.js",
+      "default": "./dist/registry.js"
     }
   },
   "scripts": {
-    "build": "tsc --outDir dist",
-    "type-check": "tsc --noEmit"
+    "build": "tsc -p tsconfig.build.json --outDir dist",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "dockerode": "^5.0.1"
   },
+  "optionalDependencies": {
+    "e2b": "^2.39.0",
+    "@vercel/sandbox": "^3.0.0",
+    "modal": "^0.9.0",
+    "@daytonaio/sdk": "^0.204.1",
+    "@browserbasehq/sdk": "^2.17.0",
+    "playwright-core": "^1.62.1",
+    "@fly/sprites": "^0.2.0",
+    "@northflank/js-client": "^0.10.1"
+  },
   "devDependencies": {
     "@types/dockerode": "^4.0.1",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }

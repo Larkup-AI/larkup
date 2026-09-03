@@ -14,10 +14,6 @@
 import { readDocuments } from './documents-store';
 import type { SourceDocument, DocumentSource } from './types';
 
-/* ------------------------------------------------------------------ */
-/* Public types                                                        */
-/* ------------------------------------------------------------------ */
-
 export interface CorpusFilter {
   /** Filter by document source type */
   source?: DocumentSource;
@@ -64,10 +60,6 @@ export interface CorpusPage {
   summary: CorpusSummary;
 }
 
-/* ------------------------------------------------------------------ */
-/* Filtering                                                           */
-/* ------------------------------------------------------------------ */
-
 function applyFilters(docs: SourceDocument[], filter?: CorpusFilter): SourceDocument[] {
   if (!filter) return docs;
 
@@ -96,10 +88,6 @@ function applyFilters(docs: SourceDocument[], filter?: CorpusFilter): SourceDocu
     return true;
   });
 }
-
-/* ------------------------------------------------------------------ */
-/* Summary computation                                                 */
-/* ------------------------------------------------------------------ */
 
 function computeSummary(docs: SourceDocument[]): CorpusSummary {
   const bySource: Record<string, number> = {};
@@ -148,10 +136,6 @@ function computeSummary(docs: SourceDocument[]): CorpusSummary {
     dateRange: earliest ? { earliest, latest } : null,
   };
 }
-
-/* ------------------------------------------------------------------ */
-/* Public API                                                          */
-/* ------------------------------------------------------------------ */
 
 /**
  * Get corpus documents with optional filtering and pagination.
