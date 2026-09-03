@@ -11,6 +11,7 @@ interface GpuActivity {
   message: string;
   percent: number;
   phase: 'waking-up' | 'analyzing';
+  toolCallId?: string;
 }
 
 interface GpuActivityStatus {
@@ -62,7 +63,10 @@ export function GpuActivityIndicator() {
   });
 
   const activity = data?.activity;
-  if (!activity || activity.phase !== 'waking-up') return null;
+  // Chat-owned activity renders inline from the first update onward. Keeping
+  // it out of this global surface avoids a visible handoff/flicker at the
+  // waking-up → analyzing boundary.
+  if (!activity || activity.phase !== 'waking-up' || activity.toolCallId) return null;
 
   return (
     <div className="fixed bottom-24 right-6 z-50">
@@ -73,8 +77,10 @@ export function GpuActivityIndicator() {
             <VideoIcon className="size-4" />
             <span className="text-xs leading-none text-muted-foreground">{activity.label}</span>
           </div>
-          <span className="leading-none">{activity.message}</span>
-          <span className="text-[11px] tabular-nums text-muted-foreground">{Math.round(activity.percent)}%</span>
+          <span className="larkup-shimmer-text leading-none">{activity.message}</span>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {Math.round(activity.percent)}%
+          </span>
         </div>
       </div>
     </div>

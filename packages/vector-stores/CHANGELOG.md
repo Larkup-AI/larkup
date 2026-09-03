@@ -1,5 +1,11 @@
 # @larkup/vector-stores
 
+## 0.1.26
+
+### Patch Changes
+
+- Rename the channel adapter package to `@larkup/connections` and remove its type-only dependency cycle with `@larkup/core`.
+
 ## 0.1.25
 
 ### Patch Changes

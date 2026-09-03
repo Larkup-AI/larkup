@@ -9,22 +9,22 @@ RUN corepack enable pnpm
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY patches ./patches/
-COPY apps/api/package.json ./apps/api/
 COPY apps/cli/package.json ./apps/cli/
 COPY apps/desktop/package.json ./apps/desktop/
 COPY e2e/package.json ./e2e/
 COPY apps/larkup-proxy/package.json ./apps/larkup-proxy/
 COPY apps/web/package.json ./apps/web/
+COPY packages/connections/package.json ./packages/connections/
 COPY packages/core/package.json ./packages/core/
 COPY packages/integrations/package.json ./packages/integrations/
 COPY packages/marketplace/package.json ./packages/marketplace/
 COPY packages/sandbox/package.json ./packages/sandbox/
 COPY packages/scraper/package.json ./packages/scraper/
 COPY packages/vector-stores/package.json ./packages/vector-stores/
-COPY packages/tools/clip-embeddings/package.json ./packages/tools/clip-embeddings/
-COPY packages/tools/doc-editor/package.json ./packages/tools/doc-editor/
-COPY packages/tools/video-audio/package.json ./packages/tools/video-audio/
-COPY apps/hub/package.json ./apps/hub/
+COPY packages/marketplace-tools/clip-embeddings/package.json ./packages/marketplace-tools/clip-embeddings/
+COPY packages/marketplace-tools/doc-editor/package.json ./packages/marketplace-tools/doc-editor/
+COPY apps/marketplace/package.json ./apps/marketplace/
+COPY apps/sdk/js-sdk/package.json ./apps/sdk/js-sdk/
 
 RUN pnpm install --frozen-lockfile
 
@@ -40,7 +40,6 @@ ENV NEXT_PUBLIC_DOCKER_ENV=${NEXT_PUBLIC_DOCKER_ENV}
 
 RUN pnpm --filter @larkup/sandbox build
 RUN pnpm --filter @larkup/tool-doc-editor build
-RUN pnpm --filter @larkup/tool-video-audio build
 RUN pnpm --filter larkup build
 
 FROM base AS runner

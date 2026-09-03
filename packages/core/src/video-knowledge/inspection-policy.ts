@@ -20,8 +20,20 @@ export interface InspectionDecision {
   committed: Pick<InspectionEstimate, 'durationSecs' | 'bytes' | 'sandboxSeconds' | 'spendUsd'>;
 }
 
-const LIMITS = {
-  durationSecs: 30,
+/**
+ * Per-bundle hard cap. `durationSecs` in particular is the contract callers
+ * that build a `recommendedInspection` range must respect: a single
+ * dispatched inspection wider than this always falls back to
+ * `background-refinement` (deferred, non-blocking) instead of `required`, so
+ * a range wider than this must be split into `<= durationSecs` chunks and
+ * dispatched sequentially (see `chunkTimeRange` in `inspection-chunking.ts`).
+ */
+export const LIMITS = {
+  // An interactive cloud pass samples at a deliberately sparse cadence and
+  // can cover a minute without turning a straightforward question into two
+  // sequential GPU jobs. The worker can still refine smaller ranges when
+  // frame precision is required.
+  durationSecs: 60,
   bytes: 256 * 1024 * 1024,
   sandboxSeconds: 120,
   spendUsd: 0.5,

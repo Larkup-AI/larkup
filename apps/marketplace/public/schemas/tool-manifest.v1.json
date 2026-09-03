@@ -33,6 +33,11 @@
       "type": "array",
       "items": { "type": "string" }
     },
+    "requiresSandbox": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the tool must execute in an isolated sandbox. Defaults to true; set false only for host-safe tools."
+    },
     "author": { "type": "string" },
     "capabilities": {
       "type": "array",

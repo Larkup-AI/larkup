@@ -17,12 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDocEditor } from './doc-editor-provider';
 import { DocumentField } from './document-field';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-
-/* ------------------------------------------------------------------ */
-/* Document Viewer — right-side preview panel                          */
-/* ------------------------------------------------------------------ */
 
 export function DocumentViewer() {
   const {
@@ -436,9 +431,9 @@ export function DocumentViewer() {
   );
 }
 
-/* ------------------------------------------------------------------ */
+/* Document viewer helpers. */
 /* Helpers                                                             */
-/* ------------------------------------------------------------------ */
+/* End document viewer helpers. */
 
 /** Basic HTML sanitization for DOCX HTML output */
 function sanitizeHtml(html: string): string {

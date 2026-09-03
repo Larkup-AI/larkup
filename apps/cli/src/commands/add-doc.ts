@@ -2,10 +2,10 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { addDocument, corpusStats } from '@larkup/core/documents-store';
 import { log } from '../ui/logger';
-import { inServerScope, requireActive } from '../lib/scope';
+import { inProjectScope, requireActiveProject } from '../lib/scope';
 
 interface AddDocOptions {
-  server?: string;
+  project?: string;
   file?: string;
   text?: string;
   url?: string;
@@ -13,8 +13,8 @@ interface AddDocOptions {
 }
 
 export async function addDocCommand(options: AddDocOptions) {
-  await inServerScope(options.server, async () => {
-    await requireActive();
+  await inProjectScope(options.project, async () => {
+    await requireActiveProject();
 
     let content: string;
     let title = options.title;

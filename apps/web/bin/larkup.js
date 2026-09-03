@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { existsSync, promises as fs, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
+import { randomUUID } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageDir = path.resolve(__dirname, '..');
@@ -49,9 +50,208 @@ if (command === '--version' || command === '-v') {
   });
 } else if (command === 'remove' || command === 'delete') {
   await removeCommand();
+} else if (command === 'enterprise-enroll') {
+  await enterpriseEnroll(args.slice(1));
+} else if (command === 'enterprise-tool' && args[1] === 'install') {
+  await installEnterpriseTool(args.slice(2));
 } else {
-  console.error('Usage: larkup <dev|start|update|remove>');
+  console.error('Usage: larkup <dev|start|update|remove|enterprise-enroll|enterprise-tool>');
   process.exit(1);
+}
+
+function option(args, name) {
+  const index = args.indexOf(name);
+  return index >= 0 && args[index + 1] && !args[index + 1].startsWith('--')
+    ? args[index + 1]
+    : undefined;
+}
+
+function enterpriseEndpoint(baseUrl, pathname) {
+  const url = new URL(pathname, baseUrl);
+  if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+    throw new Error('Enterprise dashboard URL must use HTTPS.');
+  }
+  return url;
+}
+
+function projectRoot() {
+  return path.join(packageDir, '.larkup', 'projects');
+}
+
+async function activeProjectConfig() {
+  const root = projectRoot();
+  const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    try {
+      const project = JSON.parse(
+        await fs.readFile(path.join(root, entry.name, 'project.json'), 'utf8'),
+      );
+      if (project.active) {
+        return {
+          directory: path.join(root, entry.name),
+          config: JSON.parse(await fs.readFile(path.join(root, entry.name, 'config.json'), 'utf8')),
+        };
+      }
+    } catch {}
+  }
+  throw new Error('No active Larkup Project exists. Run enterprise-enroll first.');
+}
+
+async function enterpriseEnroll(args) {
+  const url = option(args, '--url');
+  const key = option(args, '--key');
+  if (!url || !key)
+    throw new Error('Usage: larkup enterprise-enroll --url <dashboard-url> --key <one-time-key>');
+  const response = await fetch(enterpriseEndpoint(url, '/api/enrollment'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: key }),
+  });
+  const profile = await response.json().catch(() => ({}));
+  if (!response.ok || !profile.organization || !profile.installation) {
+    throw new Error(profile.error || 'The Enterprise enrollment key is invalid or expired.');
+  }
+
+  const root = projectRoot();
+  const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
+  await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        const projectFile = path.join(root, entry.name, 'project.json');
+        try {
+          const project = JSON.parse(await fs.readFile(projectFile, 'utf8'));
+          await fs.writeFile(
+            projectFile,
+            JSON.stringify({ ...project, active: false }, null, 2),
+            'utf8',
+          );
+        } catch {}
+      }),
+  );
+
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  const directory = path.join(root, id);
+  const slug =
+    String(profile.organization.name)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'enterprise';
+  const gatewayKey = profile.configuration?.chatApiKey;
+  const config = {
+    projectName: profile.organization.name,
+    embeddingProvider: profile.configuration?.embeddingProvider || 'openai',
+    embeddingApiKey: profile.configuration?.embeddingApiKey || '',
+    embeddingModelId: profile.configuration?.embeddingModelId || 'openai/text-embedding-3-small',
+    indexType: 'hybrid',
+    chunking: { chunkSize: 512, chunkOverlap: 64, strategy: 'recursive' },
+    vectorStore: 'lancedb',
+    storeConfig: {
+      mode: 'local',
+      dbPath: `./.larkup/projects/${id}/index`,
+      tableName: 'documents',
+    },
+    topK: 5,
+    chatProvider: profile.configuration?.chatProvider || 'openai',
+    chatModelId: profile.configuration?.chatModelId || '',
+    chatApiKey: gatewayKey || '',
+    toolConfigs: {},
+    skills: [],
+    enabledTools: [],
+    updatedAt: now,
+    enterprise: {
+      organizationId: profile.organization.id,
+      organizationName: profile.organization.name,
+      dashboardUrl: new URL(url).origin,
+      installationId: profile.installation.id,
+      clientKey: profile.installation.clientKey,
+      managedToolIds: [],
+      enrolledAt: now,
+    },
+  };
+  const project = {
+    id,
+    name: profile.organization.name,
+    port: 8080,
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await fs.mkdir(path.join(directory, 'releases'), { recursive: true });
+  await Promise.all([
+    fs.writeFile(path.join(directory, 'project.json'), JSON.stringify(project, null, 2), 'utf8'),
+    fs.writeFile(
+      path.join(directory, 'config.json'),
+      JSON.stringify({ ...config, projectName: slug }, null, 2),
+      'utf8',
+    ),
+    fs.writeFile(
+      path.join(directory, 'groups.json'),
+      JSON.stringify(
+        [
+          {
+            id: 'default',
+            name: 'Default',
+            description: 'Sources added without a specific group.',
+            icon: '📚',
+            assistantEnabled: true,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        null,
+        2,
+      ),
+      'utf8',
+    ),
+    ...['documents.json', 'deployments.json', 'automations.json', 'jobs.json'].map((file) =>
+      fs.writeFile(path.join(directory, file), '[]\n', 'utf8'),
+    ),
+    fs.writeFile(path.join(directory, 'runtime.json'), '{}\n', 'utf8'),
+  ]);
+  console.log(
+    `Enterprise profile for ${profile.organization.name} is ready. No onboarding is required.`,
+  );
+  if (profile.managedTools?.length)
+    console.log(
+      `Private tools available: ${profile.managedTools.map((tool) => tool.id).join(', ')}`,
+    );
+}
+
+async function installEnterpriseTool(args) {
+  const toolId = args[0];
+  const apiKey = option(args, '--api-key');
+  if (!toolId)
+    throw new Error('Usage: larkup enterprise-tool install <tool-id> --api-key <customer-key>');
+  const { directory, config } = await activeProjectConfig();
+  if (!config.enterprise?.dashboardUrl || !config.enterprise?.clientKey)
+    throw new Error('This Project is not enrolled with Enterprise.');
+  const response = await fetch(
+    enterpriseEndpoint(
+      config.enterprise.dashboardUrl,
+      `/api/client/tools/${encodeURIComponent(toolId)}/install`,
+    ),
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.enterprise.clientKey}`,
+      },
+      body: JSON.stringify({ apiKey }),
+    },
+  );
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.tool)
+    throw new Error(result.error || 'Private tool installation failed.');
+  config.enterprise.managedToolIds = [
+    ...new Set([...(config.enterprise.managedToolIds || []), result.tool.id]),
+  ];
+  config.updatedAt = new Date().toISOString();
+  await fs.writeFile(path.join(directory, 'config.json'), JSON.stringify(config, null, 2), 'utf8');
+  console.log(`Installed private tool ${result.tool.name}.`);
 }
 
 async function removeCommand() {
@@ -190,7 +390,7 @@ async function openWhenReady(url) {
       // the data request that removes that loading state instead.
       const [page, workspace] = await Promise.all([
         fetch(new URL('/chat', url)),
-        fetch(new URL('/api/servers', url)),
+        fetch(new URL('/api/projects', url)),
       ]);
       if (!page.ok || !workspace.ok) throw new Error('Application is not ready');
 

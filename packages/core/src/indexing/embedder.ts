@@ -10,13 +10,18 @@ export interface EmbedBatchResult {
 }
 
 /** Embed a batch of texts. Returns vectors aligned to the input order. */
-export async function embedTexts(config: RagConfig, texts: string[]): Promise<EmbedBatchResult> {
+export async function embedTexts(
+  config: RagConfig,
+  texts: string[],
+  abortSignal?: AbortSignal,
+): Promise<EmbedBatchResult> {
   if (texts.length === 0) return { embeddings: [], dimensions: 0 };
 
   const model = getAIModel(config);
   const { embeddings } = await embedMany({
     model,
     values: texts,
+    ...(abortSignal ? { abortSignal } : {}),
   });
 
   const totalTokens = texts.reduce((acc, t) => acc + Math.ceil(t.length / 4), 0);
@@ -38,9 +43,17 @@ export async function embedTexts(config: RagConfig, texts: string[]): Promise<Em
 }
 
 /** Embed a single query string (used by the demo / generated server). */
-export async function embedQuery(config: RagConfig, text: string): Promise<number[]> {
+export async function embedQuery(
+  config: RagConfig,
+  text: string,
+  abortSignal?: AbortSignal,
+): Promise<number[]> {
   const model = getAIModel(config);
-  const { embedding } = await embed({ model, value: text });
+  const { embedding } = await embed({
+    model,
+    value: text,
+    ...(abortSignal ? { abortSignal } : {}),
+  });
   return embedding;
 }
 

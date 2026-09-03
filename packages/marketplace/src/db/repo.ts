@@ -1,9 +1,14 @@
 /** Marketplace catalog queries. */
 
-import { and, count, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, count, eq, ilike, isNull, or, sql } from 'drizzle-orm';
 import type { MarketplaceDb } from './client.js';
 import { auditEvents } from './schema/audit.js';
-import { extensionWorkspaceGrants, extensions } from './schema/extensions.js';
+import {
+  extensionAccessKeys,
+  extensionWorkspaceGrants,
+  extensions,
+  type ACCESS_KEY_SCOPES,
+} from './schema/extensions.js';
 import { extensionVersions } from './schema/versions.js';
 import { publishers } from './schema/publishers.js';
 import { workspaceInstallations } from './schema/installations.js';
@@ -32,6 +37,22 @@ export class VersionExistsError extends Error {
   }
 }
 
+/** Thrown when a caller has no grant for a private extension. */
+export class NotAuthorizedError extends Error {
+  constructor(extensionId: string) {
+    super(`"${extensionId}" is private and this workspace has no access grant.`);
+    this.name = 'NotAuthorizedError';
+  }
+}
+
+/** Thrown when an access key is missing, expired, revoked, or exhausted. */
+export class InvalidAccessKeyError extends Error {
+  constructor(message = 'This access key is invalid, expired, or has no installs left.') {
+    super(message);
+    this.name = 'InvalidAccessKeyError';
+  }
+}
+
 export interface CatalogEntry {
   id: string;
   publisherId: string;
@@ -52,7 +73,7 @@ export interface CatalogEntry {
   updatedAt: Date;
 }
 
-/** Limits private extensions to granted workspaces. */
+/** Limits private extensions to granted workspaces. Used for browse/search — never for exact-id lookup. */
 function visibilityFilter(workspaceId: string | undefined) {
   return workspaceId
     ? or(
@@ -62,6 +83,26 @@ function visibilityFilter(workspaceId: string | undefined) {
                 and ${extensionWorkspaceGrants.workspaceId} = ${workspaceId})`,
       )
     : eq(extensions.distribution, 'public');
+}
+
+/** Whether a workspace holds an install grant for a private extension. */
+async function hasWorkspaceGrant(
+  db: MarketplaceDb,
+  extensionId: string,
+  workspaceId: string | undefined,
+): Promise<boolean> {
+  if (!workspaceId) return false;
+  const [row] = await db
+    .select({ id: extensionWorkspaceGrants.id })
+    .from(extensionWorkspaceGrants)
+    .where(
+      and(
+        eq(extensionWorkspaceGrants.extensionId, extensionId),
+        eq(extensionWorkspaceGrants.workspaceId, workspaceId),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
 async function latestVersionSubquery(db: MarketplaceDb, extensionId: string) {
@@ -125,16 +166,27 @@ export async function listExtensions(
   return { entries, total };
 }
 
+/**
+ * Fetches a single extension by its exact id. Unlike `listExtensions`, this
+ * always reveals a private extension's metadata — discovery by exact id is
+ * intentionally not gated (a manifest never carries secrets, only config
+ * schema/labels). `authorized` tells the caller whether this workspace may
+ * actually install it; enforce that separately, do not infer it from a 200.
+ */
 export async function getExtension(
   db: MarketplaceDb,
   id: string,
   options: { workspaceId?: string } = {},
-): Promise<{ entry: CatalogEntry; versions: { version: string; publishedAt: Date }[] } | null> {
+): Promise<{
+  entry: CatalogEntry;
+  versions: { version: string; publishedAt: Date }[];
+  authorized: boolean;
+} | null> {
   const [row] = await db
     .select({ ext: extensions, publisher: publishers })
     .from(extensions)
     .innerJoin(publishers, eq(extensions.publisherId, publishers.id))
-    .where(and(eq(extensions.id, id), visibilityFilter(options.workspaceId)))
+    .where(eq(extensions.id, id))
     .limit(1);
   if (!row) return null;
 
@@ -150,7 +202,14 @@ export async function getExtension(
     .from(workspaceInstallations)
     .where(eq(workspaceInstallations.extensionId, id));
 
-  return { entry: toEntry(row.ext, row.publisher, latest, installs), versions: versionRows };
+  const authorized =
+    row.ext.distribution === 'public' || (await hasWorkspaceGrant(db, id, options.workspaceId));
+
+  return {
+    entry: toEntry(row.ext, row.publisher, latest, installs),
+    versions: versionRows,
+    authorized,
+  };
 }
 
 function toEntry(
@@ -216,6 +275,7 @@ export async function publishExtension(
     license?: string;
     kind?: string;
     requiresSandbox: boolean;
+    distribution?: 'public' | 'private';
   };
 
   await db
@@ -245,6 +305,7 @@ export async function publishExtension(
         category: m.category,
         packageName: m.packageName,
         requiresSandbox: m.requiresSandbox,
+        distribution: m.distribution ?? 'public',
         repositoryUrl: m.repositoryUrl ?? null,
         license: m.license ?? null,
         updatedAt: now,
@@ -260,6 +321,7 @@ export async function publishExtension(
       category: m.category,
       packageName: m.packageName,
       requiresSandbox: m.requiresSandbox,
+      distribution: m.distribution ?? 'public',
       repositoryUrl: m.repositoryUrl ?? null,
       license: m.license ?? null,
     });
@@ -292,10 +354,14 @@ export async function recordInstall(
   workspaceId: string,
 ): Promise<{ installs: number } | null> {
   const [ext] = await db
-    .select({ id: extensions.id })
+    .select({ id: extensions.id, distribution: extensions.distribution })
     .from(extensions)
     .where(eq(extensions.id, extensionId));
   if (!ext) return null;
+
+  if (ext.distribution === 'private' && !(await hasWorkspaceGrant(db, extensionId, workspaceId))) {
+    throw new NotAuthorizedError(extensionId);
+  }
 
   await db
     .insert(workspaceInstallations)
@@ -336,5 +402,157 @@ export async function grantWorkspaceAccess(
     action: 'extension.grant_added',
     extensionId,
     workspaceId,
+  });
+}
+
+// Private tool access keys                                             */
+
+const ACCESS_KEY_PREFIX = 'lk_key_';
+
+function generateAccessKey(): string {
+  const random = Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString('base64url');
+  return `${ACCESS_KEY_PREFIX}${random}`;
+}
+
+export interface IssueAccessKeyInput {
+  extensionId: string;
+  scope: (typeof ACCESS_KEY_SCOPES)[number];
+  /** Organization/user id this key is bound to. Omit for a shared/unscoped key. */
+  scopeId?: string;
+  maxInstalls?: number;
+  expiresAt?: Date;
+  createdBy: string;
+}
+
+/** Issues a new private-tool access key. The plaintext is returned once and never stored. */
+export async function issueAccessKey(
+  db: MarketplaceDb,
+  input: IssueAccessKeyInput,
+): Promise<{ id: string; accessKey: string }> {
+  const [ext] = await db
+    .select({ id: extensions.id })
+    .from(extensions)
+    .where(eq(extensions.id, input.extensionId))
+    .limit(1);
+  if (!ext) throw new Error(`Unknown extension: "${input.extensionId}"`);
+
+  const accessKey = generateAccessKey();
+  const id = crypto.randomUUID();
+  await db.insert(extensionAccessKeys).values({
+    id,
+    extensionId: input.extensionId,
+    keyHash: await sha256Hex(accessKey),
+    keyPrefix: accessKey.slice(0, ACCESS_KEY_PREFIX.length + 6),
+    scope: input.scope,
+    scopeId: input.scopeId ?? null,
+    maxInstalls: input.maxInstalls ?? null,
+    expiresAt: input.expiresAt ?? null,
+    createdBy: input.createdBy,
+  });
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    actor: input.createdBy,
+    action: 'extension.key_issued',
+    extensionId: input.extensionId,
+    metadata: { keyId: id, scope: input.scope, scopeId: input.scopeId },
+  });
+  return { id, accessKey };
+}
+
+/** Revokes an access key. Grants already redeemed from it are unaffected — revoke those separately. */
+export async function revokeAccessKey(
+  db: MarketplaceDb,
+  extensionId: string,
+  keyId: string,
+  actor: string,
+): Promise<void> {
+  const result = await db
+    .update(extensionAccessKeys)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(extensionAccessKeys.id, keyId),
+        eq(extensionAccessKeys.extensionId, extensionId),
+        isNull(extensionAccessKeys.revokedAt),
+      ),
+    )
+    .returning({ id: extensionAccessKeys.id });
+  if (!result.length) throw new Error('Access key not found or already revoked.');
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    actor,
+    action: 'extension.key_revoked',
+    extensionId,
+    metadata: { keyId },
+  });
+}
+
+/** Lists access keys for an extension, admin-only — hashes are never returned. */
+export async function listAccessKeys(db: MarketplaceDb, extensionId: string) {
+  return db
+    .select({
+      id: extensionAccessKeys.id,
+      keyPrefix: extensionAccessKeys.keyPrefix,
+      scope: extensionAccessKeys.scope,
+      scopeId: extensionAccessKeys.scopeId,
+      maxInstalls: extensionAccessKeys.maxInstalls,
+      installCount: extensionAccessKeys.installCount,
+      expiresAt: extensionAccessKeys.expiresAt,
+      revokedAt: extensionAccessKeys.revokedAt,
+      createdBy: extensionAccessKeys.createdBy,
+      createdAt: extensionAccessKeys.createdAt,
+    })
+    .from(extensionAccessKeys)
+    .where(eq(extensionAccessKeys.extensionId, extensionId))
+    .orderBy(sql`${extensionAccessKeys.createdAt} desc`);
+}
+
+/**
+ * Redeems an access key into a standing workspace grant. This is the one
+ * place a plaintext key is ever checked; everything downstream (visibility,
+ * install) reads the grant it creates, exactly like a key issued by hand
+ * through `grantWorkspaceAccess`.
+ */
+export async function redeemAccessKey(
+  db: MarketplaceDb,
+  extensionId: string,
+  accessKey: string,
+  workspaceId: string,
+): Promise<void> {
+  if (!workspaceId?.trim())
+    throw new InvalidAccessKeyError('A workspaceId is required to redeem an access key.');
+  const keyHash = await sha256Hex(accessKey);
+  const now = new Date();
+
+  const [key] = await db
+    .select()
+    .from(extensionAccessKeys)
+    .where(
+      and(
+        eq(extensionAccessKeys.extensionId, extensionId),
+        eq(extensionAccessKeys.keyHash, keyHash),
+        isNull(extensionAccessKeys.revokedAt),
+      ),
+    )
+    .limit(1);
+
+  if (!key) throw new InvalidAccessKeyError();
+  if (key.expiresAt && key.expiresAt.getTime() <= now.getTime()) throw new InvalidAccessKeyError();
+  if (key.maxInstalls !== null && key.installCount >= key.maxInstalls)
+    throw new InvalidAccessKeyError();
+
+  await db
+    .update(extensionAccessKeys)
+    .set({ installCount: sql`${extensionAccessKeys.installCount} + 1` })
+    .where(eq(extensionAccessKeys.id, key.id));
+
+  await grantWorkspaceAccess(db, extensionId, workspaceId);
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    actor: workspaceId,
+    action: 'extension.key_redeemed',
+    extensionId,
+    workspaceId,
+    metadata: { keyId: key.id },
   });
 }

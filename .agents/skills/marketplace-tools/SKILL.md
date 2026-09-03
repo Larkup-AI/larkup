@@ -6,6 +6,35 @@ tags: marketplace, tools, plugins, schema
 
 # Adding Marketplace Tools
 
+## Marketplace v3 for portable or paid runtimes
+
+Use manifest v3 when a tool contributes UI, needs a local Docker or remote service, or may be metered. Keep all domain code under one `packages/tools/<tool-id>/` directory so uninstalling the tool removes its client, contracts, runtime, deployment, tests, and documentation together.
+
+Required v3 additions:
+
+- `manifestVersion: "3.0"`, `kind: "tool"`, and `entrypoints.server`.
+- `runtime.protocolVersion`, `runtime.defaultMode`, and explicit `local-docker`, `managed-cloud`, or `custom-remote` modes.
+- `billing.entitlementVersion` and provider-neutral meters for a paid or quota-controlled service. Tool code consumes entitlements; it must not depend directly on Stripe or another billing vendor.
+- `ui.surfaces` for host-discovered indexing, settings, result, or asset-action contributions. Untrusted browser code stays in a sandboxed iframe.
+- Minimal declared permissions and network allowlists. A local unauthenticated runtime must bind for local use only and must never be the public-cloud configuration.
+
+The stable server export must use `defineToolExtension` from `@larkup/marketplace/extension`; consumers use `loadToolExtension` rather than importing an optional tool package statically. Heavy native dependencies belong in the tool's OCI image, not its npm client.
+
+Recommended portable-tool layout:
+
+```text
+packages/tools/my-tool/
+  src/                 # typed client, extension, declarative UI surfaces
+  runtime/             # one OCI service and its tests
+  deploy/aws/          # optional provider IaC; runtime protocol stays provider-neutral
+  scripts/             # local lifecycle commands
+  tool.manifest.json
+  compose.yaml
+  README.md
+```
+
+Cloud implementations must use the same job/evidence contract as local mode, reserve quota atomically before work starts, separate entitlements from payment providers, encrypt sources and results, define retention/deletion, avoid sensitive request-body logs, and use short-lived CI identity such as GitHub OIDC. Add client-contract tests, state/quota tests, a lightweight container health test, infrastructure validation, and a changeset.
+
 ## Overview
 
 The Larkup Marketplace is a plugin system that allows extending the platform with optional tools. Each tool is a standalone npm package under `packages/tools/` that ships its own `tool.manifest.json` describing its capabilities.
@@ -255,6 +284,20 @@ if (myTool) {
 ```
 
 ## Key Conventions
+
+## Host boundary for Marketplace tools
+
+Tool-specific UI copy, field schemas, validation rules, runtime choices, and
+provider behavior belong in the tool package and its manifest. The host may
+render generic primitives such as settings forms, indexing-confirmation forms,
+results, and lifecycle actions, but it must not branch on a tool id or add a
+tool-specific API route. A new capability must be declared through a typed
+manifest/extension contract, then discovered dynamically from installed tools.
+
+Before adding a tool feature, first extend the provider-neutral Marketplace
+contract if necessary; then update the host's generic renderer and add a
+tool-owned manifest test. Do not import an optional Marketplace tool directly
+from `apps/web`.
 
 1. **Manifest file**: Every tool MUST ship a `tool.manifest.json`. The registry discovers tools by reading these files.
 2. **Optional dependencies**: If your tool has optional npm dependencies (e.g., `nodejs-whisper`), use dynamic `import()` with a try/catch and create a `.d.ts` type declaration file.

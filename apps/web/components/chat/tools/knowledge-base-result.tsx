@@ -8,9 +8,8 @@ import {
   FileText,
   Image as ImageIcon,
   Loader2,
-  Search,
-  SearchIcon,
 } from 'lucide-react';
+import { isIndeterminateProgress } from '@/lib/chat/live-tool-progress';
 
 function Typewriter({ text, animate }: { text: string; animate: boolean }) {
   const [length, setLength] = useState(animate ? 0 : text.length);
@@ -41,6 +40,13 @@ interface KBHit {
   url: string;
   score: number;
   text: string;
+  context?: string;
+  timelineContext?: Array<{
+    role: 'before' | 'matched' | 'after';
+    text: string;
+    startSecs?: number;
+    endSecs?: number;
+  }>;
   images?: { imageUrl: string; index: number; pageNumber?: number }[];
   metadata?: {
     mediaAssetId?: string;
@@ -54,16 +60,20 @@ interface KBHit {
 
 /**
  * Renders knowledge base retrieval results from tool-searchKnowledgeBase parts.
- *
- * UIMessage parts for tools look like:
- *   { type: "tool-searchKnowledgeBase", state: "input-streaming" | "input-available" | "output", input: { query }, output: { query, hits } }
  */
 export function KnowledgeBaseResult({
   parts,
   isShimmering,
+  activity,
 }: {
   parts: any[];
   isShimmering?: boolean;
+  activity?: {
+    percent: number;
+    label: string;
+    message: string;
+    phase?: 'waking-up' | 'analyzing';
+  } | null;
 }) {
   const [open, setOpen] = useState(false);
   const isRunning = parts.some((part: any) => {
@@ -82,7 +92,7 @@ export function KnowledgeBaseResult({
   const query = useMemo(() => {
     for (const part of parts) {
       const rawArgs =
-        part.type === 'tool-invocation' ? part.toolInvocation?.args : part.input ?? part.args;
+        part.type === 'tool-invocation' ? part.toolInvocation?.args : (part.input ?? part.args);
       if (rawArgs?.query) {
         return rawArgs.query;
       }
@@ -95,14 +105,12 @@ export function KnowledgeBaseResult({
         const rawResult =
           part.type === 'tool-invocation'
             ? part.toolInvocation?.result
-            : part.output ?? part.result;
+            : (part.output ?? part.result);
         const result = parseToolResult(rawResult);
         return Array.isArray(result?.hits) ? result.hits : [];
       }),
     [parts],
   );
-  // Expand only while retrieval is running, then leave a compact source count
-  // above the answer. The user can open it when they need the evidence.
   useEffect(() => {
     setOpen(isRunning);
   }, [isRunning]);
@@ -156,6 +164,42 @@ export function KnowledgeBaseResult({
         </button>
       </div>
 
+      {isRunning && activity ? (
+        <div
+          className="mt-2.5 max-w-2xl rounded-xl border border-emerald-500/70 bg-background px-3 py-2.5"
+          aria-live="polite"
+          data-testid="video-analysis-progress"
+        >
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="larkup-shimmer-text font-medium">{activity.message}</span>
+            {isIndeterminateProgress(activity.percent) ? null : (
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                {Math.max(1, Math.round(activity.percent))}%
+              </span>
+            )}
+          </div>
+          <div
+            className="mt-2 h-1.5 overflow-hidden rounded-full bg-emerald-950/10 dark:bg-emerald-100/10"
+            role="progressbar"
+            aria-label={activity.message}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            {...(isIndeterminateProgress(activity.percent)
+              ? {}
+              : { 'aria-valuenow': Math.max(1, Math.round(activity.percent)) })}
+          >
+            {isIndeterminateProgress(activity.percent) ? (
+              <div className="larkup-progress-shuttle h-full rounded-full bg-emerald-500" />
+            ) : (
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-[width] duration-700 ease-out"
+                style={{ width: `${Math.max(6, Math.min(100, activity.percent))}%` }}
+              />
+            )}
+          </div>
+        </div>
+      ) : null}
+
       {open && hits.length > 0 ? (
         <div
           className="mt-2 overflow-hidden rounded-xl border border-border bg-card"
@@ -188,15 +232,31 @@ export function KnowledgeBaseResult({
                     </a>
                   ) : null}
                 </div>
-                {h.text ? (
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                    {h.text}
-                  </p>
-                ) : null}
                 {h.metadata?.mediaType ? (
-                  <p className="mt-1.5 text-[11px] capitalize text-muted-foreground">
-                    {h.metadata.mediaType} source
-                  </p>
+                  <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span className="capitalize">{h.metadata.mediaType} source</span>
+                    {Number.isFinite(h.metadata.startSecs) ? (
+                      <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono tabular-nums">
+                        {formatTimestamp(h.metadata.startSecs!)}
+                        {Number.isFinite(h.metadata.endSecs)
+                          ? `–${formatTimestamp(h.metadata.endSecs!)}`
+                          : ''}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+                {contextForHit(h) ? (
+                  <div className="mt-2 rounded-lg bg-muted/55 px-2.5 py-2">
+                    <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Indexed context
+                    </div>
+                    <p
+                      className="line-clamp-4 text-xs leading-relaxed text-foreground/80"
+                      dir="auto"
+                    >
+                      {contextForHit(h)}
+                    </p>
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -205,6 +265,25 @@ export function KnowledgeBaseResult({
       ) : null}
     </div>
   );
+}
+
+function contextForHit(hit: KBHit) {
+  const direct = hit.context?.trim();
+  if (direct) return direct;
+  const matched = hit.timelineContext?.find((item) => item.role === 'matched')?.text?.trim();
+  if (matched) return matched;
+  const text = hit.text?.trim();
+  return text && !text.startsWith('Verified media evidence is available') ? text : '';
+}
+
+function formatTimestamp(seconds: number) {
+  const total = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(total / 3_600);
+  const minutes = Math.floor((total % 3_600) / 60);
+  const rest = total % 60;
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
+    : `${minutes}:${String(rest).padStart(2, '0')}`;
 }
 
 function parseToolResult(value: unknown): { hits?: KBHit[] } | null {

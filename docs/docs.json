@@ -63,6 +63,23 @@
         ]
       },
       {
+        "tab": "Marketplace",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["marketplace/overview", "marketplace/installing-tools"]
+          },
+          {
+            "group": "Tool Authors",
+            "pages": ["marketplace/creating-tools", "marketplace/publishing-tools"]
+          },
+          {
+            "group": "Media Tools",
+            "pages": ["marketplace/tools/video-intelligence"]
+          }
+        ]
+      },
+      {
         "tab": "SDK",
         "groups": [
           {

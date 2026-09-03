@@ -27,7 +27,15 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "../../archive/assistant-capabilities-section.tsx",
+    "../../archive/project-deploy-sheet.tsx",
+    "../../archive/theme-switcher.tsx",
+    "../../archive/page-header.tsx",
+    "../../archive/simple-setup.tsx",
+    "../../archive/tech-setup.tsx",
+    "../../archive/firecrawl-notice.tsx",
+    "../../archive/configure-form.tsx"
   ],
   "exclude": ["node_modules", "archive"]
 }

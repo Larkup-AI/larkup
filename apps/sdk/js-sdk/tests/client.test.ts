@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LarkupClient } from '../src/client';
+import { createLarkupAgentToolExecutor, LarkupAgentClient } from '../src/agent-client';
 
 const fetchMock = vi.fn();
 global.fetch = fetchMock;
@@ -67,6 +68,23 @@ describe('LarkupClient', () => {
     const res = await client.health();
     expect(res.ok).toBe(true);
     expect(res.service).toBe('my-rag');
+  });
+
+  it('lists available chat providers and models', async () => {
+    fetchMock.mockResolvedValueOnce(
+      ok({
+        configuredProvider: 'vercel_ai_gateway',
+        configuredModelId: 'openai/gpt-4o-mini',
+        source: 'vercel-ai-gateway',
+        providers: [{ id: 'openai', name: 'OpenAI', modelCount: 1 }],
+        models: [{ id: 'openai/gpt-4o-mini', name: 'GPT-4o mini', provider: 'openai' }],
+      }),
+    );
+
+    const models = await client.chatModels('openai');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('http://test.local:8080/models?provider=openai');
+    expect(models[0].id).toBe('openai/gpt-4o-mini');
   });
 
   it('query() with string shorthand', async () => {
@@ -310,5 +328,232 @@ describe('LarkupClient', () => {
     fetchMock.mockResolvedValueOnce(ok({ ok: true }));
     await c.health();
     expect(fetchMock.mock.calls[0][0]).toBe('http://example.com/health');
+  });
+});
+
+describe('LarkupAgentClient', () => {
+  it('discovers the local runtime health and OpenAPI contract', async () => {
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(ok({ status: 'ok', agentId: 'demo-agent' }));
+    fetchMock.mockResolvedValueOnce(
+      ok({ openapi: '3.1.0', info: { title: 'Demo Agent API', version: '1.0.0' }, paths: {} }),
+    );
+
+    const agent = new LarkupAgentClient({ baseUrl: 'http://agent.local:8083' });
+    await expect(agent.health()).resolves.toMatchObject({ status: 'ok', agentId: 'demo-agent' });
+    await expect(agent.openApi()).resolves.toMatchObject({ openapi: '3.1.0' });
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'http://agent.local:8083/health',
+      'http://agent.local:8083/openapi.json',
+    ]);
+  });
+
+  it('posts a simple message and collects AI SDK text frames', async () => {
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: async () => '0:"Hello "\n0:"from the agent"\nd:{"finishReason":"stop"}\n',
+    });
+
+    const agent = new LarkupAgentClient({
+      baseUrl: 'http://agent.local:8083/',
+      joinCode: 'join-me',
+    });
+
+    await expect(agent.chatText('Hi')).resolves.toBe('Hello from the agent');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://agent.local:8083/chat');
+    expect(JSON.parse(init.body)).toEqual({ messages: [{ role: 'user', content: 'Hi' }] });
+    expect(init.headers['X-Larkup-Join-Code']).toBe('join-me');
+  });
+
+  it('streams Agent text frames as they arrive', async () => {
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(sse(['0:"Hello "\n0:"streaming agent"\n']));
+
+    const agent = new LarkupAgentClient({ baseUrl: 'http://agent.local:8083' });
+    const chunks = [];
+    for await (const text of agent.streamText('Hi')) chunks.push(text);
+
+    expect(chunks).toEqual(['Hello ', 'streaming agent']);
+  });
+
+  it('discovers Agent chat models and forwards a per-request model choice', async () => {
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(
+      ok({
+        configuredProvider: 'vercel_ai_gateway',
+        configuredModelId: 'openai/gpt-4o-mini',
+        source: 'vercel-ai-gateway',
+        providers: [{ id: 'anthropic', name: 'Anthropic', modelCount: 1 }],
+        models: [{ id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet', provider: 'anthropic' }],
+      }),
+    );
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: async () => '0:"Configured model"\n',
+    });
+
+    const agent = new LarkupAgentClient({ baseUrl: 'http://agent.local:8083' });
+    await expect(agent.chatModels('anthropic')).resolves.toHaveLength(1);
+    await expect(
+      agent.chatText({
+        messages: [{ role: 'user', content: 'Hi' }],
+        provider: 'vercel_ai_gateway',
+        modelId: 'anthropic/claude-sonnet-4',
+      }),
+    ).resolves.toBe('Configured model');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('http://agent.local:8083/models?provider=anthropic');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+      provider: 'vercel_ai_gateway',
+      modelId: 'anthropic/claude-sonnet-4',
+    });
+  });
+
+  it('lists loaded Agent tools and reads UI-message stream text frames', async () => {
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(
+      ok({
+        tools: [
+          { id: 'searchKnowledgeBase', name: 'Search Knowledge Base', description: 'Search.' },
+        ],
+      }),
+    );
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: async () =>
+        'data: {"type":"start"}\n\ndata: {"type":"text-delta","delta":"Tool-aware "}\n\ndata: {"type":"text-delta","delta":"answer"}\n\n',
+    });
+
+    const agent = new LarkupAgentClient({ baseUrl: 'http://agent.local:8083' });
+    await expect(agent.tools()).resolves.toMatchObject([{ id: 'searchKnowledgeBase' }]);
+    await expect(agent.chatText('Hi')).resolves.toBe('Tool-aware answer');
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'http://agent.local:8083/agent/tools',
+      'http://agent.local:8083/chat',
+    ]);
+  });
+
+  it('groups runtime tools into capabilities through the SDK', async () => {
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(
+      ok({
+        capabilities: [
+          {
+            id: 'mcp:demo',
+            name: 'MCP · Demo',
+            source: 'mcp',
+            connectionId: 'demo',
+            tools: [
+              {
+                id: 'mcp_demo_lookup',
+                name: 'lookup',
+                description: 'MCP tool from Demo',
+                source: 'mcp',
+                connectionId: 'demo',
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const agent = new LarkupAgentClient({ baseUrl: 'http://agent.local:8083' });
+    await expect(agent.capabilities()).resolves.toEqual([
+      expect.objectContaining({ source: 'mcp', connectionId: 'demo' }),
+    ]);
+    expect(fetchMock.mock.calls[0][0]).toBe('http://agent.local:8083/agent/capabilities');
+  });
+
+  it('groups raw tools when connected to a runtime generated before capabilities existed', async () => {
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 404, text: async () => 'Not found' });
+    fetchMock.mockResolvedValueOnce(
+      ok({
+        tools: [
+          {
+            id: 'mcp_demo_lookup',
+            name: 'lookup',
+            description: 'MCP tool',
+            source: 'mcp',
+            connectionId: 'demo',
+          },
+          {
+            id: 'mcp_demo_search',
+            name: 'search',
+            description: 'MCP tool',
+            source: 'mcp',
+            connectionId: 'demo',
+          },
+        ],
+      }),
+    );
+
+    const agent = new LarkupAgentClient({ baseUrl: 'http://agent.local:8083' });
+    await expect(agent.capabilities()).resolves.toEqual([
+      expect.objectContaining({
+        id: 'mcp:demo',
+        tools: expect.arrayContaining([expect.objectContaining({ id: 'mcp_demo_lookup' })]),
+      }),
+    ]);
+  });
+
+  it('reads the saved Agent prompt and enabled skills', async () => {
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(
+      ok({
+        systemPrompt: 'Always cite sources.',
+        skills: [{ id: 'research', name: 'Research', description: 'Research workflow.' }],
+        enabledTools: [
+          {
+            id: 'searchKnowledgeBase',
+            name: 'Semantic Search',
+            description: 'Search the RAG knowledge base.',
+          },
+        ],
+        sandbox: { provider: 'e2b', configured: true, enabled: true },
+      }),
+    );
+
+    const agent = new LarkupAgentClient({ baseUrl: 'http://agent.local:8083' });
+    await expect(agent.configuration()).resolves.toMatchObject({
+      systemPrompt: 'Always cite sources.',
+      skills: [{ id: 'research' }],
+      enabledTools: [{ id: 'searchKnowledgeBase' }],
+      sandbox: { provider: 'e2b', configured: true, enabled: true },
+    });
+  });
+
+  it('reads the sanitized Agent sandbox status', async () => {
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(ok({ provider: 'e2b', configured: true, status: 'ready' }));
+    const agent = new LarkupAgentClient({ baseUrl: 'http://agent.local:8083' });
+    await expect(agent.sandbox()).resolves.toEqual({
+      provider: 'e2b',
+      configured: true,
+      status: 'ready',
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe('http://agent.local:8083/agent/sandbox');
+  });
+
+  it('provides an AI SDK-compatible executor for a remote agent', async () => {
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: async () => '0:"Remote answer"\n',
+    });
+
+    const execute = createLarkupAgentToolExecutor({ baseUrl: 'http://agent.local:8083' });
+    await expect(execute({ message: 'What can you do?' })).resolves.toBe('Remote answer');
+    expect(fetchMock.mock.calls[0][0]).toBe('http://agent.local:8083/chat');
   });
 });

@@ -1,14 +1,20 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import useSWR from 'swr';
 import { toast } from 'sonner';
-import { formatErrorMessage } from '@/lib/error-formatter';
+import { formatErrorMessage } from '@/lib/shared/error-formatter';
 import {
   describeActiveMediaStep,
-  mediaStepProgress,
+  completedMediaProcessingSeconds,
+  estimateMediaStepRemainingSeconds,
+  formatMediaProgressPercent,
+  isFinalizingMediaStep,
+  isMediaStepTelemetryStale,
+  mediaProcessingStartedAt,
   primaryRunningMediaStep,
-} from '@/lib/media-progress';
+} from '@/lib/media/progress';
 import {
   Image as ImageIcon,
   Video,
@@ -36,7 +42,9 @@ import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { useWorkspace } from '@/components/workspace/workspace-provider';
+import { useProject } from '@/components/projects/project-provider';
+import { useLiveMediaProgress } from '@/hooks/use-live-media-progress';
+import { LiveMediaProgress } from '@/components/data/live-media-progress';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { DataPrimaryAction } from '@/components/data/data-primary-action';
@@ -57,10 +65,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { GenericAlert } from '@/components/alerts/generic-alert';
+import {
+  defaultToolIndexingValues,
+  ToolIndexingDialog,
+  type ToolIndexingSurface,
+} from '@/components/data/tool-indexing-dialog';
+import { isLocallyActiveVideoJob } from '@/lib/media/video-intelligence-capacity';
+import {
+  selectedRemoteDuration,
+  selectedRemoteUrls,
+  type RemoteMediaEstimate,
+} from '@/lib/media/source-selection';
 
 type MediaSubTab = 'images' | 'video' | 'audio';
 type MediaEntryTab = 'upload' | 'url';
-type MediaPipelineStage = 'download' | 'extract' | 'transcribe' | 'vision' | 'synthesize' | 'index';
+type MediaPipelineStage =
+  'download' | 'prepare' | 'extract' | 'transcribe' | 'vision' | 'synthesize' | 'index';
+
+const RECENT_MEDIA_URLS_STORAGE_KEY = 'media_recent_urls';
+const MAX_RECENT_MEDIA_URLS = 10;
 
 interface MediaProcessingStep {
   stage: MediaPipelineStage;
@@ -69,7 +94,13 @@ interface MediaProcessingStep {
   current?: number;
   total?: number;
   unit?: string;
+  estimatedRemainingSeconds?: number;
+  elapsedSeconds?: number;
+  sequence?: number;
   message?: string;
+  startedAt?: string;
+  updatedAt?: string;
+  finishedAt?: string;
 }
 
 interface MediaAsset {
@@ -87,6 +118,7 @@ interface MediaAsset {
   processingProgress?: number;
   processingSteps?: MediaProcessingStep[];
   processingRevision?: number;
+  processingStartedAt?: string;
   caption?: string;
   documentIds: string[];
   createdAt: string;
@@ -94,9 +126,11 @@ interface MediaAsset {
   durationSecs?: number;
   indexingInstructions?: string;
   indexingQuality?: number;
+  toolInputs?: Record<string, unknown>;
   activeVideoKnowledgeRevisionId?: string;
   activeVideoKnowledgeManifestId?: string;
   activeVideoKnowledgeJobId?: string;
+  activeVideoIntelligenceJobId?: string;
 }
 
 interface StagedMedia {
@@ -107,13 +141,20 @@ interface StagedMedia {
   durationSecs?: number;
 }
 
-interface RemoteEstimate {
+interface RemoteEstimate extends RemoteMediaEstimate {
   originalUrl: string;
   title?: string;
   durationSecs?: number;
+  singleItemDurationSecs?: number;
+  singleItemUrl?: string;
   entryCount?: number;
   mediaType: 'video' | 'audio' | 'unknown';
   isYouTube?: boolean;
+}
+
+interface RecentMediaUrl {
+  url: string;
+  title?: string;
 }
 
 interface MediaApiResponse {
@@ -127,11 +168,14 @@ interface MediaApiResponse {
   storage: { usedBytes: number; fileCount: number };
 }
 
-let globalStagedMedia: Record<string, StagedMedia[]> = { image: [], video: [], audio: [] };
+interface VideoUsage {
+  sourceMinutesUsed: number;
+  sourceMinutesLimit: number | null;
+  activeJobs: number;
+  concurrentJobsLimit: number;
+}
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
+let globalStagedMedia: Record<string, StagedMedia[]> = { image: [], video: [], audio: [] };
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -190,7 +234,7 @@ function YouTubeUrlPreview({ estimate }: { estimate: RemoteEstimate }) {
         ) : (
           <Video className="size-8 text-white/70" aria-hidden="true" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
         <span className="absolute bottom-3 left-3 rounded-md bg-black/70 px-2 py-1 text-[11px] font-medium text-white">
           YouTube video
         </span>
@@ -208,8 +252,11 @@ function YouTubeUrlPreview({ estimate }: { estimate: RemoteEstimate }) {
           variant="outline"
           size="sm"
           className="shrink-0 gap-1.5 text-xs"
+          nativeButton={false}
           render={
-            <a href={estimate.originalUrl} target="_blank" rel="noreferrer">
+            // Styled as a button, but it navigates: Base UI's button
+            // primitive would otherwise announce this link as a button.
+            <a href={estimate.originalUrl} target="_blank" rel="noreferrer" role="link">
               Open on YouTube
               <ExternalLink className="size-3" />
             </a>
@@ -220,15 +267,34 @@ function YouTubeUrlPreview({ estimate }: { estimate: RemoteEstimate }) {
   );
 }
 
-function estimateMedia(durationSecs: number, isVideo: boolean) {
+function estimateMedia(durationSecs: number, isVideo: boolean, indexingMode = 'balanced') {
   const minutes = durationSecs / 60;
   const visualWindowSecs =
     durationSecs >= 4 * 60 * 60 ? 15 * 60 : durationSecs > 60 * 60 ? 5 * 60 : 60;
+  const fastMinimumMinutes = Math.max(1, Math.ceil((60 + minutes * 4) / 60));
+  const fastMaximumMinutes = Math.max(fastMinimumMinutes, Math.ceil((60 + minutes * 5) / 60));
+  const processingMinutes = Math.max(1, Math.ceil(minutes * (isVideo ? 0.35 : 0.2)));
   return {
     transcriptionCost: minutes * 0.006,
-    processingMinutes: Math.max(1, Math.ceil(minutes * (isVideo ? 0.35 : 0.2))),
+    processingMinutes:
+      isVideo && indexingMode === 'fast'
+        ? Math.ceil((fastMinimumMinutes + fastMaximumMinutes) / 2)
+        : processingMinutes,
+    minimumProcessingMinutes:
+      isVideo && indexingMode === 'fast' ? fastMinimumMinutes : processingMinutes,
+    maximumProcessingMinutes:
+      isVideo && indexingMode === 'fast' ? fastMaximumMinutes : processingMinutes,
     visualScenes: isVideo ? Math.max(1, Math.ceil(durationSecs / visualWindowSecs)) : 0,
   };
+}
+
+function formatEstimateRange(estimate: {
+  minimumProcessingMinutes: number;
+  maximumProcessingMinutes: number;
+}): string {
+  return estimate.minimumProcessingMinutes === estimate.maximumProcessingMinutes
+    ? `${estimate.minimumProcessingMinutes} min`
+    : `${estimate.minimumProcessingMinutes}–${estimate.maximumProcessingMinutes} min`;
 }
 
 function qualityFrameEstimate(quality: number, durationSecs: number): number {
@@ -299,35 +365,36 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<Medi
 const toolFetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ tools: any[] }>);
 
 function isActiveJob(asset: MediaAsset): boolean {
-  return (
-    asset.processingStatus === 'processing' ||
-    (asset.processingStatus === 'pending' && Boolean(asset.processingMessage))
-  );
+  return isLocallyActiveVideoJob(asset);
 }
 
 const INDEXING_PROGRESS_CLASS =
   '[&_[data-slot=progress-indicator]]:bg-emerald-500 dark:[&_[data-slot=progress-indicator]]:bg-emerald-400';
 
-/* ------------------------------------------------------------------ */
-/* Main component                                                      */
-/* ------------------------------------------------------------------ */
-
 export function MediaPanel({
   onAdded,
   onIndexed,
+  onProcessingStarted,
   onActionChange,
+  groupId = 'default',
 }: {
   onAdded: () => void;
   onIndexed: (asset: MediaAsset) => void;
+  onProcessingStarted?: () => void;
   onActionChange?: (action: DataPrimaryAction | null) => void;
+  groupId?: string;
 }) {
   const [activeTab, setActiveTab] = useState<MediaSubTab>('images');
   const [entryTab, setEntryTab] = useState<MediaEntryTab>('upload');
   const [videoAudioToolJustInstalled, setVideoAudioToolJustInstalled] = useState(false);
+  const [usageRequestOpen, setUsageRequestOpen] = useState(false);
+  const [usageRequestEmail, setUsageRequestEmail] = useState('');
+  const [usageRequestNote, setUsageRequestNote] = useState('');
+  const [sendingUsageRequest, setSendingUsageRequest] = useState(false);
   const mediaType = TAB_TO_TYPE[activeTab];
   const previousStatusesRef = useRef<Map<string, MediaAsset['processingStatus']> | null>(null);
-  const { activeServer } = useWorkspace();
-  const serverId = activeServer?.id;
+  const { activeProject } = useProject();
+  const serverId = activeProject?.id;
   const serverQuery = serverId ? `&serverId=${encodeURIComponent(serverId)}` : '';
   const router = useRouter();
 
@@ -423,7 +490,6 @@ export function MediaPanel({
 
     // Removed manual visibilitychange mutate to prevent SWR cache invalidation
     // The EventSource automatically reconnects and synchronizes state natively.
-
     stream.addEventListener('media-update', handleUpdate);
     return () => {
       if (fallbackTimer) clearInterval(fallbackTimer);
@@ -445,7 +511,29 @@ export function MediaPanel({
 
   // Check if the Video Intelligence tool is installed and enabled.
   const videoAudioTool = toolsData?.tools?.find((t: any) => t.id === 'video-audio');
-  const isToolInstalled = videoAudioTool?.status === 'installed' || videoAudioToolJustInstalled;
+  const videoIntelligenceTool = toolsData?.tools?.find(
+    (tool: any) => tool.id === 'video-intelligence',
+  );
+  const indexingSurface = useMemo(
+    () =>
+      toolsData?.tools
+        ?.filter((tool: any) => tool.status === 'installed')
+        .flatMap((tool: any) =>
+          (tool.ui?.surfaces ?? []).map((surface: ToolIndexingSurface) => ({
+            ...surface,
+            toolId: tool.id,
+          })),
+        )
+        .find(
+          (surface: ToolIndexingSurface & { toolId: string }) =>
+            surface.slot === 'data-indexing' && surface.appliesTo?.includes(mediaType),
+        ),
+    [mediaType, toolsData?.tools],
+  );
+  const modernVideoInstalled = videoIntelligenceTool?.status === 'installed';
+  const legacyVideoAudioInstalled =
+    videoAudioTool?.status === 'installed' || videoAudioToolJustInstalled;
+  const isToolInstalled = activeTab === 'video' ? modernVideoInstalled : legacyVideoAudioInstalled;
   const enabledTools = configData?.config?.enabledTools;
   const videoAudioConfig = configData?.config?.toolConfigs?.['video-audio'] ?? {};
   const audioProvider =
@@ -454,14 +542,98 @@ export function MediaPanel({
     typeof videoAudioConfig.audioApiKey === 'string' ? videoAudioConfig.audioApiKey : '';
   const audioConfigured = Boolean(audioProvider && (audioProvider === 'local' || audioApiKey));
   const isToolEnabled = enabledTools
-    ? enabledTools.length === 0 || enabledTools.includes('video-audio')
+    ? enabledTools.length === 0 ||
+      enabledTools.includes(
+        activeTab === 'video' && modernVideoInstalled ? 'video-intelligence' : 'video-audio',
+      )
     : true;
 
-  const needsTool = false;
+  const needsTool =
+    activeTab === 'video'
+      ? !modernVideoInstalled
+      : activeTab === 'audio' && !legacyVideoAudioInstalled;
   const isToolDisabled = activeTab !== 'images' && isToolInstalled && !isToolEnabled;
+  const { data: videoUsage, mutate: mutateVideoUsage } = useSWR<VideoUsage>(
+    modernVideoInstalled
+      ? `/api/tools/video-intelligence/usage${
+          serverId ? `?serverId=${encodeURIComponent(serverId)}` : ''
+        }`
+      : null,
+    (url) => fetch(url).then((response) => (response.ok ? response.json() : null)),
+    { refreshInterval: modernVideoInstalled ? 30_000 : 0 },
+  );
+  const usageRatio =
+    videoUsage?.sourceMinutesLimit && videoUsage.sourceMinutesLimit > 0
+      ? videoUsage.sourceMinutesUsed / videoUsage.sourceMinutesLimit
+      : 0;
+  const usageWarning = usageRatio >= 0.8;
 
   const assets = data?.assets ?? [];
+  const activeVideoAssets = assets.filter((asset) => asset.type === 'video' && isActiveJob(asset));
+  const videoConcurrencyLimit = Math.max(1, videoUsage?.concurrentJobsLimit ?? 1);
+  // A cached cloud count is advisory and may briefly remain at one after the
+  // prior job finished. Local live assets drive the button; the POST route
+  // performs the authoritative, reconciled concurrency check.
+  const videoIndexingAtCapacity = activeVideoAssets.length >= videoConcurrencyLimit;
   const storageBytes = data?.storage?.usedBytes ?? 0;
+
+  async function installMediaTool(type: 'video' | 'audio') {
+    const toolId = type === 'video' ? 'video-intelligence' : 'video-audio';
+    const toolName = type === 'video' ? 'Video Intelligence' : 'Video & Audio';
+    const toastId = toast.loading(`Installing ${toolName}…`);
+    try {
+      const query = serverId ? `?serverId=${encodeURIComponent(serverId)}` : '';
+      const response = await fetch(`/api/marketplace/${toolId}${query}`, { method: 'POST' });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'Install failed');
+      if (type === 'audio') setVideoAudioToolJustInstalled(true);
+      await mutateTools();
+      toast.success(`${toolName} installed`, {
+        id: toastId,
+        description:
+          type === 'video'
+            ? 'Larkup Cloud is ready by default. No GPU or server setup is needed.'
+            : 'Choose an audio provider before indexing audio.',
+        action: {
+          label: 'Open settings',
+          onClick: () => router.push('/settings?section=tool-settings'),
+        },
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Install failed', { id: toastId });
+    }
+  }
+
+  async function requestMoreVideoUsage() {
+    setSendingUsageRequest(true);
+    try {
+      const response = await fetch(
+        `/api/tools/video-intelligence/usage-request${
+          serverId ? `?serverId=${encodeURIComponent(serverId)}` : ''
+        }`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: usageRequestEmail,
+            note: usageRequestNote,
+            usage: videoUsage,
+          }),
+        },
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Could not send the usage request.');
+      toast.success('Usage request sent', {
+        description: 'We will contact you about additional Video Intelligence capacity.',
+      });
+      setUsageRequestOpen(false);
+      setUsageRequestNote('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not send the usage request.');
+    } finally {
+      setSendingUsageRequest(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -502,17 +674,63 @@ export function MediaPanel({
         )}
       </div>
 
+      {!toolsLoading && !modernVideoInstalled && activeTab !== 'video' ? (
+        <VideoToolInstallCallout
+          toolName={videoIntelligenceTool?.name ?? 'Video Intelligence'}
+          onInstall={() => void installMediaTool('video')}
+        />
+      ) : null}
+
+      {activeTab === 'video' && usageWarning ? (
+        <Alert variant={usageRatio >= 1 ? 'destructive' : 'default'}>
+          <AlertCircle />
+          <AlertTitle>
+            {usageRatio >= 1
+              ? 'Video Intelligence allowance reached'
+              : 'Video Intelligence allowance is nearly used'}
+          </AlertTitle>
+          <AlertDescription>
+            {Math.ceil(videoUsage?.sourceMinutesUsed ?? 0)} of {videoUsage?.sourceMinutesLimit}{' '}
+            cloud video minutes have been used this month.
+          </AlertDescription>
+          <AlertAction>
+            <Button size="sm" variant="outline" onClick={() => setUsageRequestOpen(true)}>
+              Request more usage
+            </Button>
+          </AlertAction>
+        </Alert>
+      ) : null}
+
       {/* Content: either install prompt or upload + gallery */}
       {needsTool ? (
         <InstallPrompt
-          toolId="video-audio"
-          toolName={videoAudioTool?.name ?? 'Video Intelligence'}
-          toolDescription={
-            videoAudioTool?.description ??
-            'Process video and audio files with transcription and frame analysis.'
+          toolId={activeTab === 'video' ? 'video-intelligence' : 'video-audio'}
+          toolName={
+            activeTab === 'video'
+              ? (videoIntelligenceTool?.name ?? 'Video Intelligence')
+              : (videoAudioTool?.name ?? 'Video Intelligence')
           }
-          installSize={videoAudioTool?.installSize ?? '~15 MB'}
-          systemDeps={videoAudioTool?.systemDeps}
+          toolDescription={
+            activeTab === 'video'
+              ? (videoIntelligenceTool?.description ??
+                'Index video with timestamped speech, OCR, objects, and tracks.')
+              : (videoAudioTool?.description ??
+                'Process video and audio files with transcription and frame analysis.')
+          }
+          installSize={
+            activeTab === 'video'
+              ? (videoIntelligenceTool?.installSize ?? '~120 KB client')
+              : (videoAudioTool?.installSize ?? '~15 MB')
+          }
+          systemDeps={
+            activeTab === 'video' ? videoIntelligenceTool?.systemDeps : videoAudioTool?.systemDeps
+          }
+          successDescription={
+            activeTab === 'video'
+              ? 'Larkup Cloud is selected automatically. No GPU or server setup is needed.'
+              : 'Choose an audio provider in Installed Tools before indexing audio.'
+          }
+          serverId={serverId}
           onInstallComplete={() => mutateTools()}
         />
       ) : isToolDisabled ? (
@@ -526,6 +744,7 @@ export function MediaPanel({
           storageUsedBytes={data?.storage?.usedBytes ?? 0}
           serverId={serverId}
           onMutate={() => mutate()}
+          onProcessingStarted={onProcessingStarted}
           onUploadComplete={() => {
             mutate();
             onAdded();
@@ -534,55 +753,63 @@ export function MediaPanel({
           onConfigureAudio={() => router.push('/settings?section=tool-settings')}
           entryTab={entryTab}
           onMediaTypeDetected={(type) => setActiveTab(type === 'image' ? 'images' : type)}
-          videoAudioToolInstalled={isToolInstalled}
-          videoAudioToolLoading={toolsLoading}
-          onToolRequired={() => {
-            toast.error('Video Intelligence tool required', {
-              description: 'Install it to add video or audio.',
-              action: {
-                label: 'Install',
-                onClick: async () => {
-                  const toastId = toast.loading('Installing video tool…');
-                  try {
-                    const res = await fetch('/api/marketplace/video-audio', { method: 'POST' });
-                    const body = await res.json();
-                    if (!res.ok) throw new Error(body.error || 'Install failed');
-                    setVideoAudioToolJustInstalled(true);
-                    await mutateTools();
-                    toast.success('Video Intelligence installed', {
-                      id: toastId,
-                      description: 'Choose an audio provider before indexing video or audio.',
-                      action: {
-                        label: 'Set up audio',
-                        onClick: () => router.push('/settings?section=tool-settings'),
-                      },
-                    });
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : 'Install failed', {
-                      id: toastId,
-                    });
-                  }
-                },
-              },
-            });
-          }}
+          videoToolInstalled={modernVideoInstalled}
+          audioToolInstalled={legacyVideoAudioInstalled}
+          toolLoading={toolsLoading}
+          onToolRequired={(type) => void installMediaTool(type)}
           onActionChange={onActionChange}
+          onRefreshToolConfiguration={() => void mutateTools()}
+          videoIndexingAtCapacity={videoIndexingAtCapacity}
+          videoConcurrencyLimit={videoConcurrencyLimit}
+          onVideoJobCancelled={() => void mutateVideoUsage()}
+          groupId={groupId}
+          indexingSurface={indexingSurface}
         />
       )}
+      <GenericAlert
+        open={usageRequestOpen}
+        onOpenChange={setUsageRequestOpen}
+        title="Request more video capacity"
+        description={
+          <div className="space-y-3">
+            <p>
+              Tell us where we should contact you. Your current usage summary is included
+              automatically.
+            </p>
+            <Input
+              aria-label="Work email"
+              type="email"
+              value={usageRequestEmail}
+              onChange={(event) => setUsageRequestEmail(event.target.value)}
+              placeholder="you@company.com"
+            />
+            <Textarea
+              aria-label="Capacity request details"
+              value={usageRequestNote}
+              onChange={(event) => setUsageRequestNote(event.target.value)}
+              placeholder="How many video minutes or concurrent jobs do you need?"
+              rows={3}
+            />
+          </div>
+        }
+        cancelText="Not now"
+        actionText={sendingUsageRequest ? 'Sending…' : 'Send request'}
+        onAction={() => void requestMoreVideoUsage()}
+        icon={<AlertCircle className="size-5 text-amber-600" />}
+      />
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
 /* Install prompt (for Video & Audio tab when tool not installed)       */
-/* ------------------------------------------------------------------ */
-
 function InstallPrompt({
   toolId,
   toolName,
   toolDescription,
   installSize,
   systemDeps,
+  successDescription,
+  serverId,
   onInstallComplete,
 }: {
   toolId: string;
@@ -590,6 +817,8 @@ function InstallPrompt({
   toolDescription: string;
   installSize: string;
   systemDeps?: string[];
+  successDescription: string;
+  serverId?: string;
   onInstallComplete: () => void;
 }) {
   const [installing, setInstalling] = useState(false);
@@ -600,7 +829,8 @@ function InstallPrompt({
       description: 'This may take a moment on first install.',
     });
     try {
-      const res = await fetch(`/api/marketplace/${toolId}`, {
+      const query = serverId ? `?serverId=${encodeURIComponent(serverId)}` : '';
+      const res = await fetch(`/api/marketplace/${toolId}${query}`, {
         method: 'POST',
       });
       if (!res.ok) {
@@ -608,12 +838,8 @@ function InstallPrompt({
         throw new Error(err.error || 'Install failed');
       }
       toast.dismiss(toastId);
-      toast.success('Video Intelligence installed', {
-        description: 'Choose an audio provider before indexing video or audio.',
-        action: {
-          label: 'Set up audio',
-          onClick: () => window.location.assign('/settings?section=tool-settings'),
-        },
+      toast.success(`${toolName} installed`, {
+        description: successDescription,
       });
       onInstallComplete();
     } catch (err) {
@@ -660,9 +886,37 @@ function InstallPrompt({
   );
 }
 
-/* ------------------------------------------------------------------ */
+function VideoToolInstallCallout({
+  toolName,
+  onInstall,
+}: {
+  toolName: string;
+  onInstall: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Video className="size-4" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">Want to index a video?</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            Install {toolName} first. It uses Larkup Cloud by default, so no local GPU is needed.
+          </p>
+        </div>
+      </div>
+      <Button size="sm" className="shrink-0 gap-1.5" onClick={onInstall}>
+        <Store className="size-3.5" />
+        Install video tool
+      </Button>
+    </div>
+  );
+}
+
+/* Media panel helpers. */
 /* Disabled prompt (for Video & Audio tab when tool is disabled)        */
-/* ------------------------------------------------------------------ */
+/* End media panel helpers. */
 
 function DisabledPrompt() {
   return (
@@ -682,6 +936,7 @@ function DisabledPrompt() {
         size="sm"
         className="mt-5 text-[12px]"
         render={<Link href="/settings?tab=prompts">Go to Settings</Link>}
+        nativeButton={false}
       />
     </div>
   );
@@ -695,15 +950,23 @@ function MediaContent({
   storageUsedBytes,
   serverId,
   onMutate,
+  onProcessingStarted,
   onUploadComplete,
   audioConfigured,
   onConfigureAudio,
   entryTab,
   onMediaTypeDetected,
-  videoAudioToolInstalled,
-  videoAudioToolLoading,
+  videoToolInstalled,
+  audioToolInstalled,
+  toolLoading,
   onToolRequired,
   onActionChange,
+  onRefreshToolConfiguration,
+  videoIndexingAtCapacity,
+  videoConcurrencyLimit,
+  onVideoJobCancelled,
+  groupId,
+  indexingSurface,
 }: {
   mediaType: 'image' | 'video' | 'audio';
   tab: MediaSubTab;
@@ -712,17 +975,27 @@ function MediaContent({
   storageUsedBytes: number;
   serverId?: string;
   onMutate: () => void | Promise<unknown>;
+  onProcessingStarted?: () => void;
   onUploadComplete: () => void;
   audioConfigured: boolean;
   onConfigureAudio: () => void;
   entryTab: MediaEntryTab;
   onMediaTypeDetected: (type: 'image' | 'video' | 'audio') => void;
-  videoAudioToolInstalled: boolean;
-  videoAudioToolLoading: boolean;
-  onToolRequired: () => void;
+  videoToolInstalled: boolean;
+  audioToolInstalled: boolean;
+  toolLoading: boolean;
+  onToolRequired: (type: 'video' | 'audio') => void;
   onActionChange?: (action: DataPrimaryAction | null) => void;
+  onRefreshToolConfiguration: () => void;
+  videoIndexingAtCapacity: boolean;
+  videoConcurrencyLimit: number;
+  onVideoJobCancelled: () => void;
+  groupId: string;
+  indexingSurface?: ToolIndexingSurface & { toolId: string };
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  const recentUrlsRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const [libraryTab, setLibraryTab] = useState<MediaSubTab>('images');
   const [librarySearch, setLibrarySearch] = useState('');
@@ -749,19 +1022,117 @@ function MediaContent({
     total: number;
   } | null>(null);
   const [urlsText, setUrlsText] = useState('');
+  const [recentUrls, setRecentUrls] = useState<RecentMediaUrl[]>([]);
+  const [showRecentUrls, setShowRecentUrls] = useState(false);
   const [remoteEstimates, setRemoteEstimates] = useState<RemoteEstimate[] | null>(null);
   const [remoteType, setRemoteType] = useState<'image' | 'video' | 'audio'>(mediaType);
   const [checkingUrls, setCheckingUrls] = useState(false);
   const [importingUrls, setImportingUrls] = useState(false);
   const [playlistAlertOpen, setPlaylistAlertOpen] = useState(false);
   const [assetToRemove, setAssetToRemove] = useState<MediaAsset | null>(null);
-  const [indexingInstructions, setIndexingInstructions] = useState('');
-  const [indexingQuality, setIndexingQuality] = useState(50);
+  const [indexingBriefOpen, setIndexingBriefOpen] = useState(false);
+  const [indexingAssetIds, setIndexingAssetIds] = useState<string[] | null>(null);
+  const [urlIndexingRequest, setUrlIndexingRequest] = useState<{ ignorePlaylist: boolean } | null>(
+    null,
+  );
+  const [toolIndexingValues, setToolIndexingValues] = useState<Record<string, string | boolean>>(
+    {},
+  );
+  const defaultIndexingValues = useMemo(
+    () => (indexingSurface ? defaultToolIndexingValues(indexingSurface) : {}),
+    [indexingSurface],
+  );
+  useEffect(() => {
+    setToolIndexingValues((current) => {
+      const nextEntries = Object.entries(defaultIndexingValues);
+      const unchanged =
+        Object.keys(current).length === nextEntries.length &&
+        nextEntries.every(([key, value]) => current[key] === value);
+      return unchanged ? current : defaultIndexingValues;
+    });
+  }, [defaultIndexingValues]);
   const mediaApiUrl = serverId
     ? `/api/media?serverId=${encodeURIComponent(serverId)}`
     : '/api/media';
 
   const accept = 'image/*,video/*,audio/*';
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(RECENT_MEDIA_URLS_STORAGE_KEY) ?? '[]');
+      if (!Array.isArray(stored)) return;
+      setRecentUrls(
+        stored
+          .map((value): RecentMediaUrl | null => {
+            // Keep histories saved by older releases usable while upgrading
+            // them to titled entries on the next URL review.
+            if (typeof value === 'string') return { url: value.trim() };
+            if (!value || typeof value !== 'object' || typeof value.url !== 'string') return null;
+            const title = typeof value.title === 'string' ? value.title.trim() : '';
+            return { url: value.url.trim(), ...(title ? { title } : {}) };
+          })
+          .filter((value): value is RecentMediaUrl => Boolean(value?.url))
+          .slice(0, MAX_RECENT_MEDIA_URLS),
+      );
+    } catch {
+      // A malformed browser cache should never prevent adding media.
+    }
+  }, []);
+
+  useEffect(() => {
+    function closeRecentUrls(event: MouseEvent) {
+      if (
+        !urlInputRef.current?.contains(event.target as Node) &&
+        !recentUrlsRef.current?.contains(event.target as Node)
+      ) {
+        setShowRecentUrls(false);
+      }
+    }
+    document.addEventListener('mousedown', closeRecentUrls);
+    return () => document.removeEventListener('mousedown', closeRecentUrls);
+  }, []);
+
+  function saveRecentUrls(entries: Array<string | RecentMediaUrl>) {
+    const normalized = entries
+      .map((entry): RecentMediaUrl | null => {
+        const url = typeof entry === 'string' ? entry : entry.url;
+        const title = typeof entry === 'string' ? '' : entry.title?.trim() || '';
+        return url.trim() ? { url: url.trim(), ...(title ? { title } : {}) } : null;
+      })
+      .filter((entry): entry is RecentMediaUrl => Boolean(entry));
+    if (normalized.length === 0) return;
+    setRecentUrls((current) => {
+      const titles = new Map(current.map((entry) => [entry.url, entry.title]));
+      const next = [...normalized, ...current]
+        .filter(
+          (entry, index, values) => values.findIndex((value) => value.url === entry.url) === index,
+        )
+        .map((entry) => ({
+          ...entry,
+          ...(entry.title ? {} : titles.get(entry.url) ? { title: titles.get(entry.url) } : {}),
+        }))
+        .slice(0, MAX_RECENT_MEDIA_URLS);
+      try {
+        localStorage.setItem(RECENT_MEDIA_URLS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Private-mode storage or a full quota should not block imports.
+      }
+      return next;
+    });
+  }
+
+  function removeRecentUrl(url: string, event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    setRecentUrls((current) => {
+      const next = current.filter((item) => item.url !== url);
+      try {
+        localStorage.setItem(RECENT_MEDIA_URLS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Browser-local history is optional.
+      }
+      return next;
+    });
+  }
 
   async function handleFiles(files: FileList | File[]) {
     const detectedType = getMediaType(Array.from(files)[0]);
@@ -857,18 +1228,19 @@ function MediaContent({
 
   function ensureAudioConfiguration(type = mediaType): boolean {
     if (type === 'image') return true;
-    if (videoAudioToolLoading) {
+    if (toolLoading) {
       toast.message('Checking Video Intelligence…', {
         description: 'Please wait a moment, then try again.',
       });
       return false;
     }
-    if (!videoAudioToolInstalled) {
-      onToolRequired();
+    const indexingToolInstalled = type === 'video' ? videoToolInstalled : audioToolInstalled;
+    if (!indexingToolInstalled) {
+      onToolRequired(type);
       return false;
     }
-    if (audioConfigured) return true;
-    toast.error('Set up an audio provider to index video or audio.', {
+    if (type === 'video' || audioConfigured) return true;
+    toast.error('Set up an audio provider to index audio.', {
       description: 'Select a provider and add its API key in Installed Tools.',
       duration: 10_000,
       action: { label: 'Set up audio', onClick: onConfigureAudio },
@@ -876,14 +1248,24 @@ function MediaContent({
     return false;
   }
 
-  async function processAssets(assetIds: string[]) {
+  function ensureVideoIndexingCapacity(type: 'image' | 'video' | 'audio'): boolean {
+    if (type !== 'video' || !videoIndexingAtCapacity) return true;
+    toast.error('A video is already being indexed.', {
+      description: `Your plan allows ${videoConcurrencyLimit} video indexing job${
+        videoConcurrencyLimit === 1 ? '' : 's'
+      } at a time. Stop the current video or wait for it to finish.`,
+    });
+    return false;
+  }
+
+  async function processAssets(assetIds: string[], toolInputs?: Record<string, unknown>) {
     const PROCESS_BATCH_SIZE = 4;
     for (let i = 0; i < assetIds.length; i += PROCESS_BATCH_SIZE) {
       const batch = assetIds.slice(i, i + PROCESS_BATCH_SIZE);
       const res = await fetch('/api/media/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assetIds: batch, serverId }),
+        body: JSON.stringify({ assetIds: batch, serverId, toolInputs }),
       });
 
       if (!res.ok) {
@@ -897,6 +1279,7 @@ function MediaContent({
       }
     }
     await onMutate();
+    onProcessingStarted?.();
   }
 
   function parsedUrls() {
@@ -924,7 +1307,12 @@ function MediaContent({
     setCheckingUrls(true);
     try {
       if (type === 'image') {
-        setRemoteEstimates(urls.map((originalUrl) => ({ originalUrl, mediaType: 'unknown' })));
+        const estimates = urls.map((originalUrl) => ({
+          originalUrl,
+          mediaType: 'unknown' as const,
+        }));
+        setRemoteEstimates(estimates);
+        saveRecentUrls(estimates.map(({ originalUrl }) => ({ url: originalUrl })));
         return;
       }
       const res = await fetch(mediaApiUrl, {
@@ -934,7 +1322,11 @@ function MediaContent({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Could not inspect media URLs');
-      setRemoteEstimates(data.estimates);
+      const estimates = data.estimates as RemoteEstimate[];
+      setRemoteEstimates(estimates);
+      saveRecentUrls(
+        estimates.map((estimate) => ({ url: estimate.originalUrl, title: estimate.title })),
+      );
     } catch (err) {
       showErrorToast(err);
     } finally {
@@ -942,33 +1334,29 @@ function MediaContent({
     }
   }
 
-  async function importRemoteUrls(ignorePlaylist = false) {
+  async function importRemoteUrls(
+    ignorePlaylist = false,
+    toolInputs?: Record<string, unknown>,
+  ): Promise<boolean> {
     let urls = parsedUrls();
-    if (urls.length === 0 || !remoteEstimates) return;
-    if (!ensureAudioConfiguration(remoteType)) return;
+    if (urls.length === 0 || !remoteEstimates) return false;
+    if (!ensureAudioConfiguration(remoteType)) return false;
 
-    if (ignorePlaylist) {
-      urls = urls.map((url) => {
-        try {
-          const u = new URL(url);
-          if (u.hostname.includes('youtube.com')) {
-            u.searchParams.delete('list');
-            return u.toString();
-          }
-        } catch {}
-        return url;
-      });
-    }
+    urls = selectedRemoteUrls(urls, remoteEstimates, ignorePlaylist);
 
     setImportingUrls(true);
     try {
       const res = await fetch(mediaApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls, mediaType: remoteType }),
+        body: JSON.stringify({ urls, mediaType: remoteType, groupId, toolInputs }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Media import failed');
+      const titlesByUrl = new Map(
+        remoteEstimates.map((estimate) => [estimate.originalUrl, estimate.title] as const),
+      );
+      saveRecentUrls(urls.map((url) => ({ url, title: titlesByUrl.get(url) })));
       const ids = (data.assets as MediaAsset[]).map((asset) => asset.id);
       toast.success('Media import started', {
         description: 'Queued for download and indexing. You can safely leave in the meantime.',
@@ -979,9 +1367,11 @@ function MediaContent({
       setRemoteEstimates(null);
       setProgress(null);
       onUploadComplete();
+      return true;
     } catch (err) {
       showErrorToast(err);
       setProgress(null);
+      return false;
     } finally {
       setImportingUrls(false);
     }
@@ -990,6 +1380,7 @@ function MediaContent({
   async function uploadAll() {
     if (staged.length === 0) return;
     if (!ensureAudioConfiguration()) return;
+    if (!ensureVideoIndexingCapacity(mediaType)) return;
     setUploading(true);
 
     const BATCH_SIZE = 5;
@@ -1004,10 +1395,25 @@ function MediaContent({
         const batch = staged.slice(i, i + BATCH_SIZE);
         const formData = new FormData();
         batch.forEach((item) => formData.append('file', item.file));
-        if (indexingInstructions.trim()) {
-          formData.append('indexingInstructions', indexingInstructions.trim());
+        formData.append(
+          'mediaDurations',
+          JSON.stringify(batch.map((item) => item.durationSecs ?? null)),
+        );
+        const goal =
+          typeof toolIndexingValues.goal === 'string' ? toolIndexingValues.goal.trim() : '';
+        if (goal) {
+          formData.append('indexingInstructions', goal);
         }
-        formData.append('indexingQuality', String(indexingQuality));
+        formData.append('indexingQuality', '50');
+        if (indexingSurface) {
+          formData.append(
+            'toolInputs',
+            JSON.stringify({
+              [indexingSurface.toolId]: toolIndexingValues,
+            }),
+          );
+        }
+        formData.append('groupId', groupId);
 
         const res = await fetch(mediaApiUrl, {
           method: 'POST',
@@ -1037,12 +1443,13 @@ function MediaContent({
         description:
           mediaType === 'image'
             ? 'You can safely leave while we make it searchable.'
-            : `Expected time: about ${stagedEstimate.processingMinutes} minute${
-                stagedEstimate.processingMinutes === 1 ? '' : 's'
-              }. You can safely leave while we index it.`,
+            : `Expected time: about ${formatEstimateRange(
+                stagedEstimate,
+              )}. You can safely leave while we index it.`,
         duration: 8_000,
       });
       setProgress(null);
+      setIndexingBriefOpen(false);
 
       staged.forEach((f) => {
         if (f.preview) URL.revokeObjectURL(f.preview);
@@ -1059,6 +1466,43 @@ function MediaContent({
     }
   }
 
+  function beginUpload() {
+    if (!ensureVideoIndexingCapacity(mediaType)) return;
+    if (mediaType === 'video' && !indexingSurface) {
+      onRefreshToolConfiguration();
+      toast.message('Loading video indexing options…', {
+        description:
+          'Wait a moment for the installed tool configuration, then try Add media again.',
+      });
+      return;
+    }
+    if (indexingSurface) {
+      setIndexingAssetIds(null);
+      setIndexingBriefOpen(true);
+      return;
+    }
+    void uploadAll();
+  }
+
+  function beginUrlIndexing(ignorePlaylist = false) {
+    if (!ensureVideoIndexingCapacity(remoteType)) return;
+    if (remoteType === 'video' && !indexingSurface) {
+      onRefreshToolConfiguration();
+      toast.message('Loading video indexing options…', {
+        description:
+          'Wait a moment for the installed tool configuration, then try Add media again.',
+      });
+      return;
+    }
+    if (remoteType === 'video' && indexingSurface?.appliesTo.includes(remoteType)) {
+      setIndexingAssetIds(null);
+      setUrlIndexingRequest({ ignorePlaylist });
+      setIndexingBriefOpen(true);
+      return;
+    }
+    void importRemoteUrls(ignorePlaylist);
+  }
+
   async function handleDelete(assetId: string) {
     try {
       const query = new URLSearchParams({ id: assetId, force: 'true' });
@@ -1070,6 +1514,7 @@ function MediaContent({
       }
       toast.success('File removed');
       onMutate();
+      onVideoJobCancelled();
     } catch (error) {
       showErrorToast(error);
     }
@@ -1095,13 +1540,18 @@ function MediaContent({
     }
   }
 
-  async function handleRetry(assetId: string) {
+  async function handleRetry(asset: MediaAsset) {
+    if (asset.type === 'video' && indexingSurface) {
+      setIndexingAssetIds([asset.id]);
+      setIndexingBriefOpen(true);
+      return;
+    }
     setProgress({ message: 'Retrying media processing...', current: 0, total: 1 });
     try {
-      await processAssets([assetId]);
+      await processAssets([asset.id]);
       toast.success(
         `${
-          mediaType === 'video' ? 'Video' : mediaType === 'audio' ? 'Audio' : 'Image'
+          asset.type === 'video' ? 'Video' : asset.type === 'audio' ? 'Audio' : 'Image'
         } indexing started`,
       );
       onMutate();
@@ -1112,11 +1562,57 @@ function MediaContent({
     }
   }
 
+  async function confirmExistingIndexing() {
+    if (!indexingAssetIds?.length) return;
+    setUploading(true);
+    setProgress({
+      message: 'Queueing media for indexing...',
+      current: 0,
+      total: indexingAssetIds.length,
+    });
+    try {
+      await processAssets(
+        indexingAssetIds,
+        indexingSurface ? { [indexingSurface.toolId]: toolIndexingValues } : undefined,
+      );
+      toast.success('Video indexing started');
+      setIndexingBriefOpen(false);
+      setIndexingAssetIds(null);
+    } catch (error) {
+      showErrorToast(error);
+    } finally {
+      setUploading(false);
+      setProgress(null);
+    }
+  }
+
+  async function confirmUrlIndexing() {
+    if (!urlIndexingRequest) return;
+    const imported = await importRemoteUrls(
+      urlIndexingRequest.ignorePlaylist,
+      indexingSurface ? { [indexingSurface.toolId]: toolIndexingValues } : undefined,
+    );
+    if (imported) {
+      setIndexingBriefOpen(false);
+      setUrlIndexingRequest(null);
+    }
+  }
+
   const stagedDuration = staged.reduce((total, item) => total + (item.durationSecs ?? 0), 0);
-  const stagedEstimate = estimateMedia(stagedDuration, mediaType === 'video');
-  const remoteDuration =
-    remoteEstimates?.reduce((total, estimate) => total + (estimate.durationSecs ?? 0), 0) ?? 0;
-  const remoteEstimate = estimateMedia(remoteDuration, mediaType === 'video');
+  const remoteDuration = selectedRemoteDuration(remoteEstimates, false);
+  const indexingDuration = indexingAssetIds
+    ? assets
+        .filter((asset) => indexingAssetIds.includes(asset.id))
+        .reduce((total, asset) => total + (asset.durationSecs ?? 0), 0)
+    : urlIndexingRequest
+      ? selectedRemoteDuration(remoteEstimates, urlIndexingRequest.ignorePlaylist)
+      : stagedDuration;
+  const selectedIndexingMode =
+    typeof toolIndexingValues.indexingMode === 'string'
+      ? toolIndexingValues.indexingMode
+      : 'balanced';
+  const stagedEstimate = estimateMedia(stagedDuration, mediaType === 'video', selectedIndexingMode);
+  const remoteEstimate = estimateMedia(remoteDuration, mediaType === 'video', selectedIndexingMode);
   const activeAssets = assets.filter(isActiveJob);
   const libraryPageSize = 12;
   const libraryAssets = assets.filter((asset) => {
@@ -1133,6 +1629,7 @@ function MediaContent({
   const libraryStart = libraryAssets.length === 0 ? 0 : safeLibraryPage * libraryPageSize + 1;
   const libraryEnd = Math.min((safeLibraryPage + 1) * libraryPageSize, libraryAssets.length);
   const hasUrls = parsedUrls().length > 0;
+  const videoConfigurationLoading = mediaType === 'video' && !indexingSurface;
 
   function submitUrlMedia() {
     const totalEntries =
@@ -1140,7 +1637,7 @@ function MediaContent({
     if (totalEntries > 1) {
       setPlaylistAlertOpen(true);
     } else {
-      void importRemoteUrls();
+      beginUrlIndexing();
     }
   }
 
@@ -1153,10 +1650,17 @@ function MediaContent({
           if (remoteEstimates) submitUrlMedia();
           else void reviewRemoteEstimate();
         } else {
-          void uploadAll();
+          beginUpload();
         }
       },
-      disabled: fromUrl ? !hasUrls : staged.length === 0,
+      disabled: fromUrl
+        ? !hasUrls ||
+          (remoteEstimates !== null &&
+            remoteType === 'video' &&
+            (!indexingSurface || videoIndexingAtCapacity))
+        : staged.length === 0 ||
+          videoConfigurationLoading ||
+          (mediaType === 'video' && videoIndexingAtCapacity),
       loading: fromUrl ? checkingUrls || importingUrls : uploading,
     });
     return () => onActionChange?.(null);
@@ -1169,14 +1673,39 @@ function MediaContent({
     importingUrls,
     staged,
     uploading,
+    mediaType,
     remoteType,
-    indexingInstructions,
-    indexingQuality,
+    indexingSurface,
+    videoIndexingAtCapacity,
     onActionChange,
   ]);
 
   return (
     <div className="space-y-4">
+      <ToolIndexingDialog
+        surface={indexingSurface ?? null}
+        open={indexingBriefOpen}
+        values={toolIndexingValues}
+        submitting={uploading || importingUrls}
+        sourceDurationSecs={indexingDuration || undefined}
+        onOpenChange={(open) => {
+          setIndexingBriefOpen(open);
+          if (!open) {
+            setIndexingAssetIds(null);
+            setUrlIndexingRequest(null);
+          }
+        }}
+        onChange={(key, value) =>
+          setToolIndexingValues((current) => ({ ...current, [key]: value }))
+        }
+        onConfirm={() =>
+          void (indexingAssetIds
+            ? confirmExistingIndexing()
+            : urlIndexingRequest
+              ? confirmUrlIndexing()
+              : uploadAll())
+        }
+      />
       {progress && (
         <div className="space-y-1.5 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
           <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums">
@@ -1201,16 +1730,68 @@ function MediaContent({
       {entryTab === 'url' ? (
         <div className="w-full">
           <div className="flex items-center gap-2">
-            <Input
-              aria-label="Import media URL"
-              value={urlsText}
-              onChange={(event) => {
-                setUrlsText(event.target.value);
-                setRemoteEstimates(null);
-              }}
-              placeholder="Paste an image, video, or audio URL"
-              className="bg-background text-xs h-9 flex-1"
-            />
+            <div className="relative flex-1">
+              <Input
+                ref={urlInputRef}
+                aria-label="Import media URL"
+                autoComplete="off"
+                value={urlsText}
+                onChange={(event) => {
+                  setUrlsText(event.target.value);
+                  setRemoteEstimates(null);
+                  setShowRecentUrls(true);
+                }}
+                onFocus={() => setShowRecentUrls(true)}
+                placeholder="Paste an image, video, or audio URL"
+                className="h-10 bg-white pr-8 text-xs"
+              />
+              {showRecentUrls && recentUrls.length > 0 && (
+                <div
+                  ref={recentUrlsRef}
+                  className="absolute top-full z-20 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover"
+                >
+                  <p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Recent URLs
+                  </p>
+                  <div className="max-h-52 overflow-y-auto py-1">
+                    {recentUrls.map(({ url, title }) => (
+                      <div
+                        key={url}
+                        className="group flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-muted"
+                        onClick={() => {
+                          setUrlsText(url);
+                          setRemoteEstimates(null);
+                          setShowRecentUrls(false);
+                        }}
+                      >
+                        <Clock
+                          className="size-3 shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs text-foreground">
+                            {title || url}
+                          </span>
+                          {title ? (
+                            <span className="block truncate text-[10px] text-muted-foreground">
+                              {url}
+                            </span>
+                          ) : null}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${url} from recent URLs`}
+                          className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
+                          onClick={(event) => removeRecentUrl(url, event)}
+                        >
+                          <X className="size-3" aria-hidden="true" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             {!onActionChange && (
               <Button
                 type="button"
@@ -1243,7 +1824,7 @@ function MediaContent({
                   if (totalEntries > 1) {
                     setPlaylistAlertOpen(true);
                   } else {
-                    importRemoteUrls();
+                    beginUrlIndexing();
                   }
                 }}
               >
@@ -1272,7 +1853,7 @@ function MediaContent({
                   variant="outline"
                   onClick={() => {
                     setPlaylistAlertOpen(false);
-                    importRemoteUrls(true);
+                    beginUrlIndexing(true);
                   }}
                 >
                   Single Video
@@ -1280,7 +1861,7 @@ function MediaContent({
                 <AlertDialogAction
                   onClick={() => {
                     setPlaylistAlertOpen(false);
-                    importRemoteUrls(false);
+                    beginUrlIndexing(false);
                   }}
                 >
                   Entire Playlist
@@ -1300,7 +1881,7 @@ function MediaContent({
                 const isPlaylist = totalEntries > 1;
                 return (
                   <div className="mt-4 flex flex-col gap-4 border-t border-border/70 pt-4">
-                    <div className="grid gap-2 sm:grid-cols-3">
+                    {/* <div className="grid gap-2 sm:grid-cols-3">
                       <EstimateMetric
                         label="Media"
                         value={`${totalEntries} item(s) · ${
@@ -1323,7 +1904,7 @@ function MediaContent({
                             : 'Model-dependent'
                         }
                       />
-                    </div>
+                    </div> */}
 
                     {/* Playlist warning moved to AlertDialog */}
 
@@ -1416,7 +1997,7 @@ function MediaContent({
               <EstimateMetric label="Duration" value={formatDuration(stagedDuration)} />
               <EstimateMetric
                 label="Expected time"
-                value={`~${stagedEstimate.processingMinutes} min`}
+                value={`~${formatEstimateRange(stagedEstimate)}`}
               />
               <EstimateMetric
                 label="Estimated API cost"
@@ -1429,67 +2010,22 @@ function MediaContent({
             </div>
           ) : null}
 
-          {mediaType !== 'image' && staged.length > 0 ? (
-            <div className="space-y-3 rounded-lg border border-border bg-muted/10 px-3 py-3">
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                  Focus Instructions
-                </label>
-                <Textarea
-                  value={indexingInstructions}
-                  onChange={(e) => setIndexingInstructions(e.target.value)}
-                  placeholder="e.g. Track the score between Team A and Team B, focus on goal moments and final result..."
-                  className="bg-background text-xs min-h-16 max-h-24 resize-none"
-                  rows={2}
-                />
-                <p className="text-[10px] text-muted-foreground/60">
-                  Tell the AI what to focus on while watching. This guides frame analysis and
-                  improves answer accuracy.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                    Indexing Depth
-                  </label>
-                  <span className="text-[10px] font-medium tabular-nums text-foreground">
-                    {indexingQuality <= 20
-                      ? 'Quick Scan'
-                      : indexingQuality <= 40
-                      ? 'Standard'
-                      : indexingQuality <= 60
-                      ? 'Balanced'
-                      : indexingQuality <= 80
-                      ? 'Deep'
-                      : 'Maximum'}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={indexingQuality}
-                  onChange={(e) => setIndexingQuality(Number(e.target.value))}
-                  className="w-full h-1.5 accent-primary cursor-pointer"
-                />
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground/60">
-                  <span>Faster · Cheaper</span>
-                  <span>Slower · More Accurate</span>
-                </div>
-                {stagedDuration > 0 ? (
-                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-0.5">
-                    <span>~{qualityFrameEstimate(indexingQuality, stagedDuration)} frames</span>
-                    <span>·</span>
-                    <span>~{qualityVisionCalls(indexingQuality, stagedDuration)} vision calls</span>
-                    <span>·</span>
-                    <span className="tabular-nums">
-                      ~${qualityCostEstimate(indexingQuality, stagedDuration)}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            </div>
+          {indexingSurface && staged.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setIndexingBriefOpen(true)}
+              className="flex w-full items-center justify-between rounded-lg border border-border bg-muted/10 px-3 py-3 text-left hover:bg-muted/30"
+            >
+              <span>
+                <span className="block text-xs font-medium">{indexingSurface.title}</span>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  {typeof toolIndexingValues.goal === 'string' && toolIndexingValues.goal.trim()
+                    ? 'Custom indexing instructions are ready.'
+                    : (indexingSurface.description ?? 'Configure this tool before indexing.')}
+                </span>
+              </span>
+              <Sparkles className="size-4 text-primary" />
+            </button>
           ) : null}
 
           <div className="flex items-center justify-between">
@@ -1511,7 +2047,7 @@ function MediaContent({
               </button>
               {!onActionChange && (
                 <Button
-                  onClick={uploadAll}
+                  onClick={beginUpload}
                   disabled={uploading || staged.length === 0}
                   size="sm"
                   className="h-7 text-xs px-3"
@@ -1652,7 +2188,7 @@ function MediaContent({
                         setLibraryPage(0);
                       }}
                       placeholder="Search uploads"
-                      className="h-9 w-full pl-9 text-sm"
+                      className="h-9 w-full pl-9 text-sm bg-card/90"
                     />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1811,10 +2347,6 @@ function MediaContent({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Image gallery grid                                                  */
-/* ------------------------------------------------------------------ */
-
 function ImageGallery({
   assets,
   onDelete,
@@ -1935,10 +2467,6 @@ function ImageGallery({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Video/Audio file list                                               */
-/* ------------------------------------------------------------------ */
-
 function FileList({
   assets,
   mediaType,
@@ -1948,7 +2476,7 @@ function FileList({
   assets: MediaAsset[];
   mediaType: 'video' | 'audio';
   onDelete: (id: string) => void;
-  onProcess: (id: string) => void;
+  onProcess: (asset: MediaAsset) => void;
 }) {
   const Icon = mediaType === 'video' ? Video : AudioLines;
 
@@ -1975,10 +2503,11 @@ function FileList({
                 </span>
               ) : null}
               <StatusBadge asset={asset} />
+              {mediaType === 'video' ? <IndexingTime asset={asset} /> : null}
             </div>
             {isActiveJob(asset) ? (
               <Progress
-                value={asset.processingProgress ?? 1}
+                value={asset.processingProgress ?? 0}
                 aria-label="Overall indexing progress"
                 className={cn('mt-2 h-1', INDEXING_PROGRESS_CLASS)}
               />
@@ -1991,7 +2520,7 @@ function FileList({
                 variant="secondary"
                 size="sm"
                 className="h-7 px-2 text-[11px]"
-                onClick={() => onProcess(asset.id)}
+                onClick={() => onProcess(asset)}
               >
                 Retry
               </Button>
@@ -2002,7 +2531,7 @@ function FileList({
                 variant="ghost"
                 size="sm"
                 className="h-7 px-2 text-[11px] text-muted-foreground"
-                onClick={() => onProcess(asset.id)}
+                onClick={() => onProcess(asset)}
               >
                 Re-index
               </Button>
@@ -2024,9 +2553,22 @@ function FileList({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Status badge                                                        */
-/* ------------------------------------------------------------------ */
+function IndexingTime({ asset }: { asset: MediaAsset }) {
+  const seconds = completedMediaProcessingSeconds(asset);
+  if (seconds === null) return null;
+
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  const duration = minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`;
+  return (
+    <span
+      className="flex items-center gap-0.5 text-[10px] text-muted-foreground"
+      title="Time taken to index this video"
+    >
+      · <Clock className="size-2.5" /> Indexed in {duration}
+    </span>
+  );
+}
 
 function StatusBadge({ asset }: { asset: MediaAsset }) {
   const status = asset.processingStatus;
@@ -2049,7 +2591,9 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
         >
           {asset.processingMessage || 'Processing...'}
         </span>
-        <span className="tabular-nums">{Math.round(asset.processingProgress ?? 0)}% overall</span>
+        <span className="tabular-nums">
+          {formatMediaProgressPercent(asset.processingProgress ?? 0)}% overall
+        </span>
       </span>
     );
   }
@@ -2060,7 +2604,9 @@ function StatusBadge({ asset }: { asset: MediaAsset }) {
         <span className="max-w-30 truncate sm:max-w-50" title={asset.processingMessage}>
           {asset.processingMessage}
         </span>
-        <span className="tabular-nums">{Math.round(asset.processingProgress ?? 1)}%</span>
+        <span className="tabular-nums">
+          {formatMediaProgressPercent(asset.processingProgress ?? 0)}%
+        </span>
       </span>
     );
   }
@@ -2110,79 +2656,104 @@ function ActiveIndexingList({
       </div>
 
       <div className="space-y-2">
-        {assets.map((asset) => {
-          const progress = Math.max(1, Math.min(100, asset.processingProgress ?? 1));
-          return (
-            <div
-              key={asset.id}
-              className="space-y-2 rounded-lg border border-transparent bg-background/40 p-2.5 relative group"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 pr-6">
-                  <p className="truncate text-[11px] font-medium text-foreground">
-                    {asset.fileName}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="shrink-0 text-[10px] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                    Overall {Math.round(progress)}%
-                  </span>
-                  {asset.type !== 'image' ? (
-                    <button
-                      type="button"
-                      title={asset.processingPaused ? 'Resume Indexing' : 'Pause Indexing'}
-                      aria-label={
-                        asset.processingPaused
-                          ? `Resume ${asset.fileName}`
-                          : `Pause ${asset.fileName}`
-                      }
-                      onClick={() => onPause(asset)}
-                      className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      {asset.processingPaused ? (
-                        <Play className="size-3" />
-                      ) : (
-                        <Pause className="size-3" />
-                      )}
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    title="Remove file"
-                    aria-label={`Remove ${asset.fileName}`}
-                    onClick={() => onRemove(asset)}
-                    className="p-1 -mr-1 rounded-full text-muted-foreground hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 transition-colors"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </div>
-              </div>
-              <ActiveIndexingDescription asset={asset} />
-              {asset.activeVideoKnowledgeJobId ? (
-                <p
-                  className="truncate text-[9px] text-muted-foreground"
-                  title={asset.activeVideoKnowledgeJobId}
-                >
-                  Knowledge job {asset.activeVideoKnowledgeJobId.slice(0, 8)}
-                </p>
-              ) : null}
-            </div>
-          );
-        })}
+        {assets.map((asset) => (
+          <ActiveIndexingJob key={asset.id} asset={asset} onPause={onPause} onRemove={onRemove} />
+        ))}
       </div>
     </section>
   );
 }
 
+function ActiveIndexingJob({
+  asset,
+  onPause,
+  onRemove,
+}: {
+  asset: MediaAsset;
+  onPause: (asset: MediaAsset) => void;
+  onRemove: (asset: MediaAsset) => void;
+}) {
+  const progress = useLiveMediaProgress(asset);
+  const activeStep = primaryRunningMediaStep(asset.processingSteps);
+  const isFinalizing = isFinalizingMediaStep(activeStep);
+  return (
+    <div className="group relative space-y-2 rounded-lg border border-transparent bg-background/40 p-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 pr-6">
+          <p className="truncate text-[11px] font-medium text-foreground">{asset.fileName}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 text-[10px] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+            {isFinalizing ? 'Finalizing' : `${formatMediaProgressPercent(progress)}%`}
+          </span>
+          {asset.type !== 'image' ? (
+            <button
+              type="button"
+              title={asset.processingPaused ? 'Resume Indexing' : 'Pause Indexing'}
+              aria-label={
+                asset.processingPaused ? `Resume ${asset.fileName}` : `Pause ${asset.fileName}`
+              }
+              onClick={() => onPause(asset)}
+              className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              {asset.processingPaused ? <Play className="size-3" /> : <Pause className="size-3" />}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            title="Remove file"
+            aria-label={`Remove ${asset.fileName}`}
+            onClick={() => onRemove(asset)}
+            className="-mr-1 rounded-full p-1 text-muted-foreground transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      </div>
+      <ActiveIndexingDescription asset={asset} />
+      {isFinalizing ? (
+        <IndeterminateIndexingProgress />
+      ) : (
+        <LiveMediaProgress value={progress} step={activeStep} paused={asset.processingPaused} />
+      )}
+      {asset.activeVideoKnowledgeJobId ? (
+        <p
+          className="truncate text-[9px] text-muted-foreground"
+          title={asset.activeVideoKnowledgeJobId}
+        >
+          Knowledge job {asset.activeVideoKnowledgeJobId.slice(0, 8)}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function IndeterminateIndexingProgress() {
+  return (
+    <div
+      role="progressbar"
+      aria-label="Finalizing video indexing"
+      aria-valuetext="Finalizing verified results"
+      className="relative h-2 min-h-2 w-full overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-950/60"
+    >
+      <motion.div
+        className="absolute inset-y-0 left-0 w-2/5 rounded-full bg-emerald-500 dark:bg-emerald-400"
+        initial={{ x: '-120%' }}
+        animate={{ x: ['-120%', '270%'] }}
+        transition={{ duration: 1.15, ease: 'easeInOut', repeat: Infinity }}
+      />
+    </div>
+  );
+}
+
 function ActiveIndexingDescription({ asset }: { asset: MediaAsset }) {
   const step = primaryRunningMediaStep(asset.processingSteps);
-  const progress = mediaStepProgress(step);
   const stepDescription = describeActiveMediaStep(step);
 
   return (
     <div className="min-w-0 space-y-1">
       <div className="flex min-w-0 items-center gap-1.5">
-        <ElapsedTime startTime={asset.createdAt} />
+        <ElapsedTime startTime={mediaProcessingStartedAt(asset)} />
         <p className="truncate text-[10px] text-muted-foreground animate-pulse">
           {asset.processingPaused
             ? 'Paused — resume when you are ready.'
@@ -2190,28 +2761,61 @@ function ActiveIndexingDescription({ asset }: { asset: MediaAsset }) {
         </p>
       </div>
       {!asset.processingPaused && stepDescription ? (
-        <div className="space-y-1" aria-live="polite">
-          <div className="flex min-w-0 items-center gap-1.5 text-[9px] text-muted-foreground/80">
-            <span className="truncate">{stepDescription}</span>
-          </div>
-          {progress === null ? (
-            <div
-              className="h-1 overflow-hidden rounded-full bg-muted"
-              aria-label="Active operation in progress"
-            >
-              <div className="h-full w-1/3 animate-pulse rounded-full bg-emerald-500/70" />
-            </div>
-          ) : (
-            <Progress
-              value={progress}
-              aria-label={`${stepDescription} progress`}
-              className={cn('h-1 bg-muted', INDEXING_PROGRESS_CLASS)}
-            />
-          )}
-        </div>
+        <LiveIndexingStepDescription step={step} description={stepDescription} />
       ) : null}
     </div>
   );
+}
+
+function LiveIndexingStepDescription({
+  step,
+  description,
+}: {
+  step: MediaProcessingStep | undefined;
+  description: string;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 5_000);
+    return () => clearInterval(interval);
+  }, []);
+  const stale = isMediaStepTelemetryStale(step, now);
+
+  return (
+    <div
+      className="flex min-w-0 items-center gap-1.5 text-[9px] text-muted-foreground/80"
+      aria-live="polite"
+    >
+      <span className="truncate">
+        {stale ? 'Waiting for a fresh worker update…' : `Worker active · ${description}`}
+      </span>
+      {!stale ? <EstimatedStepTime step={step} /> : null}
+    </div>
+  );
+}
+
+function EstimatedStepTime({ step }: { step: MediaProcessingStep | undefined }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const remainingSeconds = estimateMediaStepRemainingSeconds(step, now);
+  if (remainingSeconds === null) return null;
+  return (
+    <span className="shrink-0 whitespace-nowrap text-muted-foreground/70">
+      ~{formatShortDuration(remainingSeconds)} left
+    </span>
+  );
+}
+
+function formatShortDuration(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 1) return '<1 min';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
 }
 
 function ElapsedTime({ startTime }: { startTime: string }) {

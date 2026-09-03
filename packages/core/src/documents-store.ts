@@ -2,10 +2,10 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { DocumentSource, SourceDocument } from './types';
-import { getDataDir, requireDataDir } from './workspace';
+import { getProjectDataDir, requireProjectDataDir } from './project-store';
 
 /**
- * File-backed corpus store, scoped to the active server.
+ * File-backed corpus store, scoped to the active Project.
  *
  * Documents are appended here as the ETL runs (paste / upload / crawl), so an
  * interrupted multi-hour crawl never loses what it already scraped. Writes are
@@ -21,7 +21,7 @@ function serialize<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 async function docsPath(create: boolean): Promise<string | null> {
-  const dir = create ? await requireDataDir() : await getDataDir();
+  const dir = create ? await requireProjectDataDir() : await getProjectDataDir();
   if (!dir) return null;
   return path.join(dir, 'documents.json');
 }
@@ -66,6 +66,9 @@ export interface NewDocumentInput {
   source: DocumentSource;
   url?: string;
   jobId?: string;
+  groupId?: string;
+  enabled?: boolean;
+  parentSourceId?: string;
   metadata?: Record<string, any>;
 }
 
@@ -79,6 +82,9 @@ function normalize(input: NewDocumentInput): SourceDocument {
     content,
     charCount: content.length,
     jobId: input.jobId,
+    groupId: input.groupId,
+    enabled: input.enabled ?? true,
+    parentSourceId: input.parentSourceId,
     metadata: input.metadata,
     status: 'unindexed',
     createdAt: new Date().toISOString(),
@@ -139,7 +145,14 @@ export function addCrawledDocuments(jobId: string, incoming: NewDocumentInput[])
 /** Edit a document's title / content / url in place. Returns the updated doc. */
 export function updateDocument(
   id: string,
-  patch: { title?: string; content?: string; url?: string; metadata?: Record<string, any> },
+  patch: {
+    title?: string;
+    content?: string;
+    url?: string;
+    metadata?: Record<string, any>;
+    groupId?: string;
+    enabled?: boolean;
+  },
 ): Promise<SourceDocument | undefined> {
   return serialize(async () => {
     const docs = await readDocuments();
@@ -154,6 +167,8 @@ export function updateDocument(
       charCount: content.length,
       url: patch.url !== undefined ? patch.url || undefined : current.url,
       metadata: patch.metadata !== undefined ? patch.metadata : current.metadata,
+      groupId: patch.groupId !== undefined ? patch.groupId || undefined : current.groupId,
+      enabled: patch.enabled !== undefined ? patch.enabled : current.enabled,
       status: 'unindexed',
     };
     docs[idx] = next;

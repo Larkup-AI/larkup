@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readConfig, writeConfig } from '@larkup/core/config-store';
 import { getVectorStore, validateStoreConfig } from '@larkup/vector-stores/registry';
+import { getSandboxProvider, validateSandboxCredentials } from '@larkup/sandbox/registry';
 import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
 import { getAllModels } from '@larkup/core/models-cache';
 import {
@@ -8,26 +9,110 @@ import {
   normalizeNativeChatModelId,
   toChatDescriptor,
 } from '@larkup/core/chat-models/registry';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import type { RagConfig } from '@larkup/core/types';
+import { getToolById } from '@larkup/marketplace/registry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
-  return serverId ? runWithServer(serverId, fn) : fn();
+function withProject<T>(projectId: string | null, fn: () => Promise<T>) {
+  return projectId ? runWithProject(projectId, fn) : fn();
+}
+
+function imageIndexingCapability(
+  config: RagConfig,
+  models: Awaited<ReturnType<typeof getAllModels>>,
+) {
+  const provider =
+    config.visionProvider || config.chatProvider || config.embeddingProvider || 'openai';
+  const selectedModelId = config.visionModelId?.trim();
+
+  if (selectedModelId?.startsWith('custom:')) {
+    const modelName = selectedModelId.slice('custom:'.length);
+    const available = Boolean(
+      config.customVisionModels?.some((model) => model.modelName === modelName),
+    );
+    return {
+      available,
+      message: available
+        ? undefined
+        : 'The selected custom vision model is no longer configured. PDF images will not be indexed.',
+    };
+  }
+
+  const languageModels = models.filter((model) => model.type === 'language').map(toChatDescriptor);
+  const visionModels = getChatModelsForProvider(languageModels, provider).filter((model) =>
+    model.tags?.includes('vision'),
+  );
+  const available = selectedModelId
+    ? visionModels.some((model) => model.id === selectedModelId)
+    : visionModels.length > 0;
+
+  return {
+    available,
+    message: available
+      ? undefined
+      : `No vision-capable model is available from ${provider}. PDF images will not be indexed.`,
+  };
+}
+
+/** Config field keys a tool's own backend provisions (e.g. device credentials), per this tool's manifest. */
+async function serverManagedConfigKeys(toolId: string): Promise<string[]> {
+  const descriptor = await getToolById(toolId);
+  return (descriptor?.configSchema ?? [])
+    .filter((field) => field.serverManaged)
+    .map((field) => field.key);
+}
+
+/**
+ * Strips server-managed fields (e.g. a tool's provisioned device key) from
+ * every tool's config before it reaches the client, and redacts Enterprise
+ * gateway credentials, which are managed by the private control plane.
+ */
+async function configForClient(config: RagConfig): Promise<RagConfig> {
+  const toolConfigs = { ...(config.toolConfigs ?? {}) };
+  for (const toolId of Object.keys(toolConfigs)) {
+    const managedKeys = await serverManagedConfigKeys(toolId);
+    if (managedKeys.length === 0) continue;
+    const toolConfig = { ...toolConfigs[toolId] };
+    for (const key of managedKeys) delete toolConfig[key];
+    toolConfigs[toolId] = toolConfig;
+  }
+  const safeConfig: RagConfig = {
+    ...config,
+    toolConfigs,
+  };
+  if (!config.enterprise) return safeConfig;
+  return {
+    ...safeConfig,
+    embeddingApiKey: '',
+    chatApiKey: '',
+    visionApiKey: '',
+    customEmbeddings: config.customEmbeddings?.map((model) => ({ ...model, apiKey: undefined })),
+    customChatModels: config.customChatModels?.map((model) => ({ ...model, apiKey: undefined })),
+    customVisionModels: config.customVisionModels?.map((model) => ({
+      ...model,
+      apiKey: undefined,
+    })),
+  };
 }
 
 export async function GET(request: Request) {
-  const serverId = new URL(request.url).searchParams.get('serverId');
-  return withServer(serverId, async () => {
-    const config = await readConfig();
-    return NextResponse.json({ config });
+  const url = new URL(request.url);
+  const projectId = url.searchParams.get('projectId') ?? url.searchParams.get('serverId');
+  return withProject(projectId, async () => {
+    const [config, models] = await Promise.all([readConfig(), getAllModels()]);
+    return NextResponse.json({
+      config: await configForClient(config),
+      capabilities: { imageIndexing: imageIndexingCapability(config, models) },
+    });
   });
 }
 
 export async function PUT(request: Request) {
-  const serverId = new URL(request.url).searchParams.get('serverId');
+  const url = new URL(request.url);
+  const projectId = url.searchParams.get('projectId') ?? url.searchParams.get('serverId');
   let body: RagConfig;
   try {
     body = (await request.json()) as RagConfig;
@@ -158,8 +243,65 @@ export async function PUT(request: Request) {
     );
   }
 
-  return withServer(serverId, async () => {
-    const saved = await writeConfig(body);
-    return NextResponse.json({ config: saved });
+  // Validate the selected sandbox provider's credentials, if it needs any.
+  const sandboxProviderId = body.defaultSandboxProvider;
+  if (sandboxProviderId && sandboxProviderId !== 'local' && sandboxProviderId !== 'docker') {
+    const sandboxProvider = getSandboxProvider(
+      sandboxProviderId as Parameters<typeof getSandboxProvider>[0],
+    );
+    if (!sandboxProvider) {
+      return NextResponse.json(
+        { error: `Unknown sandbox provider: ${sandboxProviderId}` },
+        { status: 400 },
+      );
+    }
+    if (sandboxProvider.executionSupport !== 'full') {
+      return NextResponse.json(
+        { error: `${sandboxProvider.label} cannot run general code execution.` },
+        { status: 422 },
+      );
+    }
+    const sandboxFieldErrors = validateSandboxCredentials(
+      sandboxProvider,
+      body.sandboxProviderConfigs?.[sandboxProviderId] ?? {},
+    );
+    if (Object.keys(sandboxFieldErrors).length > 0) {
+      return NextResponse.json(
+        { error: 'Missing required sandbox provider fields', fieldErrors: sandboxFieldErrors },
+        { status: 422 },
+      );
+    }
+  }
+
+  return withProject(projectId, async () => {
+    const current = await readConfig();
+    const currentToolConfigs = current.toolConfigs ?? {};
+    const mergedToolConfigs = { ...(body.toolConfigs ?? {}) };
+    for (const toolId of Object.keys(currentToolConfigs)) {
+      const managedKeys = await serverManagedConfigKeys(toolId);
+      if (managedKeys.length === 0) continue;
+      const currentToolConfig = currentToolConfigs[toolId] ?? {};
+      const nextToolConfig = { ...(mergedToolConfigs[toolId] ?? {}) };
+      for (const key of managedKeys) {
+        if (key in currentToolConfig) nextToolConfig[key] = currentToolConfig[key];
+      }
+      mergedToolConfigs[toolId] = nextToolConfig;
+    }
+    const bodyWithManagedConnection = { ...body, toolConfigs: mergedToolConfigs };
+    const saved = await writeConfig(
+      current.enterprise
+        ? {
+            ...bodyWithManagedConnection,
+            chatApiKey: current.chatApiKey,
+            embeddingApiKey: current.embeddingApiKey,
+            visionApiKey: current.visionApiKey,
+            customEmbeddings: current.customEmbeddings,
+            customChatModels: current.customChatModels,
+            customVisionModels: current.customVisionModels,
+            enterprise: current.enterprise,
+          }
+        : bodyWithManagedConnection,
+    );
+    return NextResponse.json({ config: await configForClient(saved) });
   });
 }

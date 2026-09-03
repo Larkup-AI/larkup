@@ -5,7 +5,7 @@ import {
   createChatModel,
   resolveConfiguredChatModel,
   resolveConfiguredVisionModel,
-} from '../../../apps/web/lib/chat-model-provider';
+} from '../../../apps/web/lib/chat/model-provider';
 
 const catalog: GatewayModel[] = [
   {

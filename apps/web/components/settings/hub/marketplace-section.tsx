@@ -21,6 +21,13 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Input } from '../../ui/input';
 import { GenericAlert } from '@/components/alerts/generic-alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface MarketplaceTool {
   id: string;
@@ -46,6 +53,10 @@ interface MarketplaceTool {
   status: 'available' | 'installed' | 'installing' | 'uninstalling' | 'error';
   comingSoon?: boolean;
   installedAt?: string;
+  runtime?: {
+    defaultMode: string;
+    modes: Array<{ id: string; label: string; description: string; icon?: string }>;
+  };
 }
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -84,9 +95,12 @@ export function MarketplaceSection({ embedded = false }: { embedded?: boolean })
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [toolToDelete, setToolToDelete] = useState<string | null>(null);
+  const [toolToInstall, setToolToInstall] = useState<MarketplaceTool | null>(null);
+  const [runtimeMode, setRuntimeMode] = useState<string | null>(null);
 
   const handleInstall = useCallback(
-    async (toolId: string) => {
+    async (tool: MarketplaceTool, selectedRuntimeMode?: string) => {
+      const toolId = tool.id;
       setInstalling((prev) => new Set(prev).add(toolId));
       const toastId = toast.loading('Downloading and installing tool…', {
         description: 'This may take a minute on first install.',
@@ -94,22 +108,44 @@ export function MarketplaceSection({ embedded = false }: { embedded?: boolean })
       try {
         const res = await fetch(`/api/marketplace/${toolId}`, {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(selectedRuntimeMode ? { runtimeMode: selectedRuntimeMode } : {}),
         });
         if (!res.ok) {
           const err = await res.json();
           throw new Error(err.error || 'Install failed');
         }
         toast.dismiss(toastId);
-        if (toolId === 'video-audio') {
-          toast.success('Video Intelligence installed', {
-            description: 'Choose an audio provider before you index media.',
-            action: {
-              label: 'Set up audio',
-              onClick: () => router.push('/settings?section=tool-settings'),
-            },
+        if (selectedRuntimeMode === 'managed-cloud') {
+          const runtime = await fetch(`/api/tools/${encodeURIComponent(toolId)}/runtime`, {
+            method: 'POST',
           });
+          if (!runtime.ok) {
+            const result = await runtime.json().catch(() => ({}));
+            toast.warning('Tool installed, but cloud setup needs attention.', {
+              description: result.error || 'Open Installed Tools to reconnect your cloud runtime.',
+              action: {
+                label: 'Open settings',
+                onClick: () => router.push('/settings?section=tool-settings'),
+              },
+            });
+          } else {
+            toast.success('Tool installed and cloud access is ready.', {
+              action: {
+                label: 'Open settings',
+                onClick: () => router.push('/settings?section=tool-settings'),
+              },
+            });
+          }
         } else {
-          toast.success('Tool installed successfully');
+          toast.success('Tool installed successfully', {
+            action: tool.runtime
+              ? {
+                  label: 'Open settings',
+                  onClick: () => router.push('/settings?section=tool-settings'),
+                }
+              : undefined,
+          });
         }
         await mutate();
       } catch (err) {
@@ -126,6 +162,16 @@ export function MarketplaceSection({ embedded = false }: { embedded?: boolean })
     [mutate, router],
   );
 
+  function chooseInstall(tool: MarketplaceTool) {
+    const modes = tool.runtime?.modes ?? [];
+    if (modes.length < 2) {
+      void handleInstall(tool, modes[0]?.id);
+      return;
+    }
+    setRuntimeMode(tool.runtime?.defaultMode ?? modes[0]?.id ?? null);
+    setToolToInstall(tool);
+  }
+
   const handleUninstall = useCallback(
     async (toolId: string) => {
       setUninstalling((prev) => new Set(prev).add(toolId));
@@ -133,7 +179,7 @@ export function MarketplaceSection({ embedded = false }: { embedded?: boolean })
         description: 'This may take a moment.',
       });
       try {
-        const res = await fetch(`/api/marketplace/${toolId}`, {
+        const res = await fetch(`/api/marketplace/${toolId}?purgeConfig=true`, {
           method: 'DELETE',
         });
         if (!res.ok) throw new Error('Uninstall failed');
@@ -261,7 +307,7 @@ export function MarketplaceSection({ embedded = false }: { embedded?: boolean })
               tool={tool}
               installing={installing.has(tool.id) || tool.status === 'installing'}
               uninstalling={uninstalling.has(tool.id) || tool.status === 'uninstalling'}
-              onInstall={handleInstall}
+              onInstall={() => chooseInstall(tool)}
               onUninstall={(id) => setToolToDelete(id)}
             />
           ))}
@@ -288,6 +334,57 @@ export function MarketplaceSection({ embedded = false }: { embedded?: boolean })
           if (toolToDelete) handleUninstall(toolToDelete);
         }}
       />
+      <Dialog
+        open={Boolean(toolToInstall)}
+        onOpenChange={(open) => {
+          if (!open) setToolToInstall(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Choose how to run {toolToInstall?.name}</DialogTitle>
+            <DialogDescription>
+              This choice is saved with the installed tool and can be changed later in Installed
+              Tools.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            {toolToInstall?.runtime?.modes.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => setRuntimeMode(mode.id)}
+                className={cn(
+                  'rounded-lg border px-3 py-3 text-left transition-colors',
+                  runtimeMode === mode.id
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:bg-muted/50',
+                )}
+              >
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  {mode.icon && <img src={mode.icon} alt="" className="size-4 object-contain" />}
+                  {mode.label}
+                </span>
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                  {mode.description}
+                </span>
+              </button>
+            ))}
+          </div>
+          <Button
+            disabled={!toolToInstall || !runtimeMode}
+            onClick={() => {
+              if (!toolToInstall || !runtimeMode) return;
+              const selectedTool = toolToInstall;
+              const selectedMode = runtimeMode;
+              setToolToInstall(null);
+              void handleInstall(selectedTool, selectedMode);
+            }}
+          >
+            Install with this runtime
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -302,7 +399,7 @@ function ToolRow({
   tool: MarketplaceTool;
   installing: boolean;
   uninstalling: boolean;
-  onInstall: (id: string) => void;
+  onInstall: () => void;
   onUninstall: (id: string) => void;
 }) {
   const Icon = ICON_MAP[tool.icon] ?? Film;
@@ -378,22 +475,6 @@ function ToolRow({
         )}
       </div>
 
-      {/* Pricing badge */}
-      <div className="shrink-0">
-        <span
-          className={cn(
-            'rounded-md px-2 py-0.5 text-[10px] font-medium',
-            tool.pricing === 'free'
-              ? 'bg-secondary text-muted-foreground'
-              : tool.pricing === 'pro'
-              ? 'bg-blue-50 text-blue-600'
-              : 'bg-purple-50 text-purple-600',
-          )}
-        >
-          {tool.pricing === 'free' ? 'Free' : tool.pricing === 'pro' ? 'Pro' : 'Enterprise'}
-        </span>
-      </div>
-
       {/* Actions */}
       <div className="shrink-0 flex items-center gap-1.5">
         {tool.repositoryUrl && (
@@ -438,7 +519,7 @@ function ToolRow({
             size="sm"
             className="h-7 gap-1.5 text-[11px] px-3"
             disabled={installing}
-            onClick={() => onInstall(tool.id)}
+            onClick={onInstall}
           >
             {installing ? (
               <Loader2 className="size-3 animate-spin" />

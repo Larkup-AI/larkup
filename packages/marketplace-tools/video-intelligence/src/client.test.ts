@@ -21,6 +21,34 @@ describe('VideoIntelligenceClient', () => {
     expect(headers.get('authorization')).toBe('Bearer secret');
   });
 
+  it('uses the same private-loopback default for the Docker-free local runtime', async () => {
+    const fetcher = vi.fn(
+      async () => new Response(JSON.stringify({ status: 'ok', version: '0.1.0', operators: {} })),
+    ) as any;
+    const client = new VideoIntelligenceClient({ mode: 'local-process', fetch: fetcher });
+
+    await client.health();
+
+    expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8787/v1/health', expect.anything());
+  });
+
+  it('accepts the managed-cloud health contract used by the control plane', async () => {
+    const client = new VideoIntelligenceClient({
+      mode: 'managed-cloud',
+      endpoint: 'https://video.example.test',
+      fetch: vi.fn(async () =>
+        Response.json({
+          status: 'ok',
+          version: '0.1.0',
+          runtime: 'managed-cloud',
+          processingEnabled: true,
+        }),
+      ) as any,
+    });
+
+    await expect(client.health()).resolves.toMatchObject({ status: 'ok', operators: {} });
+  });
+
   it('surfaces API details on failed requests', async () => {
     const client = new VideoIntelligenceClient({
       mode: 'managed-cloud',
@@ -32,6 +60,37 @@ describe('VideoIntelligenceClient', () => {
     await expect(client.getUsage()).rejects.toThrow('quota reached');
   });
 
+  it('waits through a temporary GET rate limit instead of abandoning a live job', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ detail: 'slow down' }), {
+          status: 429,
+          headers: { 'Retry-After': '0' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          id: 'job_123',
+          status: 'running',
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:01Z',
+          progress: { stage: 'probe', percent: 10, message: 'Working' },
+          estimatedSourceMinutes: 1,
+          result: null,
+          error: null,
+        }),
+      );
+    const client = new VideoIntelligenceClient({
+      mode: 'managed-cloud',
+      endpoint: 'https://video.example.test',
+      fetch: fetcher,
+    });
+
+    await expect(client.getJob('job_123')).resolves.toMatchObject({ status: 'running' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it('provisions a device-scoped cloud key without sending bearer credentials', async () => {
     const fetcher = vi.fn(async () =>
       Response.json({
@@ -40,7 +99,6 @@ describe('VideoIntelligenceClient', () => {
           plan: 'device',
           sourceMinutesPerMonth: 30,
           maxConcurrentJobs: 1,
-          allowFullCoverage: false,
         },
       }),
     ) as any;
@@ -60,6 +118,36 @@ describe('VideoIntelligenceClient', () => {
     );
     const headers = fetcher.mock.calls[0][1].headers as Headers;
     expect(headers.get('authorization')).toBeNull();
+  });
+
+  it('returns only the user ID for the installed-tool connection display', async () => {
+    const provisioned = await TOOL_EXTENSION.provisionRuntime({
+      config: {},
+      fetch: vi.fn(async () =>
+        Response.json({
+          apiKey: 'lvi_device_key',
+          entitlement: {
+            plan: 'device',
+            sourceMinutesPerMonth: 30,
+            maxConcurrentJobs: 1,
+          },
+        }),
+      ) as any,
+    });
+
+    expect(provisioned.display).toEqual({ userId: expect.any(String) });
+    expect(provisioned.display).not.toHaveProperty('apiKey');
+  });
+
+  it('never provisions the managed Cloud connection for local mode', async () => {
+    const fetcher = vi.fn() as any;
+    const provisioned = await TOOL_EXTENSION.provisionRuntime({
+      config: { runtimeMode: 'local' },
+      fetch: fetcher,
+    });
+
+    expect(provisioned).toEqual({ config: {} });
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it('downloads the temporary cloud result before the caller explicitly acknowledges it', async () => {

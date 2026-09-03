@@ -7,7 +7,9 @@ test('creates retrievable image chunks with their descriptions and stored URLs',
       id: 'pdf-with-images',
       title: 'architecture.pdf',
       content: 'A short PDF introduction.',
-      source: 'upload',
+      source: 'files',
+      charCount: 25,
+      createdAt: new Date(0).toISOString(),
       metadata: {
         images: [
           {

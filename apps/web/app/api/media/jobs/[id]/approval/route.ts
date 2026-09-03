@@ -4,7 +4,7 @@ import {
   decideBackgroundRefinement,
   getBackgroundRefinement,
 } from '@larkup/core/video-knowledge/inspection-store';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import { executeApprovedBackgroundRefinement } from '@/app/api/media/inspect/route';
 
 export const runtime = 'nodejs';
@@ -42,5 +42,5 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     }
     return NextResponse.json({ job });
   };
-  return serverId ? runWithServer(serverId, handler) : handler();
+  return serverId ? runWithProject(serverId, handler) : handler();
 }

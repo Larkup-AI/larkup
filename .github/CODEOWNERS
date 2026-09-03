@@ -20,6 +20,7 @@ packages/marketplace/ @AbdelrahmanAbounida
 apps/web/ @AbdelrahmanAbounida
 apps/cli/ @AbdelrahmanAbounida
 apps/sdk/ @AbdelrahmanAbounida
+apps/marketplace/ @AbdelrahmanAbounida
 
 # ============================================================================
 # Infrastructure & CI

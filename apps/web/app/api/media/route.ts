@@ -4,18 +4,22 @@ import {
   deleteMediaAsset,
   deleteMediaAssets,
   mediaStats,
-  recoverStaleMediaAssets,
   type NewMediaAssetInput,
 } from '@larkup/core/media-store';
 import { isToolInstalled } from '@larkup/marketplace/installer';
-import { loadTool } from '@larkup/marketplace/loader';
 import { createStorageProvider } from '@larkup/marketplace/storage';
 import { deleteDocuments } from '@larkup/core/documents-store';
 import { readConfig } from '@larkup/core/config-store';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import type { MediaType } from '@larkup/core/types';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import { deleteVideoKnowledgeForMediaAsset } from '@larkup/core/video-knowledge/deletion-store';
+import { resolveGroupId } from '@larkup/core/groups-store';
+import {
+  cancelVideoIntelligenceJob,
+  purgeLocalVideoIntelligenceJobData,
+} from '@/lib/media/video-intelligence-adapter';
+import { inspectMediaUrl } from '@/lib/media/source-utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,9 +31,12 @@ export async function GET(req: Request) {
 
 async function listMedia(req: Request) {
   const url = new URL(req.url);
-  const typeFilter = url.searchParams.get('type') as MediaType | null;
+  const requestedType = url.searchParams.get('type');
+  const typeFilter: MediaType | null =
+    requestedType === 'image' || requestedType === 'video' || requestedType === 'audio'
+      ? requestedType
+      : null;
 
-  await recoverStaleMediaAssets();
   const [assets, stats] = await Promise.all([readMediaAssets(), mediaStats()]);
   const filtered = typeFilter ? assets.filter((a) => a.type === typeFilter) : assets;
 
@@ -66,9 +73,39 @@ async function saveMedia(req: Request) {
 
     const formData = await req.formData();
     const files = formData.getAll('file') as File[];
+    const rawDurations = formData.get('mediaDurations') as string | null;
+    const mediaDurations = (() => {
+      if (!rawDurations) return [] as Array<number | null>;
+      try {
+        const parsed = JSON.parse(rawDurations);
+        return Array.isArray(parsed)
+          ? parsed.map((value) => (Number.isFinite(Number(value)) ? Number(value) : null))
+          : [];
+      } catch {
+        return [] as Array<number | null>;
+      }
+    })();
     const indexingInstructions = (formData.get('indexingInstructions') as string) || undefined;
+    const rawGroupId = formData.get('groupId');
+    const groupId = await resolveGroupId(typeof rawGroupId === 'string' ? rawGroupId : undefined);
     const rawQuality = formData.get('indexingQuality') as string | null;
     const indexingQuality = rawQuality ? Number(rawQuality) : undefined;
+    const rawToolInputs = formData.get('toolInputs') as string | null;
+    let toolInputs: Record<string, unknown> | undefined;
+    if (rawToolInputs) {
+      if (rawToolInputs.length > 20_000) {
+        return NextResponse.json({ error: 'Indexing guide is too large.' }, { status: 400 });
+      }
+      try {
+        const parsed = JSON.parse(rawToolInputs);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('expected an object');
+        }
+        toolInputs = parsed as Record<string, unknown>;
+      } catch {
+        return NextResponse.json({ error: 'Invalid marketplace tool input.' }, { status: 400 });
+      }
+    }
 
     if (files.length === 0) {
       return NextResponse.json({ error: 'No files provided.' }, { status: 400 });
@@ -84,7 +121,7 @@ async function saveMedia(req: Request) {
     const storage = createStorageProvider();
     const results: NewMediaAssetInput[] = [];
 
-    for (const file of files) {
+    for (const [fileIndex, file] of files.entries()) {
       const type = detectMediaType(file.type);
       if (!type) {
         continue;
@@ -102,8 +139,11 @@ async function saveMedia(req: Request) {
         mimeType: file.type,
         storageUri,
         fileSize: file.size,
+        durationSecs: mediaDurations[fileIndex] ?? undefined,
         indexingInstructions,
         indexingQuality,
+        toolInputs,
+        groupId,
       });
     }
 
@@ -126,8 +166,19 @@ async function importRemoteMedia(req: Request, config: Awaited<ReturnType<typeof
     urls?: string[];
     estimateOnly?: boolean;
     mediaType?: 'image' | 'video' | 'audio';
+    groupId?: string;
+    toolInputs?: Record<string, unknown>;
   };
+  if (
+    body.toolInputs &&
+    (typeof body.toolInputs !== 'object' ||
+      Array.isArray(body.toolInputs) ||
+      JSON.stringify(body.toolInputs).length > 20_000)
+  ) {
+    return NextResponse.json({ error: 'Invalid marketplace tool input.' }, { status: 400 });
+  }
   const urls = [...new Set(body.urls?.map((url) => url.trim()).filter(Boolean) ?? [])];
+  const groupId = await resolveGroupId(body.groupId);
   if (urls.length === 0 || urls.length > 10) {
     return NextResponse.json({ error: 'Provide between 1 and 10 media URLs.' }, { status: 400 });
   }
@@ -166,6 +217,7 @@ async function importRemoteMedia(req: Request, config: Awaited<ReturnType<typeof
           storageUri,
           fileSize: buffer.length,
           originalUrl: url,
+          groupId,
         });
       }
       const assets = await addMediaAssets(inputs);
@@ -177,25 +229,31 @@ async function importRemoteMedia(req: Request, config: Awaited<ReturnType<typeof
       );
     }
   }
-  if (!(await isToolInstalled('video-audio'))) {
+  const toolId = body.mediaType === 'video' ? 'video-intelligence' : 'video-audio';
+  const toolName = body.mediaType === 'video' ? 'Video Intelligence' : 'Audio Transcription';
+  if (!(await isToolInstalled(toolId))) {
     return NextResponse.json(
-      { error: 'Install the Video & Audio tool before importing media URLs.' },
+      { error: `Install ${toolName} before importing media URLs.` },
       { status: 409 },
     );
   }
 
-  const tool = await loadTool<any>('video-audio');
-  if (!tool?.importMediaUrl || !tool?.inspectMediaUrl) {
-    return NextResponse.json(
-      { error: 'The installed Video & Audio tool needs an update.' },
-      { status: 409 },
-    );
-  }
-
+  // URL import is a shared application capability. The selected indexing tool
+  // owns processing after the source is stored.
   if (body.estimateOnly) {
     const estimates = [];
     for (const url of urls) {
-      const estimate = await tool.inspectMediaUrl(url);
+      let estimate;
+      try {
+        estimate = await inspectMediaUrl(url);
+      } catch (error) {
+        // inspectMediaUrl rejects unreachable, private, and non-media URLs.
+        // Those are all bad input, not a server fault.
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'Could not inspect the media URL.' },
+          { status: 400 },
+        );
+      }
       if (
         body.mediaType &&
         estimate.mediaType !== 'unknown' &&
@@ -220,6 +278,8 @@ async function importRemoteMedia(req: Request, config: Awaited<ReturnType<typeof
       storageUri: `pending://${url}`,
       fileSize: 0,
       originalUrl: url,
+      groupId,
+      toolInputs: body.toolInputs,
     };
   });
 
@@ -250,6 +310,8 @@ async function removeMedia(req: Request) {
           { status: 409 },
         );
       }
+      await cancelManagedVideoIndexing(asset);
+      await purgeLocalVideoIntelligenceCache(asset);
       const documentIds = allMediaDocumentIds(asset);
       await deleteMediaDocuments(documentIds);
       await storage.delete(asset.storageUri).catch(() => {});
@@ -269,6 +331,8 @@ async function removeMedia(req: Request) {
       );
     }
     for (const asset of selectedAssets) {
+      await cancelManagedVideoIndexing(asset);
+      await purgeLocalVideoIntelligenceCache(asset);
       const documentIds = allMediaDocumentIds(asset);
       await deleteMediaDocuments(documentIds);
       await storage.delete(asset.storageUri).catch(() => {});
@@ -280,6 +344,34 @@ async function removeMedia(req: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function cancelManagedVideoIndexing(asset: {
+  type: MediaType;
+  activeVideoIntelligenceJobId?: string;
+}): Promise<void> {
+  if (asset.type !== 'video' || !asset.activeVideoIntelligenceJobId) return;
+  try {
+    await cancelVideoIntelligenceJob(asset.activeVideoIntelligenceJobId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not stop the active video job.';
+    throw new Error(`The video is still indexing, so it was not removed. ${message}`);
+  }
+}
+
+async function purgeLocalVideoIntelligenceCache(asset: {
+  type: MediaType;
+  activeVideoIntelligenceJobId?: string;
+}): Promise<void> {
+  if (asset.type !== 'video' || !asset.activeVideoIntelligenceJobId) return;
+  try {
+    await purgeLocalVideoIntelligenceJobData(asset.activeVideoIntelligenceJobId);
+  } catch (error) {
+    // The host storage and evidence state are still deleted below. Do not
+    // block deletion merely because an older/stopped local runtime can no
+    // longer be reached; it has no active host asset to expose afterwards.
+    console.warn('[media] could not purge local Video Intelligence cache:', error);
+  }
 }
 
 function isMediaProcessing(asset: {
@@ -295,7 +387,7 @@ function isMediaProcessing(asset: {
 
 function withRequestServer<T>(req: Request, fn: () => T): T {
   const serverId = new URL(req.url).searchParams.get('serverId');
-  return serverId ? runWithServer(serverId, fn) : fn();
+  return serverId ? runWithProject(serverId, fn) : fn();
 }
 
 async function deleteMediaDocuments(documentIds: string[]): Promise<void> {
@@ -318,9 +410,9 @@ function allMediaDocumentIds(asset: {
   ];
 }
 
-/* ------------------------------------------------------------------ */
+/* Media API helpers. */
 /* Helpers                                                             */
-/* ------------------------------------------------------------------ */
+/* End media API helpers. */
 
 function detectMediaType(mimeType: string): MediaType | null {
   if (mimeType.startsWith('image/')) return 'image';

@@ -152,7 +152,7 @@ test.describe.serial('Data Page', () => {
       });
     });
 
-    await page.goto('/add?subtab=notion');
+    await page.goto('/add?subtab=integrations');
     await expect(page.getByTestId('integration-card').first()).toHaveAttribute(
       'data-integration-id',
       'notion',
@@ -260,8 +260,11 @@ test.describe.serial('Data Page', () => {
       });
     });
 
-    await page.goto('/add?subtab=notion');
-    await page.getByRole('button', { name: 'Configure', exact: true }).click();
+    await page.goto('/add?subtab=integrations');
+    await page
+      .locator('[data-integration-id="notion"]')
+      .getByRole('button', { name: 'Configure', exact: true })
+      .click();
 
     const list = page.getByTestId('notion-resource-list');
     await expect(list).toBeVisible();
@@ -286,6 +289,10 @@ test.describe.serial('Data Page', () => {
     await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 60_000 });
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(FIXTURES.pdf);
+    await expect(page.getByRole('button', { name: 'Toggle image indexing' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
     await page.waitForTimeout(3_000);
 
     // Verify the document appears in the corpus list
@@ -433,21 +440,21 @@ test.describe.serial('Data Page', () => {
     const urlInput = page
       .locator('input[placeholder*="url" i], input[placeholder*="http" i]')
       .first();
-    if (await urlInput.isVisible()) {
-      await urlInput.fill('https://example.com');
-      await page.waitForTimeout(300);
+    await expect(urlInput).toBeVisible();
+    // The form only submits URLs that are not already in the corpus, so a
+    // fixed URL makes this test pass once and fail on every later run.
+    const target = `https://example.com/?e2e=${Date.now()}`;
 
-      // Click start/scrape button
-      const scrapeBtn = page.getByRole('button', { name: /Start|Scrape|Add|Crawl/i }).first();
-      if (await scrapeBtn.isVisible()) {
-        await scrapeBtn.click();
-        await page.waitForTimeout(5_000);
+    // A pasted URL becomes a row in the candidate table; only listed URLs are
+    // submitted, so pressing Enter is part of the flow, not a shortcut.
+    await urlInput.fill(target);
+    await urlInput.press('Enter');
+    await expect(page.getByText(target, { exact: true }).first()).toBeVisible({ timeout: 10_000 });
 
-        // Verify job appears or document added
-        const jobStatus = page.getByText(/queued|running|completed|scraping/i).first();
-        await expect(jobStatus).toBeVisible({ timeout: 30_000 });
-      }
-    }
+    await page.getByRole('button', { name: 'Add website', exact: true }).first().click();
+    await expect(page.getByText(/queued|running|completed|scraping|added/i).first()).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
   test('web search with Serper', async ({ page }) => {
@@ -510,7 +517,7 @@ test.describe.serial('Data Page', () => {
     });
     await page.goto('/data');
 
-    await expect(page.getByRole('button', { name: 'Clear all files' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Clear all data' })).toBeVisible();
   });
 
   test('delete a document from corpus', async ({ page }) => {
@@ -551,21 +558,21 @@ test.describe.serial('Data Page', () => {
     }
   });
 
-  test('installed Video Intelligence directs missing audio setup to Installed Tools', async ({
-    page,
-  }) => {
+  test('video indexing proceeds without an audio provider configured', async ({ page }) => {
     await page.route('**/api/marketplace', async (route) => {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
-          tools: [{ id: 'video-audio', name: 'Video Intelligence', status: 'installed' }],
+          tools: [{ id: 'video-intelligence', name: 'Video Intelligence', status: 'installed' }],
         }),
       });
     });
     await page.route('**/api/config**', async (route) => {
       await route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify({ config: { enabledTools: [], toolConfigs: { 'video-audio': {} } } }),
+        body: JSON.stringify({
+          config: { enabledTools: [], toolConfigs: { 'video-intelligence': {} } },
+        }),
       });
     });
 
@@ -577,8 +584,10 @@ test.describe.serial('Data Page', () => {
       .fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
     await page.getByRole('button', { name: 'Check URL' }).click();
 
-    await expect(page.getByText('Set up an audio provider to index video or audio.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Set up audio' })).toBeVisible();
+    // Only an audio source needs a transcription provider up front; a video is
+    // indexed from what can be seen and read on screen as well. Neither the
+    // audio prompt nor the missing-tool prompt belongs here.
+    await expect(page.getByText(/Set up an audio provider/)).toHaveCount(0);
     await expect(page.getByText('Video Intelligence tool required')).toHaveCount(0);
   });
 
@@ -589,7 +598,7 @@ test.describe.serial('Data Page', () => {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
-          tools: [{ id: 'video-audio', name: 'Video Intelligence', status: 'installed' }],
+          tools: [{ id: 'video-intelligence', name: 'Video Intelligence', status: 'installed' }],
         }),
       });
     });
@@ -599,7 +608,7 @@ test.describe.serial('Data Page', () => {
         body: JSON.stringify({
           config: {
             enabledTools: [],
-            toolConfigs: { 'video-audio': { audioProvider: 'local' } },
+            toolConfigs: { 'video-intelligence': { audioProvider: 'local' } },
           },
         }),
       });
@@ -771,7 +780,8 @@ test.describe.serial('Data Page', () => {
             { stage: 'index', status: 'waiting', updatedAt },
           ],
           documentIds: [],
-          createdAt: updatedAt,
+          createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+          processingStartedAt: updatedAt,
           updatedAt,
         },
       ],
@@ -823,8 +833,16 @@ test.describe.serial('Data Page', () => {
     // noisy list of concurrent pipeline stages while preserving its exact
     // factual progress and the independent overall percentage.
     await expect(
-      page.getByText('Visual analysis · 18 / 43 sequences · 42% this step'),
+      page.getByText('Worker active · Visual analysis · 18 / 43 sequences · 42% this step'),
     ).toBeVisible();
-    await expect(page.getByRole('progressbar')).toHaveCount(1);
+    const progressbar = page.getByRole('progressbar');
+    await expect(progressbar).toHaveAttribute('aria-valuetext', /% progress, worker activity$/);
+    await expect(page.getByLabel('Active media indexing jobs').getByText('Live')).toHaveCount(0);
+    const firstProgress = Number(await progressbar.getAttribute('aria-valuenow'));
+    await expect
+      .poll(async () => Number(await progressbar.getAttribute('aria-valuenow')))
+      .toBeGreaterThan(firstProgress);
+    await expect(page.getByTestId('live-indexing-progress-pulse')).toBeVisible();
+    await expect(page.getByLabel('Active media indexing jobs').getByText(/^0:0\d$/)).toBeVisible();
   });
 });

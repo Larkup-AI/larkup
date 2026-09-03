@@ -1,5 +1,11 @@
 # @larkup/sandbox
 
+## 0.1.3
+
+### Patch Changes
+
+- Add a Docker-free local runtime for trusted Python and JavaScript analysis, alongside hardened provider verification and reusable remote snapshots.
+
 ## 0.1.2
 
 ### Patch Changes

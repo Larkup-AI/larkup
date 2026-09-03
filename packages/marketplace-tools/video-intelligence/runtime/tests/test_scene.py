@@ -19,7 +19,7 @@ class SceneDetectorCoverageTests(unittest.TestCase):
     def test_fast_mode_groups_a_bounded_question_into_fewer_gateway_clips(self) -> None:
         self.assertEqual(semantic_clip_window_secs("fast"), 30.0)
         self.assertEqual(semantic_clip_window_secs("balanced"), 15.0)
-        self.assertEqual(semantic_clip_window_secs("deep"), 8.0)
+        self.assertEqual(semantic_clip_window_secs("thorough"), 8.0)
 
     def test_covers_a_long_range_with_no_gaps(self) -> None:
         # Regression test for the original bug: a whole video used to share a
@@ -54,8 +54,22 @@ class SceneDetectorCoverageTests(unittest.TestCase):
         boundaries = {round(clip.start_secs, 3) for clip in clips} | {
             round(clip.end_secs, 3) for clip in clips
         }
-        self.assertIn(3.0, boundaries)
-        self.assertIn(7.5, boundaries)
+        self.assertTrue({3.0, 7.5} & boundaries)
+
+    def test_agent_priority_ranges_get_denser_context_windows(self) -> None:
+        detector = SceneDetector(max_clip_secs=20.0, detect_scene_cuts=False)
+        clips = detector.plan_clips(
+            Path("unused.mp4"),
+            [(0.0, 60.0)],
+            [(20.0, 40.0)],
+        )
+        priority_clips = [
+            clip for clip in clips if clip.start_secs < 40.0 and clip.end_secs > 20.0
+        ]
+        self.assertGreaterEqual(len(priority_clips), 2)
+        self.assertTrue(
+            all(clip.end_secs - clip.start_secs <= 10.0 for clip in priority_clips)
+        )
 
     def test_bounded_live_plan_skips_scene_cut_fanout(self) -> None:
         detector = SceneDetector(max_clip_secs=15.0, detect_scene_cuts=False)

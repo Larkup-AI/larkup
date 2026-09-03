@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { formatErrorMessage } from '@/lib/error-formatter';
+import { formatErrorMessage } from '@/lib/shared/error-formatter';
 import {
   Globe,
   Loader2,
@@ -14,6 +14,9 @@ import {
   X,
   Trash2,
   Settings,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useScrapeStore, type SearchState } from '@/store/scrape-store';
 import type { CrawlJob, CrawlScope, SearchResultItem } from '@larkup/core/types';
@@ -73,10 +76,12 @@ export function ScrapePanel({
   disabled,
   onStarted,
   onActionChange,
+  groupId,
 }: {
   disabled?: boolean;
   onStarted: (job: CrawlJob) => void;
   onActionChange?: (action: DataPrimaryAction | null) => void;
+  groupId?: string;
 }) {
   const router = useRouter();
   const {
@@ -104,6 +109,7 @@ export function ScrapePanel({
   const [gatheringAll, setGatheringAll] = useState(false);
   const [gatherProgress, setGatherProgress] = useState(0);
   const [manualUrl, setManualUrl] = useState('');
+  const [manualUrlList, setManualUrlList] = useState<string[]>([]);
   const [starting, setStarting] = useState(false);
   /** When true: only the exact custom URLs are scraped — no deep crawl/pagination */
   const [specificUrls, setSpecificUrls] = useState(false);
@@ -270,14 +276,14 @@ export function ScrapePanel({
       provider === 'serper' || provider === 'google'
         ? '/api/search/google'
         : provider === 'brave'
-        ? '/api/search/brave'
-        : provider === 'bing'
-        ? '/api/search/bing'
-        : provider === 'tavily'
-        ? '/api/search/tavily'
-        : provider === 'exa'
-        ? '/api/search/exa'
-        : null;
+          ? '/api/search/brave'
+          : provider === 'bing'
+            ? '/api/search/bing'
+            : provider === 'tavily'
+              ? '/api/search/tavily'
+              : provider === 'exa'
+                ? '/api/search/exa'
+                : null;
 
     if (!endpoint) {
       toast.error('Invalid search provider');
@@ -348,14 +354,14 @@ export function ScrapePanel({
       provider === 'serper' || provider === 'google'
         ? '/api/search/google'
         : provider === 'brave'
-        ? '/api/search/brave'
-        : provider === 'bing'
-        ? '/api/search/bing'
-        : provider === 'tavily'
-        ? '/api/search/tavily'
-        : provider === 'exa'
-        ? '/api/search/exa'
-        : null;
+          ? '/api/search/brave'
+          : provider === 'bing'
+            ? '/api/search/bing'
+            : provider === 'tavily'
+              ? '/api/search/tavily'
+              : provider === 'exa'
+                ? '/api/search/exa'
+                : null;
 
     if (!endpoint) return;
 
@@ -444,14 +450,14 @@ export function ScrapePanel({
       provider === 'serper' || provider === 'google'
         ? '/api/search/google'
         : provider === 'brave'
-        ? '/api/search/brave'
-        : provider === 'bing'
-        ? '/api/search/bing'
-        : provider === 'tavily'
-        ? '/api/search/tavily'
-        : provider === 'exa'
-        ? '/api/search/exa'
-        : null;
+          ? '/api/search/brave'
+          : provider === 'bing'
+            ? '/api/search/bing'
+            : provider === 'tavily'
+              ? '/api/search/tavily'
+              : provider === 'exa'
+                ? '/api/search/exa'
+                : null;
 
     try {
       while (page <= total) {
@@ -503,19 +509,39 @@ export function ScrapePanel({
     }
   }
 
-  function addManual() {
+  function appendManualUrl() {
     const urls = manualUrl
       .split(/[\s,]+/)
       .map((u) => u.trim())
       .filter((u) => /^https?:\/\//i.test(u));
 
-    if (urls.length === 0) {
+    if (urls.length > 0) {
+      setManualUrlList((prev) => Array.from(new Set([...prev, ...urls])));
+      setManualUrl('');
+    } else {
+      toast.error('Enter at least one full URL starting with http(s)://');
+    }
+  }
+
+  function addManual() {
+    const currentUrls = manualUrl
+      .split(/[\s,]+/)
+      .map((u) => u.trim())
+      .filter((u) => /^https?:\/\//i.test(u));
+
+    const allUrls = Array.from(new Set([...manualUrlList, ...currentUrls]));
+
+    if (allUrls.length === 0) {
       toast.error('Enter at least one full URL starting with http(s)://');
       return;
     }
 
-    setManualUrl('');
-    void startJob(urls, true);
+    void startJob(allUrls, true).then((success) => {
+      if (success) {
+        setManualUrl('');
+        setManualUrlList([]);
+      }
+    });
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -553,6 +579,7 @@ export function ScrapePanel({
           keywords: query || urls[0],
           pageLimit: specificUrls || exactUrls ? 1 : pageLimit,
           targets: urls.map((url) => ({ url, scope: effectiveScope })),
+          groupId,
         }),
       });
       const data = await res.json();
@@ -564,9 +591,19 @@ export function ScrapePanel({
       });
 
       setSelected({});
+      setSearchState((prev) => {
+        if (!prev) return prev;
+        const urlSet = new Set(urls);
+        return {
+          ...prev,
+          results: prev.results.filter((r) => !urlSet.has(r.url)),
+        };
+      });
       onStarted(data.job as CrawlJob);
+      return true;
     } catch (err) {
       toast.error(formatErrorMessage(err));
+      return false;
     } finally {
       setStarting(false);
     }
@@ -589,6 +626,20 @@ export function ScrapePanel({
     }
   }, [totalDisplayPages, displayPage]);
 
+  const [manualUrlPage, setManualUrlPage] = useState(1);
+  const MANUAL_URL_PAGE_SIZE = 10;
+  const totalManualPages = Math.max(1, Math.ceil(manualUrlList.length / MANUAL_URL_PAGE_SIZE));
+  const currentManualUrls = manualUrlList.slice(
+    (manualUrlPage - 1) * MANUAL_URL_PAGE_SIZE,
+    manualUrlPage * MANUAL_URL_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    if (manualUrlPage > totalManualPages && totalManualPages > 0) {
+      setManualUrlPage(totalManualPages);
+    }
+  }, [totalManualPages, manualUrlPage]);
+
   // Estimate for confirmation modal
   const effectiveScopeForEstimate: CrawlScope = specificUrls ? 'page' : scope;
   const estimate = useMemo(
@@ -606,14 +657,24 @@ export function ScrapePanel({
   useEffect(() => {
     const hasSelection = selectedUrls.length > 0;
     const isUrl = inputMode === 'url';
+    const currentUrls = manualUrl.split(/[\s,]+/).filter((u) => /^https?:\/\//i.test(u));
+    const allUrls = Array.from(new Set([...manualUrlList, ...currentUrls]));
+    const urlCount = allUrls.length;
+
     onActionChange?.({
-      label: isUrl ? 'Add website' : hasSelection ? 'Add selected' : 'Search topic',
+      label: isUrl
+        ? urlCount > 1
+          ? 'Add websites'
+          : 'Add website'
+        : hasSelection
+          ? 'Add selected'
+          : 'Search topic',
       onClick: () => {
         if (isUrl) void addManual();
         else if (hasSelection) handleStartClick();
         else void runSearch();
       },
-      disabled: disabled || (isUrl ? !manualUrl.trim() : !hasSelection && !query.trim()),
+      disabled: disabled || (isUrl ? urlCount === 0 : !hasSelection && !query.trim()),
       loading: searching || starting,
     });
     return () => onActionChange?.(null);
@@ -621,6 +682,7 @@ export function ScrapePanel({
     disabled,
     inputMode,
     manualUrl,
+    manualUrlList,
     query,
     searching,
     starting,
@@ -658,9 +720,9 @@ export function ScrapePanel({
           </Tabs>
 
           {/* Input field */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 flex items-center gap-2">
             {inputMode === 'search' ? (
-              <>
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground z-10 pointer-events-none" />
                 <Input
                   ref={inputRef}
@@ -712,18 +774,33 @@ export function ScrapePanel({
                     </div>
                   </div>
                 )}
-              </>
+              </div>
             ) : (
               <>
-                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground z-10 pointer-events-none" />
-                <Input
-                  placeholder="Paste URLs (comma or space separated)"
-                  value={manualUrl}
-                  disabled={disabled}
-                  className="pl-9 h-11 pr-16  bg-white"
-                  onChange={(e) => setManualUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addManual()}
-                />
+                <div className="relative flex-1 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground z-10 pointer-events-none" />
+                      <Input
+                        placeholder="Paste URLs (comma or space separated)"
+                        value={manualUrl}
+                        disabled={disabled}
+                        className="pl-9 h-11 pr-16 bg-white"
+                        onChange={(e) => setManualUrl(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && appendManualUrl()}
+                      />
+                    </div>
+                    <Button
+                      size="icon"
+                      className="h-11 w-11 shrink-0"
+                      variant="outline"
+                      onClick={() => appendManualUrl()}
+                      disabled={disabled || !manualUrl.trim()}
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                  </div>
+                </div>
               </>
             )}
           </div>
@@ -774,111 +851,178 @@ export function ScrapePanel({
 
       {/* Advanced Settings Collapsible */}
       {showAdvanced && (
-        <div className="flex flex-wrap items-center  justify-between w-full rounded-lg border border-border bg-muted/30 gap-4  p-3 mt-2 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="flex ">
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">Scope</Label>
-              <Select
-                defaultValue={scope}
-                value={scope}
-                onValueChange={(v) => setScope(v as CrawlScope)}
-                disabled={specificUrls || disabled}
-              >
-                <SelectTrigger className="w-52 bg-white h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="page">Scrape pages only</SelectItem>
-                  <SelectItem value="domain">Crawl whole domain</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {scope === 'domain' && !specificUrls && (
+        <div className="flex flex-col gap-4 w-full rounded-lg border border-border bg-muted/30 p-3 mt-2 animate-in slide-in-from-top-2 fade-in duration-200">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex ">
               <div className="flex items-center gap-2">
-                <Label htmlFor="limit" className="text-xs text-muted-foreground">
-                  Max pages
-                </Label>
-                <Input
-                  id="limit"
-                  type="number"
-                  min={1}
-                  max={500}
-                  value={pageLimit}
+                <Label className="text-xs text-muted-foreground">Scope</Label>
+                <Select
+                  defaultValue={scope}
+                  value={scope}
+                  onValueChange={(v) => setScope(v as CrawlScope)}
                   disabled={specificUrls || disabled}
-                  onChange={(e) => setPageLimit(Number(e.target.value) || 1)}
-                  className="w-20 h-8 tabular-nums text-xs"
-                />
+                >
+                  <SelectTrigger className="w-52 bg-white h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="page">Scrape pages only</SelectItem>
+                    <SelectItem value="domain">Crawl whole domain</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            )}
 
-            {inputMode === 'search' && (
-              <div className="flex items-center gap-2">
-                <Label htmlFor="search-limit" className="text-xs text-muted-foreground">
-                  Max results
-                </Label>
-                <Input
-                  id="search-limit"
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={searchLimit}
+              {scope === 'domain' && !specificUrls && (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="limit" className="text-xs text-muted-foreground ml-4">
+                    Max pages
+                  </Label>
+                  <Input
+                    id="limit"
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={pageLimit}
+                    disabled={specificUrls || disabled}
+                    onChange={(e) => setPageLimit(Number(e.target.value) || 1)}
+                    className="w-20 h-8 tabular-nums text-xs ml-2"
+                  />
+                </div>
+              )}
+
+              {inputMode === 'search' && (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="search-limit" className="text-xs text-muted-foreground ml-4">
+                    Max results
+                  </Label>
+                  <Input
+                    id="search-limit"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={searchLimit}
+                    disabled={disabled}
+                    onChange={(e) => setSearchLimit(Number(e.target.value) || 1)}
+                    className="w-20 h-8 tabular-nums text-xs ml-2"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 ml-4">
+                <Switch
+                  id="specific-urls-inline"
+                  checked={specificUrls}
+                  onCheckedChange={setSpecificUrls}
                   disabled={disabled}
-                  onChange={(e) => setSearchLimit(Number(e.target.value) || 1)}
-                  className="w-20 h-8 tabular-nums text-xs"
+                  size="sm"
                 />
+                <Label
+                  htmlFor="specific-urls-inline"
+                  className="text-xs font-medium cursor-pointer flex items-center gap-1"
+                >
+                  Exact URLs only
+                  <TooltipProvider delay={0}>
+                    <Tooltip>
+                      <TooltipTrigger
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <Info className="size-3" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-50 text-center">
+                          Scrape exact URLs only — no deep crawl or pagination.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Label>
               </div>
-            )}
-
-            <div className="flex items-center gap-2 ml-4">
-              <Switch
-                id="specific-urls-inline"
-                checked={specificUrls}
-                onCheckedChange={setSpecificUrls}
-                disabled={disabled}
-                size="sm"
-              />
-              <Label
-                htmlFor="specific-urls-inline"
-                className="text-xs font-medium cursor-pointer flex items-center gap-1"
-              >
-                Exact URLs only
-                <TooltipProvider delay={0}>
-                  <Tooltip>
-                    <TooltipTrigger
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground"
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      <Info className="size-3" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="max-w-50 text-center">
-                        Scrape exact URLs only — no deep crawl or pagination.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </Label>
             </div>
+            <TooltipProvider delay={0}>
+              <Tooltip>
+                <TooltipTrigger
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors"
+                  onClick={() => router.push('/settings?section=search-web')}
+                >
+                  <Settings className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs">
+                  <p>
+                    Customize your web search provider, or set up a custom proxy to help bypass
+                    scraping blocks.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
-          <TooltipProvider delay={0}>
-            <Tooltip>
-              <TooltipTrigger
-                type="button"
-                className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors"
-                onClick={() => router.push('/settings?section=search-web')}
-              >
-                <Settings className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs text-xs">
-                <p>
-                  Customize your web search provider, or set up a custom proxy to help bypass
-                  scraping blocks.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        </div>
+      )}
+
+      {manualUrlList.length > 0 && inputMode === 'url' && (
+        <div className="rounded-md border border-border bg-card overflow-hidden mt-2 animate-in slide-in-from-top-2 fade-in duration-200">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="py-2 pl-3 text-left font-medium text-muted-foreground">URL</th>
+                <th className="py-2 pr-3 text-right font-medium text-muted-foreground w-12">
+                  Action
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentManualUrls.map((url) => (
+                <tr
+                  key={url}
+                  className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors"
+                >
+                  <td className="py-2 pl-3">
+                    <span className="truncate max-w-100 inline-block">{url}</span>
+                  </td>
+                  <td className="py-2 pr-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setManualUrlList((prev) => prev.filter((u) => u !== url))}
+                      className="text-muted-foreground hover:text-destructive transition-colors rounded p-1"
+                      title="Remove URL"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {totalManualPages > 1 && (
+            <div className="flex items-center justify-between border-t border-border px-3 py-2 text-xs text-muted-foreground bg-muted/20">
+              <span>
+                {(manualUrlPage - 1) * MANUAL_URL_PAGE_SIZE + 1}–
+                {Math.min(manualUrlPage * MANUAL_URL_PAGE_SIZE, manualUrlList.length)} of{' '}
+                {manualUrlList.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={manualUrlPage === 1}
+                  onClick={() => setManualUrlPage((p) => Math.max(1, p - 1))}
+                  className="rounded p-1 hover:bg-muted disabled:opacity-40 transition-colors cursor-pointer"
+                >
+                  <ChevronLeft className="size-3.5" />
+                </button>
+                <span className="tabular-nums font-medium mx-1">
+                  {manualUrlPage} / {totalManualPages}
+                </span>
+                <button
+                  disabled={manualUrlPage >= totalManualPages}
+                  onClick={() => setManualUrlPage((p) => Math.min(totalManualPages, p + 1))}
+                  className="rounded p-1 hover:bg-muted disabled:opacity-40 transition-colors cursor-pointer"
+                >
+                  <ChevronRight className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

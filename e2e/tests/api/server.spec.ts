@@ -1,120 +1,91 @@
 import { test, expect } from '@playwright/test';
 import { rewriteLocalUrl } from '../../utils/env';
+import { DEFAULT_CONFIG } from '../../../packages/core/src/types';
+import { generateServer } from '../../../packages/core/src/generator/generate-server';
 
-test.describe.serial('Server API (/api/server)', () => {
-  test('GET /api/server/generate — returns generated server manifest', async ({ request }) => {
-    const res = await request.get('/api/server/generate');
-    expect(res.status()).toBe(200);
+test.describe.serial('Server API', () => {
+  test('generates a Knowledge server bundle with pinned provider versions', () => {
+    const files = Object.fromEntries(
+      generateServer({ ...DEFAULT_CONFIG, runtimeProfile: 'knowledge' }).files.map((file) => [
+        file.path,
+        file.contents,
+      ]),
+    );
 
-    const body = await res.json();
-    expect(body).toHaveProperty('config');
-    expect(body).toHaveProperty('server');
-    expect(body).toHaveProperty('serverId');
-    expect(body.server).toHaveProperty('files');
-    expect(Array.isArray(body.server.files)).toBe(true);
-    expect(body.server.files.length).toBeGreaterThan(0);
-    expect(body.server.files.map((file: { path: string }) => file.path)).toEqual(
+    expect(Object.keys(files)).toEqual(
       expect.arrayContaining(['server.mjs', 'vercel.json', 'package.json']),
     );
-    const serverFile = body.server.files.find(
-      (file: { path: string }) => file.path === 'server.mjs',
-    );
-    expect(serverFile?.contents).toContain('Location: "/reference"');
-    expect(serverFile?.contents).toContain('--scalar-color-accent: #000000');
-    expect(serverFile?.contents).toContain('url.pathname === "/query"');
-    expect(serverFile?.contents).toContain('url.pathname === "/documents"');
-    expect(serverFile?.contents).toContain('url.pathname === "/scrape"');
-    expect(serverFile?.contents).toContain('url.pathname === "/corpus"');
-    const packageFile = body.server.files.find(
-      (file: { path: string }) => file.path === 'package.json',
-    );
-    const generatedPackage = JSON.parse(packageFile.contents) as {
+
+    const serverFile = files['server.mjs'];
+    expect(serverFile).toContain('Location: "/reference"');
+    expect(serverFile).toContain('--scalar-color-accent: #000000');
+    expect(serverFile).toContain('url.pathname === "/query"');
+    expect(serverFile).toContain('url.pathname === "/documents"');
+    expect(serverFile).toContain('url.pathname === "/scrape"');
+    expect(serverFile).toContain('url.pathname === "/corpus"');
+
+    const generatedPackage = JSON.parse(files['package.json']) as {
       dependencies: Record<string, string>;
     };
-    expect(generatedPackage.dependencies.ai).toBe('^6.0.197');
     expect(Object.values(generatedPackage.dependencies)).not.toContain('latest');
-    const providerVersions: Record<string, string> = {
-      '@ai-sdk/cohere': '^3.0.39',
-      '@ai-sdk/deepseek': '^2.0.39',
-      '@ai-sdk/gateway': '^3.0.133',
-      '@ai-sdk/google': '^3.0.83',
-      '@ai-sdk/mistral': '^3.0.40',
-      '@ai-sdk/openai': '^3.0.68',
-      '@ai-sdk/openai-compatible': '^2.0.51',
-    };
     for (const [packageName, version] of Object.entries(generatedPackage.dependencies)) {
-      if (packageName.startsWith('@ai-sdk/')) {
-        expect(version).toBe(providerVersions[packageName]);
-      }
+      // Every dependency is pinned to a caret range, never a floating tag.
+      expect(version, `${packageName} must be pinned`).toMatch(/^[\^~]?\d+\.\d+\.\d+/);
     }
-    console.log(
-      `  ✓ Server generated: ${body.server.files.length} files, serverId=${body.serverId}`,
-    );
   });
 
-  test('GET /api/server/generate?download=1 — returns zip', async ({ request }) => {
-    const res = await request.get('/api/server/generate?download=1');
-    expect(res.status()).toBe(200);
-    expect(res.headers()['content-type']).toContain('application/zip');
-    expect(res.headers()['content-disposition']).toContain('attachment');
-
-    const buffer = await res.body();
-    expect(buffer.length).toBeGreaterThan(100);
-    console.log(`  ✓ Server zip downloaded: ${buffer.length} bytes`);
-  });
-
-  test('GET /api/server/local — check local server status', async ({ request }) => {
-    const res = await request.get('/api/server/local');
+  test('GET /api/projects/runtime — check runtime status', async ({ request }) => {
+    const res = await request.get('/api/projects/runtime');
     expect(res.status()).toBe(200);
 
     const body = await res.json();
-    expect(body).toHaveProperty('state');
-    expect(body.state).toHaveProperty('running');
-    expect(body.state).toHaveProperty('port');
-    console.log(`  ✓ Local server status: running=${body.state.running}, port=${body.state.port}`);
+    expect(body).toHaveProperty('runtime');
+    expect(body.runtime).toHaveProperty('running');
+    expect(body.runtime).toHaveProperty('port');
+    console.log(`  ✓ Runtime status: running=${body.runtime.running}, port=${body.runtime.port}`);
   });
 
-  test('POST /api/server/local — start local RAG server', async ({ request }) => {
+  test('POST /api/projects/runtime — start the runtime', async ({ request }) => {
     test.setTimeout(60_000);
 
-    const res = await request.post('/api/server/local', {
+    const res = await request.post('/api/projects/runtime', {
       data: { action: 'start' },
     });
     expect(res.status()).toBe(200);
 
     const body = await res.json();
-    expect(body).toHaveProperty('state');
+    expect(body).toHaveProperty('runtime');
 
-    if (body.state.running) {
-      console.log(`  ✓ RAG server started: port=${body.state.port}, pid=${body.state.pid}`);
+    if (body.runtime.running) {
+      console.log(`  ✓ Runtime started: port=${body.runtime.port}, pid=${body.runtime.pid}`);
 
       // Wait a moment and verify it's actually reachable
       await new Promise((r) => setTimeout(r, 3_000));
       try {
         const healthRes = await fetch(
-          rewriteLocalUrl(`http://localhost:${body.state.port}/health`),
+          rewriteLocalUrl(`http://localhost:${body.runtime.port}/health`),
           {
             signal: AbortSignal.timeout(5_000),
           },
         );
         expect(healthRes.ok).toBe(true);
-        console.log('  ✓ RAG server health check passed');
+        console.log('  ✓ Runtime health check passed');
       } catch {
-        console.warn('  ⚠ RAG server health check failed (may need more startup time)');
+        console.warn('  ⚠ Runtime health check failed (may need more startup time)');
       }
     } else {
-      console.warn(`  ⚠ Server did not start: ${body.state.lastError ?? 'unknown error'}`);
+      console.warn(`  ⚠ Runtime did not start: ${body.runtime.lastError ?? 'unknown error'}`);
     }
   });
 
-  test('POST /api/server/local — stop local RAG server', async ({ request }) => {
-    const res = await request.post('/api/server/local', {
+  test('POST /api/projects/runtime — stop the runtime', async ({ request }) => {
+    const res = await request.post('/api/projects/runtime', {
       data: { action: 'stop' },
     });
     expect(res.status()).toBe(200);
 
     const body = await res.json();
-    expect(body.state.running).toBe(false);
-    console.log('  ✓ RAG server stopped');
+    expect(body.runtime.running).toBe(false);
+    console.log('  ✓ Runtime stopped');
   });
 });

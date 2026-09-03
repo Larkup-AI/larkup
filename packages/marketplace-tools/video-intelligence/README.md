@@ -1,6 +1,12 @@
 # Larkup Video Intelligence
 
-An installable Marketplace v3 tool with a cloud-first Larkup Cloud connection. On first use, the app creates an opaque, device-scoped key automatically; the AWS GPU endpoint and the key stay out of the settings UI. PyAV/FFmpeg, faster-whisper, RapidOCR/PaddleOCR, YOLOX, ONNX Runtime, and anonymous tracking are isolated in runtime images.
+An installable Marketplace v3 tool with a cloud-first Larkup Cloud connection. On first use, the app creates an opaque, device-scoped key automatically; administrators may also provide a replacement key in Installed Tools. The AWS GPU endpoint and raw key are never shown in the connection status. PyAV/FFmpeg, faster-whisper, RapidOCR/PaddleOCR, YOLOX, ONNX Runtime, and anonymous tracking are isolated in runtime images.
+
+The evidence pipeline is genre-neutral. Planning is driven by the user's goal,
+question shape, source duration, and measured visual/audio signals—not a fixed
+branch for sports, lectures, entertainment, films, meetings, or any other
+content type. Direct visual claims preserve generic `subject`, `relation`, and
+`value` bindings so the same corroboration logic works across every genre.
 
 ## Where things live
 
@@ -12,7 +18,8 @@ runtime/app/
     v1.py          every /v1 route (health, uploads, jobs, usage, access codes)
     deps.py        auth/rate-limit dependencies, and the settings/store/jobs singletons
   services/
-    pipeline.py    orchestrates one job: probe -> transcribe -> decode/detect/OCR -> caption -> embed
+    brain.py       bounded agent planner: chooses modalities, density, segments, and extraction focus
+    pipeline.py    shared cloud/local executor: scout -> plan -> parallel evidence extraction -> synthesis
     transcription.py  TranscriptionService: WhisperProvider (local) / DeepgramProvider (hosted)
     vision.py      SemanticVisionService: per-clip captioning via the Vercel AI Gateway
     embedding.py   VideoEmbeddingService: cross-modal clip search via DashScope (Qwen3-VL-Embedding)
@@ -76,25 +83,43 @@ prevents a misspelled credential or GPU variable from silently doing nothing.
 The installed-tool settings card is driven by this tool's manifest and offers
 three compatible runtimes:
 
-- **Larkup Cloud** is the default. It provisions a device-scoped user ID and
-  API key automatically; monthly usage is shown only for this metered mode.
-- **Local Docker runtime** starts the optional ~8 GB image on first use. The
-  card generates a shared API key, enables runtime authentication, and lets
-  you replace `127.0.0.1` with a private LAN URL for trusted users.
+- **Larkup Cloud** is the default. Paste a Larkup Cloud API key in Installed
+  Tools when your organization issues keys manually, or leave it empty when
+  automatic project provisioning is enabled. The same card has **Request
+  Larkup Cloud API key** for requesting access; monthly usage is shown only
+  for this metered mode.
+- **Local runtime** detects Docker and uses it when available; otherwise it
+  installs and runs the native CPU runtime with `uv`. The card shows the
+  chosen engine, host suitability, install state, and explicit Install,
+  Start, and Stop controls. It generates a shared API key and lets you replace
+  `127.0.0.1` with a private LAN URL for trusted users.
 - **Custom runtime** accepts a compatible `/v1` endpoint and bearer key. Use
   the built-in Verify action before indexing through a self-hosted provider.
 
-Audio-provider configuration applies only to Larkup Cloud. Local and custom
-runtimes own their speech pipeline configuration, so the card does not show
-or bill a separate cloud audio provider for those modes.
+Every runtime requires an audio provider key plus agent/tool-brain and vision
+credentials. The audio model is selected automatically for the provider. Agent
+and vision controls start with the provider, model, and key saved under **AI
+Models**, and each can be overridden independently in the tool settings. A
+text-only provider such as DeepSeek can remain the agent while vision uses a
+separate provider. Local mode injects these settings only into the local
+process/container. Managed Cloud forwards them only in the active GPU job and
+never stores them in DynamoDB or S3. Larkup Cloud supplies compute, not model
+credits. The agent/tool-brain model may differ from the vision model.
 
 For a Docker-free portable runtime, use the `uv` package in `runtime/`:
 
 ```bash
-cd runtime
-uv sync --extra cpu --extra test
-uv run larkup-video-runtime
+# Install uv once: https://docs.astral.sh/uv/
+npx @larkup/tool-video-intelligence native
 ```
+
+The Installed Tools card exposes this automatically selected native path as
+part of **Local runtime**. It creates `./.larkup/video-intelligence/` for
+state and downloaded models, binds to
+`127.0.0.1` by default, and uses the same `/v1` API and SQLite-backed worker
+queue as Docker. To use a LAN URL, set the card's local URL to an address on
+the host and keep the generated key private. Configure optional AI/provider
+credentials with `larkup-video-intelligence config set …` before starting.
 
 ## Indexing contract
 
@@ -103,7 +128,18 @@ uv run larkup-video-runtime
 3. Poll `GET /v1/jobs/{id}`.
 4. Index the returned timestamped transcript, OCR, object tracks, and answering guide.
 
-`full-coverage` decodes and analyzes every frame as a stream with constant frame-memory usage. It requires the user's explicit processing-authority confirmation and a cloud entitlement that allows the expensive mode. Balanced mode samples every two seconds; fast and deep use five-second and 750-ms cadences.
+The only indexing modes are `fast`, `balanced`, and `thorough`. They are bounded
+latency/recall budgets, not fixed pipelines. A first planning call chooses useful
+modalities, a model-free scout collects sparse chronological motion and optional
+OCR signals while transcription runs in parallel, and a second planning call
+chooses the final whole-source cadence plus denser source-supported priority
+ranges. Every proposed number is clamped by the executor. The same Python
+implementation runs locally and in managed cloud.
+
+Progress reports measured frame/clip counters, never moves backwards, and adds a
+remaining-time estimate calculated from the actual plan. Results include the
+plan, model-call diagnostics, elapsed time, estimate error, and timestamped
+evidence so a caller can audit both speed and extraction quality.
 
 For managed cloud jobs, the Data-library asset is the canonical copy. A short-lived, KMS-encrypted processing copy is created only so the GPU worker can decode it; it is deleted when the job settles, including failed and cancelled jobs. Once the app has downloaded the evidence, it acknowledges the result and the cloud result object is deleted too. S3 lifecycle rules remove any abandoned processing source or result within one day as a safety bound.
 
@@ -135,8 +171,7 @@ The runtime does not know about Stripe or another payment provider. API keys car
 {
   "plan": "access-code",
   "sourceMinutesPerMonth": 600,
-  "maxConcurrentJobs": 2,
-  "allowFullCoverage": true
+  "maxConcurrentJobs": 2
 }
 ```
 
@@ -150,9 +185,32 @@ LARKUP_USAGE_REQUEST_FROM='Larkup <usage@example.com>'
 LARKUP_USAGE_REQUEST_TO='support@example.com'
 ```
 
-When a user selects OpenAI, Groq, Deepgram, or ElevenLabs for audio, the local app sends the source directly to that selected provider and uses its timestamped transcript. The provider key is never sent to the AWS control plane or RunPod worker; the managed GPU skips duplicate speech decoding and continues with visual analysis.
+For managed jobs, the audio, brain, and vision credentials travel through the authenticated control plane only as a transient worker payload. They are not included in the persisted job item or result, and the worker restores a clean environment after completion. Provider failures do not fall back to a Larkup-funded model.
 
-For a controlled pilot, set `AutoProvisioningEnabled=true` and choose a small `AutoProvisionedSourceMinutes` value when deploying the stack. Each local Larkup installation receives a separate key, while DynamoDB stores only its hash, its installation hash, and aggregate usage. The control plane also enforces monthly-minute, concurrency, and per-key request limits.
+For a controlled pilot, set `AutoProvisioningEnabled=true`. The first `TrialDeviceLimit` new device IDs (100 by default) receive `TrialSourceMinutes` (600 minutes, or 10 hours, by default) each month; later devices receive `PostTrialSourceMinutes` (0 by default) and can use the dashboard's support request instead. This is an allowance and rate-limit system only—there is no customer-facing price or payment flow.
+
+The support team can update a device's allowance, concurrency, or per-minute request limit without seeing its API key:
+
+```bash
+curl -X POST "$VIDEO_ENDPOINT/v1/admin/devices/$USER_ID/entitlement" \
+  -H "Content-Type: application/json" \
+  -H "X-Larkup-Admin-Token: $VIDEO_ADMIN_TOKEN" \
+  -d '{"sourceMinutesPerMonth":60,"maxConcurrentJobs":1,"requestsPerMinute":60,"plan":"support-grant"}'
+```
+
+For the common “add credits” workflow, use the support script. It calls the
+authenticated control plane, which updates the DynamoDB device entitlement and
+reconciles the current billing-period allowance atomically; it does not write
+to a Neon database. The minutes value is the new total monthly allowance, not
+an increment.
+
+```bash
+export LARKUP_VIDEO_INTELLIGENCE_CLOUD_ENDPOINT='https://video.example.com'
+export LARKUP_VIDEO_ADMIN_TOKEN='...'
+bash scripts/grant-cloud-credits.sh <user-id> 120 support-grant
+```
+
+`$USER_ID` is the generated ID shown in Installed Tools and included in the Resend support request. Each local Larkup installation receives a separate key, while DynamoDB stores only hashes of keys and installation identifiers plus aggregate usage.
 
 Access codes remain available for support-issued or upgraded plans:
 
@@ -160,7 +218,7 @@ Access codes remain available for support-issued or upgraded plans:
 curl -X POST "$VIDEO_ENDPOINT/v1/admin/access-codes" \
   -H "Content-Type: application/json" \
   -H "X-Larkup-Admin-Token: $VIDEO_ADMIN_TOKEN" \
-  -d '{"label":"pilot","sourceMinutesPerMonth":600,"maxConcurrentJobs":2,"allowFullCoverage":true,"maxUses":1}'
+  -d '{"label":"pilot","sourceMinutesPerMonth":600,"maxConcurrentJobs":2,"maxUses":1}'
 ```
 
 Only hashes of access codes, API keys, and installation identifiers are stored. The raw device key is saved only in the local project's configuration so it can authenticate future cloud jobs.
@@ -173,22 +231,37 @@ See `deploy/README.md` in a private checkout for the build/deploy, bootstrap, an
 
 ### Operator-level env vars
 
-These are worker/service configuration, not per-installation user settings (see `tool.manifest.json`'s `configSchema` for the latter):
+These are self-hosted worker/service variables. Managed Cloud receives the corresponding user values per job and has no platform-owned model-provider secrets (see `tool.manifest.json`'s `configSchema`):
 
-| Var | Default | Purpose |
-| --- | --- | --- |
-| `LARKUP_VIDEO_SEMANTIC_VISION_MODEL` | `google/gemini-3-flash` | Bulk per-clip captioning model (Vercel AI Gateway id). |
-| `LARKUP_VIDEO_REASONING_VISION_MODEL` | `alibaba/qwen3-vl-235b-a22b-instruct` | `watch_original`'s dense final-verification pass. |
-| `LARKUP_VIDEO_GPU_PROVIDER` | `modal` | `modal` or `runpod`; the managed-cloud GPU dispatch registry, private (see `deploy/README.md`). |
-| `LARKUP_VIDEO_EMBEDDING_PROVIDER` | `gateway-gemini-embedding-2` | `gateway-gemini-embedding-2` uses the configured AI Gateway key and Gemini's multimodal vector space for image-frame/text retrieval. `disabled`, DashScope `qwen3-vl-embedding`, `runpod-qwen3-vl-embedding`, and `huggingface-qwen3-vl-embedding` remain available. Live bounded answer verification skips embeddings entirely because vectors are not needed to return timestamped answer evidence. |
-| `DASHSCOPE_API_KEY` | unset | Required when `LARKUP_VIDEO_EMBEDDING_PROVIDER=qwen3-vl-embedding`. |
-| `DASHSCOPE_WORKSPACE_ID` | unset | From the Model Studio console's Workspace Details page. Required when `LARKUP_VIDEO_EMBEDDING_PROVIDER=qwen3-vl-embedding`. |
-| `DASHSCOPE_REGION` | unset | The workspace's region, e.g. `eu-central-1` (same console page). Required when `LARKUP_VIDEO_EMBEDDING_PROVIDER=qwen3-vl-embedding`. |
-| `LARKUP_VIDEO_RUNPOD_EMBEDDING_ENDPOINT_ID` | unset | Required when `LARKUP_VIDEO_EMBEDDING_PROVIDER=runpod-qwen3-vl-embedding` (also needs `RUNPOD_API_KEY`). |
-| `LARKUP_VIDEO_HF_EMBEDDING_URL` | unset | Required when `LARKUP_VIDEO_EMBEDDING_PROVIDER=huggingface-qwen3-vl-embedding` (also needs `HF_TOKEN`). |
-| `LARKUP_MEDIA_STORAGE` | `local` | Web app env var: `s3` switches `createStorageProvider()` to `S3StorageProvider` for canonical media (see `LARKUP_MEDIA_S3_BUCKET` etc.). |
-| `WEBHOOK_SIGNING_SECRET` | unset | Signs outbound job-completion webhooks (`X-Larkup-Signature`). |
-| `STALE_JOB_TIMEOUT_HOURS` | `6` | Force-fails a queued/running job older than this on the scheduled reconcile sweep. |
+| Var                                                  | Default                      | Purpose                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LARKUP_VIDEO_VISION_PROVIDER`                       | `vercel_ai_gateway`          | `vercel_ai_gateway`, `google`, or `openai`; defaults from AI Models and can be overridden per tool.                                                                                                                                                                                                                                                                                                   |
+| `LARKUP_VIDEO_VISION_API_KEY`                        | unset                        | User-owned selected provider key, supplied from AI Models or a per-tool override.                                                                                                                                                                                                                                                                                                                     |
+| `LARKUP_VIDEO_SEMANTIC_VISION_MODEL`                 | `google/gemini-3.6-flash`    | Bulk per-clip captioning model. Gemini is called through Google's native API when `LARKUP_VIDEO_VISION_PROVIDER=google`.                                                                                                                                                                                                                                                                              |
+| `LARKUP_VIDEO_AGENT_PROVIDER`                        | `vercel_ai_gateway`          | Defaults from the AI Models chat provider and can be overridden per tool; supports Gateway, Google, OpenAI, DeepSeek, Mistral, Cohere, and Anthropic.                                                                                                                                                                                                                                                 |
+| `LARKUP_VIDEO_AGENT_API_KEY`                         | unset                        | User-owned agent provider credential.                                                                                                                                                                                                                                                                                                                                                                 |
+| `LARKUP_VIDEO_AGENT_MODEL`                           | `openai/gpt-5-mini`          | Tool-brain model that chooses modalities, sampling density, priority ranges, and extraction focus.                                                                                                                                                                                                                                                                                                    |
+| `LARKUP_VIDEO_GOOGLE_CONCURRENCY`                    | `4`                          | Maximum simultaneous native Gemini vision batches. Kept below Gateway concurrency to avoid direct-project burst limits.                                                                                                                                                                                                                                                                               |
+| `LARKUP_VIDEO_GOOGLE_MAX_IMAGES_PER_REQUEST`         | `8`                          | Bounds native Gemini request size so multi-clip structured responses remain within interactive provider timeouts.                                                                                                                                                                                                                                                                                     |
+| `LARKUP_VIDEO_GOOGLE_REQUESTS_PER_MINUTE`            | `12`                         | Sliding-window request limit for native Gemini vision calls, leaving quota headroom for the agent model.                                                                                                                                                                                                                                                                                              |
+| `LARKUP_VIDEO_REASONING_VISION_MODEL`                | `google/gemini-3.6-flash`    | Dense final-verification model for bounded source inspection.                                                                                                                                                                                                                                                                                                                                         |
+| `LARKUP_VIDEO_TRANSCRIPTION_PROVIDER`                | unset                        | User-selected timestamped speech provider: `deepgram`, `openai`, `groq`, or `elevenlabs`.                                                                                                                                                                                                                                                                                                             |
+| `LARKUP_VIDEO_TRANSCRIPTION_FALLBACK`                | unset                        | Managed Cloud keeps this empty so it never falls back to Larkup-funded inference.                                                                                                                                                                                                                                                                                                                     |
+| `LARKUP_VIDEO_TRANSCRIPTION_CHUNK_SECONDS`           | `180`                        | Audio window used for long hosted transcriptions. Windows keep request sizes bounded and are merged back onto the original source clock.                                                                                                                                                                                                                                                              |
+| `LARKUP_VIDEO_TRANSCRIPTION_REQUEST_TIMEOUT_SECONDS` | `60`                         | Maximum wait for one hosted speech request before the configured fallback takes over, preventing a stalled provider from holding the progress UX for minutes.                                                                                                                                                                                                                                         |
+| `LARKUP_VIDEO_DEEPGRAM_AUTO_MODEL`                   | `nova-3`                     | User-selected Deepgram model used when the source language is unknown.                                                                                                                                                                                                                                                                                                                                |
+| `LARKUP_VIDEO_TRANSCRIPTION_CONCURRENCY`             | `3`                          | Maximum parallel hosted speech windows. The runtime keeps the merged transcript chronological even when requests finish out of order.                                                                                                                                                                                                                                                                 |
+| `LARKUP_VIDEO_GPU_PROVIDER`                          | `modal`                      | `modal` or `runpod`; the managed-cloud GPU dispatch registry, private (see `deploy/README.md`).                                                                                                                                                                                                                                                                                                       |
+| `LARKUP_VIDEO_EMBEDDING_PROVIDER`                    | `gateway-gemini-embedding-2` | `gateway-gemini-embedding-2` uses the configured AI Gateway key and Gemini's multimodal vector space for image-frame/text retrieval. `disabled`, DashScope `qwen3-vl-embedding`, `runpod-qwen3-vl-embedding`, and `huggingface-qwen3-vl-embedding` remain available. Live bounded answer verification skips embeddings entirely because vectors are not needed to return timestamped answer evidence. |
+| `LARKUP_VIDEO_EMBEDDING_FALLBACK_PROVIDER`           | `gateway-gemini-embedding-2` | Provider used automatically when the selected visual embedding service is unavailable. Set `disabled` to require the primary provider only.                                                                                                                                                                                                                                                           |
+| `DASHSCOPE_API_KEY`                                  | unset                        | Required when `LARKUP_VIDEO_EMBEDDING_PROVIDER=qwen3-vl-embedding`.                                                                                                                                                                                                                                                                                                                                   |
+| `DASHSCOPE_WORKSPACE_ID`                             | unset                        | From the Model Studio console's Workspace Details page. Required when `LARKUP_VIDEO_EMBEDDING_PROVIDER=qwen3-vl-embedding`.                                                                                                                                                                                                                                                                           |
+| `DASHSCOPE_REGION`                                   | unset                        | The workspace's region, e.g. `eu-central-1` (same console page). Required when `LARKUP_VIDEO_EMBEDDING_PROVIDER=qwen3-vl-embedding`.                                                                                                                                                                                                                                                                  |
+| `LARKUP_VIDEO_RUNPOD_EMBEDDING_ENDPOINT_ID`          | unset                        | Required when `LARKUP_VIDEO_EMBEDDING_PROVIDER=runpod-qwen3-vl-embedding` (also needs `RUNPOD_API_KEY`).                                                                                                                                                                                                                                                                                              |
+| `LARKUP_VIDEO_HF_EMBEDDING_URL`                      | unset                        | Required when `LARKUP_VIDEO_EMBEDDING_PROVIDER=huggingface-qwen3-vl-embedding` (also needs `HF_TOKEN`).                                                                                                                                                                                                                                                                                               |
+| `LARKUP_MEDIA_STORAGE`                               | `local`                      | Web app env var: `s3` switches `createStorageProvider()` to `S3StorageProvider` for canonical media (see `LARKUP_MEDIA_S3_BUCKET` etc.).                                                                                                                                                                                                                                                              |
+| `WEBHOOK_SIGNING_SECRET`                             | unset                        | Signs outbound job-completion webhooks (`X-Larkup-Signature`).                                                                                                                                                                                                                                                                                                                                        |
+| `STALE_JOB_TIMEOUT_HOURS`                            | `6`                          | Force-fails a queued/running job older than this on the scheduled reconcile sweep.                                                                                                                                                                                                                                                                                                                    |
 
 ## Verification
 
@@ -203,4 +276,6 @@ docker build --target cpu -t larkup-video-cpu runtime
 
 The AWS control plane and GPU provider tests/validation run privately -- see `deploy/README.md`.
 
-The new runtime is now the default path for uploaded videos and has passed real-video acceptance. The old `@larkup/tool-video-audio` package remains only while audio uploads, URL import, frame extraction, bounded inspection, CLI consumers, and existing assets are migrated; deleting it before those consumers move would remove working non-video features. Removing this package, its v3 catalog record, and the optional installed-tool entry cleanly removes the new implementation.
+The runtime is the default path for indexed videos. Removing this package, its
+v3 catalog record, and the optional installed-tool entry cleanly removes the
+implementation.

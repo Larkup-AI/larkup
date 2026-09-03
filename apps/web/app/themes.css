@@ -1,17 +1,4 @@
-/* ──────────────────────────────────────────────────────────────
-   Larkup Brand Theme
-   Palette reference:
-     Ink 900        #1A1813   HSL 43°, 16%, 9%
-     Ink 700        #4C4234   HSL 35°, 19%, 25%
-     Lark Yellow 500  #F3C751  HSL 44°, 87%, 64%
-     Lark Yellow 200  #FEE9BC  HSL 41°, 97%, 87%
-     Ivory 50       #FCF7EF   HSL 37°, 68%, 96%
-     Sand 100       #F5EDE4   HSL 32°, 46%, 93%
-     Sand 200       #DCD0BD   HSL 37°, 31%, 80%
-     Taupe 500      #AE9F8A   HSL 35°, 18%, 61%
-     Feather Brown 600  #665641  HSL 34°, 22%, 33%
-     White          #FFFFFF
-   ────────────────────────────────────────────────────────────── */
+/* Larkup brand themes. */
 
 /* ── Larkup Light ── */
 .theme-larkup {
@@ -49,6 +36,10 @@
   --chart-3: #665641;
   --chart-4: #dcd0bd;
   --chart-5: #4c4234;
+}
+
+.theme-larkup [data-slot="dialog-content"] {
+  background-color: #f9f9f4;
 }
 
 /* ── Larkup Dark ── */
@@ -98,7 +89,7 @@
   --card-foreground: #0a0a0a;
   --panel: #f5f4ed;
   --panel-foreground: #0a0a0a;
-  --popover: #fefefb;
+  --popover: #ffffff;
   --popover-foreground: #0a0a0a;
   --primary: #0a0a0a;
   --primary-foreground: #faf9f5;

@@ -1,15 +1,15 @@
 import { initCommand } from './init';
 import { serveCommand } from './serve';
 import { prompts } from '../ui/prompts';
-import { getActiveServer } from '@larkup/core/workspace';
+import { getActiveProject } from '@larkup/core/project-store';
 
 const DEFAULT_PROJECT_NAME = 'my-larkup';
 
 /** Create a workspace when needed, then run its local server in the foreground. */
 export async function devCommand(name?: string) {
-  const activeServer = await getActiveServer();
-  if (!name?.trim() && activeServer) {
-    await serveCommand({ server: activeServer.id });
+  const activeProject = await getActiveProject();
+  if (!name?.trim() && activeProject) {
+    await serveCommand({ project: activeProject.id });
     return;
   }
 
@@ -21,6 +21,6 @@ export async function devCommand(name?: string) {
       placeholder: DEFAULT_PROJECT_NAME,
     }));
 
-  const server = await initCommand(projectName.trim() || DEFAULT_PROJECT_NAME);
-  await serveCommand({ server: server.id });
+  const project = await initCommand(projectName.trim() || DEFAULT_PROJECT_NAME);
+  await serveCommand({ project: project.id });
 }

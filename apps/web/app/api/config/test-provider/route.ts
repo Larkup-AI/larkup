@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { embed } from 'ai';
 import { getAIModel } from '@larkup/core/embeddings/providers';
 import type { RagConfig } from '@larkup/core/types';
-import { formatErrorMessage } from '@/lib/error-formatter';
+import { formatErrorMessage } from '@/lib/shared/error-formatter';
 
 export const runtime = 'nodejs';
 

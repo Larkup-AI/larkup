@@ -1,18 +1,18 @@
 'use client';
 
 import { useThemeCustomizer } from './theme-customizer-provider';
-import { UnifiedSidebar } from './unified-sidebar';
-import { AppTopNav } from './app-topnav';
+import { UnifiedSidebar } from './sidebar';
+import { AppTopNav } from './topnav';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useWorkspace } from '@/components/workspace/workspace-provider';
+import { useProject } from '@/components/projects/project-provider';
 import { WelcomeScreen } from '@/components/onboarding/welcome-screen';
 
 export function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   const { layout } = useThemeCustomizer();
   const pathname = usePathname();
   const isChatPage = pathname?.includes('/chat');
-  const { isFirstRun, isLoading } = useWorkspace();
+  const { isFirstRun, isLoading } = useProject();
 
   if (!isLoading && isFirstRun) {
     return <WelcomeScreen />;

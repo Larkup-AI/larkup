@@ -1,23 +1,15 @@
-import type { VideoContentType, VideoIndexingBrief, VideoIndexingMode } from './contracts.js';
+import type { VideoIndexingBrief, VideoIndexingMode } from './contracts.js';
+const MODES = new Set<VideoIndexingMode>(['fast', 'balanced', 'thorough']);
 
-const CONTENT_TYPES = new Set<VideoContentType>([
-  'general',
-  'course',
-  'sports',
-  'surveillance',
-  'meeting',
-]);
-const MODES = new Set<VideoIndexingMode>(['fast', 'balanced', 'deep', 'full-coverage']);
+function normalizeMode(value: unknown): VideoIndexingMode {
+  return MODES.has(value as VideoIndexingMode) ? (value as VideoIndexingMode) : 'balanced';
+}
 
 export function createVideoIndexingBrief(
   input: Partial<VideoIndexingBrief> = {},
 ): VideoIndexingBrief {
-  const contentType = CONTENT_TYPES.has(input.contentType as VideoContentType)
-    ? (input.contentType as VideoContentType)
-    : 'general';
-  const indexingMode = MODES.has(input.indexingMode as VideoIndexingMode)
-    ? (input.indexingMode as VideoIndexingMode)
-    : 'balanced';
+  const contentType = input.contentType?.trim().slice(0, 120) || 'general';
+  const indexingMode = normalizeMode(input.indexingMode);
   const retainSourceHours = Number.isFinite(input.retainSourceHours)
     ? Math.max(0, Math.min(720, Math.floor(input.retainSourceHours!)))
     : 0;

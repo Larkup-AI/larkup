@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { readConfig, writeConfig } from '@larkup/core/config-store';
+import { withGlobalVisionGatewayConfig } from '../marketplace/tool-runtime-config';
 
 type ProvisioningClient = {
+  getUsage?: () => Promise<unknown>;
   provisionDeviceAccess?: (installationId: string) => Promise<{
     apiKey: string;
     entitlement: {
       plan: string;
       sourceMinutesPerMonth: number | null;
       maxConcurrentJobs: number;
-      allowFullCoverage: boolean;
     };
   }>;
 };
@@ -34,14 +35,16 @@ export async function resolveVideoIntelligenceConnection(
     plan: string;
     sourceMinutesPerMonth: number | null;
     maxConcurrentJobs: number;
-    allowFullCoverage: boolean;
   };
 }> {
   const globalConfig = await readConfig();
-  const current = {
-    ...installedConfig,
-    ...(globalConfig.toolConfigs?.['video-intelligence'] ?? {}),
-  };
+  const current = withGlobalVisionGatewayConfig(
+    {
+      ...installedConfig,
+      ...(globalConfig.toolConfigs?.['video-intelligence'] ?? {}),
+    },
+    globalConfig,
+  );
   const forceProvision = current.forceProvisionManagedCloud === true;
   const { forceProvisionManagedCloud: _forceProvisionManagedCloud, ...connectionConfig } = current;
   if (connectionConfig.runtimeMode && connectionConfig.runtimeMode !== 'managed-cloud') {
@@ -52,7 +55,23 @@ export async function resolveVideoIntelligenceConnection(
     typeof connectionConfig.cloudAccessKey === 'string' &&
     connectionConfig.cloudAccessKey.trim()
   ) {
-    return { config: connectionConfig, provisioned: false };
+    const existingClient = extension.createClient({
+      config: connectionConfig,
+      fetch: globalThis.fetch,
+    });
+    if (typeof existingClient.getUsage !== 'function') {
+      return { config: connectionConfig, provisioned: false };
+    }
+    try {
+      await existingClient.getUsage();
+      return { config: connectionConfig, provisioned: false };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/invalid api key|unauthorized|unauthorised/i.test(message)) throw error;
+      // A managed deployment can move while an installation still has a key
+      // issued by the previous control plane. Re-provision the same opaque
+      // installation ID once instead of letting every later job fail at submit.
+    }
   }
 
   const installationId =
@@ -83,7 +102,6 @@ export async function resolveVideoIntelligenceConnection(
         plan: string;
         sourceMinutesPerMonth: number | null;
         maxConcurrentJobs: number;
-        allowFullCoverage: boolean;
       };
       error?: string;
     };
@@ -111,7 +129,6 @@ async function persistManagedConnection(
       plan: string;
       sourceMinutesPerMonth: number | null;
       maxConcurrentJobs: number;
-      allowFullCoverage: boolean;
     };
   },
 ) {

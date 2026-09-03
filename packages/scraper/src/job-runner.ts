@@ -45,6 +45,7 @@ function rollUpStatus(targets: CrawlTarget[]): CrawlJobStatus {
 async function advancePageTarget(
   jobId: string,
   target: CrawlTarget,
+  groupId?: string,
 ): Promise<{ target: CrawlTarget; added: number }> {
   try {
     const page = await scrapePage(target.url);
@@ -52,7 +53,7 @@ async function advancePageTarget(
       throw new Error('Scraping blocked by anti-bot protection (e.g. Cloudflare)');
     }
     const added = await addCrawledDocuments(jobId, [
-      { title: page.title, url: page.url, content: page.markdown, source: 'website' },
+      { title: page.title, url: page.url, content: page.markdown, source: 'website', groupId },
     ]);
     return {
       added,
@@ -74,6 +75,7 @@ async function advanceDomainTarget(
   jobId: string,
   target: CrawlTarget,
   pageLimit: number,
+  groupId?: string,
 ): Promise<{ target: CrawlTarget; added: number }> {
   try {
     // Start the crawl on first touch.
@@ -95,7 +97,13 @@ async function advanceDomainTarget(
       pagesCrawled = status.completed || pagesCrawled;
       for (const p of status.pages) {
         if (!isBlockedPage(p.markdown)) {
-          batch.push({ title: p.title, url: p.url, content: p.markdown, source: 'website' });
+          batch.push({
+            title: p.title,
+            url: p.url,
+            content: p.markdown,
+            source: 'website',
+            groupId,
+          });
         }
       }
       pulled++;
@@ -172,8 +180,8 @@ export async function syncJob(id: string): Promise<CrawlJob | undefined> {
           return Promise.resolve({ target: t, added: 0 });
         }
         return t.scope === 'page'
-          ? advancePageTarget(id, t)
-          : advanceDomainTarget(id, t, existing.pageLimit);
+          ? advancePageTarget(id, t, existing.groupId)
+          : advanceDomainTarget(id, t, existing.pageLimit, existing.groupId);
       }),
     );
 

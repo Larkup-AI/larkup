@@ -23,16 +23,16 @@ test.describe.serial('Config API (/api/config)', () => {
   });
 
   test('PUT /api/config sets embedding credentials', async ({ request }) => {
-    const useGateway = hasEnv(ENV_KEYS.AI_GATEWAY_APIKEY);
+    const useGateway = hasEnv(ENV_KEYS.AI_GATEWAY_API_KEY);
     test.skip(
       !useGateway && !hasEnv(ENV_KEYS.OPENAI_API_KEY),
-      'AI_GATEWAY_APIKEY or OPENAI_API_KEY not set',
+      'AI_GATEWAY_API_KEY or OPENAI_API_KEY not set',
     );
 
     const getRes = await request.get('/api/config');
     const { config: current } = await getRes.json();
     const provider = useGateway ? 'vercel_ai_gateway' : 'openai';
-    const apiKey = env(useGateway ? ENV_KEYS.AI_GATEWAY_APIKEY : ENV_KEYS.OPENAI_API_KEY);
+    const apiKey = env(useGateway ? ENV_KEYS.AI_GATEWAY_API_KEY : ENV_KEYS.OPENAI_API_KEY);
 
     const res = await request.put('/api/config', {
       data: {
@@ -57,7 +57,7 @@ test.describe.serial('Config API (/api/config)', () => {
   });
 
   test('PUT /api/config with valid LanceDB config', async ({ request }) => {
-    test.skip(!hasEnv(ENV_KEYS.AI_GATEWAY_APIKEY), 'API key not set');
+    test.skip(!hasEnv(ENV_KEYS.AI_GATEWAY_API_KEY), 'API key not set');
 
     const getRes = await request.get('/api/config');
     const { config: current } = await getRes.json();

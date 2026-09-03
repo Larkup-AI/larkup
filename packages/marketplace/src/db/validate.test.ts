@@ -67,6 +67,11 @@ describe('validateToolManifest', () => {
     expect(validateToolManifest({ ...VALID, requiresSandbox: 'no' }).valid).toBe(false);
   });
 
+  it('accepts public/private distribution and rejects another value', () => {
+    expect(validateToolManifest({ ...VALID, distribution: 'private' }).valid).toBe(true);
+    expect(validateToolManifest({ ...VALID, distribution: 'unlisted' }).valid).toBe(false);
+  });
+
   it('collects every violation in one pass rather than stopping at the first', () => {
     const { errors } = validateToolManifest({});
     expect(errors.length).toBeGreaterThan(3);

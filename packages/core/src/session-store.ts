@@ -15,7 +15,7 @@
  * - Only the last `MAX_TURNS` turns are kept, so a long-running chat cannot grow
  *   a prompt (or a bill) without bound.
  * - Sessions expire after `TTL_MS` of inactivity and are swept on read.
- * - Session ids are already hashed by `@larkup/channels-core`, so no provider
+ * - Session ids are already hashed by `@larkup/connections`, so no provider
  *   user id or phone number is written to disk here.
  *
  * TASK 08 replaces the filesystem with the control plane's store; the interface
@@ -24,7 +24,10 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { AgentWireMessage } from '@larkup/agent-contracts/protocol';
+export interface ProjectSessionMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 /** Turns retained per session (user + assistant messages, not pairs). */
 const MAX_TURNS = 20;
@@ -34,13 +37,13 @@ const TTL_MS = 24 * 60 * 60 * 1000;
 
 interface StoredSession {
   updatedAt: string;
-  messages: AgentWireMessage[];
+  messages: ProjectSessionMessage[];
 }
 
 async function sessionsRoot(create = false): Promise<string> {
-  const { getDataDir, requireDataDir } = await import('./workspace');
-  const dir = create ? await requireDataDir() : await getDataDir();
-  if (!dir) throw new Error('No workspace data directory configured.');
+  const { getProjectDataDir, requireProjectDataDir } = await import('./project-store');
+  const dir = create ? await requireProjectDataDir() : await getProjectDataDir();
+  if (!dir) throw new Error('No Project data directory configured.');
   return path.join(dir, 'sessions');
 }
 
@@ -52,7 +55,7 @@ function sessionFile(root: string, sessionId: string): string {
 }
 
 /** Read the conversation so far. Returns `[]` for a new or expired session. */
-export async function readSession(sessionId: string): Promise<AgentWireMessage[]> {
+export async function readSession(sessionId: string): Promise<ProjectSessionMessage[]> {
   try {
     const root = await sessionsRoot();
     const raw = await fs.readFile(sessionFile(root, sessionId), 'utf8');
@@ -78,14 +81,14 @@ export async function appendToSession(
   sessionId: string,
   userMessage: string,
   assistantMessage: string,
-): Promise<AgentWireMessage[]> {
+): Promise<ProjectSessionMessage[]> {
   const previous = await readSession(sessionId);
-  const messages: AgentWireMessage[] = (
+  const messages: ProjectSessionMessage[] = (
     [
       ...previous,
       { role: 'user', content: userMessage },
       { role: 'assistant', content: assistantMessage },
-    ] satisfies AgentWireMessage[]
+    ] satisfies ProjectSessionMessage[]
   ).slice(-MAX_TURNS);
 
   const root = await sessionsRoot(true);

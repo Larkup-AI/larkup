@@ -22,11 +22,13 @@ class BoundedRunPodWorkerTests(unittest.TestCase):
         with TemporaryDirectory() as temporary:
             destination = Path(temporary) / "clip.mp4"
 
-            def complete(command: list[str], **_: object):
+            def complete(command: list[str], *_: object):
                 destination.write_bytes(b"clip")
-                return type("Completed", (), {"returncode": 0, "stderr": ""})()
+                return True, ""
 
-            with patch("gpu_providers.remote_source.subprocess.run", side_effect=complete) as run:
+            with patch(
+                "gpu_providers.remote_source._run_ffmpeg_with_progress", side_effect=complete
+            ) as run:
                 extract_bounded_remote_clip(
                     "https://example.test/source.mp4", destination, 600, 630
                 )
@@ -41,11 +43,13 @@ class BoundedRunPodWorkerTests(unittest.TestCase):
         with TemporaryDirectory() as temporary:
             destination = Path(temporary) / "source.mp4"
 
-            def complete(command: list[str], **_: object):
+            def complete(command: list[str], *_: object):
                 destination.write_bytes(b"video")
-                return type("Completed", (), {"returncode": 0, "stderr": ""})()
+                return True, ""
 
-            with patch("gpu_providers.remote_source.subprocess.run", side_effect=complete) as run:
+            with patch(
+                "gpu_providers.remote_source._run_ffmpeg_with_progress", side_effect=complete
+            ) as run:
                 materialize_remote_source("https://example.test/source.webm", destination)
 
             command = run.call_args.args[0]

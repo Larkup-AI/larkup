@@ -224,7 +224,7 @@ export class LanceDBAdapter implements VectorStoreAdapter {
       }
     }
 
-    // ── Cloud mode ───────────────────────────────────────────────────────────
+    // Cloud mode.
     // to force a real authenticated HTTP round-trip.
     let conn: LanceConnection;
     try {

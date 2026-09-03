@@ -5,10 +5,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Brain, ChevronDown, Cpu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-/* ------------------------------------------------------------------ */
-/* Context                                                              */
-/* ------------------------------------------------------------------ */
-
 interface ReasoningContextValue {
   isStreaming: boolean;
   isOpen: boolean;
@@ -23,10 +19,6 @@ export function useReasoning() {
   if (!ctx) throw new Error('useReasoning must be used within <Reasoning>');
   return ctx;
 }
-
-/* ------------------------------------------------------------------ */
-/* <Reasoning>                                                          */
-/* ------------------------------------------------------------------ */
 
 interface ReasoningProps {
   isStreaming?: boolean;
@@ -99,10 +91,6 @@ export function Reasoning({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* <ReasoningTrigger>                                                   */
-/* ------------------------------------------------------------------ */
-
 interface ReasoningTriggerProps {
   className?: string;
   getThinkingMessage?: (isStreaming: boolean, duration?: number) => ReactNode;
@@ -122,8 +110,8 @@ export function ReasoningTrigger({ className, getThinkingMessage }: ReasoningTri
   const defaultMessage = isStreaming
     ? 'Thinking…'
     : duration && duration > 0
-    ? `Thought for ${formatDuration(duration)}`
-    : 'Thought for a moment';
+      ? `Thought for ${formatDuration(duration)}`
+      : 'Thought for a moment';
 
   const message = getThinkingMessage ? getThinkingMessage(isStreaming, duration) : defaultMessage;
 
@@ -150,10 +138,6 @@ export function ReasoningTrigger({ className, getThinkingMessage }: ReasoningTri
     </CollapsibleTrigger>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* <ReasoningContent>                                                   */
-/* ------------------------------------------------------------------ */
 
 interface ReasoningContentProps {
   children: string;

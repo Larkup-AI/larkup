@@ -77,7 +77,7 @@ export function FileAttachmentButton({ onFileSelected, className, id }: FileAtta
                 className,
               )}
             >
-              <Paperclip className="h-[18px] w-[18px]" />
+              <Paperclip className="size-4.5" />
             </button>
           }
         />

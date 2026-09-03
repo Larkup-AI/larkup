@@ -1,9 +1,18 @@
-from .client import AsyncLarkupClient, LarkupClient, LarkupError
+from .client import AsyncLarkupClient, LarkupAgentClient, LarkupClient, LarkupError
 from .hub import AsyncLarkupHubClient, LarkupHubClient
 from .types import (
     AddDocumentResponse,
+    AgentChatRequest,
+    AgentCapability,
+    AgentRuntimeConfiguration,
+    AgentSandboxStatus,
+    AgentSkill,
+    AgentTool,
     ChatEvent,
+    ChatModel,
+    ChatModelCatalog,
     ChatMessage,
+    ChatProvider,
     ChatRequest,
     CorpusDocument,
     CorpusFilter,
@@ -36,10 +45,19 @@ from .types import (
 
 __all__ = [
     "AddDocumentResponse",
+    "AgentChatRequest",
+    "AgentCapability",
+    "AgentRuntimeConfiguration",
+    "AgentSandboxStatus",
+    "AgentSkill",
+    "AgentTool",
     "AsyncLarkupClient",
     "AsyncLarkupHubClient",
     "ChatEvent",
+    "ChatModel",
+    "ChatModelCatalog",
     "ChatMessage",
+    "ChatProvider",
     "ChatRequest",
     "CorpusDocument",
     "CorpusFilter",
@@ -50,6 +68,7 @@ __all__ = [
     "HealthResponse",
     "IndexProgressEvent",
     "LarkupClient",
+    "LarkupAgentClient",
     "LarkupClientOptions",
     "LarkupError",
     "LarkupHubClient",

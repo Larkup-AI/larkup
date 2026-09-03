@@ -420,7 +420,7 @@ export function ChatSignatureRequest({
                 <div className="text-muted-foreground flex justify-between items-center">
                   <span>Page {loc.pageIndex + 1}</span>
                   <div className="flex items-center space-x-2">
-                    <span className="italic truncate max-w-[200px]">{loc.context}</span>
+                    <span className="italic truncate max-w-50">{loc.context}</span>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -584,7 +584,7 @@ export function ChatSignatureRequest({
               {savedSignatures.map((sig) => (
                 <div
                   key={sig.id}
-                  className="relative shrink-0 w-[100px] h-[50px] border rounded bg-white flex items-center justify-center cursor-pointer hover:border-primary group overflow-hidden"
+                  className="relative shrink-0 w-25 h-12.5 border rounded bg-white flex items-center justify-center cursor-pointer hover:border-primary group overflow-hidden"
                   onClick={() => {
                     setMode(sig.mode);
                     if (sig.mode === 'upload') setUploadedImage(sig.imagePayload);
@@ -707,7 +707,7 @@ export function ChatSignatureRequest({
                     </span>
                   </div>
                 ) : (
-                  <div className="mt-2 max-h-[100px] overflow-hidden rounded bg-white w-full flex justify-center pointer-events-none">
+                  <div className="mt-2 max-h-25 overflow-hidden rounded bg-white w-full flex justify-center pointer-events-none">
                     <img
                       src={uploadedImage}
                       alt="Signature Preview"
@@ -796,8 +796,8 @@ export function ChatSignatureRequest({
           mode === 'draw' && canvasRef.current
             ? canvasRef.current.toDataURL('image/png')
             : mode === 'upload'
-            ? uploadedImage
-            : null
+              ? uploadedImage
+              : null
         }
         text={text}
         font={font}

@@ -1,4 +1,16 @@
-export type SandboxBackend = "docker" | "e2b" | "modal" | "custom";
+export type SandboxBackend =
+  | 'local'
+  | 'docker'
+  | 'e2b'
+  | 'vercel'
+  | 'modal'
+  | 'daytona'
+  | 'browserbase'
+  | 'flyio'
+  | 'northflank'
+  | 'cloudflare'
+  | 'webcontainers'
+  | 'custom';
 
 export interface DockerConfig {
   /** Docker image to use (default: "larkup-sandbox:latest") */
@@ -13,31 +25,26 @@ export interface DockerConfig {
   networkDisabled: boolean;
 }
 
-export interface RemoteConfig {
-  provider: "e2b" | "modal" | "custom";
-  apiKey: string;
-  endpoint?: string;
-}
-
 export interface SandboxConfig {
   backend: SandboxBackend;
   docker?: Partial<DockerConfig>;
-  remote?: RemoteConfig;
+  /**
+   * Credentials for the selected remote provider, keyed by the field `key`s
+   * declared in that provider's `SandboxProviderDescriptor` (see registry.ts).
+   * Unused by local and Docker backends.
+   */
+  credentials?: Record<string, string>;
 }
 
 export const DEFAULT_DOCKER_CONFIG: DockerConfig = {
-  imageName: "larkup-sandbox:latest",
+  imageName: 'larkup-sandbox:latest',
   memoryMB: 512,
   cpuShares: 1024,
   timeoutMs: 30_000,
   networkDisabled: true,
 };
 
-/* ------------------------------------------------------------------ */
-/* Execution request / result                                          */
-/* ------------------------------------------------------------------ */
-
-export type SandboxLanguage = "python" | "javascript" | "typescript";
+export type SandboxLanguage = 'python' | 'javascript' | 'typescript';
 
 export interface SandboxFile {
   /** Filename inside the sandbox (e.g., "data.csv") */
@@ -81,16 +88,14 @@ export interface ExecutionResult {
   executionTimeMs: number;
 }
 
-/* ------------------------------------------------------------------ */
-/* Sandbox status                                                      */
-/* ------------------------------------------------------------------ */
-
 export type SandboxStatus =
-  | "ready"
-  | "docker-not-found"
-  | "image-not-found"
-  | "building-image"
-  | "error";
+  | 'ready'
+  | 'docker-not-found'
+  | 'image-not-found'
+  | 'building-image'
+  | 'missing-credentials'
+  | 'unsupported'
+  | 'error';
 
 export interface SandboxHealthCheck {
   status: SandboxStatus;
@@ -98,4 +103,57 @@ export interface SandboxHealthCheck {
   dockerVersion?: string;
   imageReady?: boolean;
   error?: string;
+}
+
+export type SandboxFieldType = 'text' | 'password';
+
+/** A single credential/config field a sandbox provider needs. The Settings
+ * UI renders these dynamically per provider, the same way vector store and
+ * embedding provider fields are rendered from their own registries. */
+export interface SandboxCredentialField {
+  key: string;
+  label: string;
+  type: SandboxFieldType;
+  required: boolean;
+  placeholder?: string;
+  help?: string;
+  secret?: boolean;
+}
+
+export interface SandboxProviderDescriptor {
+  id: SandboxBackend;
+  label: string;
+  description: string;
+  /** npm package this adapter dynamically imports at runtime. Never a hard
+   * dependency of @larkup/sandbox — installing all nine SDKs unconditionally
+   * would bloat every consumer, so each adapter lazy-imports its own. */
+  sdkPackage?: string;
+  docsUrl: string;
+  /** Path under /public/icons (or /public) in the web app. */
+  icon: string;
+  /**
+   * Whether `execute()` genuinely runs arbitrary code/commands and returns
+   * output, or the provider is architecturally something else (browser
+   * automation, a client-only runtime, a Worker binding). Surfaced in the
+   * UI so operators don't pick a provider that can't do what they expect.
+   */
+  executionSupport: 'full' | 'unsupported';
+  /** Shown in the UI when executionSupport !== "full". */
+  executionCaveat?: string;
+  fields: SandboxCredentialField[];
+}
+
+/**
+ * Adapter contract every remote sandbox backend implements. Docker is
+ * handled separately (docker-runner.ts) since it talks to the local daemon
+ * and needs no credentials.
+ */
+export interface SandboxProviderAdapter {
+  readonly id: SandboxBackend;
+  /** Cheap call that proves the credentials are valid — powers the "Verify" button. */
+  verifyCredentials(credentials: Record<string, string>): Promise<void>;
+  /** Confirms the backend is reachable/configured without spinning up a full sandbox. */
+  healthCheck(credentials: Record<string, string>): Promise<SandboxHealthCheck>;
+  /** Runs code/commands inside a fresh sandbox instance and tears it down afterward. */
+  execute(request: ExecutionRequest, credentials: Record<string, string>): Promise<ExecutionResult>;
 }

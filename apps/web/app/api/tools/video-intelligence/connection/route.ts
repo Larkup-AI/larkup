@@ -15,7 +15,6 @@ type ConnectionClient = {
       plan: string;
       sourceMinutesPerMonth: number | null;
       maxConcurrentJobs: number;
-      allowFullCoverage: boolean;
     };
   }>;
 };

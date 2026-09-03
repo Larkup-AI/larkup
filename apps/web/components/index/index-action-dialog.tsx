@@ -223,11 +223,11 @@ export function IndexActionDialog({ open, onOpenChange, trigger }: IndexActionDi
           </div>
         ) : (
           <div className="space-y-6 py-4">
-            <ConfigSummary
+            {/* <ConfigSummary
               config={data.config}
               docCount={data.docCount}
               charCount={data.charCount}
-            />
+            /> */}
 
             {!data.ready && (
               <Alert variant="default">
@@ -297,10 +297,10 @@ export function IndexActionDialog({ open, onOpenChange, trigger }: IndexActionDi
                   {Boolean(data.run && ACTIVE.includes(data.run.status))
                     ? `Indexing…`
                     : starting
-                    ? `Starting…`
-                    : data.run?.status === 'completed'
-                    ? `Index new documents (${data.unindexedCount})`
-                    : `Start indexing (${data.unindexedCount})`}
+                      ? `Starting…`
+                      : data.run?.status === 'completed'
+                        ? `Index new documents (${data.unindexedCount})`
+                        : `Start indexing (${data.unindexedCount})`}
                 </Button>
 
                 {data.run?.status === 'completed' &&
@@ -455,8 +455,8 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
     run.totalChunks > 0
       ? Math.round((run.processedChunks / run.totalChunks) * 100)
       : running
-      ? 5
-      : 0;
+        ? 5
+        : 0;
 
   return (
     <div className="rounded-xl border bg-card text-card-foreground  p-4 space-y-4">
@@ -507,8 +507,8 @@ function RunCard({ run, running }: { run: IndexRun | null; running: boolean }) {
                 run.durationMs
                   ? `${(run.durationMs / 1000).toFixed(1)}s`
                   : running
-                  ? 'running…'
-                  : '—'
+                    ? 'running…'
+                    : '—'
               }
             />
           </dl>

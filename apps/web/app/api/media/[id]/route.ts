@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getMediaAsset, updateMediaAsset } from '@larkup/core/media-store';
 import { createStorageProvider } from '@larkup/marketplace/storage';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,14 +42,14 @@ async function serveMedia(_req: Request, { params }: { params: Promise<{ id: str
         suffixLength !== null
           ? Math.max(0, data.length - suffixLength)
           : match[1]
-          ? Number(match[1])
-          : 0;
+            ? Number(match[1])
+            : 0;
       const end =
         suffixLength !== null
           ? data.length - 1
           : match[2]
-          ? Math.min(Number(match[2]), data.length - 1)
-          : data.length - 1;
+            ? Math.min(Number(match[2]), data.length - 1)
+            : data.length - 1;
       if (start > end || start >= data.length) {
         return new NextResponse(null, {
           status: 416,
@@ -104,5 +104,5 @@ async function patchMedia(req: Request, { params }: { params: Promise<{ id: stri
 
 function withRequestServer<T>(req: Request, fn: () => T): T {
   const serverId = new URL(req.url).searchParams.get('serverId');
-  return serverId ? runWithServer(serverId, fn) : fn();
+  return serverId ? runWithProject(serverId, fn) : fn();
 }

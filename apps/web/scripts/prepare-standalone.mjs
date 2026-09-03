@@ -19,6 +19,7 @@ copyDirectory('.next/static', path.join(appRoot, '.next/static'));
 copyDirectory('public', path.join(appRoot, 'public'));
 
 pruneOtherPlatformNativePackages();
+removeEnvFiles(standaloneRoot);
 removeDanglingSymlinks(standaloneRoot);
 
 function copyDirectory(source, destination) {
@@ -57,6 +58,25 @@ function pruneOtherPlatformNativePackages() {
     const isNativePackage = /^(?:@lancedb\+lancedb-|@napi-rs\+canvas-|@img\+sharp-)/.test(entry);
     if (isNativePackage && !keepPrefixes.some((prefix) => entry.startsWith(prefix))) {
       rmSync(path.join(packageStore, entry), { force: true, recursive: true });
+    }
+  }
+}
+
+/**
+ * Next traces workspace siblings into the standalone tree, so a publish from a
+ * working copy would carry `apps/ee/.env`, `apps/larkup-proxy/.env` and the
+ * rest straight into a public tarball. CI publishes from a clean checkout
+ * where these do not exist; this makes a local publish safe too.
+ */
+function removeEnvFiles(directory) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      removeEnvFiles(entryPath);
+      continue;
+    }
+    if (/^\.env($|\.)/.test(entry.name) && entry.name !== '.env.example') {
+      rmSync(entryPath, { force: true });
     }
   }
 }

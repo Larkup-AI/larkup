@@ -17,6 +17,13 @@ const configSchemaEntryV1 = {
     defaultValue: { type: 'string' },
     help: { type: 'string' },
     required: { type: 'boolean' },
+    providerField: { type: 'string' },
+    defaultValueByProvider: {
+      type: 'object',
+      additionalProperties: { type: 'string' },
+    },
+    globalConfigKey: { enum: ['visionProvider', 'chatProvider'] },
+    defaultFromGlobalConfigKey: { enum: ['visionProvider', 'chatProvider'] },
     options: {
       type: 'array',
       items: {
@@ -57,6 +64,11 @@ export const toolManifestV1Schema = {
     category: { type: 'string' },
     version: { type: 'string' },
     pricing: { type: 'string' },
+    distribution: {
+      enum: ['public', 'private'],
+      default: 'public',
+      description: 'Whether the Hub lists the tool publicly or only for granted workspaces.',
+    },
     emoji: { type: 'string' },
     iconUrl: { type: 'string' },
     icon: { type: 'string' },
@@ -98,6 +110,15 @@ const configSchemaEntryV2 = {
         fields: { type: 'object', additionalProperties: { type: 'string' } },
       },
       description: 'Declarative verification request. Omit to hide Verify.',
+    },
+    visibleWhen: {
+      type: 'object',
+      required: ['field', 'equals'],
+      properties: {
+        field: { type: 'string' },
+        equals: { anyOf: [{ type: 'string' }, { type: 'boolean' }, { type: 'array' }] },
+      },
+      description: 'Shows this setting only for matching values in another setting.',
     },
   },
 };
@@ -160,7 +181,9 @@ export const toolManifestV3Schema = {
       required: ['protocolVersion', 'defaultMode', 'modes'],
       properties: {
         protocolVersion: { type: 'string' },
-        defaultMode: { enum: ['local-docker', 'managed-cloud', 'custom-remote'] },
+        defaultMode: {
+          enum: ['local', 'local-docker', 'local-process', 'managed-cloud', 'custom-remote'],
+        },
         healthPath: { type: 'string' },
         modes: {
           type: 'array',
@@ -169,7 +192,9 @@ export const toolManifestV3Schema = {
             type: 'object',
             required: ['id', 'label', 'description'],
             properties: {
-              id: { enum: ['local-docker', 'managed-cloud', 'custom-remote'] },
+              id: {
+                enum: ['local', 'local-docker', 'local-process', 'managed-cloud', 'custom-remote'],
+              },
               label: { type: 'string' },
               description: { type: 'string' },
               endpointConfigKey: { type: 'string' },
@@ -197,6 +222,25 @@ export const toolManifestV3Schema = {
               id: { type: 'string' },
               unit: { type: 'string' },
               description: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+    usage: {
+      type: 'object',
+      required: ['fields'],
+      properties: {
+        label: { type: 'string' },
+        fields: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['key', 'label'],
+            properties: {
+              key: { type: 'string' },
+              label: { type: 'string' },
+              format: { enum: ['number', 'minutes'] },
             },
           },
         },

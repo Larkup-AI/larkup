@@ -7,17 +7,16 @@
  * simple lookups and aggregations.
  *
  * Data layout:
- *   .larkup/servers/<id>/tabular-datasets.json   ← dataset metadata + rows
+ *   .larkup/projects/<id>/tabular-datasets.json  ← dataset metadata + rows
  */
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { getDataDir, requireDataDir } from './workspace';
-
-/* ------------------------------------------------------------------ */
-/* Types                                                               */
-/* ------------------------------------------------------------------ */
+import {
+  getProjectDataDir as getDataDir,
+  requireProjectDataDir as requireDataDir,
+} from './project-store';
 
 export type ColumnType = 'string' | 'number' | 'date' | 'boolean' | 'mixed';
 
@@ -68,10 +67,6 @@ export interface TabularDataset {
 
 /** Lightweight metadata without the actual rows (for listing). */
 export type TabularDatasetMeta = Omit<TabularDataset, 'rows'>;
-
-/* ------------------------------------------------------------------ */
-/* Column type detection                                               */
-/* ------------------------------------------------------------------ */
 
 const DATE_PATTERNS = [
   /^\d{4}-\d{2}-\d{2}$/,
@@ -221,10 +216,6 @@ function buildSummary(columns: ColumnMeta[], rowCount: number): DatasetSummary {
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* Storage                                                             */
-/* ------------------------------------------------------------------ */
-
 const FILE_NAME = 'tabular-datasets.json';
 
 async function datasetsPath(create: boolean): Promise<string | null> {
@@ -249,10 +240,6 @@ async function writeAll(datasets: TabularDataset[]): Promise<void> {
   if (!file) return;
   await fs.writeFile(file, JSON.stringify(datasets, null, 2), 'utf8');
 }
-
-/* ------------------------------------------------------------------ */
-/* CRUD operations                                                     */
-/* ------------------------------------------------------------------ */
 
 /** Save a new tabular dataset. Returns the saved dataset with computed metadata. */
 export async function saveTabularDataset(
@@ -302,10 +289,6 @@ export async function deleteTabularDataset(id: string): Promise<void> {
   await writeAll(all.filter((d) => d.id !== id));
 }
 
-/* ------------------------------------------------------------------ */
-/* Querying                                                            */
-/* ------------------------------------------------------------------ */
-
 export type AggregationOp = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'median';
 
 export interface TabularFilter {
@@ -319,6 +302,11 @@ export interface TabularAggregation {
   op: AggregationOp;
 }
 
+export interface TabularTimeBucket {
+  column: string;
+  grain: 'month' | 'quarter' | 'year';
+}
+
 export interface TabularQueryRequest {
   datasetId: string;
   filters?: TabularFilter[];
@@ -328,6 +316,8 @@ export interface TabularQueryRequest {
   sortOrder?: 'asc' | 'desc';
   limit?: number;
   columns?: string[];
+  /** Derive a stable calendar bucket before grouping tabular rows. */
+  timeBucket?: TabularTimeBucket;
 }
 
 export interface TabularQueryResult {
@@ -409,6 +399,25 @@ export async function queryTabular(query: TabularQueryRequest): Promise<TabularQ
         }
       });
     }
+  }
+
+  if (query.timeBucket) {
+    const { column, grain } = query.timeBucket;
+    const bucketColumn = `${column}_${grain}`;
+    rows = rows.flatMap((row) => {
+      const timestamp = parseDate(row[column]);
+      if (isNaN(timestamp)) return [];
+      const date = new Date(timestamp);
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const bucket =
+        grain === 'month'
+          ? `${year}-${month}`
+          : grain === 'quarter'
+          ? `${year}-Q${Math.floor(date.getUTCMonth() / 3) + 1}`
+          : String(year);
+      return [{ ...row, [bucketColumn]: bucket }];
+    });
   }
 
   if (query.groupBy && query.groupBy.length > 0 && query.aggregations) {

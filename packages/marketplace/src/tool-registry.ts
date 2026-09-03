@@ -10,6 +10,9 @@ import { DEFAULT_HUB_URL } from './types';
 /** Cached registry — populated on first access. */
 let cachedRegistry: Record<string, ToolDescriptor> | null = null;
 
+/** Kept loadable for installed workspaces, but no longer offered for new installs. */
+const RETIRED_CATALOG_TOOL_IDS = new Set(['video-audio']);
+
 function normalizeToolDescriptor(descriptor: ToolDescriptor): ToolDescriptor {
   return { ...descriptor, requiresSandbox: descriptor.requiresSandbox !== false };
 }
@@ -59,10 +62,10 @@ async function discoverLocalManifests(): Promise<Record<string, ToolDescriptor>>
 
   // Try multiple possible tool directories
   const searchPaths = [
-    // Monorepo development: packages/tools/*
-    path.resolve(process.cwd(), 'packages', 'tools'),
+    // Monorepo development: packages/marketplace-tools/*
+    path.resolve(process.cwd(), 'packages', 'marketplace-tools'),
     // Next.js dev server runs in apps/web
-    path.resolve(process.cwd(), '..', '..', 'packages', 'tools'),
+    path.resolve(process.cwd(), '..', '..', 'packages', 'marketplace-tools'),
     // Installed tools: .larkup/tools/node_modules/@larkup
     path.resolve(process.cwd(), '.larkup', 'tools', 'node_modules', '@larkup'),
     path.resolve(process.cwd(), '..', '..', '.larkup', 'tools', 'node_modules', '@larkup'),
@@ -79,7 +82,7 @@ async function discoverLocalManifests(): Promise<Record<string, ToolDescriptor>>
         try {
           const raw = await fs.readFile(manifestPath, 'utf8');
           const manifest = normalizeToolDescriptor(JSON.parse(raw) as ToolDescriptor);
-          if (manifest.id) {
+          if (manifest.id && !RETIRED_CATALOG_TOOL_IDS.has(manifest.id)) {
             registry[manifest.id] = manifest;
           }
         } catch {
@@ -115,7 +118,9 @@ async function fetchHubCatalog(hubUrl?: string): Promise<Record<string, ToolDesc
     const data = (await res.json()) as { tools: ToolDescriptor[] };
     const registry: Record<string, ToolDescriptor> = {};
     for (const tool of data.tools ?? []) {
-      if (tool.id) registry[tool.id] = normalizeToolDescriptor(tool);
+      if (tool.id && !RETIRED_CATALOG_TOOL_IDS.has(tool.id)) {
+        registry[tool.id] = normalizeToolDescriptor(tool);
+      }
     }
     return registry;
   } catch {
@@ -131,6 +136,7 @@ export async function fetchToolFromHub(
   toolId: string,
   hubUrl?: string,
 ): Promise<ToolDescriptor | null> {
+  if (RETIRED_CATALOG_TOOL_IDS.has(toolId)) return null;
   const baseUrl = hubUrl ?? DEFAULT_HUB_URL;
   try {
     const controller = new AbortController();
@@ -155,72 +161,6 @@ export async function fetchToolFromHub(
  * where neither manifests nor Hub are available.
  */
 const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
-  'video-audio': {
-    id: 'video-audio',
-    name: 'Video Intelligence',
-    description:
-      'Build evidence-backed video timelines with adaptive attention and bounded source rewind.',
-    category: 'media',
-    version: '0.3.6',
-    pricing: 'free',
-    emoji: '🎬',
-    icon: 'Film',
-    packageName: '@larkup/tool-video-audio',
-    installSize: '~15 MB',
-    requiresSandbox: true,
-    author: 'Larkup',
-    capabilities: [
-      'video-indexing',
-      'audio-indexing',
-      'transcription',
-      'frame-extraction',
-      'youtube-import',
-      'attention-driven-analysis',
-      'temporal-evidence',
-      'bounded-source-rewind',
-    ],
-    tags: ['video intelligence', 'temporal reasoning', 'transcription', 'ffmpeg', 'video', 'audio'],
-    downloads: 0,
-    repositoryUrl: 'https://github.com/Larkup-AI/larkup',
-    license: 'Apache-2.0',
-    updatedAt: '2026-07-20',
-    configSchema: [
-      {
-        key: 'frameInterval',
-        label: 'Baseline coverage interval (seconds)',
-        type: 'text',
-        defaultValue: '10',
-        help: 'Baseline cadence for duration-aware coverage frames; scene changes and a reserved ending pass are added separately.',
-      },
-      {
-        key: 'audioProvider',
-        label: 'Audio Provider',
-        type: 'select',
-        help: 'Choose the provider used only for audio and video transcription.',
-        options: [
-          { label: 'OpenAI', value: 'openai' },
-          { label: 'Groq', value: 'groq' },
-          { label: 'Deepgram', value: 'deepgram' },
-          { label: 'ElevenLabs', value: 'elevenlabs' },
-          { label: 'Local Whisper', value: 'local' },
-        ],
-      },
-      {
-        key: 'audioLanguage',
-        label: 'Transcription language',
-        type: 'text',
-        defaultValue: 'auto',
-        help: 'Use auto for provider language detection, or enter a language code such as ar, ar-EG, en, or de to override it.',
-      },
-      {
-        key: 'audioApiKey',
-        label: 'Audio API Key',
-        type: 'password',
-        help: 'Required for the selected audio provider and kept separate from the chat model key.',
-      },
-    ],
-  },
-
   'clip-embeddings': {
     id: 'clip-embeddings',
     name: 'CLIP Image Search',

@@ -27,11 +27,14 @@ import {
   FileCode,
   FileJson,
   File as FileIcon,
+  ListPlus,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { MessageItem } from '@/components/chat/message-item';
+import { MessageQueue, type QueuedMessage } from '@/components/chat/message-queue';
 import { ChatSettingsModal } from '@/components/chat/chat-settings-modal';
-import { useWorkspace } from '@/components/workspace/workspace-provider';
+import { shouldAutoOpenSupportingClip } from '@/lib/chat-supporting-clip';
+import { useProject } from '@/components/projects/project-provider';
 import { cn } from '@/lib/utils';
 import { getProviderMeta, ProviderIcon } from '@/components/ui/provider-icon';
 import { get, set, del } from 'idb-keyval';
@@ -61,8 +64,87 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
+import { assistantReplyCanClose } from '@/lib/chat/stream-lifecycle';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+function compactToolResult(value: any): any {
+  if (!value || typeof value !== 'object') return value;
+  if (value.type === 'json' && 'value' in value) {
+    return { ...value, value: compactToolResult(value.value) };
+  }
+
+  const compact = { ...value };
+  if (Array.isArray(compact.rows)) compact.rows = compact.rows.slice(0, 50);
+  if (Array.isArray(compact.data)) compact.data = compact.data.slice(0, 100);
+  if (typeof compact.stdout === 'string') compact.stdout = compact.stdout.slice(0, 4_000);
+  if (typeof compact.stderr === 'string') compact.stderr = compact.stderr.slice(0, 1_000);
+  if (typeof compact.fileBase64 === 'string') delete compact.fileBase64;
+  if (Array.isArray(compact.pages)) delete compact.pages;
+  return compact;
+}
+
+/**
+ * Compact messages for the LLM context to prevent massive payloads (like chart data,
+ * table rows, and document base64s) from bloating the request and exceeding token limits.
+ */
+function compactMessagesForLLM(messages: any[]) {
+  return messages.map((message, index) => {
+    // Keep the latest message completely intact
+    if (index === messages.length - 1) return message;
+
+    const { toolInvocations, experimental_attachments, parts, ...rest } = message;
+
+    // Keep tool invocations but strip heavy data fields from the results
+    const compactToolInvocations = Array.isArray(toolInvocations)
+      ? toolInvocations.map((ti) => {
+          if (ti.state === 'result' && ti.result) {
+            return { ...ti, result: compactToolResult(ti.result) };
+          }
+          return ti;
+        })
+      : toolInvocations;
+
+    // Do the same for parts
+    const compactParts = Array.isArray(parts)
+      ? parts.map((part) => {
+          if (part.type === 'tool-invocation') {
+            const ti = part.toolInvocation;
+            if (ti?.state === 'result' && ti.result) {
+              return { ...part, toolInvocation: { ...ti, result: compactToolResult(ti.result) } };
+            }
+          }
+          // AI SDK v5 serializes completed tool calls as `tool-<name>` parts.
+          // Keep the metadata needed by the server-side evidence ledger while
+          // bounding rows/chart points before the next chat request.
+          if (part.type?.startsWith('tool-')) {
+            return {
+              ...part,
+              ...(part.output !== undefined ? { output: compactToolResult(part.output) } : {}),
+              ...(part.result !== undefined ? { result: compactToolResult(part.result) } : {}),
+            };
+          }
+          return part;
+        })
+      : parts;
+
+    // Strip attachment payloads to just labels to save context window
+    const attachmentLabels = Array.isArray(experimental_attachments)
+      ? experimental_attachments.map((attachment) => ({
+          name: attachment?.name,
+          contentType: attachment?.contentType,
+          size: attachment?.size,
+        }))
+      : experimental_attachments;
+
+    return {
+      ...rest,
+      ...(compactParts ? { parts: compactParts } : {}),
+      ...(compactToolInvocations ? { toolInvocations: compactToolInvocations } : {}),
+      ...(attachmentLabels ? { experimental_attachments: attachmentLabels } : {}),
+    };
+  });
+}
 
 interface AvailableModel {
   id: string;
@@ -149,17 +231,17 @@ export function ChatWorkspace({ chatId }: { chatId?: string } = {}) {
 }
 
 function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
-  const { activeServer } = useWorkspace();
+  const { activeProject } = useProject();
   const { sessionId, parsedDocument, openCanvas, isLoading: isDocLoading } = useDocEditor();
   const docEditorState = { sessionId, fields: parsedDocument?.fields || [] };
-  const serverId = activeServer?.id ?? null;
+  const projectId = activeProject?.id ?? null;
 
   // Track dragging state
   const dragCounter = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
 
-  const statusKey = serverId
-    ? `/api/chat/status?serverId=${encodeURIComponent(serverId)}`
+  const statusKey = projectId
+    ? `/api/chat/status?projectId=${encodeURIComponent(projectId)}`
     : '/api/chat/status';
   const { data: status, isLoading: statusLoading } = useSWR<ChatStatus>(statusKey, fetcher, {
     refreshInterval: 10000,
@@ -174,6 +256,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [pendingMessage, setPendingMessage] = useState<{ text: string; files?: any } | null>(null);
+  const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -187,6 +270,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   const [currentChatId, setCurrentChatId] = useState<string>(chatId || '');
   const [history, setHistory] = useState<{ id: string; title: string; updatedAt: number }[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
   const [isInitializingChat, setIsInitializingChat] = useState(!!chatId);
 
   // Load history on mount
@@ -216,21 +300,21 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   // Fetch suggestions if missing
   useEffect(() => {
     if (status?.ready && status.suggestions && status.suggestions.length === 0) {
-      const url = serverId
-        ? `/api/chat/suggestions?serverId=${encodeURIComponent(serverId)}`
+      const url = projectId
+        ? `/api/chat/suggestions?projectId=${encodeURIComponent(projectId)}`
         : '/api/chat/suggestions';
       fetch(url, { method: 'POST' });
     }
-  }, [status?.ready, status?.suggestions, serverId]);
+  }, [status?.ready, status?.suggestions, projectId]);
 
   const chatBody = useMemo(
     () => ({
-      serverId,
+      projectId,
       chatModelId: selectedModel || undefined,
       docSessionId: docEditorState.sessionId,
       docFields: docEditorState.fields,
     }),
-    [serverId, selectedModel, docEditorState.sessionId, JSON.stringify(docEditorState.fields)],
+    [projectId, selectedModel, docEditorState.sessionId, JSON.stringify(docEditorState.fields)],
   );
 
   const chatBodyRef = useRef(chatBody);
@@ -248,7 +332,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
         prepareSendMessagesRequest({ messages, id, body }) {
           return {
             body: {
-              messages,
+              messages: compactMessagesForLLM(messages),
               id,
               ...chatBodyRef.current,
               ...body,
@@ -267,12 +351,14 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
     error,
     regenerate,
     addToolResult,
+    stop,
   } = useChat({
     transport,
   });
 
   // Initialize specific chat if ID is provided via prop
   useEffect(() => {
+    setQueuedMessages([]);
     if (chatId) {
       setIsInitializingChat(true);
       get(`chat_messages_${chatId}`).then((msgs) => {
@@ -343,16 +429,50 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   useEffect(() => {
     setMessages([]);
     setCurrentChatId('');
-  }, [serverId, setMessages]);
+    setQueuedMessages([]);
+  }, [projectId, setMessages]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   const isBusy = chatStatus === 'submitted' || chatStatus === 'streaming';
+
+  // Some providers leave the HTTP stream open after the final answer. Once
+  // visible text and every tool output have been stable for a short grace
+  // period, close that stale transport so Send and message actions recover.
+  // Any incoming delta replaces `messages` and resets this timer.
+  useEffect(() => {
+    if (chatStatus !== 'streaming') return;
+    const lastMessage = messages[messages.length - 1] as any;
+    if (!assistantReplyCanClose(lastMessage)) return;
+    const timeout = window.setTimeout(() => void stop(), 750);
+    return () => window.clearTimeout(timeout);
+  }, [chatStatus, messages, stop]);
+
+  // Drain the queue one message at a time once the assistant is free again
+  useEffect(() => {
+    if (queuedMessages.length === 0 || isBusy || isDocLoading || pendingMessage) return;
+    const [next, ...rest] = queuedMessages;
+    setQueuedMessages(rest);
+    shouldAutoScrollRef.current = true;
+    const dt = new DataTransfer();
+    (next.files ?? []).forEach((file) => dt.items.add(file));
+    sendMessage({ text: next.text, files: dt.files.length > 0 ? dt.files : undefined });
+  }, [queuedMessages, isBusy, isDocLoading, pendingMessage, sendMessage]);
+
+  const handleMessageScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    shouldAutoScrollRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || !shouldAutoScrollRef.current) return;
     const id = requestAnimationFrame(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: chatStatus === 'streaming' ? 'auto' : 'smooth',
+      });
     });
     return () => cancelAnimationFrame(id);
   }, [messages, chatStatus]);
@@ -379,6 +499,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
         setCurrentChatId(activeId);
       }
 
+      // Save full messages to IDB so UI (charts, tables) can be restored on reload
       set(`chat_messages_${activeId}`, currentMessages);
 
       if (window.location.pathname === '/chat') {
@@ -442,10 +563,52 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
     return groups;
   }, [status?.availableModels, modelSearch]);
 
+  const filteredHistory = useMemo(() => {
+    const sorted = [...history].sort((a, b) => b.updatedAt - a.updatedAt);
+    const query = historySearch.toLowerCase().trim();
+    return query ? sorted.filter((chat) => chat.title.toLowerCase().includes(query)) : sorted;
+  }, [history, historySearch]);
+
+  function removeFromQueue(id: string) {
+    setQueuedMessages((prev) => prev.filter((m) => m.id !== id));
+  }
+
+  function moveQueueItem(id: string, direction: -1 | 1) {
+    setQueuedMessages((prev) => {
+      const index = prev.findIndex((m) => m.id === id);
+      const target = index + direction;
+      if (index === -1 || target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  function editQueueItem(id: string) {
+    const item = queuedMessages.find((m) => m.id === id);
+    if (!item) return;
+    setQueuedMessages((prev) => prev.filter((m) => m.id !== id));
+    setInput(item.text);
+    setAttachments(item.files ?? []);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
   function handleSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
     const text = input.trim();
-    if ((!text && attachments.length === 0) || isBusy || isDocLoading) return;
+    if (!text && attachments.length === 0) return;
+
+    if (isBusy || isDocLoading) {
+      setQueuedMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), text, files: attachments.length > 0 ? attachments : undefined },
+      ]);
+      setInput('');
+      setAttachments([]);
+      return;
+    }
+
+    shouldAutoScrollRef.current = true;
 
     const dt = new DataTransfer();
     attachments.forEach((file) => dt.items.add(file));
@@ -538,6 +701,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   function newChat() {
     setMessages([]);
     setInput('');
+    setQueuedMessages([]);
     setCurrentChatId(crypto.randomUUID());
     window.history.pushState(null, '', '/chat');
   }
@@ -829,7 +993,13 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
           <div className="h-4 w-px bg-border mx-1" />
 
           <TooltipProvider delay={50}>
-            <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+            <Sheet
+              open={isHistoryOpen}
+              onOpenChange={(open) => {
+                setIsHistoryOpen(open);
+                if (!open) setHistorySearch('');
+              }}
+            >
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -849,59 +1019,80 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
                 <TooltipContent>Chat History</TooltipContent>
               </Tooltip>
               <SheetContent side="left" className="w-75 sm:w-87.5 p-0 flex flex-col">
-                <SheetHeader className="p-4 border-b">
+                <SheetHeader className="p-4 pb-3 border-b">
                   <SheetTitle className="text-sm font-semibold">Chat History</SheetTitle>
+                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-2.5 py-1.5">
+                    <Search className="size-3.5 shrink-0 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={historySearch}
+                      onChange={(e) => setHistorySearch(e.target.value)}
+                      placeholder="Search chats..."
+                      className="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                    />
+                    {historySearch && (
+                      <button
+                        type="button"
+                        onClick={() => setHistorySearch('')}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    )}
+                  </div>
                 </SheetHeader>
                 <div className="flex-1 overflow-y-auto p-2">
                   {history.length === 0 ? (
                     <div className="p-4 text-center text-xs text-muted-foreground">
                       No chat history
                     </div>
+                  ) : filteredHistory.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-muted-foreground">
+                      No chats match "{historySearch}"
+                    </div>
                   ) : (
-                    history
-                      .sort((a, b) => b.updatedAt - a.updatedAt)
-                      .map((chat) => (
-                        <div
-                          key={chat.id}
-                          onClick={() => loadChat(chat.id)}
-                          className={cn(
-                            'group flex items-center justify-between rounded-md px-3 py-2 text-sm cursor-pointer transition hover:bg-muted mb-1',
-                            currentChatId === chat.id && 'bg-muted font-medium',
-                          )}
-                        >
-                          <div className="truncate pr-4 flex-1 text-xs">{chat.title}</div>
-                          <AlertDialog>
-                            <AlertDialogTrigger
-                              render={
-                                <button
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive"
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </button>
-                              }
-                            />
-                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Chat</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this chat? This action cannot be
-                                  undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteChat(chat.id)}
-                                  className="bg-destructive text-white hover:bg-destructive/90"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      ))
+                    filteredHistory.map((chat) => (
+                      <div
+                        key={chat.id}
+                        onClick={() => loadChat(chat.id)}
+                        className={cn(
+                          'group flex items-center justify-between rounded-md px-3 py-2 text-sm cursor-pointer transition hover:bg-muted mb-1',
+                          currentChatId === chat.id && 'bg-muted font-medium',
+                        )}
+                      >
+                        <div className="truncate pr-4 flex-1 text-xs">{chat.title}</div>
+                        <AlertDialog>
+                          <AlertDialogTrigger
+                            render={
+                              <button
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-destructive"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            }
+                          />
+                          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this chat? This action cannot be
+                                undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteChat(chat.id)}
+                                className="bg-destructive text-white hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    ))
                   )}
                 </div>
               </SheetContent>
@@ -927,7 +1118,11 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
       </div>
 
       {/* Messages area */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={scrollRef}
+        onScroll={handleMessageScroll}
+        className="min-h-0 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden"
+      >
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
           {!ready ? (
             <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
@@ -997,7 +1192,10 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
                   isLast={idx === messages.length - 1}
                   isStreaming={chatStatus === 'streaming'}
                   addToolResult={addToolResult}
-                  serverId={serverId}
+                  serverId={projectId}
+                  autoOpenSupportingClip={shouldAutoOpenSupportingClip(messages, idx)}
+                  regenerate={regenerate}
+                  isBusy={isBusy}
                 />
               ))}
               {chatStatus === 'submitted' || isInitializingChat ? (
@@ -1057,6 +1255,15 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
       {/* Input area */}
       {ready && (
         <div className="relative z-10 mt-auto px-4 pb-5 pt-3 sm:px-6">
+          {queuedMessages.length > 0 && (
+            <MessageQueue
+              items={queuedMessages}
+              onRemove={removeFromQueue}
+              onMoveUp={(id) => moveQueueItem(id, -1)}
+              onMoveDown={(id) => moveQueueItem(id, 1)}
+              onEdit={editQueueItem}
+            />
+          )}
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
             <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-0.5 focus-within:ring-ring/20">
               <DropdownMenu>
@@ -1158,12 +1365,6 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      if (isDocLoading) {
-                        toast.info('Document is loading...', {
-                          description: 'Please wait a moment before sending.',
-                        });
-                        return;
-                      }
                       handleSubmit(e);
                     }
                   }}
@@ -1193,17 +1394,18 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
                   rows={1}
                   disabled={!ready}
                   placeholder="How can I help you…"
-                  className="max-h-48 min-h-11 w-full resize-none bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-scrollbar]:hidden disabled:opacity-50"
+                  className="max-h-48 min-h-11 w-full resize-none overflow-y-auto bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground scrollbar-none [&::-webkit-scrollbar]:hidden disabled:opacity-50"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={(!input.trim() && attachments.length === 0) || isBusy || isDocLoading}
+                disabled={!input.trim() && attachments.length === 0}
+                title={isBusy || isDocLoading ? 'Add to queue' : 'Send'}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
               >
                 {isBusy || isDocLoading ? (
-                  <Loader2 className="h-4.5 w-4.5 animate-spin" />
+                  <ListPlus className="h-4.5 w-4.5" />
                 ) : (
                   <ArrowUp className="h-4.5 w-4.5" />
                 )}

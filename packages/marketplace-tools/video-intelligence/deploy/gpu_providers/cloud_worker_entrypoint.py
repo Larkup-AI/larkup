@@ -57,12 +57,22 @@ def main() -> None:
                 json.loads(job["briefJson"]),
                 settings.model_dir,
                 settings.device,
-                lambda stage, percent, message: table.update_item(
+                lambda stage, percent, message, stage_percent=None, details=None: table.update_item(
                     Key={"pk": f"JOB#{job_id}", "sk": "JOB"},
                     UpdateExpression="SET progressJson = :progress, updatedAt = :updated",
                     ExpressionAttributeValues={
                         ":progress": json.dumps(
-                            {"stage": stage, "percent": percent, "message": message}
+                            {
+                                "stage": stage,
+                                "percent": percent,
+                                "message": message,
+                                **(
+                                    {"stagePercent": stage_percent}
+                                    if stage_percent is not None
+                                    else {}
+                                ),
+                                **(details or {}),
+                            }
                         ),
                         ":updated": _now(),
                     },

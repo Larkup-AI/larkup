@@ -13,8 +13,8 @@ import secrets
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, UploadFile
+from fastapi.responses import JSONResponse, Response
 
 from app.db.schemas import (
     CreateAccessCodeRequest,
@@ -37,7 +37,7 @@ def health() -> dict[str, object]:
     return {
         "status": "ok",
         "version": "0.1.0",
-        "runtime": "local-docker",
+        "runtime": os.getenv("LARKUP_VIDEO_RUNTIME_KIND", "local-docker"),
         "authRequired": settings.require_auth,
         "device": settings.device,
         "operators": {
@@ -46,8 +46,10 @@ def health() -> dict[str, object]:
             "detection": "YOLOX",
             "tracking": "anonymous-iou",
             "semanticVision": settings.semantic_vision_model if settings.semantic_vision_enabled else None,
+            "agentBrain": settings.agent_model if settings.agent_enabled else None,
+            "agentProvider": settings.agent_provider if settings.agent_enabled else None,
         },
-        "capabilities": ["transcription", "ocr", "object-detection", "full-frame"],
+        "capabilities": ["agent-planning", "transcription", "ocr", "object-detection", "semantic-vision"],
     }
 
 
@@ -84,13 +86,20 @@ def upload_video(
 
 
 @router.post("/v1/jobs", response_model=JobResponse, status_code=202)
-def create_job(request: CreateJobRequest, user: Annotated[Principal, Depends(principal)]) -> dict[str, object]:
+def create_job(
+    request: CreateJobRequest,
+    user: Annotated[Principal, Depends(principal)],
+    background_tasks: BackgroundTasks,
+) -> dict[str, object]:
     upload = store.get_upload(user.id, request.source.upload_id)
     probe = probe_video(Path(upload["path"]))
     job_id = "job_" + secrets.token_hex(12)
     payload = request.model_dump(by_alias=True)
+    model_configuration = payload.pop("modelConfiguration", None)
     store.create_job(user, job_id, request.source.upload_id, payload, probe.duration_seconds / 60)
-    jobs.submit(job_id)
+    # Dispatch after the response commits. This avoids losing a local job
+    # during a container restart before the thread-pool worker starts.
+    background_tasks.add_task(jobs.run, job_id, model_configuration)
     return store.get_job(user.id, job_id)
 
 
@@ -103,6 +112,13 @@ def get_job(job_id: str, user: Annotated[Principal, Depends(principal)]) -> dict
 def cancel_job(job_id: str, user: Annotated[Principal, Depends(principal)]) -> dict[str, object]:
     store.cancel_job(user.id, job_id)
     return store.get_job(user.id, job_id)
+
+
+@router.delete("/v1/jobs/{job_id}/data", response_class=Response)
+def purge_job_data(job_id: str, user: Annotated[Principal, Depends(principal)]) -> Response:
+    """Delete the local source/result cache after the host removes its media asset."""
+    store.purge_job_data(user.id, job_id)
+    return Response(status_code=204)
 
 
 @router.get("/v1/usage", response_model=UsageSummary)
@@ -129,7 +145,6 @@ def create_access_code(
     entitlement = {
         "sourceMinutesPerMonth": request.source_minutes_per_month,
         "maxConcurrentJobs": request.max_concurrent_jobs,
-        "allowFullCoverage": request.allow_full_coverage,
         "plan": "access-code",
     }
     code = store.create_access_code(

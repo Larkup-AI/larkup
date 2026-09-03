@@ -21,7 +21,7 @@ ARG YOLOX_MODEL_URL=https://github.com/Megvii-BaseDetection/YOLOX/releases/downl
 
 WORKDIR /service
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgomp1 \
+    && apt-get install -y --no-install-recommends ffmpeg libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 COPY runtime/requirements-cpu.txt ./requirements-cpu.txt
 RUN python3 -m pip install --no-cache-dir --upgrade pip \
@@ -71,9 +71,14 @@ ENV PYTHONUNBUFFERED=1 \
     LARKUP_VIDEO_MODEL_DIR=/models \
     LARKUP_VIDEO_DEVICE=auto \
     LARKUP_VIDEO_SEMANTIC_VISION=true \
-    LARKUP_VIDEO_SEMANTIC_VISION_MODEL=google/gemini-3-flash \
-    LARKUP_VIDEO_EMBEDDING_PROVIDER=gateway-gemini-embedding-2 \
-    LARKUP_VIDEO_TRANSCRIPTION_PROVIDER=deepgram \
+    LARKUP_VIDEO_SEMANTIC_VISION_MODEL=google/gemini-3.6-flash \
+    LARKUP_VIDEO_EMBEDDING_PROVIDER=disabled \
+    LARKUP_VIDEO_EMBEDDING_FALLBACK_PROVIDER=disabled \
+    LARKUP_VIDEO_TRANSCRIPTION_PROVIDER="" \
+    LARKUP_VIDEO_TRANSCRIPTION_FALLBACK="" \
+    LARKUP_VIDEO_TRANSCRIPTION_CHUNK_SECONDS=300 \
+    LARKUP_VIDEO_TRANSCRIPTION_CONCURRENCY=6 \
+    LARKUP_VIDEO_TRANSCRIPTION_REQUEST_TIMEOUT_SECONDS=120 \
     LARKUP_VIDEO_REQUIRE_AUTH=false
 
 EXPOSE 8787

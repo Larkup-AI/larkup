@@ -3,16 +3,17 @@
 import {
   Settings2,
   CpuIcon,
-  Server,
-  Search,
   Database,
   Plug,
   Store,
   Bot,
   type LucideIcon,
-  Grid2X2Plus,
-  BarChart3,
   Globe,
+  Terminal,
+  Activity,
+  Clock3,
+  Blocks,
+  Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,15 +22,12 @@ export type SettingsSection =
   | 'models'
   | 'storage'
   | 'search-web'
-  | 'connections'
-  | 'server'
-  | 'prompts'
-  | 'playground'
-  | 'deployment'
+  | 'agent-customization'
+  | 'runtime'
+  | 'monitoring'
+  | 'automations'
   | 'marketplace'
-  | 'tool-settings'
-  | 'agents'
-  | 'analytics';
+  | 'tool-settings';
 
 interface SectionItem {
   id: SettingsSection;
@@ -44,48 +42,52 @@ interface SectionGroup {
 
 const SECTION_GROUPS: SectionGroup[] = [
   {
-    label: 'Larkup Settings',
+    label: 'Project',
     items: [
       { id: 'general', label: 'General', icon: Settings2 },
       { id: 'models', label: 'AI Models', icon: CpuIcon },
-      { id: 'storage', label: 'Storage', icon: Database },
+      { id: 'storage', label: 'Storage & indexing', icon: Database },
       { id: 'search-web', label: 'Search & Scraping', icon: Globe },
-      { id: 'connections', label: 'Connections', icon: Plug },
     ],
   },
   {
     label: 'Hub',
     items: [
       { id: 'marketplace', label: 'Marketplace', icon: Store },
-      { id: 'tool-settings', label: 'Installed Tools', icon: Plug },
-      { id: 'agents', label: 'Agents', icon: Bot },
+      { id: 'tool-settings', label: 'Installed Tools', icon: Wrench },
     ],
   },
   {
-    label: 'Advanced',
+    label: 'Runtime',
     items: [
-      { id: 'server', label: 'Larkup Server', icon: Server },
-      { id: 'prompts', label: 'Agent Customization', icon: Grid2X2Plus },
-      { id: 'playground', label: 'Playground', icon: Search },
-      { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+      { id: 'agent-customization', label: 'Agent Customization', icon: Blocks },
+      { id: 'runtime', label: 'Larkup Server', icon: Terminal },
+      { id: 'monitoring', label: 'Monitor', icon: Activity },
+      // { id: 'automations', label: 'Jobs', icon: Clock3 }, // TODO:: Later
     ],
   },
 ];
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
-  activeSection: SettingsSection;
+  activeSection: SettingsSection | null;
   onSectionChange: (section: SettingsSection) => void;
+  fullWidth?: boolean;
 }
 
-export function SettingsLayout({ children, activeSection, onSectionChange }: SettingsLayoutProps) {
+export function SettingsLayout({
+  children,
+  activeSection,
+  onSectionChange,
+  fullWidth = false,
+}: SettingsLayoutProps) {
   return (
-    <div className="flex h-full min-h-[500px]">
-      <aside className="w-[240px] shrink-0 border-r bg-muted/20">
-        <nav className="flex h-full flex-col gap-6 p-4">
+    <div className="flex h-full min-h-125">
+      <aside className="w-60 shrink-0 border-r bg-muted/40">
+        <nav className="flex h-full flex-col gap-7 p-4">
           {SECTION_GROUPS.map((group) => (
             <div key={group.label}>
-              <h4 className="mb-2 px-2 text-xs font-semibold tracking-wider text-muted-foreground/70 uppercase">
+              <h4 className="mb-2 px-3 text-[12px] font-semibold text-muted-foreground">
                 {group.label}
               </h4>
               <div className="space-y-1">
@@ -94,10 +96,10 @@ export function SettingsLayout({ children, activeSection, onSectionChange }: Set
                     key={item.id}
                     onClick={() => onSectionChange(item.id)}
                     className={cn(
-                      'flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
+                      'flex w-full items-center  gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors',
                       activeSection === item.id
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                        ? 'bg-sidebar-accent/50 dark:bg-white/10 text-foreground font-medium'
+                        : 'font-normal text-muted-foreground/90 hover:bg-muted hover:text-foreground',
                     )}
                   >
                     <item.icon className="size-4" />
@@ -110,7 +112,11 @@ export function SettingsLayout({ children, activeSection, onSectionChange }: Set
         </nav>
       </aside>
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-4xl p-6 lg:p-8">{children}</div>
+        <div
+          className={cn(fullWidth ? 'w-full p-6 lg:px-10 lg:py-8' : 'mx-auto max-w-6xl p-6 lg:p-8')}
+        >
+          {children}
+        </div>
       </main>
     </div>
   );

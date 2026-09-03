@@ -1,7 +1,7 @@
-import { readMediaAssets, recoverStaleMediaAssets } from '@larkup/core/media-store';
+import { readMediaAssets } from '@larkup/core/media-store';
 import { createStorageProvider } from '@larkup/marketplace/storage';
 import type { MediaType } from '@larkup/core/types';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,13 +40,13 @@ async function snapshot(
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const type = url.searchParams.get('type');
+  const requestedType = url.searchParams.get('type');
   const serverId = url.searchParams.get('serverId');
   const typeFilter: MediaType | null =
-    type === 'image' || type === 'video' || type === 'audio' ? type : null;
-  const scoped = <T>(fn: () => T): T => (serverId ? runWithServer(serverId, fn) : fn());
-
-  await scoped(() => recoverStaleMediaAssets());
+    requestedType === 'image' || requestedType === 'video' || requestedType === 'audio'
+      ? requestedType
+      : null;
+  const scoped = <T>(fn: () => T): T => (serverId ? runWithProject(serverId, fn) : fn());
 
   let interval: ReturnType<typeof setInterval> | undefined;
   let keepAlive: ReturnType<typeof setInterval> | undefined;

@@ -1,6 +1,9 @@
 import type {
   AddDocumentResponse,
   ChatEvent,
+  ChatModel,
+  ChatModelCatalog,
+  ChatProvider,
   ChatRequest,
   CorpusExportFormat,
   CorpusRequest,
@@ -43,17 +46,7 @@ async function errorFor(response: Response): Promise<LarkupApiError> {
   return new LarkupApiError(response.status, message);
 }
 
-/**
- * Client for the Larkup **Knowledge Server** (data plane).
- *
- * Connects to a deployed or local Knowledge Server for semantic retrieval,
- * document management, and corpus operations. Use a scoped API key
- * (retrieval / ingest / admin) to control what operations are permitted.
- *
- * For the Agent (execution plane), use `LarkupAgentClient` instead.
- *
- * @see {@link https://docs.larkup.de/sdk/js Knowledge Server SDK docs}
- */
+/** Client for a generated Larkup Knowledge Server. */
 export class LarkupClient {
   private readonly baseUrl: string;
   private readonly apiKey?: string;
@@ -92,11 +85,7 @@ export class LarkupClient {
     return this.json('/health');
   }
 
-  /**
-   * Checks whether the Knowledge Server's vector store connection is live.
-   * Returns `{ ready: true, vectorStore: "connected", documents: N }` on success,
-   * or throws with a 503 if the store is unreachable.
-   */
+  /** Checks that the Knowledge Server can reach its vector store. */
   readiness(): Promise<{
     ready: boolean;
     vectorStore: string;
@@ -109,6 +98,22 @@ export class LarkupClient {
   /** Returns the generated OpenAPI schema. */
   openApi(): Promise<Record<string, unknown>> {
     return this.json('/openapi.json');
+  }
+
+  /** List all chat providers and models available to this deployment. */
+  chatModelCatalog(provider?: string): Promise<ChatModelCatalog> {
+    const query = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+    return this.json(`/models${query}`);
+  }
+
+  /** List available chat model vendors. */
+  async chatProviders(): Promise<ChatProvider[]> {
+    return (await this.chatModelCatalog()).providers;
+  }
+
+  /** List available chat models, optionally filtered by their vendor. */
+  async chatModels(provider?: string): Promise<ChatModel[]> {
+    return (await this.chatModelCatalog(provider)).models;
   }
 
   /** Runs semantic retrieval against the server's configured index. */
@@ -193,7 +198,7 @@ export class LarkupClient {
     options: IndexDocumentsOptions = {},
   ): AsyncGenerator<IndexProgressEvent> {
     const total = documents.length;
-    const requestedConcurrency = options.mode === 'parallel' ? options.concurrency ?? 4 : 1;
+    const requestedConcurrency = options.mode === 'parallel' ? (options.concurrency ?? 4) : 1;
     const concurrency = Math.max(1, Math.min(requestedConcurrency, Math.max(total, 1)));
     const pending = new Map<
       number,
@@ -228,8 +233,8 @@ export class LarkupClient {
         outcome.error instanceof Error
           ? outcome.error.message
           : outcome.error === undefined
-          ? undefined
-          : String(outcome.error);
+            ? undefined
+            : String(outcome.error);
 
       if (error) failed += 1;
       else succeeded += 1;
@@ -314,9 +319,16 @@ export class LarkupClient {
     return text;
   }
 
-  /* ---------------------------------------------------------------- */
-  /*  Media assets                                                     */
-  /* ---------------------------------------------------------------- */
+  /*
+   * Media assets.
+   *
+   * These live on the dashboard's API (`http://localhost:4567/api` by default),
+   * not on a generated Knowledge Server: indexing media needs the workspace,
+   * ffmpeg, and the media store, none of which a deployed server carries. Point
+   * `baseUrl` at the dashboard to use them:
+   *
+   *   new LarkupClient({ baseUrl: 'http://localhost:4567/api' })
+   */
 
   /** Lists all media assets (images, videos, audio). */
   async listMedia(): Promise<MediaListResponse> {

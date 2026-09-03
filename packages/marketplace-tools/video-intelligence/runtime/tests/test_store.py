@@ -19,7 +19,6 @@ class StoreTests(unittest.TestCase):
         entitlement = {
             "sourceMinutesPerMonth": 10,
             "maxConcurrentJobs": 1,
-            "allowFullCoverage": False,
             "plan": "test",
         }
         code = self.store.create_access_code(
@@ -37,7 +36,6 @@ class StoreTests(unittest.TestCase):
             {
                 "sourceMinutesPerMonth": 5,
                 "maxConcurrentJobs": 1,
-                "allowFullCoverage": False,
             },
         )
         source = Path(self.temp.name) / "video.mp4"
@@ -51,29 +49,31 @@ class StoreTests(unittest.TestCase):
         with self.assertRaises(QuotaExceededError):
             self.store.create_job(principal, "job-2", "upload", request, 3)
 
-    def test_full_coverage_requires_entitlement(self) -> None:
+    def test_live_job_progress_never_moves_backwards_for_parallel_stages(self) -> None:
         principal = Principal(
             "user",
             {
                 "sourceMinutesPerMonth": 100,
                 "maxConcurrentJobs": 1,
-                "allowFullCoverage": False,
             },
         )
         source = Path(self.temp.name) / "video.mp4"
         source.touch()
         self.store.create_upload("user", "upload", "video.mp4", source, 0)
-        with self.assertRaises(QuotaExceededError):
-            self.store.create_job(
-                principal,
-                "job",
-                "upload",
-                {
-                    "source": {"uploadId": "upload"},
-                    "brief": {"indexingMode": "full-coverage"},
-                },
-                1,
-            )
+        self.store.create_job(
+            principal,
+            "job",
+            "upload",
+            {"source": {"uploadId": "upload"}, "brief": {"indexingMode": "balanced"}},
+            1,
+        )
+
+        self.store.update_job("job", "detect", 72, "Analyzing visual evidence")
+        self.store.update_job("job", "transcribe", 41, "Speech timeline ready")
+
+        progress = self.store.get_job("user", "job")["progress"]
+        self.assertEqual(progress["stage"], "transcribe")
+        self.assertEqual(progress["percent"], 72)
 
 
 if __name__ == "__main__":

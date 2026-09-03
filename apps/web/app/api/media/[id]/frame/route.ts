@@ -6,7 +6,7 @@ import { getMediaAsset } from '@larkup/core/media-store';
 import { createStorageProvider } from '@larkup/marketplace/storage';
 import { loadTool } from '@larkup/marketplace/loader';
 import { isToolInstalled } from '@larkup/marketplace/installer';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   const serverId = new URL(req.url).searchParams.get('serverId');
   const handler = () => extractAndServeFrame(req, context);
-  return serverId ? runWithServer(serverId, handler) : handler();
+  return serverId ? runWithProject(serverId, handler) : handler();
 }
 
 async function extractAndServeFrame(req: Request, { params }: { params: Promise<{ id: string }> }) {

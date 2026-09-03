@@ -80,7 +80,10 @@ export function saveVideoAnswerMemory(input: {
     const entriesForAsset = state.answerMemory
       .filter((candidate) => candidate.mediaAssetId === input.mediaAssetId)
       .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
-    for (const stale of entriesForAsset.slice(0, Math.max(0, entriesForAsset.length - MAX_ENTRIES_PER_ASSET))) {
+    for (const stale of entriesForAsset.slice(
+      0,
+      Math.max(0, entriesForAsset.length - MAX_ENTRIES_PER_ASSET),
+    )) {
       state.answerMemory.splice(state.answerMemory.indexOf(stale), 1);
     }
     return entry;
@@ -162,5 +165,18 @@ export function recordUnansweredVideoQuestion(input: {
     };
     state.answerMemory.push(entry);
     return entry;
+  });
+}
+
+/**
+ * Remove mutable answer-level state for one asset without deleting its source
+ * evidence or deterministic analysis artifacts. This is appropriate after a
+ * retrieval-policy change: the next request starts from grounded evidence.
+ */
+export function clearVideoAnswerMemory(mediaAssetId: string) {
+  return mutateVideoKnowledgeState((state) => {
+    const before = state.answerMemory.length;
+    state.answerMemory = state.answerMemory.filter((entry) => entry.mediaAssetId !== mediaAssetId);
+    return { cleared: before - state.answerMemory.length };
   });
 }

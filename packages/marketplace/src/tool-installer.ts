@@ -433,7 +433,7 @@ async function isWorkspaceTool(packageName: string): Promise<boolean> {
   return Boolean(await resolveWorkspaceToolPath(packageName));
 }
 
-async function resolveWorkspaceToolPath(packageName: string): Promise<string | undefined> {
+export async function resolveWorkspaceToolPath(packageName: string): Promise<string | undefined> {
   try {
     const linkedPath = path.join(process.cwd(), 'node_modules', ...packageName.split('/'));
     const packageRoot = await fs.realpath(linkedPath);
@@ -464,7 +464,7 @@ async function resolveWorkspaceToolPath(packageName: string): Promise<string | u
     }
   }
 
-  const toolsRoot = path.join(workspaceRoot, 'packages', 'tools');
+  const toolsRoot = path.join(workspaceRoot, 'packages', 'marketplace-tools');
   let entries: Dirent[];
   try {
     entries = await fs.readdir(toolsRoot, { withFileTypes: true });
@@ -494,6 +494,7 @@ async function resolveWorkspaceToolPath(packageName: string): Promise<string | u
 export async function installTool(
   toolId: string,
   onProgress?: (progress: InstallProgress) => void,
+  initialConfig: Record<string, unknown> = {},
 ): Promise<void> {
   installingTools.add(toolId);
   const report = (stage: InstallProgress['stage'], percent: number, message: string) => {
@@ -577,7 +578,7 @@ export async function installTool(
       packageName: descriptor.packageName,
       resolvedPath,
       source,
-      config: buildDefaultConfig(descriptor),
+      config: { ...buildDefaultConfig(descriptor), ...initialConfig },
     };
 
     if (existing >= 0) {

@@ -24,7 +24,10 @@ export class VideoIntelligenceClient implements VideoIntelligenceClientContract 
 
   constructor(options: VideoIntelligenceClientOptions) {
     this.mode = options.mode;
-    const defaultEndpoint = options.mode === 'local-docker' ? 'http://127.0.0.1:8787' : undefined;
+    const defaultEndpoint =
+      options.mode === 'local-docker' || options.mode === 'local-process'
+        ? 'http://127.0.0.1:8787'
+        : undefined;
     if (!options.endpoint && !defaultEndpoint) {
       throw new Error(`An endpoint is required for ${options.mode}.`);
     }
@@ -38,18 +41,25 @@ export class VideoIntelligenceClient implements VideoIntelligenceClientContract 
     const health = await this.request<{
       status: string;
       version: string;
-      operators: Record<string, string>;
+      operators?: Record<string, string>;
+      runtime?: string;
+      processingEnabled?: boolean;
     }>('/v1/health');
+    const isManagedCloudHealth =
+      health.runtime === 'managed-cloud' && typeof health.processingEnabled === 'boolean';
     if (
       health.status !== 'ok' ||
       typeof health.version !== 'string' ||
       !health.version ||
-      !health.operators ||
-      typeof health.operators !== 'object'
+      ((!health.operators || typeof health.operators !== 'object') && !isManagedCloudHealth)
     ) {
       throw new Error('The endpoint did not identify itself as a Video Intelligence runtime.');
     }
-    return health;
+    return {
+      status: health.status,
+      version: health.version,
+      operators: health.operators ?? {},
+    };
   }
 
   provisionDeviceAccess(installationId: string): Promise<{
@@ -115,6 +125,15 @@ export class VideoIntelligenceClient implements VideoIntelligenceClientContract 
     return this.request(`/v1/jobs/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
   }
 
+  async purgeJobData(jobId: string): Promise<void> {
+    await this.request(`/v1/jobs/${encodeURIComponent(jobId)}/data`, { method: 'DELETE' });
+  }
+
+  /** Recovery path for an orphaned local asset. The service refuses ambiguity. */
+  cancelOnlyActiveJob(): Promise<{ status: string; alreadyStopped?: boolean }> {
+    return this.request('/v1/jobs/active', { method: 'DELETE' });
+  }
+
   getUsage(): Promise<VideoServiceUsage> {
     return this.request('/v1/usage');
   }
@@ -133,29 +152,45 @@ export class VideoIntelligenceClient implements VideoIntelligenceClientContract 
     path: string,
     init: RequestInit & { anonymous?: boolean } = {},
   ): Promise<T> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     const headers = new Headers(init.headers);
     if (!(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
     if (this.apiKey && !init.anonymous) headers.set('Authorization', `Bearer ${this.apiKey}`);
-    try {
-      const response = await this.fetcher(`${this.endpoint}${path}`, {
-        ...init,
-        headers,
-        signal: controller.signal,
-      });
-      const body = (await response.json().catch(() => ({}))) as T & {
-        detail?: string;
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(
-          body.detail ?? body.error ?? `Video service returned HTTP ${response.status}.`,
-        );
+    const canRetry = !init.method || init.method === 'GET';
+    for (let attempt = 0; ; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+      try {
+        const response = await this.fetcher(`${this.endpoint}${path}`, {
+          ...init,
+          headers,
+          signal: controller.signal,
+        });
+        const body = (await response.json().catch(() => ({}))) as T & {
+          detail?: string;
+          error?: string;
+        };
+        const retryAfter = response.headers.get('Retry-After');
+        if (response.status === 429 && canRetry && attempt < 2 && retryAfter !== null) {
+          const retryAfterSeconds = Number(retryAfter);
+          await new Promise((resolve) =>
+            setTimeout(
+              resolve,
+              Number.isFinite(retryAfterSeconds)
+                ? Math.max(0, Math.min(60, retryAfterSeconds)) * 1_000
+                : 60_000,
+            ),
+          );
+          continue;
+        }
+        if (!response.ok) {
+          throw new Error(
+            body.detail ?? body.error ?? `Video service returned HTTP ${response.status}.`,
+          );
+        }
+        return body;
+      } finally {
+        clearTimeout(timeout);
       }
-      return body;
-    } finally {
-      clearTimeout(timeout);
     }
   }
 }

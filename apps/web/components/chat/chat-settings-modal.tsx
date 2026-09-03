@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Settings, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-import { useWorkspace } from '@/components/workspace/workspace-provider';
+import { useProject } from '@/components/projects/project-provider';
 import useSWR from 'swr';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { PROVIDER_META, ProviderIcon } from '@/components/ui/provider-icon';
@@ -26,8 +26,8 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function ChatSettingsModal() {
   const [open, setOpen] = useState(false);
-  const { activeServer } = useWorkspace();
-  const serverId = activeServer?.id;
+  const { activeProject } = useProject();
+  const serverId = activeProject?.id;
 
   const { data: configData, mutate } = useSWR(
     serverId ? `/api/config?serverId=${encodeURIComponent(serverId)}` : null,

@@ -35,11 +35,11 @@ import {
 import { collectFiles } from '../lib/local-files';
 import { log } from '../ui/logger';
 import { prompts } from '../ui/prompts';
-import { inServerScope, requireActive } from '../lib/scope';
+import { inProjectScope, requireActiveProject } from '../lib/scope';
 
 interface MediaOptions {
   index?: boolean;
-  server?: string;
+  project?: string;
 }
 
 interface MediaTool {
@@ -97,7 +97,7 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 async function processMediaCommand(inputs: string[], options: MediaOptions) {
-  await requireActive();
+  await requireActiveProject();
   if (inputs.length === 0) {
     const assets = await readMediaAssets();
     if (assets.length === 0) {
@@ -146,7 +146,7 @@ async function processMediaCommand(inputs: string[], options: MediaOptions) {
 }
 
 export async function mediaCommand(inputs: string[], options: MediaOptions = {}) {
-  await inServerScope(options.server, () => processMediaCommand(inputs, options));
+  await inProjectScope(options.project, () => processMediaCommand(inputs, options));
 }
 
 async function processMediaAsset(asset: MediaAsset) {

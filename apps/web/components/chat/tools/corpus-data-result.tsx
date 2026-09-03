@@ -5,10 +5,6 @@ import { ChevronDown, Database, FileText, Globe, Upload, Table2, Image } from 'l
 import { ChatDataTable, type DataTableConfig } from '@/components/chat/tools/chat-data-table';
 import { Card } from '@/components/ui/card';
 
-/* ------------------------------------------------------------------ */
-/* Types                                                               */
-/* ------------------------------------------------------------------ */
-
 interface CorpusDocumentSummary {
   id: string;
   title: string;
@@ -37,10 +33,6 @@ export interface CorpusDataConfig {
   error?: string;
 }
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-
 const SOURCE_ICONS: Record<string, React.ReactNode> = {
   paste: <FileText className="size-3" />,
   upload: <Upload className="size-3" />,
@@ -62,10 +54,6 @@ function formatChars(chars: number): string {
   if (chars >= 1_000) return `${(chars / 1_000).toFixed(1)}K`;
   return String(chars);
 }
-
-/* ------------------------------------------------------------------ */
-/* Component                                                           */
-/* ------------------------------------------------------------------ */
 
 export function CorpusDataResult({ config }: { config: CorpusDataConfig }) {
   const [showTable, setShowTable] = useState(false);

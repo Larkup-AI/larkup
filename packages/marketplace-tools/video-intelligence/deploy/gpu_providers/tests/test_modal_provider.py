@@ -79,9 +79,55 @@ class ModalProviderTests(unittest.TestCase):
             output = provider.get_result("call-1")
         self.assertEqual(output["result"], {"durationMs": 5})
 
-    def test_get_progress_is_not_yet_supported(self) -> None:
+    def test_get_progress_reads_valid_worker_progress(self) -> None:
         provider = ModalProvider(token_id="id", token_secret="s")
-        self.assertIsNone(provider.get_progress("call-1"))
+        fake_modal = MagicMock()
+        fake_modal.Dict.from_name.return_value.get.return_value = {
+            "stage": "detect",
+            "percent": 67,
+            "stagePercent": 42.5,
+            "message": "Analyzing frame 67/100",
+        }
+        with patch.object(provider, "_sdk", return_value=fake_modal):
+            self.assertEqual(
+                provider.get_progress("call-1"),
+                {
+                    "stage": "detect",
+                    "percent": 67,
+                    "stagePercent": 42.5,
+                    "message": "Analyzing frame 67/100",
+                },
+            )
+        fake_modal.Dict.from_name.assert_called_with("larkup-video-intelligence-progress")
+
+    def test_get_progress_accepts_measured_cloud_preparation(self) -> None:
+        provider = ModalProvider(token_id="id", token_secret="s")
+        fake_modal = MagicMock()
+        fake_modal.Dict.from_name.return_value.get.return_value = {
+            "stage": "prepare",
+            "percent": 46,
+            "message": "Preparing Cloud video (46%)",
+        }
+        with patch.object(provider, "_sdk", return_value=fake_modal):
+            self.assertEqual(
+                provider.get_progress("call-1"),
+                {
+                    "stage": "prepare",
+                    "percent": 46,
+                    "message": "Preparing Cloud video (46%)",
+                },
+            )
+
+    def test_get_progress_rejects_malformed_worker_progress(self) -> None:
+        provider = ModalProvider(token_id="id", token_secret="s")
+        fake_modal = MagicMock()
+        fake_modal.Dict.from_name.return_value.get.return_value = {
+            "stage": "unknown",
+            "percent": 101,
+            "message": "bad",
+        }
+        with patch.object(provider, "_sdk", return_value=fake_modal):
+            self.assertIsNone(provider.get_progress("call-1"))
 
     def test_terminate_cancels_the_call(self) -> None:
         provider = ModalProvider(token_id="id", token_secret="s")

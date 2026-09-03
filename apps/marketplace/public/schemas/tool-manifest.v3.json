@@ -29,6 +29,7 @@
     "category": { "type": "string" },
     "version": { "type": "string" },
     "pricing": { "enum": ["free", "pro", "enterprise"] },
+    "distribution": { "enum": ["public", "private"], "default": "public" },
     "icon": { "type": "string" },
     "packageName": { "type": "string" },
     "installSize": { "type": "string" },
@@ -53,14 +54,65 @@
       }
     },
     "billing": { "type": "object" },
+    "usage": {
+      "type": "object",
+      "required": ["fields"],
+      "properties": {
+        "label": { "type": "string" },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "label"],
+            "properties": {
+              "key": { "type": "string" },
+              "label": { "type": "string" },
+              "format": { "enum": ["number", "minutes"] }
+            }
+          }
+        }
+      }
+    },
     "ui": { "type": "object" },
     "configSchema": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "options": { "type": "array", "items": { "type": "object", "properties": { "label": { "type": "string" }, "value": { "type": "string" }, "description": { "type": "string" }, "icon": { "type": "string" }, "image": { "type": "string" } } } },
-          "verification": { "type": "object", "required": ["endpoint"], "properties": { "endpoint": { "type": "string" }, "method": { "enum": ["POST", "PUT"] }, "fields": { "type": "object" } } }
+          "providerField": { "type": "string" },
+          "defaultValueByProvider": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "globalConfigKey": { "enum": ["visionProvider", "chatProvider"] },
+          "defaultFromGlobalConfigKey": { "enum": ["visionProvider", "chatProvider"] },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": { "type": "string" },
+                "value": { "type": "string" },
+                "description": { "type": "string" },
+                "icon": { "type": "string" },
+                "image": { "type": "string" }
+              }
+            }
+          },
+          "verification": {
+            "type": "object",
+            "required": ["endpoint"],
+            "properties": {
+              "endpoint": { "type": "string" },
+              "method": { "enum": ["POST", "PUT"] },
+              "fields": { "type": "object" }
+            }
+          },
+          "visibleWhen": {
+            "type": "object",
+            "required": ["field", "equals"],
+            "properties": { "field": { "type": "string" }, "equals": {} }
+          }
         }
       }
     }

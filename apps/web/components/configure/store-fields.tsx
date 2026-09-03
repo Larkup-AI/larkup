@@ -1,63 +1,48 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import { KeyRound, Eye, EyeOff } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useState } from 'react';
+import { KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
-import { visibleFields } from "@larkup/vector-stores/registry"
-import type { IndexType, VectorStoreDescriptor } from "@larkup/core/types"
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { visibleFields } from '@larkup/vector-stores/registry';
+import type { IndexType, VectorStoreDescriptor } from '@larkup/core/types';
 
 interface StoreFieldsProps {
-  store: VectorStoreDescriptor
-  values: Record<string, string>
-  errors: Record<string, string>
-  onChange: (key: string, value: string) => void
-  /** Global index type — controls showWhenIndexType visibility (e.g. sparse model for hybrid/lexical) */
-  indexType?: IndexType
+  store: VectorStoreDescriptor;
+  values: Record<string, string>;
+  errors: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+  indexType?: IndexType;
 }
 
-/**
- * Renders ONLY the fields the selected store needs, honoring `showWhen`
- * dependencies (e.g. LanceDB local-vs-cloud). Driven entirely by the
- * registry, so adding a new store requires no changes here.
- */
-export function StoreFields({
-  store,
-  values,
-  errors,
-  onChange,
-  indexType,
-}: StoreFieldsProps) {
-  const fields = visibleFields(store, values, indexType)
-  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({})
+export function StoreFields({ store, values, errors, onChange, indexType }: StoreFieldsProps) {
+  const fields = visibleFields(store, values, indexType);
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
   const togglePassword = (key: string) => {
-    setShowPasswords((prev) => ({ ...prev, [key]: !prev[key] }))
-  }
+    setShowPasswords((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <div className="grid gap-5 sm:grid-cols-2">
       {fields.map((field) => {
-        const value = values[field.key] ?? field.defaultValue ?? ""
-        const error = errors[field.key]
-        const fieldId = `store-${field.key}`
+        const value = values[field.key] ?? field.defaultValue ?? '';
+        const error = errors[field.key];
+        const fieldId = `store-${field.key}`;
 
         return (
           <div
             key={field.key}
-            className={cn(
-              "space-y-1.5",
-              field.type === "select" && "sm:col-span-1",
-            )}
+            className={cn('space-y-1.5', field.type === 'select' && 'sm:col-span-1')}
           >
             <div className="flex items-center gap-1.5">
               <Label htmlFor={fieldId}>{field.label}</Label>
@@ -77,15 +62,9 @@ export function StoreFields({
               )}
             </div>
 
-            {field.type === "select" ? (
-              <Select
-                value={value}
-                onValueChange={(v) => onChange(field.key, (v as string) ?? "")}
-              >
-                <SelectTrigger
-                  id={fieldId}
-                  className={cn("w-full", error && "border-destructive")}
-                >
+            {field.type === 'select' ? (
+              <Select value={value} onValueChange={(v) => onChange(field.key, (v as string) ?? '')}>
+                <SelectTrigger id={fieldId} className={cn('w-full', error && 'border-destructive')}>
                   <SelectValue placeholder={`Select ${field.label}`} />
                 </SelectTrigger>
                 <SelectContent>
@@ -96,19 +75,16 @@ export function StoreFields({
                   ))}
                 </SelectContent>
               </Select>
-            ) : field.type === "password" ? (
+            ) : field.type === 'password' ? (
               <div className="relative">
                 <Input
                   id={fieldId}
-                  type={showPasswords[field.key] ? "text" : "password"}
+                  type={showPasswords[field.key] ? 'text' : 'password'}
                   placeholder={field.placeholder}
                   value={value}
                   spellCheck={false}
                   autoComplete="off"
-                  className={cn(
-                    "font-mono text-sm pr-9",
-                    error && "border-destructive",
-                  )}
+                  className={cn('font-mono text-sm pr-9', error && 'border-destructive')}
                   onChange={(e) => onChange(field.key, e.target.value)}
                 />
                 <button
@@ -133,8 +109,8 @@ export function StoreFields({
                 spellCheck={false}
                 autoComplete="off"
                 className={cn(
-                  field.type === "path" && "font-mono text-sm",
-                  error && "border-destructive",
+                  field.type === 'path' && 'font-mono text-sm',
+                  error && 'border-destructive',
                 )}
                 onChange={(e) => onChange(field.key, e.target.value)}
               />
@@ -143,13 +119,11 @@ export function StoreFields({
             {error ? (
               <p className="text-xs text-destructive">{error}</p>
             ) : field.help ? (
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {field.help}
-              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{field.help}</p>
             ) : null}
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

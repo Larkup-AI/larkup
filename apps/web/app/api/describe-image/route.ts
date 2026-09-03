@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { readConfig } from '@larkup/core/config-store';
 import { getModelsByType } from '@larkup/core/models-cache';
-import { runWithServer } from '@larkup/core/workspace';
-import { createChatModel, resolveConfiguredVisionModel } from '@/lib/chat-model-provider';
-import { createImageDescriptionSignal, isImageDescriptionAbort } from '@/lib/image-description';
+import { runWithProject } from '@larkup/core/project-store';
+import {
+  createImageDescriptionSignal,
+  isImageDescriptionAbort,
+} from '@/lib/chat/image-description';
+import { createChatModel, resolveConfiguredVisionModel } from '@/lib/chat/model-provider';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   const serverId = new URL(req.url).searchParams.get('serverId');
   const describe = () => describeImage(req);
-  return serverId ? runWithServer(serverId, describe) : describe();
+  return serverId ? runWithProject(serverId, describe) : describe();
 }
 
 async function describeImage(req: Request) {

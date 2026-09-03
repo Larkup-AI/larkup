@@ -41,3 +41,11 @@ larkup media ./demo.mp4
 - `larkup update` checks for and installs CLI releases.
 
 Generated servers use `http://localhost:8080` by default. Run `larkup --help` or see the [CLI documentation](https://www.larkup.de/docs/developer/cli) for all options.
+
+## Development
+
+```bash
+pnpm --filter @larkup/cli type-check
+pnpm --filter @larkup/cli build
+node apps/cli/dist/index.js --help
+```

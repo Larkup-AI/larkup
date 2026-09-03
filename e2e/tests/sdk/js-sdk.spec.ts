@@ -5,13 +5,14 @@ import { getWebUIUrl, rewriteLocalUrl } from '../../utils/env';
 const WEB_API = getWebUIUrl();
 let ragServer = rewriteLocalUrl('http://localhost:8080');
 let client: LarkupClient;
-const sdkApiKey = process.env.AI_GATEWAY_APIKEY?.trim() || process.env.OPENAI_API_KEY?.trim() || '';
+const sdkApiKey =
+  process.env.AI_GATEWAY_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || '';
 
 test.describe.serial('JavaScript SDK', () => {
-  test.skip(!sdkApiKey, 'AI_GATEWAY_APIKEY or OPENAI_API_KEY is required for SDK E2E');
+  test.skip(!sdkApiKey, 'AI_GATEWAY_API_KEY or OPENAI_API_KEY is required for SDK E2E');
 
   test.beforeAll(async ({ request }) => {
-    const gatewayApiKey = process.env.AI_GATEWAY_APIKEY?.trim();
+    const gatewayApiKey = process.env.AI_GATEWAY_API_KEY?.trim();
 
     const configResponse = await request.get(`${WEB_API}/api/config`);
     const { config } = await configResponse.json();
@@ -28,16 +29,16 @@ test.describe.serial('JavaScript SDK', () => {
     expect(updateResponse.ok()).toBe(true);
 
     // Always regenerate the local server from the known SDK fixture config.
-    await request.post(`${WEB_API}/api/server/local`, {
+    await request.post(`${WEB_API}/api/projects/runtime`, {
       data: { action: 'stop' },
     });
-    const startResponse = await request.post(`${WEB_API}/api/server/local`, {
+    const startResponse = await request.post(`${WEB_API}/api/projects/runtime`, {
       data: { action: 'start' },
       timeout: 180_000,
     });
     const startBody = await startResponse.json();
-    expect(startBody.state?.running, startBody.state?.lastError).toBe(true);
-    if (startBody.state?.endpoint) ragServer = rewriteLocalUrl(startBody.state.endpoint);
+    expect(startBody.runtime?.running, startBody.runtime?.lastError).toBe(true);
+    if (startBody.runtime?.endpoint) ragServer = rewriteLocalUrl(startBody.runtime.endpoint);
 
     let ready = false;
     for (let attempt = 0; attempt < 90; attempt += 1) {

@@ -3,7 +3,6 @@ import {
   addDocument,
   clearDocuments,
   corpusStats,
-  deleteDocument,
   deleteDocuments,
   readDocuments,
   updateDocument,
@@ -12,21 +11,33 @@ import { readConfig } from '@larkup/core/config-store';
 import { readRun, patchRun } from '@larkup/core/index-store';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import type { DocumentSource } from '@larkup/core/types';
+import { readGroups, resolveGroupId } from '@larkup/core/groups-store';
+import { deleteVideoKnowledgeForMediaAsset } from '@larkup/core/video-knowledge/deletion-store';
+import {
+  cancelVideoIntelligenceJob,
+  purgeLocalVideoIntelligenceJobData,
+} from '@/lib/media/video-intelligence-adapter';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** GET → the full corpus plus summary stats. */
 export async function GET() {
-  const [storedDocuments, stats] = await Promise.all([readDocuments(), corpusStats()]);
+  const [storedDocuments, stats, groups] = await Promise.all([
+    readDocuments(),
+    corpusStats(),
+    readGroups(),
+  ]);
 
   // Media transcripts/timelines are staged in the document store so the
   // indexer can embed them. Do not expose those temporary records in the
   // Knowledge Base until the indexer has actually completed successfully.
   // If indexing fails, the media worker removes the staged record again.
-  const documents = storedDocuments.filter(
-    (document) => document.source !== 'media' || document.status === 'indexed',
-  );
+  // Rows/chunks are internal index records. The Data API returns one parent
+  // source card for a file, spreadsheet, CSV, or JSON upload.
+  const documents = storedDocuments
+    .filter((document) => document.source !== 'media' || document.status === 'indexed')
+    .filter((document) => !document.parentSourceId);
   const visibleChars = documents.reduce((total, document) => total + document.charCount, 0);
   const visibleStats = {
     ...stats,
@@ -43,7 +54,7 @@ export async function GET() {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  return NextResponse.json({ documents: sortedDocuments, stats: visibleStats });
+  return NextResponse.json({ documents: sortedDocuments, stats: visibleStats, groups });
 }
 
 import { randomUUID } from 'crypto';
@@ -62,6 +73,9 @@ export async function POST(req: Request) {
       source?: DocumentSource;
       url?: string;
       metadata?: Record<string, any>;
+      groupId?: string;
+      enabled?: boolean;
+      parentSourceId?: string;
     };
     if (!body.content || !body.content.trim()) {
       return NextResponse.json({ error: 'Content is empty.' }, { status: 400 });
@@ -101,6 +115,9 @@ export async function POST(req: Request) {
       content: body.content,
       source: body.source === 'files' ? 'files' : 'text',
       url: body.url || '',
+      groupId: await resolveGroupId(body.groupId),
+      enabled: body.enabled,
+      parentSourceId: body.parentSourceId,
       metadata: body.metadata,
     });
     return NextResponse.json({ document: doc }, { status: 201 });
@@ -121,6 +138,8 @@ export async function PATCH(req: Request) {
     content?: string;
     url?: string;
     metadata?: Record<string, any>;
+    groupId?: string;
+    enabled?: boolean;
   };
   try {
     body = await req.json();
@@ -133,11 +152,14 @@ export async function PATCH(req: Request) {
   if (body.content !== undefined && !body.content.trim()) {
     return NextResponse.json({ error: 'Content is empty.' }, { status: 400 });
   }
+  const groupId = body.groupId === undefined ? undefined : await resolveGroupId(body.groupId);
   const doc = await updateDocument(body.id, {
     title: body.title,
     content: body.content,
     url: body.url,
     metadata: body.metadata,
+    groupId,
+    enabled: body.enabled,
   });
   if (!doc) {
     return NextResponse.json({ error: 'Document not found.' }, { status: 404 });
@@ -163,17 +185,42 @@ export async function DELETE(req: Request) {
     toDeleteDocs = docs;
   }
 
+  if ((id || ids) && toDeleteDocs.length === 0) {
+    return NextResponse.json({ error: 'Document not found.' }, { status: 404 });
+  }
+
+  const cascadedMediaDocumentIds = new Set<string>();
+  const removedMediaAssetIds = new Set<string>();
+  const removeLinkedMediaAsset = async (assetId: string) => {
+    if (!assetId || removedMediaAssetIds.has(assetId)) return;
+    removedMediaAssetIds.add(assetId);
+    const { getMediaAsset, deleteMediaAsset } = await import('@larkup/core/media-store');
+    const { createStorageProvider } = await import('@larkup/marketplace/storage');
+    const asset = await getMediaAsset(assetId);
+    if (!asset) return;
+    for (const documentId of [
+      ...asset.documentIds,
+      ...(asset.pendingDocumentIds ?? []),
+      ...(asset.supersededDocumentIds ?? []),
+    ]) {
+      cascadedMediaDocumentIds.add(documentId);
+    }
+    if (asset.type === 'video' && asset.activeVideoIntelligenceJobId) {
+      await cancelVideoIntelligenceJob(asset.activeVideoIntelligenceJobId).catch(() => undefined);
+      await purgeLocalVideoIntelligenceJobData(asset.activeVideoIntelligenceJobId).catch(
+        () => undefined,
+      );
+    }
+    const storage = createStorageProvider();
+    await storage.delete(asset.storageUri).catch(() => {});
+    if (asset.thumbnailUri) await storage.delete(asset.thumbnailUri).catch(() => {});
+    await deleteVideoKnowledgeForMediaAsset(asset.id);
+    await deleteMediaAsset(asset.id);
+  };
+
   for (const doc of toDeleteDocs) {
     if (doc.metadata?.mediaAssetId) {
-      const { getMediaAsset, deleteMediaAsset } = await import('@larkup/core/media-store');
-      const { createStorageProvider } = await import('@larkup/marketplace/storage');
-      const asset = await getMediaAsset(doc.metadata.mediaAssetId);
-      if (asset) {
-        const storage = createStorageProvider();
-        await storage.delete(asset.storageUri).catch(() => {});
-        if (asset.thumbnailUri) await storage.delete(asset.thumbnailUri).catch(() => {});
-        await deleteMediaAsset(doc.metadata.mediaAssetId);
-      }
+      await removeLinkedMediaAsset(String(doc.metadata.mediaAssetId));
     }
 
     const cleanupUrls = [doc.url, doc.metadata?.imageUrl].filter(Boolean);
@@ -181,15 +228,7 @@ export async function DELETE(req: Request) {
       if (docUrl?.startsWith('/api/media/')) {
         const assetId = docUrl.split('/api/media/')[1]?.split('?')[0];
         if (assetId) {
-          const { getMediaAsset, deleteMediaAsset } = await import('@larkup/core/media-store');
-          const { createStorageProvider } = await import('@larkup/marketplace/storage');
-          const asset = await getMediaAsset(assetId);
-          if (asset) {
-            const storage = createStorageProvider();
-            await storage.delete(asset.storageUri).catch(() => {});
-            if (asset.thumbnailUri) await storage.delete(asset.thumbnailUri).catch(() => {});
-            await deleteMediaAsset(assetId);
-          }
+          await removeLinkedMediaAsset(assetId);
         }
       } else if (docUrl?.startsWith('/api/uploads/')) {
         const filename = docUrl.split('/api/uploads/')[1]?.split('?')[0];
@@ -203,13 +242,11 @@ export async function DELETE(req: Request) {
 
   let deletedIds: string[] = [];
 
-  if (id) {
-    await deleteDocument(id);
-    deletedIds = [id];
-  } else if (ids) {
-    const idList = ids.split(',');
-    await deleteDocuments(idList);
-    deletedIds = idList;
+  if (id || ids) {
+    deletedIds = [
+      ...new Set([...toDeleteDocs.map((document) => document.id), ...cascadedMediaDocumentIds]),
+    ];
+    await deleteDocuments(deletedIds);
   } else {
     await clearDocuments();
 

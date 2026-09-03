@@ -3,7 +3,7 @@ import {
   createImageDescriptionSignal,
   IMAGE_DESCRIPTION_TIMEOUT_MS,
   isImageDescriptionAbort,
-} from '../../../apps/web/lib/image-description';
+} from '../../../apps/web/lib/chat/image-description';
 
 test.describe('Image-description request lifecycle', () => {
   test('uses an independent, bounded provider signal instead of a caller signal', () => {

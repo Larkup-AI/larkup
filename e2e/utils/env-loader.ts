@@ -28,7 +28,7 @@ export function hasEnv(key: string): boolean {
 
 // Commonly used keys
 export const ENV_KEYS = {
-  AI_GATEWAY_APIKEY: 'AI_GATEWAY_APIKEY',
+  AI_GATEWAY_API_KEY: 'AI_GATEWAY_API_KEY',
   OPENAI_API_KEY: 'OPENAI_API_KEY',
   ANTHROPIC_API_KEY: 'ANTHROPIC_API_KEY',
   DEEPSEEK_API_KEY: 'DEEPSEEK_API_KEY',

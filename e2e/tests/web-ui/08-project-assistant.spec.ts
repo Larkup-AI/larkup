@@ -70,20 +70,22 @@ test.describe('Assistant customization', () => {
     await page.getByText('E2B', { exact: true }).click();
     await page.getByRole('button', { name: 'Save sandbox settings', exact: true }).click();
 
-    await expect(page.getByText('Invalid API key', { exact: true })).toBeVisible();
+    // The inline error and the toast carry the same copy.
+    await expect(page.getByText('Invalid API key', { exact: true }).first()).toBeVisible();
     expect(configSaveAttempted).toBe(false);
   });
 
   test('adds portable and remote Agent Skills', async ({ page }) => {
     await page.goto('/settings?section=agent-customization');
     await page.getByRole('button', { name: 'Skills', exact: true }).click();
-    await page.getByRole('button', { name: 'Add skill', exact: true }).click();
-    await page.getByRole('button', { name: 'Remote skill', exact: true }).click();
+    await page.getByRole('button', { name: 'Add skill', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Remote', exact: true }).click();
     await page
       .getByLabel('Remote SKILL.md URL')
       .fill('https://example.com/skills/release/SKILL.md');
-    await page.getByLabel('Skill name').fill('Release checklist');
+    const skillName = `Release checklist ${Date.now()}`;
+    await page.getByLabel('Skill name').fill(skillName);
     await page.getByRole('button', { name: 'Add skill', exact: true }).last().click();
-    await expect(page.getByText('Release checklist', { exact: true })).toBeVisible();
+    await expect(page.getByText(skillName, { exact: true })).toBeVisible();
   });
 });

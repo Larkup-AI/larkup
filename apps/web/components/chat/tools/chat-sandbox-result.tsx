@@ -20,20 +20,9 @@ export interface SandboxResultConfig {
   executionTimeMs: number;
 }
 
-/* ------------------------------------------------------------------ */
-/* Try to parse CSV-like stdout into a table                           */
-/* ------------------------------------------------------------------ */
-
 function tryParseStdoutAsTable(stdout: string): DataTableConfig | null {
-  // Disabled: Aggressive auto-parsing of stdout to tables causes simple print statements
-  // to be rendered as UI tables inappropriately.
-  // Explicit tabular data should be requested via the 'queryTabularData' tool instead.
   return null;
 }
-
-/* ------------------------------------------------------------------ */
-/* Component                                                           */
-/* ------------------------------------------------------------------ */
 
 export function ChatSandboxResult({
   config,
@@ -54,6 +43,10 @@ export function ChatSandboxResult({
   const stdoutTable = useMemo(() => tryParseStdoutAsTable(stdout), [stdout]);
 
   const isSuccess = exitCode === 0;
+  const isRuntimeUnavailable =
+    /docker\.sock|docker (?:isn't|is not) running|code execution is unavailable|needs python 3/i.test(
+      stderr,
+    );
 
   return (
     <Card className="overflow-hidden  animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -150,13 +143,14 @@ export function ChatSandboxResult({
         <div className="border-t border-border/40 bg-red-50/50 p-4 dark:bg-red-900/10">
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium text-red-800 dark:text-red-400">
-              Analysis encountered an issue
+              {isRuntimeUnavailable ? 'Analysis is unavailable' : 'Analysis encountered an issue'}
             </span>
             <span className="text-xs text-red-600/80 dark:text-red-400/80">
-              The AI model provided invalid code or encountered a runtime error. It will attempt to
-              fix the issue automatically.
+              {isRuntimeUnavailable
+                ? 'This workspace does not have a code-analysis runtime configured.'
+                : 'This calculation could not be completed.'}
             </span>
-            {stderr && (
+            {stderr && !isRuntimeUnavailable && (
               <details className="mt-2 group">
                 <summary className="cursor-pointer text-xs font-medium text-red-600/70 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 transition-colors list-none flex items-center gap-1">
                   <ChevronDown className="size-3 transition-transform group-open:rotate-180" />

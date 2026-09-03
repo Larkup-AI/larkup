@@ -4,7 +4,7 @@ import { corpusStats, readDocuments } from '@larkup/core/documents-store';
 import { isRunning, readRun } from '@larkup/core/index-store';
 import { createRun, runIndexer } from '@larkup/core/indexing/indexer';
 import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import type { RagConfig } from '@larkup/core/types';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 }
 
 async function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
-  return serverId ? runWithServer(serverId, fn) : fn();
+  return serverId ? runWithProject(serverId, fn) : fn();
 }
 
 async function getIndexStatus() {

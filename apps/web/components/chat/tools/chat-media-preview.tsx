@@ -49,7 +49,7 @@ export function ChatMediaPreview({
   if (mediaType === 'image') {
     if (imageUnavailable) {
       return (
-        <div className="my-2 w-full max-w-xl rounded-lg border border-border bg-card p-3">
+        <div className="my-2 w-full max-w-2xl rounded-lg border border-border bg-card p-3">
           <p className="text-xs text-muted-foreground">This source image is no longer available.</p>
           <MediaCitationFooter
             icon={<ImageIcon className="size-3 text-muted-foreground" />}
@@ -61,7 +61,7 @@ export function ChatMediaPreview({
     }
     return (
       <>
-        <div className="my-2 w-full max-w-xl overflow-hidden rounded-lg border border-border bg-card">
+        <div className="my-2 w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-card">
           <button
             type="button"
             onClick={() => setExpanded(true)}
@@ -113,7 +113,7 @@ export function ChatMediaPreview({
 
   if (mediaType === 'video') {
     return (
-      <div className="my-2 w-full max-w-xl overflow-hidden rounded-lg border border-border bg-card">
+      <div className="my-2 w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-card">
         {providerEmbedUrl ? (
           <iframe
             src={providerEmbedUrl}
@@ -342,9 +342,9 @@ function MediaCitationFooter({
   );
 }
 
-/* ------------------------------------------------------------------ */
+/* Media preview helpers. */
 /* Markdown media reference parser                                     */
-/* ------------------------------------------------------------------ */
+/* End media preview helpers. */
 
 /**
  * Parse media references from assistant text.

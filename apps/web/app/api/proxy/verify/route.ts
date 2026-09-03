@@ -40,7 +40,19 @@ export async function POST(req: Request) {
 
       const request = http.request(options, (res) => {
         if (res.statusCode && res.statusCode >= 200 && res.statusCode < 400) {
-          resolve(true);
+          let data = '';
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+          res.on('end', () => {
+            if (data.includes('Example Domain')) {
+              resolve(true);
+            } else {
+              reject(
+                new Error('Proxy connection succeeded, but received invalid response from target'),
+              );
+            }
+          });
         } else {
           reject(new Error(`Proxy returned status code ${res.statusCode}`));
         }

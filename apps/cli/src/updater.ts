@@ -1,11 +1,11 @@
-import { log } from "./ui/logger";
-import pkg from "../package.json" with { type: "json" };
+import { log } from './ui/logger';
+import pkg from '../package.json' with { type: 'json' };
 
-const VERSION_CHECK_URL = "https://www.larkup.de/api/version";
+const VERSION_CHECK_URL = 'https://www.larkup.de/api/version';
 
 function compareVersions(a: string, b: string): number {
-  const pa = a.replace(/^v/, "").split(".").map(Number);
-  const pb = b.replace(/^v/, "").split(".").map(Number);
+  const pa = a.replace(/^v/, '').split('.').map(Number);
+  const pb = b.replace(/^v/, '').split('.').map(Number);
 
   for (let i = 0; i < 3; i++) {
     const va = pa[i] || 0;
@@ -34,25 +34,23 @@ export async function getLatestVersion(): Promise<string | undefined> {
 }
 
 export async function checkUpdate(): Promise<void> {
-  if (process.env.NODE_ENV === "test") return;
+  if (process.env.NODE_ENV === 'test') return;
 
   try {
     const version = await getLatestVersion();
     const currentVersion = pkg.version;
 
     if (version && isVersionNewer(version, currentVersion)) {
-      console.log("");
+      console.log('');
       log.info(`╭──────────────────────────────────────────────╮`);
       log.info(
-        `│  Update available: ${currentVersion} → ${version}${" ".repeat(Math.max(1, 25 - currentVersion.length - version.length))}│`,
+        `│  Update available: ${currentVersion} → ${version}${' '.repeat(Math.max(1, 25 - currentVersion.length - version.length))}│`,
       );
-      log.info(
-        `│  Run: ${log.fmt.cyan("larkup update")}                         │`,
-      );
+      log.info(`│  Run: ${log.fmt.cyan('larkup update')}                         │`);
       log.info(`╰──────────────────────────────────────────────╯`);
-      console.log("");
+      console.log('');
     }
   } catch {
-    // Fail silently, don't interrupt the CLI flow
+    // Never block CLI usage on update checks.
   }
 }

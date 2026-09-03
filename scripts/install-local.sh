@@ -34,7 +34,7 @@ fi
 
 # ── Logging ───────────────────────────────────────────────────
 log_info()    { echo -e "${BLUE}==> ${NC}${1}"; }
-log_success() { echo -e "${GREEN} ✓  ${NC}${1}"; }
+log_success() { echo -e "${OCHRE} ✓  ${NC}${1}"; }
 log_warn()    { echo -e "${YELLOW} !  ${NC}${1}"; }
 log_error()   { echo -e "${RED} ✗  ${NC}${1}" >&2; }
 log_debug()   { [[ "$VERBOSE" == "1" ]] && echo -e "${DIM}[debug] ${1}${NC}" || true; }

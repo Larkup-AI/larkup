@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import {
   isSearchVerificationProvider,
   verifySearchProvider,
-} from '@/lib/search-provider-verification';
+} from '@/lib/search/provider-verification';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

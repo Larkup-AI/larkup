@@ -15,6 +15,7 @@ import {
   Type,
   Hash,
   CalendarDays,
+  Table2,
 } from 'lucide-react';
 import {
   Table,
@@ -34,6 +35,13 @@ export interface DataTableConfig {
   rows: Record<string, any>[];
   totalRows: number;
   aggregationResults?: Record<string, number>;
+}
+
+export interface ChatDataTableProps {
+  config: DataTableConfig;
+  /** Tool output is evidence for the answer, not the answer itself. Keep it
+   * tucked away until the user asks to inspect the rows. */
+  compact?: boolean;
 }
 
 function formatCell(value: any): string {
@@ -92,7 +100,7 @@ function columnTypeIndicator(
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
-export function ChatDataTable({ config }: { config: DataTableConfig }) {
+export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
   const { columns, rows, totalRows, aggregationResults } = config;
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -100,6 +108,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
   const [pageSize, setPageSize] = useState(10);
   const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(!compact);
 
   // Filter rows by search
   const filteredRows = useMemo(() => {
@@ -161,6 +170,23 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
     return <div className="py-4 text-center text-sm text-muted-foreground">No data returned</div>;
   }
 
+  if (compact && !isExpanded) {
+    const count = totalRows || rows.length;
+    return (
+      <button
+        type="button"
+        onClick={() => setIsExpanded(true)}
+        className="my-1 inline-flex items-center gap-2 rounded-md border border-border/50 bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+      >
+        <Table2 className="size-3.5" />
+        <span>Data checked</span>
+        <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] tabular-nums text-foreground">
+          {count.toLocaleString()} {count === 1 ? 'row' : 'rows'}
+        </span>
+      </button>
+    );
+  }
+
   return (
     <div className="overflow-hidden rounded-xl border border-border/90 bg-muted my-4 animate-in fade-in slide-in-from-bottom-2 duration-500 [&_*:focus]:outline-none [&_*:focus-visible]:ring-0">
       {/* Aggregation results (KPI cards) */}
@@ -189,7 +215,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
 
       {/* Toolbar: search + actions */}
       <div className="flex items-center justify-between gap-2 border-b border-border/30 px-3 py-2">
-        <div className="relative flex-1 max-w-[240px]">
+        <div className="relative flex-1 max-w-60">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
           <Input
             value={searchQuery}
@@ -274,7 +300,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
                 {columns.map((col) => (
                   <TableCell
                     key={col}
-                    className="max-w-[220px] truncate px-3 py-2 text-xs tabular-nums"
+                    className="max-w-55 truncate px-3 py-2 text-xs tabular-nums"
                     title={String(row[col] ?? '')}
                   >
                     {formatCell(row[col])}
@@ -303,7 +329,7 @@ export function ChatDataTable({ config }: { config: DataTableConfig }) {
                 setPage(0);
               }}
             >
-              <SelectTrigger className="h-6 w-[52px] text-[11px] px-2 focus:ring-0 focus-visible:ring-0">
+              <SelectTrigger className="h-6 w-13 text-[11px] px-2 focus:ring-0 focus-visible:ring-0">
                 {pageSize}
               </SelectTrigger>
               <SelectContent>

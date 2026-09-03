@@ -6,10 +6,6 @@ import { Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DocumentField as DocumentFieldType } from '@larkup/tool-doc-editor/types';
 
-/* ------------------------------------------------------------------ */
-/* DocumentField — individual editable field with animations           */
-/* ------------------------------------------------------------------ */
-
 interface DocumentFieldProps {
   field: DocumentFieldType;
   /** Whether this field is currently being filled by AI */
@@ -163,7 +159,7 @@ export function DocumentField({ field, isFilling, isUpdated, onEdit }: DocumentF
           exit={{ opacity: 0 }}
           className="absolute inset-0 rounded-lg overflow-hidden pointer-events-none"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent animate-shimmer" />
+          <div className="absolute inset-0 bg-linear-to-r from-transparent via-primary/5 to-transparent animate-shimmer" />
         </motion.div>
       )}
     </motion.div>

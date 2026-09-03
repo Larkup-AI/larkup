@@ -6,14 +6,14 @@ import { createAdapter } from '@larkup/vector-stores/factory';
 import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
 import { getVectorStore } from '@larkup/vector-stores/registry';
 import type { QueryHit } from '@larkup/vector-stores/adapter';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import { embedQuery } from '@larkup/core/indexing/embedder';
 
 export const dynamic = 'force-dynamic';
 
-/** Run a handler against a specific server when `serverId` is provided. */
-function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
-  return serverId ? runWithServer(serverId, fn) : fn();
+/** Run a handler against a specific Project when `projectId` is provided. */
+function withProject<T>(projectId: string | null, fn: () => Promise<T>) {
+  return projectId ? runWithProject(projectId, fn) : fn();
 }
 
 /**
@@ -21,11 +21,11 @@ function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
  *
  * Reports whether there's a built index to query and whether a generated
  * server is live, so the UI can label which path a query will take. Accepts
- * `?serverId=` to inspect a specific server instead of the active one.
+ * `?projectId=` to inspect a specific Project instead of the active one.
  */
 export async function GET(req: Request) {
-  const serverId = new URL(req.url).searchParams.get('serverId');
-  return withServer(serverId, () => snapshot());
+  const projectId = new URL(req.url).searchParams.get('projectId');
+  return withProject(projectId, () => snapshot());
 }
 
 async function snapshot() {
@@ -76,7 +76,7 @@ interface DemoResult {
 export async function POST(req: Request) {
   const started = Date.now();
 
-  let body: { query?: string; topK?: number; serverId?: string };
+  let body: { query?: string; topK?: number; projectId?: string };
   try {
     body = await req.json();
   } catch {
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "A non-empty 'query' is required." }, { status: 400 });
   }
 
-  return withServer(body.serverId ?? null, () => runQuery(query, body.topK, started));
+  return withProject(body.projectId ?? null, () => runQuery(query, body.topK, started));
 }
 
 async function runQuery(query: string, requestedTopK: number | undefined, started: number) {

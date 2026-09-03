@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
 
 export interface ChatTabItem {
   label: string;
@@ -35,30 +35,23 @@ export function ChatTabs({ config }: { config: ChatTabsConfig }) {
             type="button"
             onClick={() => setActive(i)}
             className={cn(
-              "relative flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors",
-              "focus:outline-none focus-visible:outline-none",
-              active === i
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground/70",
+              'relative flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors',
+              'focus:outline-none focus-visible:outline-none',
+              active === i ? 'text-foreground' : 'text-muted-foreground hover:text-foreground/70',
             )}
           >
-            {tab.icon && (
-              <span className="shrink-0 [&_svg]:size-3.5">{tab.icon}</span>
-            )}
+            {tab.icon && <span className="shrink-0 [&_svg]:size-3.5">{tab.icon}</span>}
             <span>{tab.label}</span>
             {/* Animated underline */}
             {active === i && (
-              <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-foreground animate-in fade-in zoom-in-75 duration-300" />
+              <span className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-foreground animate-in fade-in zoom-in-75 duration-300" />
             )}
           </button>
         ))}
       </div>
 
       {/* Tab content */}
-      <div
-        key={active}
-        className="pt-3 animate-in fade-in slide-in-from-bottom-1 duration-400"
-      >
+      <div key={active} className="pt-3 animate-in fade-in slide-in-from-bottom-1 duration-400">
         {tabs[active]?.content}
       </div>
     </div>

@@ -43,7 +43,7 @@ marketplace:
     - changed-files:
       - any-glob-to-any-file:
         - 'packages/marketplace/**'
-        - 'packages/tools/**'
+        - 'packages/marketplace-tools/**'
         - .agents/skills/marketplace-tools/**
 
 cli:

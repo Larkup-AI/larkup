@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { scoreVideoKnowledgeEvaluation } from '../../../packages/core/src/video-knowledge/evaluation';
-import { decideInspection } from '../../../packages/core/src/video-knowledge/inspection-policy';
+import {
+  decideInspection,
+  LIMITS,
+} from '../../../packages/core/src/video-knowledge/inspection-policy';
 import { planVideoQuestion } from '../../../packages/core/src/video-knowledge/query-planner';
 import {
   videoKnowledgeRetrievalCapabilities,
@@ -40,7 +43,9 @@ test.describe('Video Knowledge evaluation and safety policy', () => {
       required: true,
       plausibleRange: true,
       estimate: {
-        durationSecs: 31,
+        // Just past the per-bundle cap, read from the policy so raising the
+        // cap does not silently turn this into a pass.
+        durationSecs: LIMITS.durationSecs + 1,
         bytes: 1,
         sandboxSeconds: 1,
         spendUsd: 0,
@@ -188,6 +193,13 @@ test.describe('Query planner — question kind classification', () => {
     expect(plan.kinds).toContain('outcome');
     expect(plan.modalities).toContain('visual');
     expect(plan.modalities).toContain('transcript');
+    expect(plan.requiresInspectionWhenInsufficient).toBe(true);
+  });
+
+  test('classifies Arabic final-score questions as outcomes', () => {
+    const plan = planVideoQuestion('ما النتيجة النهائية ومن فاز في المباراة؟');
+    expect(plan.kinds).toContain('outcome');
+    expect(plan.requiresInspectionWhenInsufficient).toBe(true);
   });
 
   test('uses language-neutral cross-modal retrieval for an unclassified question', () => {
@@ -273,7 +285,7 @@ test.describe('Retrieval capabilities and search', () => {
       knowledgeRevisionId: revision.id,
       modality: 'transcript',
       timeRange: { startSecs: 0, endSecs: 30, precision: 'word' },
-      payload: 'The winner is Team Alpha.',
+      payload: { text: 'The winner is Team Alpha.' },
       source: { kind: 'provider', provider: 'deepgram' },
       confidence: {
         score: 0.9,
@@ -353,7 +365,7 @@ test.describe('Retrieval capabilities and search', () => {
         knowledgeRevisionId: revision.id,
         modality: 'transcript',
         timeRange: { startSecs, endSecs: startSecs + 10, precision: 'word' },
-        payload: `Goal scored at minute ${i}`,
+        payload: { text: `Goal scored at minute ${i}` },
         source: { kind: 'provider', provider: 'deepgram' },
         confidence: {
           score: 0.9,
@@ -385,6 +397,15 @@ test.describe('Retrieval capabilities and search', () => {
       minimumRangeDistanceSecs: 40,
     });
     expect(diverseHits.length).toBe(2);
+
+    // A verification pass can restrict retrieval to a source interval (for
+    // example, the most recent evidence window) without changing global rank.
+    const boundedHits = await searchVideoKnowledge(mediaAssetId, 'goal scored', 10, {
+      minimumRangeDistanceSecs: 0,
+      timeRange: { startSecs: 55, endSecs: 80 },
+    });
+    expect(boundedHits).toHaveLength(1);
+    expect(boundedHits[0].evidence.timeRange.startSecs).toBe(60);
   });
 
   test('returns empty results for an asset without an active manifest', async () => {
@@ -436,7 +457,7 @@ test.describe('Verification gate — frame precision enforcement', () => {
       knowledgeRevisionId: revision.id,
       modality: 'transcript',
       timeRange: { startSecs: 10, endSecs: 20, precision: 'segment' },
-      payload: 'Evidence with segment precision.',
+      payload: { text: 'Evidence with segment precision.' },
       source: { kind: 'provider', provider: 'deepgram' },
       confidence: {
         score: 0.9,
@@ -589,7 +610,7 @@ test.describe('Video knowledge deletion and retention', () => {
       knowledgeRevisionId: revision.id,
       modality: 'transcript',
       timeRange,
-      payload: 'text',
+      payload: { text: 'text' },
       source: { kind: 'provider' },
       confidence,
     });
@@ -841,7 +862,7 @@ test.describe('Video knowledge deletion and retention', () => {
       knowledgeRevisionId: revA.id,
       modality: 'transcript',
       timeRange: { startSecs: 0, endSecs: 30, precision: 'word' },
-      payload: 'Asset A',
+      payload: { text: 'Asset A' },
       source: { kind: 'provider' },
       confidence,
     });
@@ -850,7 +871,7 @@ test.describe('Video knowledge deletion and retention', () => {
       knowledgeRevisionId: revB.id,
       modality: 'transcript',
       timeRange: { startSecs: 0, endSecs: 30, precision: 'word' },
-      payload: 'Asset B',
+      payload: { text: 'Asset B' },
       source: { kind: 'provider' },
       confidence,
     });
@@ -859,9 +880,21 @@ test.describe('Video knowledge deletion and retention', () => {
     await deleteVideoKnowledgeForMediaAsset(assetA);
 
     const state = await readVideoKnowledgeState();
-    expect(state.revisions.some((r) => r.mediaAssetId === assetA)).toBe(false);
-    expect(state.evidence.some((e) => e.mediaAssetId === assetA)).toBe(false);
-    expect(state.revisions.some((r) => r.mediaAssetId === assetB)).toBe(true);
-    expect(state.evidence.some((e) => e.mediaAssetId === assetB)).toBe(true);
+    expect(
+      state.revisions.some(
+        (revision: { mediaAssetId: string }) => revision.mediaAssetId === assetA,
+      ),
+    ).toBe(false);
+    expect(
+      state.evidence.some((evidence: { mediaAssetId: string }) => evidence.mediaAssetId === assetA),
+    ).toBe(false);
+    expect(
+      state.revisions.some(
+        (revision: { mediaAssetId: string }) => revision.mediaAssetId === assetB,
+      ),
+    ).toBe(true);
+    expect(
+      state.evidence.some((evidence: { mediaAssetId: string }) => evidence.mediaAssetId === assetB),
+    ).toBe(true);
   });
 });

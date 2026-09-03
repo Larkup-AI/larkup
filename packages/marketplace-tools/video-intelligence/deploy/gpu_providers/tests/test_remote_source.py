@@ -9,10 +9,17 @@ import unittest
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from gpu_providers.remote_source import extract_bounded_remote_clip, materialize_remote_source
+from gpu_providers.remote_source import (
+    _scaled_preparation_progress,
+    extract_bounded_remote_clip,
+    materialize_remote_source,
+    rebase_transcript_context,
+)
 
 
-def _make_test_video(path: Path, duration_secs: int = 6, size: str = "64x48", rate: int = 10) -> None:
+def _make_test_video(
+    path: Path, duration_secs: int = 6, size: str = "64x48", rate: int = 10
+) -> None:
     subprocess.run(
         [
             "ffmpeg",
@@ -70,7 +77,16 @@ def _retrying(attempt, retries: int = 3):  # noqa: ANN001
 
 def _probe_duration_secs(path: Path) -> float:
     completed = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ],
         capture_output=True,
         text=True,
         check=True,
@@ -78,15 +94,56 @@ def _probe_duration_secs(path: Path) -> float:
     return float(completed.stdout.strip())
 
 
-@unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg/ffprobe not installed")
+@unittest.skipUnless(
+    shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg/ffprobe not installed"
+)
 class RemoteSourceTests(unittest.TestCase):
+    def test_codec_attempts_can_use_monotonic_preparation_slices(self) -> None:
+        reports: list[tuple[int, str]] = []
+        first = _scaled_preparation_progress(
+            lambda percent, message: reports.append((percent, message)), 0, 20
+        )
+        fallback = _scaled_preparation_progress(
+            lambda percent, message: reports.append((percent, message)), 20, 75
+        )
+        assert first is not None and fallback is not None
+        first(99, "Preparing Cloud video (99%)")
+        fallback(0, "Preparing Cloud video (0%)")
+        fallback(50, "Preparing Cloud video (50%)")
+
+        self.assertEqual([percent for percent, _ in reports], [20, 20, 48])
+        self.assertEqual(
+            [message for _, message in reports],
+            [
+                "Preparing Cloud video (20%)",
+                "Preparing Cloud video (20%)",
+                "Preparing Cloud video (48%)",
+            ],
+        )
+
+    def test_rebases_only_speech_overlapping_a_bounded_clip(self) -> None:
+        self.assertEqual(
+            rebase_transcript_context(
+                [
+                    {"startMs": 590_000, "endMs": 595_000, "text": "before"},
+                    {"startMs": 605_000, "endMs": 610_000, "text": "inside"},
+                    {"startMs": 631_000, "endMs": 632_000, "text": "after"},
+                ],
+                600,
+                630,
+            ),
+            [{"startMs": 5_000, "endMs": 10_000, "text": "inside"}],
+        )
+
     @classmethod
     def setUpClass(cls) -> None:
         cls._tmp = tempfile.TemporaryDirectory()
         cls.serve_dir = Path(cls._tmp.name)
         cls.video_path = cls.serve_dir / "source.mp4"
         _make_test_video(cls.video_path)
-        handler = functools.partial(_WholeFileRequestHandler, directory=str(cls.serve_dir))
+        handler = functools.partial(
+            _WholeFileRequestHandler, directory=str(cls.serve_dir)
+        )
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         cls.port = cls.server.server_port
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -99,10 +156,16 @@ class RemoteSourceTests(unittest.TestCase):
         cls.thread.join(timeout=5)
         cls._tmp.cleanup()
 
-    def test_extract_bounded_remote_clip_produces_a_clip_matching_the_requested_duration(self) -> None:
+    def test_extract_bounded_remote_clip_produces_a_clip_matching_the_requested_duration(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as out_dir:
             destination = Path(out_dir) / "clip.mp4"
-            _retrying(lambda: extract_bounded_remote_clip(self.source_url, destination, 1.0, 3.0))
+            _retrying(
+                lambda: extract_bounded_remote_clip(
+                    self.source_url, destination, 1.0, 3.0
+                )
+            )
             self.assertTrue(destination.exists())
             self.assertGreater(destination.stat().st_size, 0)
             duration = _probe_duration_secs(destination)
@@ -122,12 +185,38 @@ class RemoteSourceTests(unittest.TestCase):
             duration = _probe_duration_secs(destination)
             self.assertAlmostEqual(duration, 6.0, delta=0.5)
 
+    def test_fast_materialization_uses_measured_progress_and_keeps_h264(self) -> None:
+        with tempfile.TemporaryDirectory() as out_dir:
+            destination = Path(out_dir) / "fast.mp4"
+            reports: list[tuple[int, str]] = []
+            _retrying(
+                lambda: materialize_remote_source(
+                    self.source_url,
+                    destination,
+                    source_duration_secs=6,
+                    progress=lambda percent, message: reports.append(
+                        (percent, message)
+                    ),
+                    prefer_stream_copy=True,
+                )
+            )
+            self.assertTrue(destination.exists())
+            self.assertTrue(reports)
+            self.assertEqual(reports[0][0], 0)
+            self.assertLessEqual(max(percent for percent, _ in reports), 99)
+            self.assertTrue(
+                any("Preparing Cloud video" in message for _, message in reports)
+            )
+
     def test_extract_bounded_remote_clip_on_a_bad_url_raises(self) -> None:
         with tempfile.TemporaryDirectory() as out_dir:
             destination = Path(out_dir) / "clip.mp4"
             with self.assertRaises(RuntimeError):
                 extract_bounded_remote_clip(
-                    f"http://127.0.0.1:{self.port}/does-not-exist.mp4", destination, 0.0, 1.0
+                    f"http://127.0.0.1:{self.port}/does-not-exist.mp4",
+                    destination,
+                    0.0,
+                    1.0,
                 )
 
 

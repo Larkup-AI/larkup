@@ -37,9 +37,6 @@ const googleIntegrationsAwaitingVerification = new Set([
 const hiddenIntegrationIds = new Set(['jira-data-center']);
 const releasedIntegrationIds = new Set(['jira', 'linear']);
 
-// The display policy lives here so a cached integration-package release cannot
-// reintroduce retired cards or hide integrations that are live in the proxy.
-// Google remains unavailable until its production OAuth verification is complete.
 const panelIntegrations = integrations
   .filter((integration) => !hiddenIntegrationIds.has(integration.id))
   .map((integration) => {

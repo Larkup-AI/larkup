@@ -38,6 +38,7 @@ interface MediaDocumentOptions {
   transcriptProvider?: string;
   transcriptLanguage?: string;
   knowledgeRevisionId?: string;
+  videoRuntimeScope?: 'local' | 'cloud';
 }
 
 const SYNTHESIS_BATCH_CHARS = 14_000;
@@ -144,6 +145,12 @@ export function createFallbackMediaSummary(
 }
 
 export function buildMediaDocumentInputs(options: MediaDocumentOptions): NewDocumentInput[] {
+  const boundedSegments = options.segments.map((segment) => {
+    const startSecs = Math.max(0, Math.min(options.durationSecs, segment.startSecs));
+    const endSecs = Math.max(startSecs, Math.min(options.durationSecs, segment.endSecs));
+    return { ...segment, startSecs, endSecs };
+  });
+  const boundedOptions = { ...options, segments: boundedSegments };
   const baseMetadata = {
     mediaAssetId: options.assetId,
     mediaType: options.mediaType,
@@ -156,6 +163,7 @@ export function buildMediaDocumentInputs(options: MediaDocumentOptions): NewDocu
     transcriptProvider: options.transcriptProvider,
     transcriptLanguage: options.transcriptLanguage,
     knowledgeRevisionId: options.knowledgeRevisionId,
+    videoRuntimeScope: options.videoRuntimeScope,
   };
   const baseUrl = options.originalUrl || options.localUrl;
   const label = options.mediaType === 'video' ? 'Video' : 'Audio';
@@ -175,11 +183,11 @@ export function buildMediaDocumentInputs(options: MediaDocumentOptions): NewDocu
         ...baseMetadata,
         contentKind: `${options.mediaType}-summary`,
         isMediaSummary: true,
-        segmentCount: options.segments.length,
+        segmentCount: boundedSegments.length,
       },
     },
-    ...buildTemporalChapterInputs(options, baseMetadata, baseUrl, label),
-    ...options.segments.map((segment) => ({
+    ...buildTemporalChapterInputs(boundedOptions, baseMetadata, baseUrl, label),
+    ...boundedSegments.map((segment) => ({
       title: `${options.title} — ${formatTime(segment.startSecs)}`,
       content: [
         `${label}: ${options.title}`,
@@ -221,8 +229,8 @@ function buildTemporalChapterInputs(
     options.durationSecs <= 30 * 60
       ? 5 * 60
       : options.durationSecs <= 4 * 60 * 60
-      ? 15 * 60
-      : 30 * 60;
+        ? 15 * 60
+        : 30 * 60;
   const chapters = new Map<number, MediaEvidenceSegment[]>();
   for (const segment of options.segments) {
     const index = Math.floor(segment.startSecs / windowSecs);

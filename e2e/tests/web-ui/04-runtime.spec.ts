@@ -453,9 +453,6 @@ test.describe('Project runtime', () => {
       .toContain('streamText');
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toContain('agent.capabilities()');
-    await expect
-      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toContain('chatModelCatalog');
 
     await page.getByRole('button', { name: 'Copy Python SDK', exact: true }).click();
@@ -466,9 +463,6 @@ test.describe('Project runtime', () => {
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toContain('stream_text');
-    await expect
-      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toContain('agent.capabilities()');
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toContain('chat_model_catalog');

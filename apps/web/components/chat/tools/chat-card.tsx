@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface ChatCardConfig {
   title: string;
@@ -18,33 +18,16 @@ export interface ChatCardConfig {
  * Inspired by the "Risk Mitigation & Governance" section style from the screenshot.
  */
 export function ChatCard({ config }: { config: ChatCardConfig }) {
-  const {
-    title,
-    subtitle,
-    icon,
-    collapsible = true,
-    defaultOpen = true,
-    children,
-  } = config;
+  const { title, subtitle, icon, collapsible = true, defaultOpen = true, children } = config;
 
   const [open, setOpen] = useState(defaultOpen);
 
   const headerContent = (
     <div className="flex items-center gap-2.5 min-w-0">
-      {icon && (
-        <span className="shrink-0 text-muted-foreground [&_svg]:size-4">
-          {icon}
-        </span>
-      )}
+      {icon && <span className="shrink-0 text-muted-foreground [&_svg]:size-4">{icon}</span>}
       <div className="min-w-0 flex-1">
-        <h3 className="text-sm font-semibold text-foreground truncate">
-          {title}
-        </h3>
-        {subtitle && (
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {subtitle}
-          </p>
-        )}
+        <h3 className="text-sm font-semibold text-foreground truncate">{title}</h3>
+        {subtitle && <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>}
       </div>
     </div>
   );
@@ -61,15 +44,13 @@ export function ChatCard({ config }: { config: ChatCardConfig }) {
           {headerContent}
           <ChevronDown
             className={cn(
-              "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
-              open && "rotate-180",
+              'size-4 shrink-0 text-muted-foreground transition-transform duration-200',
+              open && 'rotate-180',
             )}
           />
         </button>
       ) : (
-        <div className="flex items-center gap-3 px-4 py-3">
-          {headerContent}
-        </div>
+        <div className="flex items-center gap-3 px-4 py-3">{headerContent}</div>
       )}
 
       {/* Content */}
@@ -82,9 +63,9 @@ export function ChatCard({ config }: { config: ChatCardConfig }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
+/* Tool-card helpers. */
 /* Simplified functional API — no config wrapper needed                 */
-/* ------------------------------------------------------------------ */
+/* End tool-card helpers. */
 
 export function ChatCardSimple({
   title,

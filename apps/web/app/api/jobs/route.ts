@@ -5,6 +5,7 @@ import { isFirecrawlConfigured } from '@larkup/scraper/firecrawl';
 import { readDocuments } from '@larkup/core/documents-store';
 import { readConfig } from '@larkup/core/config-store';
 import type { CrawlJob, CrawlScope, CrawlTarget } from '@larkup/core/types';
+import { resolveGroupId } from '@larkup/core/groups-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
     keywords?: string;
     targets?: Array<{ url?: string; scope?: CrawlScope }>;
     pageLimit?: number;
+    groupId?: string;
   };
   try {
     body = await req.json();
@@ -101,6 +103,7 @@ export async function POST(req: Request) {
     pageLimit: Math.min(Math.max(body.pageLimit ?? 2000, 1), 2000),
     pagesCrawled: 0,
     docCount: 0,
+    groupId: await resolveGroupId(body.groupId),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

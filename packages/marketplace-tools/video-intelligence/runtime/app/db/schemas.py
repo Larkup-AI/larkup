@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ApiModel(BaseModel):
@@ -16,14 +16,14 @@ def _to_camel(value: str) -> str:
 
 class VideoIndexingBrief(ApiModel):
     goal: str | None = Field(default=None, max_length=2_000)
-    content_type: Literal[
-        "general", "course", "sports", "surveillance", "meeting"
-    ] = "general"
+    # Descriptive metadata only. The agent selects modalities from source
+    # evidence and the user's goal, never from a fixed genre branch.
+    content_type: str = Field(default="general", max_length=120)
     known_entities: list[str] = Field(default_factory=list, max_length=50)
     expected_questions: list[str] = Field(default_factory=list, max_length=20)
     language: str = Field(default="auto", max_length=32)
     important_ranges: list[dict[str, Any]] = Field(default_factory=list, max_length=20)
-    indexing_mode: Literal["fast", "balanced", "deep", "full-coverage"] = "balanced"
+    indexing_mode: Literal["fast", "balanced", "thorough"] = "balanced"
     processing_authority_confirmed: bool = False
     retain_source_hours: int = Field(default=0, ge=0, le=720)
     skip_transcription: bool = False
@@ -35,11 +35,25 @@ class VideoIndexingBrief(ApiModel):
     # Semantic vision can answer ordinary visual questions directly. Reserve
     # CPU OCR/detection for requests that actually need those operators.
     skip_heavy_operators: bool = False
+    # A bounded chat verification already decided that fresh visual evidence
+    # is required. The runtime planner may tune sampling, but cannot disable
+    # the only remaining visual evidence source for that pass.
+    require_semantic_vision: bool = False
+    # Read the requested range as one chronological sequence instead of
+    # independent clips, so a before/after relationship inside it survives.
+    continuous_sequence: bool = False
+    # The retrieval agent may spend a denser visual budget on a bounded close
+    # read. Whole-source indexing leaves this unset and follows the plan.
+    max_frames: int | None = Field(default=None, ge=1, le=24)
+    # A bounded conversational verification is already planned by the host.
+    # It uses the deterministic fast lane in the worker and never changes the
+    # behavior of a normal media-indexing request.
+    interactive: bool = False
     # A selected external transcription provider can supply timestamped speech
     # to the semantic reader without forcing the worker to transcribe twice.
     transcript_context: list[dict[str, Any]] = Field(default_factory=list, max_length=2_000)
 
-    @field_validator("goal", "language")
+    @field_validator("goal", "language", "content_type")
     @classmethod
     def strip_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -60,29 +74,47 @@ class VideoIndexingBrief(ApiModel):
                 seen.add(key)
         return normalized
 
-    @model_validator(mode="after")
-    def validate_full_frame_authority(self) -> "VideoIndexingBrief":
-        if self.indexing_mode == "full-coverage" and not self.processing_authority_confirmed:
-            raise ValueError("full frame coverage requires explicit user authorization")
-        return self
-
-
 class VideoSource(ApiModel):
     upload_id: str
     file_name: str | None = None
 
 
+class ProviderModelCredential(ApiModel):
+    provider: str = Field(min_length=1, max_length=64)
+    api_key: str = Field(min_length=1, max_length=2_048)
+    model: str = Field(min_length=1, max_length=256)
+
+
+class JobModelConfiguration(ApiModel):
+    audio: ProviderModelCredential
+    brain: ProviderModelCredential
+    vision: ProviderModelCredential
+
+
 class CreateJobRequest(ApiModel):
     source: VideoSource
     brief: VideoIndexingBrief = Field(default_factory=VideoIndexingBrief)
+    # Custom-remote runtimes accept the same transient BYOK contract as
+    # managed cloud. Local calls omit it and use process-scoped settings.
+    model_configuration: JobModelConfiguration | None = None
 
 
 class JobProgress(ApiModel):
     stage: Literal[
-        "queued", "probe", "decode", "transcribe", "ocr", "detect", "synthesize", "complete"
+        "queued", "prepare", "probe", "decode", "transcribe", "ocr", "detect", "synthesize", "complete"
     ]
     percent: int = Field(ge=0, le=100)
     message: str
+    # How far through `stage` alone the job is. A host that renders one bar
+    # per step reads this instead of keeping its own copy of the pipeline's
+    # phase budget, which would break silently whenever that budget changed.
+    stage_percent: int | None = Field(default=None, ge=0, le=100)
+    sequence: int | None = Field(default=None, ge=0)
+    elapsed_seconds: int | None = Field(default=None, ge=0)
+    estimated_remaining_seconds: int | None = Field(default=None, ge=0)
+    current: int | None = Field(default=None, ge=0)
+    total: int | None = Field(default=None, ge=0)
+    unit: str | None = Field(default=None, max_length=80)
 
 
 class UsageSummary(ApiModel):
@@ -92,7 +124,6 @@ class UsageSummary(ApiModel):
     source_minutes_limit: float | None
     active_jobs: int
     concurrent_jobs_limit: int
-    allow_full_coverage: bool
 
 
 class JobResponse(ApiModel):
@@ -120,7 +151,6 @@ class CreateAccessCodeRequest(ApiModel):
     label: str = Field(min_length=1, max_length=120)
     source_minutes_per_month: float = Field(default=600, ge=1, le=1_000_000)
     max_concurrent_jobs: int = Field(default=1, ge=1, le=100)
-    allow_full_coverage: bool = False
     max_uses: int = Field(default=1, ge=1, le=100_000)
     expires_at: str | None = None
 

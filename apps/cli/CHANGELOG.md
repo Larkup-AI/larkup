@@ -1,5 +1,41 @@
 # @larkup/cli
 
+## 0.2.26
+
+### Patch Changes
+
+- Improve project settings with portable Agent Skills, runtime filtering, current installed-tool manifests, and expanded Video Intelligence configuration. Agent Server deployments now expose tool discovery plus AI SDK and OpenAI-compatible streaming endpoints, grouped separately from Knowledge endpoints in Scalar. Add text streaming helpers, chat-model discovery, and guarded per-request provider/model selection to the JavaScript and Python SDK clients. AI Gateway runtimes list their available language models; direct-provider runtimes remain constrained to their configured provider. Align `larkup chat --model` with the configured provider so a Gateway key is never routed to a direct vendor.
+- Updated dependencies [738ba6c]
+- Updated dependencies [738ba6c]
+- Updated dependencies [738ba6c]
+- Updated dependencies [b2f4aa2]
+- Updated dependencies
+- Updated dependencies [b2f4aa2]
+- Updated dependencies
+- Updated dependencies [b2f4aa2]
+- Updated dependencies [790a298]
+- Updated dependencies [b2f4aa2]
+- Updated dependencies [bf44a90]
+- Updated dependencies
+- Updated dependencies [b2f4aa2]
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies [b2f4aa2]
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies [5d9b483]
+- Updated dependencies
+- Updated dependencies [b2f4aa2]
+- Updated dependencies [b2f4aa2]
+- Updated dependencies [b2f4aa2]
+- Updated dependencies [b2f4aa2]
+- Updated dependencies [b2f4aa2]
+- Updated dependencies [b2f4aa2]
+  - @larkup/core@0.5.0
+  - @larkup/marketplace@0.2.0
+  - @larkup/vector-stores@0.1.26
+
 ## 0.2.25
 
 ### Patch Changes

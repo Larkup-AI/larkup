@@ -6,10 +6,6 @@ import { useDocEditor } from './doc-editor-provider';
 import { DocumentViewer } from './document-viewer';
 import { cn } from '@/lib/utils';
 
-/* ------------------------------------------------------------------ */
-/* DocumentCanvas    */
-/* ------------------------------------------------------------------ */
-
 interface DocumentCanvasProps {
   /** The chat content to render on the left side */
   children: React.ReactNode;
@@ -68,7 +64,7 @@ export function DocumentCanvas({ children }: DocumentCanvasProps) {
           aria-orientation="vertical"
           onMouseDown={handleMouseDown}
           className={cn(
-            'relative z-10 flex w-[3px] shrink-0 cursor-col-resize items-center justify-center',
+            'relative z-10 flex w-0.75 shrink-0 cursor-col-resize items-center justify-center',
             'bg-border/40 transition-colors hover:bg-primary/30 active:bg-primary/50',
             'group',
           )}

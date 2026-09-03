@@ -51,21 +51,8 @@ export function ChatCitations({
   const [clipOpen, setClipOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   useEffect(() => {
-    if (!autoOpenSupportingClip || !ui.mediaUrl) {
-      setClipOpen(false);
-      return;
-    }
-    // The result-ui contract can be returned by any installed tool. Keep
-    // automatic media expansion pleasant when a follow-up repeats the same
-    // citation: only the first matching supporting clip opens per session.
-    const key = `larkup:shown-supporting-clip:${ui.mediaUrl}:${ui.primaryTimestampSecs ?? ''}`;
-    if (window.sessionStorage.getItem(key)) {
-      setClipOpen(false);
-      return;
-    }
-    window.sessionStorage.setItem(key, '1');
-    setClipOpen(true);
-  }, [autoOpenSupportingClip, ui.mediaUrl, ui.primaryTimestampSecs]);
+    setClipOpen(!!(autoOpenSupportingClip && ui.mediaUrl));
+  }, [autoOpenSupportingClip, ui.mediaUrl]);
   if (!ui.items?.length && !ui.mediaUrl) return null;
 
   return (

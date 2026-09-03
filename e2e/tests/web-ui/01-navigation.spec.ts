@@ -12,28 +12,21 @@ test.describe('Navigation & Layout', () => {
 
   test('sidebar navigation links are visible', async ({ page }) => {
     await page.goto('/data');
-    await page.waitForSelector('text=Knowledge Base', { timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'Data', exact: true })).toBeVisible({
+      timeout: 60_000,
+    });
 
-    // Verify main navigation items exist in sidebar
-    const navItems = ['Add', 'Data', 'Chat', 'Settings'];
-    for (const item of navItems) {
-      const link = page
-        .getByRole('link', { name: item })
-        .or(page.getByText(item, { exact: true }))
-        .first();
-      const isVisible = await link.isVisible({ timeout: 3_000 }).catch(() => false);
-      if (isVisible) {
-        console.log(`  ✓ Nav item visible: ${item}`);
-      } else {
-        console.log(`  ℹ Nav item not found: ${item}`);
-      }
+    // The sidebar starts collapsed, so the links carry an icon and no label.
+    // Their destinations are the stable contract.
+    for (const href of ['/chat', '/add', '/data', '/settings']) {
+      await expect(page.locator(`nav a[href="${href}"]`).first()).toBeVisible();
     }
   });
 
   test('navigate to Data page', async ({ page }) => {
     await page.goto('/data');
     await expect(
-      page.getByText('Review and manage everything your AI can learn from.').first(),
+      page.getByText('Add sources, organize groups, and manage indexing.').first(),
     ).toBeVisible({
       timeout: 60_000,
     });
