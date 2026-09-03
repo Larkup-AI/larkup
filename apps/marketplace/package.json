@@ -1,9 +1,9 @@
 {
   "name": "@larkup/hub",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Larkup Hub \u2014 marketplace catalog API, tool registry, and install tracking.",
+  "description": "Larkup Hub — marketplace catalog API, tool registry, and install tracking.",
   "scripts": {
     "dev": "tsx watch scripts/dev.mjs",
     "test": "vitest run",

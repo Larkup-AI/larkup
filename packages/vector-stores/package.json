@@ -1,6 +1,6 @@
 {
   "name": "@larkup/vector-stores",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "scripts": {
     "type-check": "tsc --noEmit"
   },

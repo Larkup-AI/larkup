@@ -1,6 +1,9 @@
 {
   "name": "@larkup/cli",
-  "version": "0.2.25",
+  "version": "0.2.26",
+  "engines": {
+    "node": ">=22"
+  },
   "publishConfig": {
     "access": "public"
   },
