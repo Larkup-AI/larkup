@@ -5,14 +5,7 @@
 export type ToolStatus = 'available' | 'installing' | 'installed' | 'error';
 
 export type ToolCategory =
-  | 'media'
-  | 'search'
-  | 'analytics'
-  | 'integration'
-  | 'embedding'
-  | 'ai'
-  | 'automation'
-  | 'utility';
+  'media' | 'search' | 'analytics' | 'integration' | 'embedding' | 'ai' | 'automation' | 'utility';
 
 export type ToolPricing = 'free' | 'pro' | 'enterprise';
 /** Controls who can discover and install a published Marketplace tool. */
@@ -20,11 +13,7 @@ export type ToolDistribution = 'public' | 'private';
 
 /** A native process is a local runtime launched without a container engine. */
 export type ToolRuntimeMode =
-  | 'local'
-  | 'local-docker'
-  | 'local-process'
-  | 'managed-cloud'
-  | 'custom-remote';
+  'local' | 'local-docker' | 'local-process' | 'managed-cloud' | 'custom-remote';
 
 export interface ToolRuntimeModeDescriptor {
   id: ToolRuntimeMode;
@@ -257,8 +246,8 @@ export interface ToolConfigField {
   defaultValueByProvider?: Record<string, string>;
   /** Optional host AI Models key used as this field's unsaved default. */
   globalConfigKey?: 'visionProvider' | 'chatProvider';
-  /** Uses a workspace AI provider as an initial value without writing to it. */
-  defaultFromGlobalConfigKey?: 'visionProvider' | 'chatProvider';
+  /** Uses a workspace AI setting as the unsaved default without writing to it. */
+  defaultFromGlobalConfigKey?: 'visionProvider' | 'chatProvider' | 'visionModelId' | 'chatModelId';
   /** Optional visual group. Settings forms render each group in its own card. */
   group?: string;
   /** Declarative verification request. Omit it to hide Verify for this field. */
@@ -319,12 +308,7 @@ export interface InstalledToolsManifest {
 }
 
 export type InstallStage =
-  | 'checking-deps'
-  | 'downloading'
-  | 'installing'
-  | 'configuring'
-  | 'completed'
-  | 'failed';
+  'checking-deps' | 'downloading' | 'installing' | 'configuring' | 'completed' | 'failed';
 
 export interface InstallProgress {
   toolId: string;

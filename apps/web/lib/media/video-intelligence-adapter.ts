@@ -674,11 +674,19 @@ export function assertVideoIntelligenceConfiguration(config: Record<string, unkn
 export function resolveVideoJobModelConfiguration(config: Record<string, unknown>) {
   const value = (candidate: unknown) =>
     typeof candidate === 'string' && candidate.trim() ? candidate.trim() : undefined;
+  const visionOverride = value(config.videoVisionProvider);
   const globalVisionProvider = value(config.larkupVisionProvider);
-  const visionProvider = globalVisionProvider ?? 'vercel_ai_gateway';
+  const visionProvider =
+    visionOverride && visionOverride !== 'auto'
+      ? visionOverride
+      : (globalVisionProvider ?? 'vercel_ai_gateway');
   const visionApiKey =
-    globalVisionProvider === visionProvider ? value(config.larkupVisionApiKey) : undefined;
+    (visionOverride && visionOverride !== 'auto' ? value(config.videoVisionApiKey) : undefined) ??
+    (globalVisionProvider === visionProvider ? value(config.larkupVisionApiKey) : undefined) ??
+    value(config.visionGatewayApiKey);
+  const visionModelOverride = value(config.semanticVisionModel);
   const visionModel =
+    (visionModelOverride && visionModelOverride !== 'auto' ? visionModelOverride : undefined) ??
     (globalVisionProvider === visionProvider ? value(config.larkupVisionModel) : undefined) ??
     (visionProvider === 'google'
       ? 'google/gemini-3.6-flash'
@@ -686,12 +694,19 @@ export function resolveVideoJobModelConfiguration(config: Record<string, unknown
         ? 'openai/gpt-4o-mini'
         : 'google/gemini-3.6-flash');
 
+  const brainOverride = value(config.videoAgentProvider);
   const globalBrainProvider = value(config.larkupAgentProvider);
-  const brainProvider = globalBrainProvider ?? 'vercel_ai_gateway';
+  const brainProvider =
+    brainOverride && brainOverride !== 'auto'
+      ? brainOverride
+      : (globalBrainProvider ?? 'vercel_ai_gateway');
   const brainApiKey =
+    (brainOverride && brainOverride !== 'auto' ? value(config.videoAgentApiKey) : undefined) ??
     (globalBrainProvider === brainProvider ? value(config.larkupAgentApiKey) : undefined) ??
     (brainProvider === visionProvider ? visionApiKey : undefined);
+  const brainModelOverride = value(config.agentModel);
   const brainModel =
+    (brainModelOverride && brainModelOverride !== 'auto' ? brainModelOverride : undefined) ??
     (globalBrainProvider === brainProvider ? value(config.larkupAgentModel) : undefined) ??
     (brainProvider === 'google' ? 'google/gemini-3.5-flash-lite' : 'openai/gpt-5-mini');
 
@@ -727,12 +742,12 @@ export function resolveVideoJobModelConfiguration(config: Record<string, unknown
   }
   if (!visionApiKey) {
     throw new Error(
-      'Before indexing starts, configure a vision provider and API key under Settings → AI Models → Vision Model. Text-only providers such as DeepSeek need a separate vision provider. The video was not uploaded or downloaded.',
+      'Before indexing starts, configure a vision provider and API key in Video Intelligence or under Settings → AI Models → Vision Model. Text-only providers such as DeepSeek need a separate vision provider. The video was not uploaded or downloaded.',
     );
   }
   if (!brainApiKey) {
     throw new Error(
-      'Before indexing starts, add the selected chat provider API key under Settings → AI Models. The video was not uploaded or downloaded.',
+      'Before indexing starts, add the selected agent provider API key in Video Intelligence or under Settings → AI Models. The video was not uploaded or downloaded.',
     );
   }
   if (!audioApiKey) {

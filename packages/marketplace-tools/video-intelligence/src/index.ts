@@ -141,7 +141,7 @@ export const TOOL_EXTENSION = {
       ? {
           configured: false,
           message:
-            'Video understanding needs a vision-capable provider and API key in Settings → AI Models. Text-only chat providers such as DeepSeek need a separate Vision Model.',
+            'Video understanding needs a vision-capable provider and API key. Use the AI Models defaults or customize them in this tool; text-only providers such as DeepSeek need a separate vision provider.',
         }
       : !modelIsVideoCapable
         ? {
@@ -270,9 +270,24 @@ async function resolveUnderstandingConfig(
   config: Record<string, unknown>,
 ): Promise<VideoUnderstandingEnvConfig> {
   const str = (value: unknown) => (typeof value === 'string' && value.trim() ? value : undefined);
-  const visionProvider = str(config.larkupVisionProvider) ?? 'vercel_ai_gateway';
-  const visionApiKey = str(config.larkupVisionApiKey) ?? str(config.larkupGatewayApiKey);
-  let semanticVisionModel = str(config.larkupVisionModel) ?? str(config.larkupGatewayVisionModel);
+  const visionOverride = str(config.videoVisionProvider);
+  const globalVisionProvider = str(config.larkupVisionProvider);
+  const visionProvider =
+    visionOverride && visionOverride !== 'auto'
+      ? visionOverride
+      : (globalVisionProvider ?? 'vercel_ai_gateway');
+  const visionApiKey =
+    (visionOverride && visionOverride !== 'auto' ? str(config.videoVisionApiKey) : undefined) ??
+    (globalVisionProvider === visionProvider ? str(config.larkupVisionApiKey) : undefined) ??
+    str(config.visionGatewayApiKey) ??
+    str(config.larkupGatewayApiKey);
+  const visionModelOverride = str(config.semanticVisionModel);
+  let semanticVisionModel =
+    visionModelOverride && visionModelOverride !== 'auto'
+      ? visionModelOverride
+      : globalVisionProvider === visionProvider
+        ? (str(config.larkupVisionModel) ?? str(config.larkupGatewayVisionModel))
+        : undefined;
   if (!semanticVisionModel) {
     semanticVisionModel =
       visionProvider === 'google'
@@ -281,11 +296,20 @@ async function resolveUnderstandingConfig(
           ? 'gpt-4o-mini'
           : 'google/gemini-3.6-flash';
   }
-  const agentProvider = str(config.larkupAgentProvider) ?? 'vercel_ai_gateway';
+  const agentOverride = str(config.videoAgentProvider);
+  const globalAgentProvider = str(config.larkupAgentProvider);
+  const agentProvider =
+    agentOverride && agentOverride !== 'auto'
+      ? agentOverride
+      : (globalAgentProvider ?? 'vercel_ai_gateway');
   const agentApiKey =
-    str(config.larkupAgentApiKey) ?? (agentProvider === visionProvider ? visionApiKey : undefined);
+    (agentOverride && agentOverride !== 'auto' ? str(config.videoAgentApiKey) : undefined) ??
+    (globalAgentProvider === agentProvider ? str(config.larkupAgentApiKey) : undefined) ??
+    (agentProvider === visionProvider ? visionApiKey : undefined);
+  const agentModelOverride = str(config.agentModel);
   const agentModel =
-    str(config.larkupAgentModel) ??
+    (agentModelOverride && agentModelOverride !== 'auto' ? agentModelOverride : undefined) ??
+    (globalAgentProvider === agentProvider ? str(config.larkupAgentModel) : undefined) ??
     (agentProvider === 'google' ? 'google/gemini-3.5-flash-lite' : 'openai/gpt-5-mini');
   return {
     visionProvider,
@@ -335,7 +359,9 @@ async function verifyProviderModel(
     throw new Error(`${label} needs a provider, model, and API key before it can be verified.`);
   }
   const normalizedProvider = provider.trim().toLowerCase();
-  const normalizedModel = model.replace(/^(google|openai)\//, '');
+  const normalizedModel = model.startsWith(`${normalizedProvider}/`)
+    ? model.slice(normalizedProvider.length + 1)
+    : model;
   let response: Response;
   if (normalizedProvider === 'google') {
     response = await request(
@@ -351,16 +377,35 @@ async function verifyProviderModel(
         }),
       },
     );
-  } else if (normalizedProvider === 'openai' || normalizedProvider === 'vercel_ai_gateway') {
-    const baseUrl =
-      normalizedProvider === 'openai'
-        ? 'https://api.openai.com/v1'
-        : 'https://ai-gateway.vercel.sh/v1';
+  } else if (normalizedProvider === 'anthropic') {
+    response = await request('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: normalizedModel,
+        messages: [{ role: 'user', content: 'Reply with OK.' }],
+        max_tokens: 8,
+      }),
+    });
+  } else if (
+    ['openai', 'vercel_ai_gateway', 'deepseek', 'mistral', 'cohere'].includes(normalizedProvider)
+  ) {
+    const baseUrl = {
+      openai: 'https://api.openai.com/v1',
+      vercel_ai_gateway: 'https://ai-gateway.vercel.sh/v1',
+      deepseek: 'https://api.deepseek.com',
+      mistral: 'https://api.mistral.ai/v1',
+      cohere: 'https://api.cohere.ai/compatibility/v1',
+    }[normalizedProvider]!;
     response = await request(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: normalizedProvider === 'openai' ? normalizedModel : model,
+        model: normalizedProvider === 'vercel_ai_gateway' ? model : normalizedModel,
         messages: [{ role: 'user', content: 'Reply with OK.' }],
         max_tokens: 8,
       }),

@@ -63,19 +63,29 @@ describe('tool.manifest.json', () => {
     expect(
       indexingSurface.estimate.variants.map((variant: { value: string }) => variant.value),
     ).toEqual(['fast', 'balanced', 'thorough']);
-    for (const key of [
-      'videoVisionProvider',
-      'videoVisionApiKey',
-      'semanticVisionModel',
-      'videoAgentProvider',
-      'videoAgentApiKey',
-      'agentModel',
-      'audioModel',
-    ]) {
+    expect(
+      manifest.configSchema.find((field: { key: string }) => field.key === 'videoVisionProvider'),
+    ).toMatchObject({ defaultFromGlobalConfigKey: 'visionProvider' });
+    expect(
+      manifest.configSchema.find((field: { key: string }) => field.key === 'semanticVisionModel'),
+    ).toMatchObject({ defaultFromGlobalConfigKey: 'visionModelId' });
+    expect(
+      manifest.configSchema.find((field: { key: string }) => field.key === 'videoAgentProvider'),
+    ).toMatchObject({
+      defaultFromGlobalConfigKey: 'chatProvider',
+      options: expect.arrayContaining([expect.objectContaining({ value: 'deepseek' })]),
+    });
+    expect(
+      manifest.configSchema.find((field: { key: string }) => field.key === 'agentModel'),
+    ).toMatchObject({ defaultFromGlobalConfigKey: 'chatModelId' });
+    for (const key of ['videoVisionApiKey', 'videoAgentApiKey']) {
       expect(
         manifest.configSchema.find((field: { key: string }) => field.key === key),
-      ).toBeUndefined();
+      ).toMatchObject({ type: 'password' });
     }
+    expect(
+      manifest.configSchema.find((field: { key: string }) => field.key === 'audioModel'),
+    ).toBeUndefined();
     expect(
       manifest.configSchema.find((field: { key: string }) => field.key === 'audioProvider')
         .visibleWhen,

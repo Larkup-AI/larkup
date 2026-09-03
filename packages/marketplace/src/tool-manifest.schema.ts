@@ -181,7 +181,9 @@ export function validateToolManifest(manifest: Record<string, unknown>): Manifes
         }
         if (
           field.defaultFromGlobalConfigKey !== undefined &&
-          !['visionProvider', 'chatProvider'].includes(String(field.defaultFromGlobalConfigKey))
+          !['visionProvider', 'chatProvider', 'visionModelId', 'chatModelId'].includes(
+            String(field.defaultFromGlobalConfigKey),
+          )
         ) {
           errors.push(
             `configSchema[${i}].defaultFromGlobalConfigKey must name a supported AI provider field`,

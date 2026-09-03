@@ -282,6 +282,67 @@ describe('video runtime model ownership', () => {
     });
   });
 
+  it('allows tool-specific brain and vision choices to override AI Models', () => {
+    expect(
+      resolveVideoJobModelConfiguration({
+        audioProvider: 'deepgram',
+        audioApiKey: 'audio-key',
+        larkupAgentProvider: 'deepseek',
+        larkupAgentApiKey: 'global-deepseek-key',
+        larkupAgentModel: 'deepseek/deepseek-v4-pro',
+        larkupVisionProvider: 'google',
+        larkupVisionApiKey: 'global-google-key',
+        larkupVisionModel: 'google/gemini-3.6-flash',
+        videoAgentProvider: 'openai',
+        videoAgentApiKey: 'tool-openai-key',
+        agentModel: 'openai/gpt-5.2',
+        videoVisionProvider: 'openai',
+        videoVisionApiKey: 'tool-vision-key',
+        semanticVisionModel: 'openai/gpt-4o-mini',
+      }),
+    ).toEqual({
+      audio: { provider: 'deepgram', apiKey: 'audio-key', model: 'nova-3' },
+      brain: { provider: 'openai', apiKey: 'tool-openai-key', model: 'openai/gpt-5.2' },
+      vision: {
+        provider: 'openai',
+        apiKey: 'tool-vision-key',
+        model: 'openai/gpt-4o-mini',
+      },
+    });
+  });
+
+  it('uses AI Models again when tool overrides are set to auto', () => {
+    expect(
+      resolveVideoJobModelConfiguration({
+        audioProvider: 'deepgram',
+        audioApiKey: 'audio-key',
+        larkupAgentProvider: 'deepseek',
+        larkupAgentApiKey: 'global-deepseek-key',
+        larkupAgentModel: 'deepseek/deepseek-v4-pro',
+        larkupVisionProvider: 'google',
+        larkupVisionApiKey: 'global-google-key',
+        larkupVisionModel: 'google/gemini-3.6-flash',
+        videoAgentProvider: 'auto',
+        videoAgentApiKey: 'stale-tool-agent-key',
+        agentModel: 'auto',
+        videoVisionProvider: 'auto',
+        videoVisionApiKey: 'stale-tool-vision-key',
+        semanticVisionModel: 'auto',
+      }),
+    ).toMatchObject({
+      brain: {
+        provider: 'deepseek',
+        apiKey: 'global-deepseek-key',
+        model: 'deepseek/deepseek-v4-pro',
+      },
+      vision: {
+        provider: 'google',
+        apiKey: 'global-google-key',
+        model: 'google/gemini-3.6-flash',
+      },
+    });
+  });
+
   it('forwards all three user-owned model selections to a managed Cloud worker', () => {
     expect(
       createVideoIntelligenceSubmitRequest({

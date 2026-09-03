@@ -54,7 +54,7 @@ type ConfigField = {
   options?: { label: string; value: string; description?: string; icon?: string; image?: string }[];
   providerField?: string;
   defaultValueByProvider?: Record<string, string>;
-  defaultFromGlobalConfigKey?: 'visionProvider' | 'chatProvider';
+  defaultFromGlobalConfigKey?: 'visionProvider' | 'chatProvider' | 'visionModelId' | 'chatModelId';
   group?: string;
   verification?: { endpoint: string; method?: 'POST' | 'PUT'; fields?: Record<string, string> };
   layout?: 'full' | 'half';
@@ -145,9 +145,10 @@ function modelsForProvider(
   provider: string,
 ): ConfigField['options'] {
   if (!options) return options;
-  if (provider === 'google') return options.filter((option) => option.value.startsWith('google/'));
-  if (provider === 'openai') return options.filter((option) => option.value.startsWith('openai/'));
-  return options;
+  if (provider === 'auto' || provider === 'vercel_ai_gateway') return options;
+  return options.filter(
+    (option) => option.value === 'auto' || option.value.startsWith(`${provider}/`),
+  );
 }
 
 function ToolUsageSummary({
@@ -703,7 +704,12 @@ export function MarketplaceToolsSettings({ embedded = false }: { embedded?: bool
   };
   const valueFor = (tool: InstalledTool, field: ConfigField): string | boolean => {
     const savedValue = form[tool.id]?.[field.key];
-    if (field.defaultFromGlobalConfigKey) return providerFor(tool, field);
+    if (
+      field.defaultFromGlobalConfigKey === 'visionProvider' ||
+      field.defaultFromGlobalConfigKey === 'chatProvider'
+    ) {
+      return providerFor(tool, field);
+    }
     if (field.providerField) {
       const providerField = tool.configSchema?.find(
         (candidate) => candidate.key === field.providerField,
@@ -716,6 +722,18 @@ export function MarketplaceToolsSettings({ embedded = false }: { embedded?: bool
         options.some((option) => option.value === savedValue)
       ) {
         return savedValue;
+      }
+      const globalDefault = field.defaultFromGlobalConfigKey
+        ? configData?.config[field.defaultFromGlobalConfigKey]
+        : undefined;
+      if (
+        typeof globalDefault === 'string' &&
+        globalDefault &&
+        (provider === 'auto' ||
+          provider === 'vercel_ai_gateway' ||
+          globalDefault.startsWith(`${provider}/`))
+      ) {
+        return globalDefault;
       }
       return (
         field.defaultValueByProvider?.[provider] ?? field.defaultValue ?? options[0]?.value ?? ''
@@ -1003,12 +1021,28 @@ export function MarketplaceToolsSettings({ embedded = false }: { embedded?: bool
                                   (candidate) => candidate.key === field.providerField,
                                 )
                               : undefined;
+                            const globalDefault = field.defaultFromGlobalConfigKey
+                              ? configData?.config[field.defaultFromGlobalConfigKey]
+                              : undefined;
+                            const declaredOptions =
+                              typeof globalDefault === 'string' &&
+                              globalDefault &&
+                              !field.options?.some((option) => option.value === globalDefault)
+                                ? [
+                                    ...(field.options ?? []),
+                                    {
+                                      label: `${globalDefault} (AI Models)`,
+                                      value: globalDefault,
+                                      description: 'Current workspace default.',
+                                    },
+                                  ]
+                                : field.options;
                             const options = providerField
                               ? modelsForProvider(
-                                  field.options,
+                                  declaredOptions,
                                   String(valueFor(tool, providerField)),
                                 )
-                              : field.options;
+                              : declaredOptions;
                             const selectedOption = options?.find(
                               (option) => option.value === value,
                             );
@@ -1122,7 +1156,9 @@ export function MarketplaceToolsSettings({ embedded = false }: { embedded?: bool
                                           update(tool.id, field.key, event.target.value)
                                         }
                                         placeholder={
-                                          field.key === 'videoVisionApiKey' && !value
+                                          (field.key === 'videoVisionApiKey' ||
+                                            field.key === 'videoAgentApiKey') &&
+                                          !value
                                             ? 'Using saved AI Models key'
                                             : field.type === 'password'
                                               ? 'Enter secret…'
