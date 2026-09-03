@@ -22,6 +22,7 @@ export function deleteVideoKnowledgeForMediaAsset(mediaAssetId: string) {
       inspectionReservations: state.inspectionReservations.length,
       backgroundRefinements: state.backgroundRefinements.length,
       artifactAnalysisCache: state.artifactAnalysisCache.length,
+      answerMemory: state.answerMemory.length,
     };
     for (const key of Object.keys(before) as Array<keyof typeof before>) {
       const records = state[key] as Array<{ mediaAssetId: string }>;

@@ -19,11 +19,13 @@ from botocore.exceptions import ClientError
 
 from gpu_providers.base import InstanceState
 from gpu_providers.registry import DEFAULT_PROVIDER, get_provider
+from gpu_providers.runpod import RunpodProvider
 
 REGION, TABLE_NAME, BUCKET = os.environ["AWS_REGION"], os.environ["TABLE_NAME"], os.environ["BUCKET_NAME"]
 # Modal is the default managed-cloud dispatch target; RunPod stays fully
 # supported and selectable per-deployment. See ../../gpu_providers/README.md.
 GPU_PROVIDER = os.getenv("LARKUP_VIDEO_GPU_PROVIDER", DEFAULT_PROVIDER)
+RUNPOD_INTERACTIVE_ENDPOINT_ID = os.getenv("RUNPOD_INTERACTIVE_ENDPOINT_ID", "").strip()
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 # Optional: when set, outbound webhook deliveries carry an
 # X-Larkup-Signature HMAC-SHA256 header over the raw JSON body so a receiver
@@ -33,6 +35,10 @@ MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(20 * 1024**3)))
 PROCESSING_ENABLED = os.getenv("PROCESSING_ENABLED", "false").lower() == "true"
 AUTO_PROVISIONING_ENABLED = os.getenv("AUTO_PROVISIONING_ENABLED", "false").lower() == "true"
 AUTO_PROVISIONED_SOURCE_MINUTES = max(1, min(120, int(os.getenv("AUTO_PROVISIONED_SOURCE_MINUTES", "30"))))
+TRIAL_DEVICE_LIMIT = max(0, min(1_000_000, int(os.getenv("TRIAL_DEVICE_LIMIT", "100"))))
+TRIAL_SOURCE_MINUTES = max(0, min(1_000_000, float(os.getenv("TRIAL_SOURCE_MINUTES", "600"))))
+TRIAL_REQUESTS_PER_MINUTE = max(1, min(600, int(os.getenv("TRIAL_REQUESTS_PER_MINUTE", "60"))))
+POST_TRIAL_SOURCE_MINUTES = max(0, min(120, float(os.getenv("POST_TRIAL_SOURCE_MINUTES", "0"))))
 REQUESTS_PER_MINUTE = max(30, min(600, int(os.getenv("REQUESTS_PER_MINUTE", "120"))))
 TESTING_DEVICE_HASHES = {
     value.strip()
@@ -50,6 +56,9 @@ class ApiError(RuntimeError):
 
 
 STALE_JOB_TIMEOUT_HOURS = int(os.getenv("STALE_JOB_TIMEOUT_HOURS", "6"))
+FINALIZING_STALL_TIMEOUT_MINUTES = max(
+    5, min(60, int(os.getenv("FINALIZING_STALL_TIMEOUT_MINUTES", "12")))
+)
 
 
 def handler(event: dict[str, Any], _: Any) -> dict[str, Any]:
@@ -63,15 +72,20 @@ def handler(event: dict[str, Any], _: Any) -> dict[str, Any]:
     path = event.get("rawPath", "/")
     try:
         if method == "GET" and path == "/v1/health":
-            return response(200, {"status": "ok", "version": "0.1.0", "runtime": "managed-cloud", "authRequired": True, "processingEnabled": PROCESSING_ENABLED, "device": "cuda", "provider": GPU_PROVIDER})
+            return response(200, {"status": "ok", "version": "0.1.0", "runtime": "managed-cloud", "operators": {}, "authRequired": True, "processingEnabled": PROCESSING_ENABLED})
         if method == "POST" and path == "/v1/access-codes/redeem": return redeem_code(body(event))
         if method == "POST" and path == "/v1/device-keys": return provision_device_key(body(event))
         if method == "POST" and path == "/v1/admin/access-codes":
             require_admin(headers(event).get("x-larkup-admin-token")); return create_code(body(event))
+        if method == "POST" and path.startswith("/v1/admin/devices/") and path.endswith("/entitlement"):
+            require_admin(headers(event).get("x-larkup-admin-token"))
+            installation_id = path.removeprefix("/v1/admin/devices/").removesuffix("/entitlement").strip("/")
+            return update_device_entitlement(installation_id, body(event))
         principal = authenticate(headers(event).get("authorization"))
         if method == "POST" and path == "/v1/uploads": return create_upload(principal, body(event))
         if method == "POST" and path == "/v1/jobs": return create_job(principal, body(event))
         if method == "GET" and path == "/v1/usage": return usage(principal)
+        if method == "DELETE" and path == "/v1/jobs/active": return cancel_only_active_job(principal)
         if method == "POST" and path.startswith("/v1/jobs/") and path.endswith("/result/ack"):
             return acknowledge_result(principal, path.removeprefix("/v1/jobs/").removesuffix("/result/ack").rstrip("/"))
         if path.startswith("/v1/jobs/"):
@@ -101,7 +115,7 @@ def authenticate(authorization: str | None) -> dict[str, Any]:
             Key={"pk": f"RATE#{key_hash}#{minute}", "sk": "RATE"},
             UpdateExpression="SET expiresAtEpoch = :expires ADD requests :one",
             ConditionExpression="attribute_not_exists(requests) OR requests < :limit",
-            ExpressionAttributeValues={":expires": int((datetime.now(timezone.utc) + timedelta(minutes=2)).timestamp()), ":one": 1, ":limit": REQUESTS_PER_MINUTE},
+            ExpressionAttributeValues={":expires": int((datetime.now(timezone.utc) + timedelta(minutes=2)).timestamp()), ":one": 1, ":limit": max(1, min(600, int(entitlement.get("requestsPerMinute", REQUESTS_PER_MINUTE))))},
         )
     except ClientError as error:
         if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
@@ -119,23 +133,23 @@ def provision_device_key(payload: dict[str, Any]) -> dict[str, Any]:
     api_key, api_hash = "lvi_" + secrets.token_urlsafe(30), None
     if device:
         principal_id = device["principalId"]
-        # Renewals keep the same anonymous device principal and therefore the
-        # same usage history, but adopt the current pilot entitlement policy.
-        # This lets an operator safely adjust beta limits without resetting
-        # consumption or creating a new billable identity.
-        entitlement = auto_entitlement(str(device.get("deviceHash") or device_hash))
+        # Renewals keep the stable anonymous principal and its explicit
+        # entitlement. Older records predate per-device policy storage, so
+        # preserve their legacy allowance rather than unexpectedly resetting
+        # a current user's cloud access.
+        entitlement = json.loads(device.get("entitlementJson") or json.dumps(legacy_auto_entitlement(str(device.get("deviceHash") or device_hash))))
         api_hash = digest(api_key)
         boto3.client("dynamodb", region_name=REGION).transact_write_items(TransactItems=[
             {"Put": {"TableName": TABLE_NAME, "Item": {"pk": {"S": f"APIKEY#{api_hash}"}, "sk": {"S": "APIKEY"}, "principalId": {"S": principal_id}, "entitlementJson": {"S": json.dumps(entitlement)}, "createdAt": {"S": now_iso()}}, "ConditionExpression": "attribute_not_exists(pk)"}},
-            {"Update": {"TableName": TABLE_NAME, "Key": {"pk": {"S": device_key}, "sk": {"S": "DEVICE"}}, "UpdateExpression": "SET apiKeyHash = :hash, rotatedAt = :at", "ExpressionAttributeValues": {":hash": {"S": api_hash}, ":at": {"S": now_iso()}}}},
+            {"Update": {"TableName": TABLE_NAME, "Key": {"pk": {"S": device_key}, "sk": {"S": "DEVICE"}}, "UpdateExpression": "SET apiKeyHash = :hash, entitlementJson = :entitlement, rotatedAt = :at", "ExpressionAttributeValues": {":hash": {"S": api_hash}, ":entitlement": {"S": json.dumps(entitlement)}, ":at": {"S": now_iso()}}}},
             {"Update": {"TableName": TABLE_NAME, "Key": {"pk": {"S": f"APIKEY#{device['apiKeyHash']}"}, "sk": {"S": "APIKEY"}}, "UpdateExpression": "SET revokedAt = :at", "ExpressionAttributeValues": {":at": {"S": now_iso()}}}},
         ])
     else:
-        principal_id, entitlement, api_hash = "usr_" + secrets.token_hex(12), auto_entitlement(device_hash), digest(api_key)
+        principal_id, entitlement, api_hash = "usr_" + secrets.token_hex(12), auto_entitlement(device_hash, claim_trial_slot()), digest(api_key)
         try:
             boto3.client("dynamodb", region_name=REGION).transact_write_items(TransactItems=[
                 {"Put": {"TableName": TABLE_NAME, "Item": {"pk": {"S": f"APIKEY#{api_hash}"}, "sk": {"S": "APIKEY"}, "principalId": {"S": principal_id}, "entitlementJson": {"S": json.dumps(entitlement)}, "createdAt": {"S": now_iso()}}, "ConditionExpression": "attribute_not_exists(pk)"}},
-                {"Put": {"TableName": TABLE_NAME, "Item": {"pk": {"S": device_key}, "sk": {"S": "DEVICE"}, "principalId": {"S": principal_id}, "apiKeyHash": {"S": api_hash}, "deviceHash": {"S": device_hash}, "createdAt": {"S": now_iso()}}, "ConditionExpression": "attribute_not_exists(pk)"}},
+            {"Put": {"TableName": TABLE_NAME, "Item": {"pk": {"S": device_key}, "sk": {"S": "DEVICE"}, "principalId": {"S": principal_id}, "apiKeyHash": {"S": api_hash}, "deviceHash": {"S": device_hash}, "entitlementJson": {"S": json.dumps(entitlement)}, "createdAt": {"S": now_iso()}}, "ConditionExpression": "attribute_not_exists(pk)"}},
             ])
         except ClientError as error:
             if error.response.get("Error", {}).get("Code") == "TransactionCanceledException":
@@ -144,7 +158,7 @@ def provision_device_key(payload: dict[str, Any]) -> dict[str, Any]:
     return response(201, {"apiKey": api_key, "entitlement": entitlement})
 
 
-def auto_entitlement(device_hash: str) -> dict[str, Any]:
+def legacy_auto_entitlement(device_hash: str) -> dict[str, Any]:
     if device_hash in TESTING_DEVICE_HASHES:
         # Explicit owner-only test access is bound to an anonymized local
         # installation hash. It bypasses every metering gate while the tool is
@@ -153,11 +167,62 @@ def auto_entitlement(device_hash: str) -> dict[str, Any]:
         return {
             "sourceMinutesPerMonth": None,
             "maxConcurrentJobs": 100,
-            "allowFullCoverage": True,
             "unlimitedRequests": True,
             "plan": "owner-device-testing",
         }
-    return {"sourceMinutesPerMonth": AUTO_PROVISIONED_SOURCE_MINUTES, "maxConcurrentJobs": 1, "allowFullCoverage": False, "plan": "device"}
+    return {"sourceMinutesPerMonth": AUTO_PROVISIONED_SOURCE_MINUTES, "maxConcurrentJobs": 1, "requestsPerMinute": REQUESTS_PER_MINUTE, "plan": "auto-device"}
+
+
+def claim_trial_slot() -> bool:
+    """Atomically reserve one of the bounded, no-payment cloud trials."""
+    if TRIAL_DEVICE_LIMIT <= 0:
+        return False
+    try:
+        table.update_item(
+            Key={"pk": "TRIAL#DEVICE", "sk": "TRIAL"},
+            UpdateExpression="SET updatedAt = :at ADD claimedDevices :one",
+            ConditionExpression="attribute_not_exists(claimedDevices) OR claimedDevices < :limit",
+            ExpressionAttributeValues={":at": now_iso(), ":one": 1, ":limit": TRIAL_DEVICE_LIMIT},
+        )
+        return True
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            return False
+        raise
+
+
+def auto_entitlement(device_hash: str, has_trial: bool) -> dict[str, Any]:
+    if device_hash in TESTING_DEVICE_HASHES:
+        return legacy_auto_entitlement(device_hash)
+    if has_trial:
+        return {"sourceMinutesPerMonth": TRIAL_SOURCE_MINUTES, "maxConcurrentJobs": 1, "requestsPerMinute": TRIAL_REQUESTS_PER_MINUTE, "plan": "first-100-trial"}
+    return {"sourceMinutesPerMonth": POST_TRIAL_SOURCE_MINUTES, "maxConcurrentJobs": 1, "requestsPerMinute": TRIAL_REQUESTS_PER_MINUTE, "plan": "support-required"}
+
+
+def update_device_entitlement(installation_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Support-only control: update one device without billing or exposing its API key."""
+    if len(installation_id) < 32 or len(installation_id) > 128:
+        raise ApiError(400, "invalid installation identifier")
+    device = table.get_item(Key={"pk": f"DEVICE#{digest('device:' + installation_id)}", "sk": "DEVICE"}).get("Item")
+    if not device or not device.get("apiKeyHash"):
+        raise ApiError(404, "device not found")
+    key = table.get_item(Key={"pk": f"APIKEY#{device['apiKeyHash']}", "sk": "APIKEY"}).get("Item")
+    if not key or key.get("revokedAt"):
+        raise ApiError(404, "device has no active API key")
+    current = json.loads(key["entitlementJson"])
+    source_minutes = payload.get("sourceMinutesPerMonth", current.get("sourceMinutesPerMonth"))
+    if source_minutes is not None:
+        try: source_minutes = max(0, min(1_000_000, float(source_minutes)))
+        except (TypeError, ValueError) as error: raise ApiError(400, "sourceMinutesPerMonth must be a number or null") from error
+    try: max_jobs = max(1, min(100, int(payload.get("maxConcurrentJobs", current.get("maxConcurrentJobs", 1))))); requests_per_minute = max(1, min(600, int(payload.get("requestsPerMinute", current.get("requestsPerMinute", REQUESTS_PER_MINUTE)))))
+    except (TypeError, ValueError) as error: raise ApiError(400, "maxConcurrentJobs and requestsPerMinute must be numbers") from error
+    entitlement = {"sourceMinutesPerMonth": source_minutes, "maxConcurrentJobs": max_jobs, "requestsPerMinute": requests_per_minute, "plan": str(payload.get("plan", current.get("plan", "support")))[:80]}
+    encoded = json.dumps(entitlement)
+    table.update_item(Key={"pk": key["pk"], "sk": key["sk"]}, UpdateExpression="SET entitlementJson = :entitlement", ExpressionAttributeValues={":entitlement": encoded})
+    table.update_item(Key={"pk": device["pk"], "sk": device["sk"]}, UpdateExpression="SET entitlementJson = :entitlement, updatedAt = :at", ExpressionAttributeValues={":entitlement": encoded, ":at": now_iso()})
+    period, period_start, period_end = billing_period()
+    reconcile_usage_limit(str(device["principalId"]), period, period_start, period_end, source_minutes)
+    return response(200, {"principalId": device["principalId"], "entitlement": entitlement})
 
 
 def create_upload(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
@@ -173,6 +238,7 @@ def create_upload(principal: dict[str, Any], payload: dict[str, Any]) -> dict[st
 def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     if not PROCESSING_ENABLED: raise ApiError(503, "GPU processing is temporarily unavailable", {"Retry-After": "300"})
     source, brief = payload.get("source") or {}, payload.get("brief") or {}
+    model_configuration = worker_model_configuration(payload.get("modelConfiguration"))
     # A caller that already holds a durable canonical copy (the web app's own
     # S3StorageProvider) supplies source.url directly instead of re-uploading
     # through this control plane's short-lived sources/ prefix -- this is
@@ -197,7 +263,17 @@ def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, 
     # timestamps remain on the original source timeline. Give the worker a
     # horizon that includes every requested range without charging that full
     # timeline duration against quota.
-    timeline_duration_seconds = duration_seconds
+    # The submitted duration is the billable source window for an interactive
+    # inspection. Keep the original timeline separately so a range beginning
+    # at 0 is not mistaken for a complete short source and materialized in
+    # full by the RunPod worker.
+    try:
+        timeline_duration_seconds = float(source.get("timelineDurationSecs") or duration_seconds)
+    except (TypeError, ValueError):
+        timeline_duration_seconds = duration_seconds
+    if not math.isfinite(timeline_duration_seconds) or timeline_duration_seconds <= 0:
+        timeline_duration_seconds = duration_seconds
+    furthest_requested_second = 0.0
     for candidate in brief.get("importantRanges") or []:
         try:
             candidate_end = float(candidate.get("endSecs"))
@@ -205,16 +281,46 @@ def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, 
             continue
         if math.isfinite(candidate_end):
             timeline_duration_seconds = max(timeline_duration_seconds, candidate_end)
-    if brief.get("indexingMode") == "full-coverage" and not principal["entitlement"].get("allowFullCoverage", False): raise ApiError(403, "full-frame analysis is not enabled for this API key")
+            furthest_requested_second = max(furthest_requested_second, candidate_end)
+    # Older web clients only send the billable clipped duration. A bounded
+    # request starting at 0:00 can therefore look like a complete short
+    # source to a worker and accidentally trigger full-source materialization.
+    # Interactive inspection is always range-directed, so preserve its exact
+    # ffmpeg range path even when the original timeline is unavailable. The
+    # extra second is control metadata only; it never changes quota usage or
+    # the requested range passed to the worker.
+    if brief.get("interactive") is True and furthest_requested_second > 0:
+        timeline_duration_seconds = max(
+            timeline_duration_seconds, furthest_requested_second + 1.0
+        )
     estimate, (period, period_start, period_end) = max(0.01, duration_seconds / 60), billing_period()
     job_id, created_at = "job_" + secrets.token_hex(12), now_iso()
     source_url = external_source_url or s3.generate_presigned_url("get_object", Params={"Bucket": BUCKET, "Key": upload["sourceKey"]}, ExpiresIn=3600)
     webhook_url = str(payload.get("webhookUrl") or "")
     if webhook_url and not webhook_url.startswith("https://"): raise ApiError(400, "webhookUrl must be an HTTPS URL")
-    job_item = {"pk": {"S": f"JOB#{job_id}"}, "sk": {"S": "JOB"}, "principalId": {"S": principal["id"]}, "status": {"S": "queued"}, **({"sourceKey": {"S": upload["sourceKey"]}} if upload else {}), **({"webhookUrl": {"S": webhook_url}} if webhook_url else {}), "briefJson": {"S": json.dumps(brief, separators=(",", ":"))}, "estimatedSourceMinutes": {"N": str(estimate)}, "period": {"S": period}, "createdAt": {"S": created_at}, "updatedAt": {"S": created_at}, "retainSourceHours": {"N": "0"}, "progressJson": {"S": json.dumps({"stage": "queued", "percent": 0, "message": "Waiting for a secure EU GPU worker"})}}
+    provider_endpoint_id = (
+        RUNPOD_INTERACTIVE_ENDPOINT_ID
+        if GPU_PROVIDER == "runpod" and brief.get("interactive") is True
+        else ""
+    )
+    job_item = {"pk": {"S": f"JOB#{job_id}"}, "sk": {"S": "JOB"}, "principalId": {"S": principal["id"]}, "status": {"S": "queued"}, **({"sourceKey": {"S": upload["sourceKey"]}} if upload else {}), **({"webhookUrl": {"S": webhook_url}} if webhook_url else {}), **({"providerEndpointId": {"S": provider_endpoint_id}} if provider_endpoint_id else {}), "briefJson": {"S": json.dumps(brief, separators=(",", ":"))}, "estimatedSourceMinutes": {"N": str(estimate)}, "period": {"S": period}, "createdAt": {"S": created_at}, "updatedAt": {"S": created_at}, "lastProgressAt": {"S": created_at}, "retainSourceHours": {"N": "0"}, "progressJson": {"S": json.dumps({"stage": "queued", "percent": 0, "message": "Waiting for Larkup Cloud processing capacity"})}}
     source_limit = principal["entitlement"].get("sourceMinutesPerMonth")
     reconcile_usage_limit(principal["id"], period, period_start, period_end, source_limit)
     available, usage_key = Decimal(str(source_limit if source_limit is not None else 1_000_000_000)), f"USAGE#{principal['id']}#{period}"
+    usage_item = table.get_item(Key={"pk": usage_key, "sk": "USAGE"}, ConsistentRead=True).get("Item", {})
+    if source_limit is not None:
+        remaining_minutes = max(
+            Decimal("0"),
+            Decimal(str(source_limit))
+            - Decimal(str(usage_item.get("sourceMinutesUsed", 0)))
+            - Decimal(str(usage_item.get("reservedSourceMinutes", 0))),
+        )
+        if Decimal(str(estimate)) > remaining_minutes:
+            raise quota_limit_error(remaining_minutes, estimate)
+    active_jobs = int(usage_item.get("activeJobs", 0))
+    concurrent_jobs_limit = int(principal["entitlement"].get("maxConcurrentJobs", 1))
+    if not principal["entitlement"].get("unlimitedRequests") and active_jobs >= concurrent_jobs_limit:
+        raise ApiError(429, f"You already have {active_jobs} active video indexing job{'s' if active_jobs != 1 else ''}. Your plan allows {concurrent_jobs_limit} at a time.", {"Retry-After": "60"})
     quota_condition = (
         " AND ((attribute_not_exists(availableSourceMinutes) AND :available >= :estimate) OR availableSourceMinutes >= :estimate)"
         if source_limit is not None
@@ -240,22 +346,99 @@ def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, 
     }
     if concurrency_condition or quota_condition:
         usage_update["ConditionExpression"] = concurrency_condition + quota_condition
-    boto3.client("dynamodb", region_name=REGION).transact_write_items(TransactItems=[{"Put": {"TableName": TABLE_NAME, "Item": job_item}}, {"Update": usage_update}])
+    try:
+        boto3.client("dynamodb", region_name=REGION).transact_write_items(TransactItems=[{"Put": {"TableName": TABLE_NAME, "Item": job_item}}, {"Update": usage_update}])
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") != "TransactionCanceledException":
+            raise
+        current_usage = table.get_item(Key={"pk": usage_key, "sk": "USAGE"}, ConsistentRead=True).get("Item", {})
+        current_active_jobs = int(current_usage.get("activeJobs", 0))
+        if not principal["entitlement"].get("unlimitedRequests") and current_active_jobs >= concurrent_jobs_limit:
+            raise ApiError(429, f"You already have {current_active_jobs} active video indexing job{'s' if current_active_jobs != 1 else ''}. Your plan allows {concurrent_jobs_limit} at a time.", {"Retry-After": "60"}) from error
+        if source_limit is not None:
+            current_remaining = max(
+                Decimal("0"),
+                Decimal(str(source_limit))
+                - Decimal(str(current_usage.get("sourceMinutesUsed", 0)))
+                - Decimal(str(current_usage.get("reservedSourceMinutes", 0))),
+            )
+            raise quota_limit_error(current_remaining, estimate) from error
+        raise
     try:
         # runpod/modal are job-queue providers: `env` is the direct worker
         # payload they submit (see gpu_providers/README.md), not shell-style
         # string env vars, so brief/duration travel through as-is.
-        instance_id = get_provider(GPU_PROVIDER).launch(
+        instance_id = provider_for(GPU_PROVIDER, provider_endpoint_id).launch(
             job_id=job_id,
             image="",
-            env={"jobId": job_id, "sourceUrl": source_url, "sourceDurationSecs": timeline_duration_seconds, "brief": brief},
+            env={
+                "jobId": job_id,
+                "sourceUrl": source_url,
+                "sourceDurationSecs": timeline_duration_seconds,
+                "brief": brief,
+                "modelConfiguration": model_configuration,
+            },
             gpu_type=os.getenv("LARKUP_VIDEO_GPU_TYPE", ""),
         )
         if not instance_id: raise RuntimeError(f"{GPU_PROVIDER} did not return an instance id")
         table.update_item(Key={"pk": f"JOB#{job_id}", "sk": "JOB"}, UpdateExpression="SET providerName = :provider, instanceId = :instance", ExpressionAttributeValues={":provider": GPU_PROVIDER, ":instance": instance_id})
     except Exception as error:
-        settle_failure(job_id, f"{GPU_PROVIDER} submission failed: {error}"); raise ApiError(502, "GPU job submission failed; reservation released") from error
+        settle_failure(job_id, "Larkup Cloud could not start video indexing. Please retry."); raise ApiError(502, "Larkup Cloud could not start video indexing. Please retry.") from error
     return get_job(principal, job_id, 202)
+
+
+def provider_for(name: str, endpoint_id: str = ""):
+    """Resolve the queue that owns a job, including its bounded fast lane."""
+    if name == "runpod" and endpoint_id:
+        return RunpodProvider(
+            api_key=os.environ["RUNPOD_API_KEY"],
+            endpoint_id=endpoint_id,
+        )
+    return get_provider(name)
+
+
+def provider_for_job(item: dict[str, Any]):
+    return provider_for(
+        str(item.get("providerName") or GPU_PROVIDER),
+        str(item.get("providerEndpointId") or ""),
+    )
+
+
+def worker_model_configuration(value: Any) -> dict[str, dict[str, str]]:
+    """Validate an ephemeral BYOK bundle without writing it into the job item."""
+    if not isinstance(value, dict):
+        raise ApiError(
+            400,
+            "Audio, agent / tool-brain, and vision provider settings are required before indexing starts",
+        )
+    allowed = {
+        "audio": {"openai", "groq", "deepgram", "elevenlabs"},
+        "brain": {"vercel_ai_gateway", "google", "openai"},
+        "vision": {"vercel_ai_gateway", "google", "openai"},
+    }
+    result: dict[str, dict[str, str]] = {}
+    for role, providers in allowed.items():
+        item = value.get(role)
+        if not isinstance(item, dict):
+            raise ApiError(400, f"A configured {role} provider, model, and API key are required")
+        provider = str(item.get("provider") or "").strip()
+        api_key = str(item.get("apiKey") or "").strip()
+        model = str(item.get("model") or "").strip()
+        if provider not in providers:
+            raise ApiError(400, f"Unsupported {role} provider for Video Intelligence")
+        if not api_key or len(api_key) > 2048:
+            raise ApiError(400, f"A valid {role} API key is required before indexing starts")
+        if not model or len(model) > 256:
+            raise ApiError(400, f"A valid {role} model is required before indexing starts")
+        result[role] = {"provider": provider, "apiKey": api_key, "model": model}
+    return result
+
+
+def quota_limit_error(remaining_minutes: Decimal, required_minutes: float) -> ApiError:
+    return ApiError(
+        429,
+        f"Your cloud quota has {float(remaining_minutes):.2f} minutes remaining, but this video requires {required_minutes:.2f} minutes.",
+    )
 
 
 def get_job(principal: dict[str, Any], job_id: str, status_code: int = 200) -> dict[str, Any]:
@@ -291,32 +474,90 @@ def acknowledge_result(principal: dict[str, Any], job_id: str) -> dict[str, Any]
 def sync_job(item: dict[str, Any]) -> None:
     provider_name = str(item.get("providerName") or GPU_PROVIDER)
     instance_id = str(item.get("instanceId") or "")
+    if finalizing_is_stalled(item):
+        try:
+            provider_for_job(item).terminate(instance_id)
+        except Exception:
+            pass
+        settle(
+            item,
+            "failed",
+            0,
+            error="Video analysis stopped making progress while finalizing. Please retry.",
+        )
+        return
     try:
-        provider = get_provider(provider_name)
+        provider = provider_for_job(item)
         status = provider.get_status(instance_id)
     except Exception:
-        update_progress(item, "queued", 1, f"Waiting for {provider_name} status"); return
+        update_progress(item, "queued", 1, "Checking your Larkup Cloud job status"); return
     if status.state == InstanceState.PENDING:
-        update_progress(item, "queued", 1, f"Queued on {provider_name}")
+        update_progress(item, "queued", 1, "Queued with Larkup Cloud")
     elif status.state == InstanceState.RUNNING:
         # Job-queue providers relay their worker's own progress reports
         # through get_progress; anything else (or a rent-a-VM provider,
         # which always returns None here) falls back to a coarse placeholder.
         progress = provider.get_progress(instance_id)
         if progress:
-            update_progress(item, progress["stage"], progress["percent"], progress["message"])
+            update_progress(
+                item,
+                progress["stage"],
+                progress["percent"],
+                public_progress_message(progress["message"]),
+                progress.get("stagePercent"),
+                progress,
+            )
         else:
-            update_progress(item, "probe", 5, f"{provider_name} worker is processing the video")
+            # A transient relay hiccup (eventual-consistency lag on the
+            # provider's status API, a momentarily malformed payload) must
+            # not look like the job restarting from scratch. Re-affirm the
+            # last recorded progress instead of resetting to the first
+            # stage -- the real stage/percent resumes on the next
+            # successful poll, so this only ever holds the UI steady.
+            try:
+                previous = json.loads(str(item.get("progressJson") or "{}"))
+            except json.JSONDecodeError:
+                previous = {}
+            if previous.get("stage") and isinstance(previous.get("percent"), int):
+                update_progress(
+                    item,
+                    previous["stage"],
+                    previous["percent"],
+                    previous.get("message") or "Larkup Cloud is processing the video",
+                    previous.get("stagePercent"),
+                    previous,
+                )
+            else:
+                update_progress(item, "probe", 5, "Larkup Cloud is processing the video")
     elif status.state == InstanceState.EXITED:
         output = provider.get_result(instance_id)
         result = output.get("result") if isinstance(output, dict) else None
-        if not isinstance(result, dict): settle_failure(item["pk"][4:], f"{provider_name} completed without a result"); return
+        if not isinstance(result, dict): settle_failure(item["pk"][4:], "Larkup Cloud completed without a result. Please retry."); return
         result["jobId"] = item["pk"][4:]
         result_key = f"results/{item['principalId']}/{item['pk'][4:]}.json"
         s3.put_object(Bucket=BUCKET, Key=result_key, Body=json.dumps(result, separators=(",", ":")).encode("utf-8"), ContentType="application/json", ServerSideEncryption="aws:kms")
         settle(item, "completed", float(output.get("actualSourceMinutes") or item["estimatedSourceMinutes"]), result_key=result_key)
     elif status.state == InstanceState.FAILED:
-        settle(item, "failed", 0, error=status.detail or f"{provider_name} worker failed")
+        print(
+            json.dumps(
+                {
+                    "event": "gpu_job_failed",
+                    "jobId": item["pk"][4:],
+                    "provider": provider_name,
+                    "instanceId": instance_id,
+                    "detail": status.detail,
+                },
+                separators=(",", ":"),
+            )
+        )
+        settle(item, "failed", 0, error="Larkup Cloud could not complete this video. Please retry.")
+
+
+def public_progress_message(message: str) -> str:
+    """Keep worker implementation details and retired setup copy out of the UI."""
+    if message == "Preparing the visual search model for this video — this can take a little longer the first time":
+        return "Creating the visual search index"
+    return message
 
 
 def cancel_job(principal: dict[str, Any], job_id: str) -> dict[str, Any]:
@@ -324,14 +565,135 @@ def cancel_job(principal: dict[str, Any], job_id: str) -> dict[str, Any]:
     if not item or item.get("principalId") != principal["id"]: raise ApiError(404, "job not found")
     if item["status"] not in {"queued", "running"}: raise ApiError(409, "job cannot be cancelled")
     try:
-        if item.get("instanceId"): get_provider(str(item.get("providerName") or GPU_PROVIDER)).terminate(str(item["instanceId"]))
+        if item.get("instanceId"): provider_for_job(item).terminate(str(item["instanceId"]))
     except Exception as error: raise ApiError(502, "GPU cancellation request failed") from error
     settle(item, "cancelled", 0, error="Cancelled by the API key owner")
     return get_job(principal, job_id)
 
 
-def update_progress(item: dict[str, Any], stage: str, percent: int, message: str) -> None:
-    table.update_item(Key={"pk": item["pk"], "sk": item["sk"]}, UpdateExpression="SET #status = :status, progressJson = :progress, updatedAt = :updated", ConditionExpression="#status IN (:queued, :running)", ExpressionAttributeNames={"#status": "status"}, ExpressionAttributeValues={":status": "running" if stage != "queued" else "queued", ":queued": "queued", ":running": "running", ":progress": json.dumps({"stage": stage, "percent": percent, "message": message}), ":updated": now_iso()})
+def cancel_only_active_job(principal: dict[str, Any]) -> dict[str, Any]:
+    """Recovery for a deleted local asset when there is exactly one active job."""
+    active = active_jobs_for_principal(principal["id"])
+    if not active:
+        reconcile_active_job_count(principal["id"], 0)
+        return response(200, {"status": "cancelled", "alreadyStopped": True})
+    if len(active) > 1:
+        raise ApiError(409, "More than one video is active. Stop it from its media card instead.")
+    return cancel_job(principal, str(active[0]["pk"])[4:])
+
+
+def active_jobs_for_principal(principal_id: str) -> list[dict[str, Any]]:
+    """Returns durable active jobs; usage counters are never the source of truth."""
+    active: list[dict[str, Any]] = []
+    start_key: dict[str, Any] | None = None
+    while True:
+        request: dict[str, Any] = {
+            "FilterExpression": "principalId = :principal AND #status IN (:queued, :running)",
+            "ExpressionAttributeNames": {"#status": "status"},
+            "ExpressionAttributeValues": {
+                ":principal": principal_id,
+                ":queued": "queued",
+                ":running": "running",
+            },
+        }
+        if start_key:
+            request["ExclusiveStartKey"] = start_key
+        page = table.scan(**request)
+        active.extend(page.get("Items", []))
+        start_key = page.get("LastEvaluatedKey")
+        if not start_key:
+            return active
+
+
+def reconcile_active_job_count(principal_id: str, active_count: int) -> None:
+    """Repair a stale usage counter without changing metered source minutes."""
+    period, _, _ = billing_period()
+    key = {"pk": f"USAGE#{principal_id}#{period}", "sk": "USAGE"}
+    if not table.get_item(Key=key).get("Item"):
+        return
+    table.update_item(
+        Key=key,
+        UpdateExpression="SET activeJobs = :active",
+        ExpressionAttributeValues={":active": active_count},
+    )
+
+
+def update_progress(
+    item: dict[str, Any],
+    stage: str,
+    percent: int,
+    message: str,
+    stage_percent: float | int | None = None,
+    details: dict[str, Any] | None = None,
+) -> None:
+    progress = {"stage": stage, "percent": percent, "message": message}
+    if stage_percent is not None:
+        try:
+            measured = float(stage_percent)
+        except (TypeError, ValueError):
+            measured = None
+        if measured is not None and 0 <= measured <= 100:
+            progress["stagePercent"] = measured
+    for key in (
+        "sequence",
+        "elapsedSeconds",
+        "estimatedRemainingSeconds",
+        "current",
+        "total",
+    ):
+        try:
+            measured = float((details or {}).get(key))
+        except (TypeError, ValueError):
+            continue
+        if measured >= 0:
+            progress[key] = int(measured) if measured.is_integer() else measured
+    unit = str((details or {}).get("unit") or "").strip()[:80]
+    if unit:
+        progress["unit"] = unit
+    try:
+        previous = json.loads(str(item.get("progressJson") or "{}"))
+    except json.JSONDecodeError:
+        previous = {}
+    changed = previous != progress
+    updated_at = now_iso()
+    expression = "SET #status = :status, progressJson = :progress, updatedAt = :updated"
+    values: dict[str, Any] = {
+        ":status": "running" if stage != "queued" else "queued",
+        ":queued": "queued",
+        ":running": "running",
+        ":progress": json.dumps(progress),
+        ":updated": updated_at,
+    }
+    if changed:
+        expression += ", lastProgressAt = :progressed"
+        values[":progressed"] = updated_at
+    table.update_item(
+        Key={"pk": item["pk"], "sk": item["sk"]},
+        UpdateExpression=expression,
+        ConditionExpression="#status IN (:queued, :running)",
+        ExpressionAttributeNames={"#status": "status"},
+        ExpressionAttributeValues=values,
+    )
+
+
+def finalizing_is_stalled(item: dict[str, Any], now: datetime | None = None) -> bool:
+    """Stop a job that repeatedly reports the same near-complete final phase."""
+    try:
+        progress = json.loads(str(item.get("progressJson") or "{}"))
+        is_finalizing = progress.get("stage") == "synthesize" and int(progress.get("percent", 0)) >= 98
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return False
+    if not is_finalizing:
+        return False
+    try:
+        # Old jobs predate lastProgressAt. Their created timestamp is the only
+        # truthful marker for a final phase that has never advanced.
+        started = datetime.fromisoformat(str(item.get("lastProgressAt") or item.get("createdAt") or ""))
+    except ValueError:
+        return False
+    return ((now or datetime.now(timezone.utc)) - started).total_seconds() >= (
+        FINALIZING_STALL_TIMEOUT_MINUTES * 60
+    )
 
 
 def deliver_webhook(item: dict[str, Any], status: str, error: str | None) -> None:
@@ -466,7 +828,11 @@ def usage(principal: dict[str, Any]) -> dict[str, Any]:
         # reconciliation had a transient provider or table failure.
         pass
     period, period_start, period_end = billing_period(); item = table.get_item(Key={"pk": f"USAGE#{principal['id']}#{period}", "sk": "USAGE"}).get("Item", {}); entitlement = principal["entitlement"]
-    return response(200, {"periodStart": period_start, "periodEnd": period_end, "sourceMinutesUsed": item.get("sourceMinutesUsed", 0), "sourceMinutesLimit": entitlement.get("sourceMinutesPerMonth"), "activeJobs": item.get("activeJobs", 0), "concurrentJobsLimit": entitlement.get("maxConcurrentJobs", 1), "allowFullCoverage": entitlement.get("allowFullCoverage", False)})
+    active_jobs = active_jobs_for_principal(principal["id"])
+    active_count = len(active_jobs)
+    if int(item.get("activeJobs", 0)) != active_count:
+        reconcile_active_job_count(principal["id"], active_count)
+    return response(200, {"periodStart": period_start, "periodEnd": period_end, "sourceMinutesUsed": item.get("sourceMinutesUsed", 0), "sourceMinutesLimit": entitlement.get("sourceMinutesPerMonth"), "activeJobs": active_count, "activeJobIds": [str(job["pk"])[4:] for job in active_jobs], "concurrentJobsLimit": entitlement.get("maxConcurrentJobs", 1)})
 
 
 def reconcile_usage_limit(principal_id: str, period: str, period_start: str, period_end: str, source_limit: float | None) -> None:
@@ -512,7 +878,7 @@ def reconcile_usage_limit(principal_id: str, period: str, period_start: str, per
 
 def create_code(payload: dict[str, Any]) -> dict[str, Any]:
     code, max_uses = "lvi_code_" + secrets.token_urlsafe(18), max(1, min(100_000, int(payload.get("maxUses") or 1)))
-    entitlement = {"sourceMinutesPerMonth": max(1, float(payload.get("sourceMinutesPerMonth") or 600)), "maxConcurrentJobs": max(1, int(payload.get("maxConcurrentJobs") or 1)), "allowFullCoverage": bool(payload.get("allowFullCoverage", False)), "plan": "access-code"}
+    entitlement = {"sourceMinutesPerMonth": max(0, float(payload.get("sourceMinutesPerMonth") or 600)), "maxConcurrentJobs": max(1, int(payload.get("maxConcurrentJobs") or 1)), "requestsPerMinute": max(1, min(600, int(payload.get("requestsPerMinute") or REQUESTS_PER_MINUTE))), "plan": "access-code"}
     table.put_item(Item={"pk": f"CODE#{digest(code)}", "sk": "CODE", "label": str(payload.get("label") or "Cloud access")[:120], "entitlementJson": json.dumps(entitlement), "maxUses": max_uses, "uses": 0, "expiresAt": payload.get("expiresAt") or "9999-12-31T23:59:59+00:00", "createdAt": now_iso()})
     return response(201, {"code": code, "label": payload.get("label"), "maxUses": max_uses, "expiresAt": payload.get("expiresAt")})
 

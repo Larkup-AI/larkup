@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { getDataDir, requireDataDir } from '../workspace';
+import { getProjectDataDir, requireProjectDataDir } from '../project-store';
 import type { VideoKnowledgeStoreState } from './types';
 
 const EMPTY_STATE: VideoKnowledgeStoreState = {
@@ -11,6 +11,7 @@ const EMPTY_STATE: VideoKnowledgeStoreState = {
   inspectionReservations: [],
   backgroundRefinements: [],
   artifactAnalysisCache: [],
+  answerMemory: [],
   artifacts: [],
   evidence: [],
   observations: [],
@@ -35,7 +36,7 @@ function cloneEmpty(): VideoKnowledgeStoreState {
 }
 
 async function dataPath(create: boolean): Promise<string | null> {
-  const dir = create ? await requireDataDir() : await getDataDir();
+  const dir = create ? await requireProjectDataDir() : await getProjectDataDir();
   return dir ? path.join(dir, 'video-knowledge.json') : null;
 }
 
@@ -43,9 +44,7 @@ function isMissing(error: unknown) {
   return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
 }
 
-export async function readVideoKnowledgeState(): Promise<VideoKnowledgeStoreState> {
-  const file = await dataPath(false);
-  if (!file) return cloneEmpty();
+async function readStateUncached(file: string): Promise<VideoKnowledgeStoreState> {
   try {
     const parsed = JSON.parse(await fs.readFile(file, 'utf8')) as Partial<VideoKnowledgeStoreState>;
     if (parsed.schemaVersion !== 1)
@@ -55,6 +54,40 @@ export async function readVideoKnowledgeState(): Promise<VideoKnowledgeStoreStat
     if (isMissing(error)) return cloneEmpty();
     throw error;
   }
+}
+
+// A single indexed video reaches tens of megabytes of evidence, and one chat
+// answer reads this state a dozen times across retrieval, investigation, and
+// verification. Re-parsing it per call dominated interactive latency, so the
+// parsed document is memoized against the file's identity (mtime + size) and
+// re-read the moment anything -- this process or another -- rewrites it.
+let cached: { key: string; state: VideoKnowledgeStoreState } | null = null;
+
+/**
+ * Read-only view of the active workspace's video knowledge. Callers must
+ * treat the result as immutable; `mutateVideoKnowledgeState` is the only
+ * supported way to change it.
+ */
+export async function readVideoKnowledgeState(): Promise<VideoKnowledgeStoreState> {
+  const file = await dataPath(false);
+  if (!file) return cloneEmpty();
+  let key: string;
+  try {
+    const stat = await fs.stat(file);
+    key = `${file}:${stat.mtimeMs}:${stat.size}`;
+  } catch (error) {
+    if (isMissing(error)) return cloneEmpty();
+    throw error;
+  }
+  if (cached?.key === key) return cached.state;
+  const state = await readStateUncached(file);
+  cached = { key, state };
+  return state;
+}
+
+/** Drops the memoized document so the next read re-parses from disk. */
+export function invalidateVideoKnowledgeStateCache(): void {
+  cached = null;
 }
 
 async function writeState(state: VideoKnowledgeStoreState): Promise<void> {
@@ -115,9 +148,13 @@ export function mutateVideoKnowledgeState<T>(
   const run = writeChain.then(async () => {
     const release = await acquireStateLock();
     try {
-      const state = await readVideoKnowledgeState();
+      // Never mutate the memoized read-only document: this transaction owns
+      // a private copy, and the cache is dropped so readers pick the write up.
+      const file = await dataPath(false);
+      const state = file ? await readStateUncached(file) : cloneEmpty();
       const result = await mutate(state);
       await writeState(state);
+      invalidateVideoKnowledgeStateCache();
       return result;
     } finally {
       await release();

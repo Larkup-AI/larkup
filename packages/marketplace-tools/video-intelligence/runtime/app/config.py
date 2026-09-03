@@ -27,6 +27,9 @@ class Settings:
     semantic_vision_enabled: bool
     semantic_vision_model: str
     reasoning_vision_model: str
+    agent_enabled: bool
+    agent_provider: str
+    agent_model: str
     allowed_origins: tuple[str, ...]
 
     @classmethod
@@ -57,11 +60,14 @@ class Settings:
             # the reasoning model is reserved for watch_original's final
             # dense-verification pass, where accuracy matters more than cost.
             semantic_vision_model=os.getenv(
-                "LARKUP_VIDEO_SEMANTIC_VISION_MODEL", "google/gemini-3-flash"
+                "LARKUP_VIDEO_SEMANTIC_VISION_MODEL", "google/gemini-3.6-flash"
             ),
             reasoning_vision_model=os.getenv(
-                "LARKUP_VIDEO_REASONING_VISION_MODEL", "alibaba/qwen3-vl-235b-a22b-instruct"
+                "LARKUP_VIDEO_REASONING_VISION_MODEL", "google/gemini-3.6-flash"
             ),
+            agent_enabled=_bool("LARKUP_VIDEO_AGENT_ENABLED", True),
+            agent_provider=os.getenv("LARKUP_VIDEO_AGENT_PROVIDER", "vercel_ai_gateway"),
+            agent_model=os.getenv("LARKUP_VIDEO_AGENT_MODEL", "openai/gpt-5-mini"),
             allowed_origins=tuple(
                 origin.strip()
                 for origin in os.getenv(

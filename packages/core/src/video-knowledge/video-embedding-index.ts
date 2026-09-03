@@ -1,6 +1,7 @@
 import { createAdapter } from '@larkup/vector-stores/factory';
 import type { VectorRecord } from '@larkup/vector-stores/adapter';
 import type { VectorStoreConfig } from '@larkup/vector-stores/types';
+import { trackUsageEvent } from '../analytics-store';
 import { readConfig } from '../config-store';
 
 /**
@@ -13,9 +14,8 @@ import { readConfig } from '../config-store';
  * stores require one fixed dimensionality per collection.
  * VectorStoreAdapter.upsert() already accepts a precomputed `vector`
  * directly, so this never calls the text embedder for the clip side --
- * only for query-time text-to-video cross-modal search, which calls
- * DashScope's multimodal-embedding API directly (a plain HTTPS call, no
- * self-hosted weights, no GPU container), not the RAG embedding provider.
+ * only for query-time text-to-video cross-modal search, which calls the same
+ * multimodal provider/model family that created the stored clip vectors.
  */
 
 const COLLECTION_KEYS = ['tableName', 'collectionName', 'indexName'] as const;
@@ -81,27 +81,137 @@ export interface VideoEmbeddingHit {
 
 const DASHSCOPE_DEFAULT_URL =
   'https://dashscope-intl.aliyuncs.com/api/v1/services/embeddings/multimodal-embedding/multimodal-embedding';
+const GATEWAY_DEFAULT_URL = 'https://ai-gateway.vercel.sh/v4/ai';
 
-async function embedQueryTextForVideo(query: string): Promise<number[] | undefined> {
-  const apiKey = process.env.DASHSCOPE_API_KEY;
-  if (!apiKey) return undefined;
-  const baseUrl = process.env.LARKUP_VIDEO_DASHSCOPE_BASE_URL || DASHSCOPE_DEFAULT_URL;
-  const model = process.env.LARKUP_VIDEO_EMBEDDING_MODEL || 'qwen3-vl-embedding';
+type QueryEmbeddingProvider =
+  | 'gateway-gemini-embedding-2'
+  | 'huggingface-qwen3-vl-embedding'
+  | 'qwen3-vl-embedding'
+  | 'runpod-qwen3-vl-embedding';
+
+interface QueryEmbedding {
+  provider: QueryEmbeddingProvider;
+  model: string;
+  vector: number[];
+}
+
+function queryProviderOrder(): QueryEmbeddingProvider[] {
+  const supported = new Set<QueryEmbeddingProvider>([
+    'gateway-gemini-embedding-2',
+    'huggingface-qwen3-vl-embedding',
+    'qwen3-vl-embedding',
+    'runpod-qwen3-vl-embedding',
+  ]);
+  const ordered: QueryEmbeddingProvider[] = [];
+  const add = (provider?: string) => {
+    const normalized = provider?.trim().toLowerCase() as QueryEmbeddingProvider | undefined;
+    if (normalized && supported.has(normalized) && !ordered.includes(normalized)) {
+      ordered.push(normalized);
+    }
+  };
+
+  add(process.env.LARKUP_VIDEO_EMBEDDING_PROVIDER);
+  add(process.env.LARKUP_VIDEO_EMBEDDING_FALLBACK_PROVIDER);
+  if (process.env.AI_GATEWAY_API_KEY) add('gateway-gemini-embedding-2');
+  if (process.env.DASHSCOPE_API_KEY) add('qwen3-vl-embedding');
+  if (
+    (process.env.LARKUP_VIDEO_HF_EMBEDDING_API_KEY || process.env.HF_TOKEN) &&
+    process.env.LARKUP_VIDEO_HF_EMBEDDING_URL
+  ) {
+    add('huggingface-qwen3-vl-embedding');
+  }
+  if (
+    (process.env.LARKUP_VIDEO_RUNPOD_EMBEDDING_API_KEY || process.env.RUNPOD_API_KEY) &&
+    (process.env.LARKUP_VIDEO_RUNPOD_EMBEDDING_BASE_URL ||
+      process.env.LARKUP_VIDEO_RUNPOD_EMBEDDING_ENDPOINT_ID)
+  ) {
+    add('runpod-qwen3-vl-embedding');
+  }
+  return ordered;
+}
+
+async function embedQueryTextForVideo(
+  provider: QueryEmbeddingProvider,
+  query: string,
+): Promise<QueryEmbedding | undefined> {
+  const dimensions = Number(process.env.LARKUP_VIDEO_EMBEDDING_DIMENSION || 0) || undefined;
+  let url = '';
+  let model = '';
+  let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  let body: unknown;
+
+  if (provider === 'gateway-gemini-embedding-2') {
+    const apiKey = process.env.AI_GATEWAY_API_KEY;
+    if (!apiKey) return undefined;
+    model = process.env.LARKUP_VIDEO_GATEWAY_EMBEDDING_MODEL || 'google/gemini-embedding-2';
+    url = `${(process.env.LARKUP_VIDEO_GATEWAY_EMBEDDING_BASE_URL || GATEWAY_DEFAULT_URL).replace(
+      /\/$/,
+      '',
+    )}/embedding-model`;
+    headers = {
+      ...headers,
+      Authorization: `Bearer ${apiKey}`,
+      'ai-gateway-protocol-version': '0.0.1',
+      'ai-gateway-auth-method': 'api-key',
+      'ai-embedding-model-specification-version': '4',
+      'ai-model-id': model,
+    };
+    body = {
+      values: [query],
+      providerOptions: { google: { taskType: 'RETRIEVAL_QUERY' } },
+    };
+  } else if (provider === 'qwen3-vl-embedding') {
+    const apiKey = process.env.DASHSCOPE_API_KEY;
+    if (!apiKey) return undefined;
+    model = process.env.LARKUP_VIDEO_EMBEDDING_MODEL || 'qwen3-vl-embedding';
+    url = process.env.LARKUP_VIDEO_DASHSCOPE_BASE_URL || DASHSCOPE_DEFAULT_URL;
+    headers.Authorization = `Bearer ${apiKey}`;
+    body = {
+      model,
+      input: { contents: [{ text: query }] },
+      parameters: { enable_fusion: false, ...(dimensions ? { dimension: dimensions } : {}) },
+    };
+  } else if (provider === 'huggingface-qwen3-vl-embedding') {
+    const apiKey = process.env.LARKUP_VIDEO_HF_EMBEDDING_API_KEY || process.env.HF_TOKEN;
+    url = process.env.LARKUP_VIDEO_HF_EMBEDDING_URL || '';
+    if (!apiKey || !url) return undefined;
+    model = process.env.LARKUP_VIDEO_EMBEDDING_MODEL || 'qwen3-vl-embedding';
+    headers.Authorization = `Bearer ${apiKey}`;
+    body = { inputs: [{ text: query }], ...(dimensions ? { dimensions } : {}) };
+  } else {
+    const apiKey = process.env.LARKUP_VIDEO_RUNPOD_EMBEDDING_API_KEY || process.env.RUNPOD_API_KEY;
+    const endpointId = process.env.LARKUP_VIDEO_RUNPOD_EMBEDDING_ENDPOINT_ID;
+    url =
+      process.env.LARKUP_VIDEO_RUNPOD_EMBEDDING_BASE_URL ||
+      (endpointId ? `https://api.runpod.ai/v2/${endpointId}/runsync` : '');
+    if (!apiKey || !url) return undefined;
+    model = process.env.LARKUP_VIDEO_EMBEDDING_MODEL || 'qwen3-vl-embedding';
+    headers.Authorization = `Bearer ${apiKey}`;
+    body = { input: { inputs: [{ text: query }], ...(dimensions ? { dimensions } : {}) } };
+  }
+
   try {
-    const response = await fetch(baseUrl, {
+    const response = await fetch(url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        input: { contents: [{ text: query }] },
-        parameters: { enable_fusion: false },
-      }),
+      headers,
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) return undefined;
-    const body = (await response.json()) as { output?: { embeddings?: Array<{ embedding?: number[] }> } };
-    const vector = body.output?.embeddings?.[0]?.embedding;
-    return Array.isArray(vector) ? vector : undefined;
+    const responseBody = (await response.json()) as {
+      embeddings?: number[][];
+      output?: { embeddings?: number[][] | Array<{ embedding?: number[] }> };
+    };
+    const raw = responseBody.embeddings?.[0] ?? responseBody.output?.embeddings?.[0];
+    const vector = Array.isArray(raw) ? raw : raw?.embedding;
+    if (!Array.isArray(vector)) return undefined;
+    void trackUsageEvent({
+      type: 'embedding',
+      embeddingModelId: model,
+      chunkCount: 1,
+      timestamp: new Date().toISOString(),
+    });
+    return { provider, model, vector };
   } catch {
     return undefined;
   }
@@ -109,10 +219,10 @@ async function embedQueryTextForVideo(query: string): Promise<number[] | undefin
 
 /**
  * Cross-modal search: free-text query -> nearest clip embeddings for this
- * asset. Returns nothing (not an error) when DASHSCOPE_API_KEY is unset or
- * the query embedding call fails, so a missing/unavailable video-embedding
- * tier degrades to the existing transcript/OCR/caption retrieval rather
- * than breaking the chat turn.
+ * asset. Each available provider is attempted in configured order and only
+ * matches vectors produced by that same provider. Missing credentials,
+ * endpoint failures, and old collections with another vector dimension all
+ * degrade to transcript/OCR/caption retrieval rather than breaking chat.
  */
 export async function queryVideoEmbeddings(
   mediaAssetId: string,
@@ -120,18 +230,31 @@ export async function queryVideoEmbeddings(
   topK = 8,
 ): Promise<VideoEmbeddingHit[]> {
   if (!query.trim()) return [];
-  const vector = await embedQueryTextForVideo(query);
-  if (!vector) return [];
   const config = await readConfig();
   const adapter = await createAdapter(videoEmbeddingStoreConfig(config));
-  const hits = await adapter.query(vector, topK * 4, query);
-  return hits
-    .filter((hit) => hit.metadata?.mediaAssetId === mediaAssetId)
-    .slice(0, topK)
-    .map((hit) => ({
-      clipId: String(hit.metadata?.clipId ?? ''),
-      startSecs: Number(hit.metadata?.startSecs ?? 0),
-      endSecs: Number(hit.metadata?.endSecs ?? 0),
-      score: hit.score,
-    }));
+  for (const provider of queryProviderOrder()) {
+    const embedding = await embedQueryTextForVideo(provider, query);
+    if (!embedding) continue;
+    try {
+      const hits = await adapter.query(embedding.vector, topK * 4, query);
+      const matching = hits
+        .filter(
+          (hit) =>
+            hit.metadata?.mediaAssetId === mediaAssetId &&
+            (!hit.metadata?.provider || hit.metadata.provider === embedding.provider),
+        )
+        .slice(0, topK)
+        .map((hit) => ({
+          clipId: String(hit.metadata?.clipId ?? ''),
+          startSecs: Number(hit.metadata?.startSecs ?? 0),
+          endSecs: Number(hit.metadata?.endSecs ?? 0),
+          score: hit.score,
+        }));
+      if (matching.length) return matching;
+    } catch {
+      // A collection created by an older provider can have another fixed
+      // vector dimension. Continue to the next same-space query provider.
+    }
+  }
+  return [];
 }

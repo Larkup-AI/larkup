@@ -12,10 +12,19 @@ ifndef GPU_PROVIDERS_DIR
 $(error GPU_PROVIDERS_DIR is not set -- export it as an absolute path before running sam build; see this Makefile's header comment)
 endif
 
+PYTHON ?= python3.12
+
 build-ControlPlane:
 	mkdir -p "$(ARTIFACTS_DIR)"
 	cp *.py "$(ARTIFACTS_DIR)/"
 	cp -r "$(GPU_PROVIDERS_DIR)" "$(ARTIFACTS_DIR)/gpu_providers"
 	rm -rf "$(ARTIFACTS_DIR)/gpu_providers/tests" "$(ARTIFACTS_DIR)/gpu_providers/requirements.txt"
 	find "$(ARTIFACTS_DIR)/gpu_providers" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-	python3 -m pip install --no-cache-dir -r "$(GPU_PROVIDERS_DIR)/requirements.txt" -t "$(ARTIFACTS_DIR)"
+	$(PYTHON) -m pip install --no-cache-dir \
+		--platform manylinux2014_aarch64 \
+		--implementation cp \
+		--python-version 3.12 \
+		--abi cp312 \
+		--only-binary=:all: \
+		-r "$(GPU_PROVIDERS_DIR)/requirements.txt" \
+		-t "$(ARTIFACTS_DIR)"

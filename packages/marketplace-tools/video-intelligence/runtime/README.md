@@ -23,11 +23,11 @@ layers, while `pyproject.toml` and `uv.lock` are the portable source of truth.
 ## Indexing (upload -> evidence)
 
 1. **Probe the file** for duration, fps, resolution, audio presence. *(ffprobe, PyAV fallback)*
-2. **Transcribe speech** with word-level timestamps, if audio is present. *(`TranscriptionService`: `WhisperProvider` local, or `DeepgramProvider` hosted)*
+2. **Transcribe speech** with word-level timestamps, if audio is present. Managed jobs use the user's selected hosted provider and never fall back to platform-funded speech inference. *(`TranscriptionService`)*
 3. **Plan clip boundaries** across the video (or just the requested important ranges). *(`SceneDetector`: PySceneDetect scene-cut detection, fixed-window fallback)*
 4. **Decode and sample frames** at the mode's cadence, running object detection and OCR on each sampled frame, and building anonymous cross-frame tracks. *(`VisualOperators`: YOLOX/ONNX Runtime for detection, PaddleOCR/RapidOCR for text)*
 5. **Keep a motion-biased spread of frames per clip** (not every decoded frame) for captioning/embedding. *(`MotionSampler`)*
-6. **Caption each clip** in natural language. *(`SemanticVisionService`, via the Vercel AI Gateway VLM)*
+6. **Caption each clip** in natural language with the user's selected Google, OpenAI, or Vercel AI Gateway model. *(`SemanticVisionService`)*
 7. **Embed each clip** for cross-modal search -- optional, skipped unless configured. *(`VideoEmbeddingProvider`: DashScope, RunPod, or Hugging Face dedicated `Qwen3-VL-Embedding-8B` deployment)*
 8. **Assemble the evidence bundle** -- transcript, OCR, detections, tracks, captions, embeddings, and an answering guide -- and return it to the app, which stores it as the asset's active evidence.
 
@@ -37,7 +37,7 @@ layers, while `pyproject.toml` and `uv.lock` are the portable source of truth.
 2. **Search the active evidence hierarchy** for the question -- chapters -> scenes -> events/states -> active evidence -- combined with hybrid semantic (vector) + lexical retrieval, plus any visual clip-embedding candidates. *(`queryVideoKnowledge` tool)*
 3. **Verify the evidence actually supports the claim** being made, not just that it's topically related. *(`verifyMediaEvidence` -> `claimVerification.status`: `ok` / `insufficient` / `needs_inspection`)*
 4. **If evidence is thin:** widen the candidate range to the nearest real structural boundary (scene/chapter), or browse the hierarchy for a better one. *(`expand_range` tool; `planVideoInvestigation` tool)*
-5. **If verification calls for it:** request one bounded, authorized deep re-analysis of that specific range (max 30s of source) for fresh OCR/detection/tracks, then repeat step 2 with the same sub-question. *(`inspectVideoKnowledge` / "watch_original" tool -- dispatches to the configured GPU provider, Modal or RunPod)*
+5. **If verification calls for it:** request one bounded, authorized Thorough re-analysis of that specific range (max 30s of source) for fresh OCR/detection/tracks, then repeat step 2 with the same sub-question. *(`inspectVideoKnowledge` / "watch_original" tool -- dispatches to the configured GPU provider, Modal or RunPod)*
 6. **Read the full literal record** in a narrowed range when the question needs everything there, not a ranked search. *(`read_evidence` tool)*
 7. **For cross-timestamp computation** (counts, aggregates, comparisons across many evidence points): *(Python sandbox tool -- pandas/numpy over the retrieved evidence)*
 

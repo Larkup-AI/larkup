@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import base64
 import os
+import threading
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Callable, ClassVar
 
 import cv2
 import numpy as np
@@ -48,7 +50,11 @@ class VideoEmbeddingProvider(ABC):
     dimensions: ClassVar[int]
 
     @abstractmethod
-    def embed_clips(self, clips: list[VideoClipInput]) -> list[VideoClipEmbedding]:
+    def embed_clips(
+        self,
+        clips: list[VideoClipInput],
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[VideoClipEmbedding]:
         """One embedding per clip that had at least one frame."""
 
     @abstractmethod
@@ -60,7 +66,13 @@ class DisabledVideoEmbeddingProvider(VideoEmbeddingProvider):
     name = "disabled"
     dimensions = 0
 
-    def embed_clips(self, clips: list[VideoClipInput]) -> list[VideoClipEmbedding]:
+    def embed_clips(
+        self,
+        clips: list[VideoClipInput],
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[VideoClipEmbedding]:
+        if on_progress:
+            on_progress(0, 0)
         return []
 
     def embed_query(self, text: str) -> list[float]:
@@ -136,17 +148,22 @@ class QwenVLEmbeddingProvider(VideoEmbeddingProvider):
                 f"unexpected DashScope response shape: {str(body)[:500]}"
             ) from error
 
-    def embed_clips(self, clips: list[VideoClipInput]) -> list[VideoClipEmbedding]:
+    def embed_clips(
+        self,
+        clips: list[VideoClipInput],
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[VideoClipEmbedding]:
         embeddings: list[VideoClipEmbedding] = []
-        for clip in clips:
+        usable = [clip for clip in clips if clip.frames]
+        for completed, clip in enumerate(usable, start=1):
             frames = clip.frames[: self.frames_per_clip]
-            if not frames:
-                continue
             contents = [self._frame_content(frame) for _, frame in frames]
             vector = self._embed(contents)
             embeddings.append(
                 VideoClipEmbedding(clip_id=clip.clip_id, start_ms=clip.start_ms, end_ms=clip.end_ms, vector=vector)
             )
+            if on_progress:
+                on_progress(completed, len(usable))
         return embeddings
 
     def embed_query(self, text: str) -> list[float]:
@@ -205,7 +222,11 @@ class RunpodQwenVLEmbeddingProvider(VideoEmbeddingProvider):
             raise ValueError("could not encode frame as JPEG")
         return "data:image/jpeg;base64," + base64.b64encode(buffer.tobytes()).decode("ascii")
 
-    def embed_clips(self, clips: list[VideoClipInput]) -> list[VideoClipEmbedding]:
+    def embed_clips(
+        self,
+        clips: list[VideoClipInput],
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[VideoClipEmbedding]:
         usable = [clip for clip in clips if clip.frames]
         if not usable:
             return []
@@ -217,6 +238,8 @@ class RunpodQwenVLEmbeddingProvider(VideoEmbeddingProvider):
         )
         if len(vectors) != len(usable):
             raise VideoEmbeddingProviderError("RunPod returned a different number of embeddings than inputs")
+        if on_progress:
+            on_progress(len(usable), len(usable))
         return [
             VideoClipEmbedding(clip_id=clip.clip_id, start_ms=clip.start_ms, end_ms=clip.end_ms, vector=vector)
             for clip, vector in zip(usable, vectors, strict=True)
@@ -274,7 +297,11 @@ class HuggingFaceQwenVLEmbeddingProvider(VideoEmbeddingProvider):
             raise ValueError("could not encode frame as JPEG")
         return "data:image/jpeg;base64," + base64.b64encode(buffer.tobytes()).decode("ascii")
 
-    def embed_clips(self, clips: list[VideoClipInput]) -> list[VideoClipEmbedding]:
+    def embed_clips(
+        self,
+        clips: list[VideoClipInput],
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[VideoClipEmbedding]:
         usable = [clip for clip in clips if clip.frames]
         if not usable:
             return []
@@ -283,6 +310,8 @@ class HuggingFaceQwenVLEmbeddingProvider(VideoEmbeddingProvider):
         )
         if len(vectors) != len(usable):
             raise VideoEmbeddingProviderError("Hugging Face returned a different number of embeddings than inputs")
+        if on_progress:
+            on_progress(len(usable), len(usable))
         return [
             VideoClipEmbedding(clip_id=clip.clip_id, start_ms=clip.start_ms, end_ms=clip.end_ms, vector=vector)
             for clip, vector in zip(usable, vectors, strict=True)
@@ -306,14 +335,24 @@ class GatewayGeminiMultimodalEmbeddingProvider(VideoEmbeddingProvider):
     dimensions = 3072
 
     def __init__(self) -> None:
-        self.api_key = os.getenv("AI_GATEWAY_APIKEY") or os.getenv("AI_GATEWAY_API_KEY") or ""
+        self.api_key = os.getenv("AI_GATEWAY_API_KEY") or ""
         self.base_url = os.getenv(
             "LARKUP_VIDEO_GATEWAY_EMBEDDING_BASE_URL", "https://ai-gateway.vercel.sh/v4/ai"
         ).rstrip("/")
         self.model = os.getenv("LARKUP_VIDEO_GATEWAY_EMBEDDING_MODEL", "google/gemini-embedding-2")
         self.dimensions = int(os.getenv("LARKUP_VIDEO_EMBEDDING_DIMENSION", str(self.dimensions)))
         self.batch_size = max(1, min(6, int(os.getenv("LARKUP_VIDEO_GATEWAY_EMBEDDING_BATCH_SIZE", "6"))))
-        self._session = requests.Session()
+        self.max_concurrency = max(
+            1, min(6, int(os.getenv("LARKUP_VIDEO_GATEWAY_EMBEDDING_CONCURRENCY", "6")))
+        )
+        self._sessions = threading.local()
+
+    def _session(self) -> requests.Session:
+        session = getattr(self._sessions, "session", None)
+        if session is None:
+            session = requests.Session()
+            self._sessions.session = session
+        return session
 
     def _embed(
         self,
@@ -329,7 +368,7 @@ class GatewayGeminiMultimodalEmbeddingProvider(VideoEmbeddingProvider):
         if content is not None:
             google_options["content"] = content
         payload["providerOptions"] = {"google": google_options}
-        response = self._session.post(
+        response = self._session().post(
             f"{self.base_url}/embedding-model",
             json=payload,
             headers={
@@ -369,11 +408,17 @@ class GatewayGeminiMultimodalEmbeddingProvider(VideoEmbeddingProvider):
             }
         }
 
-    def embed_clips(self, clips: list[VideoClipInput]) -> list[VideoClipEmbedding]:
+    def embed_clips(
+        self,
+        clips: list[VideoClipInput],
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[VideoClipEmbedding]:
         usable = [clip for clip in clips if clip.frames]
-        embeddings: list[VideoClipEmbedding] = []
-        for offset in range(0, len(usable), self.batch_size):
-            batch = usable[offset : offset + self.batch_size]
+        if not usable:
+            return []
+        batches = [usable[offset : offset + self.batch_size] for offset in range(0, len(usable), self.batch_size)]
+
+        def embed_batch(batch: list[VideoClipInput]) -> list[VideoClipEmbedding]:
             vectors = self._embed(
                 ["timestamped video clip" for _ in batch],
                 content=[
@@ -384,11 +429,22 @@ class GatewayGeminiMultimodalEmbeddingProvider(VideoEmbeddingProvider):
             )
             if len(vectors) != len(batch):
                 raise VideoEmbeddingProviderError("AI Gateway returned a different number of embeddings than inputs")
-            embeddings.extend(
+            return [
                 VideoClipEmbedding(clip_id=clip.clip_id, start_ms=clip.start_ms, end_ms=clip.end_ms, vector=vector)
                 for clip, vector in zip(batch, vectors, strict=True)
-            )
-        return embeddings
+            ]
+
+        by_clip_id: dict[str, VideoClipEmbedding] = {}
+        completed = 0
+        with ThreadPoolExecutor(max_workers=min(self.max_concurrency, len(batches))) as pool:
+            futures = {pool.submit(embed_batch, batch): len(batch) for batch in batches}
+            for future in as_completed(futures):
+                embedded_batch = future.result()
+                by_clip_id.update({embedding.clip_id: embedding for embedding in embedded_batch})
+                completed += futures[future]
+                if on_progress:
+                    on_progress(completed, len(usable))
+        return [by_clip_id[clip.clip_id] for clip in usable]
 
     def embed_query(self, text: str) -> list[float]:
         return self._embed([text], task_type="RETRIEVAL_QUERY")[0]

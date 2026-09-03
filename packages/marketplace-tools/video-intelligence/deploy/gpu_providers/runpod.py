@@ -40,7 +40,17 @@ _STATUS_MAP: dict[str, InstanceState] = {
     "FAILED": InstanceState.FAILED,
     "TIMED_OUT": InstanceState.FAILED,
 }
-_PROGRESS_STAGES = {"probe", "transcribe", "decode", "detect", "synthesize"}
+_PROGRESS_STAGES = {
+    "queued",
+    "prepare",
+    "probe",
+    "transcribe",
+    "decode",
+    "ocr",
+    "detect",
+    "synthesize",
+    "complete",
+}
 
 
 @dataclass
@@ -130,7 +140,30 @@ class RunpodProvider(GPUInstanceProvider):
             return None
         if stage not in _PROGRESS_STAGES or not (0 <= percent < 100) or not message:
             return None
-        return {"stage": stage, "percent": percent, "message": message}
+        result: dict[str, Any] = {"stage": stage, "percent": percent, "message": message}
+        try:
+            stage_percent = float(progress.get("stagePercent"))
+        except (TypeError, ValueError):
+            stage_percent = None
+        if stage_percent is not None and 0 <= stage_percent <= 100:
+            result["stagePercent"] = stage_percent
+        for key in (
+            "sequence",
+            "elapsedSeconds",
+            "estimatedRemainingSeconds",
+            "current",
+            "total",
+        ):
+            try:
+                value = float(progress.get(key))
+            except (TypeError, ValueError):
+                continue
+            if value >= 0:
+                result[key] = int(value) if value.is_integer() else value
+        unit = str(progress.get("unit") or "").strip()[:80]
+        if unit:
+            result["unit"] = unit
+        return result
 
     def terminate(self, instance_id: str) -> None:
         response = requests.post(

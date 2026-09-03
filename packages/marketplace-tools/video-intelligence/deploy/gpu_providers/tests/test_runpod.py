@@ -100,6 +100,32 @@ class RunpodProviderTests(unittest.TestCase):
         ):
             self.assertIsNone(provider.get_progress("id"))
 
+    def test_get_progress_relays_prepare_and_measured_stage_percent(self) -> None:
+        provider = RunpodProvider(api_key="k", endpoint_id="ep")
+        with patch(
+            "gpu_providers.runpod.requests.get",
+            return_value=_response(
+                json_data={
+                    "status": "IN_PROGRESS",
+                    "output": {
+                        "stage": "prepare",
+                        "percent": 18,
+                        "stagePercent": 46.5,
+                        "message": "Preparing Cloud video (46%)",
+                    },
+                }
+            ),
+        ):
+            self.assertEqual(
+                provider.get_progress("id"),
+                {
+                    "stage": "prepare",
+                    "percent": 18,
+                    "stagePercent": 46.5,
+                    "message": "Preparing Cloud video (46%)",
+                },
+            )
+
     def test_terminate_tolerates_already_gone_instance(self) -> None:
         provider = RunpodProvider(api_key="k", endpoint_id="ep")
         with patch("gpu_providers.runpod.requests.post", return_value=_response(ok=False, status_code=404)):

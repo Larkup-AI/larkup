@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest.mock import patch
@@ -15,10 +16,13 @@ from app.services.embedding import (
     QwenVLEmbeddingProvider,
     RunpodQwenVLEmbeddingProvider,
     VideoClipInput,
+    VideoClipEmbedding,
     VideoEmbeddingProviderError,
     available_video_embedding_providers,
     get_video_embedding_provider,
 )
+from app.services.pipeline import _compute_video_embeddings
+from app.services.scene import ClipBounds
 
 
 def _clip(clip_id: str = "clip_0", frame_count: int = 3) -> VideoClipInput:
@@ -101,6 +105,55 @@ class DisabledProviderTests(unittest.TestCase):
     def test_embed_query_raises_a_clear_error(self) -> None:
         with self.assertRaises(VideoEmbeddingProviderError):
             DisabledVideoEmbeddingProvider().embed_query("anything")
+
+
+class EmbeddingFallbackTests(unittest.TestCase):
+    def test_pipeline_falls_back_to_gateway_when_the_selected_provider_fails(self) -> None:
+        class FailingProvider:
+            name = "selected-provider"
+
+            def embed_clips(self, _clips, _on_progress):
+                raise VideoEmbeddingProviderError("selected endpoint is paused")
+
+        class WorkingProvider:
+            name = "gateway-gemini-embedding-2"
+
+            def embed_clips(self, clips, on_progress):
+                on_progress(len(clips), len(clips))
+                return [
+                    VideoClipEmbedding(
+                        clip_id=clip.clip_id,
+                        start_ms=clip.start_ms,
+                        end_ms=clip.end_ms,
+                        vector=[0.1, 0.2],
+                    )
+                    for clip in clips
+                ]
+
+        clip = ClipBounds("clip_0", 0, 1)
+        with patch.dict(
+            "os.environ",
+            {
+                "LARKUP_VIDEO_EMBEDDING_PROVIDER": "huggingface-qwen3-vl-embedding",
+                "LARKUP_VIDEO_EMBEDDING_FALLBACK_PROVIDER": "gateway-gemini-embedding-2",
+            },
+            clear=True,
+        ), patch(
+            "app.services.pipeline.get_video_embedding_provider",
+            side_effect=[FailingProvider(), WorkingProvider()],
+        ):
+            embeddings, diagnostics = _compute_video_embeddings(
+                [clip],
+                {"clip_0": _clip().frames},
+                lambda *_args: None,
+            )
+
+        self.assertEqual(embeddings[0]["provider"], "gateway-gemini-embedding-2")
+        self.assertEqual(embeddings[0]["vector"], [0.1, 0.2])
+        self.assertTrue(diagnostics["fallbackUsed"])
+        self.assertEqual(diagnostics["fallbackProvider"], "gateway-gemini-embedding-2")
+        self.assertIn("paused", diagnostics["primaryError"])
+        self.assertIsNone(diagnostics["error"])
 
 
 class QwenVLEmbeddingProviderTests(unittest.TestCase):
@@ -247,6 +300,42 @@ class GatewayGeminiMultimodalEmbeddingProviderTests(unittest.TestCase):
             self.assertTrue(image["data"])
             self.assertEqual(query_request["body"]["values"], ["who won the match"])
             self.assertEqual(query_request["body"]["providerOptions"]["google"]["taskType"], "RETRIEVAL_QUERY")
+
+    def test_embeds_batches_concurrently_and_reports_completed_clips(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "AI_GATEWAY_API_KEY": "test-key",
+                "LARKUP_VIDEO_GATEWAY_EMBEDDING_BATCH_SIZE": "2",
+                "LARKUP_VIDEO_GATEWAY_EMBEDDING_CONCURRENCY": "2",
+            },
+            clear=True,
+        ):
+            provider = GatewayGeminiMultimodalEmbeddingProvider()
+            active = 0
+            highest_active = 0
+            lock = threading.Lock()
+
+            def embed(values, **_kwargs):
+                nonlocal active, highest_active
+                with lock:
+                    active += 1
+                    highest_active = max(highest_active, active)
+                time.sleep(0.03)
+                with lock:
+                    active -= 1
+                return [[float(index)] for index in range(len(values))]
+
+            updates: list[tuple[int, int]] = []
+            with patch.object(provider, "_embed", side_effect=embed):
+                embeddings = provider.embed_clips(
+                    [_clip(f"clip_{index}") for index in range(5)],
+                    lambda completed, total: updates.append((completed, total)),
+                )
+
+        self.assertGreaterEqual(highest_active, 2)
+        self.assertEqual([embedding.clip_id for embedding in embeddings], [f"clip_{index}" for index in range(5)])
+        self.assertEqual(updates[-1], (5, 5))
 
 
 class RunpodQwenVLEmbeddingProviderTests(unittest.TestCase):

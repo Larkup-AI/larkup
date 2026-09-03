@@ -14,7 +14,6 @@ from typing import Any, Iterator
 DEFAULT_LOCAL_ENTITLEMENT = {
     "sourceMinutesPerMonth": None,
     "maxConcurrentJobs": 4,
-    "allowFullCoverage": True,
     "plan": "local",
 }
 
@@ -233,10 +232,6 @@ class Store:
         estimated_minutes: float,
     ) -> None:
         entitlement = principal.entitlement
-        if request["brief"]["indexingMode"] == "full-coverage" and not entitlement.get(
-            "allowFullCoverage", False
-        ):
-            raise QuotaExceededError("full-frame analysis is not enabled for this API key")
         period_start, period_end = _period()
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -324,14 +319,52 @@ class Store:
             "error": row["error"],
         }
 
-    def update_job(self, job_id: str, stage: str, percent: int, message: str) -> None:
+    def update_job(
+        self,
+        job_id: str,
+        stage: str,
+        percent: int,
+        message: str,
+        stage_percent: int | None = None,
+        details: dict[str, int | float | str] | None = None,
+    ) -> None:
         with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT progress_json FROM jobs WHERE id = ? AND status IN ('queued', 'running')",
+                (job_id,),
+            ).fetchone()
+            if row is None:
+                return
+            try:
+                previous_percent = int(json.loads(row["progress_json"]).get("percent", 0))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                previous_percent = 0
+            # Decode and transcription can overlap. Their independently
+            # measured callbacks are valid, but a poller has only one overall
+            # progress value; never make that value move backwards when the
+            # later callback belongs to work already running in parallel.
+            percent = max(previous_percent, min(99, max(0, int(percent))))
             connection.execute(
                 """
                 UPDATE jobs SET status = 'running', progress_json = ?, updated_at = ?
                 WHERE id = ? AND status IN ('queued', 'running')
                 """,
-                (json.dumps({"stage": stage, "percent": percent, "message": message}), utc_now(), job_id),
+                (
+                    json.dumps(
+                        {
+                            "stage": stage,
+                            "percent": percent,
+                            "message": message,
+                            # A host drawing one bar per step reads this
+                            # instead of re-deriving the stage's band.
+                            **({"stagePercent": stage_percent} if stage_percent is not None else {}),
+                            **(details or {}),
+                        }
+                    ),
+                    utc_now(),
+                    job_id,
+                ),
             )
 
     def finish_job(self, job_id: str, result: dict[str, Any], actual_minutes: float) -> None:
@@ -382,6 +415,31 @@ class Store:
         if cursor.rowcount == 0:
             raise StoreError("job cannot be cancelled")
 
+    def purge_job_data(self, principal_id: str, job_id: str) -> None:
+        """Irreversibly remove one local job's result and uploaded source.
+
+        This is intentionally separate from cancellation: a running worker is
+        first cancelled by the caller, then this method removes the durable
+        cache only once the job is terminal.  A deleted Larkup media asset
+        must not remain readable through an old local-runtime job id.
+        """
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT j.status, j.upload_id, u.path
+                FROM jobs j JOIN uploads u ON u.id = j.upload_id
+                WHERE j.id = ? AND j.principal_id = ?
+                """,
+                (job_id, principal_id),
+            ).fetchone()
+            if row is None:
+                raise StoreError("job not found")
+            if row["status"] in {"queued", "running"}:
+                raise StoreError("job must be cancelled before its data can be removed")
+            connection.execute("DELETE FROM jobs WHERE id = ? AND principal_id = ?", (job_id, principal_id))
+            connection.execute("DELETE FROM uploads WHERE id = ? AND principal_id = ?", (row["upload_id"], principal_id))
+        Path(row["path"]).unlink(missing_ok=True)
+
     def usage(self, principal: Principal) -> dict[str, Any]:
         period_start, period_end = _period()
         with self.connect() as connection:
@@ -405,5 +463,4 @@ class Store:
             "sourceMinutesLimit": entitlement.get("sourceMinutesPerMonth"),
             "activeJobs": active,
             "concurrentJobsLimit": entitlement.get("maxConcurrentJobs", 1),
-            "allowFullCoverage": entitlement.get("allowFullCoverage", False),
         }
