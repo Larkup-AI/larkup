@@ -1,19 +1,12 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import {
-  deleteDocument,
-  readDocuments,
-  updateDocument,
-} from "@larkup/core/documents-store";
-import {
-  exportCorpusAsCSV,
-  exportCorpusAsJSONL,
-} from "@larkup/core/corpus-retriever";
-import { inServerScope, requireActive } from "../lib/scope";
-import { log } from "../ui/logger";
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { deleteDocument, readDocuments, updateDocument } from '@larkup/core/documents-store';
+import { exportCorpusAsCSV, exportCorpusAsJSONL } from '@larkup/core/corpus-retriever';
+import { inProjectScope, requireActiveProject } from '../lib/scope';
+import { log } from '../ui/logger';
 
 interface DocumentsOptions {
-  server?: string;
+  project?: string;
   title?: string;
   text?: string;
   file?: string;
@@ -23,17 +16,17 @@ interface DocumentsOptions {
 }
 
 export async function documentsCommand(
-  action = "list",
+  action = 'list',
   idOrPath: string | undefined,
   options: DocumentsOptions,
 ) {
-  await inServerScope(options.server, async () => {
-    await requireActive();
+  await inProjectScope(options.project, async () => {
+    await requireActiveProject();
 
-    if (action === "list") {
+    if (action === 'list') {
       const documents = await readDocuments();
       if (documents.length === 0) {
-        log.dim("The corpus is empty.");
+        log.dim('The corpus is empty.');
         return;
       }
       for (const document of documents) {
@@ -44,14 +37,15 @@ export async function documentsCommand(
       return;
     }
 
-    if (action === "export") {
-      const format = options.format === "jsonl" ? "jsonl" : "csv";
+    if (action === 'export') {
+      const format = options.format === 'jsonl' ? 'jsonl' : 'csv';
       const output = path.resolve(options.out || idOrPath || `corpus.${format}`);
-      const content = format === "jsonl"
-        ? await exportCorpusAsJSONL(undefined, Number.MAX_SAFE_INTEGER)
-        : await exportCorpusAsCSV(undefined, Number.MAX_SAFE_INTEGER);
+      const content =
+        format === 'jsonl'
+          ? await exportCorpusAsJSONL(undefined, Number.MAX_SAFE_INTEGER)
+          : await exportCorpusAsCSV(undefined, Number.MAX_SAFE_INTEGER);
       await fs.mkdir(path.dirname(output), { recursive: true });
-      await fs.writeFile(output, content, "utf8");
+      await fs.writeFile(output, content, 'utf8');
       log.success(`Exported corpus → ${output}`);
       return;
     }
@@ -64,7 +58,7 @@ export async function documentsCommand(
     const document = documents.find((item) => item.id === idOrPath);
     if (!document) log.error(`No document with id "${idOrPath}".`);
 
-    if (action === "show") {
+    if (action === 'show') {
       log.bold(document!.title);
       log.dim(`  id      ${document!.id}`);
       log.dim(`  source  ${document!.source}`);
@@ -74,15 +68,15 @@ export async function documentsCommand(
       return;
     }
 
-    if (action === "remove" || action === "delete") {
+    if (action === 'remove' || action === 'delete') {
       await deleteDocument(document!.id);
       log.success(`Removed "${document!.title}".`);
       return;
     }
 
-    if (action === "update") {
+    if (action === 'update') {
       const content = options.file
-        ? await fs.readFile(path.resolve(options.file), "utf8")
+        ? await fs.readFile(path.resolve(options.file), 'utf8')
         : options.text;
       const updated = await updateDocument(document!.id, {
         title: options.title,

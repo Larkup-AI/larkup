@@ -1,21 +1,6 @@
 /**
- * Knowledge Integration OAuth Proxy — OAuth routes (plan §10).
+ * Knowledge Integration OAuth Proxy — OAuth routes.
  *
- * Every provider here reads into a Knowledge Server: Notion, the Google
- * workspace apps, Slack (public channel history), GitHub, Jira, Linear,
- * Confluence. This proxy has no concept of an Agent, a channel, a chat
- * session, or a webhook — see `docs/deploy/larkup-proxy/threat-model.md` for
- * the boundary this is deliberately narrow about. A provider that needs
- * anything beyond "redirect here, exchange this code for a token" (a Slack
- * *bot* connection for the §9 channel adapter, for example) does not belong
- * in this file, however similar its name looks.
- *
- * Registry-driven: every provider's OAuth config (`authorizationUrl`,
- * `tokenUrl`, `scopes`, credential env var names) comes from
- * `@larkup/integrations`'s catalog — nothing here hard-codes a provider.
- * Adding a provider is a registry entry plus README instructions (see
- * `docs/deploy/larkup-proxy/README.md`'s "Provider registration checklist"),
- * not a code change to this file.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Hono } from 'hono';
@@ -25,9 +10,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 const app = new Hono();
 
 /**
- * Centralized OAuth broker for all registry integrations. The app that starts
- * the flow receives the access token at its own callback, so this proxy never
- * stores customer credentials.
+ * Centralized OAuth broker for all registry integrations.
  */
 app.get('/:integration', (c) => {
   const integrationId = c.req.param('integration');

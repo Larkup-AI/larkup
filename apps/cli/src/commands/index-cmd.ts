@@ -4,21 +4,21 @@ import { createRun, runIndexer } from '@larkup/core/indexing/indexer';
 import { readRun } from '@larkup/core/index-store';
 import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
 import { log } from '../ui/logger';
-import { inServerScope, requireActive } from '../lib/scope';
+import { inProjectScope, requireActiveProject } from '../lib/scope';
 import { prompts } from '../ui/prompts';
 import { ensureApiKey } from '../lib/keys';
 import { collectFiles, isMediaPath, readTextFiles } from '../lib/local-files';
 import { mediaCommand } from './media';
 
 interface IndexOptions {
-  server?: string;
+  project?: string;
   run?: boolean;
   incremental?: boolean;
 }
 
 export async function indexCommand(inputs: string[], options: IndexOptions) {
-  await inServerScope(options.server, async () => {
-    await requireActive();
+  await inProjectScope(options.project, async () => {
+    await requireActiveProject();
     if (inputs.length > 0) {
       const files = await collectFiles(inputs);
       const textFiles = await readTextFiles(files);

@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev:hono": "hono dev api/index.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@larkup/integrations": "workspace:*",
-    "hono": "^4.1.0"
+    "hono": "^4.1.0",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

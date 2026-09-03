@@ -3,6 +3,136 @@ export interface LarkupClientOptions {
   apiKey?: string;
 }
 
+/** Connection options for a single deployed Larkup Agent Runtime. */
+export interface LarkupAgentClientOptions {
+  /** Agent Runtime URL, for example http://localhost:8083. */
+  baseUrl?: string;
+  /** Optional bearer token for deployments that enforce one. */
+  apiKey?: string;
+  /** Join code for agents protected with join-code access. */
+  joinCode?: string;
+}
+
+export interface AgentChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+/** Optional per-request chat settings accepted by a generated Agent Runtime. */
+export interface AgentChatRequest {
+  messages: AgentChatMessage[];
+  /** Runtime provider. Omit to use the deployment's configured provider. */
+  provider?: string;
+  /** Model ID to use for this request. See `chatModels()` for supported IDs. */
+  modelId?: string;
+  topK?: number;
+}
+
+export interface ChatProvider {
+  id: string;
+  name: string;
+  modelCount: number;
+}
+
+export interface ChatModel {
+  id: string;
+  name: string;
+  /** Model vendor, for example `openai` or `anthropic`. */
+  provider: string;
+  contextWindow?: number;
+  maxTokens?: number;
+  tags?: string[];
+  description?: string;
+}
+
+/** Chat choices visible to the SDK for one generated Larkup runtime. */
+export interface ChatModelCatalog {
+  /** Provider configured on this runtime, e.g. `vercel_ai_gateway` or `openai`. */
+  configuredProvider: string;
+  configuredModelId: string;
+  providers: ChatProvider[];
+  models: ChatModel[];
+  /** `vercel-ai-gateway` when live Gateway discovery is available, otherwise `configured`. */
+  source: 'vercel-ai-gateway' | 'configured';
+}
+
+export interface AgentInfo {
+  name: string;
+  agentId: string;
+  profile?: 'agent';
+  releaseId?: string;
+  version?: string;
+  tools?: AgentTool[];
+}
+
+/** A tool loaded by a generated Larkup Agent Server. */
+export interface AgentTool {
+  id: string;
+  name: string;
+  description: string;
+  /** Whether this comes from Larkup, a sandbox, an MCP connection, or a plugin. */
+  source?: 'built-in' | 'sandbox' | 'mcp' | 'plugin' | 'skill';
+  /** Active means the server can execute it; configured means it is selected in the Project UI. */
+  availability?: 'active' | 'configured';
+  connectionId?: string;
+  pluginId?: string;
+}
+
+/** A runtime capability groups related tools into one user-facing integration. */
+export interface AgentCapability {
+  id: string;
+  name: string;
+  source: NonNullable<AgentTool['source']>;
+  connectionId?: string;
+  pluginId?: string;
+  tools: AgentTool[];
+}
+
+/** The saved Agent instructions and enabled skills available at runtime. */
+export interface AgentRuntimeConfiguration {
+  systemPrompt: string;
+  skills: Array<{ id: string; name: string; description?: string; url?: string }>;
+  enabledTools: Array<{ id: string; name: string; description: string }>;
+  sandbox: { provider: string; configured: boolean; enabled: boolean };
+}
+
+/** Sanitized execution-environment status for a generated Agent Server. */
+export interface AgentSandboxStatus {
+  provider: string;
+  configured: boolean;
+  status: 'ready' | 'unavailable' | 'not_configured' | 'error' | string;
+  message?: string;
+  /** Present on Agent Servers generated before the normalized `message` response. */
+  error?: string;
+}
+
+/** Response returned by the public Agent Runtime liveness endpoint. */
+export interface AgentHealth {
+  ok: boolean;
+  service?: string;
+  type?: 'agent-server';
+  profile?: 'agent';
+  /** Included by legacy deployed Agent Runtimes. */
+  status?: 'ok';
+  agentId?: string;
+  releaseId?: string;
+  version?: string;
+  uptimeSeconds?: number;
+}
+
+/** OpenAPI document served by a running Agent Runtime. */
+export interface AgentOpenApiDocument {
+  openapi: string;
+  info: { title: string; version: string; description?: string };
+  paths: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** Input shape for using a remote Larkup agent as an AI SDK tool. */
+export interface LarkupAgentToolInput {
+  message: string;
+}
+
 export interface Document {
   id: string;
   text: string;
@@ -73,6 +203,10 @@ export interface ChatMessage {
 export interface ChatRequest {
   messages: ChatMessage[];
   topK?: number;
+  /** Runtime provider. Omit to use the deployment's configured provider. */
+  provider?: string;
+  /** Model ID to use for this request. See `chatModels()` for supported IDs. */
+  modelId?: string;
 }
 
 export interface ChatEvent {
@@ -139,14 +273,7 @@ export interface IndexProgressEvent {
 }
 
 export type ToolCategory =
-  | 'media'
-  | 'search'
-  | 'analytics'
-  | 'integration'
-  | 'embedding'
-  | 'ai'
-  | 'automation'
-  | 'utility';
+  'media' | 'search' | 'analytics' | 'integration' | 'embedding' | 'ai' | 'automation' | 'utility';
 
 export type ToolPricing = 'free' | 'pro' | 'enterprise';
 
@@ -174,6 +301,7 @@ export interface MarketplaceTool {
   packageName: string;
   installSize: string;
   systemDeps?: string[];
+  requiresSandbox?: boolean;
   author: string;
   capabilities: string[];
   configSchema?: ToolConfigField[];
@@ -240,9 +368,7 @@ export interface VideoKnowledgeQueryResponse {
   };
 }
 
-/* ------------------------------------------------------------------ */
-/*  Media asset management                                             */
-/* ------------------------------------------------------------------ */
+/** Media asset management. */
 
 export type MediaType = 'image' | 'video' | 'audio';
 export type MediaProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';

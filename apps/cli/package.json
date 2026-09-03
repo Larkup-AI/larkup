@@ -14,7 +14,8 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "larkup": "tsx src/index.ts"
+    "larkup": "tsx src/index.ts",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/cohere": "^4.0.33",

@@ -1,29 +1,28 @@
-import { streamText, tool, stepCountIs } from "ai";
-import { z } from "zod";
-import * as p from "@clack/prompts";
-import { readConfig } from "@larkup/core/config-store";
-import { readRun } from "@larkup/core/index-store";
-import { refreshServerStatus } from "@larkup/core/generator/server-runtime";
-import { createAdapter } from "@larkup/vector-stores/factory";
-import { embedQuery } from "@larkup/core/indexing/embedder";
-import { getActiveServer } from "@larkup/core/workspace";
-import { getDefaultChatModel, getChatModel } from "@larkup/core/chat-models/registry";
-import { getAllModels } from "@larkup/core/models-cache";
-import { toChatDescriptor } from "@larkup/core/chat-models/registry";
-import { estimateCost, trackUsageEvent } from "@larkup/core/analytics-store";
+import { streamText, tool, stepCountIs } from 'ai';
+import { z } from 'zod';
+import * as p from '@clack/prompts';
+import { readConfig } from '@larkup/core/config-store';
+import { readRun } from '@larkup/core/index-store';
+import { refreshServerStatus } from '@larkup/core/generator/server-runtime';
+import { createAdapter } from '@larkup/vector-stores/factory';
+import { embedQuery } from '@larkup/core/indexing/embedder';
+import { getDefaultChatModel } from '@larkup/core/chat-models/registry';
+import { getAllModels } from '@larkup/core/models-cache';
+import { toChatDescriptor } from '@larkup/core/chat-models/registry';
+import { estimateCost, trackUsageEvent } from '@larkup/core/analytics-store';
 
-import { createOpenAI } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createCohere } from "@ai-sdk/cohere";
-import { createMistral } from "@ai-sdk/mistral";
-import { createDeepSeek } from "@ai-sdk/deepseek";
-import { createGateway } from "@ai-sdk/gateway";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { CustomModelConfig } from "@larkup/core/types";
+import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createCohere } from '@ai-sdk/cohere';
+import { createMistral } from '@ai-sdk/mistral';
+import { createDeepSeek } from '@ai-sdk/deepseek';
+import { createGateway } from '@ai-sdk/gateway';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import type { CustomModelConfig } from '@larkup/core/types';
 
-import { log } from "../ui/logger";
-import { inServerScope, requireActive } from "../lib/scope";
-import { ensureApiKey } from "../lib/keys";
+import { log } from '../ui/logger';
+import { inProjectScope, requireActiveProject } from '../lib/scope';
+import { ensureApiKey } from '../lib/keys';
 
 const SYSTEM_PROMPT = `You are a helpful research assistant powered by a knowledge base.
 You have one tool:
@@ -43,28 +42,32 @@ function createChatModel(
   apiKey?: string,
   customModels: CustomModelConfig[] = [],
 ) {
-  const modelName = modelId.includes("/")
-    ? modelId.split("/").slice(1).join("/")
-    : modelId;
+  const modelName = modelId.includes('/') ? modelId.split('/').slice(1).join('/') : modelId;
 
   switch (provider) {
-    case "google": return createGoogleGenerativeAI({ apiKey })(modelName);
-    case "cohere": return createCohere({ apiKey })(modelName);
-    case "mistral": return createMistral({ apiKey })(modelName);
-    case "deepseek": return createDeepSeek({ apiKey })(modelName);
-    case "vercel_ai_gateway": return createGateway({ apiKey })(modelId);
-    case "custom": {
-      const customName = modelId.replace(/^custom:/, "");
+    case 'google':
+      return createGoogleGenerativeAI({ apiKey })(modelName);
+    case 'cohere':
+      return createCohere({ apiKey })(modelName);
+    case 'mistral':
+      return createMistral({ apiKey })(modelName);
+    case 'deepseek':
+      return createDeepSeek({ apiKey })(modelName);
+    case 'vercel_ai_gateway':
+      return createGateway({ apiKey })(modelId);
+    case 'custom': {
+      const customName = modelId.replace(/^custom:/, '');
       const custom = customModels.find((model) => model.modelName === customName);
       if (!custom) throw new Error(`Custom chat model "${customName}" is not configured.`);
       return createOpenAICompatible({
-        name: "larkup-custom",
+        name: 'larkup-custom',
         baseURL: custom.baseUrl,
         apiKey: custom.apiKey || apiKey,
       }).chatModel(customName);
     }
-    case "openai":
-    default: return createOpenAI({ apiKey })(modelName);
+    case 'openai':
+    default:
+      return createOpenAI({ apiKey })(modelName);
   }
 }
 
@@ -75,8 +78,8 @@ async function queryKnowledgeBase(query: string, topK: number) {
   if (server.running) {
     try {
       const res = await fetch(`${server.endpoint}/query`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, topK }),
         signal: AbortSignal.timeout(15_000),
       });
@@ -84,12 +87,11 @@ async function queryKnowledgeBase(query: string, topK: number) {
       if (res.ok && data.hits) {
         return { query, hits: data.hits };
       }
-    } catch {
-    }
+    } catch {}
   }
 
   const run = await readRun();
-  if (!run || run.status !== "completed" || (run.totalChunks ?? 0) === 0) {
+  if (!run || run.status !== 'completed' || (run.totalChunks ?? 0) === 0) {
     return { query, hits: [] };
   }
 
@@ -100,28 +102,41 @@ async function queryKnowledgeBase(query: string, topK: number) {
   return { query, hits };
 }
 
-export async function chatCommand(options: { server?: string; model?: string }) {
-  await inServerScope(options.server, async () => {
-    const server = await requireActive();
+export async function chatCommand(options: { project?: string; model?: string }) {
+  await inProjectScope(options.project, async () => {
+    const project = await requireActiveProject();
     const config = await readConfig();
     const provider = config.chatProvider || config.embeddingProvider;
     const chatModels = (await getAllModels())
-      .filter((model) => model.type === "language")
+      .filter((model) => model.type === 'language')
       .map(toChatDescriptor);
 
     const chatModelId =
       options.model ||
       config.chatModelId ||
       getDefaultChatModel(chatModels, provider)?.id ||
-      "openai/gpt-4o-mini";
+      'openai/gpt-4o-mini';
 
-    const descriptor = getChatModel(chatModels, chatModelId);
-    const resolvedProvider = descriptor?.provider || provider;
-    
-    await ensureApiKey(config, "chat");
+    // The project provider is authoritative. In particular, a Gateway key must
+    // never be sent to a direct vendor merely because a model ID has that
+    // vendor's prefix. Gateway accepts provider-prefixed IDs directly.
+    const modelProvider = chatModelId.startsWith('custom:')
+      ? 'custom'
+      : chatModelId.includes('/')
+        ? chatModelId.split('/', 1)[0]
+        : provider;
+    if (provider !== 'vercel_ai_gateway' && modelProvider !== provider) {
+      throw new Error(
+        `Model "${chatModelId}" is not available through the configured ${provider} provider. ` +
+          'Choose a matching model or change the chat provider with `larkup settings`.',
+      );
+    }
+    const resolvedProvider = provider;
+
+    await ensureApiKey(config, 'chat');
 
     log.info(log.fmt.cyan(`Starting chat session... (Type 'exit' to quit)`));
-    log.dim(`Server: ${server.name} | Model: ${chatModelId}`);
+    log.dim(`Project: ${project.name} | Model: ${chatModelId}`);
 
     const aiModel = createChatModel(
       resolvedProvider,
@@ -133,27 +148,27 @@ export async function chatCommand(options: { server?: string; model?: string }) 
 
     while (true) {
       const input = await p.text({
-        message: log.fmt.bold("You:"),
-        placeholder: "Ask something...",
+        message: log.fmt.bold('You:'),
+        placeholder: 'Ask something...',
       });
 
       if (p.isCancel(input)) {
-        log.info("Goodbye.");
+        log.info('Goodbye.');
         process.exit(0);
       }
 
       const text = input.trim();
       if (!text) continue;
-      if (text.toLowerCase() === "exit" || text.toLowerCase() === "quit") {
-        log.info("Goodbye.");
+      if (text.toLowerCase() === 'exit' || text.toLowerCase() === 'quit') {
+        log.info('Goodbye.');
         break;
       }
 
-      messages.push({ role: "user", content: text });
+      messages.push({ role: 'user', content: text });
 
       try {
-        process.stdout.write(log.fmt.green(log.fmt.bold("Buddy: ")));
-        
+        process.stdout.write(log.fmt.green(log.fmt.bold('Buddy: ')));
+
         const result = streamText({
           model: aiModel,
           system: SYSTEM_PROMPT,
@@ -161,7 +176,7 @@ export async function chatCommand(options: { server?: string; model?: string }) 
           stopWhen: stepCountIs(5),
           tools: {
             searchKnowledgeBase: tool({
-              description: "Search the private knowledge base.",
+              description: 'Search the private knowledge base.',
               inputSchema: z.object({ query: z.string() }),
               execute: async ({ query }: { query: string }) => {
                 log.dim(`\n[Tool: searching knowledge base for "${query}"]`);
@@ -173,34 +188,28 @@ export async function chatCommand(options: { server?: string; model?: string }) 
           },
         });
 
-        let fullResponse = "";
+        let fullResponse = '';
         for await (const chunk of result.textStream) {
           process.stdout.write(log.fmt.green(chunk));
           fullResponse += chunk;
         }
         const usage = await result.usage;
         void trackUsageEvent({
-          type: "chat",
+          type: 'chat',
           modelId: chatModelId,
           provider: resolvedProvider,
           promptTokens: usage.inputTokens ?? 0,
           completionTokens: usage.outputTokens ?? 0,
           totalTokens: usage.totalTokens ?? 0,
-          estimatedCost: estimateCost(
-            chatModelId,
-            usage.inputTokens ?? 0,
-            usage.outputTokens ?? 0,
-          ),
+          estimatedCost: estimateCost(chatModelId, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
           timestamp: new Date().toISOString(),
         });
-        process.stdout.write("\n\n");
+        process.stdout.write('\n\n');
 
-        messages.push({ role: "assistant", content: fullResponse });
+        messages.push({ role: 'assistant', content: fullResponse });
       } catch (error) {
         messages.pop();
-        log.warn(
-          `\nChat error: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        log.warn(`\nChat error: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   });

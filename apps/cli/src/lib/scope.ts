@@ -1,24 +1,24 @@
-import { getActiveServer, runWithServer, type ServerMeta } from '@larkup/core/workspace';
+import { getActiveProject, runWithProject, type ProjectMeta } from '@larkup/core/project-store';
 import { log } from '../ui/logger';
 
-/** Run a body either in the active-server scope or a specific server id. */
-export async function inServerScope<T>(
-  serverId: string | undefined,
+/** Run a body either in the active Project scope or a specific Project id. */
+export async function inProjectScope<T>(
+  projectId: string | undefined,
   fn: () => Promise<T>,
 ): Promise<T> {
-  if (serverId) {
-    const found = await runWithServer(serverId, () => getActiveServer());
-    if (!found) log.error(`No server with id "${serverId}".`);
-    return runWithServer(serverId, fn);
+  if (projectId) {
+    const found = await runWithProject(projectId, () => getActiveProject());
+    if (!found) log.error(`No Project with id "${projectId}".`);
+    return runWithProject(projectId, fn);
   }
   return fn();
 }
 
-/** Get the active server or fail if none exists. */
-export async function requireActive(): Promise<ServerMeta> {
-  const server = await getActiveServer();
-  if (!server) {
-    log.error('No active server. Start one with: larkup dev');
+/** Get the active Project or fail if none exists. */
+export async function requireActiveProject(): Promise<ProjectMeta> {
+  const project = await getActiveProject();
+  if (!project) {
+    log.error('No active Project. Start one with: larkup dev');
   }
-  return server as ServerMeta;
+  return project as ProjectMeta;
 }

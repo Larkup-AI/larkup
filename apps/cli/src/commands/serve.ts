@@ -3,11 +3,11 @@ import { spawn } from 'node:child_process';
 import { readConfig } from '@larkup/core/config-store';
 import { emitToDisk } from '@larkup/core/generator/server-runtime';
 import { log } from '../ui/logger';
-import { inServerScope, requireActive } from '../lib/scope';
+import { inProjectScope, requireActiveProject } from '../lib/scope';
 
-export async function serveCommand(options: { server?: string }) {
-  await inServerScope(options.server, async () => {
-    const server = await requireActive();
+export async function serveCommand(options: { project?: string }) {
+  await inProjectScope(options.project, async () => {
+    const project = await requireActiveProject();
     const config = await readConfig();
 
     const isLocalLance =
@@ -26,7 +26,7 @@ export async function serveCommand(options: { server?: string }) {
 
     const env: NodeJS.ProcessEnv = {
       ...process.env,
-      PORT: String(server.port),
+      PORT: String(project.port),
       TOP_K: String(config.topK),
     };
 
@@ -47,7 +47,7 @@ export async function serveCommand(options: { server?: string }) {
       env.AWS_SECRET_ACCESS_KEY = config.storeConfig.s3SecretAccessKey || '';
     }
 
-    log.success(`Serving ${log.fmt.bold(config.projectName)} on http://localhost:${server.port}`);
+    log.success(`Serving ${log.fmt.bold(config.projectName)} on http://localhost:${project.port}`);
     log.dim('  POST /query  ·  POST /chat  ·  GET /health  ·  Ctrl+C to stop');
 
     const child = spawn('node', ['--env-file=.env', 'server.mjs'], {

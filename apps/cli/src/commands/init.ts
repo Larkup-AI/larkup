@@ -1,13 +1,13 @@
-import { createServer, type ServerMeta } from '@larkup/core/workspace';
+import { createProject, type ProjectMeta } from '@larkup/core/project-store';
 import { log } from '../ui/logger';
 
-export async function initCommand(name = 'my-larkup'): Promise<ServerMeta> {
+export async function initCommand(name = 'my-larkup'): Promise<ProjectMeta> {
   const projectName = name.trim() || 'my-larkup';
-  const { server } = await createServer(projectName);
+  const { project } = await createProject(projectName);
 
-  log.success(`Created server ${log.fmt.bold(server.name)}`);
-  log.dim(`  id   ${server.id}`);
-  log.dim(`  port ${server.port}  (the generated server listens here)`);
-  log.dim('  it is now the active server');
-  return server;
+  log.success(`Created Project ${log.fmt.bold(project.name)}`);
+  log.dim(`  id   ${project.id}`);
+  log.dim(`  port ${project.port}  (the Project Runtime listens here)`);
+  log.dim('  it is now the active Project');
+  return project;
 }

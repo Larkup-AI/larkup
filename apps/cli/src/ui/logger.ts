@@ -1,8 +1,6 @@
 import chalk from 'chalk';
 
-/**
- * Consistent logging utilities for the CLI.
- */
+/** CLI logging utilities. */
 export const log = {
   /** Standard info message (default color) */
   info: (msg: string) => process.stdout.write(msg + '\n'),
