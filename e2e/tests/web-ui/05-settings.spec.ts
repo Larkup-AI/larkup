@@ -205,6 +205,9 @@ test.describe('Settings Page', () => {
     await expect(page.getByRole('heading', { name: 'Audio', exact: true })).toBeVisible({
       timeout: 30_000,
     });
+    await expect(page.getByRole('combobox', { name: 'Audio transcription model' })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Video vision model' })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Agent / tool-brain model' })).toHaveCount(0);
 
     await page.getByRole('textbox', { name: 'Audio provider API key' }).fill('dummy-audio-key');
     await page.getByRole('button', { name: 'Verify Audio provider API key' }).click();

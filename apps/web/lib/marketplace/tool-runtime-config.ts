@@ -18,34 +18,44 @@ export function withGlobalVisionGatewayConfig(
     | 'embeddingApiKey'
   >,
 ): Record<string, unknown> {
+  const visionCapableProviders = new Set(['vercel_ai_gateway', 'openai', 'google']);
   const configuredGatewayKey =
     (config.visionProvider === 'vercel_ai_gateway' ? config.visionApiKey : undefined) ||
     (config.chatProvider === 'vercel_ai_gateway' ? config.chatApiKey : undefined) ||
     (config.embeddingProvider === 'vercel_ai_gateway' ? config.embeddingApiKey : undefined);
   // Model credentials must come from the user's saved project configuration.
   // A server/developer environment key is intentionally never inherited.
+  const explicitVisionProvider =
+    config.visionProvider &&
+    config.visionApiKey &&
+    visionCapableProviders.has(config.visionProvider)
+      ? config.visionProvider
+      : undefined;
+  const inheritedChatProvider =
+    config.chatProvider && config.chatApiKey && visionCapableProviders.has(config.chatProvider)
+      ? config.chatProvider
+      : undefined;
   const visionProvider =
-    (config.visionProvider && config.visionApiKey ? config.visionProvider : undefined) ||
-    (config.chatProvider && config.chatApiKey ? config.chatProvider : undefined) ||
-    (config.embeddingProvider && config.embeddingApiKey ? config.embeddingProvider : undefined) ||
+    explicitVisionProvider ||
+    inheritedChatProvider ||
     (configuredGatewayKey ? 'vercel_ai_gateway' : undefined);
   const visionApiKey =
-    config.visionApiKey ||
+    (explicitVisionProvider ? config.visionApiKey : undefined) ||
     (visionProvider === config.chatProvider ? config.chatApiKey : undefined) ||
     (visionProvider === config.embeddingProvider ? config.embeddingApiKey : undefined) ||
     (visionProvider === 'vercel_ai_gateway' ? configuredGatewayKey : undefined);
   const visionModel =
-    config.visionModelId ||
-    (visionProvider === config.chatProvider ? config.chatModelId : undefined) ||
+    (explicitVisionProvider ? config.visionModelId : undefined) ||
+    (inheritedChatProvider && inheritedChatProvider === visionProvider
+      ? config.chatModelId
+      : undefined) ||
     (visionProvider === 'vercel_ai_gateway' && config.chatProvider === 'vercel_ai_gateway'
       ? config.chatModelId
       : undefined);
 
-  const agentProvider = config.chatProvider || visionProvider;
+  const agentProvider = config.chatProvider;
   const agentApiKey =
-    config.chatApiKey ||
-    (agentProvider === visionProvider ? visionApiKey : undefined) ||
-    (agentProvider === 'vercel_ai_gateway' ? configuredGatewayKey : undefined);
+    config.chatApiKey || (agentProvider === 'vercel_ai_gateway' ? configuredGatewayKey : undefined);
   return {
     ...toolConfig,
     larkupVisionProvider: visionProvider,
@@ -55,6 +65,10 @@ export function withGlobalVisionGatewayConfig(
     larkupAgentApiKey: agentApiKey,
     larkupAgentModel:
       config.chatModelId ||
-      (agentProvider === 'google' ? 'google/gemini-3.5-flash-lite' : 'openai/gpt-5-mini'),
+      (agentProvider === 'google'
+        ? 'google/gemini-3.5-flash-lite'
+        : agentProvider === 'openai'
+          ? 'openai/gpt-5-mini'
+          : undefined),
   };
 }

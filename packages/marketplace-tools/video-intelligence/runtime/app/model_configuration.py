@@ -75,7 +75,11 @@ def temporary_model_environment(payload: dict[str, Any]) -> Iterator[None]:
 
             brain = parsed["brain"]
             brain_base_url = {
+                "anthropic": "https://api.anthropic.com/v1",
+                "cohere": "https://api.cohere.ai/compatibility/v1",
+                "deepseek": "https://api.deepseek.com",
                 "google": "https://generativelanguage.googleapis.com/v1beta",
+                "mistral": "https://api.mistral.ai/v1",
                 "openai": "https://api.openai.com/v1",
                 "vercel_ai_gateway": "https://ai-gateway.vercel.sh/v1",
             }[brain["provider"]]

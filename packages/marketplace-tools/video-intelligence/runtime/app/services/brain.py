@@ -554,7 +554,11 @@ class AgentPlanner:
             or ""
         )
         default_url = {
+            "anthropic": "https://api.anthropic.com/v1",
+            "cohere": "https://api.cohere.ai/compatibility/v1",
+            "deepseek": "https://api.deepseek.com",
             "google": "https://generativelanguage.googleapis.com/v1beta",
+            "mistral": "https://api.mistral.ai/v1",
             "openai": "https://api.openai.com/v1",
         }.get(self.provider, DEFAULT_GATEWAY_URL)
         self.base_url = os.getenv("LARKUP_VIDEO_AGENT_BASE_URL", default_url).rstrip(
@@ -922,8 +926,66 @@ class AgentPlanner:
             return _json_object(text), usage
 
         model = configured_model
-        if self.provider == "openai" and model.startswith("openai/"):
+        if model.startswith(f"{self.provider}/"):
             model = model.split("/", 1)[1]
+        if self.provider == "anthropic":
+            content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+            for sample in visual_samples[:6]:
+                data_url = str(sample.get("dataUrl") or "")
+                if "," not in data_url:
+                    continue
+                header, encoded = data_url.split(",", 1)
+                content.extend(
+                    [
+                        {
+                            "type": "text",
+                            "text": f"SCOUT FRAME @ {round(float(sample.get('timeMs') or 0))}ms",
+                        },
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": (
+                                    "image/jpeg" if "image/jpeg" in header else "image/png"
+                                ),
+                                "data": encoded,
+                            },
+                        },
+                    ]
+                )
+            response = _post_agent_request(
+                f"{self.base_url}/messages",
+                headers={
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                },
+                payload={
+                    "model": model,
+                    "temperature": 0,
+                    "max_tokens": max_output_tokens,
+                    "messages": [{"role": "user", "content": content}],
+                },
+                timeout_seconds=timeout_seconds,
+                attempts=request_attempts,
+            )
+            if not response.ok:
+                raise RuntimeError(
+                    f"agent provider returned {response.status_code}: {response.text[:240]}"
+                )
+            payload = response.json()
+            usage_payload = payload.get("usage") or {}
+            usage = {
+                "promptTokens": int(usage_payload.get("input_tokens") or 0),
+                "completionTokens": int(usage_payload.get("output_tokens") or 0),
+            }
+            text = "\n".join(
+                str(item.get("text") or "")
+                for item in payload.get("content") or []
+                if isinstance(item, dict) and item.get("type") == "text"
+            )
+            return _json_object(text), usage
+
         content: str | list[dict[str, Any]] = prompt
         if visual_samples:
             content = [{"type": "text", "text": prompt}]
@@ -949,7 +1011,7 @@ class AgentPlanner:
         }
         if self.provider == "vercel_ai_gateway":
             request_payload["reasoning"] = {"effort": "minimal"}
-        if json_schema is not None:
+        if json_schema is not None and self.provider in {"openai", "vercel_ai_gateway"}:
             request_payload["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {

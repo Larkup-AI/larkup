@@ -449,6 +449,48 @@ class AgentPlannerTests(unittest.TestCase):
     @patch.dict(
         os.environ,
         {
+            "LARKUP_VIDEO_AGENT_PROVIDER": "deepseek",
+            "LARKUP_VIDEO_AGENT_API_KEY": "user-deepseek-key",
+            "LARKUP_VIDEO_AGENT_MODEL": "deepseek/deepseek-chat",
+        },
+        clear=False,
+    )
+    @patch("app.services.brain.requests.post")
+    def test_deepseek_uses_the_user_key_and_openai_compatible_json_mode(
+        self, post: Mock
+    ) -> None:
+        response = Mock(ok=True)
+        response.json.return_value = {
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {"content": '{"summary":"ready"}'},
+                }
+            ],
+            "usage": {"prompt_tokens": 4, "completion_tokens": 2},
+        }
+        post.return_value = response
+
+        result, usage = AgentPlanner()._complete(
+            "Return one JSON object.",
+            [],
+            json_schema={"type": "object", "properties": {}},
+        )
+
+        self.assertEqual(result, {"summary": "ready"})
+        self.assertEqual(usage, {"promptTokens": 4, "completionTokens": 2})
+        self.assertEqual(post.call_args.args[0], "https://api.deepseek.com/chat/completions")
+        self.assertEqual(
+            post.call_args.kwargs["headers"]["Authorization"],
+            "Bearer user-deepseek-key",
+        )
+        request = post.call_args.kwargs["json"]
+        self.assertEqual(request["model"], "deepseek-chat")
+        self.assertEqual(request["response_format"], {"type": "json_object"})
+
+    @patch.dict(
+        os.environ,
+        {
             "LARKUP_VIDEO_AGENT_PROVIDER": "google",
             "LARKUP_VIDEO_AGENT_API_KEY": "direct-google-key",
             "LARKUP_VIDEO_AGENT_MODEL": "gemini-3.5-flash",

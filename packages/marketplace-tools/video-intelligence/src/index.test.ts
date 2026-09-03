@@ -2,29 +2,25 @@ import { describe, expect, it, vi } from 'vitest';
 import { TOOL_EXTENSION } from './index';
 
 describe('Video Intelligence configuration verification', () => {
-  it('verifies the tool-selected vision model without changing global AI settings', async () => {
+  it('verifies an audio provider without requiring a user-selected audio model', async () => {
     const request = vi
       .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ choices: [{}] }), { status: 200 }));
+      .mockResolvedValue(new Response(JSON.stringify({ projects: [] }), { status: 200 }));
 
     await TOOL_EXTENSION.verifyConfiguration?.({
-      verifyKey: 'semanticVisionModel',
+      verifyKey: 'audioApiKey',
       fetch: request,
       config: {
         runtimeMode: 'local',
-        videoVisionProvider: 'vercel_ai_gateway',
-        videoVisionApiKey: 'tool-only-key',
-        semanticVisionModel: 'google/gemini-3.6-flash',
-        visionProvider: 'openai',
-        visionModelId: 'gpt-4o-mini',
+        audioProvider: 'deepgram',
+        audioApiKey: 'user-audio-key',
       },
     });
 
     expect(request).toHaveBeenCalledWith(
-      'https://ai-gateway.vercel.sh/v1/chat/completions',
+      'https://api.deepgram.com/v1/projects',
       expect.objectContaining({
-        method: 'POST',
-        body: expect.stringContaining('google/gemini-3.6-flash'),
+        headers: { Authorization: 'Token user-audio-key' },
       }),
     );
   });

@@ -63,32 +63,6 @@ describe('tool.manifest.json', () => {
     expect(
       indexingSurface.estimate.variants.map((variant: { value: string }) => variant.value),
     ).toEqual(['fast', 'balanced', 'thorough']);
-    const agentModel = manifest.configSchema.find(
-      (field: { key: string }) => field.key === 'agentModel',
-    );
-    expect(agentModel).toMatchObject({
-      providerField: 'videoAgentProvider',
-      defaultValueByProvider: {
-        google: expect.stringMatching(/^google\//),
-        vercel_ai_gateway: expect.any(String),
-        openai: expect.stringMatching(/^openai\//),
-      },
-    });
-    expect(agentModel.verification).toMatchObject({
-      endpoint: '/api/tools/video-intelligence/verify',
-      fields: expect.objectContaining({ agentModel: 'agentModel' }),
-    });
-    expect(
-      manifest.configSchema.find((field: { key: string }) => field.key === 'audioModel'),
-    ).toMatchObject({
-      providerField: 'audioProvider',
-      defaultValueByProvider: {
-        openai: 'whisper-1',
-        groq: 'whisper-large-v3-turbo',
-        deepgram: 'nova-3',
-        elevenlabs: 'scribe_v2',
-      },
-    });
     for (const key of [
       'videoVisionProvider',
       'videoVisionApiKey',
@@ -96,27 +70,16 @@ describe('tool.manifest.json', () => {
       'videoAgentProvider',
       'videoAgentApiKey',
       'agentModel',
-      'audioProvider',
       'audioModel',
     ]) {
       expect(
-        manifest.configSchema.find((field: { key: string }) => field.key === key).visibleWhen,
+        manifest.configSchema.find((field: { key: string }) => field.key === key),
       ).toBeUndefined();
     }
     expect(
-      manifest.configSchema.find((field: { key: string }) => field.key === 'semanticVisionModel'),
-    ).toMatchObject({
-      verification: {
-        endpoint: '/api/tools/video-intelligence/verify',
-        fields: expect.objectContaining({ semanticVisionModel: 'semanticVisionModel' }),
-      },
-    });
-    expect(
-      manifest.configSchema.find((field: { key: string }) => field.key === 'videoVisionProvider'),
-    ).toMatchObject({ defaultFromGlobalConfigKey: 'visionProvider' });
-    expect(
-      manifest.configSchema.find((field: { key: string }) => field.key === 'videoAgentProvider'),
-    ).toMatchObject({ defaultFromGlobalConfigKey: 'chatProvider' });
+      manifest.configSchema.find((field: { key: string }) => field.key === 'audioProvider')
+        .visibleWhen,
+    ).toBeUndefined();
     expect(manifest.configSchema).toContainEqual(
       expect.objectContaining({
         key: 'cloudAccessKey',

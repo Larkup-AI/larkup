@@ -15,6 +15,7 @@ import {
   enforceManagedSemanticBrief,
   inferLanguageHintFromTitle,
   formatVideoKnowledgeSummary,
+  resolveVideoJobModelConfiguration,
 } from './video-intelligence-adapter';
 
 describe('inferLanguageHintFromTitle', () => {
@@ -234,25 +235,51 @@ describe('video runtime model ownership', () => {
   const configuredModels = {
     audioProvider: 'deepgram',
     audioApiKey: 'audio-key',
-    audioModel: 'nova-3',
-    videoAgentProvider: 'openai',
-    videoAgentApiKey: 'brain-key',
-    agentModel: 'openai/gpt-5-mini',
-    videoVisionProvider: 'vercel_ai_gateway',
-    videoVisionApiKey: 'vision-key',
-    semanticVisionModel: 'google/gemini-3.6-flash',
+    larkupAgentProvider: 'openai',
+    larkupAgentApiKey: 'brain-key',
+    larkupAgentModel: 'openai/gpt-5-mini',
+    larkupVisionProvider: 'vercel_ai_gateway',
+    larkupVisionApiKey: 'vision-key',
+    larkupVisionModel: 'google/gemini-3.6-flash',
   };
 
   it('requires user-owned credentials for local and cloud runtimes', () => {
     expect(() => assertVideoIntelligenceConfiguration({ runtimeMode: 'local' })).toThrow(
-      /vision provider API key/,
+      /vision provider and API key/,
     );
     expect(() => assertVideoIntelligenceConfiguration({ runtimeMode: 'managed-cloud' })).toThrow(
-      /vision provider API key/,
+      /vision provider and API key/,
     );
     expect(() =>
       assertVideoIntelligenceConfiguration({ runtimeMode: 'managed-cloud', ...configuredModels }),
     ).not.toThrow();
+  });
+
+  it('uses DeepSeek as the agent brain while keeping vision on its own provider', () => {
+    expect(
+      resolveVideoJobModelConfiguration({
+        audioProvider: 'deepgram',
+        audioApiKey: 'audio-key',
+        larkupAgentProvider: 'deepseek',
+        larkupAgentApiKey: 'deepseek-key',
+        larkupAgentModel: 'deepseek/deepseek-v4-pro',
+        larkupVisionProvider: 'google',
+        larkupVisionApiKey: 'google-key',
+        larkupVisionModel: 'google/gemini-3.6-flash',
+      }),
+    ).toEqual({
+      audio: { provider: 'deepgram', apiKey: 'audio-key', model: 'nova-3' },
+      brain: {
+        provider: 'deepseek',
+        apiKey: 'deepseek-key',
+        model: 'deepseek/deepseek-v4-pro',
+      },
+      vision: {
+        provider: 'google',
+        apiKey: 'google-key',
+        model: 'google/gemini-3.6-flash',
+      },
+    });
   });
 
   it('forwards all three user-owned model selections to a managed Cloud worker', () => {

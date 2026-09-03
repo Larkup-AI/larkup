@@ -110,7 +110,7 @@ export const TOOL_EXTENSION = {
       );
       return;
     }
-    if (context.verifyKey === 'audioApiKey' || context.verifyKey === 'audioModel') {
+    if (context.verifyKey === 'audioApiKey') {
       await verifyAudioProvider(
         understanding.audioProvider,
         understanding.audioApiKey,
@@ -132,43 +132,28 @@ export const TOOL_EXTENSION = {
       detectLocalRuntimeHost(),
       resolveUnderstandingConfig(context.config),
     ]);
-    const configuredModel =
-      typeof context.config.semanticVisionModel === 'string'
-        ? context.config.semanticVisionModel.trim()
-        : undefined;
-    const selectedModel =
-      (configuredModel && configuredModel !== 'auto' ? configuredModel : undefined) ??
-      understanding.semanticVisionModel ??
-      'google/gemini-3.6-flash';
-    const hasToolKey = Boolean(understanding.visionApiKey);
-    const gatewayKeySource: 'tool' | 'global' | null = hasToolKey
-      ? typeof context.config.videoVisionApiKey === 'string' ||
-        typeof context.config.visionGatewayApiKey === 'string'
-        ? 'tool'
-        : 'global'
-      : null;
+    const selectedModel = understanding.semanticVisionModel ?? 'google/gemini-3.6-flash';
+    const hasVisionKey = Boolean(understanding.visionApiKey);
     const modelIsVideoCapable = /gemini.*flash|gemini.*vision|qwen.*vl|gpt-4o|gpt-4\.1/i.test(
       selectedModel,
     );
-    const modelRequirement = !gatewayKeySource
+    const modelRequirement = !hasVisionKey
       ? {
           configured: false,
           message:
-            'Video understanding needs a vision-capable model and API key. Configure them in AI Models or add a local override below.',
+            'Video understanding needs a vision-capable provider and API key in Settings → AI Models. Text-only chat providers such as DeepSeek need a separate Vision Model.',
         }
       : !modelIsVideoCapable
-      ? {
-          configured: false,
-          message: `${selectedModel} is not a recommended video vision model. Use Gemini Flash or a Qwen-VL model before indexing video.`,
-        }
-      : {
-          configured: true,
-          provider: understanding.visionProvider,
-          model: selectedModel,
-          message: `Video understanding will use ${selectedModel} (${
-            gatewayKeySource === 'global' ? 'loaded from AI Models' : 'local override'
-          }).`,
-        };
+        ? {
+            configured: false,
+            message: `${selectedModel} is not a recommended video vision model. Use Gemini Flash or a Qwen-VL model before indexing video.`,
+          }
+        : {
+            configured: true,
+            provider: understanding.visionProvider,
+            model: selectedModel,
+            message: `Video understanding will use ${selectedModel}, loaded automatically from AI Models.`,
+          };
     let running = false;
     try {
       await createClientFromContext(context).health();
@@ -179,8 +164,8 @@ export const TOOL_EXTENSION = {
     return {
       ...host,
       running,
-      gatewayKeyAvailable: gatewayKeySource !== null,
-      gatewayKeySource,
+      gatewayKeyAvailable: hasVisionKey,
+      gatewayKeySource: hasVisionKey ? 'global' : null,
       modelRequirement,
     };
   },
@@ -246,12 +231,12 @@ function resolveClientOptions(config: Record<string, unknown>) {
     mode === 'managed-cloud'
       ? MANAGED_CLOUD_ENDPOINT
       : mode === 'local'
-      ? typeof config.localRuntimeUrl === 'string' && config.localRuntimeUrl.trim()
-        ? config.localRuntimeUrl
-        : 'http://127.0.0.1:8787'
-      : typeof config.customRuntimeUrl === 'string'
-      ? config.customRuntimeUrl
-      : '';
+        ? typeof config.localRuntimeUrl === 'string' && config.localRuntimeUrl.trim()
+          ? config.localRuntimeUrl
+          : 'http://127.0.0.1:8787'
+        : typeof config.customRuntimeUrl === 'string'
+          ? config.customRuntimeUrl
+          : '';
   return {
     mode,
     endpoint,
@@ -261,12 +246,12 @@ function resolveClientOptions(config: Record<string, unknown>) {
           ? config.cloudAccessKey
           : legacyCloudAccessKey
         : mode === 'local'
-        ? typeof config.localRuntimeApiKey === 'string'
-          ? config.localRuntimeApiKey
-          : undefined
-        : typeof config.customRuntimeApiKey === 'string'
-        ? config.customRuntimeApiKey
-        : undefined,
+          ? typeof config.localRuntimeApiKey === 'string'
+            ? config.localRuntimeApiKey
+            : undefined
+          : typeof config.customRuntimeApiKey === 'string'
+            ? config.customRuntimeApiKey
+            : undefined,
   };
 }
 
@@ -285,35 +270,21 @@ async function resolveUnderstandingConfig(
   config: Record<string, unknown>,
 ): Promise<VideoUnderstandingEnvConfig> {
   const str = (value: unknown) => (typeof value === 'string' && value.trim() ? value : undefined);
-  const overrideProvider = str(config.videoVisionProvider);
-  const visionProvider =
-    overrideProvider && overrideProvider !== 'auto'
-      ? overrideProvider
-      : str(config.larkupVisionProvider) ?? 'vercel_ai_gateway';
-  let visionApiKey = str(config.videoVisionApiKey) ?? str(config.visionGatewayApiKey);
-  let semanticVisionModel = str(config.semanticVisionModel);
-  if (!visionApiKey) {
-    visionApiKey = str(config.larkupVisionApiKey) ?? str(config.larkupGatewayApiKey);
-  }
-  if (!semanticVisionModel || semanticVisionModel === 'auto') {
-    semanticVisionModel = str(config.larkupVisionModel) ?? str(config.larkupGatewayVisionModel);
-  }
+  const visionProvider = str(config.larkupVisionProvider) ?? 'vercel_ai_gateway';
+  const visionApiKey = str(config.larkupVisionApiKey) ?? str(config.larkupGatewayApiKey);
+  let semanticVisionModel = str(config.larkupVisionModel) ?? str(config.larkupGatewayVisionModel);
   if (!semanticVisionModel) {
     semanticVisionModel =
       visionProvider === 'google'
         ? 'gemini-3.6-flash'
         : visionProvider === 'openai'
-        ? 'gpt-4o-mini'
-        : 'google/gemini-3.6-flash';
+          ? 'gpt-4o-mini'
+          : 'google/gemini-3.6-flash';
   }
-  const agentProvider =
-    str(config.videoAgentProvider) ?? str(config.larkupAgentProvider) ?? 'vercel_ai_gateway';
+  const agentProvider = str(config.larkupAgentProvider) ?? 'vercel_ai_gateway';
   const agentApiKey =
-    str(config.videoAgentApiKey) ??
-    str(config.larkupAgentApiKey) ??
-    (agentProvider === visionProvider ? visionApiKey : undefined);
+    str(config.larkupAgentApiKey) ?? (agentProvider === visionProvider ? visionApiKey : undefined);
   const agentModel =
-    str(config.agentModel) ??
     str(config.larkupAgentModel) ??
     (agentProvider === 'google' ? 'google/gemini-3.5-flash-lite' : 'openai/gpt-5-mini');
   return {
@@ -325,14 +296,12 @@ async function resolveUnderstandingConfig(
     agentModel,
     audioProvider: str(config.audioProvider),
     audioApiKey: str(config.audioApiKey),
-    audioModel:
-      str(config.audioModel) ??
-      ({
-        openai: 'whisper-1',
-        groq: 'whisper-large-v3-turbo',
-        deepgram: 'nova-3',
-        elevenlabs: 'scribe_v2',
-      }[str(config.audioProvider) ?? ''] as string | undefined),
+    audioModel: {
+      openai: 'whisper-1',
+      groq: 'whisper-large-v3-turbo',
+      deepgram: 'nova-3',
+      elevenlabs: 'scribe_v2',
+    }[str(config.audioProvider) ?? ''] as string | undefined,
     videoEmbeddingProvider: str(config.videoEmbeddingProvider),
     dashscopeApiKey: str(config.dashscopeApiKey),
     dashscopeWorkspaceId: str(config.dashscopeWorkspaceId),
@@ -406,8 +375,8 @@ async function verifyProviderModel(
       ? typeof body.error === 'string'
         ? body.error
         : body.error && typeof body.error === 'object' && 'message' in body.error
-        ? String(body.error.message)
-        : undefined
+          ? String(body.error.message)
+          : undefined
       : undefined;
   throw new Error(
     detail ? `${label} verification failed: ${detail}` : `${label} verification failed.`,
@@ -421,29 +390,27 @@ async function verifyAudioProvider(
   request = globalThis.fetch,
 ) {
   if (!provider || !apiKey || !model) {
-    throw new Error(
-      'Audio transcription needs a provider, model, and API key before it can be verified.',
-    );
+    throw new Error('Audio transcription needs a provider and API key before it can be verified.');
   }
   const normalized = provider.trim().toLowerCase();
   const target =
     normalized === 'openai'
       ? `https://api.openai.com/v1/models/${encodeURIComponent(model)}`
       : normalized === 'groq'
-      ? `https://api.groq.com/openai/v1/models/${encodeURIComponent(model)}`
-      : normalized === 'deepgram'
-      ? 'https://api.deepgram.com/v1/projects'
-      : normalized === 'elevenlabs'
-      ? 'https://api.elevenlabs.io/v1/user'
-      : '';
+        ? `https://api.groq.com/openai/v1/models/${encodeURIComponent(model)}`
+        : normalized === 'deepgram'
+          ? 'https://api.deepgram.com/v1/projects'
+          : normalized === 'elevenlabs'
+            ? 'https://api.elevenlabs.io/v1/user'
+            : '';
   if (!target) throw new Error(`Audio provider "${provider}" is not supported.`);
   const response = await request(target, {
     headers:
       normalized === 'deepgram'
         ? { Authorization: `Token ${apiKey}` }
         : normalized === 'elevenlabs'
-        ? { 'xi-api-key': apiKey }
-        : { Authorization: `Bearer ${apiKey}` },
+          ? { 'xi-api-key': apiKey }
+          : { Authorization: `Bearer ${apiKey}` },
   });
   if (response.ok) return;
   const body = await response.json().catch(() => ({}));
@@ -452,8 +419,8 @@ async function verifyAudioProvider(
       ? typeof body.error === 'string'
         ? body.error
         : body.error && typeof body.error === 'object' && 'message' in body.error
-        ? String(body.error.message)
-        : undefined
+          ? String(body.error.message)
+          : undefined
       : undefined;
   throw new Error(detail ? `Audio verification failed: ${detail}` : 'Audio verification failed.');
 }

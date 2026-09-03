@@ -674,20 +674,11 @@ export function assertVideoIntelligenceConfiguration(config: Record<string, unkn
 export function resolveVideoJobModelConfiguration(config: Record<string, unknown>) {
   const value = (candidate: unknown) =>
     typeof candidate === 'string' && candidate.trim() ? candidate.trim() : undefined;
-  const configuredVisionProvider = value(config.videoVisionProvider);
   const globalVisionProvider = value(config.larkupVisionProvider);
-  const visionProvider =
-    configuredVisionProvider && configuredVisionProvider !== 'auto'
-      ? configuredVisionProvider
-      : (globalVisionProvider ?? 'vercel_ai_gateway');
+  const visionProvider = globalVisionProvider ?? 'vercel_ai_gateway';
   const visionApiKey =
-    value(config.videoVisionApiKey) ??
-    value(config.visionGatewayApiKey) ??
-    (globalVisionProvider === visionProvider ? value(config.larkupVisionApiKey) : undefined);
+    globalVisionProvider === visionProvider ? value(config.larkupVisionApiKey) : undefined;
   const visionModel =
-    (value(config.semanticVisionModel) !== 'auto'
-      ? value(config.semanticVisionModel)
-      : undefined) ??
     (globalVisionProvider === visionProvider ? value(config.larkupVisionModel) : undefined) ??
     (visionProvider === 'google'
       ? 'google/gemini-3.6-flash'
@@ -695,55 +686,62 @@ export function resolveVideoJobModelConfiguration(config: Record<string, unknown
         ? 'openai/gpt-4o-mini'
         : 'google/gemini-3.6-flash');
 
-  const configuredBrainProvider = value(config.videoAgentProvider);
   const globalBrainProvider = value(config.larkupAgentProvider);
-  const brainProvider = configuredBrainProvider ?? globalBrainProvider ?? 'vercel_ai_gateway';
+  const brainProvider = globalBrainProvider ?? 'vercel_ai_gateway';
   const brainApiKey =
-    value(config.videoAgentApiKey) ??
     (globalBrainProvider === brainProvider ? value(config.larkupAgentApiKey) : undefined) ??
     (brainProvider === visionProvider ? visionApiKey : undefined);
   const brainModel =
-    value(config.agentModel) ??
     (globalBrainProvider === brainProvider ? value(config.larkupAgentModel) : undefined) ??
     (brainProvider === 'google' ? 'google/gemini-3.5-flash-lite' : 'openai/gpt-5-mini');
 
   const audioProvider = value(config.audioProvider) ?? 'deepgram';
   const audioApiKey = value(config.audioApiKey);
-  const audioModel =
-    value(config.audioModel) ??
-    ({
-      openai: 'whisper-1',
-      groq: 'whisper-large-v3-turbo',
-      deepgram: 'nova-3',
-      elevenlabs: 'scribe_v2',
-    }[audioProvider] as string | undefined);
+  const audioModel = {
+    openai: 'whisper-1',
+    groq: 'whisper-large-v3-turbo',
+    deepgram: 'nova-3',
+    elevenlabs: 'scribe_v2',
+  }[audioProvider] as string | undefined;
 
-  const supportedModelProviders = new Set(['vercel_ai_gateway', 'google', 'openai']);
-  if (!supportedModelProviders.has(visionProvider)) {
-    throw new Error(`Video vision provider "${visionProvider}" is not supported.`);
+  const supportedVisionProviders = new Set(['vercel_ai_gateway', 'google', 'openai']);
+  const supportedBrainProviders = new Set([
+    'vercel_ai_gateway',
+    'google',
+    'openai',
+    'deepseek',
+    'mistral',
+    'cohere',
+    'anthropic',
+  ]);
+  if (!supportedVisionProviders.has(visionProvider)) {
+    throw new Error(
+      `Video vision cannot use "${visionProvider}". Choose Google, OpenAI, or Vercel AI Gateway under Settings → AI Models → Vision Model.`,
+    );
   }
-  if (!supportedModelProviders.has(brainProvider)) {
+  if (!supportedBrainProviders.has(brainProvider)) {
     throw new Error(`Agent / tool-brain provider "${brainProvider}" is not supported.`);
   }
   if (!new Set(['openai', 'groq', 'deepgram', 'elevenlabs']).has(audioProvider)) {
     throw new Error(`Audio provider "${audioProvider}" is not supported.`);
   }
-  const required = [
-    ['vision', visionApiKey, visionModel],
-    ['agent / tool-brain', brainApiKey, brainModel],
-    ['audio', audioApiKey, audioModel],
-  ] as const;
-  for (const [label, apiKey, model] of required) {
-    if (!apiKey) {
-      throw new Error(
-        `Before indexing starts, add the ${label} provider API key in AI Models or Video Intelligence settings. The video was not uploaded or downloaded.`,
-      );
-    }
-    if (!model) {
-      throw new Error(
-        `Before indexing starts, choose the ${label} model in Video Intelligence settings. The video was not uploaded or downloaded.`,
-      );
-    }
+  if (!visionApiKey) {
+    throw new Error(
+      'Before indexing starts, configure a vision provider and API key under Settings → AI Models → Vision Model. Text-only providers such as DeepSeek need a separate vision provider. The video was not uploaded or downloaded.',
+    );
+  }
+  if (!brainApiKey) {
+    throw new Error(
+      'Before indexing starts, add the selected chat provider API key under Settings → AI Models. The video was not uploaded or downloaded.',
+    );
+  }
+  if (!audioApiKey) {
+    throw new Error(
+      'Before indexing starts, add the selected audio provider API key in Video Intelligence settings. The video was not uploaded or downloaded.',
+    );
+  }
+  if (!audioModel) {
+    throw new Error(`Audio provider "${audioProvider}" has no automatic transcription model.`);
   }
   return {
     audio: { provider: audioProvider, apiKey: audioApiKey!, model: audioModel! },

@@ -81,4 +81,77 @@ describe('withGlobalVisionGatewayConfig', () => {
     ).toMatchObject({ larkupVisionProvider: undefined, larkupVisionApiKey: undefined });
     delete process.env.AI_GATEWAY_API_KEY;
   });
+
+  it('does not treat a text-only DeepSeek chat provider as the vision provider', () => {
+    expect(
+      withGlobalVisionGatewayConfig(
+        {},
+        {
+          visionProvider: '',
+          visionApiKey: '',
+          visionModelId: '',
+          chatProvider: 'deepseek',
+          chatApiKey: 'deepseek-key',
+          chatModelId: 'deepseek/deepseek-v4-pro',
+          embeddingProvider: 'openai',
+          embeddingApiKey: '',
+        },
+      ),
+    ).toMatchObject({
+      larkupAgentProvider: 'deepseek',
+      larkupAgentApiKey: 'deepseek-key',
+      larkupAgentModel: 'deepseek/deepseek-v4-pro',
+      larkupVisionProvider: undefined,
+      larkupVisionApiKey: undefined,
+      larkupVisionModel: undefined,
+    });
+  });
+
+  it('ignores a saved DeepSeek vision selection because it is text-only', () => {
+    expect(
+      withGlobalVisionGatewayConfig(
+        {},
+        {
+          visionProvider: 'deepseek',
+          visionApiKey: 'deepseek-key',
+          visionModelId: 'deepseek/deepseek-v4-pro',
+          chatProvider: 'deepseek',
+          chatApiKey: 'deepseek-key',
+          chatModelId: 'deepseek/deepseek-v4-pro',
+          embeddingProvider: 'openai',
+          embeddingApiKey: '',
+        },
+      ),
+    ).toMatchObject({
+      larkupAgentProvider: 'deepseek',
+      larkupAgentApiKey: 'deepseek-key',
+      larkupVisionProvider: undefined,
+      larkupVisionApiKey: undefined,
+      larkupVisionModel: undefined,
+    });
+  });
+
+  it('reuses one vision-capable chat provider and key automatically', () => {
+    expect(
+      withGlobalVisionGatewayConfig(
+        {},
+        {
+          visionProvider: '',
+          visionApiKey: '',
+          visionModelId: '',
+          chatProvider: 'google',
+          chatApiKey: 'google-key',
+          chatModelId: 'google/gemini-3.6-flash',
+          embeddingProvider: 'openai',
+          embeddingApiKey: '',
+        },
+      ),
+    ).toMatchObject({
+      larkupAgentProvider: 'google',
+      larkupAgentApiKey: 'google-key',
+      larkupVisionProvider: 'google',
+      larkupVisionApiKey: 'google-key',
+      larkupVisionModel: 'google/gemini-3.6-flash',
+    });
+  });
 });

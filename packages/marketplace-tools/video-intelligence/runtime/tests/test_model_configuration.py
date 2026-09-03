@@ -56,6 +56,37 @@ class JobModelConfigurationTests(unittest.TestCase):
                 "gateway-gemini-embedding-2",
             )
 
+    def test_configures_deepseek_as_a_user_owned_agent_provider(self) -> None:
+        payload = {
+            "modelConfiguration": {
+                "audio": {
+                    "provider": "deepgram",
+                    "apiKey": "user-audio",
+                    "model": "nova-3",
+                },
+                "brain": {
+                    "provider": "deepseek",
+                    "apiKey": "user-deepseek",
+                    "model": "deepseek/deepseek-v4-pro",
+                },
+                "vision": {
+                    "provider": "google",
+                    "apiKey": "user-google",
+                    "model": "google/gemini-3.6-flash",
+                },
+            }
+        }
+
+        with patch.dict(os.environ, {}, clear=True):
+            with temporary_model_environment(payload):
+                self.assertEqual(os.environ["LARKUP_VIDEO_AGENT_PROVIDER"], "deepseek")
+                self.assertEqual(os.environ["LARKUP_VIDEO_AGENT_API_KEY"], "user-deepseek")
+                self.assertEqual(
+                    os.environ["LARKUP_VIDEO_AGENT_BASE_URL"],
+                    "https://api.deepseek.com",
+                )
+                self.assertEqual(os.environ["LARKUP_VIDEO_VISION_PROVIDER"], "google")
+
 
 if __name__ == "__main__":
     unittest.main()
