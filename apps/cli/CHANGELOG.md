@@ -1,5 +1,11 @@
 # @larkup/cli
 
+## 0.2.27
+
+### Patch Changes
+
+- Avoid blocking CLI startup and help output on the background update checks, fixing Windows command startup.
+
 ## 0.2.26
 
 ### Patch Changes
