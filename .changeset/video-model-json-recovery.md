@@ -1,5 +1,5 @@
 ---
-'@larkup/tool-video-audio': patch
+'@larkup/tool-video-intelligence': patch
 'larkup': patch
 ---
 

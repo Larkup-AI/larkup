@@ -1,6 +1,4 @@
 ---
-'@larkup/agent-contracts': minor
-'@larkup/agent-widget': patch
 '@larkup/core': minor
 'larkup': patch
 ---
@@ -14,7 +12,7 @@ browser, could spend the operator's model budget with nothing to stop it.
 
 **New in `@larkup/agent-contracts`**: `rate-limit.ts` — a `RateLimiter`
 interface plus `MemoryRateLimiter`, a token-bucket implementation (mirroring
-`IdempotencyStore`'s in-memory-by-default shape from `@larkup/channels-core`).
+`IdempotencyStore`'s in-memory-by-default shape from `@larkup/connections`).
 Backs three limits:
 
 - **Requests/minute per visitor** (`hash(agentId + IP + UA)`, burst 5,

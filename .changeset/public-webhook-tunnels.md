@@ -1,5 +1,5 @@
 ---
-'@larkup/channels-core': patch
+'@larkup/connections': patch
 'larkup': patch
 ---
 

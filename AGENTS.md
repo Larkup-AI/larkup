@@ -14,5 +14,11 @@ Always prefer the most specific agent instructions for the area you are modifyin
 - **Versioning**: Always use `pnpm changeset` for versioning packages when introducing features or fixes.
 - **E2E Testing**: Run `scripts/test-e2e.sh` or `cd e2e && pnpm exec playwright test` against a running dev server.
 
+## Package Collaboration
+- Keep package APIs small, typed, and documented in the package README. Do not add banner or divider comments. Keep necessary API or invariant comments to one to three direct lines.
+- Before moving or removing a package, search workspace imports, generated-server code, Docker build inputs, and E2E coverage. Do not archive a package solely because its direct imports are sparse.
+- Add or update focused unit tests and run the package type-check. Package changes must also pass the cross-platform package CI matrix.
+- When workspace package names or build inputs change, update `pnpm-lock.yaml`, Docker's dependency stage, and all affected documentation in the same change.
+
 ## Skills Integration
 When working on specific feature sets, check the `.agents/` directory for relevant skills before executing the task.

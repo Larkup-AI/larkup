@@ -1,27 +1,22 @@
 ---
-'@larkup/hub-db': minor
+'@larkup/marketplace': minor
 '@larkup/hub': minor
 ---
 
-feat(hub): move the Marketplace catalog from in-memory to Postgres (TASK 03)
+feat(marketplace): add a durable Postgres catalog
 
-`apps/hub`'s catalog — publisher identity, extension versions, install
-counts — lived in a `Map`. Every restart lost everything published.
+`apps/marketplace` now stores publisher identity, extension versions, install
+counts, and audit events in Postgres.
 
-**New package `@larkup/hub-db`**: Drizzle schema (`publishers`,
-`extensions`, `extension_versions`, `extension_workspace_grants`,
-`workspace_installations`, `audit_events`), committed migrations, a lazy
-Postgres connection factory, and every query the Hub API needs as a typed
-`repo.ts` function — `apps/hub` owns no SQL. Manifest validation on publish
-(previously only `id`/`packageName` were checked), version immutability
-(republishing `id@version` is now rejected, not overwritten), and
-first-publish ownership (a different publisher can't take over an existing
-listing) are new, real guarantees.
+**`@larkup/marketplace`** now includes the Drizzle schema, committed
+migrations, a lazy Postgres client, and typed catalog queries under `src/db`.
+The Hub owns HTTP handling while the Marketplace package owns database access.
+Publishing validates manifests, preserves immutable versions, and enforces
+publisher ownership.
 
 **Local contributor path, no Neon account needed**:
-`docker compose -f docker/hub-db.yml up`, then `pnpm --filter @larkup/hub-db
-migrate && pnpm --filter @larkup/hub-db seed`. `apps/hub/.env`'s
-`DATABASE_URL` stays gitignored and reachable only by the deployed service.
+`docker compose -f docker/marketplace-db.yml up`, then `pnpm --filter
+@larkup/marketplace db:migrate && pnpm --filter @larkup/marketplace db:seed`.
 
 **`@larkup/hub`**: `/v1/*` stays byte-compatible — every response is
 reconstructed from the stored manifest so `ToolDescriptor`/`ToolListResponse`/
@@ -32,5 +27,4 @@ reconstructed from the stored manifest so `ToolDescriptor`/`ToolListResponse`/
 per-workspace install tracking with no Hub change required).
 
 See [ADR-012](docs/adrs/adr-012-marketplace-hub-on-postgres.md) for the
-schema-scope decision (six of plan §7.4's eleven entities — the other five
-have no caller yet) and the Drizzle/connection/authorization design.
+schema and authorization design.

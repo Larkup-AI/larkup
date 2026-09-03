@@ -1,13 +1,12 @@
 ---
-'@larkup/channels-core': minor
-'@larkup/agent-contracts': minor
+'@larkup/connections': minor
 '@larkup/core': minor
 'larkup': minor
 ---
 
 feat(agent): channels, execution environments, and the deployable Agent Runtime bundle (TASK 06–08)
 
-**Channels (TASK 06).** New `@larkup/channels-core` with the shared dispatch
+**Channels (TASK 06).** New `@larkup/connections` with the shared dispatch
 pipeline — verify → parse → de-duplicate → run → deliver with retries — plus
 Webhook (HMAC-SHA256, replay window) and Telegram (secret token, message
 splitting, `setWebhook`) adapters. Inbound route, channel management API,

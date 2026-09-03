@@ -1,5 +1,5 @@
 ---
-'@larkup/channels-core': patch
+'@larkup/connections': patch
 ---
 
 Complete Telegram setup with automatic webhook registration, add managed

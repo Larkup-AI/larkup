@@ -88,7 +88,7 @@ Run the narrow proxy suite and typecheck:
 
 ```bash
 pnpm --filter @larkup/proxy test
-pnpm --filter @larkup/proxy typecheck
+pnpm --filter @larkup/proxy type-check
 pnpm --filter @larkup/connections type-check
 pnpm --filter larkup exec tsc --noEmit
 ```

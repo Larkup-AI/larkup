@@ -1,6 +1,4 @@
 ---
-'@larkup/agent-widget': minor
-'@larkup/agent-contracts': minor
 '@larkup/core': patch
 'larkup': patch
 ---

@@ -6,6 +6,11 @@ icon: 'video'
 
 Video Intelligence turns a video into searchable evidence. It transcribes speech, reads visible text, detects objects and anonymous tracks, and preserves timestamps so chat can point back to the relevant moment.
 
+Its planner is genre-neutral: it adapts to the question, duration, and measured
+source signals rather than selecting a hardcoded workflow for lectures, sports,
+films, entertainment, meetings, or other content. Visual verification records
+generic subject–relation–value bindings when a clip directly establishes them.
+
 ## Install the tool
 
 Open **Settings → Marketplace**, install **Video Intelligence (New)**, then open **Data → Media → Video**. Before indexing, the guide can collect an optional goal, known entities, and questions you expect to ask.
@@ -15,33 +20,39 @@ Open **Settings → Marketplace**, install **Video Intelligence (New)**, then op
 - Timestamped multilingual speech from faster-whisper.
 - Visible text from slides, code, scoreboards, signs, and captions.
 - Objects and anonymous motion tracks detected across the video.
+- Source-language story notes that connect speech, named participants, visual layout, and events across scenes.
 - Coverage metadata and an answering guide used to ground chat responses.
 
-Balanced mode is the normal choice. Use Fast for speech-heavy video, Deep for dense visual changes, and Analyze every frame only when a short-lived detail is important and you are authorized to process the complete footage.
+Balanced is the normal choice. Use Fast for a quick overview and Thorough for denser visual changes or short-lived details.
+
+Before any runtime starts, choose the audio, agent/tool-brain, and vision
+providers and models in the tool settings. Each needs your provider API key.
+These accounts pay for model calls; Larkup Cloud provides only the GPU compute
+that decodes, samples, reads, and structures the video.
 
 ## Choose where it runs
 
 <Tabs>
-  <Tab title="Local Docker">
-    Use this when you want processing to remain on your machine. Install Docker, select **Local Docker** in the tool settings, and upload a video from Media. The runtime starts on `127.0.0.1` and the source copy inside the runtime is deleted after successful indexing by default.
+  <Tab title="Local runtime">
+    Use this when you want processing to remain on your machine. Select **Local runtime** in the tool settings. Larkup detects Docker automatically and uses it when available; otherwise it installs and runs the native CPU runtime with `uv`. The runtime starts on `127.0.0.1` and the source copy inside the runtime is deleted after successful indexing by default.
 
-    An NVIDIA GPU can accelerate the local runtime, but it is optional. The CPU runtime still performs speech, OCR, object detection, and evidence generation.
+    The install confirmation shows the selected runtime, download size, available RAM, and model configuration. Saved **AI Models** keys can prefill the brain and vision settings. The selected provider keys are injected only into the local process or container.
 
   </Tab>
   <Tab title="Larkup Cloud">
-    Use this when you want Larkup to run the video job for you. Select **Larkup Cloud** in the tool settings and connect your Larkup Cloud access. The app uploads the source securely, tracks progress in Media, and returns the same timestamped evidence contract as Local Docker.
+    Use this when you want Larkup to run the GPU video job for you. Select **Larkup Cloud** and connect your Cloud access. Your audio, brain, and vision selections remain required. Their keys are forwarded only in the active worker payload, are never written to the Cloud job record, and are removed from a warm worker when the job ends.
 
-    The tool does not expose the underlying GPU provider to your browser. You can ask chat questions while preserving the video timestamps in each answer.
+    Larkup Cloud has no platform-owned audio, brain, vision, or embedding provider credential. It does not expose the underlying GPU provider to your browser. You can ask chat questions while preserving the video timestamps in each answer.
 
   </Tab>
   <Tab title="Custom deployment">
     Use this when your team operates its own compatible runtime. Deploy the Video Intelligence Docker runtime behind your authentication boundary, then select **Custom endpoint** and enter its URL and API key in the tool settings.
 
-    The custom runtime must implement the same `/v1/uploads`, `/v1/jobs`, and `/v1/jobs/{id}` protocol, so the Media UI and evidence results work without a separate integration.
+    The custom runtime must implement the same `/v1/uploads`, `/v1/jobs`, and `/v1/jobs/{id}` protocol, including the transient model-configuration bundle. The bundled runtime removes this bundle before persisting a job.
 
   </Tab>
 </Tabs>
 
 ## Ask questions in chat
 
-After indexing, ask direct or indirect questions such as “What changed near the end?”, “Which steps were shown before the error?”, or “Summarize the argument and the evidence on screen.” Larkup retrieves the timestamped video evidence first. If an answer uses general knowledge beyond the video, it labels that part as an inference.
+After indexing, ask direct or indirect questions such as “What changed near the end?”, “Which steps were shown before the error?”, or “Summarize the argument and the evidence on screen.” Larkup retrieves the timestamped video evidence first and reads compatible observations as one chronological trail. It performs a bounded source inspection only when that indexed trail is incomplete, conflicting, or cannot ground the requested identity. If an answer uses general knowledge beyond the video, it labels that part as an inference.

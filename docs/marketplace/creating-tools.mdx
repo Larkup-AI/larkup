@@ -1,0 +1,170 @@
+---
+title: 'Create a portable tool'
+description: 'Build a Marketplace tool with its own logic, chat actions, settings, runtime, and UI surfaces.'
+icon: 'hammer'
+---
+
+A Marketplace tool is a self-contained package. Its installable logic, runtime, settings schema, chat actions, UI declarations, tests, and author documentation belong in that package—not in `apps/web`.
+
+<Note>
+  Do not add an `if (toolId === 'my-tool')`, a static optional-tool import, a dedicated web API
+  route, or a React component to `apps/web` for a new Marketplace tool. The host discovers installed
+  manifests, extensions, agent actions, settings fields, and UI surfaces dynamically.
+</Note>
+
+## Package checklist
+
+Create one directory under `packages/marketplace-tools/<tool-id>/`:
+
+```text
+packages/marketplace-tools/acme-translator/
+  src/
+    index.ts              # TOOL_EXTENSION + public exports
+    agent.ts              # AGENT_TOOLS and action handlers
+    ui.ts                 # declarative UI surface definitions
+    client.ts             # typed service client and domain logic
+  runtime/                # optional service, Dockerfile, runtime tests
+  scripts/                # optional local lifecycle scripts
+  .env.example            # runtime/operator configuration only
+  tool.manifest.json      # catalog, settings, runtime, UI, billing metadata
+  package.json
+  README.md
+```
+
+The package is the deletion boundary: uninstalling it removes its optional behavior without changing the web application or the project’s `package.json`.
+
+## Define the manifest
+
+Use manifest v3 whenever the tool has a runtime, UI surface, credentials, or usage metering.
+
+```json
+{
+  "$schema": "https://hub.larkup.de/schemas/tool-manifest.v3.json",
+  "manifestVersion": "3.0",
+  "kind": "tool",
+  "id": "acme-translator",
+  "name": "Acme Translator",
+  "description": "Translate selected knowledge with your Acme account.",
+  "category": "ai",
+  "version": "1.0.0",
+  "pricing": "free",
+  "distribution": "public",
+  "icon": "Languages",
+  "packageName": "@acme/larkup-tool-translator",
+  "installSize": "~2 MB",
+  "author": "Acme",
+  "capabilities": ["translation"],
+  "entrypoints": { "server": ".", "agent": ".", "ui": "./ui" },
+  "runtime": {
+    "protocolVersion": "1",
+    "defaultMode": "custom-remote",
+    "modes": [
+      {
+        "id": "custom-remote",
+        "label": "Acme Cloud",
+        "description": "Use Acme's hosted translation API.",
+        "endpointConfigKey": "endpoint",
+        "credentialConfigKey": "apiKey"
+      }
+    ]
+  },
+  "configSchema": [
+    {
+      "key": "apiKey",
+      "label": "Acme API key",
+      "type": "password",
+      "required": true,
+      "help": "Created in your Acme account. Stored per Larkup installation."
+    }
+  ],
+  "ui": {
+    "isolation": "sandboxed-iframe",
+    "surfaces": [
+      {
+        "id": "translation-result",
+        "slot": "chat-result",
+        "title": "Translation",
+        "entrypoint": "./ui"
+      }
+    ]
+  }
+}
+```
+
+`configSchema` creates the installed-tool settings card. `password` fields are never prefilled from a package or committed to source control. `runtime` creates the runtime selector, while `usage` can add a manifest-driven usage section. The manifest’s `emoji`, `icon`, description, tags, and install count make up the Marketplace card.
+
+## Add an agent action
+
+Export `TOOL_EXTENSION` and `AGENT_TOOLS` from the package entrypoint. The chat route loads every installed action through this contract; it does not know your tool id, parameter schema, or handler.
+
+```ts
+import {
+  defineAgentTool,
+  defineToolExtension,
+  type AgentToolExecutionContext,
+} from '@larkup/marketplace/extension';
+
+class TranslatorClient {
+  constructor(private apiKey: string) {}
+
+  async translate(input: unknown, _context: AgentToolExecutionContext) {
+    // Validate input, call your service, and return structured output.
+    return { success: true, text: '…' };
+  }
+}
+
+export const TOOL_EXTENSION = defineToolExtension({
+  id: 'acme-translator',
+  apiVersion: '1',
+  createClient: ({ config }) => new TranslatorClient(String(config.apiKey ?? '')),
+});
+
+export const AGENT_TOOLS = [
+  defineAgentTool({
+    name: 'translateWithAcme',
+    description: 'Translate text using the installed Acme Translator tool.',
+    method: 'translate',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['text', 'targetLanguage'],
+      properties: {
+        text: { type: 'string', minLength: 1 },
+        targetLanguage: { type: 'string' },
+      },
+    },
+    systemPromptFragment: 'Use this only when the user asks for a translation.',
+  }),
+];
+```
+
+Agent action names must be globally unique. The host validates registrations and rejects an action that collides with a first-party or another installed action.
+
+## Credentials, environment variables, and limits
+
+There are two distinct configuration surfaces:
+
+| Need                                                                | Put it in                                                  | Never do                                              |
+| ------------------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------- |
+| Per-user API key, endpoint, feature toggle                          | `tool.manifest.json` → `configSchema`                      | Put a user key in `.env.example` or package defaults. |
+| Internal service secret, Docker port, provider token, request limit | the tool’s `.env.example` and runtime configuration        | Read a host app environment variable from `apps/web`. |
+| A value provisioned by the tool server                              | `serverManaged: true` config field plus `provisionRuntime` | Let the browser overwrite it.                         |
+
+Put rate limiting and quota checks in the tool runtime, before expensive work begins. Return `429` with a retry hint when appropriate. For paid or limited runtimes, declare provider-neutral `billing.meters`; reserve quota atomically, and have the runtime consume an entitlement rather than calling Stripe directly. A future payment service can update the entitlement without rewriting tool logic.
+
+## UI that travels with the tool
+
+Declare each surface in `ui.surfaces`; available slots are `data-indexing`, `settings`, `chat-result`, and `asset-actions`. Keep browser code in the package’s UI entrypoint and request `sandboxed-iframe` isolation for untrusted code. For chat output, return the host’s versioned, declarative result UI shape (for example, a `ui.kind: 'citations'` result) rather than adding a tool-name switch in the chat component.
+
+Use a package-owned `src/ui.ts` to keep surface ids, input/result contracts, and UI versions next to the tool logic. A surface must degrade gracefully when it is not rendered; chat answers must still be understandable as text.
+
+## Test before publishing
+
+```bash
+pnpm --filter @acme/larkup-tool-translator type-check
+pnpm --filter @acme/larkup-tool-translator test
+```
+
+Test the manifest, client contract, credential failure, rate-limit response, and every agent action. If the tool has a runtime, add a lightweight health check and a test for its entitlement/quota state.
+
+Next: [publish or share a private tool](/marketplace/publishing-tools).

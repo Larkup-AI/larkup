@@ -1,12 +1,12 @@
 ---
-'@larkup/channels-core': minor
+'@larkup/connections': minor
 '@larkup/core': patch
 'larkup': patch
 ---
 
 feat(channels): Slack channel adapter (plan §9, third after Webhook and Telegram)
 
-`packages/channels-core/src/adapters/slack.ts` — `verify`/`parse`/`send`/`health`
+`packages/connections/src/adapters/slack.ts` — `verify`/`parse`/`send`/`health`
 against the shared `ChannelAdapter` contract, no changes to the contract
 itself:
 
