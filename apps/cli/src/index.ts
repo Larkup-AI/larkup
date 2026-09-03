@@ -253,12 +253,20 @@ program
     await enterpriseToolInstallCommand(toolId, options);
   });
 
-if (process.argv[2] !== 'update') {
-  await checkUpdate();
-  if (await enterpriseUpdateAvailable()) {
+const shouldCheckForUpdates =
+  process.argv[2] !== 'update' &&
+  !process.argv.includes('--help') &&
+  !process.argv.includes('-h') &&
+  !process.argv.includes('--version') &&
+  !process.argv.includes('-V');
+
+if (shouldCheckForUpdates) {
+  void checkUpdate();
+  void enterpriseUpdateAvailable().then((available) => {
+    if (!available) return;
     log.warn('Your organization configuration has changed.');
     log.info(`Run: ${log.fmt.bold('larkup update --ee')}`);
-  }
+  });
 }
 
 try {
