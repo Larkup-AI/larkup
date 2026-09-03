@@ -1,5 +1,11 @@
 # larkup
 
+## 0.2.2
+
+### Patch Changes
+
+- Use clear, non-technical wording for the Larkup cache setting.
+
 ## 0.2.1
 
 ### Patch Changes
