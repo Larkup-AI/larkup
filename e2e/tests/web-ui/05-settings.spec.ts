@@ -13,6 +13,45 @@ test.describe('Settings Page', () => {
     await expect(page.getByText('Project settings and preferences.')).toBeVisible();
   });
 
+  test('build cache requires confirmation before it is cleared', async ({ page }) => {
+    let cacheSize = 5 * 1024 * 1024 * 1024;
+    let deleteRequests = 0;
+    await page.route('/api/system/cache', async (route) => {
+      if (route.request().method() === 'DELETE') {
+        deleteRequests += 1;
+        const clearedBytes = cacheSize;
+        cacheSize = 0;
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            cache: { available: true, exists: false, sizeBytes: 0 },
+            clearedBytes,
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          cache: { available: true, exists: cacheSize > 0, sizeBytes: cacheSize },
+        }),
+      });
+    });
+    await page.reload();
+
+    const cacheCard = page.locator('[data-slot="card"]', { hasText: 'Build cache' });
+    await expect(cacheCard.getByText('5.0 GB')).toBeVisible();
+    await cacheCard.getByRole('button', { name: 'Clear cache' }).click();
+    await expect(page.getByRole('alertdialog')).toContainText('projects, indexed data, settings');
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    expect(deleteRequests).toBe(0);
+
+    await cacheCard.getByRole('button', { name: 'Clear cache' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Clear cache' }).click();
+    await expect(cacheCard.getByText('0 B')).toBeVisible();
+    expect(deleteRequests).toBe(1);
+  });
+
   test('server section is accessible', async ({ page }) => {
     await page.getByRole('button', { name: 'Larkup Server', exact: true }).click();
 

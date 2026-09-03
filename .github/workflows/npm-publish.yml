@@ -8,6 +8,8 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release-version.outputs.version }}
     permissions:
       contents: read
       id-token: write
@@ -37,6 +39,24 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Wait for the published tarball
+        id: release-version
+        shell: bash
+        run: |
+          version=$(node -p "require('./apps/web/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          tarball="https://registry.npmjs.org/larkup/-/larkup-${version}.tgz"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error --head "$tarball" >/dev/null; then
+              echo "larkup@$version tarball is available."
+              exit 0
+            fi
+            echo "Waiting for npm tarball propagation ($attempt/60)..."
+            sleep 10
+          done
+          echo "larkup@$version metadata was published, but its tarball is still unavailable." >&2
+          exit 1
+
   installer-smoke:
     name: ${{ matrix.name }} published install
     needs: build-and-publish
@@ -55,6 +75,8 @@ jobs:
             os: windows-2025
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    env:
+      LARKUP_INSTALL_VERSION: ${{ needs.build-and-publish.outputs.version }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
