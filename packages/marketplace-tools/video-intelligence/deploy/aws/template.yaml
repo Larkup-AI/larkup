@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Larkup Video Intelligence control plane with hidden RunPod Secure Cloud GPU workers.
+Description: Larkup Video Intelligence control plane with managed GPU workers.
 
 Parameters:
   Environment:
@@ -10,7 +10,11 @@ Parameters:
   RunpodEndpointId:
     Type: String
     Default: ''
-    Description: Queue-based RunPod Serverless endpoint ID in an EU Secure Cloud data center. Optional when GpuProvider is modal (the default); required to actually dispatch jobs when GpuProvider is runpod.
+    Description: Queue-based RunPod Serverless endpoint ID. Optional when GpuProvider is modal (the default); required to dispatch jobs when GpuProvider is runpod. Region affinity must be verified on the endpoint itself.
+  RunpodInteractiveEndpointId:
+    Type: String
+    Default: ''
+    Description: Optional latency-oriented RunPod endpoint for bounded interactive inspections. Whole-source indexing continues to use RunpodEndpointId.
   RunpodApiKey:
     Type: String
     NoEcho: true
@@ -48,7 +52,31 @@ Parameters:
     Default: 30
     MinValue: 1
     MaxValue: 120
-    Description: Monthly minutes included with each automatically provisioned device key.
+    Description: Legacy monthly allowance retained for device records created before the trial-cap policy.
+  TrialDeviceLimit:
+    Type: Number
+    Default: 100
+    MinValue: 0
+    MaxValue: 1000000
+    Description: Number of new devices eligible for the no-payment cloud trial.
+  TrialSourceMinutes:
+    Type: Number
+    Default: 600
+    MinValue: 0
+    MaxValue: 1000000
+    Description: Monthly cloud source minutes included for each eligible trial device (600 minutes = 10 hours).
+  TrialRequestsPerMinute:
+    Type: Number
+    Default: 60
+    MinValue: 1
+    MaxValue: 600
+    Description: Per-device request rate for trial and support-required devices.
+  PostTrialSourceMinutes:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 120
+    Description: Included minutes for devices created after the trial cap is reached.
   RequestsPerMinute:
     Type: Number
     Default: 120
@@ -277,12 +305,17 @@ Resources:
           BUCKET_NAME: !Ref DataBucket
           LARKUP_VIDEO_GPU_PROVIDER: !Ref GpuProvider
           RUNPOD_ENDPOINT_ID: !Ref RunpodEndpointId
+          RUNPOD_INTERACTIVE_ENDPOINT_ID: !Ref RunpodInteractiveEndpointId
           RUNPOD_API_KEY: !Sub '{{resolve:secretsmanager:${RunpodSecret}:SecretString}}'
           MODAL_TOKEN_ID: !Sub '{{resolve:secretsmanager:${ModalSecret}:SecretString:tokenId}}'
           MODAL_API_KEY: !Sub '{{resolve:secretsmanager:${ModalSecret}:SecretString:tokenSecret}}'
           PROCESSING_ENABLED: !Ref ProcessingEnabled
           AUTO_PROVISIONING_ENABLED: !Ref AutoProvisioningEnabled
           AUTO_PROVISIONED_SOURCE_MINUTES: !Ref AutoProvisionedSourceMinutes
+          TRIAL_DEVICE_LIMIT: !Ref TrialDeviceLimit
+          TRIAL_SOURCE_MINUTES: !Ref TrialSourceMinutes
+          TRIAL_REQUESTS_PER_MINUTE: !Ref TrialRequestsPerMinute
+          POST_TRIAL_SOURCE_MINUTES: !Ref PostTrialSourceMinutes
           REQUESTS_PER_MINUTE: !Ref RequestsPerMinute
           TESTING_DEVICE_HASHES: !Ref TestingDeviceHashes
           ADMIN_TOKEN: !Sub '{{resolve:secretsmanager:${AdminSecret}:SecretString}}'

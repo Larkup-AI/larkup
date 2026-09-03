@@ -6,7 +6,7 @@ import {
   queryAwareExcerpt,
   timestampMediaUrl,
   type MediaEvidenceSegment,
-} from '../../../apps/web/lib/media-knowledge';
+} from '../../../apps/web/lib/media/knowledge';
 
 const segments: MediaEvidenceSegment[] = [
   {

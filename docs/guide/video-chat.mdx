@@ -7,32 +7,42 @@ Import a video and ask about it in Chat. Larkup finds the moment, plays it back,
 
 ## Install the tool
 
-Open **Settings → Marketplace** and install **Video Intelligence**. You only need to do this once.
+Open **Settings → Marketplace** and install **Video Intelligence (New)**. The tool is isolated, so uninstalling it removes its client and runtime integration without changing your existing data.
 
 <Frame caption="Marketplace with Video Intelligence available">
   <img src="/images/tools/marketplace-view.png" alt="Marketplace showing Video Intelligence tool" />
 </Frame>
 
-## Set the transcription provider
+## Connect Larkup Cloud
 
-Open **Settings → Installed Tools → Video Intelligence** and choose an Audio Provider and API key. Leave the language on auto to detect it.
+Open **Settings → Installed Tools → Video Intelligence**. Larkup creates a private device connection automatically on first use; you do not enter or see an access key. The cloud GPU endpoint is managed by Larkup and is not shown or configured in the browser.
 
-<Frame caption="Video Intelligence installed tool settings">
-  <img src="/images/tools/set-audio-video.png" alt="Video Intelligence audio provider and language settings" />
+You can also select the audio provider for a video's speech track. **Larkup Cloud** is the default managed multilingual pipeline. If you select OpenAI, Groq, Deepgram, or ElevenLabs, use the provider icon and **Verify** button to confirm your own key before indexing.
+
+With an external provider selected, Larkup sends the source directly to that provider for transcription; its key is never forwarded to the video GPU worker. The cloud worker continues OCR and visual analysis.
+
+<Frame caption="Video Intelligence runtime settings">
+  <img
+    src="/images/tools/set-audio-video.png"
+    alt="Video Intelligence audio provider and language settings"
+  />
 </Frame>
 
 ## Import a video
 
-Open **Data → Media**. Upload a file from your computer or paste a YouTube link, then confirm the import.
+Open **Data → Media** and choose a file. Before upload, **Guide video indexing** lets you optionally describe the goal, known people/teams/objects, and questions you expect to ask.
+
+Enable **Analyze every frame** only when a rare detail may appear for a single frame and you are authorized to process the complete footage. It provides the highest coverage but is much slower and may require a cloud entitlement.
 
 <Frame caption="Importing a YouTube video from the Media tab">
   <img src="/images/add/upload-video-data-page.png" alt="Media tab with YouTube URL import" />
 </Frame>
 
-Larkup transcribes the speech, reads visible text, and analyzes the video in the background. You can watch progress live in the Media panel.
+Larkup Cloud transcribes speech, reads visible text, detects objects, assigns anonymous tracks, and builds timestamped evidence in the background. It also writes a source-language chronological notebook that connects names from speech with supported visual layout and later events. Every transcript segment, OCR reading, and detection remains searchable with its source timestamp rather than relying only on a broad summary. The progress display reports confirmed work continuously, including measured download bytes, speed, and ETA when available.
 
 <Tip>
-  Choose a vision capable model in **Settings → AI Models → Vision Model** before importing for the best results.
+  Balanced is the default. Use Deep for slides, code, scoreboards, or dense visual changes; use Fast
+  when a quick overview matters more than visual detail.
 </Tip>
 
 ## Ask in Chat
@@ -40,7 +50,20 @@ Larkup transcribes the speech, reads visible text, and analyzes the video in the
 Open **Chat** and ask about the video: who said something, what happened at a certain point, or what the outcome was.
 
 <Frame caption="Chat answer with an embedded video player and timestamp citation">
-  <img src="/images/add/video-preview-chat-reply.png" alt="Chat reply with embedded video at cited timestamp" />
+  <img
+    src="/images/add/video-preview-chat-reply.png"
+    alt="Chat reply with embedded video at cited timestamp"
+  />
 </Frame>
 
-Try asking, "Show me the moment at seven minutes." For a YouTube video the citation also links directly to that timestamp on YouTube.
+Try asking, "What was the final score and when did it change?" or "Explain the code shown while the instructor discussed authentication." Answers use the timestamped transcript/OCR/object evidence first. If the chat model adds general knowledge that was not shown in the source, it must identify that part as an inference.
+
+Chat answers directly when multiple compatible indexed observations establish a result as a chronological trail. For an exact result, count, identity, or other weakly supported answer, it narrows the question to the best candidate moments and performs a bounded follow-up inspection before it gives up. This keeps ordinary indexed answers fast while still checking claims the index cannot safely settle.
+
+## Cloud allowance
+
+The Media panel warns you when 80% of the monthly video-minute allowance has been used. Select **Request more usage** to send your contact details and current allowance summary to the Larkup team. This is a temporary request flow until self-service billing is available.
+
+## Privacy and retention
+
+Your original Data-library asset remains the canonical local copy. To run GPU OCR and video analysis, Larkup sends a temporary KMS-encrypted processing copy to the managed worker; it is deleted when the job completes, fails, or is cancelled. After Larkup receives the timestamped evidence locally, it acknowledges and removes the temporary cloud result too. One-day lifecycle rules remove abandoned temporary objects as a safety bound. Cloud usage is metered by source minutes and concurrency per API key.

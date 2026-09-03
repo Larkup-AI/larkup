@@ -1,6 +1,9 @@
 {
   "name": "larkup",
-  "version": "0.1.76",
+  "version": "0.2.0",
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "bin": {
     "larkup": "./bin/larkup.js"
@@ -12,11 +15,12 @@
   ],
   "scripts": {
     "dev": "next dev -p 4567",
-    "prebuild": "node scripts/copy-widget.mjs",
     "build": "next build --webpack",
     "postbuild": "node scripts/prepare-standalone.mjs && if pnpm exec prettier --version >/dev/null 2>&1; then pnpm exec prettier --write next-env.d.ts; fi",
     "start": "node .next/standalone/apps/web/server.js",
-    "lint": "echo \"No lint configured\""
+    "lint": "echo \"No lint configured\"",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.15",
@@ -30,16 +34,13 @@
     "@ai-sdk/react": "4.0.86",
     "@base-ui/react": "^1.5.0",
     "@lancedb/lancedb": "^0.37.1",
-    "@larkup/agent-contracts": "workspace:*",
-    "@larkup/agent-widget": "workspace:*",
-    "@larkup/channels-core": "workspace:*",
+    "@larkup/connections": "workspace:*",
     "@larkup/core": "workspace:*",
     "@larkup/integrations": "workspace:*",
     "@larkup/marketplace": "workspace:*",
     "@larkup/sandbox": "workspace:*",
     "@larkup/scraper": "workspace:*",
     "@larkup/tool-doc-editor": "workspace:*",
-    "@larkup/tool-video-audio": "workspace:*",
     "@larkup/vector-stores": "workspace:*",
     "@napi-rs/canvas": "1.0.8",
     "@tauri-apps/plugin-process": "^2.3.1",
@@ -85,6 +86,8 @@
     "@types/react-dom": "^19",
     "postcss": "^8.5.25",
     "tailwindcss": "^4.2.0",
-    "typescript": "^7.0.2"
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }

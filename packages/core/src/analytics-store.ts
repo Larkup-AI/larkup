@@ -1,7 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { getDataDir, requireDataDir } from './workspace';
+import {
+  getProjectDataDir as getDataDir,
+  requireProjectDataDir as requireDataDir,
+} from './project-store';
 import { ALL_MODELS } from './models-list';
 
 export interface UsageEvent {
@@ -28,6 +31,8 @@ export interface UsageEvent {
   method?: string;
   statusCode?: number;
   latencyMs?: number;
+  /** Where a server request was handled. Older events are inferred from endpoint. */
+  runtime?: 'local' | 'remote';
   // Media processing-specific
   mediaType?: 'image' | 'video' | 'audio';
   durationSecs?: number;
@@ -49,6 +54,7 @@ export interface UsageEvent {
     | 'observation'
     | 'projection'
     | 'inspection'
+    | 'cloud_inspection'
     | 'investigation'
     | 'completion'
     | 'partial_failure';
@@ -140,13 +146,21 @@ export function estimateCost(
   return promptTokens * inputPrice + completionTokens * outputPrice;
 }
 
-export async function getAnalyticsSummary(days: number): Promise<AnalyticsSummary> {
+export async function getAnalyticsSummary(
+  days: number,
+  runtime: 'all' | 'local' | 'remote' = 'all',
+): Promise<AnalyticsSummary> {
   const events = await readUsageEvents();
 
   const now = new Date();
   const cutoff = days > 0 ? new Date(now.getTime() - days * 24 * 60 * 60 * 1000) : new Date(0);
 
-  const filtered = events.filter((e) => new Date(e.timestamp) >= cutoff);
+  const filtered = events.filter((e) => {
+    if (new Date(e.timestamp) < cutoff || runtime === 'all') return new Date(e.timestamp) >= cutoff;
+    const inferredRuntime =
+      e.runtime ?? (/(localhost|127\.0\.0\.1|\[::1\])/.test(e.endpoint ?? '') ? 'local' : 'remote');
+    return inferredRuntime === runtime;
+  });
 
   const summary: AnalyticsSummary = {
     totalChatTokens: 0,

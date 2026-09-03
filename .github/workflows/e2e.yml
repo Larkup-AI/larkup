@@ -21,7 +21,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v7
       with:
-        node-version: '20'
+        node-version: '22'
         cache: 'pnpm'
 
     - name: Cache Turborepo
@@ -34,7 +34,7 @@ jobs:
           ${{ runner.os }}-turbo-
 
     - name: Install dependencies
-      run: pnpm install
+      run: pnpm install --frozen-lockfile
 
     - name: Install Playwright Browsers
       run: pnpm --filter @larkup/e2e exec playwright install --with-deps

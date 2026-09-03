@@ -5,15 +5,29 @@ import type { ActiveRevisionManifest, VideoKnowledgeProjection } from './types';
 export function saveVideoKnowledgeProjection(
   record: Omit<VideoKnowledgeProjection, 'id' | 'schemaVersion' | 'createdAt'>,
 ) {
+  return saveVideoKnowledgeProjections([record]).then(([projection]) => projection);
+}
+
+/**
+ * Persists a publication's projections in one atomic write. Video indexing can
+ * produce hundreds of projections, so one write per projection leaves the
+ * asset stuck at 100% while repeatedly serializing the same evidence store.
+ */
+export function saveVideoKnowledgeProjections(
+  records: Array<Omit<VideoKnowledgeProjection, 'id' | 'schemaVersion' | 'createdAt'>>,
+) {
   return mutateVideoKnowledgeState((state) => {
-    const projection: VideoKnowledgeProjection = {
-      ...record,
-      id: randomUUID(),
-      schemaVersion: 1,
-      createdAt: new Date().toISOString(),
-    };
-    state.projections.push(projection);
-    return projection;
+    const createdAt = new Date().toISOString();
+    const projections = records.map(
+      (record): VideoKnowledgeProjection => ({
+        ...record,
+        id: randomUUID(),
+        schemaVersion: 1,
+        createdAt,
+      }),
+    );
+    state.projections.push(...projections);
+    return projections;
   });
 }
 

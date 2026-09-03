@@ -36,10 +36,6 @@ async function getDocker(): Promise<any> {
   return dockerInstance;
 }
 
-/* ------------------------------------------------------------------ */
-/* Health check                                                        */
-/* ------------------------------------------------------------------ */
-
 export async function checkDockerHealth(): Promise<SandboxHealthCheck> {
   const docker = await getDocker();
   try {
@@ -54,17 +50,18 @@ export async function checkDockerHealth(): Promise<SandboxHealthCheck> {
       imageReady: images.length > 0,
     };
   } catch (err: any) {
+    const raw = err?.message ?? '';
+    const dockerMissing =
+      /ENOENT|ECONNREFUSED|EACCES|no such file|cannot connect to the docker daemon/i.test(raw);
     return {
       status: 'docker-not-found',
       backend: 'docker',
-      error: err.message ?? 'Docker daemon not available',
+      error: dockerMissing
+        ? "Docker isn't installed or running on this machine. Local code execution is optional — install Docker Desktop to enable it, or configure a remote sandbox provider below."
+        : raw || 'Docker daemon not available',
     };
   }
 }
-
-/* ------------------------------------------------------------------ */
-/* Image management                                                    */
-/* ------------------------------------------------------------------ */
 
 export async function buildSandboxImage(onProgress?: (msg: string) => void): Promise<void> {
   const docker = await getDocker();
@@ -120,10 +117,6 @@ export async function ensureImage(): Promise<boolean> {
     return false;
   }
 }
-
-/* ------------------------------------------------------------------ */
-/* Code execution                                                      */
-/* ------------------------------------------------------------------ */
 
 /**
  * Build the Python wrapper script that:
@@ -294,6 +287,22 @@ export async function executeInDocker(
   // Write input files
   if (request.files) {
     for (const file of request.files) {
+      if (
+        !file.name ||
+        file.name === '.' ||
+        file.name === '..' ||
+        file.name.includes('/') ||
+        file.name.includes('\\') ||
+        file.name.includes('\0')
+      ) {
+        return {
+          stdout: '',
+          stderr: 'Sandbox file names must be plain file names.',
+          exitCode: 1,
+          artifacts: [],
+          executionTimeMs: Date.now() - startTime,
+        };
+      }
       const filePath = path.join(inputDir, file.name);
       if (file.isBase64) {
         await fs.writeFile(filePath, Buffer.from(file.content, 'base64'));
@@ -306,16 +315,19 @@ export async function executeInDocker(
   // Prepare the execution code
   let execCode: string;
   let cmd: string[];
+  let scriptName: string;
 
   if (request.language === 'python') {
     execCode = wrapPythonCode(request.code);
     const scriptPath = path.join(tmpDir, 'run.py');
     await fs.writeFile(scriptPath, execCode, 'utf8');
+    scriptName = 'run.py';
     cmd = ['python3', '/sandbox/run.py'];
   } else {
     // JavaScript/TypeScript (future)
     const scriptPath = path.join(tmpDir, 'run.js');
     await fs.writeFile(scriptPath, request.code, 'utf8');
+    scriptName = 'run.js';
     cmd = ['node', '/sandbox/run.js'];
   }
 
@@ -336,7 +348,7 @@ export async function executeInDocker(
         Binds: [
           `${inputDir}:${INPUT_DIR}:ro`,
           `${outputDir}:${OUTPUT_DIR}:rw`,
-          `${tmpDir}/run.py:/sandbox/run.py:ro`,
+          `${tmpDir}/${scriptName}:/sandbox/${scriptName}:ro`,
         ],
         ReadonlyRootfs: false,
       },
@@ -349,8 +361,9 @@ export async function executeInDocker(
 
     // Wait for completion with timeout
     const waitPromise = container.wait();
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(async () => {
+      timeoutHandle = setTimeout(async () => {
         try {
           await container?.kill();
         } catch {
@@ -361,6 +374,7 @@ export async function executeInDocker(
     });
 
     const result = await Promise.race([waitPromise, timeoutPromise]);
+    if (timeoutHandle) clearTimeout(timeoutHandle);
 
     // Capture logs
     const logs = await container.logs({
@@ -424,10 +438,6 @@ export async function executeInDocker(
     }
   }
 }
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
 
 /**
  * Docker multiplexes stdout/stderr into a single stream with 8-byte headers.

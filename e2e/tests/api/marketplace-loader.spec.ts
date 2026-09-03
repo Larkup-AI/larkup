@@ -17,14 +17,14 @@ import {
 
 function videoTool(version: string): ToolDescriptor {
   return {
-    id: 'video-audio',
-    name: 'Video & Audio',
+    id: 'video-intelligence',
+    name: 'Video Intelligence',
     description: 'Test tool',
     category: 'media',
     version,
     pricing: 'free',
     icon: 'Film',
-    packageName: '@larkup/tool-video-audio',
+    packageName: '@larkup/tool-video-intelligence',
     installSize: '~15 MB',
     author: 'Larkup',
     capabilities: [],
@@ -34,11 +34,11 @@ function videoTool(version: string): ToolDescriptor {
 
 test('keeps a newer marketplace catalog entry when an installed tool manifest is stale', () => {
   const merged = mergeToolDescriptors(
-    { 'video-audio': videoTool('0.3.4') },
-    { 'video-audio': videoTool('0.3.2') },
+    { 'video-intelligence': videoTool('0.3.4') },
+    { 'video-intelligence': videoTool('0.3.2') },
   );
 
-  expect(merged['video-audio'].version).toBe('0.3.4');
+  expect(merged['video-intelligence'].version).toBe('0.3.4');
 });
 
 test('bundled first-party tools are not marked installed until the user installs them', async () => {
@@ -57,31 +57,34 @@ test('installs a pnpm workspace-linked tool locally without attempting a registr
   const originalCwd = process.cwd();
   const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-marketplace-workspace-'));
   const appDir = path.join(workspace, 'apps', 'web');
-  const packageDir = path.join(workspace, 'packages', 'tools', 'video-audio');
+  const packageDir = path.join(workspace, 'packages', 'marketplace-tools', 'video-intelligence');
 
   try {
     await mkdir(path.join(appDir, 'node_modules', '@larkup'), { recursive: true });
     await mkdir(packageDir, { recursive: true });
     await writeFile(
       path.join(packageDir, 'package.json'),
-      JSON.stringify({ name: '@larkup/tool-video-audio' }),
+      JSON.stringify({ name: '@larkup/tool-video-intelligence' }),
     );
     await writeFile(
       path.join(packageDir, 'tool.manifest.json'),
       JSON.stringify(videoTool('9.9.9')),
     );
-    await symlink(packageDir, path.join(appDir, 'node_modules', '@larkup', 'tool-video-audio'));
+    await symlink(
+      packageDir,
+      path.join(appDir, 'node_modules', '@larkup', 'tool-video-intelligence'),
+    );
 
     process.chdir(appDir);
     invalidateRegistryCache();
-    await installTool('video-audio');
+    await installTool('video-intelligence');
 
     const installed = await getInstalledTools();
     const resolvedPackageDir = await realpath(packageDir);
     expect(installed).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: 'video-audio',
+          id: 'video-intelligence',
           version: '9.9.9',
           source: 'local',
           resolvedPath: resolvedPackageDir,
@@ -105,11 +108,11 @@ test('uninstall removes the persisted Marketplace state immediately', async () =
       JSON.stringify({
         tools: [
           {
-            id: 'video-audio',
+            id: 'video-intelligence',
             version: '0.2.0',
             installedAt: new Date().toISOString(),
-            packageName: '@larkup/tool-video-audio',
-            resolvedPath: '@larkup/tool-video-audio',
+            packageName: '@larkup/tool-video-intelligence',
+            resolvedPath: '@larkup/tool-video-intelligence',
             source: 'local',
             config: {},
           },
@@ -118,9 +121,9 @@ test('uninstall removes the persisted Marketplace state immediately', async () =
       }),
     );
     process.chdir(workspace);
-    await expect(isToolInstalled('video-audio')).resolves.toBe(true);
-    await uninstallTool('video-audio');
-    await expect(isToolInstalled('video-audio')).resolves.toBe(false);
+    await expect(isToolInstalled('video-intelligence')).resolves.toBe(true);
+    await uninstallTool('video-intelligence');
+    await expect(isToolInstalled('video-intelligence')).resolves.toBe(false);
   } finally {
     process.chdir(originalCwd);
     await rm(workspace, { recursive: true, force: true });

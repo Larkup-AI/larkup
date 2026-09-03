@@ -134,8 +134,9 @@ test('acceptance: cross-timestamp calculation from visual-only evidence (no tran
         return Number(match[1]) + Number(match[2]);
       };
       const firstReading = (chronological[0].evidence.payload as { text: string }).text;
-      const lastReading = (chronological[chronological.length - 1].evidence.payload as { text: string })
-        .text;
+      const lastReading = (
+        chronological[chronological.length - 1].evidence.payload as { text: string }
+      ).text;
       const goalsInSecondHalf = scoreOf(lastReading) - scoreOf(firstReading);
 
       // This is exactly the run_code step: a deterministic calculation over
@@ -232,12 +233,174 @@ test('acceptance: retrieves a terminal spoken outcome even when team names are a
   });
 });
 
+test('acceptance: a single outcome result prefers the strongest terminal evidence', async () => {
+  await withIsolatedWorkspace(async () => {
+    const { runWithProject, createProject } = await import('../project-store');
+    const { mutateVideoKnowledgeState } = await import('./store');
+    const { searchVideoKnowledge } = await import('./retrieval');
+    const { planVideoQuestion } = await import('./query-planner');
+    const { DEFAULT_VIDEO_CONFIDENCE } = await import('./types');
+    const { project } = await createProject('Single Terminal Outcome Retrieval');
+
+    await runWithProject(project.id, async () => {
+      const mediaAssetId = 'workflow-status-video';
+      const revisionId = 'single-terminal-outcome-revision';
+      const createdAt = new Date().toISOString();
+      await mutateVideoKnowledgeState((state) => {
+        state.manifests.push({
+          id: 'single-terminal-outcome-manifest',
+          mediaAssetId,
+          knowledgeRevisionId: revisionId,
+          activeEvidenceRevisionIds: {
+            intermediate: 'intermediate-score',
+            final: 'final-score',
+          },
+          activeObservationRevisionIds: {},
+          activeProjectionIds: [],
+          activationReason: 'initial',
+          schemaVersion: 1,
+          createdAt,
+          activatedAt: createdAt,
+        });
+        state.evidence.push(
+          {
+            id: 'intermediate-score',
+            lineageId: 'intermediate',
+            mediaAssetId,
+            knowledgeRevisionId: revisionId,
+            modality: 'visual',
+            timeRange: { startSecs: 510, endSecs: 540, precision: 'estimated' },
+            payload: { text: 'The visible status is pending while the work continues.' },
+            source: { kind: 'provider', provider: 'test-vision' },
+            confidence: DEFAULT_VIDEO_CONFIDENCE,
+            schemaVersion: 1,
+            createdAt,
+          },
+          {
+            id: 'final-score',
+            lineageId: 'final',
+            mediaAssetId,
+            knowledgeRevisionId: revisionId,
+            modality: 'visual',
+            timeRange: { startSecs: 840, endSecs: 870, precision: 'estimated' },
+            payload: { text: 'The final status is approved after the work is complete.' },
+            source: { kind: 'provider', provider: 'test-vision' },
+            confidence: DEFAULT_VIDEO_CONFIDENCE,
+            schemaVersion: 1,
+            createdAt,
+          },
+        );
+      });
+
+      const question = 'what was the final status?';
+      const hit = await searchVideoKnowledge(mediaAssetId, question, 1, {
+        modalities: ['visual'],
+        queryPlan: planVideoQuestion(question),
+        videoDurationSecs: 900,
+        minimumRangeDistanceSecs: 0,
+      });
+      assert.equal(hit.length, 1);
+      assert.equal(hit[0]?.evidence.id, 'final-score');
+    });
+  });
+});
+
+test('acceptance: a later, unrelated segment does not leak into an already-answered outcome query', async () => {
+  await withIsolatedWorkspace(async () => {
+    const { runWithProject, createProject } = await import('../project-store');
+    const { mutateVideoKnowledgeState } = await import('./store');
+    const { searchVideoKnowledge } = await import('./retrieval');
+    const { planVideoQuestion } = await import('./query-planner');
+    const { DEFAULT_VIDEO_CONFIDENCE } = await import('./types');
+    const { project } = await createProject('Multi-Round Outcome Isolation');
+
+    await runWithProject(project.id, async () => {
+      // A single episode covering two independent, back-to-back matchups --
+      // e.g. successive rounds of a competition -- each concluding inside
+      // the final third of the file. Nothing about this fixture is specific
+      // to sports/games/any domain; it only asserts that a later segment's
+      // unrelated conclusion must not be attributed to an earlier segment
+      // that already has its own relevant evidence.
+      const mediaAssetId = 'multi-round-episode';
+      const revisionId = 'multi-round-revision';
+      const createdAt = new Date().toISOString();
+      const videoDurationSecs = 3000;
+      await mutateVideoKnowledgeState((state) => {
+        state.manifests.push({
+          id: 'multi-round-manifest',
+          mediaAssetId,
+          knowledgeRevisionId: revisionId,
+          activeEvidenceRevisionIds: {
+            'round-a': 'round-a-evidence',
+            'round-b': 'round-b-evidence',
+          },
+          activeObservationRevisionIds: {},
+          activeProjectionIds: [],
+          activationReason: 'initial',
+          schemaVersion: 1,
+          createdAt,
+          activatedAt: createdAt,
+        });
+        state.evidence.push(
+          {
+            id: 'round-a-evidence',
+            lineageId: 'round-a',
+            mediaAssetId,
+            knowledgeRevisionId: revisionId,
+            modality: 'transcript',
+            // Inside the final third (>= 2010s) so it competes for the same
+            // terminal-outcome fallback window as round B below.
+            timeRange: { startSecs: 2100, endSecs: 2110, precision: 'word' },
+            payload: { text: 'Alpha wins against Beta, final score 3-1' },
+            source: { kind: 'provider', provider: 'test-stt' },
+            confidence: DEFAULT_VIDEO_CONFIDENCE,
+            schemaVersion: 1,
+            createdAt,
+          },
+          {
+            id: 'round-b-evidence',
+            lineageId: 'round-b',
+            mediaAssetId,
+            knowledgeRevisionId: revisionId,
+            modality: 'transcript',
+            // Closer to the true end of the file than round A -- an outcome
+            // query's naive "closest to the very end" heuristic would rank
+            // this first even though it names neither party asked about.
+            timeRange: { startSecs: 2900, endSecs: 2910, precision: 'word' },
+            payload: { text: 'Gamma wins against Delta, final score 2-0' },
+            source: { kind: 'provider', provider: 'test-stt' },
+            confidence: DEFAULT_VIDEO_CONFIDENCE,
+            schemaVersion: 1,
+            createdAt,
+          },
+        );
+      });
+
+      const question = 'who won Alpha versus Beta';
+      const plan = planVideoQuestion(question);
+      assert.ok(plan.kinds.includes('outcome'));
+      const hits = await searchVideoKnowledge(mediaAssetId, question, 8, {
+        queryPlan: plan,
+        videoDurationSecs,
+        minimumRangeDistanceSecs: 0,
+      });
+      assert.ok(hits.length > 0, 'the relevant round must still be found');
+      assert.ok(
+        hits.every((hit) => !JSON.stringify(hit.evidence.payload).includes('Gamma')),
+        "an unrelated later segment's conclusion must not be mixed into this answer",
+      );
+      assert.ok(
+        hits.some((hit) => JSON.stringify(hit.evidence.payload).includes('Alpha')),
+        'the actually-relevant round must be returned',
+      );
+    });
+  });
+});
+
 test('acceptance: visual action retrieval infrastructure (model correctness pending Model Studio activation)', async () => {
   await withIsolatedWorkspace(async () => {
     const { runWithProject, createProject } = await import('../project-store');
-    const { upsertVideoEmbeddings, queryVideoEmbeddings } = await import(
-      './video-embedding-index'
-    );
+    const { upsertVideoEmbeddings, queryVideoEmbeddings } = await import('./video-embedding-index');
 
     const { project } = await createProject('Acceptance Test B');
 
@@ -248,9 +411,27 @@ test('acceptance: visual action retrieval infrastructure (model correctness pend
       // anywhere -- the only way to find it is by visual similarity, which
       // is exactly what a caption-only or lexical search cannot do.
       await upsertVideoEmbeddings(mediaAssetId, 'rev-1', [
-        { clipId: 'clip_0', startSecs: 0, endSecs: 8, vector: [1, 0, 0, 0], provider: 'qwen3-vl-embedding' },
-        { clipId: 'clip_1', startSecs: 8, endSecs: 16, vector: [0, 1, 0, 0], provider: 'qwen3-vl-embedding' },
-        { clipId: 'clip_2', startSecs: 16, endSecs: 24, vector: [0, 0, 1, 0], provider: 'qwen3-vl-embedding' },
+        {
+          clipId: 'clip_0',
+          startSecs: 0,
+          endSecs: 8,
+          vector: [1, 0, 0, 0],
+          provider: 'qwen3-vl-embedding',
+        },
+        {
+          clipId: 'clip_1',
+          startSecs: 8,
+          endSecs: 16,
+          vector: [0, 1, 0, 0],
+          provider: 'qwen3-vl-embedding',
+        },
+        {
+          clipId: 'clip_2',
+          startSecs: 16,
+          endSecs: 24,
+          vector: [0, 0, 1, 0],
+          provider: 'qwen3-vl-embedding',
+        },
       ]);
 
       // Stands in for DashScope's multimodal-embedding endpoint (real call

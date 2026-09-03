@@ -20,7 +20,7 @@ const repoRoot = new URL('../../..', import.meta.url).pathname.replace(/\/$/, ''
 test.describe('M4 — Analysis bundle creation', () => {
   test('creates a bundle with frame manifest and enforces byte ceiling', async () => {
     const { createAnalysisBundle } = await import(
-      `${repoRoot}/apps/web/lib/video-intelligence/analysis-bundle`
+      `${repoRoot}/apps/web/lib/media/video/analysis-bundle`
     );
 
     const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-bundle-e2e-'));
@@ -49,7 +49,9 @@ test.describe('M4 — Analysis bundle creation', () => {
 
       // Should have 2 frame files + 1 manifest file.
       expect(bundle.files).toHaveLength(3);
-      const manifestFile = bundle.files.find((f) => f.name === 'manifest.json');
+      const manifestFile = bundle.files.find(
+        (file: { name: string }) => file.name === 'manifest.json',
+      );
       expect(manifestFile).toBeDefined();
 
       // Parse manifest and verify no host paths.
@@ -66,7 +68,9 @@ test.describe('M4 — Analysis bundle creation', () => {
       }
 
       // Frame files should be base64 encoded.
-      const frameFiles = bundle.files.filter((f) => f.name !== 'manifest.json');
+      const frameFiles = bundle.files.filter(
+        (file: { name: string }) => file.name !== 'manifest.json',
+      );
       for (const file of frameFiles) {
         expect(file.isBase64).toBe(true);
       }
@@ -106,16 +110,17 @@ test.describe('M4 — Inspection policy enforcement', () => {
   });
 
   test('hands oversized work to background refinement', async () => {
-    const { decideInspection } = await import(
+    const { decideInspection, LIMITS } = await import(
       `${repoRoot}/packages/core/src/video-knowledge/inspection-policy`
     );
 
-    // Duration exceeds the 30s per-bundle limit.
     const decision = decideInspection({
       required: true,
       plausibleRange: true,
       estimate: {
-        durationSecs: 31,
+        // Just past the per-bundle cap, read from the policy so raising the
+        // cap does not silently turn this into a pass.
+        durationSecs: LIMITS.durationSecs + 1,
         bytes: 1,
         sandboxSeconds: 1,
         spendUsd: 0,

@@ -71,6 +71,41 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     topK: Optional[int] = None
+    provider: Optional[str] = None
+    modelId: Optional[str] = None
+
+
+class AgentChatRequest(BaseModel):
+    """Optional per-request model settings for a generated Agent Runtime."""
+
+    messages: List[ChatMessage]
+    provider: Optional[str] = None
+    modelId: Optional[str] = None
+    topK: Optional[int] = None
+
+
+class ChatProvider(BaseModel):
+    id: str
+    name: str
+    modelCount: int
+
+
+class ChatModel(BaseModel):
+    id: str
+    name: str
+    provider: str
+    contextWindow: Optional[int] = None
+    maxTokens: Optional[int] = None
+    tags: Optional[List[str]] = None
+    description: Optional[str] = None
+
+
+class ChatModelCatalog(BaseModel):
+    configuredProvider: str
+    configuredModelId: str
+    providers: List[ChatProvider]
+    models: List[ChatModel]
+    source: Literal["vercel-ai-gateway", "configured"]
 
 
 class ChatEvent(BaseModel):
@@ -165,6 +200,7 @@ class MarketplaceTool(BaseModel):
     packageName: str
     installSize: str
     systemDeps: Optional[List[str]] = None
+    requiresSandbox: Optional[bool] = None
     author: str
     capabilities: List[str]
     configSchema: Optional[List[ToolConfigField]] = None
@@ -197,6 +233,51 @@ class ToolDetailResponse(BaseModel):
 class LarkupClientOptions(BaseModel):
     base_url: Optional[str] = None
     api_key: Optional[str] = None
+
+
+class AgentTool(BaseModel):
+    """A tool loaded by a generated Larkup Agent Server."""
+
+    id: str
+    name: str
+    description: str
+    source: Optional[Literal["built-in", "sandbox", "mcp", "plugin", "skill"]] = None
+    availability: Optional[Literal["active", "configured"]] = None
+    connectionId: Optional[str] = None
+    pluginId: Optional[str] = None
+
+
+class AgentCapability(BaseModel):
+    """A user-facing integration grouping its tools at runtime."""
+
+    id: str
+    name: str
+    source: Literal["built-in", "sandbox", "mcp", "plugin", "skill"]
+    connectionId: Optional[str] = None
+    pluginId: Optional[str] = None
+    tools: List[AgentTool]
+
+
+class AgentSkill(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    url: Optional[str] = None
+
+
+class AgentRuntimeConfiguration(BaseModel):
+    systemPrompt: str
+    skills: List[AgentSkill]
+    enabledTools: List[Dict[str, str]] = Field(default_factory=list)
+    sandbox: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentSandboxStatus(BaseModel):
+    provider: str
+    configured: bool
+    status: str
+    message: Optional[str] = None
+    error: Optional[str] = None
 
 
 class LarkupHubClientOptions(BaseModel):

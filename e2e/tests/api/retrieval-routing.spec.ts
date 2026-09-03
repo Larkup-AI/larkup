@@ -6,7 +6,7 @@ import {
   requiresCurrentWebSearch,
   requiresKnowledgeBaseSearch,
   retrievalToolsForStep,
-} from '../../../apps/web/lib/retrieval-routing';
+} from '../../../apps/web/lib/chat/retrieval-routing';
 
 const toolNames = [
   'searchKnowledgeBase',
@@ -37,7 +37,10 @@ test.describe('Retrieval-only chat routing', () => {
         forceWebSearch: false,
         toolNames,
       }),
-    ).toEqual({ toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' } });
+    ).toEqual({
+      toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' },
+      activeTools: ['searchKnowledgeBase'],
+    });
     expect(
       retrievalToolsForStep({
         stepNumber: 1,
@@ -59,7 +62,10 @@ test.describe('Retrieval-only chat routing', () => {
         forceWebSearch: false,
         toolNames,
       }),
-    ).toEqual({ toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' } });
+    ).toEqual({
+      toolChoice: { type: 'tool', toolName: 'searchKnowledgeBase' },
+      activeTools: ['searchKnowledgeBase'],
+    });
     expect(
       retrievalToolsForStep({
         stepNumber: 1,
@@ -85,6 +91,23 @@ test.describe('Retrieval-only chat routing', () => {
     ).toEqual(postRetrievalTools);
   });
 
+  // toolChoice must be explicit 'none' on the final-answer step, not left
+  // implicit: an empty activeTools array paired with the top-level
+  // streamText toolChoice ('auto') left over from earlier in the request
+  // produced a degenerate near-empty model response in production (observed
+  // live: 1 output token, no text) instead of a normal final answer.
+  test('reserves the last step for an answer after one optional analysis step', () => {
+    expect(
+      retrievalToolsForStep({
+        stepNumber: 2,
+        forceKnowledgeBaseSearch: true,
+        forceWebSearch: false,
+        toolNames,
+        finalAnswerStep: 2,
+      }),
+    ).toEqual({ activeTools: [], toolChoice: 'none' });
+  });
+
   test('reuses successful evidence only for clear conversational follow-ups', () => {
     const messages = [
       {
@@ -105,6 +128,22 @@ test.describe('Retrieval-only chat routing', () => {
     expect(isLikelyKnowledgeFollowUp('What about it?')).toBe(true);
     expect(canReuseKnowledgeBaseEvidence('What about it?', messages)).toBe(true);
     expect(canReuseKnowledgeBaseEvidence('What is the Buddy Program?', messages)).toBe(false);
+  });
+
+  test('recognizes JSON-wrapped UI tool results as prior evidence', () => {
+    const messages = [
+      {
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-searchKnowledgeBase',
+            output: { type: 'json', value: { hits: [{ title: 'PDF' }] } },
+          },
+        ],
+      },
+    ];
+
+    expect(canReuseKnowledgeBaseEvidence('What about it?', messages)).toBe(true);
   });
 
   test('does not reuse an empty or failed search result', () => {

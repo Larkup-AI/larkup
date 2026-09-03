@@ -1,6 +1,6 @@
 {
   "name": "@larkup/tool-video-intelligence",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Installable local and cloud video intelligence with evidence-first indexing.",
   "main": "./dist/index.js",
@@ -47,6 +47,7 @@
     "README.md"
   ],
   "scripts": {
+    "dev": "tsc --outDir dist --watch",
     "build": "tsc --outDir dist",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
@@ -61,6 +62,9 @@
     "@larkup/marketplace": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "@larkup/core": "workspace:*"
   },
   "devDependencies": {
     "@larkup/marketplace": "workspace:*",

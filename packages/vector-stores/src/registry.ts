@@ -1,4 +1,4 @@
-import type { IndexType, VectorStoreDescriptor, VectorStoreId } from '@larkup/core/types';
+import type { IndexType, StoreField, VectorStoreDescriptor, VectorStoreId } from './types';
 
 /**
  * Declarative registry of supported vector stores.
@@ -426,7 +426,7 @@ export function visibleFields(
   store: VectorStoreDescriptor,
   values: Record<string, string>,
   indexType?: IndexType,
-): import('@larkup/core/types').StoreField[] {
+): StoreField[] {
   return store.fields.filter((field) => {
     // Sibling-field dependency (e.g. LanceDB mode → local/cloud fields)
     if (field.showWhen) {

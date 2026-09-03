@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Contract tests for the Knowledge Integration OAuth Proxy (plan §10).
- *
- * Covers the properties the threat model (`docs/deploy/larkup-proxy/threat-model.md`)
- * relies on: signed/expiring OAuth state, redirect-origin validation on both
- * legs of the flow, denied-consent handling, and that a token never survives
- * this service past the redirect it is carried in.
+ * Contract tests for the Knowledge Integration OAuth Proxy
  */
 
 const ENV = {

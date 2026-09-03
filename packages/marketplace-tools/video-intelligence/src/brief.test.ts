@@ -21,4 +21,10 @@ describe('createVideoIndexingBrief', () => {
     expect(brief.knownEntities).toEqual(['Red car', 'Driver']);
     expect(brief.retainSourceHours).toBe(720);
   });
+
+  it('keeps a free-form source description without selecting a fixed genre', () => {
+    expect(createVideoIndexingBrief({ contentType: 'microscope experiment log' }).contentType).toBe(
+      'microscope experiment log',
+    );
+  });
 });

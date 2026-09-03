@@ -220,10 +220,8 @@ get_node_semver() {
   echo "${major} ${minor} ${patch}"
 }
 
-# System package managers can install a newer Node.js without changing a shell
-# that is still prioritising nvm, asdf, or an older Homebrew prefix. Prefer a
-# known compatible binary before running npm so node and npm use the same
-# runtime in this process.
+# A package manager can install Node.js 22 while an older nvm, asdf, or
+# Homebrew path still wins. Prefer a known supported runtime before npm runs.
 activate_supported_node() {
   local candidate candidate_dir components major
   local candidates=(
@@ -303,8 +301,6 @@ install_node() {
       brew install "node@${NODEJS_SETUP_MAJOR}"
       brew link --overwrite "node@${NODEJS_SETUP_MAJOR}" 2>/dev/null || true
     else
-      # Use the official archive only when Homebrew is unavailable. The archive
-      # contains both node and npm and works on Intel and Apple Silicon Macs.
       log_info "Homebrew not found — downloading the official Node.js installer..."
       local node_version version_index tmp_tar tmp_extract node_dir
       version_index="$(new_tmp_file)"
@@ -370,11 +366,17 @@ install_node() {
   log_success "Node.js $(node -v) installed"
 }
 
-
+# ── npm prefix setup (avoids sudo npm install -g) ─────────────
+# Running `sudo npm install -g` creates root-owned files in npm's
+# cache that break future installs. Instead, redirect npm's global
+# prefix to a user-writable directory.
 resolve_npm_bin() {
   local prefix
-  prefix="$(npm config get prefix 2>/dev/null || echo "")"
-  [[ -n "$prefix" ]] && echo "${prefix}/bin"
+  prefix="$(npm config get prefix 2>/dev/null || true)"
+  if [[ -n "$prefix" ]]; then
+    echo "${prefix}/bin"
+  fi
+  return 0
 }
 
 configure_npm_globals() {
@@ -510,7 +512,7 @@ install_larkup() {
   local install_log
   install_log="$(new_tmp_file)"
 
-  # Clear corrupted cache 
+  # Clear corrupted cache from previous failed attempts
   npm cache clean --force >/dev/null 2>&1 || true
 
   local exit_code=0
@@ -569,6 +571,8 @@ install_larkup() {
 }
 
 # ── Post-install verification ─────────────────────────────────
+# The #1 real-world failure: npm install succeeds but the binary
+# isn't on PATH. Detect this and give actionable guidance.
 verify_install() {
   if [[ "$DRY_RUN" == "1" ]]; then
     log_dry "Would verify '${BIN_NAME}' is reachable on PATH"

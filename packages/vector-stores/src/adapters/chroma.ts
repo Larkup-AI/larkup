@@ -1,24 +1,6 @@
 import type { QueryHit, VectorRecord, VectorStoreAdapter } from './base';
 
-/**
- * Chroma adapter — self-hosted (client-server) or Chroma Cloud.
- *
- * ── Server (self-hosted) ──────────────────────────────────────────────────
- *   Connects to a running Chroma instance via HTTP (default localhost:8000).
- *   Optionally uses a static auth token for secured servers.
- *
- * ── Cloud (Chroma Cloud) ──────────────────────────────────────────────────
- *   Connects to Chroma Cloud with API key, tenant, and database.
- *
- * ── Features ──────────────────────────────────────────────────────────────
- *   - Collections: getOrCreateCollection with cosine distance
- *   - Metadata filtering: stores text, title, url, source, documentId, chunkIndex
- *   - Full-text search: where_document $contains for hybrid mode
- *   - Distance → score: score = 1 / (1 + distance) for cosine distance
- *
- * The `chromadb` package is imported dynamically so it only fails if the user
- * selects Chroma without installing the optional dependency.
- */
+/** Chroma Cloud and self-hosted adapter. */
 
 interface ChromaConfig {
   mode?: string;
@@ -34,11 +16,11 @@ interface ChromaConfig {
   database?: string;
   /** Collection name */
   collectionName?: string;
-  /** Index type for determining search behavior */
+  /** Search mode. */
   indexType?: string;
 }
 
-/** RRF constant for hybrid merge */
+/** Reciprocal-rank-fusion constant. */
 const RRF_K = 60;
 
 export class ChromaAdapter implements VectorStoreAdapter {
@@ -50,11 +32,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
     this.collectionName = config.collectionName?.trim() || 'documents';
   }
 
-  /**
-   * Lazily connect to the Chroma server or cloud.
-   * The `chromadb` package is dynamically imported to avoid module-eval
-   * failures when the package isn't installed.
-   */
+  /** Lazily load the optional Chroma client. */
   private async getClient(): Promise<any> {
     if (this.client) return this.client;
 
@@ -110,8 +88,6 @@ export class ChromaAdapter implements VectorStoreAdapter {
     return this.collection;
   }
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
-
   async init(_dimensions: number): Promise<void> {
     await this.getCollection();
   }
@@ -136,13 +112,11 @@ export class ChromaAdapter implements VectorStoreAdapter {
     }
   }
 
-  // ── Upsert ─────────────────────────────────────────────────────────────────
-
   async upsert(records: VectorRecord[]): Promise<void> {
     if (records.length === 0) return;
     const collection = await this.getCollection();
 
-    // Chroma's upsert accepts parallel arrays
+    // Chroma expects parallel arrays.
     const ids: string[] = [];
     const embeddings: number[][] = [];
     const documents: string[] = [];
@@ -174,7 +148,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
       chunkIndex: r.chunkIndex,
     };
     if (r.url) meta.url = r.url;
-    // Flatten user metadata (strings/numbers/booleans only — Chroma requirement)
+    // Chroma metadata supports scalar values only.
     if (r.metadata) {
       for (const [k, v] of Object.entries(r.metadata)) {
         if (v === null || v === undefined) continue;
@@ -188,8 +162,6 @@ export class ChromaAdapter implements VectorStoreAdapter {
     return meta;
   }
 
-  // ── Count ──────────────────────────────────────────────────────────────────
-
   async count(): Promise<number | null> {
     try {
       const collection = await this.getCollection();
@@ -199,24 +171,22 @@ export class ChromaAdapter implements VectorStoreAdapter {
     }
   }
 
-  // ── Query ──────────────────────────────────────────────────────────────────
-
   async query(vector: number[], topK: number, queryText?: string): Promise<QueryHit[]> {
     const collection = await this.getCollection();
     const isSemantic = this.config.indexType === 'semantic';
     const isLexical = this.config.indexType === 'lexical';
 
-    // Semantic only
+    // Dense search.
     if (isSemantic || !queryText?.trim()) {
       return this.denseQuery(collection, vector, topK);
     }
 
-    // Lexical only (using Chroma whereDocument full-text substring)
+    // Lexical full-text search.
     if (isLexical) {
       return this.documentQuery(collection, queryText, topK);
     }
 
-    // Hybrid search
+    // Hybrid search.
     const denseHits = await this.denseQuery(collection, vector, topK);
 
     try {
@@ -225,7 +195,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
         return rrfMerge(denseHits, textHits, topK);
       }
     } catch {
-      // Full-text search fallback
+      // Fall back to dense results.
     }
 
     return denseHits;
@@ -264,7 +234,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
 
     return ids.map((id, i) => {
       const meta = (metadatas[i] ?? {}) as Record<string, any>;
-      const score = 1.0; // Exact/lexical matches get max base score before RRF
+      const score = 1.0; // Exact lexical matches get the maximum base score.
 
       const { title, url, source, documentId, chunkIndex, ...customMetadata } = meta;
 
@@ -291,7 +261,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
     return ids.map((id, i) => {
       const meta = (metadatas[i] ?? {}) as Record<string, any>;
       const distance = distances[i] ?? 0;
-      // Convert to a similarity score
+      // Convert distance to similarity.
       const score = 1 / (1 + distance);
 
       const { title, url, source, documentId, chunkIndex, ...customMetadata } = meta;
@@ -307,8 +277,6 @@ export class ChromaAdapter implements VectorStoreAdapter {
       };
     });
   }
-
-  // ── Connection test ────────────────────────────────────────────────────────
 
   async testConnection(_dimensions: number): Promise<void> {
     let client: any;
@@ -352,7 +320,7 @@ export class ChromaAdapter implements VectorStoreAdapter {
   }
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// Result helpers.
 
 function rrfMerge(denseHits: QueryHit[], sparseHits: QueryHit[], topK: number): QueryHit[] {
   const scores = new Map<string, { hit: QueryHit; score: number }>();

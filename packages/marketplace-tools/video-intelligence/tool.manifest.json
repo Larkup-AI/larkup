@@ -7,18 +7,18 @@
   "description": "Help your AI understand your videos, so you can ask questions and get answers from the right moments.",
   "longDescription": "Turn videos into knowledge your AI can understand. It listens to what is said, reads what appears on screen, and helps you find the moments that matter.",
   "category": "media",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "pricing": "free",
   "emoji": "🎥",
   "icon": "Film",
   "packageName": "@larkup/tool-video-intelligence",
-  "installSize": "~120 KB client; ~8 GB optional runtime image",
+  "installSize": "~120 KB",
   "requiresSandbox": false,
   "author": "Larkup",
   "capabilities": [
     "video-indexing",
     "video-indexing-brief",
-    "full-frame-coverage",
+    "agentic-video-indexing",
     "cloud-video-runtime",
     "timestamped-transcription",
     "ocr",
@@ -43,15 +43,15 @@
         "requiresGpu": true
       },
       {
-        "id": "local-docker",
-        "label": "Local Docker runtime",
+        "id": "local",
+        "label": "Local runtime",
         "icon": "/docker.png",
-        "description": "Run the Video Intelligence image on this computer or your private network.",
+        "description": "Run the application locally on your computer.",
         "endpointConfigKey": "localRuntimeUrl",
         "credentialConfigKey": "localRuntimeApiKey",
         "image": "ghcr.io/larkup-ai/video-intelligence:0.1.0",
         "composeFile": "compose.yaml",
-        "setupNotice": "The optional runtime image is about 8 GB and Docker Desktop must be installed. The service binds to the configured URL; protect it before sharing it on your network."
+        "setupNotice": "The local application and its models download to this computer. The initial download can be large."
       },
       {
         "id": "custom-remote",
@@ -73,21 +73,50 @@
         "description": "Minutes of source media indexed."
       },
       {
-        "id": "deep-inspection-minute",
+        "id": "thorough-inspection-minute",
         "unit": "minute",
-        "description": "Minutes decoded with deep or full coverage."
+        "description": "Minutes inspected with Thorough agent coverage."
       },
-      { "id": "gpu-second", "unit": "second", "description": "GPU worker time used." },
-      { "id": "ocr-frame", "unit": "frame", "description": "Frames sent through OCR." }
+      {
+        "id": "gpu-second",
+        "unit": "second",
+        "description": "GPU worker time used."
+      },
+      {
+        "id": "ocr-frame",
+        "unit": "frame",
+        "description": "Frames sent through OCR."
+      }
     ]
   },
   "usage": {
     "label": "Usage this month",
     "visibleWhenRuntimeMode": ["managed-cloud"],
+    "visualization": {
+      "usedKey": "sourceMinutesUsed",
+      "limitKey": "sourceMinutesLimit"
+    },
+    "support": {
+      "contactLabel": "Request more usage",
+      "description": "Each installation receives Cloud access automatically. Request more video-processing usage when your allowance is low.",
+      "userIdConfigKey": "cloudInstallationId"
+    },
     "fields": [
-      { "key": "sourceMinutesUsed", "label": "Used", "format": "minutes" },
-      { "key": "sourceMinutesLimit", "label": "Included", "format": "minutes" },
-      { "key": "activeJobs", "label": "Active jobs", "format": "number" }
+      {
+        "key": "sourceMinutesUsed",
+        "label": "Used",
+        "format": "minutes"
+      },
+      {
+        "key": "sourceMinutesLimit",
+        "label": "Included",
+        "format": "minutes"
+      },
+      {
+        "key": "activeJobs",
+        "label": "Active jobs",
+        "format": "number"
+      }
     ]
   },
   "ui": {
@@ -96,8 +125,88 @@
       {
         "id": "video-indexing-brief",
         "slot": "data-indexing",
-        "title": "Guide video indexing",
-        "entrypoint": "./ui"
+        "title": "Let your AI understand this video",
+        "entrypoint": "./ui",
+        "appliesTo": ["video"],
+        "description": "Choose how deeply to analyze it and optionally point it to what matters most.",
+        "estimate": {
+          "modeField": "indexingMode",
+          "variants": [
+            {
+              "value": "fast",
+              "analyzedFramesPerSourceMinute": 5,
+              "ocrFramesPerSourceMinute": 3,
+              "processingSecondsPerSourceMinute": 4,
+              "maxProcessingSecondsPerSourceMinute": 5,
+              "fixedOverheadSeconds": 60,
+              "maxFixedOverheadSeconds": 60,
+              "creditsPerSourceMinute": 1
+            },
+            {
+              "value": "balanced",
+              "analyzedFramesPerSourceMinute": 12,
+              "ocrFramesPerSourceMinute": 8,
+              "processingSecondsPerSourceMinute": 16,
+              "maxProcessingSecondsPerSourceMinute": 30,
+              "fixedOverheadSeconds": 120,
+              "maxFixedOverheadSeconds": 240,
+              "creditsPerSourceMinute": 2
+            },
+            {
+              "value": "thorough",
+              "analyzedFramesPerSourceMinute": 30,
+              "ocrFramesPerSourceMinute": 20,
+              "processingSecondsPerSourceMinute": 32,
+              "maxProcessingSecondsPerSourceMinute": 60,
+              "fixedOverheadSeconds": 180,
+              "maxFixedOverheadSeconds": 360,
+              "creditsPerSourceMinute": 4
+            }
+          ]
+        },
+        "form": {
+          "submitLabel": "Start indexing",
+          "fields": [
+            {
+              "key": "goal",
+              "type": "textarea",
+              "label": "What should your AI look for? (optional)",
+              "placeholder": "For example: find the final score, the moment the package is dropped, or every mention of pricing."
+            },
+            {
+              "key": "indexingMode",
+              "type": "select",
+              "label": "Coverage",
+              "defaultValue": "balanced",
+              "options": [
+                {
+                  "label": "Fast",
+                  "value": "fast",
+                  "description": "Sample key frames for a quick overview.",
+                  "setValues": {
+                    "processingAuthorityConfirmed": false
+                  }
+                },
+                {
+                  "label": "Balanced",
+                  "value": "balanced",
+                  "description": "Sample visual and OCR evidence across the video.",
+                  "setValues": {
+                    "processingAuthorityConfirmed": false
+                  }
+                },
+                {
+                  "label": "Thorough",
+                  "value": "thorough",
+                  "description": "Let the agent inspect denser evidence around subtle or infrequent details.",
+                  "setValues": {
+                    "processingAuthorityConfirmed": false
+                  }
+                }
+              ]
+            }
+          ]
+        }
       },
       {
         "id": "video-evidence-result",
@@ -114,7 +223,7 @@
       "type": "select",
       "group": "Runtime",
       "defaultValue": "managed-cloud",
-      "help": "Choose the managed Larkup Cloud service, a local Docker runtime, or your own compatible deployment.",
+      "help": "Choose managed Larkup Cloud, a local runtime that automatically selects Docker or native, or your own compatible deployment.",
       "options": [
         {
           "label": "Larkup Cloud",
@@ -123,10 +232,10 @@
           "description": "Managed GPU capacity and automatic device access."
         },
         {
-          "label": "Local Docker runtime",
-          "value": "local-docker",
+          "label": "Local runtime",
+          "value": "local",
           "icon": "/docker.png",
-          "description": "Run the optional image on this computer."
+          "description": "Run the application locally on your computer."
         },
         {
           "label": "Custom runtime",
@@ -152,7 +261,10 @@
           "runtimeMode": "runtimeMode"
         }
       },
-      "visibleWhen": { "field": "runtimeMode", "equals": "local-docker" }
+      "visibleWhen": {
+        "field": "runtimeMode",
+        "equals": "local"
+      }
     },
     {
       "key": "localRuntimeApiKey",
@@ -160,7 +272,212 @@
       "type": "password",
       "group": "Local runtime",
       "help": "Optional bearer key to use when your local runtime authentication is enabled. Share it only with trusted users on your private network.",
-      "visibleWhen": { "field": "runtimeMode", "equals": "local-docker" }
+      "visibleWhen": {
+        "field": "runtimeMode",
+        "equals": "local"
+      }
+    },
+    {
+      "key": "videoVisionProvider",
+      "label": "Vision provider",
+      "type": "select",
+      "group": "Video understanding",
+      "defaultValue": "vercel_ai_gateway",
+      "defaultFromGlobalConfigKey": "visionProvider",
+      "help": "Defaults to your saved AI Models vision provider. Choose another provider here only for this tool.",
+      "options": [
+        {
+          "label": "Use AI Models",
+          "value": "auto",
+          "description": "Follow the workspace Vision Model setting."
+        },
+        {
+          "label": "Google Gemini",
+          "value": "google",
+          "icon": "/icons/gemini.svg",
+          "description": "Use Gemini directly with a Google API key."
+        },
+        {
+          "label": "Vercel AI Gateway",
+          "value": "vercel_ai_gateway",
+          "icon": "/icons/vercel.svg",
+          "description": "Use a Gateway vision model and key."
+        },
+        {
+          "label": "OpenAI",
+          "value": "openai",
+          "icon": "/icons/openai.svg",
+          "description": "Use an OpenAI vision model directly."
+        }
+      ]
+    },
+    {
+      "key": "videoVisionApiKey",
+      "label": "Vision provider API key",
+      "type": "password",
+      "group": "Video understanding",
+      "help": "Optional tool override. Leave empty to use the matching provider key from AI Models; it is forwarded only for the active job."
+    },
+    {
+      "key": "semanticVisionModel",
+      "label": "Video vision model",
+      "type": "select",
+      "group": "Video understanding",
+      "defaultValue": "google/gemini-3.6-flash",
+      "defaultFromGlobalConfigKey": "visionModelId",
+      "providerField": "videoVisionProvider",
+      "defaultValueByProvider": {
+        "auto": "auto",
+        "google": "google/gemini-3.6-flash",
+        "vercel_ai_gateway": "google/gemini-3.6-flash",
+        "openai": "openai/gpt-4o-mini"
+      },
+      "help": "Defaults to the Vision Model in AI Models. Choose another video-capable model to override it only for this tool.",
+      "verification": {
+        "endpoint": "/api/tools/video-intelligence/verify",
+        "method": "POST",
+        "fields": {
+          "videoVisionProvider": "videoVisionProvider",
+          "videoVisionApiKey": "videoVisionApiKey",
+          "semanticVisionModel": "semanticVisionModel"
+        }
+      },
+      "options": [
+        {
+          "label": "Use AI Models",
+          "value": "auto",
+          "description": "Follow the workspace Vision Model setting."
+        },
+        {
+          "label": "Gemini 3.6 Flash",
+          "value": "google/gemini-3.6-flash",
+          "icon": "/icons/gemini.svg",
+          "description": "Current Google multimodal model for video understanding."
+        },
+        {
+          "label": "Gemini 3.5 Flash",
+          "value": "google/gemini-3.5-flash",
+          "icon": "/icons/gemini.svg",
+          "description": "Fast video and image understanding."
+        },
+        {
+          "label": "GPT-4o mini",
+          "value": "openai/gpt-4o-mini",
+          "icon": "/icons/openai.svg",
+          "description": "Efficient OpenAI vision model."
+        }
+      ]
+    },
+    {
+      "key": "videoAgentProvider",
+      "label": "Agent provider",
+      "type": "select",
+      "group": "Agent planning",
+      "defaultValue": "vercel_ai_gateway",
+      "defaultFromGlobalConfigKey": "chatProvider",
+      "help": "Defaults to your saved AI Models chat provider. Choose another provider here only for this tool.",
+      "options": [
+        {
+          "label": "Use AI Models",
+          "value": "auto",
+          "description": "Follow the workspace Chat Model setting."
+        },
+        { "label": "Google Gemini", "value": "google", "icon": "/icons/gemini.svg" },
+        { "label": "Vercel AI Gateway", "value": "vercel_ai_gateway", "icon": "/icons/vercel.svg" },
+        { "label": "OpenAI", "value": "openai", "icon": "/icons/openai.svg" },
+        {
+          "label": "DeepSeek",
+          "value": "deepseek",
+          "icon": "https://models.dev/logos/deepseek.svg"
+        },
+        {
+          "label": "Anthropic",
+          "value": "anthropic",
+          "icon": "https://models.dev/logos/anthropic.svg"
+        },
+        { "label": "Mistral", "value": "mistral", "icon": "https://models.dev/logos/mistral.svg" },
+        { "label": "Cohere", "value": "cohere", "icon": "https://models.dev/logos/cohere.svg" }
+      ]
+    },
+    {
+      "key": "videoAgentApiKey",
+      "label": "Agent provider API key",
+      "type": "password",
+      "group": "Agent planning",
+      "help": "Optional tool override. Leave empty to use the matching chat-provider key from AI Models; it is forwarded only for the active job."
+    },
+    {
+      "key": "agentModel",
+      "label": "Agent / tool-brain model",
+      "type": "select",
+      "group": "Agent planning",
+      "defaultValue": "openai/gpt-5-mini",
+      "defaultFromGlobalConfigKey": "chatModelId",
+      "providerField": "videoAgentProvider",
+      "defaultValueByProvider": {
+        "auto": "auto",
+        "google": "google/gemini-3.5-flash-lite",
+        "vercel_ai_gateway": "openai/gpt-5-mini",
+        "openai": "openai/gpt-5-mini",
+        "deepseek": "deepseek/deepseek-v3.2",
+        "anthropic": "anthropic/claude-sonnet-4",
+        "mistral": "mistral/mistral-large-3",
+        "cohere": "cohere/command-a"
+      },
+      "help": "Defaults to the Chat Model in AI Models. Choose another model to override it only for video planning and synthesis.",
+      "verification": {
+        "endpoint": "/api/tools/video-intelligence/verify",
+        "method": "POST",
+        "fields": {
+          "videoAgentProvider": "videoAgentProvider",
+          "videoAgentApiKey": "videoAgentApiKey",
+          "agentModel": "agentModel"
+        }
+      },
+      "options": [
+        {
+          "label": "Use AI Models",
+          "value": "auto",
+          "description": "Follow the workspace Chat Model setting."
+        },
+        {
+          "label": "Gemini 3.5 Flash Lite",
+          "value": "google/gemini-3.5-flash-lite",
+          "icon": "/icons/gemini.svg"
+        },
+        {
+          "label": "Gemini 3.6 Flash",
+          "value": "google/gemini-3.6-flash",
+          "icon": "/icons/gemini.svg"
+        },
+        { "label": "GPT-5 mini", "value": "openai/gpt-5-mini", "icon": "/icons/openai.svg" },
+        { "label": "GPT-5.2", "value": "openai/gpt-5.2", "icon": "/icons/openai.svg" },
+        {
+          "label": "DeepSeek V3.2",
+          "value": "deepseek/deepseek-v3.2",
+          "icon": "https://models.dev/logos/deepseek.svg"
+        },
+        {
+          "label": "DeepSeek V4 Pro",
+          "value": "deepseek/deepseek-v4-pro",
+          "icon": "https://models.dev/logos/deepseek.svg"
+        },
+        {
+          "label": "Claude Sonnet 4",
+          "value": "anthropic/claude-sonnet-4",
+          "icon": "https://models.dev/logos/anthropic.svg"
+        },
+        {
+          "label": "Mistral Large 3",
+          "value": "mistral/mistral-large-3",
+          "icon": "https://models.dev/logos/mistral.svg"
+        },
+        {
+          "label": "Command A",
+          "value": "cohere/command-a",
+          "icon": "https://models.dev/logos/cohere.svg"
+        }
+      ]
     },
     {
       "key": "customRuntimeUrl",
@@ -178,7 +495,10 @@
           "runtimeMode": "runtimeMode"
         }
       },
-      "visibleWhen": { "field": "runtimeMode", "equals": "custom-remote" }
+      "visibleWhen": {
+        "field": "runtimeMode",
+        "equals": "custom-remote"
+      }
     },
     {
       "key": "customRuntimeApiKey",
@@ -186,23 +506,19 @@
       "type": "password",
       "group": "Custom runtime",
       "required": true,
-      "visibleWhen": { "field": "runtimeMode", "equals": "custom-remote" }
+      "visibleWhen": {
+        "field": "runtimeMode",
+        "equals": "custom-remote"
+      }
     },
     {
       "key": "audioProvider",
       "label": "Audio provider",
       "type": "select",
       "group": "Audio",
-      "defaultValue": "larkup-cloud",
-      "help": "Select the speech service used for the managed Larkup Cloud audio track.",
-      "visibleWhen": { "field": "runtimeMode", "equals": "managed-cloud" },
+      "defaultValue": "deepgram",
+      "help": "Required for every runtime. Transcription is billed directly to your selected provider; Larkup Cloud does not supply audio-model credits.",
       "options": [
-        {
-          "label": "Larkup Cloud (recommended)",
-          "value": "larkup-cloud",
-          "icon": "/logo.png",
-          "description": "Managed multilingual transcription on the video GPU pipeline."
-        },
         {
           "label": "OpenAI",
           "value": "openai",
@@ -234,11 +550,14 @@
       "label": "Audio provider API key",
       "type": "password",
       "group": "Audio",
-      "help": "Only required when you select your own provider. It stays separate from the managed Larkup Cloud connection.",
+      "help": "Required. It stays in this installation and is forwarded only for the active video job.",
       "verification": {
-        "endpoint": "/api/config/verify",
+        "endpoint": "/api/tools/video-intelligence/verify",
         "method": "POST",
-        "fields": { "audioProvider": "audioProvider", "audioApiKey": "audioApiKey" }
+        "fields": {
+          "audioProvider": "audioProvider",
+          "audioApiKey": "audioApiKey"
+        }
       },
       "visibleWhen": {
         "field": "audioProvider",
@@ -252,19 +571,30 @@
       "group": "Indexing",
       "defaultValue": "balanced",
       "options": [
-        { "label": "Fast", "value": "fast" },
-        { "label": "Balanced", "value": "balanced" },
-        { "label": "Deep", "value": "deep" },
-        { "label": "Full coverage", "value": "full-coverage" }
+        {
+          "label": "Fast",
+          "value": "fast"
+        },
+        {
+          "label": "Balanced",
+          "value": "balanced"
+        },
+        {
+          "label": "Thorough",
+          "value": "thorough"
+        }
       ]
     },
     {
       "key": "cloudAccessKey",
-      "label": "Managed cloud access key",
+      "label": "Larkup Cloud API key",
       "type": "password",
       "group": "Managed cloud connection",
-      "help": "Provisioned automatically on first use; never entered or shown to a client.",
-      "serverManaged": true
+      "help": "Paste the key Larkup provides for managed cloud access. Leave this empty only when automatic project provisioning is enabled.",
+      "visibleWhen": {
+        "field": "runtimeMode",
+        "equals": "managed-cloud"
+      }
     },
     {
       "key": "cloudInstallationId",

@@ -3,10 +3,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type { ParsedDocument, DocumentField, FieldEdit } from '@larkup/tool-doc-editor/types';
 
-/* ------------------------------------------------------------------ */
-/* Types                                                               */
-/* ------------------------------------------------------------------ */
-
 interface DocEditorState {
   /** Whether the canvas split-view is open */
   isCanvasOpen: boolean;
@@ -62,10 +58,6 @@ interface DocEditorActions {
 
 type DocEditorContext = DocEditorState & DocEditorActions;
 
-/* ------------------------------------------------------------------ */
-/* Context                                                             */
-/* ------------------------------------------------------------------ */
-
 const DocEditorCtx = createContext<DocEditorContext | null>(null);
 
 export function useDocEditor(): DocEditorContext {
@@ -75,10 +67,6 @@ export function useDocEditor(): DocEditorContext {
   }
   return ctx;
 }
-
-/* ------------------------------------------------------------------ */
-/* Provider                                                            */
-/* ------------------------------------------------------------------ */
 
 export function DocEditorProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DocEditorState>({

@@ -4,8 +4,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   describeActiveMediaStep,
+  estimateMediaStepRemainingSeconds,
+  mediaProcessingStartedAt,
   primaryRunningMediaStep,
-} from '../../../apps/web/lib/media-progress';
+} from '../../../apps/web/lib/media/progress';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -23,6 +25,43 @@ test.describe('media indexing progress', () => {
     );
   });
 
+  test('uses the current processing attempt as the elapsed-time baseline after retry', () => {
+    expect(
+      mediaProcessingStartedAt({
+        createdAt: '2026-01-01T00:00:00.000Z',
+        processingStartedAt: '2026-01-01T01:00:00.000Z',
+      }),
+    ).toBe('2026-01-01T01:00:00.000Z');
+    expect(mediaProcessingStartedAt({ createdAt: '2026-01-01T00:00:00.000Z' })).toBe(
+      '2026-01-01T00:00:00.000Z',
+    );
+  });
+
+  test('counts down the runtime ETA only between fresh worker heartbeats', () => {
+    expect(
+      estimateMediaStepRemainingSeconds(
+        {
+          stage: 'vision',
+          status: 'running',
+          estimatedRemainingSeconds: 180,
+          updatedAt: '2026-09-01T10:00:00.000Z',
+        },
+        new Date('2026-09-01T10:00:10.000Z').getTime(),
+      ),
+    ).toBe(170);
+    expect(
+      estimateMediaStepRemainingSeconds(
+        {
+          stage: 'vision',
+          status: 'running',
+          estimatedRemainingSeconds: 180,
+          updatedAt: '2026-09-01T10:00:00.000Z',
+        },
+        new Date('2026-09-01T10:00:30.000Z').getTime(),
+      ),
+    ).toBeNull();
+  });
+
   test('renders one primary progress bar for each active job card', async () => {
     const source = await readFile(
       path.join(repoRoot, 'apps/web/components/data/media-panel.tsx'),
@@ -32,7 +71,14 @@ test.describe('media indexing progress', () => {
       source.indexOf('function ActiveIndexingList'),
       source.indexOf('function ActiveIndexingDescription'),
     );
+    const liveProgress = await readFile(
+      path.join(repoRoot, 'apps/web/components/data/live-media-progress.tsx'),
+      'utf8',
+    );
     expect(activeList).toContain('<ActiveIndexingDescription asset={asset} />');
-    expect(activeList).not.toContain('Overall indexing progress');
+    expect(activeList).toContain('<LiveMediaProgress');
+    expect(liveProgress).toContain('aria-label={label}');
+    expect(liveProgress).toContain('data-testid="live-indexing-progress-pulse"');
+    expect(liveProgress).toContain('`${formatted}% progress, worker activity`');
   });
 });

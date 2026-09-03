@@ -57,7 +57,7 @@ test.describe('Larkup CLI', () => {
   });
 
   test('initializes and loads a folder without indexing', () => {
-    expect(cli(['init', 'CLI E2E'])).toContain('Created server');
+    expect(cli(['init', 'CLI E2E'])).toContain('Created Project');
     expect(cli(['index', './knowledge', '--no-run'])).toContain('Loaded 2 documents');
 
     const config = cli(['config']);

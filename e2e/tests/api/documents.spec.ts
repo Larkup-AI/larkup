@@ -9,6 +9,44 @@ async function isDataAddingBlocked(request: APIRequestContext) {
 test.describe('Documents API (/api/documents)', () => {
   let createdDocId: string | null = null;
 
+  test('POST keeps a source linked to its selected group', async ({ request }) => {
+    test.skip(
+      await isDataAddingBlocked(request),
+      'Embedding credentials are required before adding data',
+    );
+
+    const groupResponse = await request.post('/api/groups', {
+      data: { name: `E2E group ${Date.now()}`, icon: '◆' },
+    });
+    expect(groupResponse.status()).toBe(201);
+    const group = (await groupResponse.json()).group as { id: string };
+
+    let documentId: string | undefined;
+    try {
+      const createResponse = await request.post('/api/documents', {
+        data: {
+          title: 'Grouped E2E document',
+          content: TEST_PASTE_TEXT,
+          source: 'paste',
+          groupId: group.id,
+        },
+      });
+      expect(createResponse.status()).toBe(201);
+      const document = (await createResponse.json()).document as { id: string; groupId: string };
+      documentId = document.id;
+      expect(document.groupId).toBe(group.id);
+
+      const malformedGroupResponse = await request.patch('/api/documents', {
+        data: { id: document.id, groupId: 'undefined' },
+      });
+      expect(malformedGroupResponse.status()).toBe(200);
+      expect((await malformedGroupResponse.json()).document.groupId).toBe('default');
+    } finally {
+      if (documentId) await request.delete(`/api/documents?id=${documentId}`).catch(() => {});
+      await request.delete(`/api/groups?id=${group.id}`).catch(() => {});
+    }
+  });
+
   test('POST /api/documents — blocks valid documents without embedding credentials', async ({
     request,
   }) => {
@@ -137,7 +175,18 @@ test.describe('Documents API (/api/documents)', () => {
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
+    const remaining = await request.get('/api/documents');
+    expect(remaining.status()).toBe(200);
+    expect((await remaining.json()).documents).not.toContainEqual(
+      expect.objectContaining({ id: document.id }),
+    );
     console.log(`  ✓ Document deleted: ${document.id}`);
+  });
+
+  test('DELETE /api/documents?id=x — missing document returns 404', async ({ request }) => {
+    const res = await request.delete('/api/documents?id=does-not-exist');
+    expect(res.status()).toBe(404);
+    expect((await res.json()).error).toContain('not found');
   });
 
   test('DELETE /api/documents?ids=a,b — delete multiple', async ({ request }) => {

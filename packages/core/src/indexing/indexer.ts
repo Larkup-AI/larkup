@@ -78,7 +78,7 @@ export async function runIndexer(
 ): Promise<void> {
   const started = Date.now();
   const patchRun = async (patch: Partial<IndexRun>) => {
-    const updated = await patchStoredRun(patch, runId);
+    const updated = await patchStoredRun(patch, runId, true);
     if (!updated) throw new Error('This index run no longer owns the active index lease.');
     return updated;
   };

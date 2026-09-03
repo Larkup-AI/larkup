@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { formatErrorMessage } from '@/lib/error-formatter';
+import { formatErrorMessage } from '@/lib/shared/error-formatter';
 import {
   FileUp,
   Loader2,
@@ -12,6 +12,7 @@ import {
   Plus,
   Database,
   Image as ImageIcon,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const ACCEPT = '.txt,.md,.markdown,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx';
@@ -68,26 +70,98 @@ interface StagedFile {
   fileObject?: File;
 }
 
+interface ImageIndexingCapability {
+  available: boolean;
+  message?: string;
+}
+
 let globalStagedFiles: StagedFile[] = [];
+const UPLOAD_QUEUE_KEY = 'larkup.upload-queue.v1';
+
+function restoreQueue(): StagedFile[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const saved = sessionStorage.getItem(UPLOAD_QUEUE_KEY);
+    return saved ? (JSON.parse(saved) as StagedFile[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistQueue(files: StagedFile[]) {
+  try {
+    const serializable = files.map(({ fileObject: _fileObject, ...file }) => file);
+    sessionStorage.setItem(UPLOAD_QUEUE_KEY, JSON.stringify(serializable));
+  } catch {}
+}
 
 export function UploadPanel({
   onAdded,
   onActionChange,
+  groupId,
 }: {
   onAdded: () => void;
   onActionChange?: (action: DataPrimaryAction | null) => void;
+  groupId?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [staged, setStagedState] = useState<StagedFile[]>(globalStagedFiles);
+  const [staged, setStagedState] = useState<StagedFile[]>(() =>
+    globalStagedFiles.length ? globalStagedFiles : restoreQueue(),
+  );
   const [indexAllImages, setIndexAllImages] = useState(false);
+  const [imageIndexingCapability, setImageIndexingCapability] =
+    useState<ImageIndexingCapability | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void fetch('/api/config')
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((data) => {
+        if (!active) return;
+        const capability = data?.capabilities?.imageIndexing;
+        setImageIndexingCapability(
+          capability?.available
+            ? { available: true }
+            : {
+                available: false,
+                message:
+                  capability?.message ??
+                  'No vision-capable model is configured. PDF images will not be indexed.',
+              },
+        );
+      })
+      .catch(() => {
+        if (active) {
+          setImageIndexingCapability({
+            available: false,
+            message: 'Could not verify a vision model. PDF images will not be indexed.',
+          });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const setStaged = (val: React.SetStateAction<StagedFile[]>) => {
     setStagedState((prev) => {
       const next = typeof val === 'function' ? (val as Function)(prev) : val;
       globalStagedFiles = next;
+      persistQueue(next);
       return next;
     });
   };
+  const imageIndexingAvailable = imageIndexingCapability?.available === true;
+
+  useEffect(() => {
+    if (!imageIndexingCapability || imageIndexingCapability.available) return;
+    setIndexAllImages(false);
+    setStaged((files) =>
+      files.map((file) =>
+        file.name.toLowerCase().endsWith('.pdf') ? { ...file, indexImages: false } : file,
+      ),
+    );
+  }, [imageIndexingCapability]);
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<{
@@ -232,10 +306,7 @@ export function UploadPanel({
             format: 'plain',
             rawContent: text,
             fileObject: file,
-            // PDF diagrams are often embedded alongside ordinary text. Keep
-            // visual indexing on by default, with the existing per-file toggle
-            // available for users who only want text extraction.
-            indexImages: true,
+            indexImages: indexAllImages,
           });
         } else {
           const content = await file.text();
@@ -259,9 +330,10 @@ export function UploadPanel({
     setSaving(true);
     let ok = 0;
 
+    const filesToIngest = [...staged];
     const payloads: any[] = [];
 
-    for (const f of staged) {
+    for (const f of filesToIngest) {
       if (f.format === 'structured' && f.rows && f.indexAsTabular) {
         try {
           const res = await fetch('/api/tabular', {
@@ -282,7 +354,7 @@ export function UploadPanel({
     }
 
     // Then: create document payloads
-    for (const f of staged) {
+    for (const f of filesToIngest) {
       if (f.format === 'plain' && (f.rawContent || f.name.toLowerCase().endsWith('.pdf'))) {
         let fileUrl = undefined;
         // Upload the physical file so chat can link to it
@@ -305,12 +377,18 @@ export function UploadPanel({
 
         const hasText = f.rawContent && f.rawContent.trim().length > 0;
         const uploadedImages: any[] = [];
+        let skippedImageCount = 0;
 
         // Extract images if requested (for PDFs)
-        if (f.indexImages && f.fileObject && f.name.toLowerCase().endsWith('.pdf')) {
+        if (
+          f.indexImages &&
+          imageIndexingAvailable &&
+          f.fileObject &&
+          f.name.toLowerCase().endsWith('.pdf')
+        ) {
           try {
             setProgress({ message: `Extracting images from ${f.name}...`, current: 0, total: 100 });
-            const { extractImagesFromPDF } = await import('@/lib/pdf-images');
+            const { extractImagesFromPDF } = await import('@/lib/media/pdf');
             const images = await extractImagesFromPDF(f.fileObject);
             const BATCH_SIZE = 5;
             for (let i = 0; i < images.length; i += BATCH_SIZE) {
@@ -362,18 +440,27 @@ export function UploadPanel({
                       console.error('Failed to describe image:', e);
                     }
 
-                    uploadedImages.push({
-                      imageUrl: url,
-                      pageNumber: img.pageNumber,
-                      index: img.index,
-                      description,
-                    });
+                    if (description.trim()) {
+                      uploadedImages.push({
+                        imageUrl: url,
+                        pageNumber: img.pageNumber,
+                        index: img.index,
+                        description,
+                      });
+                    } else {
+                      skippedImageCount++;
+                    }
                   }
                 }),
               );
             }
             // Ensure images remain in original order after concurrent processing
             uploadedImages.sort((a, b) => a.index - b.index);
+            if (skippedImageCount > 0) {
+              toast.warning(
+                `${skippedImageCount} image${skippedImageCount === 1 ? '' : 's'} from ${f.name} could not be analyzed and were not indexed.`,
+              );
+            }
           } catch (err) {
             console.error('Failed to extract images from PDF:', err);
           }
@@ -412,56 +499,27 @@ export function UploadPanel({
           });
         }
       } else if (f.format === 'lines' && f.rawContent) {
-        const lines = f.rawContent
-          .split(/\r?\n/)
-          .map((l) => l.trim())
-          .filter(Boolean);
-        lines.forEach((line, i) => {
-          payloads.push({
-            title: `${f.name} - Line ${i + 1}`,
-            content: line,
-            source: 'files',
-          });
+        payloads.push({
+          title: f.name,
+          content: f.rawContent,
+          source: 'files',
+          metadata: { fileName: f.name, format: 'lines' },
         });
       } else if (f.format === 'structured' && f.rows) {
-        for (let i = 0; i < f.rows.length; i++) {
-          const row = f.rows[i];
-          const title = f.titleKey ? String(row[f.titleKey] || `Row ${i + 1}`) : `Row ${i + 1}`;
-
-          let content = '';
-          if (f.contentKeys && f.contentKeys.length > 0) {
-            content = f.contentKeys
-              .map((k) => `${k}: ${String(row[k] || '')}`)
-              .filter(Boolean)
-              .join(f.contentSeparator || ' | ');
-          } else {
-            content = Object.entries(row)
-              .map(([k, v]) => `${k}: ${v}`)
-              .join(' | ');
-          }
-
-          const metadata: Record<string, any> = {};
-          if (f.metadataKeys) {
-            for (const mk of f.metadataKeys) {
-              metadata[mk] = row[mk];
-            }
-          }
-          if (f.globalMetadata) {
-            for (const gm of f.globalMetadata) {
-              if (gm.key.trim()) {
-                metadata[gm.key.trim()] = gm.value;
-              }
-            }
-          }
-
-          if (content.trim()) {
-            payloads.push({
-              title,
-              content,
-              metadata,
-              source: 'files',
-            });
-          }
+        const rows = f.rows
+          .map((row) => {
+            const fields = f.contentKeys?.length
+              ? f.contentKeys.map((key) => `${key}: ${String(row[key] ?? '')}`)
+              : Object.entries(row).map(([key, value]) => `${key}: ${String(value ?? '')}`);
+            return fields.join(f.contentSeparator || ' | ');
+          })
+          .filter(Boolean);
+        const metadata: Record<string, unknown> = { fileName: f.name, rowCount: f.rows.length };
+        for (const item of f.globalMetadata ?? []) {
+          if (item.key.trim()) metadata[item.key.trim()] = item.value;
+        }
+        if (rows.length) {
+          payloads.push({ title: f.name, content: rows.join('\n'), metadata, source: 'files' });
         }
       }
     }
@@ -473,7 +531,7 @@ export function UploadPanel({
         const res = await fetch('/api/documents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(p),
+          body: JSON.stringify({ ...p, groupId }),
         });
         if (res.ok) ok++;
       } catch {
@@ -486,11 +544,19 @@ export function UploadPanel({
       });
     }
 
-    const stagedCount = staged.length;
+    const stagedCount = filesToIngest.length;
     setSaving(false);
     setProgress(null);
-    globalStagedFiles = [];
-    setStaged([]);
+    setStaged((prev) => {
+      const remaining = prev.filter((p) => !filesToIngest.some((i) => i.id === p.id));
+      globalStagedFiles = remaining;
+      if (remaining.length === 0) {
+        sessionStorage.removeItem(UPLOAD_QUEUE_KEY);
+      } else {
+        persistQueue(remaining);
+      }
+      return remaining;
+    });
 
     // Also explicitly clear the input value just in case
     if (inputRef.current) {
@@ -513,12 +579,12 @@ export function UploadPanel({
     onActionChange?.({
       label:
         staged.length === 0
-          ? 'Add files'
+          ? 'Save to corpus'
           : staged.length === 1
-          ? 'Add file'
-          : `Add ${staged.length} files`,
+            ? 'Save 1 file'
+            : `Save ${staged.length} files`,
       onClick: ingest,
-      disabled: staged.length === 0,
+      disabled: staged.length === 0 || saving,
       loading: saving,
     });
     return () => onActionChange?.(null);
@@ -568,6 +634,18 @@ export function UploadPanel({
 
       {staged.length > 0 && (
         <div className="space-y-2">
+          {staged.some((file) => file.name.toLowerCase().endsWith('.pdf')) &&
+            imageIndexingCapability &&
+            !imageIndexingAvailable && (
+              <Alert className="border-amber-500/30 bg-amber-500/5">
+                <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
+                <AlertTitle>PDF image indexing is unavailable</AlertTitle>
+                <AlertDescription>
+                  {imageIndexingCapability.message} Configure a vision model in Settings → AI Models
+                  to index PDF visuals.
+                </AlertDescription>
+              </Alert>
+            )}
           <div className="flex items-center justify-between px-1">
             <span className="text-[13px] font-medium text-foreground">
               {staged.length} file{staged.length !== 1 ? 's' : ''} staged
@@ -577,7 +655,9 @@ export function UploadPanel({
                 <div className="flex items-center gap-1.5">
                   <Switch
                     checked={indexAllImages}
+                    disabled={!imageIndexingAvailable}
                     onCheckedChange={(val) => {
+                      if (!imageIndexingAvailable) return;
                       setIndexAllImages(val);
                       setStaged((p) =>
                         p.map((item) =>
@@ -620,8 +700,8 @@ export function UploadPanel({
                       {f.format === 'structured'
                         ? 'STRUCTURED'
                         : f.format === 'lines'
-                        ? 'SPLIT BY LINE'
-                        : 'PLAIN TEXT'}
+                          ? 'SPLIT BY LINE'
+                          : 'PLAIN TEXT'}
                       {f.format === 'structured' && ` • ${f.rows?.length} ROWS`}
                       {f.indexAsTabular && ' • TABULAR'}
                     </span>
@@ -667,17 +747,20 @@ export function UploadPanel({
                           <TooltipTrigger
                             type="button"
                             aria-label="Toggle image indexing"
-                            onClick={() =>
+                            aria-pressed={Boolean(f.indexImages)}
+                            disabled={!imageIndexingAvailable}
+                            onClick={() => {
+                              if (!imageIndexingAvailable) return;
                               setStaged((p) =>
                                 p.map((item) =>
                                   item.id === f.id
                                     ? { ...item, indexImages: !item.indexImages }
                                     : item,
                                 ),
-                              )
-                            }
+                              );
+                            }}
                             className={cn(
-                              'p-1.5 border rounded-md transition-colors cursor-pointer',
+                              'p-1.5 border rounded-md transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50',
                               f.indexImages
                                 ? 'bg-blue-100 border-blue-300 text-blue-600 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-400'
                                 : 'bg-secondary text-muted-foreground hover:bg-muted/50 hover:text-foreground',

@@ -1,0 +1,74 @@
+---
+title: 'Publish and share tools'
+description: 'Release a public Marketplace package or privately share one with selected workspaces.'
+icon: 'rocket'
+---
+
+Publish the package and the manifest together. The package contains executable code; the Hub stores immutable manifest versions, catalog metadata, ownership, install counts, and access grants.
+
+## Public release
+
+1. Build, test, and publish the package to the registry named by `packageName`.
+2. Bump the package and manifest version together. A published Hub version is immutable.
+3. Set `"distribution": "public"` (or omit it; public is the default).
+4. Publish the manifest from CI using the Hub publish secret.
+
+```bash
+curl --fail-with-body -X POST "$LARKUP_HUB_URL/v1/tools/publish" \
+  -H 'Content-Type: application/json' \
+  --data "$(jq -n --arg key "$HUB_PUBLISH_KEY" --slurpfile manifest tool.manifest.json \
+    '{apiKey: $key, manifest: $manifest[0]}')"
+```
+
+Keep `HUB_PUBLISH_KEY` in CI/deployment secrets. Do not put it in the package, its example environment file, or a client application. The Hub records the publisher from the manifest author and prevents a different publisher from taking the same tool id.
+
+## Private distribution
+
+Private means the Hub hides a tool from browse and search unless a workspace has been granted access. It is not a substitute for protecting a public npm tarball: use a private package registry or a signed package delivery mechanism as well.
+
+Set this in the manifest before publishing a new version:
+
+```json
+{ "distribution": "private" }
+```
+
+Then issue a scoped invite key for the recipient. The plaintext key is returned once; the Hub stores only its hash.
+
+```bash
+curl --fail-with-body -X POST "$LARKUP_HUB_URL/v1/tools/acme-translator/access-keys" \
+  -H "x-hub-admin-key: $HUB_PUBLISH_KEY" \
+  -H 'Content-Type: application/json' \
+  --data '{"scope":"workspace","scopeId":"workspace_123","maxInstalls":5,"createdBy":"acme-release"}'
+```
+
+The recipient redeems the key for their workspace:
+
+```bash
+curl --fail-with-body -X POST "$LARKUP_HUB_URL/v1/tools/acme-translator/redeem-key" \
+  -H 'Content-Type: application/json' \
+  --data '{"accessKey":"lk_key_…","workspaceId":"workspace_123"}'
+```
+
+After redemption, that workspace can discover and install the private tool. Revoke a key to stop new redemptions; revoke the workspace grant separately if existing access must end.
+
+## Marketplace listing and documentation
+
+The Marketplace catalog uses the manifest’s name, icon/emoji, description, tags, author, version, pricing, `installSize`, runtime modes, and install count. Install count is available today; popularity rankings and stars require a separate catalog-ranking and feedback feature, so do not present them as current metrics.
+
+For a first-party or shared repository tool, add a companion page at:
+
+```text
+docs/marketplace/tools/<tool-id>.mdx
+```
+
+Then add it under the **Marketplace** tab in `docs/docs.json`. Cover what the tool does, runtime choices, required user credentials, retention/deletion behavior, rate limits/quotas, pricing or entitlement model, and how to uninstall it. Keep the package `README.md` as the portable reference included with the package itself.
+
+## Selling a tool later
+
+Use `billing` to declare meters such as `source-minute`, `api-call`, or `seat`, and enforce an entitlement inside the runtime. The Marketplace does not require a payment provider in the tool package. When billing is added, the entitlement service should authorize install/access and update the runtime entitlement; the tool’s action, UI, and runtime protocol stay unchanged.
+
+<Warning>
+  Marketplace distribution controls discovery and Hub grants. It does not authorize a third-party
+  API on its own. Your runtime must still authenticate requests, validate the entitlement, and
+  enforce its own rate and quota limits.
+</Warning>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   claimMediaAsset,
+  recoverStaleMediaAssets,
   updateMediaAsset,
   updateMediaStage,
   readMediaAssets,
@@ -14,7 +15,7 @@ import { createStorageProvider } from '@larkup/marketplace/storage';
 import { readConfig } from '@larkup/core/config-store';
 import { trackUsageEvent } from '@larkup/core/analytics-store';
 import type { MediaAsset, MediaPipelineStage } from '@larkup/core/types';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import {
   createVideoKnowledgeRevision,
   findVideoKnowledgeRevision,
@@ -32,26 +33,41 @@ import {
   type OfflineKnowledgeEvidenceInput,
 } from '@larkup/core/video-knowledge/knowledge-builder';
 import type { MetadataValue } from '@larkup/core/video-knowledge/types';
-import { activateVideoKnowledgeManifest } from '@larkup/core/video-knowledge/manifest-store';
-import { saveVideoKnowledgeProjection } from '@larkup/core/video-knowledge/manifest-store';
-import { appendFrameArtifact } from '@larkup/core/video-knowledge/evidence-store';
+import { primeSemanticEvidenceIndex } from '@larkup/core/video-knowledge/evidence-semantic-index';
 import {
-  getCachedArtifactAnalysis,
-  saveCachedArtifactAnalysis,
-} from '@larkup/core/video-knowledge/artifact-cache-store';
-import { getConcurrencyLimits } from '@/lib/os-concurrency';
+  activateVideoKnowledgeManifest,
+  saveVideoKnowledgeProjections,
+} from '@larkup/core/video-knowledge/manifest-store';
+import { appendFrameArtifact } from '@larkup/core/video-knowledge/evidence-store';
+import { upsertVideoEmbeddings } from '@larkup/core/video-knowledge/video-embedding-index';
+import { getConcurrencyLimits } from '@/lib/media/concurrency';
 import {
   buildMediaDocumentInputs,
   createFallbackMediaSummary,
   createMediaKnowledgeSummary,
   formatTime,
   type MediaEvidenceSegment,
-} from '@/lib/media-knowledge';
+} from '@/lib/media/knowledge';
 import {
   createConfiguredOcrAdapter,
   createConfiguredVisionAdapter,
-} from '@/lib/video-intelligence/model-adapters';
-import { startLeasedVideoKnowledgeJob } from '@/lib/video-intelligence/worker';
+} from '@/lib/media/video/model-adapters';
+import { startLeasedVideoKnowledgeJob } from '@/lib/media/video/worker';
+import {
+  evidenceToKnowledgeInputs,
+  formatVideoKnowledgeSummary,
+  getReconciledVideoIntelligenceUsage,
+  runInstalledVideoIntelligence,
+  validateVideoIntelligenceConfiguration,
+} from '@/lib/media/video-intelligence-adapter';
+import {
+  createArtifactCacheKey,
+  deriveAudioSignals,
+  extractRunningState,
+  importMediaUrl,
+  probeMedia,
+} from '@/lib/media/source-utils';
+import { videoRuntimeScopeFromConfig } from '@/lib/media/video-runtime-scope';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,7 +79,7 @@ type StageReporter = (stage: MediaPipelineStage, patch: MediaProcessingStepPatch
 /**
  * POST → trigger media processing for one or more assets.
  *
- * Body: { assetIds: string[], serverId?: string }
+ * Body: { assetIds: string[], serverId?: string, toolInputs?: object }
  *
  * Processing is claimed atomically and continues in the background while the
  * client polls persisted asset progress.
@@ -72,11 +88,12 @@ type StageReporter = (stage: MediaPipelineStage, patch: MediaProcessingStepPatch
  */
 export async function POST(req: Request) {
   try {
-    const { assetIds, serverId, action, assetId } = (await req.json()) as {
+    const { assetIds, serverId, action, assetId, toolInputs } = (await req.json()) as {
       assetIds: string[];
       serverId?: string;
       action?: 'pause' | 'resume';
       assetId?: string;
+      toolInputs?: Record<string, unknown>;
     };
     if (action && assetId) {
       const update = async () => {
@@ -90,13 +107,13 @@ export async function POST(req: Request) {
         if (!asset) return NextResponse.json({ error: 'Media asset not found.' }, { status: 404 });
         return NextResponse.json({ asset });
       };
-      return serverId ? await runWithServer(serverId, update) : await update();
+      return serverId ? await runWithProject(serverId, update) : await update();
     }
     if (!assetIds?.length) {
       return NextResponse.json({ error: 'assetIds required' }, { status: 400 });
     }
-    const enqueue = () => enqueueMediaProcessing(req.url, assetIds, serverId);
-    return serverId ? await runWithServer(serverId, enqueue) : await enqueue();
+    const enqueue = () => enqueueMediaProcessing(req.url, assetIds, serverId, toolInputs);
+    return serverId ? await runWithProject(serverId, enqueue) : await enqueue();
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to trigger processing';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -107,6 +124,7 @@ async function enqueueMediaProcessing(
   reqUrl: string,
   assetIds: string[],
   serverId?: string,
+  toolInputs?: Record<string, unknown>,
 ): Promise<NextResponse> {
   try {
     const config = await readConfig();
@@ -118,11 +136,39 @@ async function enqueueMediaProcessing(
     }
     // A process restart can leave a leased job behind. Recover its durable
     // checkpoint before accepting more work; a new worker may then claim it.
-    await recoverStaleVideoKnowledgeJobs();
+    await Promise.all([recoverStaleVideoKnowledgeJobs(), recoverStaleMediaAssets()]);
     const assets = await readMediaAssets();
     const matchingAssets = assets.filter((asset) => assetIds.includes(asset.id));
+    if (
+      matchingAssets.some((asset) => asset.type === 'video') &&
+      (await isToolInstalled('video-intelligence'))
+    ) {
+      await validateVideoIntelligenceConfiguration();
+    }
+    if (matchingAssets.some((asset) => asset.type === 'video')) {
+      const usage = await getReconciledVideoIntelligenceUsage(assets);
+      const limit = Math.max(1, usage.concurrentJobsLimit || 1);
+      if (usage.activeJobs >= limit) {
+        throw new Error(
+          `A video is already being indexed. Your plan allows ${limit} video indexing job${
+            limit === 1 ? '' : 's'
+          } at a time. Stop the current video or wait for it to finish.`,
+        );
+      }
+    }
+    const configuredAssets = toolInputs
+      ? await Promise.all(
+          matchingAssets.map((asset) =>
+            updateMediaAsset(asset.id, {
+              toolInputs: { ...(asset.toolInputs ?? {}), ...toolInputs },
+            }),
+          ),
+        )
+      : matchingAssets;
     const claimedAssets = await Promise.all(
-      matchingAssets.map((asset) => claimMediaAsset(asset.id)),
+      configuredAssets
+        .filter((asset): asset is MediaAsset => Boolean(asset))
+        .map((asset) => claimMediaAsset(asset.id)),
     );
     const toProcess = claimedAssets.filter((asset): asset is MediaAsset => Boolean(asset));
     const sourceTranscripts = new Map<string, any>();
@@ -149,7 +195,7 @@ async function enqueueMediaProcessing(
     };
     const queuedHeartbeat = setInterval(() => {
       const touch = () => touchQueuedAssets();
-      void (serverId ? runWithServer(serverId, touch) : touch()).catch(() => {});
+      void (serverId ? runWithProject(serverId, touch) : touch()).catch(() => {});
     }, 60_000);
 
     const runJob = async () => {
@@ -202,7 +248,7 @@ async function enqueueMediaProcessing(
             processingStatus: 'processing',
             processingError: undefined,
             processingMessage: 'Starting process...',
-            processingProgress: 2,
+            processingProgress: 0,
           });
           if (!startedAsset) {
             throw new Error('Media asset was removed before processing started.');
@@ -221,24 +267,36 @@ async function enqueueMediaProcessing(
               message: 'Downloading media from URL...',
             });
             const { addMediaAssets } = await import('@larkup/core/media-store');
-            const tool = await loadTool<any>('video-audio');
-            if (!tool || !tool.importMediaUrl)
-              throw new Error('Video & Audio tool not properly installed.');
-
+            // URL fetching is a built-in compatibility utility. Video indexing itself
+            // is performed by Video Intelligence below and never needs audio-provider setup.
             const { promises: fs } = await import('node:fs');
             const path = await import('node:path');
             const os = await import('node:os');
             const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'larkup-url-media-'));
             try {
-              const entries = await tool.importMediaUrl(currentAsset.originalUrl, {
+              const entries = await importMediaUrl(currentAsset.originalUrl, {
                 outputDir: tmpDir,
                 playlistMax: 10, // max items
-                onProgress: ({ percent, message }: { percent?: number; message: string }) =>
-                  reportStage('download', {
+                onProgress: ({
+                  percent,
+                  current,
+                  total,
+                  unit,
+                  elapsedSeconds,
+                  estimatedRemainingSeconds,
+                  message,
+                }) => {
+                  void reportStage('download', {
                     status: 'running',
                     percent,
+                    current,
+                    total,
+                    unit,
+                    elapsedSeconds,
+                    estimatedRemainingSeconds,
                     message,
-                  }),
+                  });
+                },
               });
 
               if (!entries || entries.length === 0) {
@@ -325,10 +383,14 @@ async function enqueueMediaProcessing(
           if (currentAsset.type === 'image') {
             await processImageAsset(currentAsset, reqUrl, reportStage, serverId);
           } else if (currentAsset.type === 'video' || currentAsset.type === 'audio') {
-            const installed = await isToolInstalled('video-audio');
+            const installed = await isToolInstalled(
+              currentAsset.type === 'video' ? 'video-intelligence' : 'video-audio',
+            );
             if (!installed) {
               throw new Error(
-                'Video & Audio tool is not installed. Install it from the Marketplace.',
+                currentAsset.type === 'video'
+                  ? 'Video Intelligence is not installed. Install it from the Marketplace.'
+                  : 'Audio Transcription is not installed. Install it from the Marketplace.',
               );
             }
             await processMediaWithTool(
@@ -363,7 +425,7 @@ async function enqueueMediaProcessing(
       }
     };
     const job = mediaProcessingChain
-      .then(() => (serverId ? runWithServer(serverId, runJob) : runJob()))
+      .then(() => (serverId ? runWithProject(serverId, runJob) : runJob()))
       .finally(() => clearInterval(queuedHeartbeat));
     mediaProcessingChain = job.catch((error) => console.error('Media worker failed:', error));
 
@@ -377,9 +439,9 @@ async function enqueueMediaProcessing(
   }
 }
 
-/* ------------------------------------------------------------------ */
+/* Media processing helpers. */
 /* Image processing (built-in, no tool needed)                         */
-/* ------------------------------------------------------------------ */
+/* End media processing helpers. */
 
 async function processImageAsset(
   asset: MediaAsset,
@@ -489,9 +551,27 @@ async function processImageAsset(
   }
 }
 
-/* ------------------------------------------------------------------ */
+/* Background processing. */
 /* Video/Audio processing (requires marketplace tool)                  */
-/* ------------------------------------------------------------------ */
+/* End background processing. */
+
+/**
+ * A reprocessing pass must never silently shrink an already-known duration.
+ * A worker's own account of a file's length (decode, transcription coverage)
+ * can under-report when it hits a partial decode or provider length cap;
+ * trusting that over a previously verified value would mis-anchor every
+ * "near the end" lookup on the asset to a point well before the real end.
+ */
+function preserveDurationSecs(
+  asset: MediaAsset,
+  candidateSecs: number | undefined,
+): number | undefined {
+  const existing = asset.durationSecs;
+  if (!Number.isFinite(candidateSecs)) return existing;
+  if (Number.isFinite(existing) && (existing as number) > (candidateSecs as number))
+    return existing;
+  return candidateSecs;
+}
 
 async function processMediaWithTool(
   asset: MediaAsset,
@@ -506,6 +586,9 @@ async function processMediaWithTool(
   },
   serverId?: string,
 ): Promise<void> {
+  if (asset.type === 'video' && (await isToolInstalled('video-intelligence'))) {
+    return processWithInstalledVideoIntelligence(asset, reportStage);
+  }
   const tool = await loadTool<any>('video-audio');
   if (!tool) {
     throw new Error('The installed Video & Audio tool needs an update.');
@@ -553,7 +636,7 @@ async function processMediaWithTool(
     }
     const frameIntervalSecs = qualityToFrameInterval(
       asset.indexingQuality,
-      Number(installedTool?.config?.frameInterval ?? 30) || 30,
+      Number(toolConfig.frameInterval ?? installedTool?.config?.frameInterval ?? 30) || 30,
     );
     const configuredMaxFrames = Number(toolConfig.maxFrames);
     const maxFrames =
@@ -577,9 +660,9 @@ async function processMediaWithTool(
     // Duration limit: reject videos that exceed the configured maximum.
     const maxDurationSecs = Number(toolConfig.maxDurationSecs) || 14_400;
     let preflightProbe: { durationSecs: number } | undefined;
-    if (maxDurationSecs > 0 && tool.probeMedia) {
+    if (maxDurationSecs > 0) {
       try {
-        const probe = await tool.probeMedia(tmpFile);
+        const probe = await probeMedia(tmpFile);
         preflightProbe = probe;
         if (probe.durationSecs > maxDurationSecs) {
           const hours = Math.floor(maxDurationSecs / 3600);
@@ -621,6 +704,7 @@ async function processMediaWithTool(
           durationSecs: preflightProbe?.durationSecs ?? 0,
           maxDurationSecs,
           maxFrames,
+          maxInspectionSpendUsd: Math.max(0, Number(toolConfig.maxInspectionSpendUsd) || 0),
         });
         await updateMediaAsset(asset.id, { activeVideoKnowledgeJobId: knowledgeRun.jobId });
         await checkpointVideoKnowledgeJob(knowledgeRun.jobId, knowledgeRun.owner, 'extracting', {
@@ -830,7 +914,6 @@ async function processMediaWithTool(
               });
               const text = analysis.observations.map((observation) => observation.value).join(' ');
               if (text) {
-                const { extractRunningState } = await import('@larkup/tool-video-audio');
                 runningContext = extractRunningState(`${runningContext}\n${text}`);
               }
               return text
@@ -953,7 +1036,7 @@ async function processMediaWithTool(
         transcriptProvider: transcript?.origin?.provider || provider,
         transcriptLanguage: transcript?.language,
         knowledgeRevisionId: knowledgeRun?.revisionId,
-      }).map((input) => ({ ...input, id: randomUUID() }));
+      }).map((input) => ({ ...input, id: randomUUID(), groupId: asset.groupId || 'default' }));
       documentIds.push(...documentInputs.map((input) => input.id));
       if (!(await updateMediaAsset(asset.id, { pendingDocumentIds: documentIds }))) {
         throw new Error('Media asset was removed before its evidence could be published.');
@@ -996,12 +1079,12 @@ async function processMediaWithTool(
             kind: document.metadata?.isMediaSummary
               ? 'overview'
               : document.metadata?.contentKind === 'media-chapter'
-              ? 'chapter'
-              : document.metadata?.contentKind === 'multimodal-segment'
-              ? 'scene'
-              : document.metadata?.contentKind === 'video-visual'
-              ? 'visual'
-              : 'transcript',
+                ? 'chapter'
+                : document.metadata?.contentKind === 'multimodal-segment'
+                  ? 'scene'
+                  : document.metadata?.contentKind === 'video-visual'
+                    ? 'visual'
+                    : 'transcript',
             startSecs: Number.isFinite(Number(document.metadata?.startSecs))
               ? Number(document.metadata?.startSecs)
               : undefined,
@@ -1025,7 +1108,7 @@ async function processMediaWithTool(
       const publishedAsset = await updateMediaAsset(asset.id, {
         processingStatus: 'completed',
         caption: summary.slice(0, 600),
-        durationSecs: result.meta.durationSecs,
+        durationSecs: preserveDurationSecs(asset, result.meta.durationSecs),
         dimensions: { width: result.meta.width, height: result.meta.height },
         documentIds,
         pendingDocumentIds: [],
@@ -1150,7 +1233,7 @@ async function processMediaWithTool(
         transcriptProvider: transcript?.origin?.provider || provider,
         transcriptLanguage: transcript.language,
         knowledgeRevisionId: knowledgeRun?.revisionId,
-      }).map((input) => ({ ...input, id: randomUUID() }));
+      }).map((input) => ({ ...input, id: randomUUID(), groupId: asset.groupId || 'default' }));
       documentIds.push(...documentInputs.map((input) => input.id));
       if (!(await updateMediaAsset(asset.id, { pendingDocumentIds: documentIds }))) {
         throw new Error('Media asset was removed before its evidence could be published.');
@@ -1193,8 +1276,8 @@ async function processMediaWithTool(
             kind: document.metadata?.isMediaSummary
               ? 'overview'
               : document.metadata?.contentKind === 'media-chapter'
-              ? 'chapter'
-              : 'transcript',
+                ? 'chapter'
+                : 'transcript',
             startSecs: Number.isFinite(Number(document.metadata?.startSecs))
               ? Number(document.metadata?.startSecs)
               : undefined,
@@ -1208,7 +1291,7 @@ async function processMediaWithTool(
       const publishedAsset = await updateMediaAsset(asset.id, {
         processingStatus: 'completed',
         caption: summary.slice(0, 600),
-        durationSecs: transcript.durationSecs,
+        durationSecs: preserveDurationSecs(asset, transcript.durationSecs),
         documentIds,
         pendingDocumentIds: [],
         supersededDocumentIds: asset.documentIds,
@@ -1256,6 +1339,249 @@ async function processMediaWithTool(
   }
 }
 
+async function processWithInstalledVideoIntelligence(
+  asset: MediaAsset,
+  reportStage: StageReporter,
+): Promise<void> {
+  await validateVideoIntelligenceConfiguration();
+  // Capture this before the job begins. A later settings change must not
+  // relabel evidence that was already produced by the prior runtime.
+  const indexingConfig = await readConfig();
+  const videoRuntimeScope = videoRuntimeScopeFromConfig(indexingConfig);
+  await cleanupIncompleteMediaPublication(asset);
+  const storage = createStorageProvider();
+  const { promises: fs } = await import('node:fs');
+  const path = await import('node:path');
+  const os = await import('node:os');
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'larkup-video-intelligence-'));
+  const extension = asset.fileName.split('.').pop() || 'video';
+  const localFile = await storage.resolvePath?.(asset.storageUri);
+  const mediaPath = localFile || path.join(tmpDir, `source.${extension}`);
+  const documentIds: string[] = [];
+  let indexAttempted = false;
+  let knowledgeRun: Awaited<ReturnType<typeof beginVideoKnowledgeRun>> | undefined;
+  try {
+    if (!localFile) await fs.writeFile(mediaPath, await storage.retrieve(asset.storageUri));
+    const assetForCloud = await ensureCloudVideoDuration(asset, mediaPath, reportStage);
+    // A durable canonical copy already exists at asset.storageUri (S3), so
+    // hand the GPU worker a presigned read of that instead of re-uploading
+    // the same bytes through client.upload()'s sources/ PUT step. mediaPath
+    // stays local regardless -- duration probing and knowledge-run frame
+    // artifacts above/below still need it.
+    const sourceUrl = await storage.getReadUrl?.(asset.storageUri, 3_600);
+    const { evidence, segments } = await runInstalledVideoIntelligence({
+      asset: assetForCloud,
+      mediaPath,
+      sourceUrl,
+      reportStage,
+      onJobSubmitted: async (jobId) => {
+        const updated = await updateMediaAsset(asset.id, { activeVideoIntelligenceJobId: jobId });
+        if (!updated) throw new Error('The video was removed before cloud indexing started.');
+      },
+      assertStillActive: async () => {
+        const current = (await readMediaAssets()).find((candidate) => candidate.id === asset.id);
+        if (!current) throw new Error('The video was removed before cloud indexing started.');
+      },
+    });
+    if (!segments.length) {
+      throw new Error(
+        'Video Intelligence produced no searchable speech, visual, or semantic video evidence.',
+      );
+    }
+    knowledgeRun = await beginVideoKnowledgeRun({
+      asset,
+      mediaPath,
+      durationSecs: evidence.durationMs / 1_000,
+      maxDurationSecs: Math.max(1, evidence.durationMs / 1_000),
+      maxFrames: Math.max(1, evidence.visualObservations.length),
+    });
+    await reportStage('extract', {
+      status: 'completed',
+      message: `Decoded ${evidence.video.width}×${evidence.video.height} timestamped evidence.`,
+    });
+    await reportStage('synthesize', {
+      status: 'running',
+      percent: 50,
+      message: 'Publishing the worker’s audited timeline...',
+    });
+    // The worker has already skimmed the source, synthesized a structured
+    // account, and consistency-audited claims against timestamped evidence.
+    // Running the host's generic media summarizer again costs several model
+    // calls and can blur those exact timestamps, so publish the audited result
+    // directly and fall back only if an older runtime omitted it.
+    const summary =
+      formatVideoKnowledgeSummary(evidence) ??
+      createFallbackMediaSummary(asset.fileName, 'video', segments);
+    await reportStage('synthesize', {
+      status: 'completed',
+      message: 'Prepared evidence-backed notes for chat.',
+    });
+    const inputs = buildMediaDocumentInputs({
+      assetId: asset.id,
+      title: asset.fileName,
+      mediaType: 'video',
+      localUrl: `/api/media/${asset.id}`,
+      originalUrl: asset.originalUrl,
+      durationSecs: evidence.durationMs / 1_000,
+      summary,
+      segments,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      transcriptSource: 'video-intelligence-runtime',
+      transcriptProvider:
+        evidence.transcriptionDiagnostics?.fallbackUsed &&
+        evidence.transcriptionDiagnostics.fallbackProvider
+          ? evidence.transcriptionDiagnostics.fallbackProvider
+          : evidence.transcriptionDiagnostics?.provider || 'video-intelligence-runtime',
+      transcriptLanguage: evidence.detectedLanguage,
+      videoRuntimeScope,
+    }).map((input) => ({ ...input, id: randomUUID(), groupId: asset.groupId || 'default' }));
+    documentIds.push(...inputs.map((input) => input.id));
+    if (!(await updateMediaAsset(asset.id, { pendingDocumentIds: documentIds }))) {
+      throw new Error('Media asset was removed before its evidence could be published.');
+    }
+    const documents = await addDocuments(inputs);
+    await reportStage('index', {
+      status: 'running',
+      percent: 0,
+      message: `Indexing ${documents.length} timestamped evidence documents...`,
+    });
+    indexAttempted = true;
+    await ensureSearchable((current, total, message) =>
+      reportStage('index', {
+        status: 'running',
+        current,
+        total,
+        unit: 'chunks',
+        message,
+      }),
+    );
+    await reportStage('index', {
+      status: 'completed',
+      message: 'Video evidence, including semantic scene analysis, is searchable.',
+    });
+    const activeManifest = await publishVideoKnowledge({
+      assetId: asset.id,
+      knowledgeRun,
+      segments,
+      ...evidenceToKnowledgeInputs(evidence),
+      documentIds: documents.map((document) => ({
+        documentId: document.id,
+        kind: document.metadata?.isMediaSummary
+          ? 'overview'
+          : document.metadata?.contentKind === 'media-chapter'
+            ? 'chapter'
+            : document.metadata?.contentKind === 'multimodal-segment'
+              ? 'visual'
+              : 'transcript',
+        startSecs: Number.isFinite(Number(document.metadata?.startSecs))
+          ? Number(document.metadata?.startSecs)
+          : undefined,
+        endSecs: Number.isFinite(Number(document.metadata?.endSecs))
+          ? Number(document.metadata?.endSecs)
+          : undefined,
+      })),
+    });
+    if (evidence.videoEmbeddings?.length) {
+      await upsertVideoEmbeddings(
+        asset.id,
+        knowledgeRun.revisionId,
+        evidence.videoEmbeddings.map((embedding) => ({
+          clipId: embedding.clipId,
+          startSecs: embedding.startMs / 1_000,
+          endSecs: embedding.endMs / 1_000,
+          vector: embedding.vector,
+          provider: embedding.provider,
+        })),
+      ).catch(() => undefined);
+    }
+    // The normal corpus vectors are ready after `ensureSearchable`; make the
+    // evidence-level semantic vectors ready before exposing the video as ready
+    // too. Otherwise immediate questions only have lexical retrieval until a
+    // detached background task happens to finish.
+    const semanticEvidenceReady = await primeSemanticEvidenceIndex(asset.id);
+    if (!semanticEvidenceReady) {
+      throw new Error(
+        'Video evidence vectors could not be built. The asset remains unavailable until semantic retrieval is ready.',
+      );
+    }
+    const published = await updateMediaAsset(asset.id, {
+      processingStatus: 'completed',
+      processingProgress: 100,
+      processingMessage: undefined,
+      caption: summary.slice(0, 600),
+      durationSecs: preserveDurationSecs(asset, evidence.durationMs / 1_000),
+      dimensions: { width: evidence.video.width, height: evidence.video.height },
+      documentIds,
+      pendingDocumentIds: [],
+      supersededDocumentIds: asset.documentIds,
+      activeVideoKnowledgeRevisionId: knowledgeRun.revisionId,
+      activeVideoKnowledgeManifestId: activeManifest.id,
+      videoRuntimeScope,
+    });
+    if (!published) throw new Error('Media asset was removed before indexing completed.');
+    if (await cleanupDocumentRecords(asset.documentIds)) {
+      await updateMediaAsset(asset.id, { supersededDocumentIds: [] }).catch(() => undefined);
+    }
+    void trackUsageEvent({
+      type: 'media_processing',
+      mediaType: 'video',
+      mediaOperation: 'observation',
+      durationSecs: evidence.durationMs / 1_000,
+      frameCount: evidence.visualObservations.length,
+      modelId: 'faster-whisper+paddleocr+yolox',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    if (knowledgeRun) {
+      const message =
+        error instanceof Error ? error.message : 'Video Intelligence processing failed.';
+      const cancelled = /cancelled/i.test(message);
+      await updateVideoKnowledgeRevision(knowledgeRun.revisionId, {
+        status: cancelled ? 'cancelled' : 'failed',
+      }).catch(() => {});
+      await finishVideoKnowledgeJob(
+        knowledgeRun.jobId,
+        knowledgeRun.owner,
+        cancelled ? 'cancelled' : 'failed',
+        message,
+      ).catch(() => {});
+    }
+    await rollbackPendingDocuments(asset.id, documentIds, indexAttempted);
+    throw error;
+  } finally {
+    knowledgeRun?.release();
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * Cloud quota is reserved before the GPU worker receives a job. New uploads
+ * normally have browser metadata, while older assets may not. In that case we
+ * only inspect the local container header with ffprobe; no frames, audio, OCR,
+ * or video analysis run on the user's machine.
+ */
+async function ensureCloudVideoDuration(
+  asset: MediaAsset,
+  mediaPath: string,
+  reportStage: StageReporter,
+): Promise<MediaAsset> {
+  if (Number.isFinite(asset.durationSecs) && (asset.durationSecs ?? 0) > 0) return asset;
+
+  await reportStage('extract', {
+    status: 'running',
+    percent: 1,
+    message: 'Reading video metadata for cloud quota reservation...',
+  });
+  const probe = await probeMedia(mediaPath);
+  const durationSecs = Math.round(probe.durationSecs * 1_000) / 1_000;
+  if (!Number.isFinite(durationSecs) || durationSecs <= 0) {
+    throw new Error('Could not read the video duration needed for cloud quota reservation.');
+  }
+  await updateMediaAsset(asset.id, { durationSecs });
+  return { ...asset, durationSecs };
+}
+
 async function fingerprintMediaFile(mediaPath: string): Promise<string> {
   const { createReadStream } = await import('node:fs');
   const hash = createHash('sha256');
@@ -1276,44 +1602,47 @@ async function beginVideoKnowledgeRun(input: {
   durationSecs: number;
   maxDurationSecs: number;
   maxFrames: number;
+  maxInspectionSpendUsd?: number;
 }) {
   const sourceFingerprint = await fingerprintMediaFile(input.mediaPath);
   const pipelineVersion = 'video-knowledge-v1';
-  const existingRevision = await findVideoKnowledgeRevision(
+  const previousRevision = await findVideoKnowledgeRevision(
     input.asset.id,
     sourceFingerprint,
     pipelineVersion,
   );
-  const revision =
-    existingRevision ??
-    (await createVideoKnowledgeRevision({
-      mediaAssetId: input.asset.id,
-      sourceFingerprint,
-      pipelineVersion,
-      guidance: input.asset.indexingInstructions?.trim()
-        ? { text: input.asset.indexingInstructions.trim(), createdAt: new Date().toISOString() }
-        : undefined,
-      budget: {
-        maxDurationSecs: input.maxDurationSecs,
-        maxBytes: input.asset.fileSize,
-        maxFrames: input.maxFrames,
-        maxModelCalls: 0,
-        maxCostUsd: 0,
-        usedDurationSecs: input.durationSecs,
-      },
-      coverage: {
-        sourceDurationSecs: input.durationSecs,
-        inspectedRanges: [],
-        transcriptCoverage: 0,
-        visualCoverage: 0,
-        ocrCoverage: 0,
-        partialReasons: [],
-      },
-    }));
+  // A user-triggered reindex must never append new provider output into an
+  // already-published revision. Keep the previous revision immutable and make
+  // the new run independently auditable, even when the video bytes match.
+  const revision = await createVideoKnowledgeRevision({
+    mediaAssetId: input.asset.id,
+    sourceFingerprint,
+    pipelineVersion,
+    parentRevisionId: previousRevision?.id,
+    guidance: input.asset.indexingInstructions?.trim()
+      ? { text: input.asset.indexingInstructions.trim(), createdAt: new Date().toISOString() }
+      : undefined,
+    budget: {
+      maxDurationSecs: input.maxDurationSecs,
+      maxBytes: input.asset.fileSize,
+      maxFrames: input.maxFrames,
+      maxModelCalls: 0,
+      maxCostUsd: input.maxInspectionSpendUsd ?? 0,
+      usedDurationSecs: input.durationSecs,
+    },
+    coverage: {
+      sourceDurationSecs: input.durationSecs,
+      inspectedRanges: [],
+      transcriptCoverage: 0,
+      visualCoverage: 0,
+      ocrCoverage: 0,
+      partialReasons: [],
+    },
+  });
   const job = await createVideoKnowledgeJob({
     mediaAssetId: input.asset.id,
     knowledgeRevisionId: revision.id,
-    idempotencyKey: `${input.asset.id}:${sourceFingerprint}:video-knowledge-v1`,
+    idempotencyKey: `${input.asset.id}:${revision.id}:video-knowledge-v1`,
     budget: revision.budget,
   });
   const lease = await startLeasedVideoKnowledgeJob(job.id);
@@ -1338,13 +1667,14 @@ async function publishVideoKnowledge(input: {
     endSecs: number;
     observations?: Array<{
       kind: 'object' | 'action' | 'ui' | 'chart' | 'relationship' | 'state';
-      value: string;
+      value: MetadataValue;
       frameTimestamps: number[];
       confidence: number;
       uncertaintyReasons: string[];
     }>;
   }>;
   ocrEvidence: OfflineKnowledgeEvidenceInput[];
+  reconciledEvidence?: OfflineKnowledgeEvidenceInput[];
   documentIds: Array<{
     documentId: string;
     kind: 'overview' | 'chapter' | 'scene' | 'transcript' | 'visual';
@@ -1352,7 +1682,6 @@ async function publishVideoKnowledge(input: {
     endSecs?: number;
   }>;
 }) {
-  const { deriveAudioSignals } = await import('@larkup/tool-video-audio');
   const confidence = (score: number, reasons: string[] = []) => ({
     score: Math.max(0, Math.min(1, score)),
     source: 'provider' as const,
@@ -1401,31 +1730,38 @@ async function publishVideoKnowledge(input: {
         },
       })),
     ),
-    ...deriveAudioSignals(input.transcriptChunks).map((signal) => ({
-      modality: 'audio-event' as const,
-      timeRange: {
-        startSecs: signal.timestampSecs,
-        endSecs: signal.timestampSecs,
-        precision: 'segment' as const,
-      },
-      payload: {
-        transcriptChange: signal.transcriptChange,
-        silenceBoundary: signal.silenceBoundary,
-      },
-      source: { kind: 'heuristic' as const, version: 'audio-signals-v1' },
-      confidence: {
-        ...confidence(0.5, ['Derived from transcript boundaries, not raw audio classification.']),
-        source: 'heuristic' as const,
-      },
-      observation: {
-        kind: 'audio-event' as const,
-        value: {
+    // Speech segments are already retained as transcript evidence. Persist
+    // only discontinuities as audio events; duplicating every segment doubles
+    // the knowledge graph and makes publication of long videos needlessly
+    // slow without adding independent evidence.
+    ...deriveAudioSignals(input.transcriptChunks)
+      .filter((signal) => signal.silenceBoundary)
+      .map((signal) => ({
+        modality: 'audio-event' as const,
+        timeRange: {
+          startSecs: signal.timestampSecs,
+          endSecs: signal.timestampSecs,
+          precision: 'segment' as const,
+        },
+        payload: {
           transcriptChange: signal.transcriptChange,
           silenceBoundary: signal.silenceBoundary,
         },
-      },
-    })),
+        source: { kind: 'heuristic' as const, version: 'audio-signals-v1' },
+        confidence: {
+          ...confidence(0.5, ['Derived from transcript boundaries, not raw audio classification.']),
+          source: 'heuristic' as const,
+        },
+        observation: {
+          kind: 'audio-event' as const,
+          value: {
+            transcriptChange: signal.transcriptChange,
+            silenceBoundary: signal.silenceBoundary,
+          },
+        },
+      })),
     ...input.ocrEvidence,
+    ...(input.reconciledEvidence ?? []),
   ];
   // A transcript-only asset remains useful; explicit evidence is preferable to
   // falling back to the legacy, free-text timeline bridge.
@@ -1437,33 +1773,31 @@ async function publishVideoKnowledge(input: {
     knowledgeRevisionId: input.knowledgeRun.revisionId,
     evidence,
   });
-  const projections = await Promise.all(
-    input.documentIds.map((document) =>
-      saveVideoKnowledgeProjection({
-        mediaAssetId: input.assetId,
-        knowledgeRevisionId: input.knowledgeRun.revisionId,
-        kind: document.kind,
-        documentId: document.documentId,
-        lineageIds: [],
-        evidenceIds: built.evidenceIds,
-        ...(document.startSecs !== undefined && document.endSecs !== undefined
-          ? {
-              timeRange: {
-                startSecs: document.startSecs,
-                endSecs: document.endSecs,
-                precision: 'segment' as const,
-              },
-            }
-          : {}),
-        quality: {
-          score: 0.7,
-          source: 'heuristic',
-          calibrationStatus: 'uncalibrated',
-          uncertaintyReasons: ['Search projection; source evidence is authoritative.'],
-        },
-        active: false,
-      }),
-    ),
+  const projections = await saveVideoKnowledgeProjections(
+    input.documentIds.map((document) => ({
+      mediaAssetId: input.assetId,
+      knowledgeRevisionId: input.knowledgeRun.revisionId,
+      kind: document.kind,
+      documentId: document.documentId,
+      lineageIds: [],
+      evidenceIds: built.evidenceIds,
+      ...(document.startSecs !== undefined && document.endSecs !== undefined
+        ? {
+            timeRange: {
+              startSecs: document.startSecs,
+              endSecs: document.endSecs,
+              precision: 'segment' as const,
+            },
+          }
+        : {}),
+      quality: {
+        score: 0.7,
+        source: 'heuristic',
+        calibrationStatus: 'uncalibrated',
+        uncertaintyReasons: ['Search projection; source evidence is authoritative.'],
+      },
+      active: false,
+    })),
   );
   await checkpointVideoKnowledgeJob(
     input.knowledgeRun.jobId,
@@ -1522,8 +1856,24 @@ async function publishVideoKnowledge(input: {
         })),
         Math.max(0, ...input.segments.map((segment) => segment.endSecs)),
       ),
-      visualCoverage: 0,
-      ocrCoverage: 0,
+      visualCoverage: coverageFraction(
+        input.visualObservations.flatMap((sequence) =>
+          (sequence.observations ?? []).flatMap((observation) =>
+            observation.frameTimestamps.map((timestampSecs) => ({
+              startSecs: timestampSecs,
+              endSecs: timestampSecs,
+            })),
+          ),
+        ),
+        Math.max(0, ...input.segments.map((segment) => segment.endSecs)),
+      ),
+      ocrCoverage: coverageFraction(
+        input.ocrEvidence.map((item) => ({
+          startSecs: item.timeRange.startSecs,
+          endSecs: item.timeRange.endSecs,
+        })),
+        Math.max(0, ...input.segments.map((segment) => segment.endSecs)),
+      ),
       partialReasons: [
         'Visual understanding uses adaptive source anchors rather than continuous frame-by-frame observation.',
         'The raw source is retained so the agent can perform a bounded rewind when an answer needs stronger visual evidence.',
@@ -1535,8 +1885,8 @@ async function publishVideoKnowledge(input: {
 }
 
 /**
- * OCR is a retained-frame operation with a durable cache key that includes
- * content, operation, and analyzer schema—not a filename, path, or secret.
+ * OCR is performed anew for every indexing run.  Video Intelligence caching
+ * is temporarily disabled so re-indexing never reuses a prior analyzer read.
  */
 async function extractOfflineOcrEvidence(input: {
   mediaAssetId: string;
@@ -1546,102 +1896,103 @@ async function extractOfflineOcrEvidence(input: {
   signal: AbortSignal;
   concurrency?: number;
 }): Promise<OfflineKnowledgeEvidenceInput[]> {
-  const { createArtifactCacheKey } = await import('@larkup/tool-video-audio');
-  const { readFile } = await import('node:fs/promises');
   const adapter = createConfiguredOcrAdapter();
   const step = Math.max(1, Math.ceil(input.frames.length / input.maxFrames));
   const selected = input.frames.filter((_, index) => index % step === 0).slice(0, input.maxFrames);
   const evidenceList = await mapConcurrent(selected, input.concurrency ?? 5, async (frame) => {
-    if (input.signal.aborted) throw new Error('Video knowledge processing was cancelled.');
-    const bytes = await readFile(frame.path);
-    const contentHash = createHash('sha256').update(bytes).digest('hex');
-    const key = createArtifactCacheKey({
-      contentHash,
-      operation: 'ocr',
-      promptVersion: 'ocr-visible-text-v1',
-      schemaVersion: '1',
-    });
-    const cached = await getCachedArtifactAnalysis(input.mediaAssetId, key);
-    const payload =
-      cached ??
-      (await (async () => {
-        const result = await adapter.recognize({ imagePath: frame.path, signal: input.signal });
-        const value: MetadataValue = {
-          blocks: result.blocks.map((block) => ({
-            text: block.text,
-            left: block.left,
-            top: block.top,
-            width: block.width,
-            height: block.height,
-            confidence: block.confidence,
-            ...(block.language ? { language: block.language } : {}),
-            ...(block.direction ? { direction: block.direction } : {}),
-          })),
-          ...(result.provider ? { provider: result.provider } : {}),
-          ...(result.model ? { model: result.model } : {}),
-        };
-        await saveCachedArtifactAnalysis({
-          key,
-          mediaAssetId: input.mediaAssetId,
-          knowledgeRevisionId: input.knowledgeRevisionId,
-          operation: 'ocr',
-          value,
-        });
-        return value;
-      })());
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-    const payloadRecord = payload as Record<string, MetadataValue>;
-    const blocks: MetadataValue[] = Array.isArray(payloadRecord.blocks) ? payloadRecord.blocks : [];
-    const text = blocks
-      .map((block: MetadataValue) =>
-        block && typeof block === 'object' && !Array.isArray(block) ? block.text : '',
-      )
-      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-      .join('\n');
-    if (!text) return null;
-    return {
-      modality: 'ocr',
-      timeRange: {
-        startSecs: frame.timestampSecs,
-        endSecs: frame.timestampSecs,
-        precision: 'estimated',
-      },
-      payload,
-      source: {
-        kind: 'provider',
-        provider:
-          typeof payloadRecord.provider === 'string' ? payloadRecord.provider : 'configured-ocr',
-        ...(typeof payloadRecord.model === 'string' ? { model: payloadRecord.model } : {}),
-      },
-      confidence: {
-        score: Math.min(
-          1,
-          Math.max(
-            0,
-            blocks.reduce(
-              (sum: number, block: MetadataValue) =>
-                sum +
-                (block &&
-                typeof block === 'object' &&
-                !Array.isArray(block) &&
-                typeof block.confidence === 'number'
-                  ? block.confidence
-                  : 0),
+    try {
+      if (input.signal.aborted) throw new Error('Video knowledge processing was cancelled.');
+      const result = await adapter.recognize({ imagePath: frame.path, signal: input.signal });
+      const payload: MetadataValue = {
+        blocks: result.blocks.map((block) => ({
+          text: block.text,
+          left: block.left,
+          top: block.top,
+          width: block.width,
+          height: block.height,
+          confidence: block.confidence,
+          ...(block.language ? { language: block.language } : {}),
+          ...(block.direction ? { direction: block.direction } : {}),
+        })),
+        ...(result.provider ? { provider: result.provider } : {}),
+        ...(result.model ? { model: result.model } : {}),
+      };
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+      const payloadRecord = payload as Record<string, MetadataValue>;
+      const blocks: MetadataValue[] = Array.isArray(payloadRecord.blocks)
+        ? payloadRecord.blocks
+        : [];
+      const text = blocks
+        .map((block: MetadataValue) =>
+          block && typeof block === 'object' && !Array.isArray(block) ? block.text : '',
+        )
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .join('\n');
+      if (!text) return null;
+      return {
+        modality: 'ocr',
+        timeRange: {
+          startSecs: frame.timestampSecs,
+          endSecs: frame.timestampSecs,
+          precision: 'estimated',
+        },
+        payload,
+        source: {
+          kind: 'provider',
+          provider:
+            typeof payloadRecord.provider === 'string' ? payloadRecord.provider : 'configured-ocr',
+          ...(typeof payloadRecord.model === 'string' ? { model: payloadRecord.model } : {}),
+        },
+        confidence: {
+          score: Math.min(
+            1,
+            Math.max(
               0,
-            ) / Math.max(1, blocks.length),
+              blocks.reduce(
+                (sum: number, block: MetadataValue) =>
+                  sum +
+                  (block &&
+                  typeof block === 'object' &&
+                  !Array.isArray(block) &&
+                  typeof block.confidence === 'number'
+                    ? block.confidence
+                    : 0),
+                0,
+              ) / Math.max(1, blocks.length),
+            ),
           ),
-        ),
-        source: 'provider',
-        calibrationStatus: 'uncalibrated',
-        uncertaintyReasons: ['OCR derived from a retained adaptive frame.'],
-      },
-      observation: { kind: 'ocr', value: { text } },
-    } as OfflineKnowledgeEvidenceInput;
+          source: 'provider',
+          calibrationStatus: 'uncalibrated',
+          uncertaintyReasons: ['OCR derived from a retained adaptive frame.'],
+        },
+        observation: { kind: 'ocr', value: { text } },
+      } as OfflineKnowledgeEvidenceInput;
+    } catch (error) {
+      if (input.signal.aborted) throw error;
+      console.warn(
+        `[video] OCR skipped at ${formatTime(
+          frame.timestampSecs,
+        )} because the provider response was unusable.`,
+        error,
+      );
+      return null;
+    }
   });
   return evidenceList.filter((e): e is OfflineKnowledgeEvidenceInput => e !== null);
 }
 
-function parseStructuredState(value: string): MetadataValue {
+function parseStructuredState(value: MetadataValue): MetadataValue {
+  if (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    typeof value.subject === 'string' &&
+    typeof value.property === 'string' &&
+    value.value !== undefined
+  ) {
+    return { subject: value.subject, property: value.property, value: String(value.value) };
+  }
+  if (typeof value !== 'string') return { text: JSON.stringify(value) };
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
     if (
@@ -1660,7 +2011,6 @@ async function persistVideoFrameArtifacts(input: {
   knowledgeRevisionId: string;
   frames: Array<{ path: string; timestampSecs: number }>;
 }) {
-  const { createArtifactCacheKey } = await import('@larkup/tool-video-audio');
   const { readFile } = await import('node:fs/promises');
   await Promise.all(
     input.frames.map(async (frame) => {
@@ -1850,8 +2200,8 @@ function ensureSearchable(
           activeRun.status === 'chunking'
             ? 'Preparing searchable chunks'
             : activeRun.status === 'upserting'
-            ? 'Saving vectors'
-            : 'Embedding media evidence';
+              ? 'Saving vectors'
+              : 'Embedding media evidence';
         await onProgress?.(
           current,
           total,

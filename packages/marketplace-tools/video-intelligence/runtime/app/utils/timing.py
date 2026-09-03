@@ -28,8 +28,8 @@ def normalized_important_ranges(
 
 def visual_sampling_interval(mode: str, duration_seconds: float) -> float:
     """Seconds between sampled frames for a given indexing mode and source length."""
-    base_intervals = {"fast": 5.0, "balanced": 2.0, "deep": 0.75}
-    max_samples = {"fast": 360, "balanced": 720, "deep": 1_800}
+    base_intervals = {"fast": 5.0, "balanced": 2.0, "thorough": 0.75}
+    max_samples = {"fast": 360, "balanced": 720, "thorough": 1_800}
     return max(base_intervals[mode], duration_seconds / max_samples[mode])
 
 
@@ -55,9 +55,16 @@ def rebase_result_timestamps(result: dict[str, Any], offset_secs: float) -> None
     for track in result.get("tracks", []):
         if isinstance(track, dict):
             shift(track, "startMs", "endMs")
-    for state in result.get("scoreboardStates", []):
-        if isinstance(state, dict):
-            shift(state, "timeMs")
+    for overlay in result.get("recurringOverlayText", []):
+        if not isinstance(overlay, dict):
+            continue
+        shift(overlay, "firstSeenMs", "lastSeenMs")
+        if isinstance(overlay.get("timestampsMs"), list):
+            overlay["timestampsMs"] = [
+                round(float(timestamp)) + offset_ms
+                for timestamp in overlay["timestampsMs"]
+                if isinstance(timestamp, (int, float))
+            ]
     for observation in result.get("semanticObservations", []):
         if isinstance(observation, dict):
             shift(observation, "startMs", "endMs")
@@ -72,3 +79,21 @@ def rebase_result_timestamps(result: dict[str, Any], offset_secs: float) -> None
             for timestamp in entity["timestampsMs"]
             if isinstance(timestamp, (int, float))
         ]
+
+    # Knowledge synthesis runs while a bounded source is still on its local
+    # clip clock. Its citations are persisted alongside raw evidence, so they
+    # must be translated by the same offset before a refinement is searchable.
+    summary = result.get("knowledgeSummary")
+    if not isinstance(summary, dict):
+        return
+    for key in ("stateHistory", "keyEvents"):
+        for item in summary.get(key, []):
+            if isinstance(item, dict):
+                shift(item, "startMs", "endMs")
+    for key in ("participants", "context"):
+        for item in summary.get(key, []):
+            if not isinstance(item, dict):
+                continue
+            for evidence in item.get("evidence", []):
+                if isinstance(evidence, dict):
+                    shift(evidence, "startMs", "endMs")

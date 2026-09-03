@@ -23,7 +23,7 @@ services:
       TMPDIR: "/app/.tmp"
     # Ephemeral volumes — no host state leaks into tests
     tmpfs:
-      - /app/.larkup:uid=1001,gid=1001
+      - /app/apps/web/.larkup:uid=1001,gid=1001
       - /app/.tmp:uid=1001,gid=1001
     healthcheck:
       test:
@@ -52,7 +52,7 @@ services:
       # Override the base URL to point at the `web` container
       PLAYWRIGHT_BASE_URL: "http://web:4567"
       # Forward any API keys needed for integration tests
-      AI_GATEWAY_APIKEY: "${AI_GATEWAY_APIKEY:-}"
+      AI_GATEWAY_API_KEY: "${AI_GATEWAY_API_KEY:-}"
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       PINECONE_APIKEY: "${PINECONE_APIKEY:-}"
     volumes:

@@ -28,10 +28,6 @@ import {
 import { Download, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-/* ------------------------------------------------------------------ */
-/* Color palette — refined, premium tones                              */
-/* ------------------------------------------------------------------ */
-
 const CHART_COLORS = [
   '#10b981', // green (emerald)
   '#f97316', // orange
@@ -61,10 +57,6 @@ function ChartGradients({ series }: { series: SeriesConfig[] }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Custom tooltip — clean, minimal                                     */
-/* ------------------------------------------------------------------ */
-
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload || payload.length === 0) return null;
 
@@ -92,10 +84,6 @@ function CustomTooltip({ active, payload, label }: any) {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* Types                                                               */
-/* ------------------------------------------------------------------ */
 
 interface SeriesConfig {
   dataKey: string;
@@ -151,11 +139,6 @@ function copyDataToClipboard(data: Record<string, any>[]) {
   navigator.clipboard.writeText(text);
 }
 
-/* ------------------------------------------------------------------ */
-/* Stable style objects — declared outside component to prevent        */
-/* Recharts infinite re-render loops                                   */
-/* ------------------------------------------------------------------ */
-
 const AXIS_TICK_STYLE = {
   fontSize: 11,
   fill: 'var(--muted-foreground)',
@@ -177,10 +160,6 @@ const BAR_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
 
 const renderPieLabel = ({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`;
 
-/* ------------------------------------------------------------------ */
-/* Deep compare hook — prevents infinite loops from object references  */
-/* ------------------------------------------------------------------ */
-
 function useDeepMemo<T>(factory: () => T, deps: any[]): T {
   const ref = useRef<{ deps: any[]; value: T } | null>(null);
 
@@ -192,10 +171,6 @@ function useDeepMemo<T>(factory: () => T, deps: any[]): T {
 
   return ref.current.value;
 }
-
-/* ------------------------------------------------------------------ */
-/* Main component                                                      */
-/* ------------------------------------------------------------------ */
 
 export function ChatChart({ config }: { config: ChartConfig }) {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -214,12 +189,76 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     yAxisLabel,
   } = config;
 
-  const stableData = useDeepMemo(() => data, [data]);
+  const { stableData, stableSeries, stableXAxisKey } = useDeepMemo(() => {
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return { stableData: [], stableSeries: series, stableXAxisKey: xAxisKey };
+    }
+
+    const firstRow = data[0];
+    const availableKeys = Object.keys(firstRow);
+
+    // 1. Auto-correct xAxisKey
+    let newXAxisKey = xAxisKey;
+    if (xAxisKey && !(xAxisKey in firstRow)) {
+      const match = availableKeys.find(
+        (k) =>
+          k.toLowerCase().includes(xAxisKey.toLowerCase()) ||
+          xAxisKey.toLowerCase().includes(k.toLowerCase()),
+      );
+      if (match) {
+        newXAxisKey = match;
+      } else {
+        // Find the first key that typically represents a label (string)
+        const stringKey = availableKeys.find(
+          (k) =>
+            typeof firstRow[k] === 'string' &&
+            isNaN(Number(firstRow[k].toString().replace(/[^0-9.-]/g, ''))),
+        );
+        if (stringKey) newXAxisKey = stringKey;
+        else newXAxisKey = availableKeys[0]; // fallback
+      }
+    }
+
+    // 2. Auto-correct series dataKeys
+    const valueKeys = availableKeys.filter((k) => k !== newXAxisKey);
+    const newSeries = series.map((s) => {
+      if (!(s.dataKey in firstRow) && valueKeys.length > 0) {
+        const match = valueKeys.find(
+          (k) =>
+            k.toLowerCase().includes(s.dataKey.toLowerCase()) ||
+            s.dataKey.toLowerCase().includes(k.toLowerCase()),
+        );
+        if (match) {
+          return { ...s, dataKey: match };
+        }
+        return { ...s, dataKey: valueKeys[0] };
+      }
+      return s;
+    });
+
+    // 3. Coerce values
+    const newData = data.map((row) => {
+      const newRow = { ...row };
+      newSeries.forEach((s) => {
+        const val = newRow[s.dataKey];
+        if (typeof val === 'string') {
+          // clean commas, currency symbols, etc.
+          const cleaned = val.replace(/[^0-9.-]/g, '');
+          if (cleaned !== '' && !isNaN(Number(cleaned))) {
+            newRow[s.dataKey] = Number(cleaned);
+          }
+        }
+      });
+      return newRow;
+    });
+
+    return { stableData: newData, stableSeries: newSeries, stableXAxisKey: newXAxisKey };
+  }, [data, series, xAxisKey]);
 
   const chartColors = useDeepMemo(() => {
     const palette = colors && colors.length > 0 ? colors : CHART_COLORS;
-    return series.map((s, i) => s.color || palette[i % palette.length]);
-  }, [series, colors]);
+    return stableSeries.map((s, i) => s.color || palette[i % palette.length]);
+  }, [stableSeries, colors]);
 
   const pieColors = useDeepMemo(() => {
     return colors && colors.length > 0 ? colors : CHART_COLORS;
@@ -230,12 +269,12 @@ export function ChatChart({ config }: { config: ChartConfig }) {
   }, [chartColors]);
 
   const handleCopy = useCallback(() => {
-    copyDataToClipboard(data);
+    copyDataToClipboard(stableData);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [data]);
+  }, [stableData]);
 
-  const handleDownload = useCallback(() => downloadCSV(data, title), [data, title]);
+  const handleDownload = useCallback(() => downloadCSV(stableData, title), [stableData, title]);
 
   // Memoize axis labels stably
   const xLabelObj = useDeepMemo(
@@ -264,9 +303,6 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     [yAxisLabel],
   );
 
-  // Stable memoized series config for rendering
-  const stableSeries = useDeepMemo(() => series, [series]);
-
   const renderChart = () => {
     switch (chartType) {
       case 'bar':
@@ -279,7 +315,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               vertical={false}
             />
             <XAxis
-              dataKey={xAxisKey}
+              dataKey={stableXAxisKey}
               tick={AXIS_TICK_STYLE}
               axisLine={AXIS_LINE_STYLE}
               tickLine={false}
@@ -322,7 +358,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               vertical={false}
             />
             <XAxis
-              dataKey={xAxisKey}
+              dataKey={stableXAxisKey}
               tick={AXIS_TICK_STYLE}
               axisLine={AXIS_LINE_STYLE}
               tickLine={false}
@@ -360,7 +396,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               vertical={false}
             />
             <XAxis
-              dataKey={xAxisKey}
+              dataKey={stableXAxisKey}
               tick={AXIS_TICK_STYLE}
               axisLine={AXIS_LINE_STYLE}
               tickLine={false}
@@ -396,7 +432,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
             <Pie
               data={stableData}
               dataKey={dataKey}
-              nameKey={xAxisKey}
+              nameKey={stableXAxisKey}
               cx="50%"
               cy="50%"
               outerRadius="75%"
@@ -433,12 +469,12 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               vertical={false}
             />
             <XAxis
-              dataKey={xAxisKey}
+              dataKey={stableXAxisKey}
               type="number"
               tick={AXIS_TICK_STYLE}
               axisLine={AXIS_LINE_STYLE}
               tickLine={false}
-              name={xAxisLabel || xAxisKey}
+              name={xAxisLabel || stableXAxisKey}
             />
             <YAxis
               dataKey={stableSeries[0]?.dataKey}
@@ -463,7 +499,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
         return (
           <RadarChart data={stableData} outerRadius="75%">
             <PolarGrid stroke="var(--border)" opacity={0.5} />
-            <PolarAngleAxis dataKey={xAxisKey} tick={POLAR_ANGLE_TICK} />
+            <PolarAngleAxis dataKey={stableXAxisKey} tick={POLAR_ANGLE_TICK} />
             <PolarRadiusAxis tick={POLAR_RADIUS_TICK} />
             <Tooltip content={CustomTooltip} />
             {stableSeries.map((s, i) => (
@@ -502,11 +538,6 @@ export function ChatChart({ config }: { config: ChartConfig }) {
   return (
     <div
       ref={chartRef}
-      // NOTE: removed `zoom-in-[0.98]` from the entrance animation.
-      // A scale() transform animating on this wrapper fights with
-      // ResponsiveContainer's ResizeObserver (it keeps reporting new
-      // sizes every animation frame), which caused the
-      // "Maximum update depth exceeded" crash. Fade-only is safe.
       className="overflow-hidden rounded-xl border border-border/70 bg-muted my-4 animate-in fade-in duration-300 [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_*:focus-visible]:ring-0"
     >
       {/* Header */}
@@ -517,7 +548,6 @@ export function ChatChart({ config }: { config: ChartConfig }) {
         </div>
       </div>
 
-      {/* Chart area — compact height */}
       <div className="px-2 py-4 pb-2">
         <div style={{ width: '100%', height: 240, minHeight: 240 }}>
           <ResponsiveContainer width="100%" height="100%" debounce={50}>

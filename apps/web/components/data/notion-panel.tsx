@@ -4,7 +4,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { toast } from 'sonner';
 import { useNotionAuth } from '@/hooks/use-notion-auth';
-import { formatErrorMessage } from '@/lib/error-formatter';
+import { formatErrorMessage } from '@/lib/shared/error-formatter';
 import {
   ExternalLink,
   Loader2,
@@ -17,7 +17,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { DialogFooter } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
@@ -207,8 +206,8 @@ export function NotionPanel({ onAdded, onClose }: { onAdded: () => void; onClose
     showType === 'pages'
       ? filteredPages
       : showType === 'databases'
-      ? filteredDatabases
-      : [...filteredPages, ...filteredDatabases];
+        ? filteredDatabases
+        : [...filteredPages, ...filteredDatabases];
 
   return (
     <div className="flex w-full min-w-0 flex-col">
@@ -343,7 +342,7 @@ export function NotionPanel({ onAdded, onClose }: { onAdded: () => void; onClose
               {search ? 'No pages match your search.' : 'No pages found.'}
             </p>
             {!search && (
-              <p className="text-xs text-muted-foreground mt-1 max-w-[350px]">
+              <p className="text-xs text-muted-foreground mt-1 max-w-87.5">
                 Make sure your integration has access to pages in Notion.
               </p>
             )}
@@ -352,7 +351,7 @@ export function NotionPanel({ onAdded, onClose }: { onAdded: () => void; onClose
       </div>
 
       {/* Import actions */}
-      <DialogFooter className="!m-0 flex flex-row items-center justify-between space-x-0 gap-2 border-t border-border/70 bg-muted/50 p-4 sm:justify-between">
+      <DialogFooter className="m-0! flex flex-row items-center justify-between space-x-0 gap-2 border-t border-border/70 bg-muted/50 p-4 sm:justify-between">
         <Button
           variant="destructive"
           onClick={async () => {

@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import useSWR from 'swr';
 import type { UIMessage } from 'ai';
+import { MessageActions } from '@/components/chat/message-actions';
 import { ChatChart, type ChartConfig } from '@/components/chat/tools/chat-chart';
 import { ChatDataTable, type DataTableConfig } from '@/components/chat/tools/chat-data-table';
 import {
@@ -16,39 +18,18 @@ import {
 import { ChatSignatureRequest } from '@/components/chat/tools/chat-signature-request';
 import { Sparkles, FileEdit, CheckCircle2, Globe, ChevronDown } from 'lucide-react';
 import { ChatMediaPreview } from '@/components/chat/tools/chat-media-preview';
-import { VideoEvidenceResult } from '@/components/chat/tools/video-evidence-result';
+import { ChatCitations, type ChatCitationsUi } from '@/components/chat/tools/chat-citations';
 import { KnowledgeBaseResult } from '@/components/chat/tools/knowledge-base-result';
 import { useDocEditor } from '@/components/chat/canvas/doc-editor-provider';
-import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/chat/reasoning';
-
-function FollowUpButtons({
-  suggestions,
-  onSelect,
-}: {
-  suggestions: string[];
-  onSelect?: (text: string) => void;
-}) {
-  if (suggestions.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap gap-2 pt-1">
-      {suggestions.map((s, i) => (
-        <button
-          key={i}
-          type="button"
-          onClick={() => onSelect?.(s)}
-          className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
-            i === 0
-              ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/20'
-              : 'border-border bg-card text-foreground hover:bg-secondary'
-          }`}
-        >
-          {s}
-        </button>
-      ))}
-    </div>
-  );
-}
+import { CHAT_TOOL_BEHAVIORS, getChatToolBehavior } from '@/lib/constants/tools';
+import { decodeToolOutput } from '@/lib/chat/tool-output';
+import {
+  isIndeterminateProgress,
+  keepToolProgressMonotonic,
+  smoothLiveToolProgress,
+  smoothPendingToolProgress,
+  type LiveToolActivity,
+} from '@/lib/chat/live-tool-progress';
 
 export function MessageItem({
   message,
@@ -56,14 +37,91 @@ export function MessageItem({
   isStreaming,
   addToolResult,
   serverId,
+  autoOpenSupportingClip = false,
+  regenerate,
+  isBusy,
 }: {
   message: UIMessage;
   isLast?: boolean;
   isStreaming?: boolean;
   addToolResult?: Function;
   serverId?: string | null;
+  /** Only the first assistant message in a chat may expand a clip initially. */
+  autoOpenSupportingClip?: boolean;
+  regenerate?: (options?: { messageId?: string }) => void;
+  /** True while a request is in flight — hides "Regenerate" on a trailing user message that's still waiting on a reply. */
+  isBusy?: boolean;
 }) {
   const isUser = message.role === 'user';
+  const [progressClock, setProgressClock] = useState(() => Date.now());
+  const pendingToolStartedAt = useRef<Record<string, number>>({});
+  const [lastToolActivity, setLastToolActivity] = useState<LiveToolActivity | null>(null);
+  const [toolProgressFloors, setToolProgressFloors] = useState<Record<string, number>>({});
+
+  // The server gives us authoritative stage updates; this lightweight clock
+  // only animates the safe in-between estimate above. It is scoped to the
+  // active streamed answer so completed chat history never re-renders.
+  useEffect(() => {
+    if (!isLast || !isStreaming) return;
+    setProgressClock(Date.now());
+    const timer = window.setInterval(() => setProgressClock(Date.now()), 500);
+    return () => window.clearInterval(timer);
+  }, [isLast, isStreaming]);
+
+  // Any long-running tool call (any installed tool, not just video) can
+  // report live progress keyed by its own toolCallId -- see
+  // gpu-activity-store.ts. Only the currently-streaming message ever has an
+  // executing tool part, so there's nothing to match against otherwise.
+  const { data: liveToolActivity } = useSWR<{ activity: LiveToolActivity | null }>(
+    isLast && isStreaming
+      ? `/api/gpu-activity${serverId ? `?projectId=${encodeURIComponent(serverId)}` : ''}`
+      : null,
+    (url: string) => fetch(url).then((r) => r.json()),
+    {
+      refreshInterval: 800,
+      dedupingInterval: 0,
+      keepPreviousData: true,
+    },
+  );
+  const currentToolActivity =
+    liveToolActivity?.activity?.toolCallId && liveToolActivity.activity.phase
+      ? liveToolActivity.activity
+      : lastToolActivity;
+  const smoothedToolPercent = currentToolActivity
+    ? smoothLiveToolProgress(currentToolActivity, progressClock)
+    : 0;
+  const priorToolPercent = currentToolActivity?.toolCallId
+    ? toolProgressFloors[currentToolActivity.toolCallId]
+    : undefined;
+  const visibleToolPercent = keepToolProgressMonotonic(priorToolPercent, smoothedToolPercent);
+
+  // A query may inspect several short source ranges in succession. The API
+  // clears each finished range before the next starts, but they are one chat
+  // action. Preserve its last visual floor and activity through that handoff
+  // so the inline bar never drops back to the beginning.
+  useEffect(() => {
+    if (!liveToolActivity?.activity?.toolCallId) return;
+    setLastToolActivity(liveToolActivity.activity);
+    const callId = liveToolActivity.activity.toolCallId;
+    const next = smoothLiveToolProgress(liveToolActivity.activity, progressClock);
+    setToolProgressFloors((current) => {
+      const floor = keepToolProgressMonotonic(current[callId], next);
+      return current[callId] === floor ? current : { ...current, [callId]: floor };
+    });
+  }, [liveToolActivity?.activity, progressClock]);
+  // Shown for both phases -- a silent "Working…" row for the whole time a
+  // cold GPU worker takes to wake up reads as hung, even though the
+  // dedicated bottom-right ring is also showing that same wait.
+  const activeToolProgress = currentToolActivity?.toolCallId
+    ? {
+        toolCallId: currentToolActivity.toolCallId,
+        percent: visibleToolPercent,
+        label: currentToolActivity.label,
+        message: currentToolActivity.message || currentToolActivity.label,
+        phase: currentToolActivity.phase,
+      }
+    : null;
+
   let updateFromToolResult: ((result: any) => void) | undefined;
   let openCanvas: ((file: File, options?: any) => Promise<void>) | undefined;
 
@@ -211,7 +269,7 @@ export function MessageItem({
     const allAttachments = attachments.length > 0 ? attachments : partAttachments;
 
     return (
-      <div className="message user-message flex justify-end" data-role="user">
+      <div className="message user-message group flex justify-end" data-role="user">
         <div className="max-w-[85%] flex flex-col gap-2 items-end">
           {allAttachments.length > 0 && (
             <div className="flex flex-wrap justify-end gap-2">
@@ -324,6 +382,16 @@ export function MessageItem({
               {text}
             </div>
           )}
+          {text && (
+            <MessageActions
+              text={text}
+              className="opacity-0 transition group-hover:opacity-100 focus-within:opacity-100"
+              regenerateLabel="Resend from here"
+              onRegenerate={
+                !isBusy && regenerate ? () => regenerate({ messageId: message.id }) : undefined
+              }
+            />
+          )}
         </div>
       </div>
     );
@@ -332,14 +400,34 @@ export function MessageItem({
   // Assistant message
   const kbParts = parts.filter((p: any) => {
     const { toolName } = getToolInfo(p);
-    return toolName === 'searchKnowledgeBase';
+    return getChatToolBehavior(toolName).placement === 'source';
+  });
+  // searchKnowledgeBase automatically enriches a video match with active
+  // evidence (queryVideoKnowledge's own result, ui.kind:'citations' included
+  // -- the same generic shape any tool's completed result can carry).
+  // Preserve that nested result as a visible citation card instead of
+  // making a completed GPU investigation look like ordinary RAG only.
+  const nestedVideoCitationsUi: ChatCitationsUi[] = kbParts.flatMap((part: any) => {
+    const output = getToolInfo(part).output;
+    const result = decodeToolOutput(output) as any;
+    return result?.videoEvidence?.success && result.videoEvidence.ui?.kind === 'citations'
+      ? [result.videoEvidence.ui as ChatCitationsUi]
+      : [];
   });
   const isKnowledgeSearchActive = kbParts.some((part: any) => getToolInfo(part).isExecuting);
+  const activeKnowledgeProgress =
+    activeToolProgress &&
+    kbParts.some((part: any) => {
+      const invocation = part.toolInvocation ?? part;
+      return (invocation.toolCallId || invocation.id || '') === activeToolProgress.toolCallId;
+    })
+      ? activeToolProgress
+      : null;
 
   let signatureFound = false;
   const toolParts = parts.filter((p: any) => {
     const { toolName } = getToolInfo(p);
-    if (toolName === 'searchKnowledgeBase') return false;
+    if (getChatToolBehavior(toolName).placement === 'source') return false;
     if (toolName === 'requestDocumentSignature') {
       if (signatureFound) return false;
       signatureFound = true;
@@ -349,17 +437,7 @@ export function MessageItem({
 
   const textParts = parts.filter((p: any) => p.type === 'text');
 
-  const nativeReasoningParts = parts.filter((p: any) => p.type === 'reasoning');
-  const nativeReasoningText = nativeReasoningParts
-    .map((p: any) => p.text || '')
-    .filter(Boolean)
-    .join('\n\n');
-  const hasNativeReasoning = nativeReasoningParts.length > 0;
-  const lastPart = parts.at(-1);
-  const isNativeReasoningStreaming = isLast && isStreaming && lastPart?.type === 'reasoning';
-
-  const { allCleanTexts, thinkReasoningText, hasThinkTags } = useMemo(() => {
-    let thinkText = '';
+  const { allCleanTexts, hasThinkTags } = useMemo(() => {
     let hasTags = false;
     const cleanTexts: string[] = [];
     for (const part of textParts) {
@@ -367,47 +445,54 @@ export function MessageItem({
       const { cleanText, reasoningText } = stripThinkTags(raw);
       cleanTexts.push(cleanText);
       if (reasoningText) {
-        thinkText += (thinkText ? '\n\n' : '') + reasoningText;
         hasTags = true;
       }
     }
-    return { allCleanTexts: cleanTexts, thinkReasoningText: thinkText, hasThinkTags: hasTags };
+    return { allCleanTexts: cleanTexts, hasThinkTags: hasTags };
   }, [textParts]);
 
-  const isThinkReasoningStreaming = useMemo(() => {
-    if (!isLast || !isStreaming || !hasThinkTags) return false;
-    const lastText = textParts.at(-1)?.text || '';
-    const openCount = (lastText.match(/<think>/gi) || []).length;
-    const closeCount = (lastText.match(/<\/think>/gi) || []).length;
-    return openCount > closeCount;
-  }, [isLast, isStreaming, hasThinkTags, textParts]);
+  const answerText = useMemo(
+    () => allCleanTexts.filter(Boolean).join('\n\n').trim(),
+    [allCleanTexts],
+  );
 
-  const combinedReasoningText = [nativeReasoningText, thinkReasoningText]
-    .filter(Boolean)
-    .join('\n\n');
-  const hasAnyReasoning = hasNativeReasoning || hasThinkTags;
-  const isReasoningStreaming = isNativeReasoningStreaming || isThinkReasoningStreaming;
+  // Feedback is presentation state only. Answers are always regenerated from
+  // fresh retrieval and are never saved as a shortcut for a later question.
+  const [liked, setLiked] = useState(false);
+  const [disliked, setDisliked] = useState(false);
+
+  const handleLike = () => {
+    setLiked((current) => !current);
+    setDisliked(false);
+  };
+
+  const handleDislike = () => {
+    const next = !disliked;
+    setDisliked(next);
+    if (next) setLiked(false);
+  };
 
   const isShimmering =
     textParts.every((p: any) => !p.text || p.text.trim().length === 0) && isLast && isStreaming;
 
   const isVizPart = (p: any) => {
     const { toolName, isCompleted } = getToolInfo(p);
-    return toolName === 'generateVisualization' && isCompleted;
+    return getChatToolBehavior(toolName).placement === 'visualization' && isCompleted;
   };
 
   const vizParts = toolParts.filter(isVizPart);
-  const mediaToolParts = toolParts.filter((p: any) => getToolInfo(p).toolName === 'presentMedia');
-  const videoEvidenceParts = toolParts.filter(
-    (p: any) => getToolInfo(p).toolName === 'queryVideoKnowledge',
+  const mediaToolParts = toolParts.filter(
+    (p: any) => getChatToolBehavior(getToolInfo(p).toolName).placement === 'media',
   );
-  const webSearchParts = toolParts.filter((p: any) => getToolInfo(p).toolName === 'webSearch');
-  const nonVizToolParts = toolParts.filter(
-    (p: any) =>
-      !isVizPart(p) &&
-      getToolInfo(p).toolName !== 'presentMedia' &&
-      getToolInfo(p).toolName !== 'queryVideoKnowledge' &&
-      getToolInfo(p).toolName !== 'webSearch',
+  const webSearchParts = toolParts.filter(
+    (p: any) => getChatToolBehavior(getToolInfo(p).toolName).placement === 'web-search',
+  );
+  const nonVizToolParts = toolParts.filter((p: any) => {
+    const placement = getChatToolBehavior(getToolInfo(p).toolName).placement;
+    return !isVizPart(p) && placement === 'inline';
+  });
+  const firstCitationToolPartIndex = toolParts.findIndex(
+    (part: any) => getToolInfo(part).output?.ui?.kind === 'citations',
   );
 
   const vizTabs =
@@ -425,31 +510,59 @@ export function MessageItem({
     () =>
       toolParts.filter((p: any) => {
         const { isExecuting, toolName } = getToolInfo(p);
-        return isExecuting && toolName !== 'searchKnowledgeBase';
+        return isExecuting && getChatToolBehavior(toolName).placement !== 'source';
       }),
     [toolParts],
   );
+  const progressForExecutingPart = (part: any) => {
+    const invocation = part.toolInvocation ?? part;
+    const toolCallId = invocation.toolCallId || invocation.id || '';
+    if (activeToolProgress?.toolCallId === toolCallId) return activeToolProgress;
+    pendingToolStartedAt.current[toolCallId] ??= progressClock;
+    const behavior = getChatToolBehavior(getToolInfo(part).toolName);
+    return {
+      toolCallId,
+      percent: smoothPendingToolProgress(pendingToolStartedAt.current[toolCallId], progressClock),
+      label: behavior.pendingLabel || 'Working…',
+      message: behavior.pendingLabel || 'Working…',
+    };
+  };
 
   return (
     <div className="message assistant-message flex flex-col gap-2" data-role="assistant">
-      {kbParts.length > 0 && <KnowledgeBaseResult parts={kbParts} isShimmering={isShimmering} />}
+      {kbParts.length > 0 && (
+        <KnowledgeBaseResult
+          parts={kbParts}
+          isShimmering={isShimmering}
+          activity={activeKnowledgeProgress}
+        />
+      )}
 
-      {videoEvidenceParts.length > 0 && <VideoEvidenceResult parts={videoEvidenceParts} />}
+      {nestedVideoCitationsUi.map((ui, i) => (
+        <ChatCitations
+          key={`nested-citations-${i}`}
+          ui={ui}
+          autoOpenSupportingClip={autoOpenSupportingClip && i === 0}
+        />
+      ))}
 
       {webSearchParts.length > 0 && <WebSearchSummary parts={webSearchParts} />}
 
-      {hasAnyReasoning && !isKnowledgeSearchActive && (
-        <Reasoning isStreaming={isReasoningStreaming}>
-          <ReasoningTrigger />
-          <ReasoningContent>{combinedReasoningText}</ReasoningContent>
-        </Reasoning>
-      )}
-
       {nonVizToolParts
         .filter((p: any) => getToolInfo(p).isCompleted)
-        .map((part: any, i: number) =>
-          renderToolPart(part, i, addToolResult, updateFromToolResult),
-        )}
+        .map((part: any, i: number) => {
+          const partIndex = toolParts.indexOf(part);
+          return renderToolPart(
+            part,
+            i,
+            addToolResult,
+            updateFromToolResult,
+            undefined,
+            autoOpenSupportingClip &&
+              nestedVideoCitationsUi.length === 0 &&
+              partIndex === firstCitationToolPartIndex,
+          );
+        })}
 
       {vizTabs ? (
         <ChatTabs config={{ tabs: vizTabs }} />
@@ -460,14 +573,20 @@ export function MessageItem({
       )}
 
       {executingParts.map((part: any, i: number) =>
-        renderToolPart(part, i, addToolResult, updateFromToolResult),
+        renderToolPart(
+          part,
+          i,
+          addToolResult,
+          updateFromToolResult,
+          progressForExecutingPart(part),
+        ),
       )}
 
       {isLast &&
         isStreaming &&
         executingParts.length === 0 &&
         !isKnowledgeSearchActive &&
-        !hasAnyReasoning &&
+        !hasThinkTags &&
         textParts.every((p: any) => !p.text || p.text.trim().length === 0) && (
           <div className="flex items-center gap-2">
             <div className="size-6.5 bg-white border border-border rounded-full flex items-center justify-center p-1 animate-pulse">
@@ -518,6 +637,17 @@ export function MessageItem({
         .map((part: any, i: number) =>
           renderToolPart(part, i, addToolResult, updateFromToolResult),
         )}
+
+      {answerText && !(isLast && isStreaming) && (
+        <MessageActions
+          text={answerText}
+          liked={liked}
+          disliked={disliked}
+          onLike={handleLike}
+          onDislike={handleDislike}
+          onRegenerate={regenerate ? () => regenerate({ messageId: message.id }) : undefined}
+        />
+      )}
     </div>
   );
 }
@@ -631,28 +761,98 @@ function stripThinkTags(text: string): { cleanText: string; reasoningText: strin
   if (!text) return { cleanText: '', reasoningText: '' };
 
   const reasoningParts: string[] = [];
-  let cleaned = text;
+  let cleaned = stripLeakedToolCalls(text);
 
-  // Extract complete <think>…</think> blocks
-  const completeRegex = /<think>([\s\S]*?)<\/think>/gi;
+  // 1. Extract complete <think>…</think> or <thought>…</thought> blocks
+  const thinkRegex = /<(?:think|thought)>([\s\S]*?)<\/(?:think|thought)>/gi;
   let match;
-  while ((match = completeRegex.exec(cleaned)) !== null) {
+  while ((match = thinkRegex.exec(cleaned)) !== null) {
     reasoningParts.push(match[1].trim());
   }
-  cleaned = cleaned.replace(completeRegex, '');
+  cleaned = cleaned.replace(thinkRegex, '');
 
-  // Extract unclosed <think>… (streaming, no closing tag yet)
-  const unclosedRegex = /<think>([\s\S]*)$/i;
-  const unclosedMatch = cleaned.match(unclosedRegex);
-  if (unclosedMatch) {
-    reasoningParts.push(unclosedMatch[1].trim());
-    cleaned = cleaned.replace(unclosedRegex, '');
+  // 2. Extract unclosed <think> or <thought> (streaming, no closing tag yet)
+  const unclosedThinkRegex = /<(?:think|thought)>([\s\S]*)$/i;
+  const unclosedThinkMatch = cleaned.match(unclosedThinkRegex);
+  if (unclosedThinkMatch) {
+    reasoningParts.push(unclosedThinkMatch[1].trim());
+    cleaned = cleaned.replace(unclosedThinkRegex, '');
+  }
+
+  // 3. Handle <result>...</result>
+  const resultRegex = /<result>([\s\S]*?)<\/result>/gi;
+  let resultMatch;
+  let foundResult = false;
+  let finalCleanText = '';
+  let textOutsideResult = cleaned;
+
+  while ((resultMatch = resultRegex.exec(cleaned)) !== null) {
+    foundResult = true;
+    finalCleanText += (finalCleanText ? '\n\n' : '') + resultMatch[1].trim();
+    textOutsideResult = textOutsideResult.replace(resultMatch[0], '');
+  }
+
+  // Handle unclosed <result>
+  const unclosedResultRegex = /<result>([\s\S]*)$/i;
+  const unclosedResultMatch = textOutsideResult.match(unclosedResultRegex);
+  if (unclosedResultMatch) {
+    foundResult = true;
+    finalCleanText += (finalCleanText ? '\n\n' : '') + unclosedResultMatch[1].trim();
+    textOutsideResult = textOutsideResult.replace(unclosedResultRegex, '');
+  }
+
+  if (foundResult) {
+    if (textOutsideResult.trim()) {
+      reasoningParts.push(textOutsideResult.trim());
+    }
+    return {
+      cleanText: finalCleanText.trim(),
+      reasoningText: reasoningParts.filter(Boolean).join('\n\n'),
+    };
   }
 
   return {
     cleanText: cleaned.trim(),
     reasoningText: reasoningParts.filter(Boolean).join('\n\n'),
   };
+}
+
+/**
+ * Some providers occasionally place a tool request in assistant text after
+ * sending (or instead of sending) the structured tool part. Tool calls are
+ * implementation detail, never useful answer content. Restrict removal to
+ * registered first-party names so ordinary prose and code remain intact.
+ */
+function stripLeakedToolCalls(text: string): string {
+  const names = new Set(Object.keys(CHAT_TOOL_BEHAVIORS));
+  const lines = text.split('\n');
+  const kept: string[] = [];
+  let callDepth = 0;
+
+  for (const line of lines) {
+    if (callDepth > 0) {
+      callDepth += countParentheses(line);
+      if (callDepth <= 0) callDepth = 0;
+      continue;
+    }
+    const name = line.match(/^\s*([A-Za-z_$][\w$]*)\s*\(/)?.[1];
+    if (name && names.has(name)) {
+      callDepth = countParentheses(line);
+      if (callDepth <= 0) callDepth = 0;
+      continue;
+    }
+    kept.push(line);
+  }
+  return kept.join('\n');
+}
+
+function countParentheses(text: string): number {
+  let count = 0;
+  for (const char of text) {
+    if (char === '(') count += 1;
+    if (char === ')') count -= 1;
+  }
+  return count;
 }
 
 function getToolInfo(part: any): {
@@ -671,7 +871,7 @@ function getToolInfo(part: any): {
       isCompleted:
         (state === 'result' || state === 'output' || state === 'output-available') &&
         ti.result !== undefined,
-      output: ti.result,
+      output: decodeToolOutput(ti.result) ?? ti.result,
       input: ti.args,
     };
   }
@@ -684,7 +884,7 @@ function getToolInfo(part: any): {
       isExecuting: state === 'input-streaming' || state === 'input-available',
       isCompleted:
         (state === 'output' || state === 'output-available') && part.output !== undefined,
-      output: part.output,
+      output: decodeToolOutput(part.output) ?? part.output,
       input: part.input,
     };
   }
@@ -703,15 +903,22 @@ function renderToolPart(
   index: number,
   addToolResult?: Function,
   updateFromToolResult?: Function,
+  toolProgress?: {
+    toolCallId: string;
+    percent: number;
+    label: string;
+    message?: string;
+  } | null,
+  autoOpenSupportingClip = false,
 ): React.ReactNode | null {
   const { toolName, isExecuting, isCompleted, output, input } = getToolInfo(part);
+  const behavior = getChatToolBehavior(toolName);
+  const callId = part.toolInvocation?.toolCallId || part.toolCallId || part.id || '';
 
-  // Still executing — show loading indicator
   if (isExecuting) {
-    if (toolName === 'searchKnowledgeBase') return null;
+    if (behavior.placement === 'source') return null;
 
-    if (toolName === 'requestDocumentSignature') {
-      const callId = part.toolInvocation?.toolCallId || part.toolCallId || part.id || '';
+    if (behavior.resultView === 'signature') {
       return (
         <ChatSignatureRequest
           key={index}
@@ -722,38 +929,117 @@ function renderToolPart(
       );
     }
 
+    const liveProgress = toolProgress && toolProgress.toolCallId === callId ? toolProgress : null;
+    // Past the point where the remaining work has a measurable size, a
+    // percentage is a claim we cannot back. Drop it and shuttle the bar
+    // instead, so the wait still reads as active rather than stalled.
+    const indeterminate = liveProgress ? isIndeterminateProgress(liveProgress.percent) : false;
+
     return (
-      <div key={index} className="flex items-center gap-2 py-3">
-        <div className="size-6.5 bg-white dark:bg-card border border-border rounded-full flex items-center justify-center p-1 animate-pulse">
-          <img src="/logo.png" alt="logo" className="size-4 animate-spin" />
+      <div key={index} className="flex flex-col gap-1.5 py-3">
+        <div className="flex items-center gap-2">
+          <div className="size-6.5 bg-white dark:bg-card border border-border rounded-full flex items-center justify-center p-1">
+            <img src="/logo.png" alt="" className="size-4 animate-spin" />
+          </div>
+          <span className="larkup-shimmer-text text-[13px] font-medium">
+            {liveProgress?.message || liveProgress?.label || behavior.pendingLabel || 'Working'}
+          </span>
         </div>
-        <span className="text-[13px] font-medium text-foreground/80 animate-pulse">
-          {toolName === 'queryTabularData' && 'Querying data...'}
-          {toolName === 'generateVisualization' && 'Generating chart...'}
-          {toolName === 'executeAnalysis' && 'Running analysis...'}
-          {toolName === 'getIndexedData' && 'Fetching corpus data...'}
-          {toolName === 'analyzeCorpusWithCode' && 'Analyzing corpus...'}
-          {toolName === 'fillDocumentForm' && 'Filling form fields...'}
-          {toolName === 'editDocument' && 'Editing document...'}
-          {toolName === 'requestDocumentSignature' && 'Processing signature request...'}
-          {![
-            'queryTabularData',
-            'generateVisualization',
-            'executeAnalysis',
-            'getIndexedData',
-            'analyzeCorpusWithCode',
-            'fillDocumentForm',
-            'editDocument',
-            'requestDocumentSignature',
-          ].includes(toolName) && 'Processing...'}
-        </span>
+        {liveProgress ? (
+          <div className="ml-9 flex items-center gap-2">
+            <div className="h-1.5 w-48 overflow-hidden rounded-full bg-muted">
+              {indeterminate ? (
+                <div className="larkup-progress-shuttle h-full rounded-full bg-emerald-500" />
+              ) : (
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-[width] duration-700 ease-out"
+                  style={{ width: `${Math.max(6, Math.min(100, liveProgress.percent))}%` }}
+                />
+              )}
+            </div>
+            {!indeterminate ? (
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {Math.round(liveProgress.percent)}%
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     );
   }
 
   if (isCompleted) {
-    switch (toolName) {
-      case 'queryTabularData': {
+    const enterpriseUi = output?.ui;
+    if (enterpriseUi?.kind === 'notice') {
+      return (
+        <div
+          key={index}
+          className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm"
+        >
+          <div className="font-medium">{enterpriseUi.title}</div>
+          <div className="mt-1 text-muted-foreground">{enterpriseUi.body}</div>
+        </div>
+      );
+    }
+    if (enterpriseUi?.kind === 'card') {
+      return (
+        <div key={index} className="rounded-xl border border-border bg-card px-4 py-3 text-sm">
+          <div className="font-medium">{enterpriseUi.title}</div>
+          <dl className="mt-3 grid gap-2">
+            {(enterpriseUi.facts ?? []).map((fact: { label: string; value: string }) => (
+              <div className="flex items-start justify-between gap-5" key={fact.label}>
+                <dt className="text-muted-foreground">{fact.label}</dt>
+                <dd className="text-right">{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      );
+    }
+    if (enterpriseUi?.kind === 'table') {
+      return (
+        <div
+          key={index}
+          className="overflow-x-auto rounded-xl border border-border bg-card p-3 text-sm"
+        >
+          <div className="mb-3 font-medium">{enterpriseUi.title}</div>
+          <table className="w-full text-left">
+            <thead className="text-muted-foreground">
+              <tr>
+                {(enterpriseUi.columns ?? []).map((column: string) => (
+                  <th className="px-2 py-1" key={column}>
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(enterpriseUi.rows ?? []).map((row: Record<string, string>, rowIndex: number) => (
+                <tr className="border-t border-border/60" key={rowIndex}>
+                  {(enterpriseUi.columns ?? []).map((column: string) => (
+                    <td className="px-2 py-2" key={column}>
+                      {row[column]}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+    if (enterpriseUi?.kind === 'citations') {
+      return (
+        <ChatCitations
+          key={index}
+          ui={enterpriseUi}
+          assetId={output?.mediaAssetId}
+          autoOpenSupportingClip={autoOpenSupportingClip}
+        />
+      );
+    }
+    switch (behavior.resultView) {
+      case 'data-table': {
         if (output.error) return null;
         const tableConfig: DataTableConfig = {
           columns: output.columns ?? [],
@@ -762,30 +1048,35 @@ function renderToolPart(
           aggregationResults: output.aggregationResults,
         };
         if (tableConfig.rows.length === 0 && !tableConfig.aggregationResults) return null;
-        return <ChatDataTable key={index} config={tableConfig} />;
+        const visualization = output.visualization as ChartConfig | undefined;
+        return (
+          <div key={index}>
+            <ChatDataTable config={tableConfig} compact={behavior.compactResult} />
+            {visualization?.data?.length ? <ChatChart config={visualization} /> : null}
+          </div>
+        );
       }
 
-      case 'generateVisualization': {
+      case 'none': {
+        if (behavior.placement !== 'visualization') return null;
         const chartConfig = output as ChartConfig;
         if (!chartConfig?.data || chartConfig.data.length === 0) return null;
         return <ChatChart key={index} config={chartConfig} />;
       }
 
-      case 'executeAnalysis':
-      case 'analyzeCorpusWithCode': {
+      case 'sandbox': {
         const result = output as SandboxResultConfig;
         const code = input?.code;
         return <ChatSandboxResult key={index} config={result} code={code} />;
       }
 
-      case 'getIndexedData': {
+      case 'corpus': {
         const corpusConfig = output as CorpusDataConfig;
         if (!corpusConfig) return null;
         return <CorpusDataResult key={index} config={corpusConfig} />;
       }
 
-      case 'fillDocumentForm':
-      case 'editDocument': {
+      case 'document-edit': {
         if (!output.success) return null;
 
         const fileName = output.fileName || 'Document';
@@ -838,7 +1129,7 @@ function renderToolPart(
         );
       }
 
-      case 'requestDocumentSignature': {
+      case 'signature': {
         if (!output?.success) return null;
         return (
           <div
@@ -866,25 +1157,7 @@ function renderToolPart(
         );
       }
 
-      case 'webSearch': {
-        if (output.error) return null;
-        const resultsCount = output.results?.length || 0;
-        return (
-          <div key={index} className="mb-2 w-full">
-            <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
-              <Globe className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate max-w-62.5 sm:max-w-100">
-                Searched web for "{input?.query}"
-              </span>
-              <span className="shrink-0 text-[10px] bg-secondary text-foreground px-1.5 py-0.5 rounded-full font-medium ml-1">
-                {resultsCount} result{resultsCount === 1 ? '' : 's'}
-              </span>
-            </div>
-          </div>
-        );
-      }
-
-      case 'analyzeImageDeeply': {
+      case 'image-analysis': {
         if (output.error) return null;
         return (
           <div key={index} className="mb-2 w-full">
@@ -896,7 +1169,7 @@ function renderToolPart(
         );
       }
 
-      case 'presentMedia': {
+      case 'media': {
         if (
           !output?.success ||
           !output.assetId ||
@@ -919,7 +1192,7 @@ function renderToolPart(
       }
 
       default:
-        return;
+        return null;
       // return (
       //   <div key={index} className="mb-2 w-full">
       //     <div className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground bg-muted/30 rounded-md border border-border/50">
@@ -1081,10 +1354,6 @@ export function renderMarkdown(text: string): string {
     (match) => `<ul class="msg-ul">${match}</ul>`,
   );
 
-  // Ordered lists — normalize paragraph-separated numbered lists first.
-  // Small LLMs often output `1. item\n\n1. item\n\n1. item` instead of
-  // consecutive lines. Collapse the double-newlines between numbered items
-  // so they group into a single <ol>.
   html = html.replace(/(^\d+\. .+$)(\n\n)((?=\d+\. ))/gm, '$1\n$3');
 
   html = html.replace(/^(\d+)\. (.+)$/gm, '<li class="msg-li-ordered" data-order="$1">$2</li>');
@@ -1103,3 +1372,32 @@ export function renderMarkdown(text: string): string {
 
   return html;
 }
+
+// function FollowUpButtons({
+//   suggestions,
+//   onSelect,
+// }: {
+//   suggestions: string[];
+//   onSelect?: (text: string) => void;
+// }) {
+//   if (suggestions.length === 0) return null;
+
+//   return (
+//     <div className="flex flex-wrap gap-2 pt-1">
+//       {suggestions.map((s, i) => (
+//         <button
+//           key={i}
+//           type="button"
+//           onClick={() => onSelect?.(s)}
+//           className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
+//             i === 0
+//               ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/20'
+//               : 'border-border bg-card text-foreground hover:bg-secondary'
+//           }`}
+//         >
+//           {s}
+//         </button>
+//       ))}
+//     </div>
+//   );
+// }

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ArrowRight, Loader2, ChevronDown, ChevronUp, Pencil, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useWorkspace } from '@/components/workspace/workspace-provider';
+import { useProject } from '@/components/projects/project-provider';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import {
@@ -23,7 +23,7 @@ import type { CustomModelConfig } from '@larkup/core/types';
 const WELCOME_PROVIDERS = ['vercel_ai_gateway', 'openai', 'google', 'mistral', 'custom'] as const;
 
 export function WelcomeScreen() {
-  const { setUsername, createServer, refresh } = useWorkspace();
+  const { createProject, refresh } = useProject();
   const router = useRouter();
   const [name, setName] = useState('');
 
@@ -82,7 +82,7 @@ export function WelcomeScreen() {
   const handleComplete = async () => {
     setSaving(true);
     try {
-      // Build config payload first (before creating server)
+      // Build configuration before creating the Project.
       const configRes = await fetch('/api/config');
       const { config } = await configRes.json();
 
@@ -150,11 +150,7 @@ export function WelcomeScreen() {
         return;
       }
 
-      if (name.trim()) {
-        await setUsername(name.trim());
-      }
-
-      await createServer('my-larkup');
+      await createProject(name.trim() || 'my-larkup');
 
       await fetch('/api/config', {
         method: 'PUT',
@@ -174,12 +170,7 @@ export function WelcomeScreen() {
   const handleSkip = async () => {
     setSaving(true);
     try {
-      if (name.trim()) {
-        await setUsername(name.trim());
-      }
-
-      // Create a default server so isFirstRun becomes false
-      await createServer('my-larkup');
+      await createProject(name.trim() || 'my-larkup');
 
       refresh();
       router.push('/chat');
@@ -316,7 +307,7 @@ export function WelcomeScreen() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="How should we call you?"
-                className="bg-background/50"
+                className="bg-white"
               />
             </div>
 
@@ -352,7 +343,7 @@ export function WelcomeScreen() {
                     value={embeddingApiKey}
                     onChange={(e) => setEmbeddingApiKey(e.target.value)}
                     placeholder="sk-..."
-                    className="bg-background/50 pr-10"
+                    className="bg-white pr-10"
                   />
                   <button
                     type="button"
@@ -532,11 +523,16 @@ export function WelcomeScreen() {
 
             {/* Buttons */}
             <div className="pt-2 flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={handleSkip} disabled={saving}>
+              <Button
+                variant="outline"
+                className="flex-1 h-10"
+                onClick={handleSkip}
+                disabled={saving}
+              >
                 Skip for now
               </Button>
               <Button
-                className="flex-1"
+                className="flex-1 h-10"
                 onClick={handleComplete}
                 disabled={saving || !canContinue()}
               >

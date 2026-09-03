@@ -1,7 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { IndexRun } from './types';
-import { getDataDir, requireDataDir } from './workspace';
+import {
+  getProjectDataDir as getDataDir,
+  requireProjectDataDir as requireDataDir,
+} from './project-store';
 
 /**
  * File-backed state for the current/last indexing run, scoped to the active
@@ -66,11 +69,14 @@ export function claimRun(run: IndexRun): Promise<IndexRun> {
 export function patchRun(
   patch: Partial<IndexRun>,
   expectedRunId?: string,
+  requireActive?: boolean,
 ): Promise<IndexRun | null> {
   return serialize(async () => {
     const current = await readRun();
     if (!current) return null;
     if (expectedRunId && current.id !== expectedRunId) return null;
+    if (requireActive && !['chunking', 'embedding', 'upserting'].includes(current.status))
+      return null;
     const next: IndexRun = {
       ...current,
       ...patch,

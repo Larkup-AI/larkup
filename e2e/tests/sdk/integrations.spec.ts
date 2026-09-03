@@ -2,30 +2,23 @@ import { test, expect } from '@playwright/test';
 
 import { getWebUIUrl, rewriteLocalUrl } from '../../utils/env';
 
-/**
- * Integration pattern tests — validate that the documented SDK integration
- * patterns (AI-SDK tool, LangChain retriever) actually work against the
- * running RAG server.
- *
- * These are pattern tests: they instantiate the SDK, call it, and verify
- * the response shape matches what the integration docs promise.
- */
+/** Verifies documented SDK integration patterns against the Project Runtime. */
 const WEB_API = getWebUIUrl();
 let RAG_SERVER = rewriteLocalUrl('http://localhost:8080');
 
 test.describe('SDK Integration Patterns', () => {
   test.beforeAll(async ({ request }) => {
     try {
-      // Ensure the server is running (other tests may have stopped it)
-      await request.post(`${WEB_API}/api/server/local`, {
+      // Other tests may have stopped the runtime.
+      await request.post(`${WEB_API}/api/projects/runtime`, {
         data: { action: 'start' },
       });
       await new Promise((r) => setTimeout(r, 2000));
 
-      const statusRes = await request.get(`${WEB_API}/api/server/local`);
-      const { state } = await statusRes.json();
-      if (state.endpoint) {
-        RAG_SERVER = rewriteLocalUrl(state.endpoint);
+      const statusRes = await request.get(`${WEB_API}/api/projects/runtime`);
+      const { runtime } = await statusRes.json();
+      if (runtime.endpoint) {
+        RAG_SERVER = rewriteLocalUrl(runtime.endpoint);
       }
       // Wait for server to be responsive
       for (let i = 0; i < 15; i++) {

@@ -12,6 +12,8 @@ export interface SearchState {
   searchProvider: 'firecrawl' | 'serper' | 'google' | 'brave' | 'bing' | 'tavily';
 }
 
+type StateUpdate<T> = T | ((previous: T) => T);
+
 interface ScrapeStore {
   query: string;
   searchState: SearchState | null;
@@ -23,19 +25,15 @@ interface ScrapeStore {
   serperTotalForQuery: { query: string; total: number; totalPages: number } | null;
 
   setQuery: (query: string) => void;
-  setSearchState: (
-    state: SearchState | null | ((prev: SearchState | null) => SearchState | null),
-  ) => void;
-  setSelected: (
-    selected:
-      | Record<string, boolean>
-      | ((prev: Record<string, boolean>) => Record<string, boolean>),
-  ) => void;
+  setSearchState: (state: StateUpdate<SearchState | null>) => void;
+  setSelected: (selected: StateUpdate<Record<string, boolean>>) => void;
   setScope: (scope: CrawlScope) => void;
   setPageLimit: (limit: number) => void;
   setSearchLimit: (limit: number) => void;
   setShowAdvanced: (show: boolean) => void;
-  setSerperTotalForQuery: (val: any) => void;
+  setSerperTotalForQuery: (
+    value: StateUpdate<{ query: string; total: number; totalPages: number } | null>,
+  ) => void;
 
   flush: () => void;
 }
@@ -63,9 +61,9 @@ export const useScrapeStore = create<ScrapeStore>()((set) => ({
   setPageLimit: (limit) => set({ pageLimit: limit }),
   setSearchLimit: (limit) => set({ searchLimit: limit }),
   setShowAdvanced: (show) => set({ showAdvanced: show }),
-  setSerperTotalForQuery: (val) =>
+  setSerperTotalForQuery: (value) =>
     set((prev) => ({
-      serperTotalForQuery: typeof val === 'function' ? val(prev.serperTotalForQuery) : val,
+      serperTotalForQuery: typeof value === 'function' ? value(prev.serperTotalForQuery) : value,
     })),
 
   flush: () =>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readConfig, writeConfig } from '@larkup/core/config-store';
 import { readRun } from '@larkup/core/index-store';
-import { runWithServer } from '@larkup/core/workspace';
+import { runWithProject } from '@larkup/core/project-store';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import { embedQuery } from '@larkup/core/indexing/embedder';
 import { generateObject } from 'ai';
@@ -17,12 +17,12 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGateway } from '@ai-sdk/gateway';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
-import { gatewayProviderOptions } from '@/lib/gateway-fallbacks';
+import { gatewayProviderOptions } from '@/lib/chat/gateway-fallbacks';
 
 export const dynamic = 'force-dynamic';
 
-function withServer<T>(serverId: string | null, fn: () => Promise<T>) {
-  return serverId ? runWithServer(serverId, fn) : fn();
+function withProject<T>(projectId: string | null, fn: () => Promise<T>) {
+  return projectId ? runWithProject(projectId, fn) : fn();
 }
 
 function createChatModel(
@@ -68,8 +68,8 @@ function createChatModel(
 }
 
 export async function POST(req: Request) {
-  const serverId = new URL(req.url).searchParams.get('serverId');
-  return withServer(serverId, async () => {
+  const projectId = new URL(req.url).searchParams.get('projectId');
+  return withProject(projectId, async () => {
     const config = await readConfig();
     const run = await readRun();
 

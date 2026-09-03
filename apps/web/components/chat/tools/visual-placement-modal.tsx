@@ -196,15 +196,13 @@ export function VisualPlacementModal({
   };
 
   const handleSave = () => {
-    // If there's no placement for the current page but the user moved the signature, auto-add it?
-    // The handleDragEnd automatically adds it.
     onSave(localPlacements);
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[1000px] sm:max-w-[1000px] h-[95vh] max-h-[95vh] bg-white/80 backdrop-blur-md overflow-hidden flex flex-col p-4">
+      <DialogContent className="w-[95vw] max-w-250 sm:max-w-250 h-[95vh] max-h-[95vh] bg-white/80 backdrop-blur-md overflow-hidden flex flex-col p-4">
         <DialogHeader className="mb-2 shrink-0">
           <DialogTitle>Visual Signature Placement</DialogTitle>
           <div className="flex items-center justify-between mt-2">
@@ -286,7 +284,7 @@ export function VisualPlacementModal({
                   <img
                     src={imagePayload}
                     alt="Signature"
-                    className="max-h-[60px] pointer-events-none"
+                    className="max-h-15 pointer-events-none"
                   />
                 ) : (
                   <span className="text-muted-foreground text-sm">No signature</span>

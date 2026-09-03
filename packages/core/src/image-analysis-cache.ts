@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { getDataDir, requireDataDir } from './workspace';
+import {
+  getProjectDataDir as getDataDir,
+  requireProjectDataDir as requireDataDir,
+} from './project-store';
 
 interface CachedImageAnalysis {
   analysis: string;

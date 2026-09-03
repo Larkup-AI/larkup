@@ -10,15 +10,21 @@ import {
   Globe,
   Pencil,
   Loader2,
-  X,
   ChevronLeft,
   ChevronRight,
   Film,
   Upload,
-  Eye,
   Type,
   Image,
   Plug,
+  ChevronDown,
+  Check,
+  X,
+  Eye,
+  EyeOff,
+  Monitor,
+  Cloud,
+  Info,
 } from 'lucide-react';
 import {
   Select,
@@ -27,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { DocumentSource, SourceDocument } from '@larkup/core/types';
+import type { DocumentSource, SourceDocument, DataGroup } from '@larkup/core/types';
 import { GenericAlert } from '@/components/alerts/generic-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,7 +58,14 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import {
+  videoRuntimeScopeFromMetadata,
+  videoRuntimeScopeLabel,
+  type VideoRuntimeScope,
+} from '@/lib/media/video-runtime-scope';
 
 const SOURCE_META: Record<DocumentSource, { label: string; icon: any }> = {
   website: { label: 'Website', icon: Globe },
@@ -64,12 +77,16 @@ const SOURCE_META: Record<DocumentSource, { label: string; icon: any }> = {
 
 export function CorpusPanel({
   documents,
+  groups = [],
   onChanged,
   isIndexing,
+  activeVideoRuntimeScope,
 }: {
   documents: SourceDocument[];
-  onChanged: () => void;
+  groups?: DataGroup[];
+  onChanged: () => void | Promise<unknown>;
   isIndexing?: boolean;
+  activeVideoRuntimeScope: VideoRuntimeScope;
 }) {
   const [active, setActive] = useState<SourceDocument | null>(null);
   const [deleteTask, setDeleteTask] = useState<
@@ -82,6 +99,8 @@ export function CorpusPanel({
 
   const [sourceFilter, setSourceFilter] = useState<DocumentSource | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'indexed' | 'unindexed'>('all');
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+  const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
 
   const groupedDocuments = useMemo(() => {
     const grouped = new Map<string, SourceDocument>();
@@ -116,54 +135,105 @@ export function CorpusPanel({
   const filteredDocuments = groupedDocuments.filter(
     (document) =>
       (sourceFilter === 'all' || document.source === sourceFilter) &&
-      (statusFilter === 'all' || (document.status ?? 'unindexed') === statusFilter),
+      (statusFilter === 'all' || (document.status ?? 'unindexed') === statusFilter) &&
+      (selectedGroupIds.size === 0 || selectedGroupIds.has(document.groupId ?? 'default')),
   );
 
   useEffect(() => {
     setPage(0);
-  }, [sourceFilter, statusFilter]);
+  }, [sourceFilter, statusFilter, selectedGroupIds]);
 
   const PAGE_SIZE = 10;
   const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
   const pageDocuments = filteredDocuments.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+  const legacyVideoCount = groupedDocuments.filter(
+    (document) =>
+      document.source === 'media' &&
+      document.metadata?.isGroup &&
+      !videoRuntimeScopeFromMetadata(document.metadata),
+  ).length;
 
   const allPageSelected =
     pageDocuments.length > 0 && pageDocuments.every((d) => selectedIds.has(d.id));
 
+  async function deleteRequest(url: string) {
+    const response = await fetch(url, { method: 'DELETE' });
+    if (response.ok) return;
+
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error ?? 'Could not delete this document.');
+  }
+
   async function del(id: string, doc?: SourceDocument) {
-    if (doc?.metadata?.isGroup && doc?.metadata?.mediaAssetId) {
-      await fetch(`/api/media?id=${doc.metadata.mediaAssetId}`, { method: 'DELETE' });
-    } else {
-      await fetch(`/api/documents?id=${id}`, { method: 'DELETE' });
+    try {
+      if (doc?.metadata?.isGroup && doc?.metadata?.mediaAssetId) {
+        await deleteRequest(`/api/media?id=${doc.metadata.mediaAssetId}`);
+      } else {
+        await deleteRequest(`/api/documents?id=${id}`);
+      }
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      await onChanged();
+      toast.success('Document deleted');
+    } catch (error) {
+      toast.error(formatErrorMessage(error) || 'Could not delete this document.');
     }
-    toast.message('Deleted');
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    onChanged();
   }
   async function delSelected() {
     if (selectedIds.size === 0) return;
     const toDelete = groupedDocuments.filter((d) => selectedIds.has(d.id));
-    for (const doc of toDelete) {
-      if (doc.metadata?.isGroup && doc.metadata?.mediaAssetId) {
-        await fetch(`/api/media?id=${doc.metadata.mediaAssetId}`, { method: 'DELETE' });
-      } else {
-        await fetch(`/api/documents?id=${doc.id}`, { method: 'DELETE' });
+    try {
+      for (const doc of toDelete) {
+        if (doc.metadata?.isGroup && doc.metadata?.mediaAssetId) {
+          await deleteRequest(`/api/media?id=${doc.metadata.mediaAssetId}`);
+        } else {
+          await deleteRequest(`/api/documents?id=${doc.id}`);
+        }
       }
+      setSelectedIds(new Set());
+      await onChanged();
+      toast.success(`Deleted ${toDelete.length} item(s)`);
+    } catch (error) {
+      toast.error(formatErrorMessage(error) || 'Could not delete the selected documents.');
     }
-    toast.message(`Deleted ${selectedIds.size} item(s)`);
-    setSelectedIds(new Set());
-    onChanged();
   }
   async function clearAll() {
-    await fetch('/api/documents', { method: 'DELETE' });
-    toast.message('Corpus and vector index cleared');
-    setSelectedIds(new Set());
-    onChanged();
+    try {
+      await deleteRequest('/api/documents');
+      setSelectedIds(new Set());
+      await onChanged();
+      toast.success('Corpus and vector index cleared');
+    } catch (error) {
+      toast.error(formatErrorMessage(error) || 'Could not clear the corpus.');
+    }
+  }
+
+  const isAllSelected = selectedGroupIds.size === 0;
+  const selectedGroupLabels = useMemo(() => {
+    if (isAllSelected) return 'All Groups';
+    return Array.from(selectedGroupIds)
+      .map((id) => {
+        const g = groups.find((g) => g.id === id);
+        return g ? (g.icon ? `${g.icon} ${g.name}` : g.name) : id;
+      })
+      .join(', ');
+  }, [selectedGroupIds, groups, isAllSelected]);
+
+  function toggleGroupFilter(groupId: string) {
+    setSelectedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
+
+  function clearGroupFilter() {
+    setSelectedGroupIds(new Set());
   }
 
   if (documents.length === 0) {
@@ -182,7 +252,7 @@ export function CorpusPanel({
   }
 
   return (
-    <>
+    <TooltipProvider>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between pb-3">
         <div className="flex items-center gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -209,11 +279,79 @@ export function CorpusPanel({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Popover open={groupDropdownOpen} onOpenChange={setGroupDropdownOpen}>
+            <PopoverTrigger
+              render={
+                <button
+                  type="button"
+                  className={cn(
+                    'inline-flex h-9  items-center gap-1.5 rounded-md border border-border bg-white px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/50 shadow-none',
+                    !isAllSelected && 'border-primary/40 bg-primary/5 text-primary',
+                  )}
+                  aria-label="Filter by group"
+                >
+                  <span className="max-w-40 truncate">{selectedGroupLabels}</span>
+                  <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+                </button>
+              }
+            />
+            <PopoverContent align="start" className="w-56 p-1.5 shadow-none">
+              <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={clearGroupFilter}
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs transition-colors hover:bg-accent',
+                    isAllSelected && 'bg-accent/60 font-medium',
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'flex size-4 shrink-0 items-center justify-center rounded border border-primary/40',
+                      isAllSelected ? 'bg-primary border-primary' : 'bg-white',
+                    )}
+                  >
+                    {isAllSelected && <Check className="size-2.5 text-white" strokeWidth={3} />}
+                  </div>
+                  All Groups
+                </button>
+                {groups.length > 0 && <div className="my-1 border-t border-border" />}
+                {groups.map((group) => {
+                  const isChecked = selectedGroupIds.has(group.id);
+                  return (
+                    <button
+                      key={group.id}
+                      type="button"
+                      onClick={() => toggleGroupFilter(group.id)}
+                      className={cn(
+                        'flex w-full items-center gap-2 rounded-sm px-2 py-1.5  text-xs transition-colors hover:bg-accent',
+                        isChecked && 'bg-accent/60',
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'flex size-4 shrink-0 items-center justify-center rounded border border-primary/40',
+                          isChecked ? 'bg-primary border-primary' : 'bg-white',
+                        )}
+                      >
+                        {isChecked && <Check className="size-2.5 text-white" strokeWidth={3} />}
+                      </div>
+                      <span className="flex-1 truncate text-left">
+                        {group.icon ? `${group.icon} ` : ''}
+                        {group.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <Select
             value={statusFilter}
             onValueChange={(v) => v && setStatusFilter(v as 'all' | 'indexed' | 'unindexed')}
           >
-            <SelectTrigger className="w-29 shadow-none border-border/70 bg-white h-8 text-xs">
+            <SelectTrigger className="w-29 shadow-none border-border/70 bg-white h-9! text-xs">
               <SelectValue placeholder="All status" />
             </SelectTrigger>
             <SelectContent>
@@ -226,25 +364,46 @@ export function CorpusPanel({
             <Button
               size="sm"
               variant="secondary"
-              className="h-8 text-xs text-muted-foreground hover:text-destructive"
+              className="h-8 text-xs border-destructive/30 hover:border-destructive/50 hover:text-white hover:bg-destructive  bg-destructive text-white "
               onClick={() => setDeleteTask({ type: 'selected' })}
             >
               <Trash2 className="size-3.5" />
               Delete {selectedIds.size} selected
             </Button>
           )}
-          <Button
-            size="sm"
-            variant="destructive"
-            className="h-8 border border-border text-xs"
-            onClick={() => setDeleteTask({ type: 'all' })}
-            disabled={isIndexing}
-          >
-            <Trash2 className="size-3.5" />
-            Clear all files
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    aria-label="Clear all data"
+                    className="h-9 border border-border text-xs"
+                    onClick={() => setDeleteTask({ type: 'all' })}
+                    disabled={isIndexing}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                }
+              />
+              <TooltipContent>Clear all data</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
+
+      {legacyVideoCount > 0 && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
+          <Info className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            {legacyVideoCount} existing video{legacyVideoCount === 1 ? '' : 's'} will stay available
+            until re-indexed. Re-index a video once to link it to{' '}
+            {videoRuntimeScopeLabel(activeVideoRuntimeScope)} and enable runtime-specific
+            visibility.
+          </span>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-lg border border-border">
         <Table>
@@ -281,8 +440,22 @@ export function CorpusPanel({
                 icon: FileText,
               };
               const Icon = meta.icon;
+              const indexedRuntimeScope =
+                doc.source === 'media' ? videoRuntimeScopeFromMetadata(doc.metadata) : undefined;
+              const unavailableInActiveRuntime =
+                Boolean(indexedRuntimeScope) && indexedRuntimeScope !== activeVideoRuntimeScope;
+              const runtimeLabel = indexedRuntimeScope
+                ? videoRuntimeScopeLabel(indexedRuntimeScope)
+                : undefined;
+              const RuntimeIcon = indexedRuntimeScope === 'local' ? Monitor : Cloud;
               return (
-                <TableRow key={doc.id} className="border-border/50 h-10.5!">
+                <TableRow
+                  key={doc.id}
+                  className={cn(
+                    'border-border/50 h-10.5! transition-opacity',
+                    unavailableInActiveRuntime && 'opacity-45 hover:opacity-70',
+                  )}
+                >
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.has(doc.id)}
@@ -313,9 +486,33 @@ export function CorpusPanel({
                         {doc.title}
                       </span>
                       {doc.metadata?.isGroup && (
-                        <span className="line-clamp-1 text-[10px] text-muted-foreground mt-0.5">
-                          Video ({doc.metadata.childIds?.length} chunks)
-                        </span>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                          <span className="line-clamp-1">
+                            Video ({doc.metadata.childIds?.length} chunks)
+                          </span>
+                          {unavailableInActiveRuntime && runtimeLabel && (
+                            <Tooltip>
+                              <TooltipTrigger
+                                render={
+                                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/5 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:text-amber-300">
+                                    <EyeOff className="size-2.5" />
+                                    {indexedRuntimeScope === 'local' ? 'Local only' : 'Cloud only'}
+                                  </span>
+                                }
+                              />
+                              <TooltipContent className="max-w-64 text-center">
+                                This video was indexed with {runtimeLabel}. It is not available to
+                                the agent while {videoRuntimeScopeLabel(activeVideoRuntimeScope)} is
+                                selected. Switch runtimes or re-index the video.
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          {!indexedRuntimeScope && (
+                            <span className="shrink-0 text-[9px] text-muted-foreground/70">
+                              Legacy index
+                            </span>
+                          )}
+                        </div>
                       )}
                       {/* {doc.url && (
                         <span className="line-clamp-1 text-xs text-muted-foreground">
@@ -350,10 +547,20 @@ export function CorpusPanel({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="gap-1 font-normal">
-                      <Icon className="size-3" />
-                      {meta.label}
-                    </Badge>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="secondary" className="gap-1 font-normal">
+                        <Icon className="size-3" />
+                        {meta.label}
+                      </Badge>
+                      {doc.metadata?.isGroup &&
+                        indexedRuntimeScope &&
+                        !unavailableInActiveRuntime && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <RuntimeIcon className="size-2.5" />
+                            {indexedRuntimeScope === 'local' ? 'Local' : 'Cloud'}
+                          </span>
+                        )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
                     {doc.charCount.toLocaleString()}
@@ -371,14 +578,21 @@ export function CorpusPanel({
                         </button>
                       )}
                       {doc.metadata?.isGroup && (
-                        <button
-                          type="button"
-                          aria-label="Inspect indexed content"
-                          onClick={() => setInspectorDoc(doc)}
-                          className="text-muted-foreground transition-colors hover:text-primary"
-                        >
-                          <Eye className="size-4" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                type="button"
+                                aria-label="View indexed video evidence"
+                                onClick={() => setInspectorDoc(doc)}
+                                className="text-muted-foreground transition-colors hover:text-primary"
+                              >
+                                <Eye className="size-4" />
+                              </button>
+                            }
+                          />
+                          <TooltipContent>View indexed video evidence</TooltipContent>
+                        </Tooltip>
                       )}
                       <button
                         type="button"
@@ -441,6 +655,12 @@ export function CorpusPanel({
         }}
       />
 
+      <VideoKnowledgeInspector
+        doc={inspectorDoc}
+        allDocuments={documents}
+        onClose={() => setInspectorDoc(null)}
+      />
+
       <GenericAlert
         open={deleteTask !== null}
         onOpenChange={(open) => {
@@ -450,8 +670,8 @@ export function CorpusPanel({
           deleteTask?.type === 'all'
             ? 'Clear corpus'
             : deleteTask?.type === 'selected'
-            ? 'Delete selected documents'
-            : 'Delete document'
+              ? 'Delete selected documents'
+              : 'Delete document'
         }
         description={
           deleteTask?.type === 'all' ? (
@@ -472,24 +692,18 @@ export function CorpusPanel({
         variant="destructive"
         onAction={() => {
           if (deleteTask?.type === 'all') {
-            clearAll();
+            void clearAll();
           } else if (deleteTask?.type === 'selected') {
-            delSelected();
+            void delSelected();
           } else if (deleteTask?.type === 'single') {
-            del(deleteTask.doc.id, deleteTask.doc);
+            void del(deleteTask.doc.id, deleteTask.doc);
             if (active?.id === deleteTask.doc.id) {
               setActive(null);
             }
           }
         }}
       />
-
-      <VideoKnowledgeInspector
-        doc={inspectorDoc}
-        allDocuments={documents}
-        onClose={() => setInspectorDoc(null)}
-      />
-    </>
+    </TooltipProvider>
   );
 }
 
@@ -516,7 +730,7 @@ function VideoKnowledgeInspector({
 
   return (
     <Dialog open={!!doc} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-full max-w-3xl max-h-[90%]">
+      <DialogContent className="w-full pb-3 max-w-5xl! max-h-[90%]! h-full!">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Film className="size-4 text-muted-foreground" />
@@ -557,8 +771,8 @@ function VideoKnowledgeInspector({
             })}
           </div>
         </ScrollArea>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        <DialogFooter className="h-full">
+          <Button variant="outline" onClick={onClose} className={''}>
             Close
           </Button>
         </DialogFooter>
@@ -665,7 +879,7 @@ function DocumentDialog({
 
   return (
     <Dialog open={!!doc} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-2xl max-h-[90%] ">
+      <DialogContent className="w-full max-w-5xl!  ">
         <DialogHeader>
           <DialogTitle className="text-balance">
             {editing ? 'Edit document' : doc?.title}
@@ -682,7 +896,7 @@ function DocumentDialog({
 
         {editing ? (
           <div
-            className="grid gap-4 overflow-y-auto pr-2 pb-2"
+            className="grid gap-4 overflow-y-auto pr-2 pb-2 "
             style={{ maxHeight: 'calc(80vh - 150px)' }}
           >
             <div className="grid gap-2">
@@ -788,7 +1002,7 @@ function DocumentDialog({
             <>
               <Button
                 variant="destructive"
-                className="text-muted-foreground hover:text-destructive"
+                className="text-white hover:text-white hover:bg-destructive/80"
                 onClick={() => doc && onDelete(doc.id)}
               >
                 <Trash2 className="size-4 mr-2" />

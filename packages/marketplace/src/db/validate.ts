@@ -18,6 +18,7 @@ const CATEGORIES = [
   'utility',
 ] as const;
 const PRICING = ['free', 'pro', 'enterprise'] as const;
+const DISTRIBUTIONS = ['public', 'private'] as const;
 
 export function validateToolManifest(manifest: unknown): ManifestValidationResult {
   const errors: string[] = [];
@@ -46,6 +47,9 @@ export function validateToolManifest(manifest: unknown): ManifestValidationResul
   }
   if (typeof m.pricing !== 'string' || !PRICING.includes(m.pricing as any)) {
     errors.push(`"pricing" must be one of: ${PRICING.join(', ')}`);
+  }
+  if (m.distribution !== undefined && !DISTRIBUTIONS.includes(m.distribution as any)) {
+    errors.push('"distribution" must be "public" or "private" when provided');
   }
   if (typeof m.version !== 'string' || !VERSION_PATTERN.test(m.version)) {
     errors.push('"version" must be semver, e.g. "1.0.0"');

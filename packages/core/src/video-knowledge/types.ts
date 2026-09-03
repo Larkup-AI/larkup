@@ -400,6 +400,32 @@ export interface ArtifactAnalysisCacheEntry {
   createdAt: string;
 }
 
+/**
+ * A revision-scoped response memory for an exact video question. It is kept
+ * separate from source evidence: a cached response can accelerate retrieval,
+ * but never changes what counts as evidence for the asset.
+ */
+export interface VideoAnswerMemoryEntry {
+  id: string;
+  mediaAssetId: string;
+  knowledgeRevisionId: string;
+  question: string;
+  questionKey: string;
+  /** The previously returned, evidence-backed queryVideoKnowledge payload. */
+  answer?: unknown;
+  evidenceIds: string[];
+  /** A user-confirmed correction; never promoted into source evidence. */
+  userCorrection?: {
+    answer: string;
+    note?: string;
+    createdAt: string;
+  };
+  unansweredCount: number;
+  lastUnansweredAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface VideoKnowledgeStoreState {
   schemaVersion: 1;
   revisions: VideoKnowledgeRevision[];
@@ -407,6 +433,7 @@ export interface VideoKnowledgeStoreState {
   inspectionReservations: InspectionBudgetReservation[];
   backgroundRefinements: BackgroundRefinementJob[];
   artifactAnalysisCache: ArtifactAnalysisCacheEntry[];
+  answerMemory: VideoAnswerMemoryEntry[];
   artifacts: FrameArtifactRevision[];
   evidence: EvidenceRevision[];
   observations: ObservationRevision[];

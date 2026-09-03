@@ -34,6 +34,20 @@ from .base import GPUInstanceProvider, GPUProviderError, InstanceState, Instance
 
 DEFAULT_APP_NAME = "larkup-video-intelligence"
 DEFAULT_FUNCTION_NAME = "process_video_job"
+PROGRESS_DICT_NAME = "larkup-video-intelligence-progress"
+_PROGRESS_STAGES = frozenset(
+    {
+        "queued",
+        "prepare",
+        "probe",
+        "decode",
+        "transcribe",
+        "ocr",
+        "detect",
+        "synthesize",
+        "complete",
+    }
+)
 
 
 @dataclass
@@ -101,15 +115,53 @@ class ModalProvider(GPUInstanceProvider):
             value = self._function_call(instance_id).get(timeout=0)
         except Exception:
             return None
+        # The named dict is only a live-status relay. Once the immutable function
+        # result is available, discard this call's transient progress entry.
+        try:
+            del self._sdk().Dict.from_name(PROGRESS_DICT_NAME)[instance_id]
+        except Exception:
+            pass
         return value if isinstance(value, dict) else None
 
     def get_progress(self, instance_id: str) -> dict[str, Any] | None:
-        # Modal does not relay a mid-call progress channel through
-        # FunctionCall the way RunPod's status endpoint does. Wiring this up
-        # would need the worker to publish progress through a separate Modal
-        # primitive (a Dict or Queue keyed by call id) that this method then
-        # reads -- left as a follow-up rather than faked here.
-        return None
+        try:
+            progress = self._sdk().Dict.from_name(PROGRESS_DICT_NAME).get(instance_id)
+        except Exception:
+            return None
+        if not isinstance(progress, dict):
+            return None
+        stage = str(progress.get("stage") or "")
+        message = str(progress.get("message") or "")
+        try:
+            percent = int(progress.get("percent"))
+        except (TypeError, ValueError):
+            return None
+        if stage not in _PROGRESS_STAGES or not (0 <= percent < 100) or not message:
+            return None
+        result: dict[str, Any] = {"stage": stage, "percent": percent, "message": message}
+        try:
+            stage_percent = float(progress.get("stagePercent"))
+        except (TypeError, ValueError):
+            stage_percent = None
+        if stage_percent is not None and 0 <= stage_percent <= 100:
+            result["stagePercent"] = stage_percent
+        for key in (
+            "sequence",
+            "elapsedSeconds",
+            "estimatedRemainingSeconds",
+            "current",
+            "total",
+        ):
+            try:
+                value = float(progress.get(key))
+            except (TypeError, ValueError):
+                continue
+            if value >= 0:
+                result[key] = int(value) if value.is_integer() else value
+        unit = str(progress.get("unit") or "").strip()[:80]
+        if unit:
+            result["unit"] = unit
+        return result
 
     def terminate(self, instance_id: str) -> None:
         try:

@@ -6,7 +6,7 @@ packages:
   - '!apps/local-chat-connection-larkup'
   - apps/sdk/*
   - packages/*
-  - packages/tools/*
+  - packages/marketplace-tools/*
   - e2e
 ignoredBuiltDependencies:
   - '@ffmpeg-installer/darwin-arm64'

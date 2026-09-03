@@ -59,6 +59,8 @@ apps/cli/*
 apps/docs/*
 !apps/docs/package.json
 apps/sdk/*
-!apps/sdk/package.json
+!apps/sdk/js-sdk
+apps/sdk/js-sdk/*
+!apps/sdk/js-sdk/package.json
 apps/local-chat-connection-larkup/*
 !apps/local-chat-connection-larkup/package.json

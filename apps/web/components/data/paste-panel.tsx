@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { formatErrorMessage } from '@/lib/error-formatter';
+import { formatErrorMessage } from '@/lib/shared/error-formatter';
 import { Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,9 +13,11 @@ import type { DataPrimaryAction } from '@/components/data/data-primary-action';
 export function PastePanel({
   onAdded,
   onActionChange,
+  groupId,
 }: {
   onAdded: () => void;
   onActionChange?: (action: DataPrimaryAction | null) => void;
+  groupId?: string;
 }) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -35,6 +37,7 @@ export function PastePanel({
           title: title.trim() || 'Pasted text',
           content: content,
           source: 'text',
+          groupId,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Failed');
@@ -76,7 +79,7 @@ export function PastePanel({
         <Textarea
           id="paste-content"
           placeholder="Paste any text, markdown, or notes here…"
-          className="min-h-48 placeholder:text-muted-foreground/50 placeholder:text-xs font-mono text-xs leading-relaxed "
+          className="min-h-48 bg-white placeholder:text-muted-foreground/50 placeholder:text-xs font-mono text-xs leading-relaxed "
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />

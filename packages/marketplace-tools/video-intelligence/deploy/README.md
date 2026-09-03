@@ -35,6 +35,11 @@ GPU_PROVIDERS_DIR="$(cd ../gpu_providers && pwd)" sam build
 sam deploy --parameter-overrides ModalTokenId=... ModalTokenSecret=... [ProcessingEnabled=true]
 ```
 
+The custom builder downloads Linux ARM64 wheels explicitly, so this command is
+safe on either macOS or Linux. Do not add `--use-container`: SAM mounts only the
+control-plane `CodeUri`, while the builder intentionally packages the sibling
+GPU-provider adapter directory.
+
 `RunpodEndpointId`/`RunpodApiKey` are optional (default empty/placeholder)
 when `GpuProvider` stays `modal`; only `ModalTokenId`/`ModalTokenSecret` are
 required. One-time bootstrap from an AWS SSO/admin session:
@@ -49,8 +54,11 @@ relative import):
 ```bash
 cd packages/marketplace-tools/video-intelligence
 modal deploy -m deploy.gpu_providers.modal_worker_entrypoint
-modal secret create larkup-video-intelligence AI_GATEWAY_API_KEY=<real key> --force
 ```
+
+Do not attach audio, brain, vision, or embedding provider secrets to the Modal
+function or RunPod template. Those credentials are user-owned and arrive only
+in the authenticated, transient job payload.
 
 ## Build and publish the RunPod worker image
 

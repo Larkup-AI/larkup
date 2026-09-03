@@ -142,6 +142,190 @@ class ReconcileAndWebhookTests(unittest.TestCase):
         item = self.handler.table.get_item(Key={"pk": "JOB#job_fresh", "sk": "JOB"})["Item"]
         self.assertIn(item["status"], {"queued", "running"})
 
+    def test_pending_job_uses_the_larkup_cloud_status_message(self) -> None:
+        item = {
+            "pk": "JOB#job_pending",
+            "sk": "JOB",
+            "principalId": "p1",
+            "status": "queued",
+            "instanceId": "instance-1",
+            "providerName": "runpod",
+            "period": "2026-08",
+            "estimatedSourceMinutes": "1",
+            "retainSourceHours": 0,
+            "createdAt": "now",
+            "updatedAt": "now",
+            "progressJson": "{}",
+        }
+        self.handler.table.put_item(Item=item)
+
+        handler = self.handler
+
+        class PendingProvider:
+            def get_status(self, instance_id: str):
+                return type("PendingStatus", (), {"state": handler.InstanceState.PENDING})()
+
+        with patch.object(self.handler, "get_provider", return_value=PendingProvider()):
+            self.handler.sync_job(item)
+
+        saved = self.handler.table.get_item(Key={"pk": "JOB#job_pending", "sk": "JOB"})["Item"]
+        progress = json.loads(saved["progressJson"])
+        self.assertEqual(progress["message"], "Queued with Larkup Cloud")
+        self.assertNotIn("runpod", progress["message"].lower())
+
+    def test_running_job_replaces_the_retired_visual_model_setup_message(self) -> None:
+        item = {
+            "pk": "JOB#job_running",
+            "sk": "JOB",
+            "principalId": "p1",
+            "status": "running",
+            "instanceId": "instance-1",
+            "providerName": "runpod",
+            "period": "2026-08",
+            "estimatedSourceMinutes": "1",
+            "retainSourceHours": 0,
+            "createdAt": "now",
+            "updatedAt": "now",
+            "progressJson": "{}",
+        }
+        self.handler.table.put_item(Item=item)
+        handler = self.handler
+
+        class RunningProvider:
+            def get_status(self, instance_id: str):
+                return type("RunningStatus", (), {"state": handler.InstanceState.RUNNING})()
+
+            def get_progress(self, instance_id: str):
+                return {
+                    "stage": "synthesize",
+                    "percent": 90,
+                    "stagePercent": 37.5,
+                    "message": "Preparing the visual search model for this video — this can take a little longer the first time",
+                }
+
+        with patch.object(self.handler, "get_provider", return_value=RunningProvider()):
+            self.handler.sync_job(item)
+
+        saved = self.handler.table.get_item(Key={"pk": "JOB#job_running", "sk": "JOB"})["Item"]
+        progress = json.loads(saved["progressJson"])
+        self.assertEqual(progress["message"], "Creating the visual search index")
+        self.assertEqual(progress["stagePercent"], 37.5)
+
+    def test_running_job_keeps_its_last_progress_when_the_provider_relay_hiccups(self) -> None:
+        """A transient get_progress() miss (eventual-consistency lag, a
+        malformed payload) must not look like the job restarting -- it
+        should hold the last known stage/percent, not reset to probe/5."""
+        item = {
+            "pk": "JOB#job_hiccup",
+            "sk": "JOB",
+            "principalId": "p1",
+            "status": "running",
+            "instanceId": "instance-1",
+            "providerName": "runpod",
+            "period": "2026-08",
+            "estimatedSourceMinutes": "1",
+            "retainSourceHours": 0,
+            "createdAt": "now",
+            "updatedAt": "now",
+            "progressJson": json.dumps(
+                {"stage": "synthesize", "percent": 90, "message": "Creating the visual search index"}
+            ),
+        }
+        self.handler.table.put_item(Item=item)
+        handler = self.handler
+
+        class HiccupProvider:
+            def get_status(self, instance_id: str):
+                return type("RunningStatus", (), {"state": handler.InstanceState.RUNNING})()
+
+            def get_progress(self, instance_id: str):
+                return None
+
+        with patch.object(self.handler, "get_provider", return_value=HiccupProvider()):
+            self.handler.sync_job(item)
+
+        saved = self.handler.table.get_item(Key={"pk": "JOB#job_hiccup", "sk": "JOB"})["Item"]
+        progress = json.loads(saved["progressJson"])
+        self.assertEqual(progress["stage"], "synthesize")
+        self.assertEqual(progress["percent"], 90)
+
+    def test_failed_gpu_job_logs_operator_diagnostics_but_keeps_the_public_error_generic(self) -> None:
+        item = {
+            "pk": "JOB#job_failed",
+            "sk": "JOB",
+            "principalId": "p1",
+            "status": "running",
+            "instanceId": "instance-1",
+            "providerName": "runpod",
+            "period": "2026-08",
+            "estimatedSourceMinutes": "1",
+            "retainSourceHours": 0,
+            "createdAt": "now",
+            "updatedAt": "now",
+            "progressJson": "{}",
+        }
+        self.handler.table.put_item(Item=item)
+        self._put_usage("p1", "2026-08")
+        handler = self.handler
+
+        class FailedProvider:
+            def get_status(self, instance_id: str):
+                return type(
+                    "FailedStatus",
+                    (),
+                    {
+                        "state": handler.InstanceState.FAILED,
+                        "detail": "semantic provider returned 429",
+                    },
+                )()
+
+        with (
+            patch.object(self.handler, "get_provider", return_value=FailedProvider()),
+            patch("builtins.print") as printed,
+        ):
+            self.handler.sync_job(item)
+
+        diagnostic = json.loads(printed.call_args.args[0])
+        self.assertEqual(diagnostic["event"], "gpu_job_failed")
+        self.assertEqual(diagnostic["detail"], "semantic provider returned 429")
+        saved = self.handler.table.get_item(Key={"pk": item["pk"], "sk": "JOB"})["Item"]
+        self.assertEqual(saved["error"], "Larkup Cloud could not complete this video. Please retry.")
+
+    def test_finalizing_job_without_progress_is_failed_after_the_short_timeout(self) -> None:
+        self.handler.FINALIZING_STALL_TIMEOUT_MINUTES = 12
+        old_created_at = (datetime.now(timezone.utc) - timedelta(minutes=13)).isoformat()
+        item = {
+            "pk": "JOB#job_finalizing",
+            "sk": "JOB",
+            "principalId": "p1",
+            "status": "running",
+            "instanceId": "instance-1",
+            "providerName": "runpod",
+            "period": "2026-08",
+            "estimatedSourceMinutes": "1",
+            "retainSourceHours": 0,
+            "createdAt": old_created_at,
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+            "progressJson": json.dumps(
+                {"stage": "synthesize", "percent": 99, "message": "Creating the visual search index"}
+            ),
+        }
+        self.handler.table.put_item(Item=item)
+        self._put_usage("p1", "2026-08")
+
+        class RunningProvider:
+            def terminate(self, instance_id: str) -> None:
+                self.terminated = instance_id
+
+        provider = RunningProvider()
+        with patch.object(self.handler, "get_provider", return_value=provider):
+            self.handler.sync_job(item)
+
+        saved = self.handler.table.get_item(Key={"pk": "JOB#job_finalizing", "sk": "JOB"})["Item"]
+        self.assertEqual(provider.terminated, "instance-1")
+        self.assertEqual(saved["status"], "failed")
+        self.assertIn("stopped making progress", saved["error"])
+
     def test_settle_delivers_a_signed_webhook_on_completion(self) -> None:
         _RecordingWebhookHandler.received = []
         server = HTTPServer(("127.0.0.1", 0), _RecordingWebhookHandler)

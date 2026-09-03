@@ -11,7 +11,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGateway } from '@ai-sdk/gateway';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
-import { formatErrorMessage } from '@/lib/error-formatter';
+import { formatErrorMessage } from '@/lib/shared/error-formatter';
 import { normalizeNativeChatModelId } from '@larkup/core/chat-models/registry';
 
 export const runtime = 'nodejs';
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No provider fields to verify' }, { status: 400 });
   }
 
-  // ── Verify Embedding ────────────────────────────────────────────────
+  // Verify embedding.
   if (embeddingProvider) {
     try {
       const resolvedEmbeddingProvider =
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Verify Chat ─────────────────────────────────────────────────────
+  // Verify chat.
   if (chatProvider) {
     try {
       const resolvedProvider =
@@ -260,7 +260,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Verify Audio ────────────────────────────────────────────────────
+  // Verify audio.
   if (audioProvider && audioProvider !== 'local') {
     try {
       let url = '';

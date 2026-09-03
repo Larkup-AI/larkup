@@ -4,18 +4,18 @@ import { getEmbeddingModel } from "@larkup/core/embeddings/registry";
 import { readRun } from "@larkup/core/index-store";
 import { createAdapter } from "@larkup/vector-stores/factory";
 import { log } from "../ui/logger";
-import { inServerScope, requireActive } from "../lib/scope";
+import { inProjectScope, requireActiveProject } from "../lib/scope";
 
 interface TestOptions {
-  server?: string;
+  project?: string;
   endpoint?: string;
   apiKey?: string;
   connection?: boolean;
 }
 
 export async function testCommand(options: TestOptions) {
-  await inServerScope(options.server, async () => {
-    await requireActive();
+  await inProjectScope(options.project, async () => {
+    await requireActiveProject();
     const [config, stats, run] = await Promise.all([readConfig(), corpusStats(), readRun()]);
     const model = getEmbeddingModel(config.embeddingModelId);
 

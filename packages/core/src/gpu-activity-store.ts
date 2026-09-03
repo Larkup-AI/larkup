@@ -71,12 +71,22 @@ export function writeGpuActivity(
     if (!file) return;
     const now = new Date().toISOString();
     const existing = await readGpuActivity();
+    const sameJob = existing?.id === patch.id;
     const next: GpuActivity = {
       ...patch,
-      startedAt: existing?.id === patch.id ? existing.startedAt : now,
+      // A transient relay hiccup upstream must never visibly rewind
+      // progress for the same job -- only a genuinely new job (a different
+      // id) is allowed to start back at a lower percent.
+      percent: sameJob ? Math.max(existing.percent, patch.percent) : patch.percent,
+      startedAt: sameJob ? existing.startedAt : now,
       updatedAt: now,
     };
-    await fs.writeFile(file, JSON.stringify(next), 'utf8');
+    // Readers poll while analysis is running. Replacing the file atomically
+    // prevents them from observing a half-written JSON document and briefly
+    // clearing the progress card between otherwise valid updates.
+    const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
+    await fs.writeFile(temporary, JSON.stringify(next), 'utf8');
+    await fs.rename(temporary, file);
   });
 }
 

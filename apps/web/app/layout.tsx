@@ -2,10 +2,11 @@ import { Analytics } from '@vercel/analytics/next';
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/sonner';
-import { WorkspaceProvider } from '@/components/workspace/workspace-provider';
+import { ProjectProvider } from '@/components/projects/project-provider';
 import { ThemeCustomizerProvider } from '@/components/theme-customizer-provider';
 import { ClientLayoutWrapper } from '@/components/client-layout-wrapper';
 import { GlobalIndexProgress } from '@/components/index/global-index-progress';
+import { GpuActivityIndicator } from '@/components/chat/gpu-activity-indicator';
 import { UpdateBanner } from '@/components/update-banner';
 import { ThemeProvider } from 'next-themes';
 
@@ -36,11 +37,12 @@ export default function RootLayout({
         >
           <UpdateBanner />
           <ThemeCustomizerProvider>
-            <WorkspaceProvider>
+            <ProjectProvider>
               <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
-              <Toaster position="bottom-left" />
+              <Toaster position="bottom-right" />
               <GlobalIndexProgress />
-            </WorkspaceProvider>
+              <GpuActivityIndicator />
+            </ProjectProvider>
           </ThemeCustomizerProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

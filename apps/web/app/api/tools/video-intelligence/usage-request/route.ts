@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server';
 import { readConfig } from '@larkup/core/config-store';
+import { runWithProject } from '@larkup/core/project-store';
 import { getInstalledTool } from '@larkup/marketplace/installer';
 
 export const runtime = 'nodejs';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function withProject<T>(request: Request, operation: () => Promise<T>) {
+  const url = new URL(request.url);
+  const projectId = url.searchParams.get('projectId') ?? url.searchParams.get('serverId');
+  return projectId ? runWithProject(projectId, operation) : operation();
+}
 
 /** Sends a small, operator-actionable capacity request without exposing an AWS or GPU endpoint. */
 export async function POST(request: Request) {
@@ -19,46 +26,59 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Enter a valid work email address.' }, { status: 400 });
   }
 
-  const [tool, config] = await Promise.all([getInstalledTool('video-intelligence'), readConfig()]);
-  if (!tool)
-    return NextResponse.json({ error: 'Video Intelligence is not installed.' }, { status: 404 });
+  return withProject(request, async () => {
+    const [tool, config] = await Promise.all([
+      getInstalledTool('video-intelligence'),
+      readConfig(),
+    ]);
+    if (!tool)
+      return NextResponse.json({ error: 'Video Intelligence is not installed.' }, { status: 404 });
 
-  const resendKey = process.env.RESEND_API_KEY;
-  const from = process.env.LARKUP_USAGE_REQUEST_FROM;
-  const to = process.env.LARKUP_USAGE_REQUEST_TO;
-  if (!resendKey || !from || !to) {
-    return NextResponse.json(
-      { error: 'Usage requests are not configured yet. Please contact your Larkup administrator.' },
-      { status: 503 },
-    );
-  }
+    const resendKey = process.env.RESEND_API_KEY;
+    const from = process.env.LARKUP_USAGE_REQUEST_FROM;
+    const to = process.env.LARKUP_USAGE_REQUEST_TO;
+    if (!resendKey || !from || !to) {
+      return NextResponse.json(
+        {
+          error: 'Usage requests are not configured yet. Please contact your Larkup administrator.',
+        },
+        { status: 503 },
+      );
+    }
 
-  const usage = body?.usage && typeof body.usage === 'object' ? body.usage : {};
-  const message = [
-    'Video Intelligence capacity request',
-    `Contact: ${email}`,
-    `Project: ${config.projectName || 'Unnamed project'}`,
-    `Usage: ${JSON.stringify(usage)}`,
-    note ? `Note: ${note}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      reply_to: email,
-      subject: 'Larkup Video capacity request',
-      text: message,
-    }),
+    const usage = body?.usage && typeof body.usage === 'object' ? body.usage : {};
+    const toolConfig = { ...tool.config, ...(config.toolConfigs?.['video-intelligence'] ?? {}) };
+    const userId =
+      typeof toolConfig.cloudInstallationId === 'string'
+        ? toolConfig.cloudInstallationId
+        : 'Unavailable';
+    const message = [
+      'Video Intelligence capacity request',
+      `Contact: ${email}`,
+      `Project: ${config.projectName || 'Unnamed project'}`,
+      `User ID: ${userId}`,
+      `Usage: ${JSON.stringify(usage)}`,
+      note ? `Note: ${note}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        reply_to: email,
+        subject: 'Larkup Video capacity request',
+        text: message,
+      }),
+    });
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: 'Could not send the usage request. Please try again.' },
+        { status: 502 },
+      );
+    }
+    return NextResponse.json({ status: 'sent' }, { status: 202 });
   });
-  if (!response.ok) {
-    return NextResponse.json(
-      { error: 'Could not send the usage request. Please try again.' },
-      { status: 502 },
-    );
-  }
-  return NextResponse.json({ status: 'sent' }, { status: 202 });
 }

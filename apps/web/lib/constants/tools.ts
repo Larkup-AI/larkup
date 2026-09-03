@@ -43,6 +43,16 @@ export const CHAT_TOOL_BEHAVIORS: Record<string, ChatToolBehavior> = {
     pendingLabel: 'Reviewing the video…',
     resultView: 'none',
   },
+  queryVideoEvidence: {
+    placement: 'inline',
+    pendingLabel: 'Reviewing indexed video context…',
+    resultView: 'none',
+  },
+  inspectVideoKnowledge: {
+    placement: 'inline',
+    pendingLabel: 'Checking the relevant moment…',
+    resultView: 'none',
+  },
   webSearch: { placement: 'web-search', resultView: 'none' },
   presentMedia: { placement: 'media', resultView: 'media' },
   queryTabularData: {

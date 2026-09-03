@@ -1,35 +1,12 @@
-import type { RagConfig } from '@larkup/core/types';
 import type { VectorStoreAdapter } from './adapters/base';
-import { getActiveServer } from '@larkup/core/workspace';
+import type { VectorStoreConfig } from './types';
 
-/**
- * Build the right adapter from the persisted config. Centralizing this keeps
- * the indexer + retrieval store-agnostic — they only ever see the interface.
- *
- * Adapters are imported lazily (dynamic import) so a heavy/native engine like
- * LanceDB is only loaded when it's actually the selected store. This keeps the
- * indexing route from crashing at module-eval time if one engine's native
- * binding isn't available in the current environment.
- */
+/** Creates the configured adapter with lazy provider imports. */
 export async function createAdapter(
-  config: RagConfig,
+  config: VectorStoreConfig,
   onRateLimit?: (waitSecs: number, attempt: number) => void | Promise<void>,
 ): Promise<VectorStoreAdapter> {
   const overrides = { ...config.storeConfig };
-  const server = await getActiveServer();
-  const serverId = server?.id;
-
-  if (serverId) {
-    const safeId = serverId.replace(/[^a-zA-Z0-9_-]/g, '_');
-    if (config.vectorStore === 'pinecone') {
-      overrides.namespace = serverId;
-    } else if (config.vectorStore === 'chroma') {
-      overrides.collectionName = `documents_${safeId}`;
-    } else if (config.vectorStore === 'lancedb' || !config.vectorStore) {
-      overrides.tableName = `documents_${safeId}`;
-    }
-  }
-
   switch (config.vectorStore) {
     case 'pinecone': {
       const { PineconeAdapter } = await import('./adapters/pinecone');

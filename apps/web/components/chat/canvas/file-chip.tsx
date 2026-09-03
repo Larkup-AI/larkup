@@ -4,10 +4,6 @@ import { FileText, FileSpreadsheet, Presentation, File as FileIcon } from 'lucid
 import { cn } from '@/lib/utils';
 import { useDocEditor } from './doc-editor-provider';
 
-/* ------------------------------------------------------------------ */
-/* File type icon/color mapping                                        */
-/* ------------------------------------------------------------------ */
-
 const FILE_TYPE_CONFIG: Record<
   string,
   { icon: typeof FileText; color: string; bg: string; label: string }
@@ -55,9 +51,9 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/* ------------------------------------------------------------------ */
+/* File chip helpers. */
 /* FileChip — minimal inline file preview in chat messages             */
-/* ------------------------------------------------------------------ */
+/* End file chip helpers. */
 
 interface FileChipProps {
   fileName: string;
@@ -108,7 +104,7 @@ export function FileChip({
         )}
       >
         <Icon className={cn('size-3 shrink-0', config.color)} />
-        <span className="truncate max-w-[120px] text-foreground">{fileName}</span>
+        <span className="truncate max-w-30 text-foreground">{fileName}</span>
       </button>
     );
   }
@@ -120,7 +116,7 @@ export function FileChip({
       className={cn(
         'flex items-center gap-3 rounded-xl border border-border/60 px-3.5 py-2.5 transition',
         'hover:bg-secondary/50 cursor-pointer group',
-        'w-full max-w-[280px]',
+        'w-full max-w-70',
         className,
       )}
     >

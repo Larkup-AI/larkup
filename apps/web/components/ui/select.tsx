@@ -42,11 +42,11 @@ function SelectTrigger({
       data-size={size}
       className={cn(
         // layout
-        'flex w-fit items-center justify-between gap-2 rounded-md border border-input bg-transparent',
+        'flex w-fit items-center justify-between gap-2 rounded-md border border-input bg-background',
         'pr-3 pl-3 text-sm whitespace-nowrap select-none outline-none',
         // transitions & hover
         'transition-all duration-150',
-        'hover:border-foreground/15 hover:bg-accent/40',
+        'hover:border-foreground/7 hover:bg-accent/90',
         // data-open ring
         'data-[state=open]:border-primary/60 data-[state=open]:ring-2 data-[state=open]:ring-primary/15',
         // sizes
