@@ -1,5 +1,11 @@
 # @larkup/tool-video-intelligence
 
+## 0.2.1
+
+### Patch Changes
+
+- Add safe build-cache size reporting and confirmed cleanup in Settings, wait for the exact npm tarball before release installer smoke tests begin, and document the current Video Intelligence collaboration roadmap.
+
 ## 0.2.0
 
 ### Minor Changes

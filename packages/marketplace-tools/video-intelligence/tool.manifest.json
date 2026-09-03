@@ -7,7 +7,7 @@
   "description": "Help your AI understand your videos, so you can ask questions and get answers from the right moments.",
   "longDescription": "Turn videos into knowledge your AI can understand. It listens to what is said, reads what appears on screen, and helps you find the moments that matter.",
   "category": "media",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "pricing": "free",
   "emoji": "🎥",
   "icon": "Film",
@@ -91,7 +91,9 @@
   },
   "usage": {
     "label": "Usage this month",
-    "visibleWhenRuntimeMode": ["managed-cloud"],
+    "visibleWhenRuntimeMode": [
+      "managed-cloud"
+    ],
     "visualization": {
       "usedKey": "sourceMinutesUsed",
       "limitKey": "sourceMinutesLimit"
@@ -127,7 +129,9 @@
         "slot": "data-indexing",
         "title": "Let your AI understand this video",
         "entrypoint": "./ui",
-        "appliesTo": ["video"],
+        "appliesTo": [
+          "video"
+        ],
         "description": "Choose how deeply to analyze it and optionally point it to what matters most.",
         "estimate": {
           "modeField": "indexingMode",
@@ -382,9 +386,21 @@
           "value": "auto",
           "description": "Follow the workspace Chat Model setting."
         },
-        { "label": "Google Gemini", "value": "google", "icon": "/icons/gemini.svg" },
-        { "label": "Vercel AI Gateway", "value": "vercel_ai_gateway", "icon": "/icons/vercel.svg" },
-        { "label": "OpenAI", "value": "openai", "icon": "/icons/openai.svg" },
+        {
+          "label": "Google Gemini",
+          "value": "google",
+          "icon": "/icons/gemini.svg"
+        },
+        {
+          "label": "Vercel AI Gateway",
+          "value": "vercel_ai_gateway",
+          "icon": "/icons/vercel.svg"
+        },
+        {
+          "label": "OpenAI",
+          "value": "openai",
+          "icon": "/icons/openai.svg"
+        },
         {
           "label": "DeepSeek",
           "value": "deepseek",
@@ -395,8 +411,16 @@
           "value": "anthropic",
           "icon": "https://models.dev/logos/anthropic.svg"
         },
-        { "label": "Mistral", "value": "mistral", "icon": "https://models.dev/logos/mistral.svg" },
-        { "label": "Cohere", "value": "cohere", "icon": "https://models.dev/logos/cohere.svg" }
+        {
+          "label": "Mistral",
+          "value": "mistral",
+          "icon": "https://models.dev/logos/mistral.svg"
+        },
+        {
+          "label": "Cohere",
+          "value": "cohere",
+          "icon": "https://models.dev/logos/cohere.svg"
+        }
       ]
     },
     {
@@ -450,8 +474,16 @@
           "value": "google/gemini-3.6-flash",
           "icon": "/icons/gemini.svg"
         },
-        { "label": "GPT-5 mini", "value": "openai/gpt-5-mini", "icon": "/icons/openai.svg" },
-        { "label": "GPT-5.2", "value": "openai/gpt-5.2", "icon": "/icons/openai.svg" },
+        {
+          "label": "GPT-5 mini",
+          "value": "openai/gpt-5-mini",
+          "icon": "/icons/openai.svg"
+        },
+        {
+          "label": "GPT-5.2",
+          "value": "openai/gpt-5.2",
+          "icon": "/icons/openai.svg"
+        },
         {
           "label": "DeepSeek V3.2",
           "value": "deepseek/deepseek-v3.2",
@@ -561,7 +593,12 @@
       },
       "visibleWhen": {
         "field": "audioProvider",
-        "equals": ["openai", "groq", "deepgram", "elevenlabs"]
+        "equals": [
+          "openai",
+          "groq",
+          "deepgram",
+          "elevenlabs"
+        ]
       }
     },
     {
@@ -605,13 +642,23 @@
       "serverManaged": true
     }
   ],
-  "tags": ["video", "ocr", "tracking", "cloud", "gpu", "private", "gdpr"],
+  "tags": [
+    "video",
+    "ocr",
+    "tracking",
+    "cloud",
+    "gpu",
+    "private",
+    "gdpr"
+  ],
   "downloads": 0,
   "repositoryUrl": "https://github.com/Larkup-AI/larkup",
   "license": "Apache-2.0",
   "updatedAt": "2026-08-20",
   "trustLevel": "elevated",
   "permissions": {
-    "httpAllow": ["video.larkup.de"]
+    "httpAllow": [
+      "video.larkup.de"
+    ]
   }
 }

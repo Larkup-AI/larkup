@@ -35,7 +35,15 @@ runtime/app/
   worker.py        local-Docker CLI entrypoint (`python -m app.worker <job_id>`)
 ```
 
-`deploy/` is the operator/infrastructure side for Larkup's managed cloud offering: the AWS control plane (Lambda + API Gateway + DynamoDB + S3) and GPU provider dispatch/worker entrypoints (RunPod, Modal, and other vendors behind one interface). It is gitignored and not part of this public checkout -- kept fully separate from `runtime/app` so a self-hosted Docker/local install never depends on it. If you operate the managed cloud stack, see `deploy/README.md` in your private checkout for testing, validation, and deploy commands.
+`deploy/` is the operator/infrastructure side for Larkup's managed cloud offering: the AWS control plane (Lambda + API Gateway + DynamoDB + S3) and GPU provider dispatch/worker entrypoints (RunPod, Modal, and other vendors behind one interface). It is public for review and collaboration, but remains fully separate from `runtime/app` so a self-hosted Docker/local install never depends on it. It uses short-lived CI identity and contains no deployed credentials. See `deploy/README.md` for testing, validation, and deploy commands.
+
+## Current roadmap
+
+Collaborators are currently focused on three connected improvements:
+
+1. **Smarter indexing** — produce a coherent story-like timeline and durable notes that preserve the important people, questions, events, and changes across the full video.
+2. **Faster analysis** — reduce indexing and follow-up latency with bounded parallel work, better sampling, and direct inspection of only the ranges that need more evidence.
+3. **Stronger reuse of indexing results** — make analysis and chat use the stored transcript, visual evidence, entities, summaries, and answering guide first, then request bounded re-analysis only when indexed evidence is incomplete.
 
 ## Local run
 
@@ -225,9 +233,9 @@ Only hashes of access codes, API keys, and installation identifiers are stored. 
 
 ## AWS deployment
 
-The production stack -- API Gateway + Lambda control plane, DynamoDB, S3 + KMS, and GPU dispatch through Modal/RunPod -- is real-deployed and smoke-tested end to end (control plane → GPU worker → S3 → job completion). Its source lives in the private, gitignored `deploy/` directory described above, not in this public checkout. `ProcessingEnabled` defaults to `false` -- a stack accepts no real jobs until explicitly turned on.
+The production stack -- API Gateway + Lambda control plane, DynamoDB, S3 + KMS, and GPU dispatch through Modal/RunPod -- is real-deployed and smoke-tested end to end (control plane → GPU worker → S3 → job completion). Its source lives in the public `deploy/` directory described above. `ProcessingEnabled` defaults to `false` -- a stack accepts no real jobs until explicitly turned on.
 
-See `deploy/README.md` in a private checkout for the build/deploy, bootstrap, and RunPod image publish commands. Do not send a long-lived AWS secret through chat or store it in GitHub; a short AWS SSO session is sufficient for bootstrap, with GitHub assuming a narrow OIDC deployment role afterward.
+See `deploy/README.md` for the build/deploy, bootstrap, and RunPod image publish commands. Do not send a long-lived AWS secret through chat or store it in GitHub; a short AWS SSO session is sufficient for bootstrap, with GitHub assuming a narrow OIDC deployment role afterward.
 
 ### Operator-level env vars
 

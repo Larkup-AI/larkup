@@ -29,6 +29,7 @@ import {
   type ThemeVariant,
   type LayoutVariant,
 } from '@/components/theme-customizer-provider';
+import { CacheManagementCard } from './cache-management-card';
 
 const THEMES: { id: ThemeVariant; name: string; color: string; description: string }[] = [
   {
@@ -325,6 +326,8 @@ export function GeneralSection() {
           </CardFooter>
         </Card>
       )}
+
+      <CacheManagementCard />
     </div>
   );
 }
