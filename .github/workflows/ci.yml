@@ -148,8 +148,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Run through turbo, not a raw filter: `@larkup/tool-doc-editor` type-checks
+      # against `@larkup/sandbox`'s built `dist/`, and turbo's `^build`
+      # dependency is what produces it.
       - name: Test and type-check packages
-        run: pnpm --filter './packages/**' --if-present test && pnpm --filter './packages/**' --if-present type-check
+        run: pnpm turbo test type-check --filter='./packages/**'
 
       - name: Verify the JavaScript SDK
         run: pnpm --filter @larkup/sdk test && pnpm --filter @larkup/sdk type-check && pnpm --filter @larkup/sdk build
