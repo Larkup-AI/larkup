@@ -75,10 +75,10 @@ export function CacheManagementCard() {
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <CardTitle className="text-sm">Build cache</CardTitle>
+              <CardTitle className="text-sm">Larkup cache</CardTitle>
               <CardDescription className="mt-1 text-xs">
-                Temporary Turborepo artifacts created only when building Larkup from source. Curl
-                and npm installs do not create this cache.
+                Temporary files that help Larkup run smoothly. You can clear them anytime to free up
+                space.
               </CardDescription>
             </div>
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
