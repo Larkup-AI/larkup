@@ -350,28 +350,28 @@ importers:
         specifier: ^0.38.0
         version: 0.38.0(@types/node@26.4.1)(apache-arrow@18.1.0)
       '@larkup/connections':
-        specifier: workspace:*
+        specifier: ^0.2.0
         version: link:../../packages/connections
       '@larkup/core':
-        specifier: workspace:*
+        specifier: ^0.5.2
         version: link:../../packages/core
       '@larkup/integrations':
-        specifier: workspace:*
+        specifier: ^0.2.1
         version: link:../../packages/integrations
       '@larkup/marketplace':
-        specifier: workspace:*
+        specifier: ^0.2.2
         version: link:../../packages/marketplace
       '@larkup/sandbox':
-        specifier: workspace:*
+        specifier: ^0.1.4
         version: link:../../packages/sandbox
       '@larkup/scraper':
-        specifier: workspace:*
+        specifier: ^0.1.41
         version: link:../../packages/scraper
       '@larkup/tool-doc-editor':
-        specifier: workspace:*
+        specifier: ^0.2.19
         version: link:../../packages/marketplace-tools/doc-editor
       '@larkup/vector-stores':
-        specifier: workspace:*
+        specifier: ^0.1.27
         version: link:../../packages/vector-stores
       '@napi-rs/canvas':
         specifier: 1.0.8
