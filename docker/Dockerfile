@@ -39,6 +39,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_DOCKER_ENV=${NEXT_PUBLIC_DOCKER_ENV}
 
 RUN pnpm --filter @larkup/sandbox build
+RUN pnpm --filter @larkup/integrations build
 RUN pnpm --filter @larkup/tool-doc-editor build
 RUN pnpm --filter larkup build
 
