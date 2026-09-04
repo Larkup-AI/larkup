@@ -18,7 +18,7 @@
     "./chroma": "./src/adapters/chroma.ts"
   },
   "dependencies": {
-    "@lancedb/lancedb": "^0.37.1",
+    "@lancedb/lancedb": "^0.38.0",
     "@pinecone-database/pinecone": "^8.1.0",
     "apache-arrow": "18.1.0"
   },

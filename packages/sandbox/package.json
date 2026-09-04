@@ -45,8 +45,8 @@
   "optionalDependencies": {
     "e2b": "^2.39.0",
     "@vercel/sandbox": "^3.0.0",
-    "modal": "^0.9.0",
-    "@daytona/sdk": "^0.204.1",
+    "modal": "^0.10.0",
+    "@daytona/sdk": "^0.207.0",
     "@browserbasehq/sdk": "^2.17.0",
     "playwright-core": "^1.62.1",
     "@fly/sprites": "^0.2.0",
