@@ -46,43 +46,36 @@ if (command === '--version' || command === '-v') {
   void openWhenReady(url);
 } else if (command === 'update') {
   const currentVersion = pkg.version;
-  let latestVersion = currentVersion;
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1500);
-    const res = await fetch('https://www.larkup.de/api/version', { signal: controller.signal });
-    clearTimeout(timeout);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.version) latestVersion = data.version;
-    }
-  } catch {}
+  const latestVersion = await getLatestPublishedVersion();
 
-  const compareVersions = (a, b) => {
-    const pa = a.replace(/^v/, '').split('.').map(Number);
-    const pb = b.replace(/^v/, '').split('.').map(Number);
-    for (let i = 0; i < 3; i++) {
-      if ((pa[i] || 0) > (pb[i] || 0)) return 1;
-      if ((pa[i] || 0) < (pb[i] || 0)) return -1;
-    }
-    return 0;
-  };
+  if (!latestVersion) {
+    console.error(
+      'Could not check for a Larkup update. Please check your connection and try again.',
+    );
+    process.exit(1);
+  }
 
   if (compareVersions(latestVersion, currentVersion) <= 0) {
     console.log('');
-    console.log('\x1b[1m╭──────────────────────────────────────────────╮\x1b[0m');
+    console.log('\x1b[1m╭─ Larkup update ──────────────────────────────╮\x1b[0m');
     console.log(
-      '\x1b[1m│  \x1b[32m✓\x1b[0m\x1b[1m Already up to date!                       │\x1b[0m',
+      '\x1b[1m│  \x1b[32m✓\x1b[0m\x1b[1m You already have the latest version.      │\x1b[0m',
     );
     console.log(
-      `\x1b[1m│    Larkup  ${currentVersion}${' '.repeat(Math.max(1, 34 - currentVersion.length))}│\x1b[0m`,
+      `\x1b[1m│    Larkup ${currentVersion}${' '.repeat(Math.max(1, 35 - currentVersion.length))}│\x1b[0m`,
     );
     console.log('\x1b[1m╰──────────────────────────────────────────────╯\x1b[0m');
     console.log('');
     process.exit(0);
   }
 
-  console.log(`\x1b[90mUpdating Larkup  ${currentVersion} → ${latestVersion} …\x1b[0m`);
+  console.log('');
+  console.log('\x1b[1m╭─ Larkup update ──────────────────────────────╮\x1b[0m');
+  console.log(
+    `\x1b[1m│  Updating ${currentVersion} → ${latestVersion}${' '.repeat(Math.max(1, 26 - currentVersion.length - latestVersion.length))}│\x1b[0m`,
+  );
+  console.log('\x1b[1m╰──────────────────────────────────────────────╯\x1b[0m');
+  console.log('');
   await migrateLegacyRuntimeState();
   const child = spawn(
     'npm',
@@ -94,8 +87,7 @@ if (command === '--version' || command === '-v') {
       '--ignore-scripts',
       '--legacy-peer-deps',
       '--loglevel=error',
-      'larkup@latest',
-      '@larkup/cli@latest',
+      `larkup@${latestVersion}`,
     ],
     { stdio: 'inherit' },
   );
@@ -106,11 +98,11 @@ if (command === '--version' || command === '-v') {
   child.once('exit', (code) => {
     if (code === 0) {
       console.log('');
-      console.log('\x1b[1m╭──────────────────────────────────────────────╮\x1b[0m');
+      console.log('\x1b[1m╭─ Larkup update ──────────────────────────────╮\x1b[0m');
       console.log(
-        `\x1b[1m│  \x1b[32m✓\x1b[0m\x1b[1m Updated to ${latestVersion}!${' '.repeat(Math.max(1, 31 - latestVersion.length))}│\x1b[0m`,
+        `\x1b[1m│  \x1b[32m✓\x1b[0m\x1b[1m Updated to ${latestVersion}.${' '.repeat(Math.max(1, 31 - latestVersion.length))}│\x1b[0m`,
       );
-      console.log('\x1b[1m│    Restart your terminal to apply the update. │\x1b[0m');
+      console.log('\x1b[1m│    Run larkup --version to confirm.           │\x1b[0m');
       console.log('\x1b[1m╰──────────────────────────────────────────────╯\x1b[0m');
       console.log('');
     }
@@ -132,6 +124,33 @@ function option(args, name) {
   return index >= 0 && args[index + 1] && !args[index + 1].startsWith('--')
     ? args[index + 1]
     : undefined;
+}
+
+async function getLatestPublishedVersion() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const response = await fetch('https://registry.npmjs.org/larkup/latest', {
+      signal: controller.signal,
+    });
+    if (!response.ok) return undefined;
+    const release = await response.json();
+    return typeof release.version === 'string' ? release.version : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function compareVersions(a, b) {
+  const pa = a.replace(/^v/, '').split('.').map(Number);
+  const pb = b.replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+  }
+  return 0;
 }
 
 function enterpriseEndpoint(baseUrl, pathname) {

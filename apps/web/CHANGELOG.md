@@ -1,5 +1,11 @@
 # larkup
 
+## 0.2.9
+
+### Patch Changes
+
+- Fix global installation and updates by publishing resolvable internal dependencies, checking npm's published version, and showing clear update status.
+
 ## 0.2.7
 
 ### Patch Changes

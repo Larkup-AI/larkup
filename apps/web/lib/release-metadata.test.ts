@@ -30,6 +30,22 @@ describe('published npm metadata', () => {
     expect(sandboxPackage.optionalDependencies['@daytonaio/sdk']).toBeUndefined();
     expect(launcher).toContain("'--legacy-peer-deps'");
     expect(launcher).toContain("'--loglevel=error'");
+    expect(launcher).toContain('https://registry.npmjs.org/larkup/latest');
+    expect(launcher).toContain('`larkup@${latestVersion}`');
+    expect(launcher).not.toContain("'@larkup/cli@latest'");
+    expect(launcher).toContain('You already have the latest version.');
+    for (const dependency of [
+      '@larkup/connections',
+      '@larkup/core',
+      '@larkup/integrations',
+      '@larkup/marketplace',
+      '@larkup/sandbox',
+      '@larkup/scraper',
+      '@larkup/tool-doc-editor',
+      '@larkup/vector-stores',
+    ]) {
+      expect(webPackage.dependencies[dependency]).not.toContain('workspace:');
+    }
     expect(webPackage.files).toEqual(['bin', '.next/standalone/apps/web']);
   });
 
