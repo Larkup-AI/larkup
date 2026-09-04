@@ -169,10 +169,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ toolI
       });
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Could not remove the local runtime.' },
-      { status: 503 },
-    );
+    console.error(`[Marketplace] Failed to execute removeRuntime for tool ${toolId}:`, error);
+    // Proceed with uninstallation anyway so a broken tool doesn't become permanently stuck
   }
   await uninstallTool(toolId);
   const configPurged = new URL(req.url).searchParams.get('purgeConfig') !== 'false';
