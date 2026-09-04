@@ -120,7 +120,7 @@ wheels = [
 
 [[package]]
 name = "larkup"
-version = "0.1.74"
+version = "0.2.3"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

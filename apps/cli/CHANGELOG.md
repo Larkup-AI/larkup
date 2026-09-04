@@ -1,5 +1,18 @@
 # @larkup/cli
 
+## 0.2.28
+
+### Patch Changes
+
+- 847b502: Keep global installs and updates quiet and compatible by aligning Apache Arrow with LanceDB's
+  supported peer range, shipping the marketplace TypeScript runtime loader, and using the renamed
+  Daytona SDK package. Public tarballs also scrub local project state from all traced workspaces.
+- Updated dependencies [847b502]
+- Updated dependencies [81abfcb]
+  - @larkup/marketplace@0.2.1
+  - @larkup/vector-stores@0.1.27
+  - @larkup/core@0.5.1
+
 ## 0.2.27
 
 ### Patch Changes
