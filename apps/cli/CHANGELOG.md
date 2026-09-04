@@ -1,5 +1,11 @@
 # @larkup/cli
 
+## 0.2.30
+
+### Patch Changes
+
+- f0ae72a: `larkup update`: show bold "Already up to date" banner when CLI is current; use a spinner with black text during npm install; show bold success banner after a successful update.
+
 ## 0.2.29
 
 ### Patch Changes

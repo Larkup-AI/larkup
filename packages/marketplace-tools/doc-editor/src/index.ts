@@ -4,12 +4,6 @@
  * Document Editor / Form Filling tool for the Larkup platform.
  * Enables AI-powered form filling and document editing in a Canvas-style UI.
  *
- * Supports: PDF, DOCX, PPTX, TXT
- *
- * Uses:
- * - pdf-lib (MIT) for native PDF form field operations
- * - mammoth (MIT) for DOCX reading
- * - @larkup/sandbox for heavy editing (python-docx, python-pptx, pypdf)
  */
 
 export const TOOL_META = {
