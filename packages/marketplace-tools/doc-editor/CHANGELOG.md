@@ -1,5 +1,11 @@
 # @larkup/tool-doc-editor
 
+## 0.2.19
+
+### Patch Changes
+
+- 3b3b030: fix(marketplace): add missing TOOL_EXTENSION export to prevent uninstall error log
+
 ## 0.2.18
 
 ### Patch Changes
