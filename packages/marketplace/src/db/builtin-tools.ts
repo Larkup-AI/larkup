@@ -10,7 +10,7 @@ export const BUILTIN_TOOLS: Record<string, unknown>[] = [
     longDescription:
       'Turn videos into knowledge your AI can understand. It listens to what is said, reads what appears on screen, and helps you find the moments that matter.',
     category: 'media',
-    version: '0.1.0',
+    version: '0.2.2',
     pricing: 'free',
     emoji: '🎬',
     icon: 'Film',

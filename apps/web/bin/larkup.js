@@ -11,6 +11,12 @@ const packageDir = path.resolve(__dirname, '..');
 const standaloneServer = path.join(packageDir, '.next', 'standalone', 'apps', 'web', 'server.js');
 const pkg = JSON.parse(readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
 
+// npm replaces its global package directory during an update. Runtime state
+// must therefore live outside that directory. Docker and development can
+// still provide LARKUP_DATA_DIR explicitly when they need a mounted/local root.
+const larkupDataDir = resolveLarkupDataDir();
+process.env.LARKUP_DATA_DIR = larkupDataDir;
+
 const args = process.argv.slice(2);
 const command = args[0];
 
@@ -24,6 +30,7 @@ if (command === '--version' || command === '-v') {
     console.error('Larkup is missing its production server. Reinstall the package and try again.');
     process.exit(1);
   }
+  await migrateLegacyRuntimeState();
   const child = spawn(process.execPath, [standaloneServer], {
     cwd: packageDir,
     stdio: 'inherit',
@@ -39,6 +46,7 @@ if (command === '--version' || command === '-v') {
   void openWhenReady(url);
 } else if (command === 'update') {
   console.log('\x1b[38;2;223;156;32mUpdating Larkup…\x1b[0m');
+  await migrateLegacyRuntimeState();
   const child = spawn(
     'npm',
     [
@@ -88,7 +96,34 @@ function enterpriseEndpoint(baseUrl, pathname) {
 }
 
 function projectRoot() {
-  return path.join(packageDir, '.larkup', 'projects');
+  return path.join(larkupDataDir, 'projects');
+}
+
+function resolveLarkupDataDir() {
+  const configured = process.env.LARKUP_DATA_DIR?.trim();
+  if (configured) return path.resolve(configured);
+  const home = process.env.HOME;
+  return home ? path.join(home, '.larkup') : path.join(packageDir, '.larkup');
+}
+
+async function migrateLegacyRuntimeState() {
+  const legacyDataDir = path.join(packageDir, '.larkup');
+  if (path.resolve(legacyDataDir) === path.resolve(larkupDataDir)) return;
+  try {
+    await fs.access(larkupDataDir);
+    return;
+  } catch {
+    // The durable directory has not been created yet.
+  }
+  try {
+    await fs.access(legacyDataDir);
+    await fs.cp(legacyDataDir, larkupDataDir, { recursive: true, errorOnExist: true });
+    console.log(`Migrated local Larkup data to ${larkupDataDir}.`);
+  } catch (error) {
+    if (error?.code !== 'ENOENT' && error?.code !== 'EEXIST') {
+      console.warn('Could not migrate existing local Larkup data:', error.message);
+    }
+  }
 }
 
 async function activeProjectConfig() {
@@ -164,7 +199,7 @@ async function enterpriseEnroll(args) {
     vectorStore: 'lancedb',
     storeConfig: {
       mode: 'local',
-      dbPath: `./.larkup/projects/${id}/index`,
+      dbPath: path.join(larkupDataDir, 'projects', id, 'index'),
       tableName: 'documents',
     },
     topK: 5,
@@ -271,7 +306,7 @@ async function removeCommand() {
   console.log(
     '\x1b[33mWarning: this permanently removes Larkup, its local database, installed tools, and configuration.\x1b[0m',
   );
-  console.log(`Data directory: ${path.join(packageDir, '.larkup')}`);
+  console.log(`Data directory: ${larkupDataDir}`);
 
   const confirmed = await confirm('Continue? Type y or yes to confirm ');
   if (!confirmed) {
@@ -281,11 +316,12 @@ async function removeCommand() {
 
   const localRoot = getLocalInstallRoot();
   if (localRoot) {
+    await fs.rm(larkupDataDir, { recursive: true, force: true });
     await removeLocalInstall(localRoot);
     return;
   }
 
-  await fs.rm(path.join(packageDir, '.larkup'), { recursive: true, force: true });
+  await fs.rm(larkupDataDir, { recursive: true, force: true });
   await fs.rm(path.join(packageDir, '.larkupdb'), { recursive: true, force: true });
   await fs.rm(path.join(packageDir, '.next', 'cache'), { recursive: true, force: true });
   await fs.rm(path.join(packageDir, '.env.local'), { force: true });

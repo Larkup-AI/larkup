@@ -161,7 +161,7 @@ export async function removeVideoRuntime(kind: LocalVideoRuntimeKind): Promise<v
   const packageDirectory = resolvePackageDirectory();
   if (kind === 'local-process') {
     stopNativeVideoRuntime(nativePidPath(packageDirectory));
-    rmSync(path.join(process.cwd(), '.larkup', 'video-intelligence'), {
+    rmSync(videoRuntimeDataDir(), {
       recursive: true,
       force: true,
     });
@@ -431,12 +431,12 @@ export async function detectLocalRuntimeHost(): Promise<LocalRuntimeHostReport> 
   const recommendedKind: LocalVideoRuntimeKind | null = acceleration.dockerSupported
     ? 'local-docker'
     : acceleration.nativeSupported
-    ? 'local-process'
-    : docker.daemonRunning
-    ? 'local-docker'
-    : native.uvInstalled
-    ? 'local-process'
-    : null;
+      ? 'local-process'
+      : docker.daemonRunning
+        ? 'local-docker'
+        : native.uvInstalled
+          ? 'local-process'
+          : null;
   const totalMemGB = os.totalmem() / 1024 ** 3;
   const freeMemGB = os.freemem() / 1024 ** 3;
   const cpus = os.cpus().length;
@@ -456,29 +456,29 @@ export async function detectLocalRuntimeHost(): Promise<LocalRuntimeHostReport> 
             )} GB RAM free across ${cpus} CPU cores — comfortable for the Docker runtime.`,
           }
       : recommendedKind === 'local-process'
-      ? acceleration.nativeSupported
-        ? {
-            level: 'good',
-            message: `${acceleration.message} The native runtime is recommended so it can use the GPU directly.`,
-          }
-        : freeMemGB < 3
-        ? {
-            level: 'tight',
-            message: `Only ${freeMemGB.toFixed(
-              1,
-            )} GB RAM is free; the native CPU runtime may run slowly.`,
-          }
+        ? acceleration.nativeSupported
+          ? {
+              level: 'good',
+              message: `${acceleration.message} The native runtime is recommended so it can use the GPU directly.`,
+            }
+          : freeMemGB < 3
+            ? {
+                level: 'tight',
+                message: `Only ${freeMemGB.toFixed(
+                  1,
+                )} GB RAM is free; the native CPU runtime may run slowly.`,
+              }
+            : {
+                level: 'good',
+                message: `${freeMemGB.toFixed(
+                  1,
+                )} GB RAM free across ${cpus} CPU cores — the native runtime should run well.`,
+              }
         : {
-            level: 'good',
-            message: `${freeMemGB.toFixed(
-              1,
-            )} GB RAM free across ${cpus} CPU cores — the native runtime should run well.`,
-          }
-      : {
-          level: 'unknown',
-          message:
-            'Neither Docker nor uv was detected yet. Installing will set up uv automatically.',
-        };
+            level: 'unknown',
+            message:
+              'Neither Docker nor uv was detected yet. Installing will set up uv automatically.',
+          };
   return {
     docker,
     native,
@@ -565,7 +565,15 @@ function resolvePackageDirectory(): string {
 }
 
 function nativePidPath(packageDirectory: string) {
-  return path.join(process.cwd(), '.larkup', 'video-intelligence', 'runtime.pid');
+  return path.join(videoRuntimeDataDir(), 'runtime.pid');
+}
+
+function videoRuntimeDataDir() {
+  const root = process.env.LARKUP_DATA_DIR?.trim();
+  return path.join(
+    root ? path.resolve(root) : path.join(process.cwd(), '.larkup'),
+    'video-intelligence',
+  );
 }
 
 export function stopNativeVideoRuntime(pidFile: string) {
@@ -616,7 +624,7 @@ function nativeRuntimeEnvironment(
 ) {
   const port = portFromUrl(localRuntimeUrl) ?? '8787';
   const hostname = hostnameFromUrl(localRuntimeUrl);
-  const dataDirectory = path.join(process.cwd(), '.larkup', 'video-intelligence');
+  const dataDirectory = videoRuntimeDataDir();
   return withUvPath({
     ...process.env,
     LARKUP_VIDEO_PORT: port,

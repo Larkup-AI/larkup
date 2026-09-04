@@ -25,7 +25,7 @@ describe('PDF visual routing', () => {
     ).toMatchObject({ image: { pageNumber: 3, index: 0 } });
   });
 
-  it('reuses a relevant indexed image description without another slow vision pass', () => {
+  it('visually verifies exhaustive diagram requests instead of trusting a partial caption', () => {
     expect(
       shouldInspectRetrievedImage(
         "list every view and routine name shown, and tell me how many routines are under 'Resources'.",
@@ -43,7 +43,7 @@ describe('PDF visual routing', () => {
           ],
         },
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('requires a fresh visual read when indexed descriptions do not cover the question', () => {

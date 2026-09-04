@@ -39,7 +39,8 @@ function serializePackageMutation<T>(fn: () => Promise<T>): Promise<T> {
 
 /** Root directory for tool installations. */
 function getToolsDir(): string {
-  return path.join(process.cwd(), '.larkup', 'tools');
+  const dataDir = process.env.LARKUP_DATA_DIR?.trim();
+  return path.join(dataDir ? path.resolve(dataDir) : path.join(process.cwd(), '.larkup'), 'tools');
 }
 
 /** Path to the installed tools manifest. */
