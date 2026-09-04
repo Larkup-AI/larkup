@@ -1,5 +1,26 @@
 # larkup
 
+## 0.2.3
+
+### Patch Changes
+
+- 847b502: Keep global installs and updates quiet and compatible by aligning Apache Arrow with LanceDB's
+  supported peer range, shipping the marketplace TypeScript runtime loader, and using the renamed
+  Daytona SDK package. Public tarballs also scrub local project state from all traced workspaces.
+- 81abfcb: Stabilize plain, spreadsheet, PDF, and generated-agent chat by filtering unavailable tools,
+  closing UI streams without lifecycle deadlocks, normalizing API messages, preserving accurate
+  tabular aggregations, routing the leading source, and recovering friendly responses. Reuse indexed
+  PDF descriptions, render image previews reliably, and let additional file uploads join active
+  background indexing queues.
+- Updated dependencies [847b502]
+- Updated dependencies [81abfcb]
+  - @larkup/marketplace@0.2.1
+  - @larkup/sandbox@0.1.4
+  - @larkup/vector-stores@0.1.27
+  - @larkup/core@0.5.1
+  - @larkup/tool-doc-editor@0.2.17
+  - @larkup/scraper@0.1.40
+
 ## 0.2.2
 
 ### Patch Changes
