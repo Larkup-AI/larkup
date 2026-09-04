@@ -1,5 +1,11 @@
 # larkup
 
+## 0.2.10
+
+### Patch Changes
+
+- 5bab80c: Fix: autoload the API key from the LLM provider for the vision provider in video intelligence when no vision provider is explicitly configured.
+
 ## 0.2.9
 
 ### Patch Changes
