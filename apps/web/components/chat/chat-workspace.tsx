@@ -64,7 +64,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { assistantReplyCanClose } from '@/lib/chat/stream-lifecycle';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -351,7 +350,6 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
     error,
     regenerate,
     addToolResult,
-    stop,
   } = useChat({
     transport,
   });
@@ -435,18 +433,6 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const isBusy = chatStatus === 'submitted' || chatStatus === 'streaming';
-
-  // Some providers leave the HTTP stream open after the final answer. Once
-  // visible text and every tool output have been stable for a short grace
-  // period, close that stale transport so Send and message actions recover.
-  // Any incoming delta replaces `messages` and resets this timer.
-  useEffect(() => {
-    if (chatStatus !== 'streaming') return;
-    const lastMessage = messages[messages.length - 1] as any;
-    if (!assistantReplyCanClose(lastMessage)) return;
-    const timeout = window.setTimeout(() => void stop(), 750);
-    return () => window.clearTimeout(timeout);
-  }, [chatStatus, messages, stop]);
 
   // Drain the queue one message at a time once the assistant is free again
   useEffect(() => {

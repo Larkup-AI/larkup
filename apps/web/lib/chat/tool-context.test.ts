@@ -4,7 +4,7 @@ import {
   collectAnswerLevelMediaStatements,
   containsAnswerLevelMediaEvidence,
   collectQuestionMatchedDirectClaims,
-  ensureNonEmptyTextStream,
+  recoverEmptyUIMessageStream,
   formatDirectObservationAnswer,
   formatExhaustiveMediaAnswer,
   formatOutcomeMediaAnswer,
@@ -26,7 +26,7 @@ async function transformedChunks(chunks: any[], fallback = 'A visible fallback a
       controller.close();
     },
   });
-  const reader = source.pipeThrough(ensureNonEmptyTextStream(fallback)()).getReader();
+  const reader = source.pipeThrough(recoverEmptyUIMessageStream(fallback)()).getReader();
   const output: any[] = [];
   for (;;) {
     const next = await reader.read();
@@ -35,47 +35,59 @@ async function transformedChunks(chunks: any[], fallback = 'A visible fallback a
   }
 }
 
-describe('ensureNonEmptyTextStream', () => {
-  it.each(['finish', 'error', 'abort'])(
-    'inserts visible text before a terminal %s',
-    async (type) => {
-      const chunks = await transformedChunks([
-        { type: 'start-step' },
-        { type: 'finish-step' },
-        { type },
-      ]);
+describe('recoverEmptyUIMessageStream', () => {
+  it('inserts visible text before a normal finish', async () => {
+    const chunks = await transformedChunks([
+      { type: 'start-step' },
+      { type: 'finish-step' },
+      { type: 'finish' },
+    ]);
 
-      const terminalIndex = chunks.findIndex((chunk) => chunk.type === type);
-      const fallbackIndex = chunks.findIndex(
-        (chunk) => chunk.type === 'text-delta' && chunk.text === 'A visible fallback answer.',
-      );
-      expect(fallbackIndex).toBeGreaterThan(-1);
-      expect(fallbackIndex).toBeLessThan(terminalIndex);
-      expect(chunks.filter((chunk) => chunk.type === 'text-delta')).toHaveLength(1);
-    },
-  );
+    const finishIndex = chunks.findIndex((chunk) => chunk.type === 'finish');
+    const fallbackIndex = chunks.findIndex(
+      (chunk) => chunk.type === 'text-delta' && chunk.delta === 'A visible fallback answer.',
+    );
+    expect(fallbackIndex).toBeGreaterThan(-1);
+    expect(fallbackIndex).toBeLessThan(finishIndex);
+  });
+
+  it('forwards finish-step immediately so multi-step generation cannot deadlock', async () => {
+    const chunks = await transformedChunks([{ type: 'start-step' }, { type: 'finish-step' }]);
+    expect(chunks[1]).toEqual({ type: 'finish-step' });
+  });
+
+  it('turns a sanitized stream error into ordinary assistant text', async () => {
+    const chunks = await transformedChunks([
+      { type: 'error', errorText: 'The provider is temporarily unavailable.' },
+    ]);
+    expect(chunks.some((chunk) => chunk.type === 'error')).toBe(false);
+    expect(chunks).toContainEqual(
+      expect.objectContaining({
+        type: 'text-delta',
+        delta: 'The provider is temporarily unavailable.',
+      }),
+    );
+  });
 
   it('also inserts visible text when a provider closes without a terminal chunk', async () => {
     const chunks = await transformedChunks([{ type: 'start-step' }, { type: 'finish-step' }]);
     expect(chunks).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: 'text-delta', text: 'A visible fallback answer.' }),
+        expect.objectContaining({ type: 'text-delta', delta: 'A visible fallback answer.' }),
       ]),
     );
-    expect(chunks.findIndex((chunk) => chunk.type === 'text-delta')).toBeLessThan(
-      chunks.findIndex((chunk) => chunk.type === 'finish-step'),
-    );
+    expect(chunks.filter((chunk) => chunk.type === 'text-delta')).toHaveLength(1);
   });
 
   it('does not add fallback text when the model already answered', async () => {
     const chunks = await transformedChunks([
       { type: 'start-step' },
-      { type: 'text-delta', id: 'answer', text: 'The actual answer.' },
+      { type: 'text-delta', id: 'answer', delta: 'The actual answer.' },
       { type: 'finish-step' },
       { type: 'finish' },
     ]);
     expect(chunks.filter((chunk) => chunk.type === 'text-delta')).toEqual([
-      expect.objectContaining({ text: 'The actual answer.' }),
+      expect.objectContaining({ delta: 'The actual answer.' }),
     ]);
   });
 });
@@ -141,6 +153,26 @@ describe('formatOutcomeMediaAnswer', () => {
         'What were the participants wearing?',
       ),
     ).toBeUndefined();
+  });
+
+  it('preserves the team-to-score binding from a quoted Arabic scoreboard', () => {
+    expect(
+      formatOutcomeMediaAnswer(
+        {
+          success: true,
+          claimVerification: { status: 'established-by-trail' },
+          temporalContext: {
+            readings: [
+              {
+                atSecs: 750.64,
+                text: "On screen: 'الزمالك المصري 2 - 1 الهلال السعودي' — score remains 2-1",
+              },
+            ],
+          },
+        },
+        'Who won this match?',
+      ),
+    ).toBe('الزمالك المصري won, 2–1 over الهلال السعودي.');
   });
 });
 

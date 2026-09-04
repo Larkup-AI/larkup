@@ -180,8 +180,8 @@ export function extractConversationEvidence(
     const hits = Array.isArray(result?.hits) ? result.hits : [];
 
     const images = new Map<string, ReusableImageEvidence>();
-    const sources = hits.slice(0, 2).flatMap((hit: any) => {
-      if (!hit || typeof hit !== 'object') return [];
+    for (const hit of hits.slice(0, 4) as any[]) {
+      if (!hit || typeof hit !== 'object') continue;
       const title = typeof hit.title === 'string' ? hit.title : undefined;
       for (const image of [
         ...imageEvidence(hit.images, title),
@@ -189,6 +189,10 @@ export function extractConversationEvidence(
       ]) {
         images.set(image.imageUrl, image);
       }
+    }
+    const sources = hits.slice(0, 2).flatMap((hit: any) => {
+      if (!hit || typeof hit !== 'object') return [];
+      const title = typeof hit.title === 'string' ? hit.title : undefined;
       return [
         {
           title,

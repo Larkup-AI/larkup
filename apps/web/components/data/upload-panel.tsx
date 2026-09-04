@@ -105,9 +105,10 @@ export function UploadPanel({
   groupId?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [staged, setStagedState] = useState<StagedFile[]>(() =>
-    globalStagedFiles.length ? globalStagedFiles : restoreQueue(),
-  );
+  const initialStaged = globalStagedFiles.length ? globalStagedFiles : restoreQueue();
+  const [staged, setStagedState] = useState<StagedFile[]>(initialStaged);
+  const stagedRef = useRef(initialStaged);
+  const savingRef = useRef(false);
   const [indexAllImages, setIndexAllImages] = useState(false);
   const [imageIndexingCapability, setImageIndexingCapability] =
     useState<ImageIndexingCapability | null>(null);
@@ -144,12 +145,11 @@ export function UploadPanel({
   }, []);
 
   const setStaged = (val: React.SetStateAction<StagedFile[]>) => {
-    setStagedState((prev) => {
-      const next = typeof val === 'function' ? (val as Function)(prev) : val;
-      globalStagedFiles = next;
-      persistQueue(next);
-      return next;
-    });
+    const next = typeof val === 'function' ? val(stagedRef.current) : val;
+    stagedRef.current = next;
+    globalStagedFiles = next;
+    persistQueue(next);
+    setStagedState(next);
   };
   const imageIndexingAvailable = imageIndexingCapability?.available === true;
 
@@ -175,6 +175,7 @@ export function UploadPanel({
   const editingFile = staged.find((f) => f.id === editingFileId);
 
   async function readFiles(files: FileList | File[]) {
+    const joinedActiveSave = savingRef.current;
     const next: StagedFile[] = [];
     for (const file of Array.from(files)) {
       const ext = file.name.split('.').pop()?.toLowerCase();
@@ -323,14 +324,19 @@ export function UploadPanel({
       }
     }
     setStaged((prev) => [...prev, ...next]);
+    if (joinedActiveSave && next.length > 0) {
+      toast.message(`${next.length} file${next.length === 1 ? '' : 's'} added to the queue`);
+      window.setTimeout(() => void ingest(), 0);
+    }
   }
 
   async function ingest() {
-    if (staged.length === 0) return;
+    if (savingRef.current || stagedRef.current.length === 0) return;
+    savingRef.current = true;
     setSaving(true);
     let ok = 0;
 
-    const filesToIngest = [...staged];
+    const filesToIngest = [...stagedRef.current];
     const payloads: any[] = [];
 
     for (const f of filesToIngest) {
@@ -545,18 +551,14 @@ export function UploadPanel({
     }
 
     const stagedCount = filesToIngest.length;
+    savingRef.current = false;
     setSaving(false);
     setProgress(null);
-    setStaged((prev) => {
-      const remaining = prev.filter((p) => !filesToIngest.some((i) => i.id === p.id));
-      globalStagedFiles = remaining;
-      if (remaining.length === 0) {
-        sessionStorage.removeItem(UPLOAD_QUEUE_KEY);
-      } else {
-        persistQueue(remaining);
-      }
-      return remaining;
-    });
+    const remaining = stagedRef.current.filter(
+      (pending) => !filesToIngest.some((ingested) => ingested.id === pending.id),
+    );
+    setStaged(remaining);
+    if (remaining.length === 0) sessionStorage.removeItem(UPLOAD_QUEUE_KEY);
 
     // Also explicitly clear the input value just in case
     if (inputRef.current) {
@@ -573,19 +575,22 @@ export function UploadPanel({
     } else {
       toast.error('No text or images could be extracted from the uploaded files.');
     }
+
+    if (remaining.length > 0) window.setTimeout(() => void ingest(), 0);
   }
 
   useEffect(() => {
     onActionChange?.({
-      label:
-        staged.length === 0
+      label: saving
+        ? 'Add more files'
+        : staged.length === 0
           ? 'Save to corpus'
           : staged.length === 1
             ? 'Save 1 file'
             : `Save ${staged.length} files`,
-      onClick: ingest,
-      disabled: staged.length === 0 || saving,
-      loading: saving,
+      onClick: saving ? () => inputRef.current?.click() : ingest,
+      disabled: !saving && staged.length === 0,
+      loading: false,
     });
     return () => onActionChange?.(null);
   }, [staged, saving, onActionChange]);

@@ -69,6 +69,8 @@ import {
 } from '@/lib/chat/media-source-routing';
 import { createTabularVisualization } from '@/lib/chat/tabular-visualization';
 import { inferTabularPlan } from '@/lib/chat/tabular-query-plan';
+import { leadingMediaAssetId } from '@/lib/chat/media-retrieval-routing';
+import { findIndexedImageSource } from '@/lib/chat/visual-routing';
 import { indexedVideoEvidenceIsSufficient } from '@/lib/chat/video-rag-routing';
 import {
   inspectStoredPdf,
@@ -752,16 +754,8 @@ async function findEvidenceFirstVideoAssetId(
     return selection;
   };
 
-  for (const hit of retrieval.hits ?? []) {
-    const directAssetId = hit.metadata?.mediaAssetId;
-    if (typeof directAssetId === 'string' && assetsById.has(directAssetId)) {
-      return preferEvidenceQuality(directAssetId);
-    }
-    const assetId = assetIdByDocumentId.get(String(hit.documentId ?? ''));
-    if (assetId) return preferEvidenceQuality(assetId);
-  }
-
-  return undefined;
+  const assetId = leadingMediaAssetId(retrieval, new Set(assetsById.keys()), assetIdByDocumentId);
+  return assetId ? preferEvidenceQuality(assetId) : undefined;
 }
 
 /** Builds the SandboxManager config from the workspace's configured default sandbox provider. */
@@ -2254,20 +2248,14 @@ export async function getChatTools(context: {
           }
           if (imageUrl) {
             const documents = await readDocuments();
-            const source = documents.find(
-              (document) =>
-                Array.isArray(document.metadata?.images) &&
-                document.metadata.images.some((image: any) => image?.imageUrl === imageUrl),
-            );
-            const image = source?.metadata?.images?.find(
-              (candidate: any) => candidate?.imageUrl === imageUrl,
-            );
-            if (!image) {
+            const indexedImage = findIndexedImageSource(documents, imageUrl);
+            if (!indexedImage) {
               return {
                 success: false,
                 error: 'That extracted document image is no longer available.',
               };
             }
+            const { source, image } = indexedImage;
             return {
               success: true,
               // The preview uses mediaUrl when supplied; this stable sentinel
@@ -3027,6 +3015,8 @@ export async function getChatTools(context: {
         'executeAnalysis',
         // PDF/image hits can require one visual pass after retrieval. This is
         // available only to a follow-up tool step, never auto-run on chat.
+        'inspectPdfPages',
+        'analyzePdfPages',
         'analyzeImageDeeply',
         'presentMedia',
         'fillDocumentForm',

@@ -9,6 +9,45 @@ import type { RagConfig } from '@larkup/core/types';
 
 export const dynamic = 'force-dynamic';
 
+let queuedIndexRequested = false;
+let queuedIndexWorker: Promise<void> | null = null;
+
+function scheduleQueuedIndex() {
+  queuedIndexRequested = true;
+  if (queuedIndexWorker) return;
+
+  queuedIndexWorker = (async () => {
+    while (queuedIndexRequested) {
+      queuedIndexRequested = false;
+      while (await isRunning()) {
+        await new Promise((resolve) => setTimeout(resolve, 750));
+      }
+
+      const [config, stats, documents, previousRun] = await Promise.all([
+        readConfig(),
+        corpusStats(),
+        readDocuments(),
+        readRun(),
+      ]);
+      if (!documents.some((document) => document.status !== 'indexed')) continue;
+      if (!assessReadiness(config, stats.docCount).ready) continue;
+
+      try {
+        const run = await createRun(config);
+        await runIndexer(run.id, config, previousRun);
+      } catch (error) {
+        // Another request may win the narrow gap between the running check and
+        // createRun. Keep the durable unindexed documents queued for its end.
+        if (await isRunning()) queuedIndexRequested = true;
+        else console.error('[index] queued indexing failed:', error);
+      }
+    }
+  })().finally(() => {
+    queuedIndexWorker = null;
+    if (queuedIndexRequested) scheduleQueuedIndex();
+  });
+}
+
 /**
  * Assess whether indexing can run with the current config + corpus.
  * Returned to the UI so it can explain exactly what is missing before enabling
@@ -83,7 +122,8 @@ async function getIndexStatus() {
 
 export async function POST(req: Request) {
   if (await isRunning()) {
-    return NextResponse.json({ error: 'An indexing run is already in progress.' }, { status: 409 });
+    scheduleQueuedIndex();
+    return NextResponse.json({ queued: true, run: await readRun() }, { status: 202 });
   }
 
   const [config, stats] = await Promise.all([readConfig(), corpusStats()]);

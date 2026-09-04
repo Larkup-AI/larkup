@@ -43,7 +43,17 @@ export function inferTabularPlan(
   const text = requestText?.toLocaleLowerCase() ?? '';
   const dateColumn = dataset.columns.find((column) => column.type === 'date')?.name;
   const numeric = numericColumns(dataset);
-  const measureColumn = numeric.length === 1 ? numeric[0] : undefined;
+  const requestedMeasures = (request.aggregations ?? [])
+    .map((aggregation) => aggregation.column)
+    .filter(
+      (column, index, columns) => numeric.includes(column) && columns.indexOf(column) === index,
+    );
+  const measureColumn =
+    numeric.length === 1
+      ? numeric[0]
+      : requestedMeasures.length === 1
+        ? requestedMeasures[0]
+        : undefined;
   const year = text.match(/\b(20\d{2})\b/)?.[1];
 
   if (dateColumn && measureColumn && /\b(?:monthly|per month|month(?:ly)? trend)\b/i.test(text)) {
@@ -56,6 +66,11 @@ export function inferTabularPlan(
     return {
       request: {
         ...request,
+        // A model may also send the source column names. Once rows are
+        // grouped those names no longer exist (for example, Revenue becomes
+        // sum_Revenue), so retaining the projection would turn every result
+        // row into an empty object.
+        columns: undefined,
         filters,
         timeBucket: { column: dateColumn, grain: 'month' },
         groupBy: [bucketColumn],

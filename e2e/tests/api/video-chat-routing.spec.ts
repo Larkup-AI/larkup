@@ -3,6 +3,29 @@ import { readFile } from 'node:fs/promises';
 
 const repoRoot = new URL('../../..', import.meta.url).pathname.replace(/\/$/, '');
 
+test('chat filters unavailable optional tools before invoking the AI SDK', async () => {
+  const route = await readFile(`${repoRoot}/apps/web/app/api/chat/route.ts`, 'utf8');
+  const tools = await readFile(`${repoRoot}/apps/web/app/api/chat/tools.ts`, 'utf8');
+  const messageInput = await readFile(`${repoRoot}/apps/web/lib/chat/message-input.ts`, 'utf8');
+  const toolContext = await readFile(`${repoRoot}/apps/web/lib/chat/tool-context.ts`, 'utf8');
+  const workspace = await readFile(
+    `${repoRoot}/apps/web/components/chat/chat-workspace.tsx`,
+    'utf8',
+  );
+
+  expect(route).toContain('executableTools({');
+  expect(route).toContain('normalizeIncomingMessages(body?.messages)');
+  expect(route).toContain('.pipeThrough(');
+  expect(route).toContain('recoverEmptyUIMessageStream(');
+  expect(route).toContain('if (imagePreviewFollowUp && previewImage && builtInTools.presentMedia)');
+  expect(tools).toContain("'inspectPdfPages'");
+  expect(tools).toContain("'analyzePdfPages'");
+  expect(messageInput).toContain("typeof message.content === 'string'");
+  expect(toolContext).toContain("if (chunk.type === 'finish') emitRecovery(controller)");
+  expect(toolContext).not.toContain('pendingFinishStep');
+  expect(workspace).not.toContain('assistantReplyCanClose');
+});
+
 test('chat exposes the evidence-first video tools instead of ordinary search alone', async () => {
   const route = await readFile(`${repoRoot}/apps/web/app/api/chat/route.ts`, 'utf8');
   const tools = await readFile(`${repoRoot}/apps/web/app/api/chat/tools.ts`, 'utf8');
@@ -186,9 +209,7 @@ test('grounds a named person before presenting an appearance claim', async () =>
   expect(videoAgent).toContain('knownEntities: inspectionEntityHints(hits, plan)');
   expect(inspectRoute).toContain('const knownEntities = Array.isArray(body.knownEntities)');
   // Match on the expression, not on how the formatter happened to wrap it.
-  expect(inspectRoute.replace(/\s+/g, ' ')).toContain(
-    "knownEntities.length > 0 ? 'thorough'",
-  );
+  expect(inspectRoute.replace(/\s+/g, ' ')).toContain("knownEntities.length > 0 ? 'thorough'");
   expect(vision).toContain('Name a person only where this clip shows a readable name label');
   expect(vision).toContain('Aligned evidence context for this clip');
   expect(vision).toContain('Named people or entities that require visual grounding');
@@ -290,10 +311,11 @@ test('bounds answer generation and never reuses a cached video answer', async ()
   );
   const toolContext = await readFile(`${repoRoot}/apps/web/lib/chat/tool-context.ts`, 'utf8');
 
-  expect(route).toContain('experimental_transform: ensureNonEmptyTextStream(');
+  expect(route).toContain('recoverEmptyUIMessageStream(');
+  expect(route).not.toContain('experimental_transform: ensureNonEmptyTextStream(');
   expect(route).toContain('totalMs: 45_000');
   expect(route).toContain('firstChunkMs: 25_000');
-  expect(toolContext).toContain('export function ensureNonEmptyTextStream(');
+  expect(toolContext).toContain('export function recoverEmptyUIMessageStream(');
   expect(tools).not.toContain('rememberVideoCorrection: tool(');
   expect(tools).not.toContain('saveVideoAnswerCorrection');
   expect(workspace).not.toContain('answer-cache-store');

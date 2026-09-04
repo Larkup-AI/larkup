@@ -18,6 +18,37 @@ describe('continuesRecentMediaTopic', () => {
 });
 
 describe('media conversation evidence', () => {
+  it('keeps an indexed PDF image below the compact text-source summary', () => {
+    const evidence = extractConversationEvidence([
+      {
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-searchKnowledgeBase',
+            output: {
+              hits: [
+                { title: 'Schema text', text: 'Views and routines' },
+                { title: 'More schema text', text: 'Resources' },
+                {
+                  title: 'Schema diagram',
+                  images: [{ imageUrl: '/api/uploads/schema.png', pageNumber: 3 }],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    expect(evidence.images).toEqual([
+      expect.objectContaining({
+        imageUrl: '/api/uploads/schema.png',
+        pageNumber: 3,
+        title: 'Schema diagram',
+      }),
+    ]);
+  });
+
   it('keeps a title-matched media source when vector retrieval has no document hits', () => {
     const evidence = extractConversationEvidence([
       {
