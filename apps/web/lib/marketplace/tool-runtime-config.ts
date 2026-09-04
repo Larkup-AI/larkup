@@ -19,6 +19,7 @@ export function withGlobalVisionGatewayConfig(
   >,
 ): Record<string, unknown> {
   const visionCapableProviders = new Set(['vercel_ai_gateway', 'openai', 'google']);
+  const toolConfigWithCurrentDefaults = migrateLegacyVideoIntelligenceDefaults(toolConfig, config);
   const configuredGatewayKey =
     (config.visionProvider === 'vercel_ai_gateway' ? config.visionApiKey : undefined) ||
     (config.chatProvider === 'vercel_ai_gateway' ? config.chatApiKey : undefined) ||
@@ -35,9 +36,16 @@ export function withGlobalVisionGatewayConfig(
     config.chatProvider && config.chatApiKey && visionCapableProviders.has(config.chatProvider)
       ? config.chatProvider
       : undefined;
+  const inheritedEmbeddingProvider =
+    config.embeddingProvider &&
+    config.embeddingApiKey &&
+    visionCapableProviders.has(config.embeddingProvider)
+      ? config.embeddingProvider
+      : undefined;
   const visionProvider =
     explicitVisionProvider ||
     inheritedChatProvider ||
+    inheritedEmbeddingProvider ||
     (configuredGatewayKey ? 'vercel_ai_gateway' : undefined);
   const visionApiKey =
     (explicitVisionProvider ? config.visionApiKey : undefined) ||
@@ -53,11 +61,22 @@ export function withGlobalVisionGatewayConfig(
       ? config.chatModelId
       : undefined);
 
-  const agentProvider = config.chatProvider;
+  // Older projects commonly have one OpenAI key saved with the embedding
+  // configuration before a separate Chat Model was introduced. Reuse it when
+  // it belongs to a provider that can run the video tool's planning pass.
+  const agentProvider =
+    (config.chatProvider && config.chatApiKey ? config.chatProvider : undefined) ||
+    (config.embeddingProvider &&
+    config.embeddingApiKey &&
+    visionCapableProviders.has(config.embeddingProvider)
+      ? config.embeddingProvider
+      : config.chatProvider);
   const agentApiKey =
-    config.chatApiKey || (agentProvider === 'vercel_ai_gateway' ? configuredGatewayKey : undefined);
+    (agentProvider === config.chatProvider ? config.chatApiKey : undefined) ||
+    (agentProvider === config.embeddingProvider ? config.embeddingApiKey : undefined) ||
+    (agentProvider === 'vercel_ai_gateway' ? configuredGatewayKey : undefined);
   return {
-    ...toolConfig,
+    ...toolConfigWithCurrentDefaults,
     larkupVisionProvider: visionProvider,
     larkupVisionApiKey: visionApiKey,
     larkupVisionModel: visionModel,
@@ -71,4 +90,66 @@ export function withGlobalVisionGatewayConfig(
           ? 'openai/gpt-5-mini'
           : undefined),
   };
+}
+
+/**
+ * Versions through 0.2.4 persisted provider-specific values that were meant
+ * to be defaults. Those values shadow AI Models forever, so an existing
+ * OpenAI setup can look unconfigured after installing Video Intelligence.
+ * Treat only the exact old, keyless defaults as automatic. Real overrides and
+ * Gateway-based AI Models selections remain untouched.
+ */
+function migrateLegacyVideoIntelligenceDefaults(
+  toolConfig: Record<string, unknown>,
+  config: Pick<
+    RagConfig,
+    | 'visionProvider'
+    | 'visionApiKey'
+    | 'chatProvider'
+    | 'chatApiKey'
+    | 'embeddingProvider'
+    | 'embeddingApiKey'
+  >,
+): Record<string, unknown> {
+  if (!('videoVisionProvider' in toolConfig) && !('videoAgentProvider' in toolConfig)) {
+    return toolConfig;
+  }
+
+  const value = (key: string) =>
+    typeof toolConfig[key] === 'string' ? toolConfig[key].trim() : undefined;
+  const hasSavedVisionDefault = Boolean(
+    (config.visionProvider && config.visionApiKey) ||
+    (config.chatProvider && config.chatApiKey) ||
+    (config.embeddingProvider && config.embeddingApiKey),
+  );
+  const hasSavedAgentDefault = Boolean(
+    (config.chatProvider && config.chatApiKey) ||
+    (config.embeddingProvider && config.embeddingApiKey),
+  );
+  const usesSavedGateway =
+    config.visionProvider === 'vercel_ai_gateway' || config.chatProvider === 'vercel_ai_gateway';
+  const migrated = { ...toolConfig };
+
+  if (
+    hasSavedVisionDefault &&
+    !usesSavedGateway &&
+    value('videoVisionProvider') === 'vercel_ai_gateway' &&
+    !value('videoVisionApiKey') &&
+    value('semanticVisionModel') === 'google/gemini-3.6-flash'
+  ) {
+    migrated.videoVisionProvider = 'auto';
+    migrated.semanticVisionModel = 'auto';
+  }
+  if (
+    hasSavedAgentDefault &&
+    config.chatProvider !== 'vercel_ai_gateway' &&
+    config.embeddingProvider !== 'vercel_ai_gateway' &&
+    value('videoAgentProvider') === 'vercel_ai_gateway' &&
+    !value('videoAgentApiKey') &&
+    value('agentModel') === 'openai/gpt-5-mini'
+  ) {
+    migrated.videoAgentProvider = 'auto';
+    migrated.agentModel = 'auto';
+  }
+  return migrated;
 }

@@ -154,4 +154,64 @@ describe('withGlobalVisionGatewayConfig', () => {
       larkupVisionModel: 'google/gemini-3.6-flash',
     });
   });
+
+  it('migrates the old keyless Video Intelligence defaults to saved OpenAI settings', () => {
+    expect(
+      withGlobalVisionGatewayConfig(
+        {
+          videoVisionProvider: 'vercel_ai_gateway',
+          semanticVisionModel: 'google/gemini-3.6-flash',
+          videoAgentProvider: 'vercel_ai_gateway',
+          agentModel: 'openai/gpt-5-mini',
+        },
+        {
+          visionProvider: '',
+          visionApiKey: '',
+          visionModelId: '',
+          chatProvider: 'openai',
+          chatApiKey: 'openai-key',
+          chatModelId: 'openai/gpt-5-mini',
+          embeddingProvider: 'openai',
+          embeddingApiKey: 'embedding-key',
+        },
+      ),
+    ).toMatchObject({
+      videoVisionProvider: 'auto',
+      semanticVisionModel: 'auto',
+      videoAgentProvider: 'auto',
+      agentModel: 'auto',
+      larkupVisionProvider: 'openai',
+      larkupVisionApiKey: 'openai-key',
+      larkupAgentProvider: 'openai',
+      larkupAgentApiKey: 'openai-key',
+    });
+  });
+
+  it('uses a compatible saved embedding key when no chat key has been configured yet', () => {
+    expect(
+      withGlobalVisionGatewayConfig(
+        {
+          videoVisionProvider: 'vercel_ai_gateway',
+          semanticVisionModel: 'google/gemini-3.6-flash',
+          videoAgentProvider: 'vercel_ai_gateway',
+          agentModel: 'openai/gpt-5-mini',
+        },
+        {
+          visionProvider: '',
+          visionApiKey: '',
+          visionModelId: '',
+          chatProvider: '',
+          chatApiKey: '',
+          chatModelId: '',
+          embeddingProvider: 'openai',
+          embeddingApiKey: 'openai-key',
+        },
+      ),
+    ).toMatchObject({
+      larkupVisionProvider: 'openai',
+      larkupVisionApiKey: 'openai-key',
+      larkupAgentProvider: 'openai',
+      larkupAgentApiKey: 'openai-key',
+    });
+  });
 });

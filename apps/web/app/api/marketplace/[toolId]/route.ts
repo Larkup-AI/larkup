@@ -173,17 +173,28 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ toolI
     // Proceed with uninstallation anyway so a broken tool doesn't become permanently stuck
   }
   await uninstallTool(toolId);
-  const configPurged = new URL(req.url).searchParams.get('purgeConfig') !== 'false';
-  if (configPurged) {
-    await withProject(req, async () => {
-      const config = await readConfig();
+  // A managed Video Intelligence allowance is tied to an anonymous device
+  // identity. Keep that identity on a normal uninstall so reinstalling on the
+  // same computer renews the same principal instead of resetting its usage.
+  // An explicit purge remains available for a user intentionally resetting it.
+  const requestedPurge = new URL(req.url).searchParams.get('purgeConfig');
+  const configPurged =
+    toolId === 'video-intelligence' ? requestedPurge === 'true' : requestedPurge !== 'false';
+  await withProject(req, async () => {
+    const config = await readConfig();
+    if (configPurged) {
       const { [toolId]: _removedConfig, ...toolConfigs } = config.toolConfigs ?? {};
       await writeConfig({
         ...config,
         toolConfigs,
         enabledTools: config.enabledTools?.filter((id) => id !== toolId),
       });
+      return;
+    }
+    await writeConfig({
+      ...config,
+      enabledTools: config.enabledTools?.filter((id) => id !== toolId),
     });
-  }
+  });
   return NextResponse.json({ status: 'uninstalled', configPurged });
 }

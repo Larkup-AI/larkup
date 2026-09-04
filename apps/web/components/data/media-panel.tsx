@@ -1675,6 +1675,7 @@ function MediaContent({
     uploading,
     mediaType,
     remoteType,
+    groupId,
     indexingSurface,
     videoIndexingAtCapacity,
     onActionChange,
