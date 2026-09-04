@@ -5,7 +5,12 @@ import { promisify } from 'node:util';
 import type { RagConfig } from '../types';
 import { generateServer, type GeneratedFile } from './generate-server';
 import { resolveChatModel } from './chat-module';
-import { getActiveProject, getProjectDataDir, requireProjectDataDir } from '../project-store';
+import {
+  getActiveProject,
+  getLarkupDataDir,
+  getProjectDataDir,
+  requireProjectDataDir,
+} from '../project-store';
 import { readEnabledMcpConnectionsForAgent } from '../mcp-store';
 
 /**
@@ -152,10 +157,7 @@ async function loadEnabledPlugins(
 ): Promise<AgentPluginRuntime[]> {
   if (config.runtimeProfile !== 'assistant') return [];
   try {
-    const raw = await fs.readFile(
-      path.join(process.cwd(), '.larkup', 'tools', 'installed.json'),
-      'utf8',
-    );
+    const raw = await fs.readFile(path.join(getLarkupDataDir(), 'tools', 'installed.json'), 'utf8');
     const parsed = JSON.parse(raw) as { tools?: InstalledPlugin[] };
     const enabled = new Set(config.enabledTools ?? []);
     const installed = (parsed.tools ?? []).filter(

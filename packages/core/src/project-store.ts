@@ -28,13 +28,27 @@ export interface ProjectWorkspace {
   projects: ProjectMeta[];
 }
 
-const LARKUP_ROOT = path.join(process.cwd(), '.larkup');
-const PROJECTS_DIR = path.join(LARKUP_ROOT, 'projects');
 const BASE_PORT = 8080;
 const EMPTY_WORKSPACE: ProjectWorkspace = { activeProjectId: null, projects: [] };
 const projectScope = new AsyncLocalStorage<{ projectId: string }>();
 
 let writeChain: Promise<unknown> = Promise.resolve();
+
+/**
+ * Resolve the durable local-state root. Packaged Larkup sets
+ * `LARKUP_DATA_DIR` before launching so npm can replace its own installation
+ * directory without replacing a user's projects, credentials, or indexes.
+ * Development, Docker, and direct library consumers retain the local
+ * `./.larkup` default unless they explicitly opt in to another root.
+ */
+export function getLarkupDataDir(): string {
+  const configured = process.env.LARKUP_DATA_DIR?.trim();
+  return configured ? path.resolve(configured) : path.join(process.cwd(), '.larkup');
+}
+
+function projectsDir(): string {
+  return path.join(getLarkupDataDir(), 'projects');
+}
 
 function serialize<T>(operation: () => Promise<T>): Promise<T> {
   const run = writeChain.then(operation, operation);
@@ -44,14 +58,14 @@ function serialize<T>(operation: () => Promise<T>): Promise<T> {
 
 async function readWorkspaceFile(): Promise<ProjectWorkspace> {
   try {
-    const entries = await fs.readdir(PROJECTS_DIR, { withFileTypes: true });
+    const entries = await fs.readdir(projectsDir(), { withFileTypes: true });
     const projects = await Promise.all(
       entries
         .filter((entry) => entry.isDirectory())
         .map(async (entry) => {
           try {
             return JSON.parse(
-              await fs.readFile(path.join(PROJECTS_DIR, entry.name, 'project.json'), 'utf8'),
+              await fs.readFile(path.join(projectsDir(), entry.name, 'project.json'), 'utf8'),
             ) as ProjectMeta;
           } catch {
             return null;
@@ -70,7 +84,7 @@ async function readWorkspaceFile(): Promise<ProjectWorkspace> {
 }
 
 async function writeWorkspaceFile(workspace: ProjectWorkspace): Promise<ProjectWorkspace> {
-  await fs.mkdir(PROJECTS_DIR, { recursive: true });
+  await fs.mkdir(projectsDir(), { recursive: true });
   await Promise.all(
     workspace.projects.map(async (project) => {
       const persisted = { ...project, active: project.id === workspace.activeProjectId };
@@ -111,13 +125,16 @@ function slugify(name: string): string {
 }
 
 function initialConfig(project: ProjectMeta): RagConfig {
+  const configuredDataRoot = process.env.LARKUP_DATA_DIR?.trim();
   return {
     ...DEFAULT_CONFIG,
     projectName: slugify(project.name),
     storeConfig: {
       ...DEFAULT_CONFIG.storeConfig,
       mode: 'local',
-      dbPath: `./.larkup/projects/${project.id}/index`,
+      dbPath: configuredDataRoot
+        ? path.join(getLarkupDataDir(), 'projects', project.id, 'index')
+        : `./.larkup/projects/${project.id}/index`,
     },
     updatedAt: new Date().toISOString(),
   };
@@ -130,7 +147,7 @@ export function runWithProject<T>(projectId: string, operation: () => T): T {
 
 /** Returns the Project directory. This function never resolves legacy paths. */
 export function projectDir(projectId: string): string {
-  return path.join(PROJECTS_DIR, projectId);
+  return path.join(projectsDir(), projectId);
 }
 
 /** Reads the clean Project workspace. */
@@ -185,16 +202,35 @@ export function createProject(
     const dir = projectDir(project.id);
     await fs.mkdir(path.join(dir, 'releases'), { recursive: true });
     await Promise.all([
-      fs.writeFile(path.join(dir, 'project.json'), JSON.stringify({ ...project, active: true }, null, 2), 'utf8'),
+      fs.writeFile(
+        path.join(dir, 'project.json'),
+        JSON.stringify({ ...project, active: true }, null, 2),
+        'utf8',
+      ),
       fs.writeFile(
         path.join(dir, 'config.json'),
         JSON.stringify(initialConfig(project), null, 2),
         'utf8',
       ),
-      fs.writeFile(path.join(dir, 'groups.json'), JSON.stringify([{
-        id: 'default', name: 'Default', description: 'Sources added without a specific group.', icon: '📚', assistantEnabled: true,
-        createdAt: now, updatedAt: now,
-      }], null, 2), 'utf8'),
+      fs.writeFile(
+        path.join(dir, 'groups.json'),
+        JSON.stringify(
+          [
+            {
+              id: 'default',
+              name: 'Default',
+              description: 'Sources added without a specific group.',
+              icon: '📚',
+              assistantEnabled: true,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+          null,
+          2,
+        ),
+        'utf8',
+      ),
       fs.writeFile(path.join(dir, 'documents.json'), '[]\n', 'utf8'),
       fs.writeFile(path.join(dir, 'deployments.json'), '[]\n', 'utf8'),
       fs.writeFile(path.join(dir, 'automations.json'), '[]\n', 'utf8'),
@@ -236,7 +272,11 @@ export function renameProject(projectId: string, name: string): Promise<ProjectW
         const config = JSON.parse(await fs.readFile(configFile, 'utf8')) as RagConfig;
         await fs.writeFile(
           configFile,
-          JSON.stringify({ ...config, projectName: slugify(renamed.name), updatedAt: new Date().toISOString() }, null, 2),
+          JSON.stringify(
+            { ...config, projectName: slugify(renamed.name), updatedAt: new Date().toISOString() },
+            null,
+            2,
+          ),
           'utf8',
         );
       } catch {
@@ -256,7 +296,7 @@ export function deleteProject(projectId: string): Promise<ProjectWorkspace> {
     return writeWorkspaceFile({
       activeProjectId:
         workspace.activeProjectId === projectId
-          ? projects[0]?.id ?? null
+          ? (projects[0]?.id ?? null)
           : workspace.activeProjectId,
       projects,
     });
@@ -268,10 +308,11 @@ export function deleteProject(projectId: string): Promise<ProjectWorkspace> {
  * in a destructive confirmation UI/CLI. No legacy data is read or migrated.
  */
 export async function resetLocalProjects(confirmedPath: string): Promise<void> {
-  if (confirmedPath !== PROJECTS_DIR) {
-    throw new Error(`Confirmation must exactly match ${PROJECTS_DIR}.`);
+  const target = projectsDir();
+  if (confirmedPath !== target) {
+    throw new Error(`Confirmation must exactly match ${target}.`);
   }
   await serialize(async () => {
-    await fs.rm(PROJECTS_DIR, { recursive: true, force: true });
+    await fs.rm(target, { recursive: true, force: true });
   });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
+import { getLarkupDataDir } from '@larkup/core/project-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').substring(0, 50);
     const filename = `${randomUUID()}-${safeName}`;
 
-    const uploadsDir = path.join(process.cwd(), '.larkup', 'uploads');
+    const uploadsDir = path.join(getLarkupDataDir(), 'uploads');
     await fs.mkdir(uploadsDir, { recursive: true });
 
     const filePath = path.join(uploadsDir, filename);

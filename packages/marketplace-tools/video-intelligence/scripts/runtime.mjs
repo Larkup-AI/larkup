@@ -61,7 +61,11 @@ function runtimeEnvironment() {
 }
 
 function nativeRuntimeEnvironment() {
-  const dataDir = path.join(process.cwd(), '.larkup', 'video-intelligence');
+  const root = process.env.LARKUP_DATA_DIR?.trim();
+  const dataDir = path.join(
+    root ? path.resolve(root) : path.join(process.cwd(), '.larkup'),
+    'video-intelligence',
+  );
   return {
     ...runtimeEnvironment(),
     LARKUP_VIDEO_RUNTIME_KIND: 'local-process',

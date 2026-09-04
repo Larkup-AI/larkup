@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { getData } from 'pdf-parse/worker';
+import { getLarkupDataDir } from '@larkup/core/project-store';
 
 const MAX_SOURCE_BYTES = 100 * 1024 * 1024;
 const MAX_PAGES = 3;
@@ -46,7 +47,7 @@ function uploadFileName(url: string | undefined): string {
 
 export async function readStoredPdfBytes(source: PdfSource): Promise<Buffer> {
   const fileName = uploadFileName(source.url);
-  const filePath = path.join(process.cwd(), '.larkup', 'uploads', fileName);
+  const filePath = path.join(getLarkupDataDir(), 'uploads', fileName);
   const stat = await fs.stat(filePath);
   if (!stat.isFile() || stat.size > MAX_SOURCE_BYTES) {
     throw new Error('The PDF is unavailable or too large for bounded local inspection.');

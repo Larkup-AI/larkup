@@ -89,6 +89,19 @@ export function shouldInspectRetrievedImage(text: string, evidence: unknown): bo
     return false;
   }
 
+  // Captions are useful for orientation, but they cannot prove an exhaustive
+  // visual request. A diagram question that asks for every label, a count, or
+  // an exact name must receive one bounded image read; otherwise a partial
+  // caption can make the assistant confidently omit the information the user
+  // actually asked it to enumerate.
+  if (
+    /\b(?:every|all|each|list|enumerate|count|how many|number of)\b|\b(?:view|routine|table|column|field|label|name)s?\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+
   const descriptions = indexedImageDescriptions(evidence).join(' ').toLocaleLowerCase();
   if (!descriptions) return true;
   const terms = searchTerms(text);

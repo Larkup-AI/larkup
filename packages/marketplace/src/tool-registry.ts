@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { ToolDescriptor } from './types';
 import { DEFAULT_HUB_URL } from './types';
+import { BUILTIN_TOOLS } from './db/builtin-tools';
 
 /**
  * Tool registry — resolves tool descriptors from multiple sources.
@@ -61,12 +62,16 @@ async function discoverLocalManifests(): Promise<Record<string, ToolDescriptor>>
   const registry: Record<string, ToolDescriptor> = {};
 
   // Try multiple possible tool directories
+  const persistentDataDir = process.env.LARKUP_DATA_DIR?.trim();
   const searchPaths = [
     // Monorepo development: packages/marketplace-tools/*
     path.resolve(process.cwd(), 'packages', 'marketplace-tools'),
     // Next.js dev server runs in apps/web
     path.resolve(process.cwd(), '..', '..', 'packages', 'marketplace-tools'),
     // Installed tools: .larkup/tools/node_modules/@larkup
+    ...(persistentDataDir
+      ? [path.resolve(persistentDataDir, 'tools', 'node_modules', '@larkup')]
+      : []),
     path.resolve(process.cwd(), '.larkup', 'tools', 'node_modules', '@larkup'),
     path.resolve(process.cwd(), '..', '..', '.larkup', 'tools', 'node_modules', '@larkup'),
   ];
@@ -160,51 +165,12 @@ export async function fetchToolFromHub(
  * Minimal hardcoded registry for offline / first-run scenarios
  * where neither manifests nor Hub are available.
  */
-const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = {
-  'clip-embeddings': {
-    id: 'clip-embeddings',
-    name: 'CLIP Image Search',
-    description: 'Direct image-to-image similarity search using CLIP/SigLIP embeddings.',
-    category: 'embedding',
-    version: '0.1.0',
-    pricing: 'free',
-    emoji: '🔍',
-    icon: 'ScanEye',
-    packageName: '@larkup/tool-clip-embeddings',
-    installSize: '~200 MB',
-    requiresSandbox: true,
-    author: 'Larkup',
-    capabilities: ['clip-embeddings', 'image-similarity'],
-    tags: ['clip', 'siglip', 'image-search', 'visual-similarity'],
-    downloads: 0,
-    repositoryUrl: 'https://github.com/Larkup-AI/larkup',
-    license: 'Apache-2.0',
-    updatedAt: '2026-07-20',
-    comingSoon: true,
-  },
-
-  'doc-editor': {
-    id: 'doc-editor',
-    name: 'Document Editor',
-    description: 'AI-powered form filling and document editing with Canvas-style live preview.',
-    category: 'utility',
-    version: '0.2.3',
-    pricing: 'free',
-    emoji: '📝',
-    icon: 'FileEdit',
-    packageName: '@larkup/tool-doc-editor',
-    installSize: '~5 MB',
-    systemDeps: ['docker'],
-    requiresSandbox: true,
-    author: 'Larkup',
-    capabilities: ['document-editing', 'form-filling', 'document-preview'],
-    tags: ['pdf', 'docx', 'pptx', 'form', 'canvas', 'editor', 'fill'],
-    downloads: 0,
-    repositoryUrl: 'https://github.com/Larkup-AI/larkup',
-    license: 'Apache-2.0',
-    updatedAt: '2026-07-20',
-  },
-};
+const FALLBACK_REGISTRY: Record<string, ToolDescriptor> = Object.fromEntries(
+  BUILTIN_TOOLS.map((tool) => {
+    const descriptor = normalizeToolDescriptor(tool as unknown as ToolDescriptor);
+    return [descriptor.id, descriptor];
+  }),
+);
 
 /**
  * Build the full tool registry by merging sources. The deployed Hub is the

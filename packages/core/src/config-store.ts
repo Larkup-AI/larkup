@@ -30,13 +30,26 @@ export async function readConfig(): Promise<RagConfig> {
       }
     }
 
+    const storedDbPath = parsed.storeConfig?.dbPath;
+    const usesLegacyRelativeProjectPath =
+      typeof storedDbPath === 'string' &&
+      /^(?:\.\/)?\.larkup\/projects\/[^/]+\/index\/?$/.test(storedDbPath);
     const result: RagConfig = {
       ...DEFAULT_CONFIG,
       ...parsed,
       embeddingModelId: migratedEmbeddingId ?? DEFAULT_CONFIG.embeddingModelId,
       customEmbeddings: migratedEmbeddings,
       chunking: { ...DEFAULT_CONFIG.chunking, ...parsed.chunking },
-      storeConfig: { ...DEFAULT_CONFIG.storeConfig, ...parsed.storeConfig },
+      storeConfig: {
+        ...DEFAULT_CONFIG.storeConfig,
+        ...parsed.storeConfig,
+        // A copied packaged workspace used to point its vector index back into
+        // node_modules via a relative path. Keep the index alongside the
+        // migrated project whenever a durable data root is configured.
+        ...(process.env.LARKUP_DATA_DIR?.trim() && usesLegacyRelativeProjectPath
+          ? { dbPath: path.join(dir, 'index') }
+          : {}),
+      },
     };
 
     delete (result as unknown as Record<string, unknown>)['customEmbedding'];

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { getLarkupDataDir } from '@larkup/core/project-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    const uploadsDir = path.join(process.cwd(), '.larkup', 'uploads');
+    const uploadsDir = path.join(getLarkupDataDir(), 'uploads');
     const filePath = path.join(uploadsDir, filename);
 
     if (!fs.existsSync(filePath)) {
