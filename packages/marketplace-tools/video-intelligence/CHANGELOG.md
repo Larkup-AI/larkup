@@ -1,5 +1,11 @@
 # @larkup/tool-video-intelligence
 
+## 0.2.4
+
+### Patch Changes
+
+- 275a7ee: fix(ai): improve video intelligence outcome routing and index preservation
+
 ## 0.2.3
 
 ### Patch Changes
