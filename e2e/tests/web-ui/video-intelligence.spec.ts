@@ -28,6 +28,8 @@ test.describe('Video Intelligence', () => {
   }) => {
     const playlistUrl = 'https://www.youtube.com/watch?v=chosen-video&list=long-playlist&index=16';
     let importedUrls: string[] | undefined;
+    let importedGroupId: string | undefined;
+    const selectedGroup = { id: 'video-e2e-group', name: 'Video E2E group', icon: '◆' };
 
     await page.route('**/api/marketplace', (route) =>
       route.fulfill({
@@ -91,6 +93,24 @@ test.describe('Video Intelligence', () => {
         }),
       }),
     );
+    await page.route('**/api/documents', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          documents: [],
+          groups: [
+            {
+              id: 'default',
+              name: 'Default',
+              icon: '📚',
+              assistantEnabled: true,
+            },
+            { ...selectedGroup, assistantEnabled: true },
+          ],
+          stats: { docCount: 0, charCount: 0, bySource: {} },
+        }),
+      }),
+    );
     await page.route('**/api/tools/video-intelligence/usage**', (route) =>
       route.fulfill({
         contentType: 'application/json',
@@ -114,7 +134,11 @@ test.describe('Video Intelligence', () => {
         });
         return;
       }
-      const body = route.request().postDataJSON() as { estimateOnly?: boolean; urls?: string[] };
+      const body = route.request().postDataJSON() as {
+        estimateOnly?: boolean;
+        urls?: string[];
+        groupId?: string;
+      };
       if (body.estimateOnly) {
         await route.fulfill({
           contentType: 'application/json',
@@ -136,6 +160,7 @@ test.describe('Video Intelligence', () => {
         return;
       }
       importedUrls = body.urls;
+      importedGroupId = body.groupId;
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
@@ -160,6 +185,8 @@ test.describe('Video Intelligence', () => {
     await page.getByRole('button', { name: 'From URL' }).click();
     await page.getByRole('textbox', { name: 'Import media URL' }).fill(playlistUrl);
     await page.getByRole('button', { name: 'Check URL' }).click();
+    await page.getByLabel('Data group').click();
+    await page.getByText(selectedGroup.name, { exact: true }).click();
     await page.getByRole('button', { name: 'Add media', exact: true }).click();
     await page.getByRole('button', { name: 'Single Video' }).click();
 
@@ -168,6 +195,7 @@ test.describe('Video Intelligence', () => {
     await expect(dialog.getByText('~60', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: 'Start indexing' }).click();
     await expect.poll(() => importedUrls).toEqual(['https://www.youtube.com/watch?v=chosen-video']);
+    expect(importedGroupId).toBe(selectedGroup.id);
   });
 
   test('renders manifest-driven runtimes and provider branding', async ({ page }) => {

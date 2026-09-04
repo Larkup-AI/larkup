@@ -34,6 +34,9 @@ export interface UrlInspection {
   isYouTube: boolean;
 }
 
+/** Checking a pasted non-YouTube URL must stay interactive, not block on a slow origin. */
+export const MEDIA_URL_INSPECTION_TIMEOUT_MS = 7_000;
+
 interface YouTubeInspectionData {
   title?: string;
   duration?: number;
@@ -209,9 +212,9 @@ export async function inspectMediaUrl(url: string): Promise<UrlInspection> {
     return inspection;
   }
 
-  let response = await fetchPublic(url, { method: 'HEAD' });
+  let response = await inspectPublicMediaUrl(url, { method: 'HEAD' });
   if (response.status === 405 || response.status === 501) {
-    response = await fetchPublic(url, { headers: { Range: 'bytes=0-0' } });
+    response = await inspectPublicMediaUrl(url, { headers: { Range: 'bytes=0-0' } });
   }
   if (!response.ok) throw new Error(`Unable to inspect media URL (${response.status}).`);
   const headerMime = response.headers.get('content-type')?.split(';')[0];
@@ -230,6 +233,22 @@ export async function inspectMediaUrl(url: string): Promise<UrlInspection> {
     entryCount: 1,
     isYouTube: false,
   };
+}
+
+async function inspectPublicMediaUrl(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetchPublic(url, {
+      ...init,
+      signal: AbortSignal.timeout(MEDIA_URL_INSPECTION_TIMEOUT_MS),
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new Error(
+        'The media URL did not respond within 7 seconds. Check that it is public and try again.',
+      );
+    }
+    throw error;
+  }
 }
 
 export async function importMediaUrl(
