@@ -10,8 +10,7 @@
   },
   "files": [
     "bin",
-    ".next/standalone",
-    "public"
+    ".next/standalone/apps/web"
   ],
   "scripts": {
     "dev": "next dev -p 4567",

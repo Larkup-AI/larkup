@@ -30,6 +30,7 @@ describe('published npm metadata', () => {
     expect(sandboxPackage.optionalDependencies['@daytonaio/sdk']).toBeUndefined();
     expect(launcher).toContain("'--legacy-peer-deps'");
     expect(launcher).toContain("'--loglevel=error'");
+    expect(webPackage.files).toEqual(['bin', '.next/standalone/apps/web']);
   });
 
   it('scrubs local project state from every traced workspace before packing', () => {
