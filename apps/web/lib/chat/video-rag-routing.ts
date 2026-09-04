@@ -93,7 +93,7 @@ export function indexedVideoEvidenceIsSufficient(input: {
   // not a remembered answer. It is the index's strongest reusable result.
   if (descriptive.some((item) => item.modality === 'computed')) return true;
 
-  if (input.questionKinds.includes('state-change')) {
+  if (input.questionKinds.includes('state-change') || input.questionKinds.includes('outcome')) {
     const duration = input.durationSecs;
     const moments = new Set(descriptive.map((item) => Math.floor(item.startSecs / 15))).size;
     const buckets = duration && duration > 0 ? 5 : 1;
@@ -104,7 +104,12 @@ export function indexedVideoEvidenceIsSufficient(input: {
           : 0,
       ),
     ).size;
-    return moments >= 3 && coveredBuckets / buckets >= 0.6 && (input.hierarchyRanges ?? 0) > 0;
+
+    // For outcome questions, if we have broad temporal coverage of the video,
+    // the index is sufficient without needing to rewatch the final 10 seconds blindly.
+    if (moments >= 3 && coveredBuckets / buckets >= 0.6 && (input.hierarchyRanges ?? 0) > 0) {
+      return true;
+    }
   }
 
   // A semantically located visual account can answer a focused appearance,

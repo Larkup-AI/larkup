@@ -262,7 +262,10 @@ export function attachVideoIntelligenceAgentClient(
                   'the index agree. A lone reading that contradicts both the other readings and ' +
                   'the index -- naming someone or something that appears nowhere else -- is a ' +
                   'misreading, whatever confidence it carries; leave it out rather than reporting ' +
-                  'it. Where the readings genuinely conflict, say what is certain and what is not.',
+                  'it. IMPORTANT: If a reading states that a detail (e.g. names, identities) is missing, ' +
+                  'unclear, or not explicitly shown in its limited clip, but that detail IS established ' +
+                  'by the indexed evidence, rely on the indexed evidence. Do not let an isolated reading ' +
+                  'erase established timeline facts. Where the readings genuinely conflict, say what is certain and what is not.',
               },
               ...temporalContextResult(hits, plan),
               claimVerification: {
@@ -383,8 +386,8 @@ export function attachVideoIntelligenceAgentClient(
           status: assessment.establishedByTrail
             ? 'established-by-trail'
             : assessment.sufficient
-            ? 'directly-established'
-            : 'needs-corroboration',
+              ? 'directly-established'
+              : 'needs-corroboration',
           directlyEstablished: assessment.sufficient && !assessment.establishedByTrail,
           rule: answeringRule(assessment, plan, analysisUnavailable),
         },
@@ -640,14 +643,14 @@ function assessEvidence(
     const answerBearing = plan.kinds.includes('question-inventory')
       ? questionInventoryHits(usable, question)
       : plan.kinds.includes('source-inventory')
-      ? sourceInventoryHits(usable, question)
-      : plan.kinds.includes('entity-inventory')
-      ? identityInventoryHits(usable, question)
-      : plan.kinds.includes('evaluation')
-      ? evaluationEvidenceHits(usable)
-      : plan.kinds.includes('state-change')
-      ? temporalSequenceHits(usable)
-      : usable;
+        ? sourceInventoryHits(usable, question)
+        : plan.kinds.includes('entity-inventory')
+          ? identityInventoryHits(usable, question)
+          : plan.kinds.includes('evaluation')
+            ? evaluationEvidenceHits(usable)
+            : plan.kinds.includes('state-change')
+              ? temporalSequenceHits(usable)
+              : usable;
     const isQuestionInventory = plan.kinds.includes('question-inventory');
     const isSourceInventory = plan.kinds.includes('source-inventory');
     const isEntityInventory = plan.kinds.includes('entity-inventory');
@@ -697,13 +700,16 @@ function assessEvidence(
       sufficient: isQuestionInventory
         ? explicitQuestionInventoryReady
         : isSourceInventory
-        ? explicitSourceInventoryReady
-        : isEntityInventory
-        ? answerBearing.length > 0
-        : plan.kinds.includes('evaluation')
-        ? evaluationEvidenceReady(answerBearing)
-        : reconciledSequenceReady ||
-          (answerBearing.length >= 3 && coverageRatio >= 0.6 && hierarchyReady && sequenceReady),
+          ? explicitSourceInventoryReady
+          : isEntityInventory
+            ? answerBearing.length > 0
+            : plan.kinds.includes('evaluation')
+              ? evaluationEvidenceReady(answerBearing)
+              : reconciledSequenceReady ||
+                (answerBearing.length >= 3 &&
+                  coverageRatio >= 0.6 &&
+                  hierarchyReady &&
+                  sequenceReady),
     };
   }
 
@@ -741,12 +747,12 @@ function assessEvidence(
     direct.length > 0
       ? direct
       : reconciled.length > 0
-      ? reconciled
-      : describesUnboundSubjects
-      ? unboundSubjectEvidence
-      : establishedByCrossEvidence
-      ? trail
-      : [];
+        ? reconciled
+        : describesUnboundSubjects
+          ? unboundSubjectEvidence
+          : establishedByCrossEvidence
+            ? trail
+            : [];
   return {
     needsBreadth,
     coverageRatio: 1,
@@ -1487,8 +1493,8 @@ function inspectionTargets(
   const budget = assessment.needsBreadth
     ? 6
     : plan.requiresBothRanges || plan.kinds.includes('outcome')
-    ? 3
-    : 2;
+      ? 3
+      : 2;
   const fromHits = rangesAroundHits(hits, durationSecs, budget * 2);
   const fromHierarchy = (investigation?.candidateRanges ?? []).map((range) => ({
     startSecs: Math.max(0, range.startSecs),
@@ -1511,8 +1517,8 @@ function inspectionTargets(
     ? // An account of the whole progression needs every moment it moved.
       outcomeTransitionRanges(hits, durationSecs, { limit: budget, lateOnly: false })
     : plan.kinds.includes('outcome')
-    ? outcomeTransitionRanges(hits, durationSecs, { limit: 1 })
-    : [];
+      ? outcomeTransitionRanges(hits, durationSecs, { limit: 1 })
+      : [];
   // For a conclusion, a located window inside the closing phase beats the
   // closing offsets, which only know how long the recording is. Elsewhere in
   // the source, located windows lead outright: they are the one signal that
@@ -1781,14 +1787,14 @@ async function inspectRanges(options: {
         maxFrames: plan.kinds.includes('state-change')
           ? 24
           : plan.kinds.includes('person-attribute') || plan.requiresIdentityContext
-          ? // Identity reads need chronology, but a very dense single VLM
-            // request is less reliable than a compact, readable spread.
-            8
-          : plan.requiresBothRanges ||
-            plan.kinds.includes('comparison') ||
-            plan.kinds.includes('outcome')
-          ? 10
-          : 14,
+            ? // Identity reads need chronology, but a very dense single VLM
+              // request is less reliable than a compact, readable spread.
+              8
+            : plan.requiresBothRanges ||
+                plan.kinds.includes('comparison') ||
+                plan.kinds.includes('outcome')
+              ? 10
+              : 14,
         ...(knownEntities.length > 0 ? { knownEntities } : {}),
         // A close read costs more per range, so it is spent where a wrong
         // reading of one detail changes the answer, and the fast reader
@@ -2578,8 +2584,8 @@ function hasNegativeVerdictForQuestion(hit: VideoKnowledgeSearchHit, question: s
   const questionMatch = payload.match(/Claim question:\s*([^\n"]+)/i);
   return Boolean(
     /Claim verdict:\s*(?:partial|not-established)/i.test(payload) &&
-      questionMatch !== null &&
-      questionSimilarity(questionMatch[1], question) >= 0.35,
+    questionMatch !== null &&
+    questionSimilarity(questionMatch[1], question) >= 0.35,
   );
 }
 
