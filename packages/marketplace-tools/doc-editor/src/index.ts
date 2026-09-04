@@ -18,6 +18,12 @@ export const TOOL_META = {
   version: '0.1.0',
 } as const;
 
+export const TOOL_EXTENSION = {
+  id: 'doc-editor',
+  apiVersion: '1',
+  createClient: () => ({}),
+};
+
 // Public API
 export {
   createSession,
