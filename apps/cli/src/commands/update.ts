@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process';
+import chalk from 'chalk';
 import pkg from '../../package.json' with { type: 'json' };
 import { getLatestVersion, isVersionNewer } from '../updater';
 import { log } from '../ui/logger';
+import { prompts } from '../ui/prompts';
 import { updateEnterpriseCommand } from './enterprise-update';
 
 export async function updateCommand(options: { check?: boolean; ee?: boolean }) {
@@ -17,19 +19,47 @@ export async function updateCommand(options: { check?: boolean; ee?: boolean }) 
   }
 
   if (!isVersionNewer(latest, pkg.version)) {
-    log.success(`Larkup CLI ${pkg.version} is up to date.`);
+    // Already up to date — show a prominent banner
+    console.log('');
+    log.info(chalk.bold('╭──────────────────────────────────────────────╮'));
+    log.info(chalk.bold(`│  ✓ Already up to date!                       │`));
+    log.info(
+      chalk.bold(
+        `│    Larkup CLI  ${pkg.version}${' '.repeat(Math.max(1, 30 - pkg.version.length))}│`,
+      ),
+    );
+    log.info(chalk.bold('╰──────────────────────────────────────────────╯'));
+    console.log('');
     return;
   }
 
   log.info(`Update available: ${pkg.version} → ${latest}`);
   if (options.check) return;
 
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn('npm', ['install', '-g', `@larkup/cli@${latest}`], { stdio: 'inherit' });
-    child.on('error', reject);
-    child.on('exit', (code) =>
-      code === 0 ? resolve() : reject(new Error(`npm exited with code ${code}`)),
-    );
-  });
-  log.success(`Updated to ${latest}. Restart your terminal to use the new version.`);
+  // Show a spinner with dark/black text while npm installs
+  const s = prompts.spinner();
+  s.start(chalk.black(`Updating Larkup CLI  ${pkg.version} → ${latest} …`));
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn('npm', ['install', '-g', `@larkup/cli@${latest}`], { stdio: 'pipe' });
+      child.on('error', reject);
+      child.on('exit', (code) =>
+        code === 0 ? resolve() : reject(new Error(`npm exited with code ${code}`)),
+      );
+    });
+  } catch (err) {
+    s.stop(chalk.red(`✗ Update failed`));
+    throw err;
+  }
+
+  s.stop(chalk.black(`Done!`));
+
+  // Big success banner
+  console.log('');
+  log.info(chalk.bold('╭──────────────────────────────────────────────╮'));
+  log.info(chalk.bold(`│  ✓ Updated to ${latest}!${' '.repeat(Math.max(1, 31 - latest.length))}│`));
+  log.info(chalk.bold('│    Restart your terminal to apply the update. │'));
+  log.info(chalk.bold('╰──────────────────────────────────────────────╯'));
+  console.log('');
 }
