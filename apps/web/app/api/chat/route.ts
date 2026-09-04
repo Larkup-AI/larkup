@@ -988,7 +988,6 @@ ${fieldLines}`;
               ) {
                 if (stepNumber === 0) {
                   return {
-                    toolChoice: { type: 'tool', toolName: 'inspectPdfPages' },
                     activeTools: ['inspectPdfPages'],
                     messages: compactToolContextForModel(messages),
                   };
@@ -1001,7 +1000,6 @@ ${fieldLines}`;
                         messages: compactToolContextForModel(messages),
                       }
                     : {
-                        toolChoice: { type: 'tool', toolName: 'analyzePdfPages' },
                         activeTools: ['analyzePdfPages'],
                         messages: compactToolContextForModel(messages),
                       };
@@ -1031,7 +1029,6 @@ ${fieldLines}`;
                   };
                 }
                 return {
-                  toolChoice: { type: 'tool', toolName: 'analyzeImageDeeply' },
                   activeTools: ['analyzeImageDeeply'],
                   messages: compactToolContextForModel(messages),
                 };
