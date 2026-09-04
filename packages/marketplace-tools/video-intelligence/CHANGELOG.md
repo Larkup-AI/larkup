@@ -1,5 +1,13 @@
 # @larkup/tool-video-intelligence
 
+## 0.2.3
+
+### Patch Changes
+
+- 2bb75fa: Persist packaged local projects, credentials, uploads, indexes, installed tools, and Video Intelligence runtime data outside the npm installation, with automatic migration from the legacy package-local directory. Keep Video Intelligence available when a Hub catalog is incomplete, and require a fresh visual pass for exhaustive PDF diagram questions.
+- Updated dependencies [2bb75fa]
+  - @larkup/core@0.5.2
+
 ## 0.2.2
 
 ### Patch Changes
