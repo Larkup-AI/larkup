@@ -126,7 +126,7 @@ export const SANDBOX_PROVIDERS: Record<
     label: 'Daytona',
     description:
       'Elastic infrastructure for running AI-generated code in fast, isolated sandboxes.',
-    sdkPackage: '@daytonaio/sdk',
+    sdkPackage: '@daytona/sdk',
     docsUrl: 'https://www.daytona.io/docs/en/sandboxes/',
     icon: '/icons/daytonaio.png',
     executionSupport: 'full',

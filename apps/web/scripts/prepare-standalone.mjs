@@ -10,8 +10,6 @@ if (!existsSync(standaloneRoot)) {
 
 removeDanglingSymlinks(standaloneRoot);
 
-rmSync(path.join(appRoot, '.larkup'), { force: true, recursive: true });
-rmSync(path.join(appRoot, '.larkupdb'), { force: true, recursive: true });
 rmSync(path.join(appRoot, '.env.local'), { force: true });
 rmSync(path.join(appRoot, 'public'), { force: true, recursive: true });
 
@@ -19,6 +17,7 @@ copyDirectory('.next/static', path.join(appRoot, '.next/static'));
 copyDirectory('public', path.join(appRoot, 'public'));
 
 pruneOtherPlatformNativePackages();
+removePrivateRuntimeState(standaloneRoot);
 removeEnvFiles(standaloneRoot);
 removeDanglingSymlinks(standaloneRoot);
 
@@ -41,8 +40,8 @@ function pruneOtherPlatformNativePackages() {
     process.platform === 'linux'
       ? `linux-${process.arch}-${libc}`
       : process.platform === 'win32'
-      ? `win32-${process.arch}-msvc`
-      : `${process.platform}-${process.arch}`;
+        ? `win32-${process.arch}-msvc`
+        : `${process.platform}-${process.arch}`;
   const sharpPlatform =
     process.platform === 'linux' && libc === 'musl'
       ? `linuxmusl-${process.arch}`
@@ -62,11 +61,24 @@ function pruneOtherPlatformNativePackages() {
   }
 }
 
+function removePrivateRuntimeState(directory) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+
+    const entryPath = path.join(directory, entry.name);
+    if (entry.name === '.larkup' || entry.name === '.larkupdb') {
+      rmSync(entryPath, { force: true, recursive: true });
+      continue;
+    }
+    removePrivateRuntimeState(entryPath);
+  }
+}
+
 /**
  * Next traces workspace siblings into the standalone tree, so a publish from a
- * working copy would carry `apps/ee/.env`, `apps/larkup-proxy/.env` and the
- * rest straight into a public tarball. CI publishes from a clean checkout
- * where these do not exist; this makes a local publish safe too.
+ * working copy would carry private env files and local project state straight
+ * into a public tarball. CI publishes from a clean checkout where these do not
+ * exist; these scrubbers make a local publish safe too.
  */
 function removeEnvFiles(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
