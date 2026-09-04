@@ -45,7 +45,44 @@ if (command === '--version' || command === '-v') {
 
   void openWhenReady(url);
 } else if (command === 'update') {
-  console.log('\x1b[38;2;223;156;32mUpdating Larkup…\x1b[0m');
+  const currentVersion = pkg.version;
+  let latestVersion = currentVersion;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch('https://www.larkup.de/api/version', { signal: controller.signal });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.version) latestVersion = data.version;
+    }
+  } catch {}
+
+  const compareVersions = (a, b) => {
+    const pa = a.replace(/^v/, '').split('.').map(Number);
+    const pb = b.replace(/^v/, '').split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+      if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+      if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+    }
+    return 0;
+  };
+
+  if (compareVersions(latestVersion, currentVersion) <= 0) {
+    console.log('');
+    console.log('\x1b[1m╭──────────────────────────────────────────────╮\x1b[0m');
+    console.log(
+      '\x1b[1m│  \x1b[32m✓\x1b[0m\x1b[1m Already up to date!                       │\x1b[0m',
+    );
+    console.log(
+      `\x1b[1m│    Larkup  ${currentVersion}${' '.repeat(Math.max(1, 34 - currentVersion.length))}│\x1b[0m`,
+    );
+    console.log('\x1b[1m╰──────────────────────────────────────────────╯\x1b[0m');
+    console.log('');
+    process.exit(0);
+  }
+
+  console.log(`\x1b[90mUpdating Larkup  ${currentVersion} → ${latestVersion} …\x1b[0m`);
   await migrateLegacyRuntimeState();
   const child = spawn(
     'npm',
@@ -58,6 +95,7 @@ if (command === '--version' || command === '-v') {
       '--legacy-peer-deps',
       '--loglevel=error',
       'larkup@latest',
+      '@larkup/cli@latest',
     ],
     { stdio: 'inherit' },
   );
@@ -66,7 +104,16 @@ if (command === '--version' || command === '-v') {
     process.exit(1);
   });
   child.once('exit', (code) => {
-    if (code === 0) console.log('Larkup is up to date. Restart it to use the new version.');
+    if (code === 0) {
+      console.log('');
+      console.log('\x1b[1m╭──────────────────────────────────────────────╮\x1b[0m');
+      console.log(
+        `\x1b[1m│  \x1b[32m✓\x1b[0m\x1b[1m Updated to ${latestVersion}!${' '.repeat(Math.max(1, 31 - latestVersion.length))}│\x1b[0m`,
+      );
+      console.log('\x1b[1m│    Restart your terminal to apply the update. │\x1b[0m');
+      console.log('\x1b[1m╰──────────────────────────────────────────────╯\x1b[0m');
+      console.log('');
+    }
     process.exit(code ?? 0);
   });
 } else if (command === 'remove' || command === 'delete') {
