@@ -1,5 +1,11 @@
 # @larkup/tool-video-intelligence
 
+## 0.2.5
+
+### Patch Changes
+
+- 7cd86a5: Use saved AI Models credentials for Video Intelligence by default, keep managed-cloud usage tied to a stable device identity after uninstall, bound media URL checks, and preserve the selected add-page group during media indexing.
+
 ## 0.2.4
 
 ### Patch Changes
