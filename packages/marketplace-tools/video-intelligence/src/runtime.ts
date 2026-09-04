@@ -182,8 +182,10 @@ export async function removeVideoRuntime(kind: LocalVideoRuntimeKind): Promise<v
       { timeout: 2 * 60_000, maxBuffer: 1024 * 1024 },
     );
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
-    throw error;
+    console.warn(
+      '[video-intelligence] Failed to remove docker runtime during uninstall. Proceeding anyway.',
+      error,
+    );
   }
 }
 
