@@ -1,5 +1,11 @@
 # larkup
 
+## 0.2.5
+
+### Patch Changes
+
+- 275a7ee: fix(ai): improve video intelligence outcome routing and index preservation
+
 ## 0.2.4
 
 ### Patch Changes
