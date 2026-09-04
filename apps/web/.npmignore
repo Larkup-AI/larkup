@@ -4,6 +4,10 @@
 .next/trace
 .next/trace-build
 .next/turbopack
+.next/standalone/**/.next/cache/
+.next/standalone/**/.next/dev/
+.next/standalone/**/.turbo/
+.next/standalone/**/.venv/
 .larkup/
 .larkupdb/
 .turbo/

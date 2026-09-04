@@ -19,6 +19,7 @@ copyDirectory('public', path.join(appRoot, 'public'));
 pruneOtherPlatformNativePackages();
 removePrivateRuntimeState(standaloneRoot);
 removeEnvFiles(standaloneRoot);
+removeBuildCaches(standaloneRoot);
 removeDanglingSymlinks(standaloneRoot);
 
 function copyDirectory(source, destination) {
@@ -90,6 +91,25 @@ function removeEnvFiles(directory) {
     if (/^\.env($|\.)/.test(entry.name) && entry.name !== '.env.example') {
       rmSync(entryPath, { force: true });
     }
+  }
+}
+
+function removeBuildCaches(directory) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (!entry.isDirectory()) continue;
+
+    if (entry.name === '.venv' || entry.name === '.turbo') {
+      rmSync(entryPath, { force: true, recursive: true });
+      continue;
+    }
+
+    if (entry.name === '.next') {
+      rmSync(path.join(entryPath, 'cache'), { force: true, recursive: true });
+      rmSync(path.join(entryPath, 'dev'), { force: true, recursive: true });
+    }
+
+    removeBuildCaches(entryPath);
   }
 }
 

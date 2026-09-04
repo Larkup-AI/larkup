@@ -37,6 +37,12 @@ describe('published npm metadata', () => {
     const tracedPackage = path.join(testRoot, '.next/standalone/packages/example');
     const envFile = path.join(tracedPackage, '.env.local');
     const envExample = path.join(tracedPackage, '.env.example');
+    const cacheFile = path.join(tracedPackage, '.next/cache/webpack/cache.pack');
+    const devFile = path.join(tracedPackage, '.next/dev/cache/cache.sst');
+    const virtualEnvironmentFile = path.join(
+      tracedPackage,
+      'runtime/.venv/site-packages/native.bin',
+    );
 
     try {
       mkdirSync(path.join(tracedPackage, '.larkup/projects/local'), { recursive: true });
@@ -44,6 +50,12 @@ describe('published npm metadata', () => {
       writeFileSync(path.join(tracedPackage, '.larkup/projects/local/config.json'), '{}');
       writeFileSync(envFile, 'PRIVATE=value');
       writeFileSync(envExample, 'SAFE=example');
+      mkdirSync(path.dirname(cacheFile), { recursive: true });
+      mkdirSync(path.dirname(devFile), { recursive: true });
+      mkdirSync(path.dirname(virtualEnvironmentFile), { recursive: true });
+      writeFileSync(cacheFile, 'cache');
+      writeFileSync(devFile, 'dev cache');
+      writeFileSync(virtualEnvironmentFile, 'environment');
 
       execFileSync(
         process.execPath,
@@ -57,6 +69,9 @@ describe('published npm metadata', () => {
       expect(existsSync(path.join(tracedPackage, '.larkupdb'))).toBe(false);
       expect(existsSync(envFile)).toBe(false);
       expect(existsSync(envExample)).toBe(true);
+      expect(existsSync(cacheFile)).toBe(false);
+      expect(existsSync(devFile)).toBe(false);
+      expect(existsSync(virtualEnvironmentFile)).toBe(false);
     } finally {
       rmSync(testRoot, { force: true, recursive: true });
     }
