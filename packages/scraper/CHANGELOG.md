@@ -1,5 +1,12 @@
 # @larkup/scraper
 
+## 0.1.41
+
+### Patch Changes
+
+- Updated dependencies [2bb75fa]
+  - @larkup/core@0.5.2
+
 ## 0.1.40
 
 ### Patch Changes
