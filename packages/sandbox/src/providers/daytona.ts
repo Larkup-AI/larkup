@@ -48,7 +48,7 @@ interface DaytonaModule {
 }
 
 async function loadSdk(): Promise<DaytonaModule> {
-  return (await import('@daytonaio/sdk')) as unknown as DaytonaModule;
+  return (await import('@daytona/sdk')) as unknown as DaytonaModule;
 }
 
 function requireFields(credentials: Record<string, string>): { apiKey: string; apiUrl?: string } {

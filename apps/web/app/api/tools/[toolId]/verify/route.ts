@@ -34,7 +34,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ too
     loadToolExtension<VerifiableTool>(toolId),
   ]);
   if (!installed) return NextResponse.json({ error: 'Tool is not installed.' }, { status: 404 });
-  const verifyConfiguration = extension?.verifyConfiguration;
+  if (!extension) {
+    return NextResponse.json(
+      { error: 'Installed tool could not be loaded. Restart Larkup or reinstall the tool.' },
+      { status: 503 },
+    );
+  }
+  const verifyConfiguration = extension.verifyConfiguration;
   if (!verifyConfiguration) {
     return NextResponse.json(
       { error: 'This tool does not support verification.' },

@@ -37,13 +37,13 @@
     "@aws-sdk/s3-request-presigner": "^3.700.0",
     "@larkup/core": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "tsx": "^4.23.5"
   },
   "devDependencies": {
     "@types/node": "^26",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
-    "tsx": "^4.23.5",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
