@@ -27,6 +27,7 @@ describe('inferTabularPlan', () => {
   it('turns a monthly 2025 request into a bounded grouped date query', () => {
     const plan = inferTabularPlan("What's the monthly revenue trend for 2025?", dataset, {
       datasetId: dataset.id,
+      columns: ['Date', 'Net Revenue'],
     });
 
     expect(plan.request).toMatchObject({
@@ -41,6 +42,7 @@ describe('inferTabularPlan', () => {
       { column: 'Date', op: 'gte', value: '2025-01-01' },
       { column: 'Date', op: 'lt', value: '2026-01-01' },
     ]);
+    expect(plan.request.columns).toBeUndefined();
   });
 
   it('repairs an invalid text aggregation only when the schema has one numeric measure', () => {
@@ -53,6 +55,31 @@ describe('inferTabularPlan', () => {
     expect(plan.request).toMatchObject({
       groupBy: ['Region'],
       aggregations: [{ column: 'Net Revenue', op: 'sum' }],
+    });
+  });
+
+  it('completes a monthly grouping when the model selected one measure from several', () => {
+    const multiMeasureDataset: TabularDataset = {
+      ...dataset,
+      columns: [
+        ...dataset.columns,
+        { name: 'Quantity', type: 'number', nullCount: 0, uniqueCount: 20 },
+      ],
+      summary: { ...dataset.summary, numericColumns: 2, totalColumns: 5 },
+    };
+
+    const plan = inferTabularPlan('Show the monthly revenue trend for 2025', multiMeasureDataset, {
+      datasetId: dataset.id,
+      timeBucket: { column: 'Date', grain: 'month' },
+      aggregations: [{ column: 'Net Revenue', op: 'sum' }],
+      sortBy: 'Date',
+    });
+
+    expect(plan.request).toMatchObject({
+      groupBy: ['Date_month'],
+      aggregations: [{ column: 'Net Revenue', op: 'sum' }],
+      sortBy: 'Date_month',
+      sortOrder: 'asc',
     });
   });
 });

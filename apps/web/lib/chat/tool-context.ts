@@ -213,17 +213,45 @@ export function formatOutcomeMediaAnswer(value: unknown, question: string): stri
   };
   visit(value);
 
+  const cleanLabel = (label: string) =>
+    label
+      .replace(/^.*?(?:(?:final\s+)?(?:result|score)|النتيجة(?:\s+النهائية)?)\s*:\s*/iu, '')
+      .replace(/^(?:Reconciled|Indexed)\s+state:\s*/i, '')
+      .replace(/^(?:(?:final\s+)?(?:result|score)|النتيجة(?:\s+النهائية)?)\s*/iu, '')
+      .replace(/^[\s:،؛,.'"“”‘’_-]+|[\s:،؛,.'"“”‘’_-]+$/gu, '')
+      .trim();
+  // Scoreboards commonly render `left side 2 - 1 right side`. Preserve that
+  // left/right binding; reducing the score to two unlabeled numbers can swap
+  // the winner when a nearby summary lists the teams in another order.
+  const scorelinePattern =
+    /^\s*(.+?\p{L})\s+(\d+(?:[.,]\d+)?)\s*[-–—−]\s*(\d+(?:[.,]\d+)?)\s+(\p{L}.*?)\s*$/u;
+  const scorelineCandidates = readings
+    .sort((left, right) => left.at - right.at)
+    .flatMap((reading) => {
+      const quoted = [...reading.text.matchAll(/["'“”‘’]([^"'“”‘’\n]{2,180})["'“”‘’]/gu)].map(
+        (match) => match[1],
+      );
+      const segments = quoted.length > 0 ? quoted : reading.text.split('\n');
+      return segments.flatMap((segment) => {
+        const match = segment.match(scorelinePattern);
+        if (!match) return [];
+        const left = { label: cleanLabel(match[1]), value: Number(match[2].replace(',', '.')) };
+        const right = { label: cleanLabel(match[4]), value: Number(match[3].replace(',', '.')) };
+        return left.label &&
+          right.label &&
+          Number.isFinite(left.value) &&
+          Number.isFinite(right.value)
+          ? [{ ...reading, pairs: [left, right] }]
+          : [];
+      });
+    });
   const pairPattern =
     /([^=,;،؛\n]{2,100}?)(?:\s*=\s*|\s*:\s*|\s+)(-?\d+(?:[.,]\d+)?)(?=$|[,;،؛])/gu;
   const candidates = readings
     .sort((left, right) => left.at - right.at)
     .map((reading) => {
       const pairs = [...reading.text.matchAll(pairPattern)].map((match) => ({
-        label: (match[1] ?? '')
-          .replace(/^.*?(?:(?:final\s+)?(?:result|score)|النتيجة(?:\s+النهائية)?)\s*:\s*/iu, '')
-          .replace(/^(?:Reconciled|Indexed)\s+state:\s*/i, '')
-          .replace(/^(?:(?:final\s+)?(?:result|score)|النتيجة(?:\s+النهائية)?)\s*/iu, '')
-          .trim(),
+        label: cleanLabel(match[1] ?? ''),
         value: Number((match[2] ?? '').replace(',', '.')),
       }));
       return {
@@ -232,7 +260,7 @@ export function formatOutcomeMediaAnswer(value: unknown, question: string): stri
       };
     })
     .filter((reading) => reading.pairs.length === 2);
-  const settled = candidates.at(-1);
+  const settled = scorelineCandidates.at(-1) ?? candidates.at(-1);
   if (!settled) return undefined;
   const [left, right] = settled.pairs;
   const mostlyArabic =
@@ -408,60 +436,44 @@ export function formatExhaustiveMediaAnswer(value: unknown, question: string): s
     .join('\n')}`;
 }
 
-/**
- * Guarantee that a provider stream ends with visible answer text.
- *
- * Tool-backed reasoning models can terminate with a normal finish, an error,
- * an abort, or simply close the stream without emitting a final text part.
- * Buffering finish-step lets the fallback text stay inside the final step.
- */
-export function ensureNonEmptyTextStream(fallbackText: string) {
+/** Guarantee a visible, normally-closing UI answer without delaying AI SDK lifecycle events. */
+export function recoverEmptyUIMessageStream(fallbackText: string) {
   const fallback =
     fallbackText.trim() ||
     'I found the relevant source, but the answer could not be completed. Please try again.';
 
   return () => {
-    let currentStepHasText = false;
-    let fallbackEmitted = false;
-    let pendingFinishStep: any;
+    let hasText = false;
+    let recoveryEmitted = false;
 
-    const emitFallback = (controller: TransformStreamDefaultController<any>) => {
-      if (currentStepHasText || fallbackEmitted) return;
+    const emitRecovery = (
+      controller: TransformStreamDefaultController<any>,
+      recoveryText = fallback,
+    ) => {
+      if (hasText || recoveryEmitted) return;
       const id = `answer-${crypto.randomUUID()}`;
       controller.enqueue({ type: 'text-start', id });
-      controller.enqueue({ type: 'text-delta', id, text: fallback });
+      controller.enqueue({ type: 'text-delta', id, delta: recoveryText });
       controller.enqueue({ type: 'text-end', id });
-      currentStepHasText = true;
-      fallbackEmitted = true;
-    };
-
-    const emitPendingFinishStep = (controller: TransformStreamDefaultController<any>) => {
-      if (pendingFinishStep) controller.enqueue(pendingFinishStep);
-      pendingFinishStep = undefined;
+      hasText = true;
+      recoveryEmitted = true;
     };
 
     return new TransformStream<any, any>({
       transform(chunk, controller) {
-        if (chunk.type === 'finish-step') {
-          pendingFinishStep = chunk;
+        if (!chunk || typeof chunk !== 'object') return;
+        if (chunk.type === 'text-delta' && String(chunk.delta ?? '').trim()) hasText = true;
+        if (chunk.type === 'error') {
+          emitRecovery(controller, String(chunk.errorText ?? '').trim() || fallback);
+          // A recovered error is ordinary assistant text. Do not also leave the
+          // client in its error state with a duplicate red technical banner.
           return;
         }
-        if (chunk.type === 'start-step') {
-          emitPendingFinishStep(controller);
-          currentStepHasText = false;
-          controller.enqueue(chunk);
-          return;
-        }
-        if (chunk.type === 'text-delta' && chunk.text?.trim()) currentStepHasText = true;
-        if (chunk.type === 'finish' || chunk.type === 'error' || chunk.type === 'abort') {
-          emitFallback(controller);
-          emitPendingFinishStep(controller);
-        }
+        if (chunk.type === 'finish') emitRecovery(controller);
         controller.enqueue(chunk);
       },
       flush(controller) {
-        emitFallback(controller);
-        emitPendingFinishStep(controller);
+        emitRecovery(controller);
       },
     });
   };
@@ -548,6 +560,10 @@ function compactValue(value: unknown, toolName?: string): unknown {
               imageUrl: image.imageUrl,
               pageNumber: image.pageNumber,
               index: image.index,
+              description:
+                typeof image.description === 'string'
+                  ? image.description.slice(0, 1_600)
+                  : undefined,
             }))
           : undefined,
         metadata: hit.metadata

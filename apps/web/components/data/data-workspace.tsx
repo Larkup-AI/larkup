@@ -20,17 +20,9 @@ import {
   type MediaIndexingResponse,
 } from '@/components/data/media-indexing-jobs-panel';
 import { CorpusPanel } from '@/components/data/corpus-panel';
-import { IndexWorkspace } from '@/components/index/index-workspace';
 import type { DataPrimaryAction } from '@/components/data/data-primary-action';
 import { useProject } from '@/components/projects/project-provider';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
 import { Select, SelectContent, SelectTrigger } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { videoRuntimeScopeFromConfig } from '@/lib/media/video-runtime-scope';
@@ -162,9 +154,8 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   const registerPrimaryAction = useCallback((action: DataPrimaryAction | null) => {
     setPrimaryAction(action);
   }, []);
-  const [indexDialogOpen, setIndexDialogOpen] = useState(false);
-  const [resetKey, setResetKey] = useState(0);
   const prevJobsRef = useRef<CrawlJob[]>([]);
+  const pendingIndexRef = useRef(false);
 
   const jobsQuery = useSWR('/api/jobs', fetchJobsWithSync, {
     refreshInterval: (data) =>
@@ -172,6 +163,18 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   });
   const jobs = jobsQuery.data?.jobs ?? [];
   const hasActiveCrawlJobs = jobs.some((j) => j.status === 'running' || j.status === 'queued');
+
+  const indexQuery = useSWR<{
+    unindexedCount: number;
+    running: boolean;
+    run: IndexRun | null;
+    blockers: string[];
+  }>('/api/index', fetcher, {
+    refreshInterval: (d) => (d?.running ? 2000 : 0),
+  });
+  const indexRunning = indexQuery.data?.running ?? false;
+  const dataAddBlocked = indexQuery.data?.blockers?.includes('MISSING_EMBEDDING_API_KEY') ?? false;
+  const { mutate: mutateIndex } = indexQuery;
 
   const mediaQuery = useSWR<MediaIndexingResponse>(
     `/api/media?type=all${serverId ? `&serverId=${encodeURIComponent(serverId)}` : ''}`,
@@ -183,12 +186,12 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   );
   const activeMediaAssets = (mediaQuery.data?.assets ?? []).filter(isActiveMediaIndexing);
   const hasActiveMedia = activeMediaAssets.length > 0;
-  const hasActive = hasActiveCrawlJobs || hasActiveMedia;
+  const hasActive = hasActiveCrawlJobs || hasActiveMedia || indexRunning;
   const activeCrawlTargetCount = jobs
     .filter((job) => job.status === 'running' || job.status === 'queued')
     .reduce((count, job) => count + (job.targets?.length || 1), 0);
-  const activeJobCount = activeCrawlTargetCount + activeMediaAssets.length;
-  const hasJobsDrawerContent = jobs.length > 0 || hasActiveMedia;
+  const activeJobCount = activeCrawlTargetCount + activeMediaAssets.length + (indexRunning ? 1 : 0);
+  const hasJobsDrawerContent = jobs.length > 0 || hasActiveMedia || indexRunning;
   const activeOrAttentionJobs = jobs.filter((job) => job.status !== 'completed');
   const completedJobs = jobs.filter((job) => job.status === 'completed');
   const [jobsFilterTab, setJobsFilterTab] = useState<'running' | 'all'>('running');
@@ -210,29 +213,9 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   // deleted/stale URL parameter can never be submitted as an orphaned group.
   const targetGroupId = selectedGroups[0]?.id ?? 'default';
 
-  const indexQuery = useSWR<{
-    unindexedCount: number;
-    running: boolean;
-    run: IndexRun | null;
-    blockers: string[];
-  }>('/api/index', fetcher, {
-    refreshInterval: (d) => (d?.running ? 2000 : 0),
-  });
-  const indexRunning = indexQuery.data?.running ?? false;
-  const dataAddBlocked = indexQuery.data?.blockers?.includes('MISSING_EMBEDDING_API_KEY') ?? false;
-  const { mutate: mutateIndex } = indexQuery;
-
   useEffect(() => {
     if (dataAddBlocked) setPrimaryAction(null);
   }, [dataAddBlocked]);
-
-  const prevIndexRunning = useRef(indexRunning);
-  useEffect(() => {
-    if (prevIndexRunning.current && !indexRunning) {
-      docsQuery.mutate();
-    }
-    prevIndexRunning.current = indexRunning;
-  }, [indexRunning, docsQuery]);
 
   const { mutate: mutateGlobal } = useSWRConfig();
 
@@ -254,21 +237,43 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
         body: JSON.stringify({ incremental: Boolean(indexQuery.data?.run) }),
       });
       const body = await res.json();
-      if (res.status === 409) return;
+      if (res.status === 409 || body.queued) {
+        pendingIndexRef.current = res.status === 409;
+        toast.message('Added to the indexing queue', {
+          id: 'document-index-queued',
+          description: 'It will start automatically after the current indexing job.',
+        });
+        void mutateIndex();
+        return;
+      }
       if (!res.ok) {
         toast.error(body.error || 'Your data was added, but indexing could not start.');
         return;
       }
       toast.success('Making your data searchable', {
-        description: 'This continues in the background. You can safely leave this page.',
+        description: 'This runs in the background. You can keep adding files.',
         duration: 7_000,
       });
-      setIndexDialogOpen(true);
-      void indexQuery.mutate();
+      pendingIndexRef.current = false;
+      void mutateIndex();
     } catch {
       toast.error('Your data was added, but indexing could not start.');
     }
-  }, [indexQuery]);
+  }, [indexQuery.data?.run, mutateIndex]);
+
+  const prevIndexRunning = useRef(indexRunning);
+  useEffect(() => {
+    if (prevIndexRunning.current && !indexRunning) {
+      void mutateDocuments();
+      // Compatibility with an older local server that still returns 409.
+      // Current servers own this queue durably and start the follow-up pass.
+      if (pendingIndexRef.current) {
+        pendingIndexRef.current = false;
+        void startAutomaticIndex();
+      }
+    }
+    prevIndexRunning.current = indexRunning;
+  }, [indexRunning, mutateDocuments, startAutomaticIndex]);
 
   useEffect(() => {
     const prevJobs = prevJobsRef.current;
@@ -468,25 +473,6 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
         </>
       )}
 
-      <Dialog open={indexDialogOpen} onOpenChange={setIndexDialogOpen}>
-        <DialogContent className="max-w-lg overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Making your data searchable</DialogTitle>
-            <DialogDescription>
-              This runs safely in the background. You can close this and come back anytime.
-            </DialogDescription>
-          </DialogHeader>
-          <IndexWorkspace
-            automatic
-            onDone={() => {
-              indexQuery.mutate();
-              setResetKey((k) => k + 1);
-            }}
-            onClose={() => setIndexDialogOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
       {showJobsDrawer && hasJobsDrawerContent && (
         <div className="mb-6 animate-in slide-in-from-top-2 fade-in duration-200">
           <div
@@ -505,6 +491,22 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
               </button>
             </div>
             <MediaIndexingJobsPanel assets={activeMediaAssets} />
+            {indexRunning && (
+              <div
+                className={cn(
+                  'flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5',
+                  activeMediaAssets.length > 0 && 'mt-3',
+                )}
+              >
+                <Loader2 className="size-4 shrink-0 animate-spin text-emerald-600" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">Indexing files</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Running in the background — new files will join the queue.
+                  </p>
+                </div>
+              </div>
+            )}
             {jobs.length > 0 && (
               <div
                 className={cn(activeMediaAssets.length > 0 && 'mt-4 border-t border-border pt-4')}
@@ -549,7 +551,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
       <div>
         {activeTab === 'add' && (
           <div className="w-full ">
-            <div className="relative" key={resetKey}>
+            <div className="relative">
               {dataAddBlocked ? (
                 <div className="mx-auto flex min-h-72 max-w-xl mt-5 flex-col items-center justify-center rounded-xl px-6 text-center">
                   <div className="mb-4 rounded-full bg-primary/10 p-3 text-primary">

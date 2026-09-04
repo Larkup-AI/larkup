@@ -2,17 +2,64 @@ import { describe, expect, it } from 'vitest';
 import {
   hasRetrievedImageEvidence,
   hasRetrievedPdfEvidence,
+  findIndexedImageSource,
   requestsImagePresentation,
   shouldInspectRetrievedImage,
 } from './visual-routing';
 
 describe('PDF visual routing', () => {
-  it('requires a vision pass for any substantive question with image evidence', () => {
+  it('resolves previews from legacy standalone indexed-image records', () => {
+    expect(
+      findIndexedImageSource(
+        [
+          {
+            metadata: {
+              imageUrl: '/api/uploads/schema.png',
+              pageNumber: 3,
+              index: 0,
+            },
+          },
+        ],
+        '/api/uploads/schema.png',
+      ),
+    ).toMatchObject({ image: { pageNumber: 3, index: 0 } });
+  });
+
+  it('reuses a relevant indexed image description without another slow vision pass', () => {
     expect(
       shouldInspectRetrievedImage(
         "list every view and routine name shown, and tell me how many routines are under 'Resources'.",
-        { hits: [{ images: [{ imageUrl: '/api/uploads/schema.png' }] }] },
+        {
+          hits: [
+            {
+              images: [
+                {
+                  imageUrl: '/api/uploads/schema.png',
+                  description:
+                    'Views: film_list and staff_list. Resources routines: get_customer and film_in_stock.',
+                },
+              ],
+            },
+          ],
+        },
       ),
+    ).toBe(false);
+  });
+
+  it('requires a fresh visual read when indexed descriptions do not cover the question', () => {
+    expect(
+      shouldInspectRetrievedImage('What color is the connector between the billing tables?', {
+        hits: [
+          {
+            images: [
+              {
+                imageUrl: '/api/uploads/schema.png',
+                description: 'A database overview with user account labels.',
+              },
+            ],
+          },
+        ],
+      }),
     ).toBe(true);
   });
 

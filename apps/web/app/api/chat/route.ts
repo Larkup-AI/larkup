@@ -40,7 +40,7 @@ import {
   collectAnswerLevelMediaStatements,
   containsAnswerLevelMediaEvidence,
   collectQuestionMatchedDirectClaims,
-  ensureNonEmptyTextStream,
+  recoverEmptyUIMessageStream,
   formatDirectObservationAnswer,
   formatExhaustiveMediaAnswer,
   formatOutcomeMediaAnswer,
@@ -55,6 +55,9 @@ import {
   shouldInspectRetrievedImage,
 } from '@/lib/chat/visual-routing';
 import { collectExhaustiveVideoEvidencePages } from '@/lib/chat/video-rag-routing';
+import { executableTools } from '@/lib/chat/tool-registry';
+import { normalizeIncomingMessages } from '@/lib/chat/message-input';
+import { explicitMediaEvidenceAssetId } from '@/lib/chat/media-retrieval-routing';
 import { authorizeEnterpriseAiRequest, trackEnterpriseAiUsage } from '@/lib/enterprise-client';
 
 // A local CPU inspection can legitimately outlive the default server route
@@ -233,7 +236,7 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
   const contextBudget = containsExhaustiveEvidence(safeOutput) ? 120_000 : 24_000;
   const directClaims = unverifiedMedia ? [] : collectQuestionMatchedDirectClaims(result, question);
   const hasEstablishedMediaEvidence = containsAnswerLevelMediaEvidence(result);
-  const mediaAssetId = findMediaEvidenceAssetId(result);
+  const mediaAssetId = explicitMediaEvidenceAssetId(result);
   if (
     mediaAssetId &&
     directClaims.length === 0 &&
@@ -275,27 +278,6 @@ function containsExhaustiveEvidence(value: unknown): boolean {
     return true;
   }
   return Object.values(record).some(containsExhaustiveEvidence);
-}
-
-/** A retrieval fallback may locate a video by title without carrying an answer. */
-function findMediaEvidenceAssetId(value: unknown): string | null {
-  if (!value || typeof value !== 'object') return null;
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findMediaEvidenceAssetId(item);
-      if (found) return found;
-    }
-    return null;
-  }
-  const record = value as Record<string, unknown>;
-  if (typeof record.mediaAssetId === 'string' && record.mediaAssetId.trim()) {
-    return record.mediaAssetId;
-  }
-  for (const nested of Object.values(record)) {
-    const found = findMediaEvidenceAssetId(nested);
-    if (found) return found;
-  }
-  return null;
 }
 
 /**
@@ -417,14 +399,15 @@ function escapeRegExp(value: string) {
 }
 
 export async function POST(req: Request) {
+  const parsedBody: unknown = await req.json();
+  const body =
+    parsedBody && typeof parsedBody === 'object' ? (parsedBody as Record<string, unknown>) : {};
   const {
-    messages,
     projectId,
     chatModelId: requestedModelId,
     docSessionId,
     docFields,
-  }: {
-    messages: UIMessage[];
+  } = body as {
     projectId?: string;
     chatModelId?: string;
     docSessionId?: string;
@@ -436,7 +419,11 @@ export async function POST(req: Request) {
       context?: string;
       placeholder?: string;
     }[];
-  } = await req.json();
+  };
+  const messages = normalizeIncomingMessages(body?.messages) as UIMessage[];
+  if (!messages.some((message) => message.role === 'user')) {
+    return Response.json({ error: 'At least one user message is required.' }, { status: 400 });
+  }
 
   const config = await readConfig();
   const provider = config.chatProvider || config.embeddingProvider;
@@ -712,7 +699,7 @@ ${fieldLines}`;
     systemPrompt += `\nINSTALLED TOOLS:\n${dynamicToolPromptFragments.join('\n')}\n`;
   }
   // Provide both RAG tools and Data Analysis tools so the model can handle complex queries (e.g. Excel)
-  const builtInTools = {
+  const builtInTools = executableTools({
     searchKnowledgeBase: allTools.searchKnowledgeBase,
     presentMedia: allTools.presentMedia,
     queryTabularData: allTools.queryTabularData,
@@ -727,7 +714,7 @@ ${fieldLines}`;
     fillDocumentForm: allTools.fillDocumentForm,
     editDocument: allTools.editDocument,
     requestDocumentSignature: allTools.requestDocumentSignature,
-  };
+  });
   const isGreeting =
     /^(hi|hello|hey|thanks|thank you|ok|sure|yes|no|please|help|how are you|good morning|good afternoon|good evening|bye|goodbye)[.!\s]*$/i.test(
       userText.trim(),
@@ -784,6 +771,48 @@ ${fieldLines}`;
         let preloadedVideoEvidence = false;
         const preflightToolCallId = `knowledge-${crypto.randomUUID()}`;
 
+        const previewImage = reusableEvidence.images[0];
+        if (imagePreviewFollowUp && previewImage && builtInTools.presentMedia) {
+          const previewCallId = `preview-${crypto.randomUUID()}`;
+          writer.write({ type: 'start' });
+          writer.write({
+            type: 'tool-input-available',
+            toolCallId: previewCallId,
+            toolName: 'presentMedia',
+            input: { imageUrl: previewImage.imageUrl },
+          });
+          let previewOutput: unknown;
+          try {
+            previewOutput = await (builtInTools.presentMedia as any).execute(
+              { imageUrl: previewImage.imageUrl },
+              { toolCallId: previewCallId },
+            );
+          } catch {
+            previewOutput = { success: false, error: 'The image preview is not available.' };
+          }
+          writer.write({
+            type: 'tool-output-available',
+            toolCallId: previewCallId,
+            output: previewOutput,
+          });
+          const previewSucceeded =
+            previewOutput &&
+            typeof previewOutput === 'object' &&
+            (previewOutput as { success?: unknown }).success === true;
+          const answerId = `answer-${crypto.randomUUID()}`;
+          writer.write({ type: 'text-start', id: answerId });
+          writer.write({
+            type: 'text-delta',
+            id: answerId,
+            delta: previewSucceeded
+              ? `Here is the${previewImage.title ? ` ${previewImage.title}` : ''} diagram preview.`
+              : 'I could not open that indexed image preview. Please re-index the PDF image and try again.',
+          });
+          writer.write({ type: 'text-end', id: answerId });
+          await mcp.close();
+          return;
+        }
+
         if (forceKnowledgeBaseSearch && builtInTools.searchKnowledgeBase) {
           // Open the message ourselves since a tool part is about to stream
           // before streamText runs. Without this, the client sees a tool
@@ -818,7 +847,7 @@ ${fieldLines}`;
             output: preloadedEvidence,
           });
 
-          const mediaAssetId = findMediaEvidenceAssetId(preloadedEvidence);
+          const mediaAssetId = explicitMediaEvidenceAssetId(preloadedEvidence);
           // Retrieval identifies the source; the installed capability verifies
           // the claim. Dispatch the one unambiguous evidence-query action
           // deterministically so every supported chat model follows the same
@@ -868,6 +897,7 @@ ${fieldLines}`;
 
         const deterministicAnswer = preloadedVideoEvidence
           ? (formatExhaustiveMediaAnswer(preloadedEvidence, userText) ??
+            collectQuestionMatchedDirectClaims(preloadedEvidence, userText)[0] ??
             formatOutcomeMediaAnswer(preloadedEvidence, userText) ??
             formatDirectObservationAnswer(preloadedEvidence, userText))
           : undefined;
@@ -905,9 +935,6 @@ ${fieldLines}`;
                 chunkMs: 20_000,
                 toolMs: 30_000,
               },
-          experimental_transform: ensureNonEmptyTextStream(
-            fallbackAnswerFromEvidence(preloadedEvidence, userText),
-          ),
           providerOptions: gatewayProviderOptions(resolvedProvider, chatModelId),
           system: `${systemPrompt}${
             preloadedEvidence === undefined
@@ -932,7 +959,7 @@ ${fieldLines}`;
           toolChoice: 'auto',
           prepareStep: ({ stepNumber, messages }) => {
             if (preloadedEvidence !== undefined) {
-              const preloadedMediaAssetId = findMediaEvidenceAssetId(preloadedEvidence);
+              const preloadedMediaAssetId = explicitMediaEvidenceAssetId(preloadedEvidence);
               if (
                 !preloadedVideoEvidence &&
                 preloadedMediaAssetId &&
@@ -1165,80 +1192,82 @@ ${fieldLines}`;
         });
 
         writer.merge(
-          result.toUIMessageStream({
-            // The preflight branch above already sent the message's 'start' event
-            // itself (see the comment there) -- a second one here would split the
-            // response into two separate assistant messages on the client.
-            sendStart: !(forceKnowledgeBaseSearch && builtInTools.searchKnowledgeBase),
-            // Reasoning is execution detail; keep the chat focused on the answer
-            // and the compact, inspectable evidence UI.
-            sendReasoning: false,
-            onError: (error: any) => {
-              // Extract the deepest error message available
-              const rawMessage: string =
-                error?.lastError?.message ||
-                error?.message ||
-                error?.error?.message ||
-                (typeof error === 'string' ? error : '');
+          result
+            .toUIMessageStream({
+              // The preflight branch above already sent the message's 'start' event
+              // itself (see the comment there) -- a second one here would split the
+              // response into two separate assistant messages on the client.
+              sendStart: !(forceKnowledgeBaseSearch && builtInTools.searchKnowledgeBase),
+              // Reasoning is execution detail; keep the chat focused on the answer
+              // and the compact, inspectable evidence UI.
+              sendReasoning: false,
+              onError: (error: any) => {
+                // Extract the deepest error message available
+                const rawMessage: string =
+                  error?.lastError?.message ||
+                  error?.message ||
+                  error?.error?.message ||
+                  (typeof error === 'string' ? error : '');
 
-              // Only log non-trivial errors to console (skip tool-routing noise)
-              const isToolRouting =
-                rawMessage.includes('unavailable tool') || error?.name === 'AI_NoSuchToolError';
-              if (!isToolRouting) {
-                console.error('[chat] stream error:', rawMessage);
-              }
+                // Only log non-trivial errors to console (skip tool-routing noise)
+                const isToolRouting =
+                  rawMessage.includes('unavailable tool') || error?.name === 'AI_NoSuchToolError';
+                if (!isToolRouting) {
+                  console.error('[chat] stream error:', rawMessage);
+                }
 
-              // ── Rate limit / quota exceeded ──
-              if (
-                rawMessage.includes('rate-limited') ||
-                rawMessage.includes('rate_limit') ||
-                rawMessage.includes('RateLimitError') ||
-                rawMessage.includes('429') ||
-                rawMessage.includes('quota')
-              ) {
-                return 'Vercel AI Gateway could not serve this model because it is rate-limited. We tried compatible backup models. Try again shortly, choose another model, or add AI Gateway credits / a provider key in Settings.';
-              }
+                // ── Rate limit / quota exceeded ──
+                if (
+                  rawMessage.includes('rate-limited') ||
+                  rawMessage.includes('rate_limit') ||
+                  rawMessage.includes('RateLimitError') ||
+                  rawMessage.includes('429') ||
+                  rawMessage.includes('quota')
+                ) {
+                  return 'Vercel AI Gateway could not serve this model because it is rate-limited. We tried compatible backup models. Try again shortly, choose another model, or add AI Gateway credits / a provider key in Settings.';
+                }
 
-              // ── Model tried to call a tool that was not available in this step ──
-              // This happens when the step-routing removes a tool but the model still
-              // tries to call it. It is not a real failure — just retry.
-              if (isToolRouting) {
-                return 'The model tried an unavailable action. Please try your question again.';
-              }
+                // ── Model tried to call a tool that was not available in this step ──
+                // This happens when the step-routing removes a tool but the model still
+                // tries to call it. It is not a real failure — just retry.
+                if (isToolRouting) {
+                  return 'The model tried an unavailable action. Please try your question again.';
+                }
 
-              // ── Authentication / API key errors ──
-              if (
-                rawMessage.includes('401') ||
-                rawMessage.includes('Unauthorized') ||
-                rawMessage.includes('Invalid API Key') ||
-                rawMessage.includes('authentication')
-              ) {
-                return 'Your API key appears to be invalid or expired. Please check your AI provider settings.';
-              }
+                // ── Authentication / API key errors ──
+                if (
+                  rawMessage.includes('401') ||
+                  rawMessage.includes('Unauthorized') ||
+                  rawMessage.includes('Invalid API Key') ||
+                  rawMessage.includes('authentication')
+                ) {
+                  return 'Your API key appears to be invalid or expired. Please check your AI provider settings.';
+                }
 
-              // ── Context length / token limit ──
-              if (
-                rawMessage.includes('context_length') ||
-                rawMessage.includes('maximum context') ||
-                rawMessage.includes('too many tokens') ||
-                rawMessage.includes('max_tokens')
-              ) {
-                return 'The conversation is too long for this model. Try starting a new chat or switching to a model with a larger context window.';
-              }
+                // ── Context length / token limit ──
+                if (
+                  rawMessage.includes('context_length') ||
+                  rawMessage.includes('maximum context') ||
+                  rawMessage.includes('too many tokens') ||
+                  rawMessage.includes('max_tokens')
+                ) {
+                  return 'The conversation is too long for this model. Try starting a new chat or switching to a model with a larger context window.';
+                }
 
-              // ── Timeout ──
-              if (rawMessage.includes('timeout') || rawMessage.includes('ETIMEDOUT')) {
-                return 'The request timed out. Please try again.';
-              }
+                // ── Timeout ──
+                if (rawMessage.includes('timeout') || rawMessage.includes('ETIMEDOUT')) {
+                  return 'The request timed out. Please try again.';
+                }
 
-              // ── Generic fallback — strip any URLs and technical noise ──
-              if (rawMessage.length > 200 || rawMessage.includes('http')) {
+                // ── Generic fallback — never expose implementation errors ──
                 return 'Something went wrong while generating a response. Please try again.';
-              }
-
-              return rawMessage || 'Something went wrong while generating a response.';
-            },
-          }),
+              },
+            })
+            .pipeThrough(
+              recoverEmptyUIMessageStream(
+                fallbackAnswerFromEvidence(preloadedEvidence, userText),
+              )(),
+            ),
         );
       },
     });

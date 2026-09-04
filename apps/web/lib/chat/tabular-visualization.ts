@@ -1,5 +1,5 @@
 export type TabularChartConfig = {
-  chartType: 'bar';
+  chartType: 'bar' | 'line';
   title: string;
   data: Record<string, unknown>[];
   xAxisKey: string;
@@ -33,7 +33,7 @@ export function createTabularVisualization(
   if (!categoryColumn || numericColumns.length === 0) return undefined;
 
   return {
-    chartType: 'bar',
+    chartType: /\b(trend|over time|time series)\b/i.test(requestText) ? 'line' : 'bar',
     title: `Distribution by ${categoryColumn}`,
     data: result.rows.slice(0, 50),
     xAxisKey: categoryColumn,

@@ -945,7 +945,7 @@ function renderToolPart(
             {liveProgress?.message || liveProgress?.label || behavior.pendingLabel || 'Working'}
           </span>
         </div>
-        {liveProgress ? (
+        {liveProgress && behavior.showProgressBar !== false ? (
           <div className="ml-9 flex items-center gap-2">
             <div className="h-1.5 w-48 overflow-hidden rounded-full bg-muted">
               {indeterminate ? (

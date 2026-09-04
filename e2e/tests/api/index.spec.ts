@@ -105,13 +105,13 @@ test.describe('Index API (/api/index)', () => {
     }
   });
 
-  test('POST /api/index — returns 409 if already running', async ({ request }) => {
+  test('POST /api/index — queues new documents if already running', async ({ request }) => {
     // Check if indexing is currently running
     const statusRes = await request.get('/api/index');
     const status = await statusRes.json();
 
     if (!status.running) {
-      console.log('  ⏭ Skipping 409 test — no indexing in progress');
+      console.log('  ⏭ Skipping queue test — no indexing in progress');
       test.skip(true, 'No indexing in progress');
       return;
     }
@@ -120,15 +120,10 @@ test.describe('Index API (/api/index)', () => {
       data: {},
     });
 
-    if (res.status() === 202) {
-      console.log('  ⚠ Indexing finished right before POST, ignoring race condition');
-      return;
-    }
-
-    expect(res.status()).toBe(409);
+    expect(res.status()).toBe(202);
     const body = await res.json();
-    expect(body.error).toContain('already in progress');
-    console.log('  ✓ Concurrent indexing correctly rejected (409)');
+    if (body.queued) console.log('  ✓ New documents joined the indexing queue');
+    else console.log('  ⚠ Indexing finished just before the request; a new run started');
   });
 
   test('DELETE /api/index — cancel running index', async ({ request }) => {

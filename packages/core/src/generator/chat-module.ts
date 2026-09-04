@@ -345,6 +345,10 @@ async function buildAgentTools() {
         continue;
       }
       for (const [name, pluginTool] of Object.entries(pluginTools)) {
+        if (!pluginTool || typeof pluginTool !== "object") {
+          console.warn("[agent] Plugin returned an invalid tool:", plugin.id || plugin.packageName, name);
+          continue;
+        }
         tools[name] = pluginTool;
         descriptions.push({ id: name, name, description: "Tool provided by plugin " + (plugin.id || plugin.packageName), source: "plugin", pluginId: plugin.id, pluginName });
       }

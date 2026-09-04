@@ -31,6 +31,8 @@ export interface ChatToolBehavior {
   pendingLabel?: string;
   resultView: ChatToolResultView;
   compactResult?: boolean;
+  /** Keep quick operations moving without implying a measurable percentage. */
+  showProgressBar?: boolean;
 }
 
 export const CHAT_TOOL_BEHAVIORS: Record<string, ChatToolBehavior> = {
@@ -60,6 +62,7 @@ export const CHAT_TOOL_BEHAVIORS: Record<string, ChatToolBehavior> = {
     pendingLabel: 'Checking data…',
     resultView: 'data-table',
     compactResult: true,
+    showProgressBar: false,
   },
   generateVisualization: {
     placement: 'visualization',
