@@ -7,13 +7,39 @@ import { log } from '../ui/logger';
 import { inProjectScope, requireActiveProject } from '../lib/scope';
 import { prompts } from '../ui/prompts';
 import { ensureApiKey } from '../lib/keys';
-import { collectFiles, isMediaPath, readTextFiles } from '../lib/local-files';
+import { collectFiles, filterLocalFiles, isMediaPath, readTextFiles } from '../lib/local-files';
 import { mediaCommand } from './media';
 
 interface IndexOptions {
   project?: string;
   run?: boolean;
   incremental?: boolean;
+  pdf?: boolean;
+  json?: boolean;
+  media?: boolean;
+  image?: boolean;
+  audio?: boolean;
+  video?: boolean;
+  extension?: string;
+}
+
+function selectedKinds(options: IndexOptions) {
+  return [
+    ...(options.pdf ? (['pdf'] as const) : []),
+    ...(options.json ? (['json'] as const) : []),
+    ...(options.media ? (['media'] as const) : []),
+    ...(options.image ? (['image'] as const) : []),
+    ...(options.audio ? (['audio'] as const) : []),
+    ...(options.video ? (['video'] as const) : []),
+  ];
+}
+
+function progressBar(current: number, total: number): string {
+  if (total <= 0) return 'Preparing chunks';
+  const width = 24;
+  const completed = Math.min(width, Math.round((current / total) * width));
+  const percentage = Math.min(100, Math.round((current / total) * 100));
+  return `[${'█'.repeat(completed)}${'░'.repeat(width - completed)}] ${percentage}%`;
 }
 
 export async function indexCommand(inputs: string[], options: IndexOptions) {
@@ -21,8 +47,12 @@ export async function indexCommand(inputs: string[], options: IndexOptions) {
     await requireActiveProject();
     if (inputs.length > 0) {
       const files = await collectFiles(inputs);
-      const textFiles = await readTextFiles(files);
-      const mediaFiles = files.filter(isMediaPath);
+      const selected = filterLocalFiles(files, {
+        kinds: selectedKinds(options),
+        extensions: options.extension?.split(','),
+      });
+      const textFiles = await readTextFiles(selected);
+      const mediaFiles = selected.filter(isMediaPath);
 
       for (const document of textFiles) {
         await addDocument({ title: document.title, content: document.content, source: 'files' });
@@ -65,7 +95,9 @@ export async function indexCommand(inputs: string[], options: IndexOptions) {
       const r = await readRun();
       if (!r || done) return;
       if (r.totalChunks > 0) {
-        s.message(`${r.status.padEnd(10)} ${r.processedChunks}/${r.totalChunks} chunks`);
+        s.message(
+          `${r.status.padEnd(10)} ${progressBar(r.processedChunks, r.totalChunks)} ${r.processedChunks}/${r.totalChunks} chunks`,
+        );
       } else {
         s.message(`${r.status}…`);
       }

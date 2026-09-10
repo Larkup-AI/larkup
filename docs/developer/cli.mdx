@@ -1,6 +1,6 @@
 ---
-title: "CLI Reference"
-description: "Build, index, test, and deploy Larkup servers from the terminal."
+title: 'CLI Reference'
+description: 'Build, index, test, and deploy Larkup servers from the terminal.'
 ---
 
 The CLI manages the same server workspaces used by the Web UI. Commands operate on the active server unless you pass `--project <id>`.
@@ -38,7 +38,7 @@ larkup index ./knowledge
 larkup dev
 ```
 
-`index` recursively loads supported text and source code files, then streams chunking and embedding progress. It skips `.git`, `.larkup`, `node_modules`, `dist`, and `build` directories.
+`index` recursively loads supported text, PDF, Word, JSON, and source code files, then streams chunking and embedding progress with a terminal progress bar. It skips `.git`, `.larkup`, `node_modules`, `dist`, and `build` directories. The active Project's document and index-run records are shared with the Web UI, so an indexing run started here appears in the Data and Index views immediately.
 
 Use `--no-run` when you want to load files without rebuilding the vector index:
 
@@ -46,6 +46,35 @@ Use `--no-run` when you want to load files without rebuilding the vector index:
 larkup index ./docs ./src --no-run
 larkup index --incremental
 ```
+
+Use one simple command for a folder, or narrow it to a file type when needed:
+
+```bash
+larkup index ./folder                 # all supported files
+larkup index ./folder --pdf
+larkup index ./folder --json
+larkup index ./folder --media         # image, audio, and video
+larkup index ./folder --video
+larkup index ./folder --extension .json,.pdf
+```
+
+`larkup indexing` is an alias for `larkup index`.
+
+## Configure AI models
+
+Projects, model settings, and indexing can all be managed from the terminal. Changes are written to the same active Project configuration used by the Web UI.
+
+```bash
+larkup init product-docs
+larkup ai-model --embedding openai/text-embedding-3-small --api-key "$OPENAI_API_KEY"
+larkup ai-model --chat openai/gpt-5 --api-key "$OPENAI_API_KEY"
+larkup ai-model list --type embedding
+larkup ai-model list --type chat
+larkup ai-model list --type vision
+```
+
+`--apikey` is accepted as a shorthand for `--api-key`. `larkup set ai-model` is an alias for configuring models.
+When no model flag is provided, `larkup ai-model --api-key <key>` updates the active embedding model's API key.
 
 ## Media
 
@@ -114,13 +143,13 @@ larkup deploy docker --out ./deployment
 
 Deployment targets:
 
-| Target | Behavior |
-| --- | --- |
+| Target   | Behavior                                                           |
+| -------- | ------------------------------------------------------------------ |
 | `docker` | Generate or export a server ready for Docker. This is the default. |
-| `vercel` | Generate or export a server ready for Vercel. |
-| `export` | Copy the portable server artifact to `--out`. |
-| `local` | Generate and start the standard server in the background. |
-| `agent` | Generate the extendable agent server, or start it with `--start`. |
+| `vercel` | Generate or export a server ready for Vercel.                      |
+| `export` | Copy the portable server artifact to `--out`.                      |
+| `local`  | Generate and start the standard server in the background.          |
+| `agent`  | Generate the extendable agent server, or start it with `--start`.  |
 
 The standard generated server includes retrieval, document APIs, scraping, corpus export, and streaming chat. The agent target remains useful when you need the portable agent manifest and widget surface.
 
@@ -138,24 +167,25 @@ larkup update
 
 ## Command reference
 
-| Command | Description |
-| --- | --- |
-| `larkup dev [name]` | First run: create a workspace and run its local server. Later: run the active workspace. Pass a name to create another workspace. |
-| `larkup init [name]` | Create and activate a server workspace. |
-| `larkup projects` | List all Projects. |
-| `larkup use <projectId>` | Switch the active Project. |
-| `larkup config` | Show configuration and status. |
-| `larkup add-doc` | Add a file or inline text with optional source URL metadata. |
-| `larkup documents` | List, show, update, remove, or export corpus documents. |
-| `larkup index [sources...]` | Load files or folders and build the index. |
-| `larkup media [sources...]` | Process image, audio, or video files. |
-| `larkup query <question>` | Retrieve the most relevant chunks. |
-| `larkup chat` | Start a streaming terminal chat. |
-| `larkup generate` | Emit a portable standard server. |
-| `larkup serve` | Run the standard server in the foreground. |
-| `larkup marketplace` | List, inspect, install, or uninstall tools. |
-| `larkup deploy [target]` | Prepare or start a deployment target. |
-| `larkup test` | Validate configuration, storage, or an endpoint. |
-| `larkup open [target]` | Open the Web UI, API reference, or URL. |
-| `larkup update` | Check for or install a CLI update. |
-| `larkup settings` | Configure terminal chat models. |
+| Command                     | Description                                                                                                                       |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `larkup dev [name]`         | First run: create a workspace and run its local server. Later: run the active workspace. Pass a name to create another workspace. |
+| `larkup init [name]`        | Create and activate a server workspace.                                                                                           |
+| `larkup projects`           | List all Projects.                                                                                                                |
+| `larkup use <projectId>`    | Switch the active Project.                                                                                                        |
+| `larkup config`             | Show configuration and status.                                                                                                    |
+| `larkup add-doc`            | Add a file or inline text with optional source URL metadata.                                                                      |
+| `larkup documents`          | List, show, update, remove, or export corpus documents.                                                                           |
+| `larkup index [sources...]` | Load files or folders and build the index.                                                                                        |
+| `larkup ai-model [list]`    | Show, list, or configure embedding, chat, and vision models.                                                                      |
+| `larkup media [sources...]` | Process image, audio, or video files.                                                                                             |
+| `larkup query <question>`   | Retrieve the most relevant chunks.                                                                                                |
+| `larkup chat`               | Start a streaming terminal chat.                                                                                                  |
+| `larkup generate`           | Emit a portable standard server.                                                                                                  |
+| `larkup serve`              | Run the standard server in the foreground.                                                                                        |
+| `larkup marketplace`        | List, inspect, install, or uninstall tools.                                                                                       |
+| `larkup deploy [target]`    | Prepare or start a deployment target.                                                                                             |
+| `larkup test`               | Validate configuration, storage, or an endpoint.                                                                                  |
+| `larkup open [target]`      | Open the Web UI, API reference, or URL.                                                                                           |
+| `larkup update`             | Check for or install a CLI update.                                                                                                |
+| `larkup settings`           | Configure terminal chat models.                                                                                                   |
