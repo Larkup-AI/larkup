@@ -66,6 +66,7 @@ import {
 import {
   activeMediaFollowUpResult,
   clearlyTitleMatchedMediaAsset,
+  shouldKeepActiveMediaSource,
 } from '@/lib/chat/media-source-routing';
 import { createTabularVisualization } from '@/lib/chat/tabular-visualization';
 import { inferTabularPlan } from '@/lib/chat/tabular-query-plan';
@@ -772,12 +773,22 @@ export async function getChatTools(context: {
   docSessionId?: string;
   config?: any;
   requestText?: string;
+  /** Compact source context used only to disambiguate the user's immediate follow-up retrieval. */
+  contextualKnowledgeQuery?: string;
   /** Public origin of the incoming chat request, used for local media URLs. */
   origin?: string;
   /** Media source from the immediately preceding evidence-backed turn. */
   preferredMediaAssetId?: string;
 }) {
-  const { projectId, docSessionId, config, origin, requestText, preferredMediaAssetId } = context;
+  const {
+    projectId,
+    docSessionId,
+    config,
+    origin,
+    requestText,
+    preferredMediaAssetId,
+    contextualKnowledgeQuery,
+  } = context;
   // Installed tools are shared, while their connection/runtime selection is
   // project-scoped. Resolve that configuration once before constructing any
   // dynamic client so Local and Cloud tools always receive the active
@@ -983,17 +994,41 @@ export async function getChatTools(context: {
           ? await mediaEvidence.getAsset(preferredMediaAssetId)
           : undefined;
         if (continuingAsset?.processingStatus === 'completed') {
-          return activeMediaFollowUpResult(
-            query,
-            continuingAsset,
-            await indexedMediaContext(continuingAsset.id),
+          const config = await readConfig();
+          const activeScope = videoRuntimeScopeFromConfig(config);
+          const completedMedia = (await readMediaAssets()).filter(
+            (asset) =>
+              asset.processingStatus === 'completed' &&
+              Boolean(asset.activeVideoKnowledgeRevisionId) &&
+              isMediaAssetAvailableInRuntime(asset, activeScope) &&
+              (asset.type === 'video' || asset.type === 'audio'),
           );
+          // Continuing on an unambiguous source keeps ordinary follow-ups
+          // fast. With several indexed videos, however, search again unless
+          // the user clearly names the current one; otherwise the first clip
+          // mentioned in a chat silently monopolizes every later question.
+          if (shouldKeepActiveMediaSource(query, continuingAsset, completedMedia)) {
+            return activeMediaFollowUpResult(
+              query,
+              continuingAsset,
+              await indexedMediaContext(continuingAsset.id),
+            );
+          }
         }
         // RAG is a locator, never an answer cache.  The chat route turns a
         // matched mediaAssetId into a separate, visible evidence-query tool
         // call. That action can then fall back to bounded live analysis.
-        const retrieval = await queryKnowledgeBase(query, 4, projectId ?? null);
-        return retrieval;
+        // The deterministic preflight calls this action with the user's exact
+        // wording. Preserve that wording in the UI, but use the compact prior
+        // topic to resolve a reference such as "what will it be about?" before
+        // vector retrieval. Model-authored, already-specific search queries
+        // are left untouched.
+        const retrievalQuery =
+          contextualKnowledgeQuery && query.trim() === requestText?.trim()
+            ? contextualKnowledgeQuery
+            : query;
+        const retrieval = await queryKnowledgeBase(retrievalQuery, 4, projectId ?? null);
+        return retrievalQuery === query ? retrieval : { ...retrieval, query };
       },
     }),
 

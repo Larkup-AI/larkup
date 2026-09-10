@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   continuesRecentMediaTopic,
   compactTabularRowsForConversation,
+  contextualizeKnowledgeFollowUpQuery,
   extractConversationEvidence,
   isTabularFollowUp,
 } from './conversation-memory';
@@ -50,6 +51,37 @@ describe('media conversation evidence', () => {
     ]);
   });
 
+  it('does not turn a secondary video search hit into the active conversation topic', () => {
+    const evidence = extractConversationEvidence([
+      {
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-searchKnowledgeBase',
+            output: {
+              hits: [
+                {
+                  title: 'NVIDIA GTC AI Conference Berlin',
+                  text: 'The event is scheduled for October 2026.',
+                },
+                {
+                  title: 'Unrelated football highlights',
+                  text: 'A football match.',
+                  metadata: { mediaAssetId: 'video-secondary' },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    expect(evidence.mediaAssetIds).toEqual([]);
+    expect(contextualizeKnowledgeFollowUpQuery('What will it be about?', evidence)).toContain(
+      'NVIDIA GTC AI Conference Berlin',
+    );
+  });
+
   it('keeps a title-matched media source when vector retrieval has no document hits', () => {
     const evidence = extractConversationEvidence([
       {
@@ -92,6 +124,37 @@ describe('media conversation evidence', () => {
     ]);
     expect(evidence.mediaAssetIds).toEqual(['video-2']);
     expect(continuesRecentMediaTopic('What did each person wear?', evidence)).toBe(true);
+  });
+});
+
+describe('generic source conversation evidence', () => {
+  const event = {
+    sources: [
+      {
+        title: 'NVIDIA GTC AI Conference Berlin',
+        text: 'The conference is scheduled for October 2026 and covers AI infrastructure.',
+      },
+    ],
+    images: [],
+    mediaAssetIds: [],
+  };
+
+  it('qualifies an anaphoric event follow-up before retrieval', () => {
+    expect(contextualizeKnowledgeFollowUpQuery('What will it be about?', event)).toContain(
+      'NVIDIA GTC AI Conference Berlin',
+    );
+  });
+
+  it('keeps a short immediate follow-up on the established source topic', () => {
+    expect(contextualizeKnowledgeFollowUpQuery('How do I participate?', event)).toContain(
+      'scheduled for October 2026',
+    );
+  });
+
+  it('does not carry source context into an explicitly different source', () => {
+    expect(
+      contextualizeKnowledgeFollowUpQuery('What about another website?', event),
+    ).toBeUndefined();
   });
 });
 

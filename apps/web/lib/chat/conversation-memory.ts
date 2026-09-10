@@ -263,10 +263,13 @@ export function extractConversationEvidence(
     const nestedVideoAssetId = result?.videoEvidence?.mediaAssetId;
     if (typeof nestedVideoAssetId === 'string') mediaAssetIds.add(nestedVideoAssetId);
     for (const mediaAssetId of directMediaAssetIds) mediaAssetIds.add(mediaAssetId);
-    for (const hit of hits as any[]) {
-      const mediaAssetId = hit?.metadata?.mediaAssetId;
-      if (typeof mediaAssetId === 'string') mediaAssetIds.add(mediaAssetId);
-    }
+    // A secondary video hit is merely an alternate search result, not the
+    // active conversational topic. Carrying every media ID here made an
+    // unrelated clip hijack a later "what about it?" question even when a
+    // website/document was the leading result. Explicit evidence actions and
+    // an explicitly routed `videoEvidence` above remain authoritative.
+    const leadingMediaAssetId = (hits[0] as any)?.metadata?.mediaAssetId;
+    if (typeof leadingMediaAssetId === 'string') mediaAssetIds.add(leadingMediaAssetId);
     return {
       sources,
       images: [...images.values()].slice(0, 4),
@@ -350,6 +353,49 @@ export function continuesRecentMediaTopic(text: string, evidence: ConversationEv
   return !/\b(?:another|different|new|other)\s+(?:video|recording|match|episode|file|upload|source)\b/i.test(
     normalized,
   );
+}
+
+const SOURCE_SWITCH_LANGUAGE =
+  /\b(?:another|different|new|other)\s+(?:website|site|page|document|file|report|source|upload|video|recording)\b/i;
+const TOPIC_REFERENCE_LANGUAGE =
+  /\b(?:it|its|this|that|these|those|they|them|their|there|above|previous|same|event|conference)\b/i;
+const SHORT_FOLLOW_UP_LANGUAGE =
+  /^(?:how|when|where|who|what|which|can|could|do|does|is|are|will|would)\b/i;
+const MAX_FOLLOW_UP_TOPIC_CHARS = 1_200;
+
+/**
+ * Qualify a vague immediate follow-up with the prior non-media source before
+ * embedding it. This changes retrieval only; the original user wording stays
+ * visible in chat and the model transcript remains bounded.
+ */
+export function contextualizeKnowledgeFollowUpQuery(
+  text: string,
+  evidence: ConversationEvidence,
+): string | undefined {
+  if (
+    evidence.sources.length === 0 ||
+    evidence.mediaAssetIds.length > 0 ||
+    evidence.tabular ||
+    SOURCE_SWITCH_LANGUAGE.test(text)
+  ) {
+    return undefined;
+  }
+  const normalized = text.trim();
+  if (!normalized) return undefined;
+  const wordCount = normalized.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
+  const isFollowUp =
+    TOPIC_REFERENCE_LANGUAGE.test(normalized) ||
+    (wordCount <= 8 && SHORT_FOLLOW_UP_LANGUAGE.test(normalized));
+  if (!isFollowUp) return undefined;
+
+  const topic = evidence.sources
+    .slice(0, 1)
+    .map((source) => [source.title, source.text].filter(Boolean).join('\n'))
+    .join('\n')
+    .slice(0, MAX_FOLLOW_UP_TOPIC_CHARS)
+    .trim();
+  if (!topic) return undefined;
+  return `${normalized}\n\nImmediate prior topic (resolve references against this source only):\n${topic}`;
 }
 
 export function formatConversationEvidence(evidence: ConversationEvidence): string {
