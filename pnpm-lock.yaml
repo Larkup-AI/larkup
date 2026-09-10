@@ -374,13 +374,13 @@ importers:
         specifier: ^0.2.4
         version: link:../../packages/marketplace
       '@larkup/sandbox':
-        specifier: ^0.1.5
+        specifier: ^0.1.6
         version: link:../../packages/sandbox
       '@larkup/scraper':
         specifier: ^0.1.43
         version: link:../../packages/scraper
       '@larkup/tool-doc-editor':
-        specifier: ^0.2.21
+        specifier: ^0.2.22
         version: link:../../packages/marketplace-tools/doc-editor
       '@larkup/vector-stores':
         specifier: ^0.1.27
