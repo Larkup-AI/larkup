@@ -114,7 +114,6 @@ export async function GET(req: Request) {
         maxInputTokens: m.maxInputTokens,
         description: m.description,
       })),
-      suggestions: config.chatSuggestions || [],
     });
   });
 }

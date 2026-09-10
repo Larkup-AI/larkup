@@ -92,7 +92,6 @@ export interface RagConfig {
    * SKILL.md document; remote skills retain their canonical URL. */
   skills?: AgentSkill[];
 
-  chatSuggestions?: string[];
   systemPrompt?: string;
   serperApiKey?: string;
   webSearchEnabled?: boolean;
@@ -311,13 +310,7 @@ export type MediaProcessingStatus = 'pending' | 'processing' | 'completed' | 'fa
 
 /** Durable stages used by the media ingestion pipeline. */
 export type MediaPipelineStage =
-  | 'download'
-  | 'prepare'
-  | 'extract'
-  | 'transcribe'
-  | 'vision'
-  | 'synthesize'
-  | 'index';
+  'download' | 'prepare' | 'extract' | 'transcribe' | 'vision' | 'synthesize' | 'index';
 
 export type MediaProcessingStepStatus = 'waiting' | 'running' | 'completed' | 'skipped' | 'failed';
 
@@ -445,12 +438,7 @@ export interface SearchResultItem {
 }
 
 export type IndexRunStatus =
-  | 'idle'
-  | 'chunking'
-  | 'embedding'
-  | 'upserting'
-  | 'completed'
-  | 'failed';
+  'idle' | 'chunking' | 'embedding' | 'upserting' | 'completed' | 'failed';
 
 export type IndexRunStage = 'chunk' | 'embed' | 'upsert';
 

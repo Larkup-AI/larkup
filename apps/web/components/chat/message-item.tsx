@@ -1372,32 +1372,3 @@ export function renderMarkdown(text: string): string {
 
   return html;
 }
-
-// function FollowUpButtons({
-//   suggestions,
-//   onSelect,
-// }: {
-//   suggestions: string[];
-//   onSelect?: (text: string) => void;
-// }) {
-//   if (suggestions.length === 0) return null;
-
-//   return (
-//     <div className="flex flex-wrap gap-2 pt-1">
-//       {suggestions.map((s, i) => (
-//         <button
-//           key={i}
-//           type="button"
-//           onClick={() => onSelect?.(s)}
-//           className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
-//             i === 0
-//               ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/20'
-//               : 'border-border bg-card text-foreground hover:bg-secondary'
-//           }`}
-//         >
-//           {s}
-//         </button>
-//       ))}
-//     </div>
-//   );
-// }

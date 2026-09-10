@@ -216,7 +216,6 @@ interface ChatStatus {
   provider: string;
   chatModelId: string;
   availableModels: AvailableModel[];
-  suggestions: string[];
 }
 
 export function ChatWorkspace({ chatId }: { chatId?: string } = {}) {
@@ -295,16 +294,6 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
       setModelSearch('');
     }
   }, [showModelSelect]);
-
-  // Fetch suggestions if missing
-  useEffect(() => {
-    if (status?.ready && status.suggestions && status.suggestions.length === 0) {
-      const url = projectId
-        ? `/api/chat/suggestions?projectId=${encodeURIComponent(projectId)}`
-        : '/api/chat/suggestions';
-      fetch(url, { method: 'POST' });
-    }
-  }, [status?.ready, status?.suggestions, projectId]);
 
   const chatBody = useMemo(
     () => ({
@@ -1134,8 +1123,9 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
             </div>
           ) : isEmpty ? (
             <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white border border-border/60 text-primary ">
-                <MessageCircle className="size-7" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/90 border border-border/60 text-primary ">
+                {/* <MessageCircle className="size-7" /> */}
+                <img src={'/logo.png'} alt="Logo" className="size-9" />
               </div>
               <h1 className="text-xl font-semibold tracking-tight text-foreground text-balance">
                 Chat with your knowledge base
@@ -1150,24 +1140,6 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
                   with source citations.
                 </div>
               )} */}
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {status?.suggestions && status.suggestions.length > 0 ? (
-                  status.suggestions.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => {
-                        sendMessage({ text: s });
-                      }}
-                      className="rounded-full border border-border bg-card px-3.5 py-1.5 text-xs text-foreground transition hover:bg-secondary"
-                    >
-                      {s}
-                    </button>
-                  ))
-                ) : (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground"></div>
-                )}
-              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-6">
