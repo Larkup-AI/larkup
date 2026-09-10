@@ -11,7 +11,7 @@ export {
   ensureImage,
   executeInDocker,
 } from './docker-runner.js';
-export { checkLocalRuntime, executeLocally } from './local-runner.js';
+export { checkLocalRuntime, executeLocally, setupLocalRuntime } from './local-runner.js';
 export {
   SANDBOX_PROVIDERS,
   SANDBOX_PROVIDER_LIST,

@@ -20,7 +20,7 @@ import {
   ensureImage,
   executeInDocker,
 } from './docker-runner.js';
-import { checkLocalRuntime, executeLocally } from './local-runner.js';
+import { checkLocalRuntime, executeLocally, setupLocalRuntime } from './local-runner.js';
 import { getSandboxProviderAdapter } from './providers/index.js';
 
 const defaultDockerConfig: DockerConfig = {
@@ -62,6 +62,9 @@ export class SandboxManager {
   async setup(onProgress?: (msg: string) => void): Promise<void> {
     switch (this.config.backend) {
       case 'local':
+        onProgress?.('Preparing Larkup local analysis environment…');
+        await setupLocalRuntime();
+        onProgress?.('Local analysis environment is ready ✓');
         return;
       case 'docker':
         await buildSandboxImage(onProgress);

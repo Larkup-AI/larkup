@@ -5,7 +5,9 @@ import type { ExecutionRequest, SandboxBackend } from '@larkup/sandbox';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// A first local Python run may need to create the managed environment and
+// download the analysis packages. Later executions retain the normal request timeout.
+export const maxDuration = 300;
 
 async function getManager() {
   const config = await readConfig();

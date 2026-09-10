@@ -13,7 +13,14 @@ export async function GET() {
   const provider = (config.defaultSandboxProvider as SandboxBackend) || 'local';
   try {
     await verifySandboxProvider(provider, config.sandboxProviderConfigs?.[provider] ?? {});
-    return NextResponse.json({ provider, status: 'ready', message: 'Ready for code execution.' });
+    return NextResponse.json({
+      provider,
+      status: 'ready',
+      message:
+        provider === 'local'
+          ? 'Ready. Larkup prepares its isolated Python analysis environment automatically before the first Python run.'
+          : 'Ready for code execution.',
+    });
   } catch (error) {
     return NextResponse.json({
       provider,
