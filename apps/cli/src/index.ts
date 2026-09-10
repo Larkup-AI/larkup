@@ -29,6 +29,7 @@ import { enterpriseEnrollCommand } from './commands/enterprise-enroll';
 import { enterpriseToolInstallCommand } from './commands/enterprise-tool';
 import { enterpriseUpdateAvailable } from './commands/enterprise-update';
 import { installCommand } from './commands/install';
+import { aiModelCommand } from './commands/ai-model';
 
 const program = new Command();
 
@@ -119,9 +120,59 @@ program
   .option('--project <id>', 'Target a specific Project instead of the active one')
   .option('--no-run', 'Load supplied sources without building the index')
   .option('--incremental', 'Index only documents added since the last completed run')
+  .option('--pdf', 'Index PDF files only')
+  .option('--json', 'Index JSON and JSONL files only')
+  .option('--media', 'Index images, audio, and video only')
+  .option('--image', 'Index image files only')
+  .option('--audio', 'Index audio files only')
+  .option('--video', 'Index video files only')
+  .option('--extension <extensions>', 'Comma-separated extensions, for example .json,.pdf')
   .action(async (sources, options) => {
     await indexCommand(sources ?? [], options);
   });
+
+program
+  .command('indexing [sources...]')
+  .description('Alias for index')
+  .option('--project <id>', 'Target a specific Project instead of the active one')
+  .option('--no-run', 'Load supplied sources without building the index')
+  .option('--incremental', 'Index only documents added since the last completed run')
+  .option('--pdf', 'Index PDF files only')
+  .option('--json', 'Index JSON and JSONL files only')
+  .option('--media', 'Index images, audio, and video only')
+  .option('--image', 'Index image files only')
+  .option('--audio', 'Index audio files only')
+  .option('--video', 'Index video files only')
+  .option('--extension <extensions>', 'Comma-separated extensions, for example .json,.pdf')
+  .action(async (sources, options) => {
+    await indexCommand(sources ?? [], options);
+  });
+
+function configureAiModelCommand(command: Command) {
+  return command
+    .option('--embedding <model>', 'Set the embedding model ID')
+    .option('--chat <model>', 'Set the chat model ID')
+    .option('--vision <model>', 'Set the vision model ID')
+    .option('--api-key <key>', 'Set the API key for the selected model type(s)')
+    .option('--apikey <key>', 'Alias for --api-key')
+    .option('--project <id>', 'Target a specific Project instead of the active one')
+    .option('--type <embedding|chat|vision>', 'Filter model list by capability');
+}
+
+configureAiModelCommand(
+  program
+    .command('ai-model [action]')
+    .description('List or configure embedding, chat, and vision AI models'),
+).action(async (action, options) => {
+  await aiModelCommand(action, options);
+});
+
+const setCommand = program.command('set').description('Set Project configuration values');
+configureAiModelCommand(
+  setCommand.command('ai-model').description('Configure AI models (alias for ai-model)'),
+).action(async (options) => {
+  await aiModelCommand(undefined, options);
+});
 
 program
   .command('media [sources...]')

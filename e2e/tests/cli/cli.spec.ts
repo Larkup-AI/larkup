@@ -32,6 +32,7 @@ test.describe('Larkup CLI', () => {
     fs.mkdirSync(path.join(workspace, 'knowledge'));
     fs.writeFileSync(path.join(workspace, 'knowledge', 'one.md'), '# One\nFirst document.');
     fs.writeFileSync(path.join(workspace, 'knowledge', 'two.txt'), 'Second document.');
+    fs.writeFileSync(path.join(workspace, 'knowledge', 'metadata.json'), '{"kind":"test"}');
   });
 
   test.afterAll(() => {
@@ -58,12 +59,34 @@ test.describe('Larkup CLI', () => {
 
   test('initializes and loads a folder without indexing', () => {
     expect(cli(['init', 'CLI E2E'])).toContain('Created Project');
-    expect(cli(['index', './knowledge', '--no-run'])).toContain('Loaded 2 documents');
+    expect(cli(['index', './knowledge', '--no-run'])).toContain('Loaded 3 documents');
 
     const config = cli(['config']);
     expect(config).toContain('CLI E2E');
     expect(config).toContain('corpus');
-    expect(config).toContain('2 docs');
+    expect(config).toContain('3 docs');
+  });
+
+  test('filters folder indexing and synchronizes AI model configuration', () => {
+    const filtered = path.join(workspace, 'filtered');
+    fs.mkdirSync(filtered);
+    fs.writeFileSync(path.join(filtered, 'only.json'), '{"included":true}');
+    fs.writeFileSync(path.join(filtered, 'skip.md'), '# Skip');
+
+    expect(cli(['indexing', './filtered', '--json', '--no-run'])).toContain('Loaded 1 document');
+    expect(
+      cli([
+        'ai-model',
+        '--embedding',
+        'openai/text-embedding-3-small',
+        '--api-key',
+        'test-embedding-key',
+      ]),
+    ).toContain('AI model settings saved');
+    expect(cli(['config'])).toContain('text-embedding-3-small');
+    expect(cli(['ai-model', 'list', '--type', 'embedding'])).toContain(
+      'openai/text-embedding-3-small',
+    );
   });
 
   test('validates the active configuration', () => {
@@ -75,11 +98,11 @@ test.describe('Larkup CLI', () => {
     expect(cli(['documents', 'export', '--format', 'jsonl', '--out', exportPath])).toContain(
       'Exported corpus',
     );
-    expect(fs.readFileSync(exportPath, 'utf8').trim().split('\n')).toHaveLength(2);
+    expect(fs.readFileSync(exportPath, 'utf8').trim().split('\n')).toHaveLength(4);
 
     const output = cli(['test']);
     expect(output).toContain('Configuration is valid');
-    expect(output).toContain('2 document');
+    expect(output).toContain('4 document');
   });
 
   test('generates a deployable server with chat', () => {

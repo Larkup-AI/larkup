@@ -12,11 +12,20 @@ npm install -g @larkup/cli
 
 ```bash
 larkup init product-docs
+larkup ai-model --embedding openai/text-embedding-3-small --api-key "$OPENAI_API_KEY"
 larkup index ./knowledge
 larkup dev
 ```
 
-`index` accepts individual files or folders, including text, source code, CSV, JSON, PDF, and Word documents. It streams loading and indexing progress.
+`index` accepts individual files or folders, including text, source code, CSV, JSON, PDF, and Word documents. It streams loading and indexing progress, and writes the same Project state shown in the Web UI.
+
+```bash
+larkup index ./folder --pdf
+larkup index ./folder --media
+larkup index ./folder --video
+larkup index ./folder --extension .json,.pdf
+larkup ai-model list --type embedding
+```
 
 Use the dedicated media command for images, audio, and video:
 
@@ -28,6 +37,7 @@ larkup media ./demo.mp4
 ## Commands
 
 - `larkup index [sources...]` loads sources and builds the index.
+- `larkup ai-model [list]` lists or configures embedding, chat, and vision models.
 - `larkup dev [name]` creates a workspace (default: `my-larkup`) and runs its local server.
 - `larkup documents` manages and exports corpus documents.
 - `larkup media [sources...]` processes image, audio, and video files.
