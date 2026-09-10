@@ -26,6 +26,22 @@ export function clearlyTitleMatchedMediaAsset<T extends RoutableMediaAsset>(
   return ranked[0].asset;
 }
 
+/**
+ * A prior clip is a useful conversational default only when it is the sole
+ * completed source or the new wording clearly repeats that clip's title.
+ * Otherwise retrieval must get a chance to select another indexed video.
+ */
+export function shouldKeepActiveMediaSource<T extends RoutableMediaAsset>(
+  query: string,
+  activeAsset: T,
+  availableAssets: readonly T[],
+) {
+  return (
+    availableAssets.length <= 1 ||
+    clearlyTitleMatchedMediaAsset(query, availableAssets)?.id === activeAsset.id
+  );
+}
+
 /** A conversational follow-up stays on its active source and skips global reranking. */
 export function activeMediaFollowUpResult(
   query: string,

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   extractConversationEvidence,
+  contextualizeKnowledgeFollowUpQuery,
   formatConversationEvidence,
   isImagePreviewFollowUp,
   isTabularFollowUp,
@@ -68,6 +69,62 @@ test('uses the completed search result when an earlier tool part is incomplete',
   expect(evidence.sources).toEqual([
     { title: 'Preferences', text: 'Favorite character: Kakashi Hatake.' },
   ]);
+});
+
+test('keeps an unmentioned event follow-up scoped to its immediately preceding source', () => {
+  const evidence = extractConversationEvidence([
+    {
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-searchKnowledgeBase',
+          output: {
+            hits: [
+              {
+                title: 'NVIDIA GTC AI Conference Berlin',
+                text: 'The event takes place in October 2026 and covers AI infrastructure.',
+              },
+            ],
+          },
+        },
+      ],
+    },
+  ]);
+
+  const retrievalQuery = contextualizeKnowledgeFollowUpQuery('What will it be about?', evidence);
+  expect(retrievalQuery).toContain('NVIDIA GTC AI Conference Berlin');
+  expect(retrievalQuery).toContain('AI infrastructure');
+});
+
+test('does not let a secondary video result replace the leading event topic', () => {
+  const evidence = extractConversationEvidence([
+    {
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-searchKnowledgeBase',
+          output: {
+            hits: [
+              {
+                title: 'NVIDIA GTC AI Conference Berlin',
+                text: 'The event is in October 2026.',
+              },
+              {
+                title: 'Football highlights',
+                text: 'Spain plays Argentina.',
+                metadata: { mediaAssetId: 'unrelated-video' },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  ]);
+
+  expect(evidence.mediaAssetIds).toEqual([]);
+  expect(contextualizeKnowledgeFollowUpQuery('What will it be about?', evidence)).toContain(
+    'NVIDIA GTC AI Conference Berlin',
+  );
 });
 
 test('reuses the table just shown for a misspelled comparative follow-up', () => {

@@ -29,6 +29,7 @@ import { gatewayProviderOptions } from '@/lib/chat/gateway-fallbacks';
 import { canReuseKnowledgeBaseEvidence, retrievalToolsForStep } from '@/lib/chat/retrieval-routing';
 import {
   extractConversationEvidence,
+  contextualizeKnowledgeFollowUpQuery,
   formatConversationEvidence,
   isImagePreviewFollowUp,
   isTabularFollowUp,
@@ -648,6 +649,10 @@ ${fieldLines}`;
     .join('\n\n');
   const userText = latestUserText(messagesToProcess);
   const reusableEvidence = extractConversationEvidence(evidenceMessages);
+  // This compact string is used by retrieval only, not appended to model
+  // history. It preserves the immediate topic while keeping the model context
+  // at the existing 20-message bound.
+  const contextualKnowledgeQuery = contextualizeKnowledgeFollowUpQuery(userText, reusableEvidence);
   const tabularQuestion = isLikelyTabularQuestion({
     text: userText,
     columnNames: tabularColumnNames,
@@ -703,6 +708,7 @@ ${fieldLines}`;
     docSessionId,
     config,
     requestText: userText,
+    contextualKnowledgeQuery,
     origin: new URL(req.url).origin,
     preferredMediaAssetId: continuesMediaTopic ? reusableEvidence.mediaAssetIds[0] : undefined,
   });

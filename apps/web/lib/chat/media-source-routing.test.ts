@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activeMediaFollowUpResult,
   clearlyTitleMatchedMediaAsset,
+  shouldKeepActiveMediaSource,
   type RoutableMediaAsset,
 } from './media-source-routing';
 
@@ -64,5 +65,33 @@ describe('media source routing', () => {
         asset('b', 'The weekly episode B'),
       ]),
     ).toBeUndefined();
+  });
+
+  it('identifies another explicit video instead of treating it as the active follow-up', () => {
+    expect(
+      clearlyTitleMatchedMediaAsset('what happened in the Spain semifinal', [
+        asset('final', 'Spain vs Argentina final highlights'),
+        asset('semi', 'France vs Spain semifinal highlights'),
+      ])?.id,
+    ).toBe('semi');
+  });
+
+  it('re-runs retrieval for another video or an ambiguous multi-video question', () => {
+    const final = asset('final', 'Spain vs Argentina final highlights');
+    const semifinal = asset('semi', 'France vs Spain semifinal highlights');
+
+    expect(
+      shouldKeepActiveMediaSource('what happened in the Spain semifinal', final, [
+        final,
+        semifinal,
+      ]),
+    ).toBe(false);
+    expect(shouldKeepActiveMediaSource('who won?', final, [final, semifinal])).toBe(false);
+    expect(
+      shouldKeepActiveMediaSource('what happened in the Argentina final', final, [
+        final,
+        semifinal,
+      ]),
+    ).toBe(true);
   });
 });
