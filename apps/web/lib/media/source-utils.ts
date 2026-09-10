@@ -105,6 +105,7 @@ export function inspectYouTubeMetadata(url: string, data: YouTubeInspectionData)
 
 export interface MediaProbe {
   durationSecs: number;
+  hasAudio: boolean;
   hasCorruptionSignals: boolean;
 }
 
@@ -193,17 +194,19 @@ export async function probeMedia(mediaPath: string): Promise<MediaProbe> {
     '-v',
     'error',
     '-show_entries',
-    'format=duration:format_tags=probe_score',
+    'format=duration:format_tags=probe_score:stream=codec_type',
     '-of',
     'json',
     mediaPath,
   ]);
   const data = JSON.parse(output) as {
     format?: { duration?: string; tags?: { probe_score?: string } };
+    streams?: Array<{ codec_type?: string }>;
   };
   const durationSecs = Number(data.format?.duration ?? 0);
   return {
     durationSecs: Number.isFinite(durationSecs) ? Math.max(0, durationSecs) : 0,
+    hasAudio: data.streams?.some((stream) => stream.codec_type === 'audio') ?? false,
     hasCorruptionSignals: !Number.isFinite(durationSecs) || durationSecs <= 0,
   };
 }
@@ -295,7 +298,7 @@ export async function importMediaUrl(
         '2',
         '--newline',
         '--format',
-        'best[height<=360]/bestvideo[height<=360]+bestaudio/best',
+        youtubeDownloadFormat(),
         '--merge-output-format',
         'mp4',
         '-o',
@@ -412,6 +415,22 @@ export async function importMediaUrl(
       mediaType: mediaTypeFromMime(mimeType),
     },
   ];
+}
+
+/**
+ * Prefer a browser-safe H.264 MP4 video plus M4A audio stream. `best` can
+ * otherwise select an adaptive video-only representation on some YouTube
+ * responses, leaving the browser with a volume control but no audio track.
+ * The combined-format fallbacks keep older and audio-less public videos usable.
+ */
+export function youtubeDownloadFormat() {
+  return [
+    'bestvideo*[height<=360][ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]',
+    'best[height<=360][ext=mp4][vcodec!=none][acodec!=none]',
+    'bestvideo*[height<=360]+bestaudio',
+    'best[height<=360][vcodec!=none][acodec!=none]',
+    'best',
+  ].join('/');
 }
 
 /**

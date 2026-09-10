@@ -319,6 +319,8 @@ async function enqueueMediaProcessing(
 
               const firstEntry = entries[0];
               const mimeType = firstEntry.mimeType || 'application/octet-stream';
+              const downloadedProbe =
+                firstEntry.mediaType === 'video' ? await probeMedia(firstEntry.path) : undefined;
               const ext = path.extname(firstEntry.path).slice(1) || 'mp4';
               const key = `videos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
               const storedFirstEntry = await storeDownloadedFile(firstEntry.path, key, mimeType);
@@ -327,6 +329,9 @@ async function enqueueMediaProcessing(
                 (await updateMediaAsset(currentAsset.id, {
                   fileName: firstEntry.title || path.basename(firstEntry.path),
                   mimeType,
+                  ...(downloadedProbe?.durationSecs
+                    ? { durationSecs: downloadedProbe.durationSecs }
+                    : {}),
                   ...storedFirstEntry,
                 })) || currentAsset;
               await reportStage('download', {
@@ -342,6 +347,8 @@ async function enqueueMediaProcessing(
                 for (let i = 1; i < entries.length; i++) {
                   const entry = entries[i];
                   const entryMime = entry.mimeType || 'application/octet-stream';
+                  const entryProbe =
+                    entry.mediaType === 'video' ? await probeMedia(entry.path) : undefined;
                   const entryExt = path.extname(entry.path).slice(1) || 'mp4';
                   const entryKey = `videos/${Date.now()}_${Math.random()
                     .toString(36)
@@ -351,6 +358,7 @@ async function enqueueMediaProcessing(
                     type: currentAsset.type,
                     fileName: entry.title || path.basename(entry.path),
                     mimeType: entryMime,
+                    ...(entryProbe?.durationSecs ? { durationSecs: entryProbe.durationSecs } : {}),
                     ...storedEntry,
                     originalUrl: entry.originalUrl || currentAsset.originalUrl,
                   });
@@ -1389,10 +1397,10 @@ async function processWithInstalledVideoIntelligence(
       );
     }
     knowledgeRun = await beginVideoKnowledgeRun({
-      asset,
+      asset: assetForCloud,
       mediaPath,
-      durationSecs: evidence.durationMs / 1_000,
-      maxDurationSecs: Math.max(1, evidence.durationMs / 1_000),
+      durationSecs: assetForCloud.durationSecs ?? evidence.durationMs / 1_000,
+      maxDurationSecs: Math.max(1, assetForCloud.durationSecs ?? evidence.durationMs / 1_000),
       maxFrames: Math.max(1, evidence.visualObservations.length),
     });
     await reportStage('extract', {
@@ -1422,7 +1430,7 @@ async function processWithInstalledVideoIntelligence(
       mediaType: 'video',
       localUrl: `/api/media/${asset.id}`,
       originalUrl: asset.originalUrl,
-      durationSecs: evidence.durationMs / 1_000,
+      durationSecs: assetForCloud.durationSecs ?? evidence.durationMs / 1_000,
       summary,
       segments,
       fileName: asset.fileName,
@@ -1510,7 +1518,9 @@ async function processWithInstalledVideoIntelligence(
       processingProgress: 100,
       processingMessage: undefined,
       caption: summary.slice(0, 600),
-      durationSecs: preserveDurationSecs(asset, evidence.durationMs / 1_000),
+      // The downloaded/uploaded container is the playback timeline. Do not
+      // let a stale browser estimate or an upstream worker report stretch it.
+      durationSecs: assetForCloud.durationSecs ?? evidence.durationMs / 1_000,
       dimensions: { width: evidence.video.width, height: evidence.video.height },
       documentIds,
       pendingDocumentIds: [],
@@ -1566,20 +1576,25 @@ async function ensureCloudVideoDuration(
   mediaPath: string,
   reportStage: StageReporter,
 ): Promise<MediaAsset> {
-  if (Number.isFinite(asset.durationSecs) && (asset.durationSecs ?? 0) > 0) return asset;
-
   await reportStage('extract', {
     status: 'running',
     percent: 1,
     message: 'Reading video metadata for cloud quota reservation...',
   });
-  const probe = await probeMedia(mediaPath);
-  const durationSecs = Math.round(probe.durationSecs * 1_000) / 1_000;
-  if (!Number.isFinite(durationSecs) || durationSecs <= 0) {
-    throw new Error('Could not read the video duration needed for cloud quota reservation.');
+  try {
+    const probe = await probeMedia(mediaPath);
+    const durationSecs = Math.round(probe.durationSecs * 1_000) / 1_000;
+    if (!Number.isFinite(durationSecs) || durationSecs <= 0) {
+      throw new Error('Could not read the video duration needed for cloud quota reservation.');
+    }
+    // Browser metadata and an earlier worker result are advisory. The source
+    // bytes are the only timeline the player and the evidence worker share.
+    if (asset.durationSecs !== durationSecs) await updateMediaAsset(asset.id, { durationSecs });
+    return { ...asset, durationSecs };
+  } catch (error) {
+    if (Number.isFinite(asset.durationSecs) && (asset.durationSecs ?? 0) > 0) return asset;
+    throw error;
   }
-  await updateMediaAsset(asset.id, { durationSecs });
-  return { ...asset, durationSecs };
 }
 
 async function fingerprintMediaFile(mediaPath: string): Promise<string> {

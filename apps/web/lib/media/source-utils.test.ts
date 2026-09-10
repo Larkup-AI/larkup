@@ -7,6 +7,7 @@ import {
   inspectYouTubeMetadata,
   parseYtDlpProgress,
   resolveYtDlpMediaPath,
+  youtubeDownloadFormat,
 } from './source-utils';
 
 const temporaryDirectories: string[] = [];
@@ -74,6 +75,16 @@ describe('parseYtDlpProgress', () => {
 
   it('ignores downloader log lines that contain no measured progress', () => {
     expect(parseYtDlpProgress('[youtube] Extracting URL')).toBeNull();
+  });
+});
+
+describe('youtubeDownloadFormat', () => {
+  it('prefers a muxable MP4 video and M4A audio pair before combined fallbacks', () => {
+    const [preferred, combinedFallback] = youtubeDownloadFormat().split('/');
+    expect(preferred).toContain('bestvideo*');
+    expect(preferred).toContain('[vcodec^=avc]');
+    expect(preferred).toContain('+bestaudio[ext=m4a]');
+    expect(combinedFallback).toContain('acodec!=none');
   });
 });
 
