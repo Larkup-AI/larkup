@@ -1,5 +1,11 @@
 # @larkup/cli
 
+## 0.3.0
+
+### Minor Changes
+
+- 3e51f64: Add folder filters, PDF and Word ingestion, progress bars, and AI model commands to the CLI.
+
 ## 0.2.32
 
 ### Patch Changes

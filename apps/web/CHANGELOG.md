@@ -1,5 +1,18 @@
 # larkup
 
+## 0.3.0
+
+### Minor Changes
+
+- 61cd050: Add a Files-tab URL importer for public PDF, Word, spreadsheet, JSON, and text files, including GitHub and Hugging Face share-link support.
+
+### Patch Changes
+
+- ceb12a5: Prepare an isolated local Python environment automatically for analysis tools, without exposing automatic sandbox readiness or dependency status in Settings.
+- Updated dependencies [ceb12a5]
+  - @larkup/sandbox@0.1.6
+  - @larkup/tool-doc-editor@0.2.22
+
 ## 0.2.16
 
 ### Patch Changes
