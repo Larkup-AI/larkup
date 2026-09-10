@@ -1,5 +1,11 @@
 # @larkup/sandbox
 
+## 0.1.6
+
+### Patch Changes
+
+- ceb12a5: Prepare an isolated local Python environment automatically for analysis tools, without exposing automatic sandbox readiness or dependency status in Settings.
+
 ## 0.1.5
 
 ### Patch Changes
