@@ -13,6 +13,8 @@ import {
   Database,
   Image as ImageIcon,
   AlertTriangle,
+  Link2,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +44,8 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-const ACCEPT = '.txt,.md,.markdown,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx';
+const ACCEPT = '.txt,.md,.markdown,.toml,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx';
+const CONTENT_PREVIEW_LIMIT = 100_000;
 
 type FileFormat = 'plain' | 'lines' | 'structured';
 
@@ -68,6 +71,8 @@ interface StagedFile {
   indexImages?: boolean;
   /** The original file object for client-side processing */
   fileObject?: File;
+  /** The public URL used to import this file, retained as source metadata. */
+  sourceUrl?: string;
 }
 
 interface ImageIndexingCapability {
@@ -163,6 +168,9 @@ export function UploadPanel({
     );
   }, [imageIndexingCapability]);
   const [dragging, setDragging] = useState(false);
+  const [entryTab, setEntryTab] = useState<'upload' | 'url'>('upload');
+  const [remoteUrl, setRemoteUrl] = useState('');
+  const [loadingRemoteFile, setLoadingRemoteFile] = useState(false);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<{
     message?: string;
@@ -172,16 +180,21 @@ export function UploadPanel({
 
   // Mapping state
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
+  const [previewingFileId, setPreviewingFileId] = useState<string | null>(null);
   const editingFile = staged.find((f) => f.id === editingFileId);
+  const previewingFile = staged.find((f) => f.id === previewingFileId);
+  const shouldLoadRemoteFile = entryTab === 'url' && remoteUrl.trim().length > 0;
 
-  async function readFiles(files: FileList | File[]) {
+  async function readFiles(files: FileList | File[], sourceUrl?: string) {
     const joinedActiveSave = savingRef.current;
     const next: StagedFile[] = [];
+    const stage = (file: StagedFile) => next.push({ ...file, sourceUrl });
     for (const file of Array.from(files)) {
       const ext = file.name.split('.').pop()?.toLowerCase();
 
       // Prevent dragging media into the documents tab
-      if (ext && !ACCEPT.includes(`.${ext}`)) {
+      const isRemotePlainText = Boolean(sourceUrl && file.type.startsWith('text/'));
+      if (ext && !ACCEPT.includes(`.${ext}`) && !isRemotePlainText) {
         toast.error(
           `Unsupported file type: ${file.name}. Please upload media files in the Media tab.`,
         );
@@ -198,7 +211,7 @@ export function UploadPanel({
           });
           if (result.data.length > 0) {
             const keys = Object.keys(result.data[0] as object);
-            next.push({
+            stage({
               id,
               name: file.name,
               size: file.size,
@@ -233,7 +246,7 @@ export function UploadPanel({
             });
             if (rows.length === 0) continue;
             const keys = Object.keys(rows[0] as object);
-            next.push({
+            stage({
               id: `${id}-${indexedSheets}`,
               name: hasMultipleSheets ? `${file.name} — ${sheetName}` : file.name,
               size: file.size,
@@ -258,7 +271,7 @@ export function UploadPanel({
             const parsed = JSON.parse(content);
             if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object') {
               const keys = Object.keys(parsed[0]);
-              next.push({
+              stage({
                 id,
                 name: file.name,
                 size: file.size,
@@ -273,7 +286,7 @@ export function UploadPanel({
                 indexAsTabular: true,
               });
             } else {
-              next.push({
+              stage({
                 id,
                 name: file.name,
                 size: file.size,
@@ -282,7 +295,7 @@ export function UploadPanel({
               });
             }
           } catch {
-            next.push({
+            stage({
               id,
               name: file.name,
               size: file.size,
@@ -310,7 +323,7 @@ export function UploadPanel({
               'This PDF does not contain selectable text. Try another copy of the file.',
             );
           }
-          next.push({
+          stage({
             id,
             name: file.name,
             size: file.size,
@@ -321,7 +334,7 @@ export function UploadPanel({
           });
         } else {
           const content = await file.text();
-          next.push({
+          stage({
             id,
             name: file.name,
             size: file.size,
@@ -337,6 +350,48 @@ export function UploadPanel({
     if (joinedActiveSave && next.length > 0) {
       toast.message(`${next.length} file${next.length === 1 ? '' : 's'} added to the queue`);
       window.setTimeout(() => void ingest(), 0);
+    }
+  }
+
+  async function loadRemoteFile() {
+    const requestedUrl = remoteUrl.trim();
+    if (!requestedUrl) {
+      toast.error('Paste a public link to a file first.');
+      return;
+    }
+
+    setLoadingRemoteFile(true);
+    try {
+      const response = await fetch('/api/files/remote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: requestedUrl }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Could not load this remote file.');
+      }
+
+      const fileName = decodeURIComponent(
+        response.headers.get('X-Larkup-File-Name') || 'remote-file',
+      );
+      const sourceUrl = decodeURIComponent(
+        response.headers.get('X-Larkup-Source-Url') || requestedUrl,
+      );
+      const bytes = await response.arrayBuffer();
+      if (!bytes.byteLength) throw new Error('This remote file is empty.');
+
+      await readFiles(
+        [new File([bytes], fileName, { type: response.headers.get('content-type') || '' })],
+        sourceUrl,
+      );
+      setRemoteUrl('');
+      setEntryTab('upload');
+      toast.success(`Loaded ${fileName}. Review it below, then save it to your corpus.`);
+    } catch (error) {
+      toast.error(formatErrorMessage(error));
+    } finally {
+      setLoadingRemoteFile(false);
     }
   }
 
@@ -500,9 +555,10 @@ export function UploadPanel({
             title: f.name,
             content: contentStr,
             source: 'files',
-            url: fileUrl,
-            metadata:
-              uploadedImages.length > 0
+            url: fileUrl ?? f.sourceUrl,
+            metadata: {
+              ...(f.sourceUrl ? { originalUrl: f.sourceUrl } : {}),
+              ...(uploadedImages.length > 0
                 ? {
                     images: uploadedImages.map((img) => ({
                       imageUrl: img.imageUrl,
@@ -511,7 +567,8 @@ export function UploadPanel({
                       description: img.description,
                     })),
                   }
-                : undefined,
+                : {}),
+            },
           });
         }
       } else if (f.format === 'lines' && f.rawContent) {
@@ -519,7 +576,11 @@ export function UploadPanel({
           title: f.name,
           content: f.rawContent,
           source: 'files',
-          metadata: { fileName: f.name, format: 'lines' },
+          metadata: {
+            fileName: f.name,
+            format: 'lines',
+            ...(f.sourceUrl ? { originalUrl: f.sourceUrl } : {}),
+          },
         });
       } else if (f.format === 'structured' && f.rows) {
         const rows = f.rows
@@ -530,7 +591,11 @@ export function UploadPanel({
             return fields.join(f.contentSeparator || ' | ');
           })
           .filter(Boolean);
-        const metadata: Record<string, unknown> = { fileName: f.name, rowCount: f.rows.length };
+        const metadata: Record<string, unknown> = {
+          fileName: f.name,
+          rowCount: f.rows.length,
+          ...(f.sourceUrl ? { originalUrl: f.sourceUrl } : {}),
+        };
         for (const item of f.globalMetadata ?? []) {
           if (item.key.trim()) metadata[item.key.trim()] = item.value;
         }
@@ -591,19 +656,25 @@ export function UploadPanel({
 
   useEffect(() => {
     onActionChange?.({
-      label: saving
-        ? 'Add more files'
-        : staged.length === 0
-          ? 'Save to corpus'
-          : staged.length === 1
-            ? 'Save 1 file'
-            : `Save ${staged.length} files`,
-      onClick: saving ? () => inputRef.current?.click() : ingest,
-      disabled: !saving && staged.length === 0,
-      loading: false,
+      label: shouldLoadRemoteFile
+        ? 'Load remote file'
+        : saving
+          ? 'Add more files'
+          : staged.length === 0
+            ? 'Save to corpus'
+            : staged.length === 1
+              ? 'Save 1 file'
+              : `Save ${staged.length} files`,
+      onClick: shouldLoadRemoteFile
+        ? () => void loadRemoteFile()
+        : saving
+          ? () => inputRef.current?.click()
+          : ingest,
+      disabled: shouldLoadRemoteFile ? false : !saving && staged.length === 0,
+      loading: shouldLoadRemoteFile ? loadingRemoteFile : false,
     });
     return () => onActionChange?.(null);
-  }, [staged, saving, onActionChange]);
+  }, [entryTab, staged, saving, remoteUrl, loadingRemoteFile, onActionChange]);
 
   function updateEditingFile(patch: Partial<StagedFile>) {
     setStaged((prev) => prev.map((f) => (f.id === editingFileId ? { ...f, ...patch } : f)));
@@ -611,30 +682,92 @@ export function UploadPanel({
 
   return (
     <div className="space-y-4 cursor-pointer">
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          if (e.dataTransfer.files?.length) readFiles(e.dataTransfer.files);
-        }}
-        className={cn(
-          'flex w-full flex-col cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-6 py-10 text-center transition-colors hover:bg-muted/70',
-          dragging && 'border-primary bg-accent',
-        )}
-      >
-        <FileUp className="size-6 text-muted-foreground" />
-        <span className="text-sm font-medium">Drop files here or click to browse</span>
-        <span className="text-xs text-muted-foreground">
-          Text, JSON, CSV, Excel, PDF, and Word files
-        </span>
-      </button>
+      <div className="flex w-fit items-center gap-1 rounded-lg border border-border/90 bg-muted/60 p-1">
+        {[
+          { id: 'upload' as const, label: 'Upload', icon: FileUp },
+          { id: 'url' as const, label: 'From URL', icon: Link2 },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const active = entryTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setEntryTab(tab.id)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-all',
+                active
+                  ? 'bg-background text-foreground ring-1 ring-border'
+                  : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground',
+              )}
+            >
+              <Icon className="size-3.5" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {entryTab === 'upload' ? (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (e.dataTransfer.files?.length) readFiles(e.dataTransfer.files);
+          }}
+          className={cn(
+            'flex w-full flex-col cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-6 py-10 text-center transition-colors hover:bg-muted/70',
+            dragging && 'border-primary bg-accent',
+          )}
+        >
+          <FileUp className="size-6 text-muted-foreground" />
+          <span className="text-sm font-medium">Drop files here or click to browse</span>
+          <span className="text-xs text-muted-foreground">
+            Text, JSON, CSV, Excel, PDF, and Word files
+          </span>
+        </button>
+      ) : (
+        <div className="space-y-1">
+          <Input
+            aria-label="Remote file URL"
+            type="url"
+            value={remoteUrl}
+            onChange={(event) => setRemoteUrl(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void loadRemoteFile();
+            }}
+            placeholder="https://example.com/my-report.pdf"
+            disabled={loadingRemoteFile}
+            className="bg-white"
+          />
+          <p className="text-[11px] pl-1 leading-relaxed text-muted-foreground">
+            Paste a public file URL, GitHub file link, or Hugging Face file link. PDF, Word, CSV,
+            JSON, Excel, and text files up to 50 MB are supported.
+          </p>
+          {!onActionChange && (
+            <Button
+              type="button"
+              onClick={() => void loadRemoteFile()}
+              disabled={!remoteUrl.trim() || loadingRemoteFile}
+            >
+              {loadingRemoteFile ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Link2 className="size-4" />
+              )}
+              Load remote file
+            </Button>
+          )}
+        </div>
+      )}
       <input
         ref={inputRef}
         type="file"
@@ -648,7 +781,7 @@ export function UploadPanel({
       />
 
       {staged.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2 pb-5">
           {staged.some((file) => file.name.toLowerCase().endsWith('.pdf')) &&
             imageIndexingCapability &&
             !imageIndexingAvailable && (
@@ -661,11 +794,11 @@ export function UploadPanel({
                 </AlertDescription>
               </Alert>
             )}
-          <div className="flex items-center justify-between px-1">
+          <div className="flex items-center justify-between px-1 ">
             <span className="text-[13px] font-medium text-foreground">
               {staged.length} file{staged.length !== 1 ? 's' : ''} staged
             </span>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4  mt-5">
               {staged.some((f) => f.name.toLowerCase().endsWith('.pdf')) && (
                 <div className="flex items-center gap-1.5">
                   <Switch
@@ -702,7 +835,7 @@ export function UploadPanel({
               </button>
             </div>
           </div>
-          <ul className="space-y-1.5 max-h-87.5 overflow-y-auto pr-1">
+          <ul className="space-y-1.5">
             {staged.map((f) => (
               <li
                 key={f.id}
@@ -720,6 +853,14 @@ export function UploadPanel({
                       {f.format === 'structured' && ` • ${f.rows?.length} ROWS`}
                       {f.indexAsTabular && ' • TABULAR'}
                     </span>
+                    {f.sourceUrl && (
+                      <span
+                        className="truncate text-[10px] text-muted-foreground"
+                        title={f.sourceUrl}
+                      >
+                        Imported from {new URL(f.sourceUrl).hostname.replace(/^www\./, '')}
+                      </span>
+                    )}
                   </div>
                   <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                     {(f.size / 1024).toFixed(1)} KB
@@ -793,6 +934,17 @@ export function UploadPanel({
                         </Tooltip>
                       </TooltipProvider>
                     )}
+                    {f.rawContent && (
+                      <button
+                        type="button"
+                        aria-label={`Preview ${f.name}`}
+                        title="Preview extracted content"
+                        onClick={() => setPreviewingFileId(f.id)}
+                        className="rounded-md border bg-secondary p-1.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                      >
+                        <Eye className="size-3.5" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       aria-label={`Configure ${f.name}`}
@@ -837,13 +989,28 @@ export function UploadPanel({
       )}
 
       {!onActionChange && (
-        <Button onClick={ingest} disabled={saving || staged.length === 0}>
-          {saving ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4" />}
-          {saving && progress
-            ? `Adding ${progress.current} of ${progress.total}`
-            : `Add ${staged.length > 0 ? staged.length : ''} file${
-                staged.length === 1 ? '' : 's'
-              } to corpus`}
+        <Button
+          onClick={shouldLoadRemoteFile ? () => void loadRemoteFile() : ingest}
+          disabled={shouldLoadRemoteFile ? loadingRemoteFile : saving || staged.length === 0}
+        >
+          {shouldLoadRemoteFile ? (
+            loadingRemoteFile ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Link2 className="size-4" />
+            )
+          ) : saving ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <FileUp className="size-4" />
+          )}
+          {shouldLoadRemoteFile
+            ? 'Load remote file'
+            : saving && progress
+              ? `Adding ${progress.current} of ${progress.total}`
+              : `Add ${staged.length > 0 ? staged.length : ''} file${
+                  staged.length === 1 ? '' : 's'
+                } to corpus`}
         </Button>
       )}
 
@@ -1136,6 +1303,24 @@ export function UploadPanel({
           <DialogFooter className="pb-2! bg-muted ">
             <Button onClick={() => setEditingFileId(null)}>Done</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!previewingFile} onOpenChange={(open) => !open && setPreviewingFileId(null)}>
+        <DialogContent className="max-w-7xl! ">
+          <DialogHeader>
+            <DialogTitle className="truncate">Preview: {previewingFile?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[65vh] overflow-auto rounded-md border bg-muted/30">
+            <pre className="min-w-max p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-break-word">
+              {previewingFile?.rawContent?.slice(0, CONTENT_PREVIEW_LIMIT)}
+            </pre>
+          </div>
+          {(previewingFile?.rawContent?.length ?? 0) > CONTENT_PREVIEW_LIMIT && (
+            <p className="text-xs text-muted-foreground">
+              Preview is limited to the first {CONTENT_PREVIEW_LIMIT.toLocaleString()} characters.
+            </p>
+          )}
         </DialogContent>
       </Dialog>
     </div>
