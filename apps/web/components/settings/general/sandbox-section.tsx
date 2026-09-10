@@ -2,16 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
-import {
-  Loader2,
-  Save,
-  Eye,
-  EyeOff,
-  AlertTriangle,
-  ExternalLink,
-  CircleAlert,
-  CircleCheck,
-} from 'lucide-react';
+import { Loader2, Save, Eye, EyeOff, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,7 +29,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import Image from 'next/image';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
-type SandboxStatus = { provider: SandboxBackend; status: 'ready' | 'unavailable'; message: string };
 const localSandbox = { label: 'Local Sandbox' };
 const defaultLocalSandboxIcon = '/icons/linux.png';
 let cachedLocalSandboxIcon: string | undefined;
@@ -52,8 +42,8 @@ function getLocalSandboxIcon() {
   cachedLocalSandboxIcon = /windows/i.test(platform)
     ? '/icons/windows.png'
     : /mac|iphone|ipad|ipod/i.test(platform)
-    ? '/icons/mac.png'
-    : defaultLocalSandboxIcon;
+      ? '/icons/mac.png'
+      : defaultLocalSandboxIcon;
   return cachedLocalSandboxIcon;
 }
 
@@ -67,21 +57,12 @@ export function SandboxSection({
   children?: React.ReactNode;
 }) {
   const { data, isLoading, mutate } = useSWR('/api/config', fetcher);
-  const { data: sandboxStatus, mutate: mutateSandboxStatus } = useSWR<SandboxStatus>(
-    '/api/sandbox/verify',
-    (url) => fetch(url).then((r) => r.json()),
-    { revalidateOnFocus: false },
-  );
   const [form, setForm] = useState<Partial<RagConfig>>({});
   const [provider, setProvider] = useState<SandboxBackend>('local');
   const [localSandboxIcon, setLocalSandboxIcon] = useState(defaultLocalSandboxIcon);
   const [saving, setSaving] = useState(false);
   const [showSecrets, setShowSecrets] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [verifyStatus, setVerifyStatus] = useState<{
-    status: 'success' | 'error' | null;
-    message?: string;
-  }>({ status: null });
   const migratedLegacyDocker = useRef(false);
 
   useEffect(() => {
@@ -100,31 +81,34 @@ export function SandboxSection({
   useEffect(() => {
     if (
       migratedLegacyDocker.current ||
-      data?.config.defaultSandboxProvider !== 'docker' ||
-      sandboxStatus?.provider !== 'docker' ||
-      sandboxStatus.status === 'ready'
+      !data?.config ||
+      data.config.defaultSandboxProvider !== 'docker'
     ) {
       return;
     }
-    migratedLegacyDocker.current = true;
-    void fetch('/api/config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data.config, defaultSandboxProvider: 'local' }),
-    })
-      .then(async (response) => {
+    // Keep a one-time compatibility migration for old Docker defaults, but do
+    // not surface any automatic sandbox health messages in Settings.
+    void fetch('/api/sandbox/verify')
+      .then((response) => response.json() as Promise<{ provider?: string; status?: string }>)
+      .then(async (status) => {
+        if (status.provider !== 'docker' || status.status === 'ready') return;
+        migratedLegacyDocker.current = true;
+        const response = await fetch('/api/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...data.config, defaultSandboxProvider: 'local' }),
+        });
         if (!response.ok) return;
         const json = (await response.json()) as { config: RagConfig };
         setForm(json.config);
         setProvider('local');
         onProviderChange?.('local');
         await mutate(json, { revalidate: false });
-        await mutateSandboxStatus();
       })
       .catch(() => {
         migratedLegacyDocker.current = false;
       });
-  }, [data, mutate, mutateSandboxStatus, onProviderChange, sandboxStatus]);
+  }, [data, mutate, onProviderChange]);
 
   const descriptor = getSandboxProvider(provider);
   const values = form.sandboxProviderConfigs?.[provider] ?? {};
@@ -135,7 +119,6 @@ export function SandboxSection({
       JSON.stringify(data?.config?.sandboxProviderConfigs?.[provider] ?? {});
 
   function setFieldValue(key: string, value: string) {
-    setVerifyStatus({ status: null });
     setForm((prev) => ({
       ...prev,
       sandboxProviderConfigs: {
@@ -147,7 +130,6 @@ export function SandboxSection({
 
   async function verifySandbox(showSuccessToast: boolean) {
     setVerifying(true);
-    setVerifyStatus({ status: null });
     try {
       const res = await fetch('/api/sandbox/verify', {
         method: 'POST',
@@ -157,8 +139,6 @@ export function SandboxSection({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Verification failed');
 
-      setVerifyStatus({ status: 'success' });
-      await mutateSandboxStatus();
       if (showSuccessToast) {
         toast.success(
           `${
@@ -170,7 +150,6 @@ export function SandboxSection({
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Verification failed';
-      setVerifyStatus({ status: 'error', message: msg });
       toast.error(msg, { position: 'top-right' });
       return false;
     } finally {
@@ -181,7 +160,9 @@ export function SandboxSection({
   async function handleSave() {
     setSaving(true);
     try {
-      if (!(await verifySandbox(false))) return;
+      // Local Python is provisioned lazily in Larkup's own isolated runtime.
+      // It must never depend on packages installed on the host or block saving.
+      if (provider !== 'local' && !(await verifySandbox(false))) return;
 
       const payload: RagConfig = {
         ...(data?.config as RagConfig),
@@ -198,7 +179,6 @@ export function SandboxSection({
 
       setForm((prev) => ({ ...prev, ...json.config }));
       await mutate(json, { revalidate: false });
-      await mutateSandboxStatus();
       toast.success('Sandbox settings saved');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save');
@@ -228,39 +208,6 @@ export function SandboxSection({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {(() => {
-          const isCurrent = sandboxStatus?.provider === provider;
-          const isReady = sandboxStatus?.status === 'ready';
-          return (
-            <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs">
-              {isReady ? (
-                <CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-              ) : (
-                <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
-              )}
-              <div>
-                <p className="font-medium">
-                  {isCurrent
-                    ? isReady
-                      ? 'Current sandbox is ready'
-                      : 'Current sandbox needs attention'
-                    : 'Save to select this sandbox'}
-                </p>
-                <p className="mt-0.5 text-muted-foreground">
-                  {isCurrent
-                    ? sandboxStatus.message
-                    : `${
-                        provider === 'local'
-                          ? localSandbox.label
-                          : provider === 'docker'
-                          ? 'Local Docker'
-                          : descriptor?.label ?? provider
-                      } is not active yet.`}
-                </p>
-              </div>
-            </div>
-          );
-        })()}
         <div className="space-y-1.5">
           <Label className="text-xs">Provider</Label>
           <Select
@@ -269,7 +216,6 @@ export function SandboxSection({
               const p = value as SandboxBackend;
               setProvider(p);
               onProviderChange?.(p);
-              setVerifyStatus({ status: null });
             }}
           >
             <SelectTrigger className="w-full">
@@ -287,8 +233,8 @@ export function SandboxSection({
                     value === 'local'
                       ? localSandbox.label
                       : value === 'docker'
-                      ? 'Local Docker'
-                      : descriptor?.label ?? value
+                        ? 'Local Docker'
+                        : (descriptor?.label ?? value)
                   }
                 </SelectValue>
               </div>
@@ -394,20 +340,15 @@ export function SandboxSection({
           </div>
         )}
 
-        {verifyStatus.status === 'success' && (
-          <p className="text-[11px] font-medium text-green-600">✓ Credentials verified</p>
-        )}
-        {verifyStatus.status === 'error' && (
-          <p className="text-[11px] font-medium text-red-500">{verifyStatus.message}</p>
-        )}
-
         {children}
       </CardContent>
       <CardFooter className="flex justify-end gap-2 border-t pt-4">
-        <Button variant="outline" size="lg" onClick={handleVerify} disabled={verifying}>
-          {verifying ? <Loader2 className="size-3.5 animate-spin" /> : null}
-          Verify
-        </Button>
+        {provider !== 'local' && (
+          <Button variant="outline" size="lg" onClick={handleVerify} disabled={verifying}>
+            {verifying ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            Verify
+          </Button>
+        )}
         <Button
           size="lg"
           disabled={saving || verifying || !dirty}

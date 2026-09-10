@@ -26,24 +26,35 @@ test.describe('Assistant customization', () => {
   });
 
   test('uses the local sandbox without Docker by default', async ({ page }) => {
-    await page.route('**/api/sandbox/verify', async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({
-          contentType: 'application/json',
-          body: JSON.stringify({
-            provider: 'local',
-            status: 'ready',
-            message: 'Ready for code execution.',
-          }),
-        });
-        return;
-      }
-      await route.continue();
+    await page.route('**/api/projects', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          activeProjectId: 'sandbox-settings-test',
+          projects: [
+            {
+              id: 'sandbox-settings-test',
+              name: 'Sandbox settings test',
+              port: 4567,
+              createdAt: '2026-01-01T00:00:00.000Z',
+              updatedAt: '2026-01-01T00:00:00.000Z',
+              sourceCount: 0,
+              indexed: false,
+              running: false,
+              endpoint: 'http://localhost:4567',
+            },
+          ],
+        }),
+      });
     });
     await page.goto('/settings?section=agent-customization');
     await page.getByRole('button', { name: 'Sandbox', exact: true }).click();
-    await expect(page.getByText('Current sandbox is ready', { exact: true })).toBeVisible();
     await expect(page.getByText('Local Sandbox', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Current sandbox is ready', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Current sandbox needs attention', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Verify', exact: true })).toHaveCount(0);
+    await expect(page.getByText(/No Docker or credentials needed/i)).toBeVisible();
   });
 
   test('does not save sandbox settings when verification fails', async ({ page }) => {
@@ -70,8 +81,6 @@ test.describe('Assistant customization', () => {
     await page.getByText('E2B', { exact: true }).click();
     await page.getByRole('button', { name: 'Save sandbox settings', exact: true }).click();
 
-    // The inline error and the toast carry the same copy.
-    await expect(page.getByText('Invalid API key', { exact: true }).first()).toBeVisible();
     expect(configSaveAttempted).toBe(false);
   });
 

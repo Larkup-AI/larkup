@@ -20,13 +20,13 @@ describe('executeLocally', () => {
     ]);
   });
 
-  it('does not mark a bare Python installation as analysis-ready', async () => {
+  it('accepts a Python installation that can bootstrap the managed analysis environment', async () => {
     const health = await checkLocalRuntime();
     expect(health.backend).toBe('local');
     if (health.status === 'ready') {
       expect(health.error).toBeUndefined();
     } else {
-      expect(health.error).toMatch(/Python|analysis dependenc/i);
+      expect(health.error).toMatch(/Python|virtual-environment/i);
     }
   });
 });

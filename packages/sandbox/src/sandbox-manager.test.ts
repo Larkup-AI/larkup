@@ -8,6 +8,7 @@ const dockerRunner = vi.hoisted(() => ({
 const localRunner = vi.hoisted(() => ({
   checkLocalRuntime: vi.fn(),
   executeLocally: vi.fn(),
+  setupLocalRuntime: vi.fn(),
 }));
 
 vi.mock('./docker-runner.js', () => ({
@@ -23,6 +24,7 @@ vi.mock('./providers/index.js', () => ({
 vi.mock('./local-runner.js', () => ({
   checkLocalRuntime: localRunner.checkLocalRuntime,
   executeLocally: localRunner.executeLocally,
+  setupLocalRuntime: localRunner.setupLocalRuntime,
 }));
 
 import { SandboxManager } from './sandbox-manager.js';
@@ -70,5 +72,15 @@ describe('SandboxManager', () => {
     expect(result.exitCode).toBe(0);
     expect(localRunner.executeLocally).toHaveBeenCalledOnce();
     expect(dockerRunner.checkDockerHealth).not.toHaveBeenCalled();
+  });
+
+  it('provisions the managed local runtime when setup is requested', async () => {
+    const progress = vi.fn();
+
+    await new SandboxManager({ backend: 'local' }).setup(progress);
+
+    expect(localRunner.setupLocalRuntime).toHaveBeenCalledOnce();
+    expect(progress).toHaveBeenNthCalledWith(1, 'Preparing Larkup local analysis environment…');
+    expect(progress).toHaveBeenLastCalledWith('Local analysis environment is ready ✓');
   });
 });
