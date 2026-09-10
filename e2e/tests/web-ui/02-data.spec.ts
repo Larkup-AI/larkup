@@ -51,6 +51,45 @@ test.describe.serial('Data Page', () => {
     ).toBeVisible();
   });
 
+  test('stages a remote file from the Files URL importer', async ({ page }) => {
+    await page.getByRole('button', { name: 'Files', exact: true }).click();
+    await page.route('**/api/files/remote', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/plain',
+        headers: {
+          'X-Larkup-File-Name': encodeURIComponent('aliases.py'),
+          'X-Larkup-Source-Url': encodeURIComponent('https://example.com/aliases.py'),
+        },
+        body: 'Alias = str\n',
+      });
+    });
+
+    await page.getByRole('button', { name: 'From URL', exact: true }).click();
+    await page
+      .getByRole('textbox', { name: 'Remote file URL' })
+      .fill('https://example.com/aliases.py');
+    await page.getByRole('button', { name: 'Load remote file' }).click();
+
+    await expect(page.getByText('aliases.py', { exact: true })).toBeVisible();
+    await expect(page.getByText('Imported from example.com', { exact: true })).toBeVisible();
+    await expect(page.locator('ul').filter({ hasText: 'aliases.py' })).toHaveCSS(
+      'overflow-y',
+      'visible',
+    );
+    await page.getByRole('button', { name: 'Preview aliases.py' }).click();
+    await expect(page.getByRole('heading', { name: 'Preview: aliases.py' })).toBeVisible();
+    await expect(page.getByText('Alias = str', { exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'From URL', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save 1 file', exact: true })).toBeVisible();
+    await page
+      .getByRole('textbox', { name: 'Remote file URL' })
+      .fill('https://example.com/next.toml');
+    await expect(page.getByRole('button', { name: 'Load remote file', exact: true })).toBeVisible();
+  });
+
   test('blocks all add actions until an embedding API key is configured', async ({ page }) => {
     await page.route('**/api/index', async (route) => {
       if (route.request().method() !== 'GET') return route.continue();
