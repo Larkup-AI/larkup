@@ -1,5 +1,11 @@
 # larkup
 
+## 0.3.1
+
+### Patch Changes
+
+- Ground chat answers in the available indexed evidence, query matching spreadsheets through the structured table API, and preserve compact source context across long conversations.
+
 ## 0.3.0
 
 ### Minor Changes
