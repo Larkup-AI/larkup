@@ -429,7 +429,10 @@ export function youtubeDownloadFormat() {
     'best[height<=360][ext=mp4][vcodec!=none][acodec!=none]',
     'bestvideo*[height<=360]+bestaudio',
     'best[height<=360][vcodec!=none][acodec!=none]',
-    'best',
+    // Never silently persist a video-only fallback. If the source offers no
+    // audio-bearing format, surface that import failure instead of rendering
+    // a player with a misleading volume control and no sound.
+    'best[vcodec!=none][acodec!=none]',
   ].join('/');
 }
 

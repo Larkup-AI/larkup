@@ -249,7 +249,7 @@ export function attachVideoIntelligenceAgentClient(
                   modality: 'visual',
                   timeRange: { ...reading.range, precision: 'estimated' },
                 })),
-                supportingClip.startSecs,
+                supportingClip,
               ),
               directObservation: {
                 readings: established,
@@ -379,7 +379,7 @@ export function attachVideoIntelligenceAgentClient(
               // The UI contract is generic and tool-owned. The host only
               // renders a citations surface; it does not know why this
               // source range was selected or expose extraction details.
-              ui: citationSurface(asset, context, evidence, supportingClip.startSecs),
+              ui: citationSurface(asset, context, evidence, supportingClip),
             }
           : {}),
         claimVerification: {
@@ -2291,7 +2291,7 @@ function citationSurface(
   asset: Awaited<ReturnType<MediaEvidence['getAsset']>> & {},
   context: AgentToolExecutionContext,
   evidence: Array<{ modality: string; timeRange: TimeRange }>,
-  primaryTimestampSecs: number,
+  supportingClip: TimeRange,
 ) {
   const sourceUrl = `/api/media/${encodeURIComponent(asset!.id)}${
     context.projectId ? `?projectId=${encodeURIComponent(context.projectId)}` : ''
@@ -2302,7 +2302,9 @@ function citationSurface(
     fileName: asset!.fileName ?? 'Video',
     mediaType: asset!.type === 'audio' ? ('audio' as const) : ('video' as const),
     mediaUrl: sourceUrl,
-    primaryTimestampSecs,
+    sourceUrl: asset!.originalUrl || sourceUrl,
+    primaryTimestampSecs: supportingClip.startSecs,
+    primaryEndSecs: supportingClip.endSecs,
     // Keep citations inspectable without surfacing raw transcription or
     // frame-extraction text in the conversation.
     items: evidence.map((item) => ({

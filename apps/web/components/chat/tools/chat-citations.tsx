@@ -16,9 +16,12 @@ export interface ChatCitationsUi {
   kind: 'citations';
   title?: string;
   mediaUrl?: string;
+  /** Original public source, when it has a browser-supported player. */
+  sourceUrl?: string;
   mediaType?: 'video' | 'audio';
   fileName?: string;
   primaryTimestampSecs?: number;
+  primaryEndSecs?: number;
   items: ChatCitationItem[];
 }
 
@@ -77,8 +80,9 @@ export function ChatCitations({
                 mediaType={ui.mediaType ?? 'video'}
                 fileName={ui.fileName}
                 mediaUrl={ui.mediaUrl}
-                sourceUrl={ui.mediaUrl}
+                sourceUrl={ui.sourceUrl ?? ui.mediaUrl}
                 startSecs={ui.primaryTimestampSecs}
+                endSecs={ui.primaryEndSecs}
               />
             </div>
           ) : null}

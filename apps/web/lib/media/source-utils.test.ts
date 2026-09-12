@@ -85,6 +85,7 @@ describe('youtubeDownloadFormat', () => {
     expect(preferred).toContain('[vcodec^=avc]');
     expect(preferred).toContain('+bestaudio[ext=m4a]');
     expect(combinedFallback).toContain('acodec!=none');
+    expect(youtubeDownloadFormat().split('/').at(-1)).toContain('acodec!=none');
   });
 });
 
