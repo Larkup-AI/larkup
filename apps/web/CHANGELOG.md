@@ -1,5 +1,11 @@
 # larkup
 
+## 0.3.2
+
+### Patch Changes
+
+- d3d9698: Render cited public video ranges through their browser-supported provider player and require an audio-bearing YouTube download fallback.
+
 ## 0.3.1
 
 ### Patch Changes
