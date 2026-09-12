@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- Ground chat answers in the available indexed evidence, query matching spreadsheets through the structured table API, and preserve compact source context across long conversations.
+- Ground chat answers in the available indexed evidence, query matching spreadsheets through the structured table API, preserve compact source context across long conversations, and clarify staged-file save actions.
 
 ## 0.3.0
 
