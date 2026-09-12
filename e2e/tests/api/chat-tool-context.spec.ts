@@ -153,6 +153,16 @@ test('starts every spreadsheet question with the structured data tool', () => {
   });
 });
 
+test('recognizes a distinctive workbook metric without requiring the word spreadsheet', () => {
+  expect(
+    isLikelyTabularQuestion({
+      text: "What is the dropout level among master's students in Germany?",
+      columnNames: ['Student cohort', 'Master dropout rate', 'University'],
+      datasetNames: ['germany_integration_university_dataset_clean.xlsx'],
+    }),
+  ).toBe(true);
+});
+
 test('keeps PDF questions on document retrieval when a workbook is also uploaded', () => {
   expect(
     isLikelyTabularQuestion({
