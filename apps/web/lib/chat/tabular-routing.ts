@@ -51,6 +51,13 @@ export function isLikelyTabularQuestion(input: {
     const normalized = column.trim().toLocaleLowerCase();
     if (normalized.length >= 4 && text.includes(normalized)) return true;
     const terms = normalized.match(/[\p{L}\p{N}_]+/gu) ?? [];
-    return terms.filter((term) => term.length >= 4 && text.includes(term)).length >= 2;
+    const matchedTerms = terms.filter((term) => term.length >= 4 && text.includes(term));
+    if (matchedTerms.length >= 2) return true;
+
+    // Metrics in real workbooks often have long headers while the user asks
+    // with one distinctive word. A sufficiently specific header token is
+    // enough to choose the exact table tool without relying on dataset- or
+    // domain-specific routing rules.
+    return matchedTerms.some((term) => term.length >= 6);
   });
 }

@@ -119,7 +119,7 @@ For each substantive question, get fresh evidence: use queryTabularData for CSV,
 
 Do not repeat an evidence tool in the same response. After evidence is returned, answer directly or use one appropriate refinement when the evidence action requests it.
 
-Use only returned evidence. If it does not support an answer, do not guess: say briefly that you could not confirm the specific detail in the video. Do not recommend a search engine, public website, or outside source unless the user explicitly asks you to search the web. For video/audio, name the relevant timestamp range when one was returned. Speak as someone who watched the material: never expose retrieval, transcripts, frames, visual observations, models, tools, or analysis steps unless the user explicitly asks how you determined the answer.
+Use only returned evidence. Do not guess beyond it, but do not turn an incomplete verification flag into a refusal when the source contains relevant instructions, statements, or a useful trail. Give the most specific answer the available source material establishes and clearly limit only the unsupported portion. Do not recommend a search engine, public website, or outside source unless the user explicitly asks you to search the web. For video/audio, name the relevant timestamp range when one was returned. Speak as someone who watched the material: never expose retrieval, transcripts, frames, visual observations, models, tools, or analysis steps unless the user explicitly asks how you determined the answer.
 
 ${PERSONALIZED_RESPONSE_STYLE}
 
@@ -135,7 +135,7 @@ For media questions, searchKnowledgeBase first, then use an installed evidence-q
 
 For a media claim that requires a terminal state, comparison, aggregate, count, or change over time, ordinary retrieval is not enough. Follow claimVerification.rule from the installed evidence action -- it states what the gathered evidence supports for this particular question. Never promote a local observation into a broader conclusion without source coverage.
 
-"Not directly established" means no single record states the answer outright. It does not mean the source is silent. When the evidence contains a trail that leads to the answer -- readings over time, a state and the change to it, two sides of a comparison -- read across it and give the answer, saying how confident you are and citing the moments it rests on. Reserve "the video does not show this" for when the evidence genuinely lacks any bearing on the question, and never use it to describe an answer you could have reasoned to.
+"Not directly established" means no single record states the answer outright. It does not mean the source is silent. When the evidence contains a trail that leads to the answer -- readings over time, a state and the change to it, two sides of a comparison -- read across it and give the answer, saying how confident you are and citing the moments it rests on. If a source provides procedures or instructions relevant to the question, state those procedures even when it cannot verify a broader conclusion. Reserve "the video does not show this" for when the evidence genuinely lacks any bearing on the question, and never use it to describe an answer you could have reasoned to.
 
 For every video claim, distinguish a direct observation from an inference. Do not turn a reaction, mood, body language, or a summary into a factual conclusion without direct supporting evidence. If evidence is incomplete or conflicts, inspect the relevant source range and answer only what it establishes.
 
@@ -197,24 +197,25 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
   ]);
   const output = (compact[0] as any)?.content?.[0]?.output ?? result;
   const unverifiedMedia = findUnverifiedMediaEvidence(result);
-  // An ordinary retrieval hit can contain an intermediate caption, OCR read,
-  // or stale-looking summary. Once the media capability says that it could
-  // not directly establish this claim, that material must not be available
-  // to the answer model as a tempting substitute for the evidence gate.
+  // A verification result controls how narrowly a claim may be phrased; it
+  // must not erase the source excerpts that led to the result. Erasing those
+  // excerpts made a source with useful procedures look empty and forced the
+  // model into a generic refusal. Keep the bounded evidence available and
+  // make the limitation explicit instead.
   const safeOutput = unverifiedMedia
     ? {
-        mediaEvidenceGate: {
-          success: true,
+        evidence: output,
+        mediaEvidenceStatus: {
           mediaAssetId: unverifiedMedia.mediaAssetId,
           claimVerification: unverifiedMedia.claimVerification,
           instruction:
-            'The media source was found, but this specific claim was not directly established. Do not use any ordinary retrieval text, summary, OCR value, or local observation to answer it. Say only that the detail could not be confirmed from the available video evidence.',
+            'The source has relevant material but the requested claim is not yet established as one direct observation. Answer from the source passages and any corroborating trail that are present. Do not invent missing details or present a broad conclusion as verified; do provide the concrete procedures, statements, or partial answer the source does establish.',
         },
       }
     : output;
   const serialized = typeof safeOutput === 'string' ? safeOutput : JSON.stringify(safeOutput);
   const contextBudget = containsExhaustiveEvidence(safeOutput) ? 120_000 : 24_000;
-  const directClaims = unverifiedMedia ? [] : collectQuestionMatchedDirectClaims(result, question);
+  const directClaims = collectQuestionMatchedDirectClaims(result, question);
   const hasEstablishedMediaEvidence = containsAnswerLevelMediaEvidence(result);
   const mediaAssetId = explicitMediaEvidenceAssetId(result);
   if (
@@ -233,7 +234,7 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
       : ''
   }${serialized.slice(0, contextBudget)}\n\n${
     unverifiedMedia
-      ? 'The evidence gate above is authoritative: do not infer or fill in the answer from omitted retrieval material.'
+      ? 'The verification status above limits certainty, not access to the source material. Give the most useful source-grounded answer that is supported.'
       : "Answer the user's question directly from this evidence."
   } Do not mention tools, retrieval, frames, transcripts, or analysis.`;
 }
@@ -344,11 +345,78 @@ function fallbackAnswerFromEvidence(evidence: unknown, question: string) {
   ];
   if (established.length > 0) return established.join('\n');
   const trail = collectAnswerLevelMediaStatements(evidence);
-  return trail.length > 0
-    ? trail.join('\n')
-    : /\p{Script=Arabic}/u.test(question)
-      ? 'ماقدرتش أكمل الإجابة دلوقتي. جرّب السؤال تاني.'
-      : 'I could not complete the answer just now. Please try the question again.';
+  if (trail.length > 0) return trail.join('\n');
+  const excerpts = collectSourceExcerpts(evidence, question);
+  if (excerpts.length > 0) return excerpts.join('\n\n');
+  return 'I could not complete the response just now. Please try the question again.';
+}
+
+/**
+ * Preserve a useful, source-grounded fallback when a provider closes after
+ * tools without generating text. This is deliberately schema-tolerant so
+ * every retrieval or marketplace capability can contribute its own text
+ * evidence without teaching the chat route about individual source types.
+ */
+function collectSourceExcerpts(value: unknown, question: string): string[] {
+  const excerpts = new Set<string>();
+  const questionTerms = new Set(
+    question.toLocaleLowerCase().match(/[\p{Letter}\p{Number}]+/gu) ?? [],
+  );
+  const add = (candidate: unknown) => {
+    if (typeof candidate !== 'string') return;
+    const text = candidate.replace(/\s+/g, ' ').trim();
+    if (text.length < 16) return;
+    const normalized = text.toLocaleLowerCase();
+    const matches = [...questionTerms].filter(
+      (term) => term.length > 2 && normalized.includes(term),
+    );
+    if (matches.length > 0 || excerpts.size === 0) excerpts.add(text.slice(0, 900));
+  };
+  const visit = (candidate: unknown, key?: string) => {
+    if (typeof candidate === 'string') {
+      if (key === 'text' || key === 'excerpt' || key === 'content' || key === 'summary')
+        add(candidate);
+      return;
+    }
+    if (Array.isArray(candidate)) {
+      candidate.forEach((item) => visit(item));
+      return;
+    }
+    if (!candidate || typeof candidate !== 'object') return;
+    for (const [childKey, child] of Object.entries(candidate)) visit(child, childKey);
+  };
+  visit(value);
+  return [...excerpts].slice(0, 4);
+}
+
+/**
+ * True when retrieval located a spreadsheet-like source that also exists in
+ * the structured table store. Matching by normalized file stem avoids sending
+ * a question about one uploaded spreadsheet to an unrelated workbook.
+ */
+function hasRetrievedTabularEvidence(value: unknown, datasetNames: string[]): boolean {
+  const datasetStems = new Set(
+    datasetNames.map((name) => name.replace(/\.(?:csv|xlsx?|ods|json)$/i, '').toLocaleLowerCase()),
+  );
+  const matchesDataset = (text: string) => {
+    const fileName = text.match(/[^/\\]+\.(?:csv|xlsx?|ods|json)\b/i)?.[0];
+    if (!fileName) return false;
+    const stem = fileName.replace(/\.(?:csv|xlsx?|ods|json)$/i, '').toLocaleLowerCase();
+    return datasetStems.has(stem);
+  };
+  const visit = (candidate: unknown): boolean => {
+    if (typeof candidate === 'string') {
+      try {
+        return visit(JSON.parse(candidate));
+      } catch {
+        return matchesDataset(candidate);
+      }
+    }
+    if (Array.isArray(candidate)) return candidate.some(visit);
+    if (!candidate || typeof candidate !== 'object') return false;
+    return Object.values(candidate).some(visit);
+  };
+  return visit(value);
 }
 
 /** Tool output can be embedded as a compact JSON string before the next model
@@ -686,7 +754,11 @@ ${fieldLines}`;
     // prevented the evidence capability from requesting a bounded live read.
     // Keep the rule source-driven: any continuing media topic gets fresh RAG
     // followed by its installed evidence-query action.
-    canReuseKnowledgeBaseEvidence(userText, messagesToProcess) &&
+    // Use the larger compact-evidence window for routing. The model still
+    // receives only the bounded recent transcript plus the single latest
+    // source summary, so a long chat keeps its topic without replaying all
+    // historical messages or tool payloads.
+    canReuseKnowledgeBaseEvidence(userText, evidenceMessages) &&
     !continuesMediaTopic;
   let systemPrompt =
     (config.systemPrompt ? `USER INSTRUCTIONS:\n${config.systemPrompt}\n` : '') +
@@ -913,7 +985,10 @@ ${fieldLines}`;
               toolCallId: evidenceToolCallId,
               output: videoEvidence,
             });
-            preloadedVideoEvidence = true;
+            preloadedVideoEvidence =
+              videoEvidence !== null &&
+              typeof videoEvidence === 'object' &&
+              (videoEvidence as { success?: unknown }).success === true;
             preloadedEvidence = {
               ...(preloadedEvidence as Record<string, unknown>),
               videoEvidence,
@@ -1029,6 +1104,27 @@ ${fieldLines}`;
                         activeTools: ['analyzePdfPages'],
                         messages: compactToolContextForModel(messages),
                       };
+                }
+                return {
+                  toolChoice: 'none' as const,
+                  activeTools: [],
+                  messages: withFinalAnswerNudge(compactToolContextForModel(messages)),
+                };
+              }
+              // A vector hit from a spreadsheet is a locator, not a reliable
+              // representation of the sheet. Once such a source is found,
+              // route the answer through the structured dataset API so exact
+              // filters and values are read from the full indexed table.
+              if (
+                hasTabularData &&
+                hasRetrievedTabularEvidence(preloadedEvidence, tabularDatasetNames)
+              ) {
+                if (stepNumber === 0) {
+                  return {
+                    toolChoice: { type: 'tool', toolName: 'queryTabularData' },
+                    activeTools: ['queryTabularData'],
+                    messages: compactToolContextForModel(messages),
+                  };
                 }
                 return {
                   toolChoice: 'none' as const,
