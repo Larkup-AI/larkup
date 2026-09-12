@@ -264,6 +264,8 @@ test('renders video citations through the generic ui.kind contract, opening only
   expect(citations).toContain('setClipOpen');
   expect(citations).toContain('Sources');
   expect(citations).toContain('ChatMediaPreview');
+  expect(citations).toContain('sourceUrl={ui.sourceUrl ?? ui.mediaUrl}');
+  expect(citations).toContain('endSecs={ui.primaryEndSecs}');
 
   expect(chatWorkspace).toContain('shouldAutoOpenSupportingClip(messages, idx)');
   expect(supportingClip).toContain(
@@ -280,6 +282,8 @@ test('renders video citations through the generic ui.kind contract, opening only
   expect(preview).toContain('getProviderEmbedUrl');
   expect(preview).toContain('youtube-nocookie.com/embed');
   expect(preview).toContain('player.vimeo.com/video');
+  expect(preview).toContain("embed.searchParams.set('end'");
+  expect(preview).toContain('onTimeUpdate');
 });
 
 test('keeps citations compact while exposing the matched indexed video context', async () => {

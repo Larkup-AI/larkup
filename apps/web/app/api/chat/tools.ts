@@ -1918,7 +1918,9 @@ export async function getChatTools(context: {
             ...(verification.status === 'supported' && primarySupportingHit
               ? {
                   mediaUrl: sourceUrl,
+                  sourceUrl: asset.originalUrl || sourceUrl,
                   primaryTimestampSecs: primarySupportingHit.evidence.timeRange.startSecs,
+                  primaryEndSecs: primarySupportingHit.evidence.timeRange.endSecs,
                 }
               : {}),
             items: hits.map((hit) => ({

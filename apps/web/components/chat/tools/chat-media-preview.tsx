@@ -42,9 +42,14 @@ export function ChatMediaPreview({
       ? `${assetUrl.split('#')[0]}#t=${startSecs}${endSecs !== undefined ? `,${endSecs}` : ''}`
       : assetUrl;
   const providerEmbedUrl = useMemo(
-    () => (mediaType === 'video' ? getProviderEmbedUrl(sourceUrl, startSecs) : undefined),
-    [mediaType, sourceUrl, startSecs],
+    () => (mediaType === 'video' ? getProviderEmbedUrl(sourceUrl, startSecs, endSecs) : undefined),
+    [mediaType, sourceUrl, startSecs, endSecs],
   );
+  const hasClipEnd =
+    mediaType === 'video' &&
+    Number.isFinite(startSecs) &&
+    Number.isFinite(endSecs) &&
+    (endSecs as number) > (startSecs as number);
 
   if (mediaType === 'image') {
     if (imageUnavailable) {
@@ -129,6 +134,15 @@ export function ChatMediaPreview({
             playsInline
             preload="metadata"
             className="max-h-90 w-full bg-black object-contain"
+            onTimeUpdate={(event) => {
+              // Media-fragment end times are not enforced consistently by
+              // browsers. Stop local playback at the cited evidence boundary
+              // so a supporting clip never continues into unrelated footage.
+              if (hasClipEnd && event.currentTarget.currentTime >= (endSecs as number)) {
+                event.currentTarget.pause();
+                event.currentTarget.currentTime = endSecs as number;
+              }
+            }}
           />
         )}
         <MediaCitationFooter
@@ -269,19 +283,31 @@ export function ChatMediaPreview({
  * other URLs fall back to the locally indexed asset, which also keeps private
  * uploads and direct video links reliable in chat.
  */
-export function getProviderEmbedUrl(sourceUrl?: string, startSecs?: number): string | undefined {
+export function getProviderEmbedUrl(
+  sourceUrl?: string,
+  startSecs?: number,
+  endSecs?: number,
+): string | undefined {
   if (!sourceUrl) return undefined;
 
   try {
     const url = new URL(sourceUrl);
     const host = url.hostname.toLowerCase().replace(/^www\./, '');
     const start = Math.max(0, Math.floor(startSecs ?? 0));
+    const end =
+      Number.isFinite(endSecs) && (endSecs as number) > start ? Math.floor(endSecs!) : undefined;
+
+    const youtubeEmbedUrl = (videoId: string) => {
+      const embed = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
+      embed.searchParams.set('start', String(start));
+      embed.searchParams.set('rel', '0');
+      if (end !== undefined) embed.searchParams.set('end', String(end));
+      return embed.toString();
+    };
 
     if (host === 'youtu.be' || host.endsWith('.youtu.be')) {
       const videoId = url.pathname.split('/').filter(Boolean)[0];
-      return videoId
-        ? `https://www.youtube-nocookie.com/embed/${videoId}?start=${start}&rel=0`
-        : undefined;
+      return videoId ? youtubeEmbedUrl(videoId) : undefined;
     }
 
     if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
@@ -289,9 +315,7 @@ export function getProviderEmbedUrl(sourceUrl?: string, startSecs?: number): str
       const videoId =
         url.searchParams.get('v') ||
         (['embed', 'shorts', 'live'].includes(pathParts[0]) ? pathParts[1] : undefined);
-      return videoId
-        ? `https://www.youtube-nocookie.com/embed/${videoId}?start=${start}&rel=0`
-        : undefined;
+      return videoId ? youtubeEmbedUrl(videoId) : undefined;
     }
 
     if (host === 'vimeo.com' || host.endsWith('.vimeo.com')) {
