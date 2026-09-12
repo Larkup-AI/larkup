@@ -660,11 +660,7 @@ export function UploadPanel({
         ? 'Load remote file'
         : saving
           ? 'Add more files'
-          : staged.length === 0
-            ? 'Save to corpus'
-            : staged.length === 1
-              ? 'Save 1 file'
-              : `Save ${staged.length} files`,
+          : `Save ${staged.length} file${staged.length === 1 ? '' : 's'}`,
       onClick: shouldLoadRemoteFile
         ? () => void loadRemoteFile()
         : saving
@@ -1008,9 +1004,7 @@ export function UploadPanel({
             ? 'Load remote file'
             : saving && progress
               ? `Adding ${progress.current} of ${progress.total}`
-              : `Add ${staged.length > 0 ? staged.length : ''} file${
-                  staged.length === 1 ? '' : 's'
-                } to corpus`}
+              : `Save ${staged.length} file${staged.length === 1 ? '' : 's'}`}
         </Button>
       )}
 
