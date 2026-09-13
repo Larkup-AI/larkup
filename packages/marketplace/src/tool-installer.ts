@@ -572,6 +572,7 @@ export async function installTool(
     const manifest = await readManifest();
     const existing = manifest.tools.findIndex((t) => t.id === toolId);
 
+    const existingTool = existing >= 0 ? manifest.tools[existing] : undefined;
     const entry: InstalledTool = {
       id: toolId,
       version: installedVersion,
@@ -579,7 +580,13 @@ export async function installTool(
       packageName: descriptor.packageName,
       resolvedPath,
       source,
-      config: { ...buildDefaultConfig(descriptor), ...initialConfig },
+      // Updating a package must not silently discard settings that are kept in
+      // the installation manifest. Explicit input still wins over prior values.
+      config: {
+        ...buildDefaultConfig(descriptor),
+        ...(existingTool?.config ?? {}),
+        ...initialConfig,
+      },
     };
 
     if (existing >= 0) {

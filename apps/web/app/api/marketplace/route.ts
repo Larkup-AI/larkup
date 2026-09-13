@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { getAllTools } from '@larkup/marketplace/registry';
+import { compareToolVersions, getAllTools } from '@larkup/marketplace/registry';
 import {
   getInstalledTools,
   getDownloadCounts,
@@ -55,11 +55,15 @@ export async function GET() {
   );
   const ongoing = getOngoingOperations();
   const tools = allTools.map((tool) => {
+    const installedTool = installed.find((candidate) => candidate.id === tool.id);
     let status: ToolStatus = 'available';
     if (tool.comingSoon) status = 'available';
     else if (ongoing.installing.includes(tool.id)) status = 'installing';
     else if (ongoing.uninstalling.includes(tool.id)) status = 'uninstalling' as ToolStatus;
-    else if (installedIds.has(tool.id)) status = 'installed';
+    else if (installedTool) status = 'installed';
+
+    const availableVersion = tool.version;
+    const installedVersion = installedTool?.version;
 
     return {
       ...tool,
@@ -67,7 +71,13 @@ export async function GET() {
       // Merge local download counts into the registry data
       downloads: (tool.downloads ?? 0) + (downloadCounts[tool.id] ?? 0),
       status,
-      installedAt: installed.find((t) => t.id === tool.id)?.installedAt,
+      installedAt: installedTool?.installedAt,
+      availableVersion,
+      installedVersion,
+      updateAvailable:
+        status === 'installed' &&
+        installedVersion !== undefined &&
+        compareToolVersions(availableVersion, installedVersion) > 0,
     };
   });
 

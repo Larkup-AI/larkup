@@ -53,6 +53,11 @@ interface MarketplaceTool {
   status: 'available' | 'installed' | 'installing' | 'uninstalling' | 'error';
   comingSoon?: boolean;
   installedAt?: string;
+  /** Version recorded when this tool was installed on this machine. */
+  installedVersion?: string;
+  /** Newest version supplied by the Marketplace catalog. */
+  availableVersion?: string;
+  updateAvailable?: boolean;
   runtime?: {
     defaultMode: string;
     modes: Array<{ id: string; label: string; description: string; icon?: string }>;
@@ -99,14 +104,19 @@ export function MarketplaceSection({ embedded = false }: { embedded?: boolean })
   const [runtimeMode, setRuntimeMode] = useState<string | null>(null);
 
   const handleInstall = useCallback(
-    async (tool: MarketplaceTool, selectedRuntimeMode?: string) => {
+    async (tool: MarketplaceTool, selectedRuntimeMode?: string, forceUpdate = false) => {
       const toolId = tool.id;
       setInstalling((prev) => new Set(prev).add(toolId));
-      const toastId = toast.loading('Downloading and installing tool…', {
-        description: 'This may take a minute on first install.',
-      });
+      const toastId = toast.loading(
+        forceUpdate ? 'Updating tool…' : 'Downloading and installing tool…',
+        {
+          description: forceUpdate
+            ? 'Your existing configuration will be kept.'
+            : 'This may take a minute on first install.',
+        },
+      );
       try {
-        const res = await fetch(`/api/marketplace/${toolId}`, {
+        const res = await fetch(`/api/marketplace/${toolId}${forceUpdate ? '?force=true' : ''}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(selectedRuntimeMode ? { runtimeMode: selectedRuntimeMode } : {}),
@@ -138,7 +148,7 @@ export function MarketplaceSection({ embedded = false }: { embedded?: boolean })
             });
           }
         } else {
-          toast.success('Tool installed successfully', {
+          toast.success(forceUpdate ? 'Tool updated successfully' : 'Tool installed successfully', {
             action: tool.runtime
               ? {
                   label: 'Open settings',
@@ -160,6 +170,13 @@ export function MarketplaceSection({ embedded = false }: { embedded?: boolean })
       }
     },
     [mutate, router],
+  );
+
+  const handleUpdate = useCallback(
+    async (tool: MarketplaceTool) => {
+      await handleInstall(tool, undefined, true);
+    },
+    [handleInstall],
   );
 
   function chooseInstall(tool: MarketplaceTool) {
@@ -308,6 +325,7 @@ export function MarketplaceSection({ embedded = false }: { embedded?: boolean })
               installing={installing.has(tool.id) || tool.status === 'installing'}
               uninstalling={uninstalling.has(tool.id) || tool.status === 'uninstalling'}
               onInstall={() => chooseInstall(tool)}
+              onUpdate={() => void handleUpdate(tool)}
               onUninstall={(id) => setToolToDelete(id)}
             />
           ))}
@@ -394,12 +412,14 @@ function ToolRow({
   installing,
   uninstalling,
   onInstall,
+  onUpdate,
   onUninstall,
 }: {
   tool: MarketplaceTool;
   installing: boolean;
   uninstalling: boolean;
   onInstall: () => void;
+  onUpdate: () => void;
   onUninstall: (id: string) => void;
 }) {
   const Icon = ICON_MAP[tool.icon] ?? Film;
@@ -435,7 +455,9 @@ function ToolRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <h3 className="text-[13px] font-medium text-foreground truncate">{tool.name}</h3>
-          <span className="shrink-0 text-[11px] text-muted-foreground/60">v{tool.version}</span>
+          <span className="shrink-0 text-[11px] text-muted-foreground/60">
+            v{tool.availableVersion ?? tool.version}
+          </span>
           <span className="shrink-0 text-[11px] text-muted-foreground/40">·</span>
           <span className="shrink-0 text-[11px] text-muted-foreground/60">{tool.author}</span>
         </div>
@@ -495,10 +517,27 @@ function ToolRow({
           </Button>
         ) : isInstalled ? (
           <div className="flex items-center gap-1.5">
-            <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
-              <Check className="size-3" />
-              Installed
-            </span>
+            {tool.updateAvailable ? (
+              <Button
+                variant="default"
+                size="sm"
+                disabled={installing}
+                className="h-7 gap-1.5 px-3 text-[11px]"
+                onClick={onUpdate}
+              >
+                {installing ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Download className="size-3" />
+                )}
+                {installing ? 'Updating…' : 'Update'}
+              </Button>
+            ) : (
+              <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                <Check className="size-3" />
+                Installed
+              </span>
+            )}
             <Button
               variant="ghost"
               size="sm"

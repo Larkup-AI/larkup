@@ -1176,6 +1176,8 @@ function MediaContent({
     const msg = formatErrorMessage(err);
     const normalizedMessage = msg.toLowerCase();
     if (
+      normalizedMessage.includes('video intelligence tool needs an update') ||
+      normalizedMessage.includes('video intelligence tool not properly installed') ||
       normalizedMessage.includes('video & audio tool needs an update') ||
       normalizedMessage.includes('video & audio tool not properly installed') ||
       normalizedMessage.includes('yt-dlp is required for youtube urls')
@@ -1186,7 +1188,7 @@ function MediaContent({
         duration: 10_000,
         action: {
           label: 'Update tool',
-          onClick: () => void updateVideoAudioTool(),
+          onClick: () => void updateVideoIntelligenceTool(),
         },
       });
       return;
@@ -1209,16 +1211,20 @@ function MediaContent({
     }
   }
 
-  async function updateVideoAudioTool() {
+  async function updateVideoIntelligenceTool() {
     const toastId = toast.loading('Updating Video Intelligence…');
     try {
-      const response = await fetch('/api/marketplace/video-audio?force=true', { method: 'POST' });
+      const query = serverId ? `&serverId=${encodeURIComponent(serverId)}` : '';
+      const response = await fetch(`/api/marketplace/video-intelligence?force=true${query}`, {
+        method: 'POST',
+      });
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
       if (!response.ok) throw new Error(body?.error || 'Could not update Video Intelligence.');
       toast.success('Video Intelligence updated', {
         id: toastId,
         description: 'Try adding the media again.',
       });
+      await onRefreshToolConfiguration();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not update Video Intelligence.', {
         id: toastId,

@@ -23,7 +23,7 @@ function normalizeToolDescriptor(descriptor: ToolDescriptor): ToolDescriptor {
  * use stable releases, but accepting a suffix keeps a pre-release catalog
  * entry from incorrectly outranking its corresponding stable release.
  */
-function compareToolVersions(left: string, right: string): number {
+export function compareToolVersions(left: string, right: string): number {
   const parse = (version: string) => {
     const [core, suffix = ''] = version.split('-', 2);
     const parts = core.split('.').map((part) => Number.parseInt(part, 10) || 0);
