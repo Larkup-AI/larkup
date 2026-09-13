@@ -34,6 +34,48 @@ test.describe('Marketplace', () => {
     await expect(actionBtn).toBeVisible({ timeout: 10_000 });
   });
 
+  test('offers an update when the installed tool is behind the catalog', async ({ page }) => {
+    let updateRequests = 0;
+    await page.route('**/api/marketplace', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          tools: [
+            {
+              id: 'video-intelligence',
+              name: 'Video Intelligence',
+              description: 'Evidence-backed video analysis.',
+              version: '0.2.9',
+              availableVersion: '0.2.9',
+              installedVersion: '0.2.8',
+              updateAvailable: true,
+              status: 'installed',
+              emoji: '🎬',
+              icon: 'Film',
+              author: 'Larkup',
+              installSize: '~120 KB',
+              capabilities: [],
+              downloads: 0,
+              pricing: 'free',
+              category: 'media',
+            },
+          ],
+        }),
+      }),
+    );
+    await page.route('**/api/marketplace/video-intelligence?force=true', (route) => {
+      updateRequests += 1;
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'updated' }),
+      });
+    });
+
+    await page.goto('/settings?section=marketplace');
+    await page.getByRole('button', { name: 'Update', exact: true }).click();
+    await expect.poll(() => updateRequests).toBe(1);
+  });
+
   test('installed tool settings render every field the manifest declares', async ({ page }) => {
     await page.route('**/api/marketplace', (route) =>
       route.fulfill({

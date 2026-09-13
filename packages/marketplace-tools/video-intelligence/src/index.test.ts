@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { TOOL_EXTENSION } from './index';
+import { TOOL_EXTENSION, TOOL_META } from './index';
+
+describe('Video Intelligence package metadata', () => {
+  it('identifies the current marketplace release', () => {
+    expect(TOOL_META.version).toBe('0.2.9');
+  });
+});
 
 describe('Video Intelligence configuration verification', () => {
   it('verifies an audio provider without requiring a user-selected audio model', async () => {
