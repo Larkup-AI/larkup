@@ -1,5 +1,11 @@
 # larkup
 
+## 0.3.4
+
+### Patch Changes
+
+- acefb98: Restrict the Settings cache action to Turborepo cache files and protect project settings and API keys from cache cleanup.
+
 ## 0.3.3
 
 ### Patch Changes
