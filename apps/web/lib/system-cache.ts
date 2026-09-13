@@ -53,7 +53,19 @@ async function directorySizeBytes(directory: string): Promise<number> {
 async function resolveBuildCache(startDirectory: string) {
   const workspaceRoot = await findWorkspaceRoot(startDirectory);
   if (!workspaceRoot) return null;
-  return path.join(workspaceRoot, '.turbo');
+
+  const turboDirectory = path.join(workspaceRoot, '.turbo');
+  try {
+    const stats = await lstat(turboDirectory);
+    // Never follow a user-controlled .turbo link or replace another kind of
+    // workspace file. Cache maintenance is deliberately limited to cache/.
+    if (!stats.isDirectory() || stats.isSymbolicLink()) return null;
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? error.code : undefined;
+    if (code !== 'ENOENT') throw error;
+  }
+
+  return path.join(turboDirectory, 'cache');
 }
 
 export async function getBuildCacheStatus(
