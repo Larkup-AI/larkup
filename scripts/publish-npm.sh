@@ -36,6 +36,9 @@ pnpm --filter @larkup/tool-video-audio build
 pnpm --filter @larkup/tool-video-intelligence build
 pnpm --filter @larkup/sdk build
 pnpm --filter @larkup/cli build
+# The npm package ships Next's standalone output. Rebuild it from scratch so a
+# previous release's traced bundle is never republished with a new outer version.
+rm -rf apps/web/.next
 pnpm --filter larkup build
 
 echo "Publishing versioned workspace packages through Changesets..."
