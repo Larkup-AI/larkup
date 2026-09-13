@@ -33,6 +33,7 @@ pnpm --filter @larkup/integrations build
 pnpm --filter @larkup/sandbox build
 pnpm --filter @larkup/tool-doc-editor build
 pnpm --filter @larkup/tool-video-audio build
+pnpm --filter @larkup/tool-video-intelligence build
 pnpm --filter @larkup/sdk build
 pnpm --filter @larkup/cli build
 pnpm --filter larkup build
