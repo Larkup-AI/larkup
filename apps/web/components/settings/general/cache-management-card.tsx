@@ -137,7 +137,7 @@ export function CacheManagementCard() {
             <AlertDialogTitle>Clear the build cache?</AlertDialogTitle>
             <AlertDialogDescription>
               This will remove {formatBytes(cache?.sizeBytes || 0)} of temporary Turborepo files. It
-              will not remove projects, indexed data, settings, or installed tools.
+              will not remove projects, indexed data, settings, API keys, or installed tools.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -42,7 +42,9 @@ test.describe('Settings Page', () => {
     const cacheCard = page.locator('[data-slot="card"]', { hasText: 'Larkup cache' });
     await expect(cacheCard.getByText('5.0 GB')).toBeVisible();
     await cacheCard.getByRole('button', { name: 'Clear cache' }).click();
-    await expect(page.getByRole('alertdialog')).toContainText('projects, indexed data, settings');
+    await expect(page.getByRole('alertdialog')).toContainText(
+      'projects, indexed data, settings, API keys',
+    );
     await page.getByRole('button', { name: 'Cancel' }).click();
     expect(deleteRequests).toBe(0);
 
