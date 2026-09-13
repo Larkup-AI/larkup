@@ -1,5 +1,11 @@
 # @larkup/marketplace
 
+## 0.2.5
+
+### Patch Changes
+
+- a37cee1: Make Marketplace tool updates visible and preserve installed settings while updating Video Intelligence to the cited-video playback release.
+
 ## 0.2.4
 
 ### Patch Changes
