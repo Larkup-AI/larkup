@@ -7,6 +7,7 @@ import {
   toChatDescriptor,
   getChatModelsForProvider,
   getDefaultChatModel,
+  getVisionModelsForProvider,
 } from '@larkup/core/chat-models/registry';
 import {
   toEmbeddingDescriptor,
@@ -93,19 +94,26 @@ export async function GET(req: Request) {
         tags: m.tags,
       })),
       // Keep this workspace-wide list separate from the chat provider list.
-      // A vision tool may intentionally use a different provider than chat.
+      // `availableFrom` preserves the provider/model compatibility that was
+      // lost when native and Gateway catalogs were previously merged.
       availableVisionModels: [
-        ...allChatModels.filter((m) => m.provider !== 'google' && m.tags?.includes('vision')),
-        ...getChatModelsForProvider(allChatModels, 'google').filter((m) =>
-          m.tags?.includes('vision'),
-        ),
-      ].map((m) => ({
-        id: m.id,
-        label: m.name,
-        provider: m.provider,
-        context_window: m.context_window,
-        tags: m.tags,
-      })),
+        ...getVisionModelsForProvider(allChatModels, 'vercel_ai_gateway').map((m) => ({
+          id: m.id,
+          label: m.name,
+          provider: m.provider,
+          availableFrom: ['vercel_ai_gateway', ...(m.provider === 'google' ? [] : [m.provider])],
+          context_window: m.context_window,
+          tags: m.tags,
+        })),
+        ...getVisionModelsForProvider(allChatModels, 'google').map((m) => ({
+          id: m.id,
+          label: m.name,
+          provider: m.provider,
+          availableFrom: ['google'],
+          context_window: m.context_window,
+          tags: m.tags,
+        })),
+      ],
       availableEmbeddingModels: mergedEmbeddings.map((m) => ({
         id: m.id,
         label: m.label,

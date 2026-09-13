@@ -4,9 +4,12 @@ import {
   getChatModelsForProvider,
   getDefaultChatModel,
   getDefaultVisionModel,
+  getVisionModelsForProvider,
   isNativeChatModel,
   normalizeNativeChatModelId,
+  toChatDescriptor,
 } from '../../../packages/core/src/chat-models/registry';
+import { ALL_MODELS } from '../../../packages/core/src/models-list';
 
 test.describe('native provider model routing', () => {
   test('exposes only current, tool-capable Gemini models to direct Google API users', () => {
@@ -52,5 +55,15 @@ test.describe('native provider model routing', () => {
     expect(getDefaultChatModel(catalog, 'google')?.id).toBe(DEFAULT_NATIVE_CHAT_MODELS.google);
     expect(getDefaultVisionModel(catalog, 'google')?.id).toBe(DEFAULT_NATIVE_CHAT_MODELS.google);
     expect(getChatModelsForProvider(catalog, 'openai')).toEqual(catalog);
+  });
+
+  test('does not offer Google-native Gemini models through Vercel AI Gateway', () => {
+    const catalog = ALL_MODELS.filter((model) => model.type === 'language').map(toChatDescriptor);
+    const gatewayModels = getVisionModelsForProvider(catalog, 'vercel_ai_gateway');
+    const nativeGoogleModels = getVisionModelsForProvider(catalog, 'google');
+
+    expect(gatewayModels.some((model) => model.id === 'google/gemini-2.5-flash')).toBe(true);
+    expect(gatewayModels.some((model) => model.id === 'google/gemini-3.6-flash')).toBe(false);
+    expect(nativeGoogleModels.some((model) => model.id === 'google/gemini-3.6-flash')).toBe(true);
   });
 });

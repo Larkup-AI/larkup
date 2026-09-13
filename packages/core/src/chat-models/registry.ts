@@ -118,6 +118,28 @@ export function getChatModelsForProvider(
   );
 }
 
+/**
+ * Return models that can accept image input for the configured provider.
+ *
+ * Gateway models come from its catalog, whereas direct Google API users must
+ * use the current native Gemini catalog rather than Gateway-only aliases.
+ */
+export function getVisionModelsForProvider(
+  models: ChatModelDescriptor[],
+  provider: string,
+): ChatModelDescriptor[] {
+  if (provider === 'vercel_ai_gateway') {
+    return models.filter((model) => model.tags?.includes('vision'));
+  }
+  if (provider === 'google') {
+    return GOOGLE_NATIVE_CHAT_MODELS.filter((model) => model.tags?.includes('vision'));
+  }
+  return models.filter(
+    (model) =>
+      model.provider?.toLowerCase() === provider.toLowerCase() && model.tags?.includes('vision'),
+  );
+}
+
 /** Pick a sensible default model for a provider. */
 export function getDefaultChatModel(
   models: ChatModelDescriptor[],
@@ -143,9 +165,7 @@ export function getDefaultVisionModel(
   models: ChatModelDescriptor[],
   provider: string,
 ): ChatModelDescriptor | undefined {
-  const candidates = getChatModelsForProvider(models, provider).filter((model) =>
-    model.tags?.includes('vision'),
-  );
+  const candidates = getVisionModelsForProvider(models, provider);
   const defaults: Record<string, string> = {
     vercel_ai_gateway: 'openai/gpt-4o-mini',
     openai: 'openai/gpt-4o-mini',
