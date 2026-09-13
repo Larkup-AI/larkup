@@ -5,7 +5,7 @@ import { getSandboxProvider, validateSandboxCredentials } from '@larkup/sandbox/
 import { getEmbeddingModel } from '@larkup/core/embeddings/registry';
 import { getAllModels } from '@larkup/core/models-cache';
 import {
-  getChatModelsForProvider,
+  getVisionModelsForProvider,
   normalizeNativeChatModelId,
   toChatDescriptor,
 } from '@larkup/core/chat-models/registry';
@@ -42,9 +42,7 @@ function imageIndexingCapability(
   }
 
   const languageModels = models.filter((model) => model.type === 'language').map(toChatDescriptor);
-  const visionModels = getChatModelsForProvider(languageModels, provider).filter((model) =>
-    model.tags?.includes('vision'),
-  );
+  const visionModels = getVisionModelsForProvider(languageModels, provider);
   const available = selectedModelId
     ? visionModels.some((model) => model.id === selectedModelId)
     : visionModels.length > 0;
@@ -178,12 +176,10 @@ export async function PUT(request: Request) {
   if (body.visionProvider && !body.visionModelId && body.visionProvider !== 'custom') {
     const models = await getAllModels();
     const hasDefaultVisionModel =
-      body.visionProvider === 'vercel_ai_gateway'
-        ? models.some((model) => model.type === 'language' && model.tags?.includes('vision'))
-        : getChatModelsForProvider(
-            models.filter((model) => model.type === 'language').map(toChatDescriptor),
-            body.visionProvider,
-          ).some((model) => model.tags?.includes('vision'));
+      getVisionModelsForProvider(
+        models.filter((model) => model.type === 'language').map(toChatDescriptor),
+        body.visionProvider,
+      ).length > 0;
     if (!hasDefaultVisionModel) {
       return NextResponse.json(
         { error: `No vision-capable models are available from ${body.visionProvider}.` },
@@ -203,22 +199,12 @@ export async function PUT(request: Request) {
       }
     } else {
       const models = await getAllModels();
-      const model = models.find((candidate) => candidate.id === body.visionModelId);
       const provider = body.visionProvider || body.chatProvider || body.embeddingProvider;
-      const nativeModel = getChatModelsForProvider(
+      const visionModel = getVisionModelsForProvider(
         models.filter((candidate) => candidate.type === 'language').map(toChatDescriptor),
         provider,
       ).find((candidate) => candidate.id === body.visionModelId);
-      const providerMatches =
-        provider === 'vercel_ai_gateway' ||
-        model?.owned_by.toLowerCase() === provider?.toLowerCase() ||
-        nativeModel?.provider === provider;
-      if (
-        (!model && !nativeModel) ||
-        (model && model.type !== 'language') ||
-        !(model?.tags?.includes('vision') || nativeModel?.tags?.includes('vision')) ||
-        !providerMatches
-      ) {
+      if (!visionModel) {
         return NextResponse.json(
           { error: `Vision model "${body.visionModelId}" is not available from ${provider}.` },
           { status: 400 },

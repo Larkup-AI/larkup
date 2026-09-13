@@ -84,13 +84,16 @@ export function ModelsSection() {
   const { data: chatStatus } = useSWR(statusKey, (url: string) => fetch(url).then((r) => r.json()));
 
   const embeddingModels: EmbeddingModelDescriptor[] = chatStatus?.availableEmbeddingModels ?? [];
-  const visionModels: Array<{ id: string; label: string; provider: string }> =
-    chatStatus?.availableVisionModels ?? [];
+  const visionModels: Array<{
+    id: string;
+    label: string;
+    provider: string;
+    availableFrom?: string[];
+  }> = chatStatus?.availableVisionModels ?? [];
   const visionProviders = useMemo(() => {
-    const providers = new Set(visionModels.map((model) => model.provider));
-    if (visionModels.length > 0) {
-      providers.add('vercel_ai_gateway');
-    }
+    const providers = new Set(
+      visionModels.flatMap((model) => model.availableFrom ?? [model.provider]),
+    );
     return [...providers].filter(
       (provider) =>
         VISION_PROVIDER_LIST.has(provider) && PROVIDER_META[provider as keyof typeof PROVIDER_META],
@@ -698,10 +701,8 @@ export function ModelsSection() {
               }}
               items={[
                 { id: 'default', label: 'Default vision model' },
-                ...visionModels.filter(
-                  (model) =>
-                    form.visionProvider === 'vercel_ai_gateway' ||
-                    model.provider === form.visionProvider,
+                ...visionModels.filter((model) =>
+                  (model.availableFrom ?? [model.provider]).includes(form.visionProvider || ''),
                 ),
               ]}
               customModels={form.customVisionModels}
