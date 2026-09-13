@@ -37,12 +37,19 @@ import { shouldAutoOpenSupportingClip } from '@/lib/chat-supporting-clip';
 import { useProject } from '@/components/projects/project-provider';
 import { cn } from '@/lib/utils';
 import { getProviderMeta, ProviderIcon } from '@/components/ui/provider-icon';
-import { get, set, del } from 'idb-keyval';
+import { get, set, del, keys } from 'idb-keyval';
 import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/store/chat-store';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -746,6 +753,26 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
     }
   }
 
+  async function deleteAllChats() {
+    try {
+      const chatStorageKeys = (await keys()).filter(
+        (key): key is string =>
+          typeof key === 'string' && (key === 'chat_sessions' || key.startsWith('chat_messages_')),
+      );
+      await Promise.all(chatStorageKeys.map((key) => del(key)));
+      setHistory([]);
+      setHistorySearch('');
+      setMessages([]);
+      setQueuedMessages([]);
+      setCurrentChatId('');
+      window.history.pushState(null, '', '/chat');
+      toast.success('Chat history cleared');
+    } catch (error) {
+      console.error('Failed to clear chat history', error);
+      toast.error('Could not clear chat history. Please try again.');
+    }
+  }
+
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -993,9 +1020,67 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
                 />
                 <TooltipContent>Chat History</TooltipContent>
               </Tooltip>
-              <SheetContent side="left" className="w-75 sm:w-87.5 p-0 flex flex-col">
+              <SheetContent
+                side="left"
+                showCloseButton={false}
+                className="w-75 sm:w-87.5 p-0 flex flex-col"
+              >
                 <SheetHeader className="p-4 pb-3 border-b">
-                  <SheetTitle className="text-sm font-semibold">Chat History</SheetTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    <SheetTitle className="text-sm font-semibold">Chat History</SheetTitle>
+                    <div className="flex items-center gap-1">
+                      <AlertDialog>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <AlertDialogTrigger
+                                render={
+                                  <button
+                                    type="button"
+                                    aria-label="Clear chat history"
+                                    disabled={history.length === 0}
+                                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-40"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                }
+                              />
+                            }
+                          />
+                          <TooltipContent>Clear all chat history</TooltipContent>
+                        </Tooltip>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete all chat history?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete all saved chats on this device. This
+                              action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => void deleteAllChats()}
+                              className="bg-destructive text-white hover:bg-destructive/90"
+                            >
+                              Delete all
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <SheetClose
+                        render={
+                          <button
+                            type="button"
+                            aria-label="Close chat history"
+                            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        }
+                      />
+                    </div>
+                  </div>
                   <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-2.5 py-1.5">
                     <Search className="size-3.5 shrink-0 text-muted-foreground" />
                     <input

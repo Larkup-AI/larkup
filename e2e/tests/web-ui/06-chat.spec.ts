@@ -96,5 +96,13 @@ test.describe.serial('Chat Page', () => {
     await page.getByRole('button', { name: 'Chat history' }).click();
 
     await expect(page.getByRole('heading', { name: 'Chat History' })).toBeVisible();
+    const clearHistory = page.getByRole('button', { name: 'Clear chat history' });
+    await expect(clearHistory).toBeVisible();
+
+    if (await clearHistory.isEnabled()) {
+      await clearHistory.click();
+      await expect(page.getByRole('alertdialog')).toContainText('Delete all chat history');
+      await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
+    }
   });
 });
