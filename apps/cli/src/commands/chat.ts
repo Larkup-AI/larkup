@@ -157,7 +157,7 @@ export async function chatCommand(options: { project?: string; model?: string })
         process.exit(0);
       }
 
-      const text = input.trim();
+      const text = typeof input === 'string' ? input.trim() : '';
       if (!text) continue;
       if (text.toLowerCase() === 'exit' || text.toLowerCase() === 'quit') {
         log.info('Goodbye.');
