@@ -1,9 +1,18 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { TOOL_EXTENSION, TOOL_META } from './index';
 
 describe('Video Intelligence package metadata', () => {
-  it('identifies the current marketplace release', () => {
-    expect(TOOL_META.version).toBe('0.2.9');
+  it('matches the Marketplace manifest version', async () => {
+    const manifestPath = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../tool.manifest.json',
+    );
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { version: string };
+
+    expect(TOOL_META.version).toBe(manifest.version);
   });
 });
 
