@@ -25,6 +25,7 @@ import {
   Monitor,
   Cloud,
   Info,
+  FolderInput,
 } from 'lucide-react';
 import {
   Select,
@@ -59,6 +60,16 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import {
@@ -93,6 +104,7 @@ export function CorpusPanel({
     { type: 'single'; doc: SourceDocument } | { type: 'all' } | { type: 'selected' } | null
   >(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [movingGroupId, setMovingGroupId] = useState<string | null>(null);
   const [inspectorDoc, setInspectorDoc] = useState<SourceDocument | null>(null);
 
   const [page, setPage] = useState(0);
@@ -209,6 +221,49 @@ export function CorpusPanel({
       toast.success('Corpus and vector index cleared');
     } catch (error) {
       toast.error(formatErrorMessage(error) || 'Could not clear the corpus.');
+    }
+  }
+
+  const selectedDocuments = useMemo(
+    () => groupedDocuments.filter((document) => selectedIds.has(document.id)),
+    [groupedDocuments, selectedIds],
+  );
+  const moveTargets = groups.filter((group) =>
+    selectedDocuments.some((document) => (document.groupId ?? 'default') !== group.id),
+  );
+
+  async function moveSelectedToGroup(group: DataGroup) {
+    if (selectedDocuments.length === 0 || movingGroupId) return;
+    const documentIds = selectedDocuments.flatMap((document) => {
+      if (!document.metadata?.isGroup) return [document.id];
+      return (document.metadata.childIds ?? []).filter(
+        (id: unknown): id is string => typeof id === 'string',
+      );
+    });
+    const mediaAssetIds = selectedDocuments.flatMap((document) =>
+      document.metadata?.isGroup && typeof document.metadata.mediaAssetId === 'string'
+        ? [document.metadata.mediaAssetId]
+        : [],
+    );
+
+    setMovingGroupId(group.id);
+    try {
+      const response = await fetch('/api/documents/move', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentIds, mediaAssetIds, groupId: group.id }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? 'Could not move the selected data.');
+      setSelectedIds(new Set());
+      await onChanged();
+      toast.success(
+        `Moved ${selectedDocuments.length} source${selectedDocuments.length === 1 ? '' : 's'} to ${group.name}.`,
+      );
+    } catch (error) {
+      toast.error(formatErrorMessage(error) || 'Could not move the selected data.');
+    } finally {
+      setMovingGroupId(null);
     }
   }
 
@@ -361,15 +416,55 @@ export function CorpusPanel({
             </SelectContent>
           </Select>
           {selectedIds.size > 0 && (
-            <Button
-              size="sm"
-              variant="secondary"
-              className="h-8 text-xs border-destructive/30 hover:border-destructive/50 hover:text-white hover:bg-destructive  bg-destructive text-white "
-              onClick={() => setDeleteTask({ type: 'selected' })}
-            >
-              <Trash2 className="size-3.5" />
-              Delete {selectedIds.size} selected
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-8 gap-1.5 text-xs"
+                    disabled={movingGroupId !== null}
+                  >
+                    <FolderInput className="size-3.5" />
+                    {movingGroupId ? 'Moving…' : `Actions (${selectedIds.size})`}
+                    <ChevronDown className="size-3.5" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="min-w-52">
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <FolderInput className="size-3.5" />
+                    Move to group
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="min-w-52">
+                    {moveTargets.length > 0 ? (
+                      moveTargets.map((group) => (
+                        <DropdownMenuItem
+                          key={group.id}
+                          disabled={movingGroupId !== null}
+                          onClick={() => void moveSelectedToGroup(group)}
+                        >
+                          <span className="w-5 text-center">{group.icon || '✦'}</span>
+                          <span className="truncate">{group.name}</span>
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <DropdownMenuItem disabled>Already in this group</DropdownMenuItem>
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={movingGroupId !== null}
+                  onClick={() => setDeleteTask({ type: 'selected' })}
+                >
+                  <Trash2 className="size-3.5" />
+                  Delete selected
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <TooltipProvider>
             <Tooltip>
