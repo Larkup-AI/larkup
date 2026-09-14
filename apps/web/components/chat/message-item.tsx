@@ -1060,7 +1060,7 @@ function renderToolPart(
       case 'none': {
         if (behavior.placement !== 'visualization') return null;
         const chartConfig = output as ChartConfig;
-        if (!chartConfig?.data || chartConfig.data.length === 0) return null;
+        if (!chartConfig) return null;
         return <ChatChart key={index} config={chartConfig} />;
       }
 

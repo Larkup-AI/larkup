@@ -17,4 +17,32 @@ describe('createTabularVisualization', () => {
       series: [{ dataKey: 'sum_Revenue', label: 'sum_Revenue' }],
     });
   });
+
+  it('never exposes empty spreadsheet columns as chart labels', () => {
+    expect(
+      createTabularVisualization('show a comparison chart', {
+        columns: ['__EMPTY', 'University', 'International dropout', 'Domestic dropout'],
+        rows: [
+          {
+            __EMPTY: 'ignored',
+            University: 'North',
+            'International dropout': '16%',
+            'Domestic dropout': '13%',
+          },
+          {
+            __EMPTY: 'ignored',
+            University: 'South',
+            'International dropout': '49%',
+            'Domestic dropout': '26%',
+          },
+        ],
+      }),
+    ).toMatchObject({
+      xAxisKey: 'University',
+      series: [
+        { dataKey: 'International dropout', label: 'International dropout' },
+        { dataKey: 'Domestic dropout', label: 'Domestic dropout' },
+      ],
+    });
+  });
 });

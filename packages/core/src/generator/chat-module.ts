@@ -176,6 +176,7 @@ Before answering any user query, you MUST aggressively utilize your available to
 2. Use your MCP (Model Context Protocol) tools to query connected external systems.
 3. Use your Sandbox tools if you need to compute or analyze data.
 4. Strictly follow any active Skill instructions provided below.
+5. When a chart is requested and generateVisualization is available, call it with exact returned rows. Never write chart JSON, ASCII art, or a Markdown table as a substitute.
 
 Your primary directive is: Check Knowledge > Check MCP/Plugins > Follow Skills > Answer User.\`;
 
@@ -305,6 +306,26 @@ async function buildAgentTools() {
       execute: ({ page, limit }) => storeList({ page: page || 1, limit: limit || 20 }),
     });
     descriptions.push({ id: "getIndexedData", name: "Get Indexed Data", description: "List indexed knowledge-base documents.", source: "built-in" });
+  }
+  if (isToolEnabled("generateVisualization")) {
+    tools.generateVisualization = tool({
+      description: "Create an interactive chart from rows already returned by another tool. Call this tool instead of writing chart JSON or an ASCII chart. data must contain the exact rows to plot, and xAxisKey and every series dataKey must exactly match keys in those rows. Never use placeholder keys such as EMPTY, null, or undefined.",
+      inputSchema: z.object({
+        chartType: z.enum(["bar", "area", "line", "pie", "scatter", "radar"]),
+        title: z.string(),
+        subtitle: z.string().optional(),
+        data: z.array(z.record(z.string(), z.any())),
+        xAxisKey: z.string(),
+        series: z.array(z.object({ dataKey: z.string(), label: z.string().optional(), color: z.string().optional() })),
+        colors: z.array(z.string()).optional(),
+        stacked: z.boolean().optional(),
+        showLegend: z.boolean().optional(),
+        xAxisLabel: z.string().optional(),
+        yAxisLabel: z.string().optional(),
+      }),
+      execute: async (config) => config,
+    });
+    descriptions.push({ id: "generateVisualization", name: "Generate Charts", description: "Create interactive charts from returned rows.", source: "built-in" });
   }
   if (isToolEnabled("executeAnalysis") || isToolEnabled("analyzeCorpusWithCode")) {
     tools.executeAnalysis = tool({

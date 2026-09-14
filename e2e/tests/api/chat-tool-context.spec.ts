@@ -5,6 +5,7 @@ import {
   requestsVisualization,
 } from '../../../apps/web/lib/chat/tabular-visualization';
 import { inferTabularPlan } from '../../../apps/web/lib/chat/tabular-query-plan';
+import { normalizeChartConfig } from '../../../apps/web/lib/chat/chart-config';
 import { hasRetrievedPdfEvidence } from '../../../apps/web/lib/chat/visual-routing';
 import {
   isLikelyTabularQuestion,
@@ -94,6 +95,27 @@ test('creates a chart from a queried grouped result without another model tool c
     xAxisKey: 'Region',
     series: [{ dataKey: 'sum_Net Revenue' }],
   });
+});
+
+test('removes placeholder chart names before the chat renderer sees a tool result', () => {
+  const chart = normalizeChartConfig({
+    chartType: 'line',
+    title: 'Comparison',
+    data: [
+      { Campus: 'North', __EMPTY: 0.16, International: '16%', Domestic: '13%' },
+      { Campus: 'South', __EMPTY: 0.49, International: '49%', Domestic: '26%' },
+    ],
+    xAxisKey: 'Campus',
+    series: [
+      { dataKey: '__EMPTY', label: '__EMPTY' },
+      { dataKey: 'International', label: 'International' },
+      { dataKey: 'Domestic', label: 'Domestic' },
+    ],
+  });
+
+  expect(chart.error).toBeUndefined();
+  expect(chart.series.map((series) => series.label)).toEqual(['International', 'Domestic']);
+  expect(JSON.stringify(chart)).not.toContain('EMPTY');
 });
 
 test('plans the CSV demo questions as bounded table queries', () => {
