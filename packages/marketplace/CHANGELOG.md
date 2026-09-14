@@ -1,5 +1,11 @@
 # @larkup/marketplace
 
+## 0.2.7
+
+### Patch Changes
+
+- Fix Hub database modules loading on Node.js runtimes that use native TypeScript stripping.
+
 ## 0.2.6
 
 ### Patch Changes
