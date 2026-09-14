@@ -1,5 +1,13 @@
 # @larkup/core
 
+## 0.5.5
+
+### Patch Changes
+
+- 167ee9c: Fix Agent Server chart requests by registering the interactive visualization tool.
+- b483d01: Preserve indexed source state when moving data between groups.
+- ff5a5b6: fix: only offer vision models supported by the selected provider
+
 ## 0.5.4
 
 ### Patch Changes

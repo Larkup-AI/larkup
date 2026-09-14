@@ -1,5 +1,21 @@
 # larkup
 
+## 0.3.5
+
+### Patch Changes
+
+- cb7196f: Add a confirmed bulk-delete action for local chat history.
+- b483d01: Allow selected sources to be moved between Data groups from the actions menu.
+- ff5a5b6: fix: only offer vision models supported by the selected provider
+- 167ee9c: Fix chart rendering when an assistant returns malformed data or placeholder series names.
+- Updated dependencies [167ee9c]
+- Updated dependencies [b483d01]
+- Updated dependencies [ff5a5b6]
+  - @larkup/core@0.5.5
+  - @larkup/marketplace@0.2.6
+  - @larkup/tool-doc-editor@0.2.23
+  - @larkup/scraper@0.1.44
+
 ## 0.3.4
 
 ### Patch Changes

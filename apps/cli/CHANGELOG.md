@@ -1,5 +1,16 @@
 # @larkup/cli
 
+## 0.3.2
+
+### Patch Changes
+
+- Prevent cancelled CLI prompt values from being handled as strings.
+- Updated dependencies [167ee9c]
+- Updated dependencies [b483d01]
+- Updated dependencies [ff5a5b6]
+  - @larkup/core@0.5.5
+  - @larkup/marketplace@0.2.6
+
 ## 0.3.1
 
 ### Patch Changes
