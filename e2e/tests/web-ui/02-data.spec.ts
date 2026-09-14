@@ -559,6 +559,60 @@ test.describe.serial('Data Page', () => {
     await expect(page.getByRole('button', { name: 'Clear all data' })).toBeVisible();
   });
 
+  test('moves selected corpus data into another group from the actions menu', async ({ page }) => {
+    const groups = [
+      { id: 'default', name: 'Ungrouped', icon: '', color: '#6b7280', createdAt: '2026-01-01' },
+      { id: 'research', name: 'Research', icon: '◆', color: '#2563eb', createdAt: '2026-01-01' },
+      { id: 'archive', name: 'Archive', icon: '●', color: '#6b7280', createdAt: '2026-01-01' },
+    ];
+    let moveRequest: unknown;
+
+    await page.route('**/api/documents/move', async (route) => {
+      moveRequest = route.request().postDataJSON();
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ groupId: 'archive', movedCount: 1, documents: [], mediaAssets: [] }),
+      });
+    });
+    await page.route('**/api/documents', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          documents: [
+            {
+              id: 'move-fixture',
+              title: 'Quarterly research',
+              content: 'Fixture content',
+              source: 'text',
+              charCount: 15,
+              status: 'indexed',
+              createdAt: '2026-01-01T00:00:00.000Z',
+              groupId: 'research',
+            },
+          ],
+          groups,
+          stats: { docCount: 1, charCount: 15, bySource: { text: 1 } },
+        }),
+      });
+    });
+    await page.goto('/data');
+
+    await page.getByRole('checkbox', { name: 'Select document' }).check();
+    await page.getByRole('button', { name: 'Actions (1)' }).click();
+    await page.getByText('Move to group', { exact: true }).hover();
+    await page.getByText('Archive', { exact: true }).click();
+
+    await expect
+      .poll(() => moveRequest)
+      .toEqual({
+        documentIds: ['move-fixture'],
+        mediaAssetIds: [],
+        groupId: 'archive',
+      });
+    await expect(page.getByText('Moved 1 source to Archive.')).toBeVisible();
+  });
+
   test('delete a document from corpus', async ({ page }) => {
     await page.goto('/data');
     await page.waitForTimeout(500);

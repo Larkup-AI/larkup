@@ -47,6 +47,60 @@ test.describe('Documents API (/api/documents)', () => {
     }
   });
 
+  test('PATCH /api/documents/move moves selected sources between groups', async ({ request }) => {
+    test.skip(
+      await isDataAddingBlocked(request),
+      'Embedding credentials are required before adding data',
+    );
+
+    const suffix = Date.now();
+    const sourceGroupResponse = await request.post('/api/groups', {
+      data: { name: `Move source ${suffix}`, icon: '◆' },
+    });
+    const targetGroupResponse = await request.post('/api/groups', {
+      data: { name: `Move target ${suffix}`, icon: '●' },
+    });
+    expect(sourceGroupResponse.status()).toBe(201);
+    expect(targetGroupResponse.status()).toBe(201);
+    const sourceGroup = (await sourceGroupResponse.json()).group as { id: string };
+    const targetGroup = (await targetGroupResponse.json()).group as { id: string };
+
+    let documentId: string | undefined;
+    try {
+      const createResponse = await request.post('/api/documents', {
+        data: {
+          title: 'Movable E2E document',
+          content: TEST_PASTE_TEXT,
+          source: 'paste',
+          groupId: sourceGroup.id,
+        },
+      });
+      expect(createResponse.status()).toBe(201);
+      documentId = (await createResponse.json()).document.id as string;
+
+      const moveResponse = await request.patch('/api/documents/move', {
+        data: { documentIds: [documentId], mediaAssetIds: [], groupId: targetGroup.id },
+      });
+      expect(moveResponse.status()).toBe(200);
+      const move = await moveResponse.json();
+      expect(move.groupId).toBe(targetGroup.id);
+      expect(move.movedCount).toBe(1);
+      expect(move.documents).toEqual([
+        expect.objectContaining({ id: documentId, groupId: targetGroup.id }),
+      ]);
+
+      const documents = await request.get('/api/documents');
+      expect(documents.status()).toBe(200);
+      expect((await documents.json()).documents).toContainEqual(
+        expect.objectContaining({ id: documentId, groupId: targetGroup.id }),
+      );
+    } finally {
+      if (documentId) await request.delete(`/api/documents?id=${documentId}`).catch(() => {});
+      await request.delete(`/api/groups?id=${sourceGroup.id}`).catch(() => {});
+      await request.delete(`/api/groups?id=${targetGroup.id}`).catch(() => {});
+    }
+  });
+
   test('POST /api/documents — blocks valid documents without embedding credentials', async ({
     request,
   }) => {

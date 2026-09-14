@@ -284,6 +284,25 @@ export function updateMediaAsset(
   });
 }
 
+/** Move media assets to a group while preserving all indexing state. */
+export function updateMediaAssetsGroup(ids: string[], groupId: string): Promise<MediaAsset[]> {
+  return serialize(async () => {
+    const idSet = new Set(ids);
+    if (idSet.size === 0) return [];
+    const assets = await readMediaAssets();
+    const now = new Date().toISOString();
+    const updated: MediaAsset[] = [];
+    for (const asset of assets) {
+      if (!idSet.has(asset.id) || asset.groupId === groupId) continue;
+      asset.groupId = groupId;
+      asset.updatedAt = now;
+      updated.push(asset);
+    }
+    if (updated.length > 0) await writeAll(assets);
+    return updated;
+  });
+}
+
 /**
  * Merge one stage update without clobbering progress reported by parallel
  * stages. The legacy scalar progress fields remain a projection for older
@@ -315,8 +334,8 @@ export function updateMediaStage(
     const status = terminalStatuses.has(previous.status)
       ? previous.status
       : previous.status === 'running' && requestedStatus === 'waiting'
-      ? previous.status
-      : requestedStatus;
+        ? previous.status
+        : requestedStatus;
 
     const previousPercent = boundedPercent(previous.percent);
     const requestedPercent = boundedPercent(patch.percent);
@@ -360,7 +379,7 @@ export function updateMediaStage(
         previous.startedAt ??
         (status === 'running' || isTerminal ? now : undefined),
       updatedAt: now,
-      finishedAt: isTerminal ? patch.finishedAt ?? previous.finishedAt ?? now : undefined,
+      finishedAt: isTerminal ? (patch.finishedAt ?? previous.finishedAt ?? now) : undefined,
     };
     steps[stepIndex] = nextStep;
 
@@ -373,8 +392,8 @@ export function updateMediaStage(
       .find((step) => step.status === 'running' && step.message)?.message;
     const projectedMessage =
       nextStep.status === 'running'
-        ? nextStep.message ?? patch.message ?? asset.processingMessage
-        : runningMessage ?? patch.message ?? nextStep.message ?? asset.processingMessage;
+        ? (nextStep.message ?? patch.message ?? asset.processingMessage)
+        : (runningMessage ?? patch.message ?? nextStep.message ?? asset.processingMessage);
 
     assets[index] = {
       ...asset,

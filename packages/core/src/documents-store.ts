@@ -180,6 +180,23 @@ export function updateDocument(
   });
 }
 
+/** Move a set of stored sources to an existing group without re-indexing them. */
+export function updateDocumentsGroup(ids: string[], groupId: string): Promise<SourceDocument[]> {
+  return serialize(async () => {
+    const idSet = new Set(ids);
+    if (idSet.size === 0) return [];
+    const docs = await readDocuments();
+    const updated: SourceDocument[] = [];
+    for (const doc of docs) {
+      if (!idSet.has(doc.id) || doc.groupId === groupId) continue;
+      doc.groupId = groupId;
+      updated.push(doc);
+    }
+    if (updated.length > 0) await writeAll(docs);
+    return updated;
+  });
+}
+
 export function deleteDocument(id: string) {
   return serialize(async () => {
     const docs = await readDocuments();
