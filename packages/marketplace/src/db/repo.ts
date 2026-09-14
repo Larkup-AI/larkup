@@ -15,9 +15,12 @@ import { workspaceInstallations } from './schema/installations.js';
 import { validateToolManifest } from './validate.js';
 
 export class ManifestInvalidError extends Error {
-  constructor(readonly errors: string[]) {
+  readonly errors: string[];
+
+  constructor(errors: string[]) {
     super(`Invalid manifest: ${errors.join('; ')}`);
     this.name = 'ManifestInvalidError';
+    this.errors = errors;
   }
 }
 
