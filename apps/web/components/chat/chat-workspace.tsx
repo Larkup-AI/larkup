@@ -1308,13 +1308,13 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
             />
           )}
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
-            <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-0.5 focus-within:ring-ring/20">
+            <div className="flex items-center gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-0.5 focus-within:ring-ring/20">
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
                     <button
                       type="button"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-secondary hover:text-foreground mt-1"
                     >
                       <Plus className="h-4.5 w-4.5" />
                     </button>
@@ -1437,7 +1437,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
                   rows={1}
                   disabled={!ready}
                   placeholder="How can I help you…"
-                  className="max-h-48 min-h-11 w-full resize-none overflow-y-auto bg-transparent px-2 py-3 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground scrollbar-none [&::-webkit-scrollbar]:hidden disabled:opacity-50"
+                  className="max-h-48 min-h-11 w-full resize-none overflow-y-auto bg-transparent px-2 py-2.5 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground scrollbar-none [&::-webkit-scrollbar]:hidden disabled:opacity-50"
                 />
               </div>
 
