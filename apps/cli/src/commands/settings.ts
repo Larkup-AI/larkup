@@ -27,6 +27,7 @@ export async function settingsCommand(options: { project?: string }) {
       log.info('Cancelled.');
       return;
     }
+    if (typeof selectedProvider !== 'string') return;
 
     const availableModels = chatModels.filter((m) => m.provider === selectedProvider);
 
@@ -40,11 +41,12 @@ export async function settingsCommand(options: { project?: string }) {
       log.info('Cancelled.');
       return;
     }
+    if (typeof selectedModel !== 'string') return;
 
     await writeConfig({
       ...config,
-      chatProvider: selectedProvider as string,
-      chatModelId: selectedModel as string,
+      chatProvider: selectedProvider,
+      chatModelId: selectedModel,
     });
     log.success(`Settings saved. Chat model set to ${selectedModel}.`);
   });
