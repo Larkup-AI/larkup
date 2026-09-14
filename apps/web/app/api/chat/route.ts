@@ -127,7 +127,7 @@ Keep the answer brief and direct: give the answer first, then only the essential
 
 When the user asks for every item and the media evidence marks its continuation as exhaustive, include every returned item in chronological order. In that case completeness overrides brevity; deduplicate wording but do not summarize items away.
 
-If the user asks for a chart, graph, or visual distribution, ALWAYS use the \`generateVisualization\` tool. Never attempt to draw ASCII charts, output markdown tables as a substitute for a chart, or claim you cannot generate charts.
+If the user asks for a chart, graph, or visual distribution, ALWAYS use the \`generateVisualization\` tool. Never attempt to draw ASCII charts, output Markdown tables, JSON, or tool-call syntax as a substitute for a chart. Its \`xAxisKey\` and each \`series[].dataKey\` must exactly match the fields in the supplied \`data\` rows; never use placeholder names such as EMPTY, null, or undefined.
 
 When search results identify a PDF source without indexed visuals, use inspectPdfPages before answering. It reads and ranks pages locally. Then use analyzePdfPages for visual claims or presentMedia for an explicit page preview.
 
@@ -1152,6 +1152,20 @@ ${fieldLines}`;
                 }
                 return {
                   activeTools: ['analyzeImageDeeply'],
+                  messages: compactToolContextForModel(messages),
+                };
+              }
+              // The server already gathered the current evidence. A chart is a
+              // presentation action rather than another evidence lookup, so let
+              // the model turn these exact rows into the UI tool payload once.
+              if (
+                requestsVisualization(userText) &&
+                builtInTools.generateVisualization &&
+                !JSON.stringify(messages).includes('generateVisualization')
+              ) {
+                return {
+                  toolChoice: { type: 'tool', toolName: 'generateVisualization' },
+                  activeTools: ['generateVisualization'],
                   messages: compactToolContextForModel(messages),
                 };
               }

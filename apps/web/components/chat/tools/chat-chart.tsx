@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -27,6 +27,7 @@ import {
 } from 'recharts';
 import { Download, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { normalizeChartConfig, type ChartConfig, type SeriesConfig } from '@/lib/chat/chart-config';
 
 const CHART_COLORS = [
   '#10b981', // green (emerald)
@@ -85,25 +86,7 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-interface SeriesConfig {
-  dataKey: string;
-  label?: string;
-  color?: string;
-}
-
-export interface ChartConfig {
-  chartType: 'bar' | 'area' | 'line' | 'pie' | 'scatter' | 'radar';
-  title: string;
-  subtitle?: string;
-  data: Record<string, any>[];
-  xAxisKey: string;
-  series: SeriesConfig[];
-  colors?: string[];
-  stacked?: boolean;
-  showLegend?: boolean;
-  xAxisLabel?: string;
-  yAxisLabel?: string;
-}
+export type { ChartConfig } from '@/lib/chat/chart-config';
 
 function downloadCSV(data: Record<string, any>[], title: string) {
   if (data.length === 0) return;
@@ -175,6 +158,10 @@ function useDeepMemo<T>(factory: () => T, deps: any[]): T {
 export function ChatChart({ config }: { config: ChartConfig }) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  // Tool outputs are model-generated and historic conversations may contain
+  // older payload shapes. Normalize immediately before rendering as a final
+  // defensive boundary.
+  const normalizedConfig = useMemo(() => normalizeChartConfig(config), [config]);
   const {
     chartType,
     title,
@@ -187,73 +174,11 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     showLegend = true,
     xAxisLabel,
     yAxisLabel,
-  } = config;
+  } = normalizedConfig;
 
-  const { stableData, stableSeries, stableXAxisKey } = useDeepMemo(() => {
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      return { stableData: [], stableSeries: series, stableXAxisKey: xAxisKey };
-    }
-
-    const firstRow = data[0];
-    const availableKeys = Object.keys(firstRow);
-
-    // 1. Auto-correct xAxisKey
-    let newXAxisKey = xAxisKey;
-    if (xAxisKey && !(xAxisKey in firstRow)) {
-      const match = availableKeys.find(
-        (k) =>
-          k.toLowerCase().includes(xAxisKey.toLowerCase()) ||
-          xAxisKey.toLowerCase().includes(k.toLowerCase()),
-      );
-      if (match) {
-        newXAxisKey = match;
-      } else {
-        // Find the first key that typically represents a label (string)
-        const stringKey = availableKeys.find(
-          (k) =>
-            typeof firstRow[k] === 'string' &&
-            isNaN(Number(firstRow[k].toString().replace(/[^0-9.-]/g, ''))),
-        );
-        if (stringKey) newXAxisKey = stringKey;
-        else newXAxisKey = availableKeys[0]; // fallback
-      }
-    }
-
-    // 2. Auto-correct series dataKeys
-    const valueKeys = availableKeys.filter((k) => k !== newXAxisKey);
-    const newSeries = series.map((s) => {
-      if (!(s.dataKey in firstRow) && valueKeys.length > 0) {
-        const match = valueKeys.find(
-          (k) =>
-            k.toLowerCase().includes(s.dataKey.toLowerCase()) ||
-            s.dataKey.toLowerCase().includes(k.toLowerCase()),
-        );
-        if (match) {
-          return { ...s, dataKey: match };
-        }
-        return { ...s, dataKey: valueKeys[0] };
-      }
-      return s;
-    });
-
-    // 3. Coerce values
-    const newData = data.map((row) => {
-      const newRow = { ...row };
-      newSeries.forEach((s) => {
-        const val = newRow[s.dataKey];
-        if (typeof val === 'string') {
-          // clean commas, currency symbols, etc.
-          const cleaned = val.replace(/[^0-9.-]/g, '');
-          if (cleaned !== '' && !isNaN(Number(cleaned))) {
-            newRow[s.dataKey] = Number(cleaned);
-          }
-        }
-      });
-      return newRow;
-    });
-
-    return { stableData: newData, stableSeries: newSeries, stableXAxisKey: newXAxisKey };
-  }, [data, series, xAxisKey]);
+  const stableData = data;
+  const stableSeries = series;
+  const stableXAxisKey = xAxisKey;
 
   const chartColors = useDeepMemo(() => {
     const palette = colors && colors.length > 0 ? colors : CHART_COLORS;
@@ -526,11 +451,11 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     }
   };
 
-  if (!data || data.length === 0) {
+  if (normalizedConfig.error) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center border border-border/70 rounded-xl my-4 bg-transparent text-muted-foreground">
-        <p className="text-sm">No data available for this chart</p>
-        <p className="text-xs opacity-70 mt-1">The AI did not provide any data to plot.</p>
+        <p className="text-sm">This chart could not be prepared</p>
+        <p className="text-xs opacity-70 mt-1">{normalizedConfig.error}</p>
       </div>
     );
   }

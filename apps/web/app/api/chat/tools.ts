@@ -69,6 +69,7 @@ import {
   shouldKeepActiveMediaSource,
 } from '@/lib/chat/media-source-routing';
 import { createTabularVisualization } from '@/lib/chat/tabular-visualization';
+import { normalizeChartConfig } from '@/lib/chat/chart-config';
 import { inferTabularPlan } from '@/lib/chat/tabular-query-plan';
 import { leadingMediaAssetId } from '@/lib/chat/media-retrieval-routing';
 import { findIndexedImageSource } from '@/lib/chat/visual-routing';
@@ -2420,7 +2421,7 @@ export async function getChatTools(context: {
 
     generateVisualization: tool({
       description:
-        'Generate an interactive chart visualization. Use this when the user asks to see trends, comparisons, distributions, or any visual representation of data. The UI will render this as an interactive Recharts chart automatically. CRITICAL: Do NOT attempt to embed a markdown image (e.g. ![chart](url)) after calling this tool. The UI handles the rendering. Simply summarize the chart verbally.',
+        'Generate an interactive chart visualization from evidence already returned by a tool. Call this tool instead of writing JSON, Markdown, or an ASCII chart in your answer. Copy the exact rows to data. xAxisKey and every series.dataKey must exactly match fields in those rows; never use placeholder names such as EMPTY, null, or undefined. The UI renders the result automatically, so after calling it only summarize the finding in prose.',
       inputSchema: z.object({
         chartType: z
           .enum(['bar', 'area', 'line', 'pie', 'scatter', 'radar'])
@@ -2459,8 +2460,10 @@ export async function getChatTools(context: {
         yAxisLabel: z.string().optional().describe('Label for the Y axis.'),
       }),
       execute: async (config) => {
-        // Pass through — the UI renders this directly
-        return config;
+        // Treat model tool arguments as untrusted. The renderer repeats this
+        // normalization for historical messages, but normalizing here keeps
+        // follow-up model steps from receiving unusable series names as well.
+        return normalizeChartConfig(config);
       },
     }),
 
