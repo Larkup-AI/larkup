@@ -4,6 +4,7 @@
 
 ### Patch Changes
 
+- Keep the bundled Video Intelligence fallback catalog aligned with version 0.2.10.
 - Updated dependencies [167ee9c]
 - Updated dependencies [b483d01]
 - Updated dependencies [ff5a5b6]

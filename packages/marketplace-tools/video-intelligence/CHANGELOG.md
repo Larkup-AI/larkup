@@ -4,6 +4,7 @@
 
 ### Patch Changes
 
+- Keep the runtime metadata aligned with the Marketplace package version.
 - Updated dependencies [167ee9c]
 - Updated dependencies [b483d01]
 - Updated dependencies [ff5a5b6]

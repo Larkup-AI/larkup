@@ -92,7 +92,9 @@ echo "  Docker:  ${PUBLISH_DOCKER}"
 echo "  Desktop: ${PUBLISH_DESKTOP}"
 
 if [ "$PUBLISH_NPM" = true ]; then
+  node "$SCRIPTS_DIR/publish-marketplace-catalog.mjs" --check
   "$SCRIPTS_DIR/publish-npm.sh"
+  node "$SCRIPTS_DIR/publish-marketplace-catalog.mjs"
 fi
 
 if [ "$PUBLISH_PYPI" = true ]; then
