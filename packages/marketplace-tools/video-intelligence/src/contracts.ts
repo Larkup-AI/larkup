@@ -4,11 +4,7 @@
  * runtime.ts executes against once detection resolves 'local' to one of them.
  */
 export type VideoRuntimeMode =
-  | 'local'
-  | 'local-docker'
-  | 'local-process'
-  | 'managed-cloud'
-  | 'custom-remote';
+  'local' | 'local-docker' | 'local-process' | 'managed-cloud' | 'custom-remote';
 export type LocalVideoRuntimeKind = 'local-docker' | 'local-process';
 export type VideoIndexingMode = 'fast' | 'balanced' | 'thorough';
 /** Optional free-form source description; it never selects a fixed pipeline. */
@@ -268,13 +264,38 @@ export interface VideoEvidenceBundle {
       evidence: Array<{ startMs: number; endMs: number }>;
     }>;
     sourceItems?: Array<{
-      kind: 'question' | 'heading' | 'slide-item' | 'board-item' | 'list-item';
+      kind: 'question' | 'clue' | 'heading' | 'slide-item' | 'board-item' | 'list-item';
       channel: 'spoken' | 'visible';
+      questionRole?: 'primary' | 'interactional' | 'rhetorical' | 'not-question';
       text: string;
       answer: string;
+      respondent?: string;
       startMs: number;
       endMs: number;
     }>;
+    sourceActivityStructures?: Array<{
+      kind: 'grid' | 'sequence' | 'collection';
+      label: string;
+      dimensions: Array<{ label: string; values: string[] }>;
+      promptCount?: number;
+      startMs: number;
+      endMs: number;
+    }>;
+    sourceTaskInstances?: Array<{
+      id: string;
+      prompt: string;
+      channel: 'spoken' | 'visible';
+      answer: string;
+      respondent?: string;
+      startMs: number;
+      endMs: number;
+    }>;
+    sourceInventoryCoverage?: {
+      complete: boolean;
+      totalWindows: number;
+      processedWindows: number;
+      reason?: string;
+    };
     uncertainties: string[];
   };
   answeringGuide: {

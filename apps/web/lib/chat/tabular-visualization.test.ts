@@ -14,8 +14,32 @@ describe('createTabularVisualization', () => {
     ).toMatchObject({
       chartType: 'line',
       xAxisKey: 'Date_month',
-      series: [{ dataKey: 'sum_Revenue', label: 'sum_Revenue' }],
+      series: [{ dataKey: 'sum_Revenue', label: 'sum Revenue' }],
     });
+  });
+
+  it('recognizes plural trend requests as a visualization intent', () => {
+    expect(
+      createTabularVisualization('Show monthly Sales and Profit trends.', {
+        columns: ['Order Date_month', 'sum_Sales', 'sum_Profit'],
+        rows: [{ 'Order Date_month': '2025-01', sum_Sales: 100, sum_Profit: 10 }],
+      }),
+    ).toMatchObject({
+      chartType: 'line',
+      series: [{ dataKey: 'sum_Sales' }, { dataKey: 'sum_Profit' }],
+    });
+  });
+
+  it('uses a line chart when the user explicitly requests one', () => {
+    expect(
+      createTabularVisualization('Create a line chart of monthly sales.', {
+        columns: ['Order Date_month', 'sum_Sales'],
+        rows: [
+          { 'Order Date_month': '2025-01', sum_Sales: 100 },
+          { 'Order Date_month': '2025-02', sum_Sales: 150 },
+        ],
+      }),
+    ).toMatchObject({ chartType: 'line' });
   });
 
   it('never exposes empty spreadsheet columns as chart labels', () => {

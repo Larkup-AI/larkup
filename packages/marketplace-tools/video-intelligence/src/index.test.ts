@@ -65,5 +65,8 @@ describe('Video Intelligence configuration verification', () => {
         body: expect.stringContaining('"model":"deepseek-v3.2"'),
       }),
     );
+    expect(request.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ body: expect.stringContaining('"max_tokens":16') }),
+    );
   });
 });

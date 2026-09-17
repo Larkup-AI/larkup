@@ -247,6 +247,7 @@ SOURCE_INVENTORY_JSON_SCHEMA: dict[str, Any] = {
                         "type": "string",
                         "enum": [
                             "question",
+                            "clue",
                             "heading",
                             "slide-item",
                             "board-item",
@@ -254,24 +255,96 @@ SOURCE_INVENTORY_JSON_SCHEMA: dict[str, Any] = {
                         ],
                     },
                     "channel": {"type": "string", "enum": ["spoken", "visible"]},
+                    "questionRole": {
+                        "type": "string",
+                        "enum": ["primary", "interactional", "rhetorical", "not-question"],
+                    },
                     "text": {"type": "string", "maxLength": 600},
                     "answer": {"type": "string", "maxLength": 600},
+                    "respondent": {"type": "string", "maxLength": 240},
                     "startMs": {"type": "number"},
                     "endMs": {"type": "number"},
                 },
                 "required": [
                     "kind",
                     "channel",
+                    "questionRole",
                     "text",
                     "answer",
+                    "respondent",
                     "startMs",
                     "endMs",
                 ],
                 "additionalProperties": False,
             },
-        }
+        },
+        "structures": {
+            "type": "array",
+            "maxItems": 24,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "kind": {"type": "string", "enum": ["grid", "sequence", "collection"]},
+                    "label": {"type": "string", "maxLength": 240},
+                    "dimensions": {
+                        "type": "array",
+                        "maxItems": 4,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "label": {"type": "string", "maxLength": 120},
+                                "values": {
+                                    "type": "array",
+                                    "maxItems": 24,
+                                    "items": {"type": "string", "maxLength": 120},
+                                },
+                            },
+                            "required": ["label", "values"],
+                            "additionalProperties": False,
+                        },
+                    },
+                    "startMs": {"type": "number"},
+                    "endMs": {"type": "number"},
+                },
+                "required": ["kind", "label", "dimensions", "startMs", "endMs"],
+                "additionalProperties": False,
+            },
+        },
+        "taskInstances": {
+            "type": "array",
+            "maxItems": 128,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "prompt": {"type": "string", "maxLength": 600},
+                    "channel": {"type": "string", "enum": ["spoken", "visible"]},
+                    "answer": {"type": "string", "maxLength": 600},
+                    "respondent": {"type": "string", "maxLength": 240},
+                    "startMs": {"type": "number"},
+                    "endMs": {"type": "number"},
+                },
+                "required": [
+                    "prompt",
+                    "channel",
+                    "answer",
+                    "respondent",
+                    "startMs",
+                    "endMs",
+                ],
+                "additionalProperties": False,
+            },
+        },
     },
-    "required": ["items"],
+    "required": ["items", "structures", "taskInstances"],
+    "additionalProperties": False,
+}
+
+TASK_INSTANCE_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "taskInstances": SOURCE_INVENTORY_JSON_SCHEMA["properties"]["taskInstances"],
+    },
+    "required": ["taskInstances"],
     "additionalProperties": False,
 }
 
@@ -579,6 +652,14 @@ class AgentPlanner:
         self.last_error: str | None = None
         self.errors: list[str] = []
         self.fallback_used = False
+        self.source_inventory_coverage: dict[str, Any] = {
+            "complete": False,
+            "totalWindows": 0,
+            "processedWindows": 0,
+            "reason": "source inventory has not run",
+        }
+        self.source_activity_structures: list[dict[str, Any]] = []
+        self.source_task_instances: list[dict[str, Any]] = []
 
     def plan(
         self,
@@ -774,9 +855,17 @@ class AgentPlanner:
         semantic_observations: list[dict[str, Any]],
         overlay_text: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
-        """Map every source-authored question and visible list unit in bounded time chunks."""
+        """Map source units and source-established layouts in bounded time chunks."""
         fallback = _fallback_source_inventory(semantic_observations, duration_secs)
+        self.source_activity_structures = []
+        self.source_task_instances = []
         if not self.enabled or not self.api_key:
+            self.source_inventory_coverage = {
+                "complete": False,
+                "totalWindows": 0,
+                "processedWindows": 0,
+                "reason": "source inventory model is unavailable",
+            }
             return fallback
         chunks = _source_inventory_chunks(
             duration_secs=duration_secs,
@@ -785,9 +874,17 @@ class AgentPlanner:
             overlay_text=overlay_text or [],
         )
         if not chunks:
+            self.source_inventory_coverage = {
+                "complete": False,
+                "totalWindows": 0,
+                "processedWindows": 0,
+                "reason": "no source evidence was available to scan",
+            }
             return fallback
         started = time.monotonic()
         completed: dict[int, list[dict[str, Any]]] = {}
+        completed_structures: dict[int, list[dict[str, Any]]] = {}
+        completed_tasks: dict[int, list[dict[str, Any]]] = {}
         errors: list[str] = []
         usage_totals = {"promptTokens": 0, "completionTokens": 0}
 
@@ -800,7 +897,35 @@ class AgentPlanner:
                 json_schema=SOURCE_INVENTORY_JSON_SCHEMA,
                 request_attempts=1,
             )
-            return index, _validated_source_inventory(raw, duration_secs, chunk), usage
+            items = _validated_source_inventory(raw, duration_secs, chunk)
+            tasks = _validated_source_task_instances(raw, duration_secs, chunk)
+            if not tasks and any(item["kind"] == "question" for item in items) and sum(
+                item["kind"] == "clue" for item in items
+            ) >= 2:
+                task_raw, task_usage = self._complete(
+                    _source_task_instance_prompt(chunk["range"], items),
+                    [],
+                    max_output_tokens=4_000,
+                    timeout_seconds=30,
+                    json_schema=TASK_INSTANCE_JSON_SCHEMA,
+                    request_attempts=1,
+                )
+                tasks = _validated_source_task_instances(
+                    task_raw, duration_secs, chunk
+                )
+                usage = {
+                    "promptTokens": usage.get("promptTokens", 0)
+                    + task_usage.get("promptTokens", 0),
+                    "completionTokens": usage.get("completionTokens", 0)
+                    + task_usage.get("completionTokens", 0),
+                }
+            return (
+                index,
+                items,
+                _validated_source_activity_structures(raw, duration_secs, chunk),
+                tasks,
+                usage,
+            )
 
         try:
             # These requests contain disjoint time ranges and are independent.
@@ -813,8 +938,10 @@ class AgentPlanner:
                 for future in as_completed(futures):
                     self.requests += 1
                     try:
-                        index, items, usage = future.result()
+                        index, items, structures, tasks, usage = future.result()
                         completed[index] = items
+                        completed_structures[index] = structures
+                        completed_tasks[index] = tasks
                         usage_totals["promptTokens"] += usage.get("promptTokens", 0)
                         usage_totals["completionTokens"] += usage.get("completionTokens", 0)
                     except Exception as error:
@@ -826,10 +953,46 @@ class AgentPlanner:
             self.completion_tokens += usage_totals["completionTokens"]
             if errors:
                 self.errors.extend(errors[-3:])
-            return _merge_source_inventory(
+            self.source_inventory_coverage = {
+                "complete": len(completed) == len(chunks) and not errors,
+                "totalWindows": len(chunks),
+                "processedWindows": len(completed),
+                **(
+                    {}
+                    if len(completed) == len(chunks) and not errors
+                    else {"reason": "one or more source inventory windows failed"}
+                ),
+            }
+            self.source_activity_structures = _merge_source_activity_structures(
+                *[
+                    completed_structures[index]
+                    for index in sorted(completed_structures)
+                ]
+            )
+            merged_items = _merge_source_inventory(
                 fallback,
                 *[completed[index] for index in sorted(completed)],
             )
+            task_instances = _merge_source_task_instances(
+                *[completed_tasks[index] for index in sorted(completed_tasks)]
+            )
+            self.source_task_instances = [
+                task
+                for task in task_instances
+                if not any(
+                    item["kind"] == "question"
+                    and item["channel"] == task["channel"]
+                    and re.sub(r"\s+", " ", item["text"].casefold()).strip()
+                    == re.sub(r"\s+", " ", task["prompt"].casefold()).strip()
+                    # A held card can be inventoried several times while its
+                    # timer runs. It is still the same direct prompt, not a
+                    # continued instance, even when the readings are a minute
+                    # apart.
+                    and abs(item["startMs"] - task["startMs"]) <= 120_000
+                    for item in merged_items
+                )
+            ]
+            return merged_items
         finally:
             self.latency_ms += round((time.monotonic() - started) * 1_000)
 
@@ -1247,19 +1410,79 @@ def _source_inventory_prompt(chunk: dict[str, Any]) -> str:
     return (
         "Create an exhaustive inventory of discrete source-authored units in this timestamped "
         "portion of a recording. The source can be any kind of recording. Extract only: questions "
-        "actually asked by a speaker or visibly written; headings or titles; individual slide, "
-        "board, or explicitly enumerated list items. Do not turn ordinary narration, conversation, "
-        "descriptions, model instructions, or analysis prompts into inventory items. Preserve the "
-        "source language and wording. For a spoken question, start at the actual interrogative or "
-        "request and omit surrounding banter, answers, and reactions. If a nearby source passage "
-        "explicitly answers a question, "
-        "copy the answer; otherwise use an empty answer. Give the narrowest supplied timestamp "
+        "whose answer is a substantive part of the recording; headings or titles; individual slide, "
+        "board, or explicitly enumerated list items; and declarative hints used to solve an explicit "
+        "prompt. Use kind 'question' only for a standalone, content-bearing prompt that asks for an "
+        "answer. A greeting, social check-in, turn-management request, rhetorical question, or casual "
+        "banter is not a source question. Do not turn a declarative hint, a description, model "
+        "instruction, or analysis prompt into a question: represent an explicit solving hint as kind "
+        "'clue' and otherwise omit it. Preserve the source language and wording. For a spoken "
+        "question, start at the actual interrogative or request and omit surrounding banter, answers, "
+        "and reactions. Set questionRole to 'primary' only for a content-bearing question; use "
+        "'interactional' for social or turn-management speech, 'rhetorical' when no answer is sought, "
+        "and 'not-question' for every other kind. It is safer to omit an ambiguous spoken question "
+        "than to label ordinary conversation as primary. If a nearby source passage explicitly answers a question, "
+        "copy the answer; otherwise use an empty answer. If the answer itself names the person who "
+        "gave it, copy only that supplied name or role into respondent; otherwise use an empty "
+        "respondent. Give the narrowest supplied timestamp "
         "that supports each item. A recurring header is one item in this portion, while separate "
-        "questions or differently worded items remain separate. Never infer missing words or add "
-        "outside facts. Return JSON only: {items:[{kind:'question'|'heading'|'slide-item'|"
-        "'board-item'|'list-item',channel:'spoken'|'visible',text:string,answer:string,"
+        "questions or differently worded items remain separate. Also record a structure only when "
+        "the source itself establishes a repeated arrangement: 'grid' for independent labeled axes, "
+        "'sequence' for an ordered run, or 'collection' for a named set. Preserve only labels and "
+        "values directly present in the source; do not infer missing dimensions or entries. For a reusable "
+        "source prompt followed by separately resolved clue bundles, add one taskInstances record for each "
+        "separately resolved bundle. Its prompt must copy the exact reusable question already present in this "
+        "portion; its time range must cover that bundle, not the earlier title. A new card/title, an answer "
+        "reveal, or another directly observed reset can establish a separate bundle. Do not create a task "
+        "instance from a clue alone or carry a prompt in from another portion. Never infer missing words or "
+        "add outside facts. Return JSON only: {items:[{kind:'question'|'clue'|"
+        "'heading'|'slide-item'|'board-item'|'list-item',channel:'spoken'|'visible',questionRole:"
+        "'primary'|'interactional'|'rhetorical'|'not-question',text:string,answer:string,"
+        "respondent:string,startMs:number,endMs:number}],structures:[{kind:'grid'|'sequence'|"
+        "'collection',label:string,dimensions:[{label:string,values:string[]}],startMs:number,endMs:number}],"
+        "taskInstances:[{prompt:string,channel:'spoken'|'visible',answer:string,respondent:string,"
         "startMs:number,endMs:number}]}.\nINPUT:\n"
         + json.dumps(chunk, ensure_ascii=False, separators=(",", ":"))
+    )
+
+
+def _source_task_instance_prompt(
+    source_range: dict[str, Any], items: list[dict[str, Any]]
+) -> str:
+    return (
+        "Reconcile reusable source prompts with their already-grounded clue items in one bounded "
+        "portion of a recording. The input is chronological source evidence, not a topic summary. "
+        "When one exact, explicit prompt introduces a repeated activity and later clue bundles are "
+        "separately resolved, return one task instance per separately resolved bundle. Copy prompt "
+        "exactly from an input question; do not turn a clue into a prompt or bring in a prompt not in "
+        "the input. A new displayed item, a revealed answer, or an independently bounded run of clues "
+        "can establish a new instance. Keep an empty answer/respondent if the input does not directly "
+        "supply it. If the input does not establish separate instances, return an empty list. Return JSON only: "
+        "{taskInstances:[{prompt:string,channel:'spoken'|'visible',answer:string,respondent:string,"
+        "startMs:number,endMs:number}]}.\nINPUT:\n"
+        + json.dumps(
+            {
+                "range": source_range,
+                "items": [
+                    {
+                        key: item[key]
+                        for key in (
+                            "kind",
+                            "channel",
+                            "text",
+                            "answer",
+                            "respondent",
+                            "startMs",
+                            "endMs",
+                        )
+                    }
+                    for item in items
+                    if item["kind"] in {"question", "clue"}
+                ],
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
     )
 
 
@@ -1267,18 +1490,31 @@ def _inventory_terms(value: str) -> list[str]:
     return re.findall(r"[\w\u0600-\u06ff]+", value.casefold(), re.UNICODE)
 
 
-def _looks_like_spoken_question(value: str) -> bool:
+def _looks_like_explicit_prompt(value: str) -> bool:
+    """Accept a question/request, never a declarative hint with a guessed answer."""
     text = value.strip()
     if re.search(r"[?؟]\s*$", text):
         return True
     cue = re.compile(
         r"^(?:who|what|when|where|why|how|which|whose|whom|is|are|was|were|do|does|did|"
-        r"can|could|would|will|name|list|identify|describe|tell|give|"
+        r"can|could|would|will|name|list|identify|describe|tell|give|guess|choose|select|"
         r"من|ما|ماذا|متى|أين|اين|كيف|كم|هل|أي|اي|لماذا|مين|إيه|ايه|فين|امتى|ازاي|"
-        r"اذكر|أذكر|حدد|سم|سمي)$",
+        r"اذكر|أذكر|حدد|سم|سمي|اختر|إختر|اكتشف|خمن|خمّن|توقع|أكمل|اكمل|رتب|رتِّب)$",
         re.I,
     )
-    return any(cue.match(term) for term in _inventory_terms(text)[:4])
+    terms = _inventory_terms(text)
+    if not terms:
+        return False
+    if cue.match(terms[0]):
+        return True
+    # Arabic (and other languages) can put a preposition before a question
+    # word, e.g. "في أي سنة…". Looking through every early token would make
+    # a declarative clue such as "لعبت … من الدوريات" look interrogative.
+    return (
+        len(terms) >= 2
+        and terms[0] in {"في", "ب", "على", "الى", "إلى"}
+        and cue.match(terms[1]) is not None
+    )
 
 
 def _inventory_item_is_grounded(
@@ -1307,22 +1543,77 @@ def _inventory_item_is_grounded(
     return matched / len(candidate_terms) >= 0.7
 
 
+def _inventory_detail_is_grounded(
+    value: str, item: dict[str, Any], source_chunk: dict[str, Any]
+) -> bool:
+    """Keep answer metadata only when the nearby source evidence contains it."""
+    candidate_terms = _inventory_terms(value)
+    if not candidate_terms:
+        return True
+    start_ms = item["startMs"]
+    end_ms = item["endMs"]
+    nearby = [
+        source
+        for source in (
+            list(source_chunk.get("spokenEvidence") or [])
+            + list(source_chunk.get("visibleEvidence") or [])
+        )
+        if float(source.get("startMs") or 0) <= end_ms + 15_000
+        and float(source.get("endMs") or source.get("startMs") or 0)
+        >= start_ms - 5_000
+    ]
+    if not nearby:
+        nearby = list(source_chunk.get("spokenEvidence") or []) + list(
+            source_chunk.get("visibleEvidence") or []
+        )
+    source_terms = set(
+        _inventory_terms(" ".join(str(source.get("text") or "") for source in nearby))
+    )
+    matched = sum(1 for term in candidate_terms if term in source_terms)
+    # Metadata is more dangerous than the question text: a fabricated name can
+    # share generic words such as "starts the round" with a real answer. Keep
+    # it only for a near-exact match (or an exact short name/role).
+    required_ratio = 1 if len(candidate_terms) <= 2 else 0.9
+    return matched / len(candidate_terms) >= required_ratio
+
+
 def _validated_source_inventory(
     raw: dict[str, Any],
     duration_secs: float,
     source_chunk: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     duration_ms = max(1, round(duration_secs * 1_000))
-    allowed_kinds = {"question", "heading", "slide-item", "board-item", "list-item"}
+    allowed_kinds = {
+        "question",
+        "clue",
+        "heading",
+        "slide-item",
+        "board-item",
+        "list-item",
+    }
     allowed_channels = {"spoken", "visible"}
+    allowed_question_roles = {
+        "primary",
+        "interactional",
+        "rhetorical",
+        "not-question",
+    }
     items: list[dict[str, Any]] = []
     for candidate in raw.get("items") or []:
         if not isinstance(candidate, dict):
             continue
         kind = str(candidate.get("kind") or "").strip()
         channel = str(candidate.get("channel") or "").strip()
+        question_role = str(candidate.get("questionRole") or "").strip()
         text = str(candidate.get("text") or "").strip()[:600]
         if kind not in allowed_kinds or channel not in allowed_channels or not text:
+            continue
+        if not question_role:
+            # Older runtimes did not emit a role. Keep their direct questions
+            # readable after an upgrade, but require the new mapper to make
+            # the distinction explicitly.
+            question_role = "primary" if kind == "question" else "not-question"
+        if question_role not in allowed_question_roles:
             continue
         try:
             start_ms = min(
@@ -1337,17 +1628,183 @@ def _validated_source_inventory(
         item = {
             "kind": kind,
             "channel": channel,
+            "questionRole": question_role,
             "text": text,
             "answer": str(candidate.get("answer") or "").strip()[:600],
+            "respondent": str(candidate.get("respondent") or "").strip()[:240],
             "startMs": start_ms,
             "endMs": end_ms,
         }
-        if kind == "question" and channel == "spoken" and not _looks_like_spoken_question(text):
+        if kind == "question":
+            if question_role != "primary":
+                continue
+            if not _looks_like_explicit_prompt(text):
+                if channel != "visible":
+                    continue
+                # The text remains useful source evidence, but a declarative
+                # card is a clue to an implicit task—not a question in the
+                # requested question inventory. This is deliberately based on
+                # linguistic form, never a source genre or topic.
+                item["kind"] = "clue"
+                item["questionRole"] = "not-question"
+        elif question_role != "not-question":
             continue
         if source_chunk is not None and not _inventory_item_is_grounded(item, source_chunk):
             continue
+        if source_chunk is not None:
+            if item["answer"] and not _inventory_detail_is_grounded(
+                item["answer"], item, source_chunk
+            ):
+                item["answer"] = ""
+            if item["respondent"] and not _inventory_detail_is_grounded(
+                item["respondent"], item, source_chunk
+            ):
+                item["respondent"] = ""
         items.append(item)
     return items
+
+
+def _validated_source_activity_structures(
+    raw: dict[str, Any],
+    duration_secs: float,
+    source_chunk: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Keep only explicitly evidenced layouts; never manufacture a prompt count."""
+    duration_ms = max(1, round(duration_secs * 1_000))
+    allowed_kinds = {"grid", "sequence", "collection"}
+    structures: list[dict[str, Any]] = []
+    for candidate in raw.get("structures") or []:
+        if not isinstance(candidate, dict):
+            continue
+        kind = str(candidate.get("kind") or "").strip()
+        label = str(candidate.get("label") or "").strip()[:240]
+        if kind not in allowed_kinds:
+            continue
+        try:
+            start_ms = min(duration_ms, max(0, round(float(candidate.get("startMs")))))
+            end_ms = min(
+                duration_ms,
+                max(start_ms, round(float(candidate.get("endMs")))),
+            )
+        except (TypeError, ValueError):
+            continue
+        dimensions: list[dict[str, Any]] = []
+        for raw_dimension in candidate.get("dimensions") or []:
+            if not isinstance(raw_dimension, dict):
+                continue
+            dimension_label = str(raw_dimension.get("label") or "").strip()[:120]
+            values: list[str] = []
+            for raw_value in raw_dimension.get("values") or []:
+                value = str(raw_value or "").strip()[:120]
+                normalized = re.sub(r"\s+", " ", value.casefold())
+                if value and normalized not in {
+                    re.sub(r"\s+", " ", previous.casefold()) for previous in values
+                }:
+                    values.append(value)
+            if dimension_label and values:
+                dimensions.append({"label": dimension_label, "values": values})
+        if kind == "grid" and (
+            len(dimensions) < 2 or any(len(item["values"]) < 2 for item in dimensions)
+        ):
+            continue
+        if kind in {"sequence", "collection"} and not dimensions:
+            continue
+        structure = {
+            "kind": kind,
+            "label": label,
+            "dimensions": dimensions,
+            "startMs": start_ms,
+            "endMs": end_ms,
+        }
+        if kind == "grid":
+            structure["promptCount"] = math.prod(
+                len(dimension["values"]) for dimension in dimensions
+            )
+        # A layout claim is valuable only if its labels/values occur in the
+        # same bounded source window. Empty labels are permitted because many
+        # real source grids have labels only on their axes.
+        direct_terms = " ".join(
+            [label]
+            + [
+                f"{dimension['label']} {' '.join(dimension['values'])}"
+                for dimension in dimensions
+            ]
+        ).strip()
+        if source_chunk is not None and direct_terms and not _inventory_detail_is_grounded(
+            direct_terms,
+            structure,
+            source_chunk,
+        ):
+            continue
+        structures.append(structure)
+    return structures
+
+
+def _source_text_is_grounded_anywhere(
+    value: str, channel: str, source_chunk: dict[str, Any]
+) -> bool:
+    source_key = "spokenEvidence" if channel == "spoken" else "visibleEvidence"
+    candidate_terms = _inventory_terms(value)
+    if not candidate_terms:
+        return False
+    source_terms = set(
+        _inventory_terms(
+            " ".join(
+                str(source.get("text") or "")
+                for source in source_chunk.get(source_key) or []
+            )
+        )
+    )
+    return sum(1 for term in candidate_terms if term in source_terms) / len(
+        candidate_terms
+    ) >= 0.8
+
+
+def _validated_source_task_instances(
+    raw: dict[str, Any],
+    duration_secs: float,
+    source_chunk: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Validate continued prompt instances without treating their clues as questions."""
+    duration_ms = max(1, round(duration_secs * 1_000))
+    tasks: list[dict[str, Any]] = []
+    for candidate in raw.get("taskInstances") or []:
+        if not isinstance(candidate, dict):
+            continue
+        prompt = str(candidate.get("prompt") or "").strip()[:600]
+        channel = str(candidate.get("channel") or "").strip()
+        if channel not in {"spoken", "visible"} or not _looks_like_explicit_prompt(prompt):
+            continue
+        try:
+            start_ms = min(duration_ms, max(0, round(float(candidate.get("startMs")))))
+            end_ms = min(
+                duration_ms,
+                max(start_ms, round(float(candidate.get("endMs")))),
+            )
+        except (TypeError, ValueError):
+            continue
+        task = {
+            "id": f"task-{start_ms}",
+            "prompt": prompt,
+            "channel": channel,
+            "answer": str(candidate.get("answer") or "").strip()[:600],
+            "respondent": str(candidate.get("respondent") or "").strip()[:240],
+            "startMs": start_ms,
+            "endMs": end_ms,
+        }
+        if source_chunk is not None:
+            if not _source_text_is_grounded_anywhere(prompt, channel, source_chunk):
+                continue
+            if task["answer"] and not _inventory_detail_is_grounded(
+                task["answer"], task, source_chunk
+            ):
+                task["answer"] = ""
+            if task["respondent"] and not _inventory_detail_is_grounded(
+                task["respondent"], task, source_chunk
+            ):
+                task["respondent"] = ""
+        tasks.append(task)
+    return tasks
 
 
 def _fallback_source_inventory(
@@ -1362,17 +1819,29 @@ def _fallback_source_inventory(
             )
             if not match:
                 continue
-            answer_match = (
-                re.match(r"^Source answer:\s*(.*)$", lines[index + 1].strip(), re.I)
-                if index + 1 < len(lines)
-                else None
-            )
+            answer = ""
+            respondent = ""
+            for detail_line in lines[index + 1 : index + 4]:
+                if re.match(r"^Source question \(", detail_line.strip(), re.I):
+                    break
+                answer_match = re.match(
+                    r"^Source answer:\s*(.*)$", detail_line.strip(), re.I
+                )
+                respondent_match = re.match(
+                    r"^Source respondent:\s*(.*)$", detail_line.strip(), re.I
+                )
+                if answer_match:
+                    answer = answer_match.group(1).strip()[:600]
+                if respondent_match:
+                    respondent = respondent_match.group(1).strip()[:240]
             items.append(
                 {
                     "kind": "question",
                     "channel": match.group(1).lower(),
+                    "questionRole": "primary",
                     "text": match.group(2).strip()[:600],
-                    "answer": (answer_match.group(1).strip()[:600] if answer_match else ""),
+                    "answer": answer,
+                    "respondent": respondent,
                     "startMs": observation.get("startMs") or 0,
                     "endMs": observation.get("endMs") or observation.get("startMs") or 0,
                 }
@@ -1382,18 +1851,106 @@ def _fallback_source_inventory(
 
 def _merge_source_inventory(*groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
     merged: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, int]] = set()
+    positions: dict[tuple[str, str, int], int] = {}
     for item in sorted(
         (item for group in groups for item in group),
         key=lambda value: (value["startMs"], value["endMs"], value["kind"]),
     ):
         normalized = re.sub(r"\s+", " ", item["text"].casefold()).strip()
         key = (item["kind"], normalized, round(item["startMs"] / 5_000))
-        if not normalized or key in seen:
+        if not normalized:
             continue
-        seen.add(key)
+        existing_index = positions.get(key)
+        if existing_index is not None:
+            existing = merged[existing_index]
+            if not existing.get("answer") and item.get("answer"):
+                existing["answer"] = item["answer"]
+            if not existing.get("respondent") and item.get("respondent"):
+                existing["respondent"] = item["respondent"]
+            continue
+        positions[key] = len(merged)
         merged.append(item)
     return merged[:2_000]
+
+
+def _merge_source_activity_structures(
+    *groups: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Merge overlapping readings of the same layout without joining later repeats."""
+    merged: list[dict[str, Any]] = []
+    positions: dict[tuple[str, str, int], int] = {}
+    for structure in sorted(
+        (item for group in groups for item in group),
+        key=lambda value: (value["startMs"], value["endMs"], value["kind"]),
+    ):
+        normalized_label = re.sub(r"\s+", " ", structure["label"].casefold()).strip()
+        key = (structure["kind"], normalized_label, round(structure["startMs"] / 5_000))
+        existing_index = positions.get(key)
+        if existing_index is None:
+            positions[key] = len(merged)
+            merged.append(
+                {
+                    **structure,
+                    "dimensions": [
+                        {"label": item["label"], "values": list(item["values"])}
+                        for item in structure["dimensions"]
+                    ],
+                }
+            )
+            continue
+        existing = merged[existing_index]
+        existing["endMs"] = max(existing["endMs"], structure["endMs"])
+        dimensions_by_label = {
+            re.sub(r"\s+", " ", item["label"].casefold()).strip(): item
+            for item in existing["dimensions"]
+        }
+        for dimension in structure["dimensions"]:
+            dimension_key = re.sub(r"\s+", " ", dimension["label"].casefold()).strip()
+            target = dimensions_by_label.get(dimension_key)
+            if target is None:
+                target = {"label": dimension["label"], "values": []}
+                existing["dimensions"].append(target)
+                dimensions_by_label[dimension_key] = target
+            known = {
+                re.sub(r"\s+", " ", value.casefold()).strip()
+                for value in target["values"]
+            }
+            for value in dimension["values"]:
+                value_key = re.sub(r"\s+", " ", value.casefold()).strip()
+                if value_key not in known:
+                    target["values"].append(value)
+                    known.add(value_key)
+        if existing["kind"] == "grid":
+            existing["promptCount"] = math.prod(
+                len(dimension["values"]) for dimension in existing["dimensions"]
+            )
+    return merged[:256]
+
+
+def _merge_source_task_instances(
+    *groups: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Collapse overlapping reads of one continued task, retaining later turns."""
+    merged: list[dict[str, Any]] = []
+    positions: dict[tuple[str, str, int], int] = {}
+    for task in sorted(
+        (item for group in groups for item in group),
+        key=lambda value: (value["startMs"], value["endMs"], value["prompt"]),
+    ):
+        prompt_key = re.sub(r"\s+", " ", task["prompt"].casefold()).strip()
+        key = (task["channel"], prompt_key, round(task["startMs"] / 5_000))
+        existing_index = positions.get(key)
+        if existing_index is None:
+            positions[key] = len(merged)
+            merged.append(dict(task))
+            continue
+        existing = merged[existing_index]
+        existing["endMs"] = max(existing["endMs"], task["endMs"])
+        if len(task.get("answer") or "") > len(existing.get("answer") or ""):
+            existing["answer"] = task["answer"]
+        if len(task.get("respondent") or "") > len(existing.get("respondent") or ""):
+            existing["respondent"] = task["respondent"]
+    return merged[:512]
 
 
 def _synthesis_prompt(

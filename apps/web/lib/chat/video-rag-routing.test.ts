@@ -34,6 +34,7 @@ describe('video RAG fallback routing', () => {
       {
         success: true,
         mediaAssetId: 'asset-1',
+        claimVerification: { status: 'directly-established' },
         evidence: [{ id: 'a' }, { id: 'b' }],
         continuation: { exhaustive: true, nextCursor: 2, hasMore: true },
       },
@@ -47,6 +48,7 @@ describe('video RAG fallback routing', () => {
       aggregatedItems: 4,
       contextLimitReached: false,
     });
+    expect(result.claimVerification).toEqual({ status: 'directly-established' });
   });
 
   it('uses a semantically located indexed visual answer without live analysis', () => {

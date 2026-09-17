@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activeMediaFollowUpResult,
   clearlyTitleMatchedMediaAsset,
+  hasExplicitMediaIntent,
   shouldKeepActiveMediaSource,
   type RoutableMediaAsset,
 } from './media-source-routing';
@@ -16,6 +17,13 @@ const asset = (id: string, fileName: string): RoutableMediaAsset => ({
 });
 
 describe('media source routing', () => {
+  it('recognizes an explicit media source reference without depending on a title', () => {
+    expect(
+      hasExplicitMediaIntent('Create a timestamped table from the indexed competition video.'),
+    ).toBe(true);
+    expect(hasExplicitMediaIntent('Summarize the sales report.')).toBe(false);
+  });
+
   it('keeps a follow-up on the active source without exposing unrelated global hits', () => {
     expect(
       activeMediaFollowUpResult(

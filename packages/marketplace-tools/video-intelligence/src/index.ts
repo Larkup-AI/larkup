@@ -348,6 +348,8 @@ function createClientFromContext(context: {
   );
 }
 
+const PROVIDER_VERIFICATION_MAX_TOKENS = 16;
+
 async function verifyProviderModel(
   label: string,
   provider: string | undefined,
@@ -373,7 +375,7 @@ async function verifyProviderModel(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: 'Reply with OK.' }] }],
-          generationConfig: { maxOutputTokens: 8 },
+          generationConfig: { maxOutputTokens: PROVIDER_VERIFICATION_MAX_TOKENS },
         }),
       },
     );
@@ -388,7 +390,7 @@ async function verifyProviderModel(
       body: JSON.stringify({
         model: normalizedModel,
         messages: [{ role: 'user', content: 'Reply with OK.' }],
-        max_tokens: 8,
+        max_tokens: PROVIDER_VERIFICATION_MAX_TOKENS,
       }),
     });
   } else if (
@@ -407,7 +409,7 @@ async function verifyProviderModel(
       body: JSON.stringify({
         model: normalizedProvider === 'vercel_ai_gateway' ? model : normalizedModel,
         messages: [{ role: 'user', content: 'Reply with OK.' }],
-        max_tokens: 8,
+        max_tokens: PROVIDER_VERIFICATION_MAX_TOKENS,
       }),
     });
   } else {

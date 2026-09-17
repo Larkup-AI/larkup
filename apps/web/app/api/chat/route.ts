@@ -43,13 +43,18 @@ import {
   collectQuestionMatchedDirectClaims,
   recoverEmptyUIMessageStream,
   formatDirectObservationAnswer,
+  formatParticipantInventory,
   formatExhaustiveMediaAnswer,
   formatOutcomeMediaAnswer,
   mediaClaimNeedsCorroboration,
   withFinalAnswerNudge,
 } from '@/lib/chat/tool-context';
 import { requestsVisualization } from '@/lib/chat/tabular-visualization';
-import { isLikelyTabularQuestion, tabularToolsForStep } from '@/lib/chat/tabular-routing';
+import {
+  isLikelyTabularQuestion,
+  requiresTabularSandbox,
+  tabularToolsForStep,
+} from '@/lib/chat/tabular-routing';
 import {
   hasRetrievedImageEvidence,
   hasRetrievedPdfEvidence,
@@ -115,7 +120,7 @@ function createChatModel(
 const CHAT_POLICY = `
 Answer only from the user's provided material.
 
-For each substantive question, get fresh evidence: use queryTabularData for CSV, Excel, or JSON facts; otherwise use searchKnowledgeBase. For a direct follow-up, reuse the compact recent evidence when it fully covers the request. Use one focused query first. Use code analysis only when the available data tool cannot answer the calculation.
+For each substantive question, get fresh evidence: use queryTabularData for CSV, Excel, or JSON facts; otherwise use searchKnowledgeBase. For a direct follow-up, reuse the compact recent evidence when it fully covers the request. Use one focused query first. Use code analysis only when the available data tool cannot answer the calculation. For a join or statistical analysis across files or worksheets, use executeAnalysis with every needed datasetId in datasetIds; read datasets.json to identify their mounted CSV files and never try to emulate the join with a cross-dataset table filter.
 
 Do not repeat an evidence tool in the same response. After evidence is returned, answer directly or use one appropriate refinement when the evidence action requests it.
 
@@ -322,7 +327,18 @@ function collectDirectReadings(value: unknown): string[] {
             observation && typeof observation === 'object'
               ? (observation as { found?: unknown }).found
               : undefined;
-          if (typeof found === 'string' && found.trim()) readings.add(found.trim());
+          const settlesQuestion =
+            observation && typeof observation === 'object'
+              ? (observation as { settlesQuestion?: unknown }).settlesQuestion
+              : undefined;
+          if (
+            typeof found === 'string' &&
+            settlesQuestion === true &&
+            found.trim() &&
+            !/^Observed context \(not a complete answer\):/i.test(found.trim())
+          ) {
+            readings.add(found.trim());
+          }
         }
       }
     }
@@ -366,6 +382,13 @@ function collectSourceExcerpts(value: unknown, question: string): string[] {
     if (typeof candidate !== 'string') return;
     const text = candidate.replace(/\s+/g, ' ').trim();
     if (text.length < 16) return;
+    if (
+      /^Observed context \(not a complete answer\):/i.test(text) ||
+      /Claim verdict:\s*(?:partial|not-established)\b/i.test(text) ||
+      /^Verified media evidence is available\./i.test(text)
+    ) {
+      return;
+    }
     const normalized = text.toLocaleLowerCase();
     const matches = [...questionTerms].filter(
       (term) => term.length > 2 && normalized.includes(term),
@@ -726,6 +749,8 @@ ${fieldLines}`;
     columnNames: tabularColumnNames,
     datasetNames: tabularDatasetNames,
   });
+  const requiresSandboxAnalysis =
+    hasTabularData && tabularQuestion && requiresTabularSandbox(userText);
   const isExplicitVideoCorrection =
     /^(?:no|nah),\s+|\b(?:that(?:'s| is) (?:wrong|incorrect)|correction\s*:|actually\s*,|instead\s*,|should be|not .{0,80}\bbut|i meant)\b/i.test(
       userText,
@@ -998,6 +1023,7 @@ ${fieldLines}`;
 
         const deterministicAnswer = preloadedVideoEvidence
           ? (formatExhaustiveMediaAnswer(preloadedEvidence, userText) ??
+            formatParticipantInventory(preloadedEvidence, userText) ??
             collectQuestionMatchedDirectClaims(preloadedEvidence, userText)[0] ??
             formatOutcomeMediaAnswer(preloadedEvidence, userText) ??
             formatDirectObservationAnswer(preloadedEvidence, userText))
@@ -1021,21 +1047,35 @@ ${fieldLines}`;
           timeout: preloadedVideoEvidence
             ? {
                 // Retrieval and any bounded source check already finished.
-                // This last call only turns verified evidence into prose, so a
-                // slow provider must yield to the grounded fallback quickly.
-                totalMs: 20_000,
-                stepMs: 15_000,
-                firstChunkMs: 10_000,
-                chunkMs: 10_000,
-                toolMs: 10_000,
-              }
-            : {
+                // This last call only turns verified evidence into prose, but
+                // cross-modal evidence can still take a provider longer than a
+                // trivial text reply. Keep it bounded while allowing a normal
+                // complete answer instead of prematurely exposing recovery text.
                 totalMs: 45_000,
                 stepMs: 35_000,
                 firstChunkMs: 25_000,
                 chunkMs: 20_000,
-                toolMs: 30_000,
-              },
+                toolMs: 20_000,
+              }
+            : requiresSandboxAnalysis
+              ? {
+                  // A deep spreadsheet task needs time for the model to write
+                  // code, a bounded local execution, and a grounded response.
+                  // Keep this wider budget limited to explicit analytical
+                  // operations so ordinary table questions remain responsive.
+                  totalMs: 150_000,
+                  stepMs: 90_000,
+                  firstChunkMs: 70_000,
+                  chunkMs: 70_000,
+                  toolMs: 45_000,
+                }
+              : {
+                  totalMs: 45_000,
+                  stepMs: 35_000,
+                  firstChunkMs: 25_000,
+                  chunkMs: 20_000,
+                  toolMs: 30_000,
+                },
           providerOptions: gatewayProviderOptions(resolvedProvider, chatModelId),
           system: `${systemPrompt}${
             preloadedEvidence === undefined
@@ -1226,10 +1266,13 @@ ${fieldLines}`;
               // structured query engine. It works for large sheets without a
               // Python environment and removes model/provider variance that
               // previously sent simple "highest/lowest" questions to code.
-              // A second bounded query lets the model compare another uploaded
-              // sheet when needed. Code analysis remains available only after
-              // the reliable table path has produced evidence.
-              const routing = tabularToolsForStep({ stepNumber, toolNames: toolNames as string[] });
+              // Code analysis can receive multiple explicitly selected sheets
+              // when a relationship cannot be answered by one bounded query.
+              const routing = tabularToolsForStep({
+                stepNumber,
+                toolNames: toolNames as string[],
+                requiresSandbox: requiresTabularSandbox(userText),
+              });
               return {
                 ...routing,
                 activeTools: routing.activeTools.filter(

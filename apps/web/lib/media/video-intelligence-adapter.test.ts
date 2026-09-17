@@ -139,6 +139,7 @@ describe('evidenceToSegments', () => {
             channel: 'spoken',
             text: 'Which option is supported?',
             answer: 'Option B',
+            respondent: 'Participant A',
             startMs: 42_000,
             endMs: 46_000,
           },
@@ -151,6 +152,11 @@ describe('evidenceToSegments', () => {
             endMs: 55_000,
           },
         ],
+        sourceInventoryCoverage: {
+          complete: true,
+          totalWindows: 1,
+          processedWindows: 1,
+        },
         uncertainties: [],
       },
       answeringGuide: {
@@ -173,7 +179,10 @@ describe('evidenceToSegments', () => {
       /^Participant A introduces the round/,
     );
     expect(segments.map((segment) => segment.visualContext).join('\n')).toContain(
-      'Source question (spoken): Which option is supported?\nSource answer: Option B',
+      'Source question (spoken): Which option is supported?\nSource answer: Option B\nSource respondent: Participant A',
+    );
+    expect(segments.map((segment) => segment.visualContext).join('\n')).toContain(
+      'Source inventory coverage: complete',
     );
     expect(segments.map((segment) => segment.visualContext).join('\n')).toContain(
       'Source item (slide-item, visible): First supported point',

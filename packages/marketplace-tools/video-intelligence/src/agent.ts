@@ -67,7 +67,7 @@ export const AGENT_TOOLS = [
   {
     name: 'queryVideoEvidence',
     description:
-      'Answer a question about an indexed video. Always use the existing RAG index first; perform a bounded direct re-watch only when the retrieved evidence is genuinely incomplete or conflicting. For requests that explicitly ask for every item, the full account, or everything said, set exhaustive=true and follow continuation.nextCursor until hasMore=false.',
+      'Answer a question about an indexed video. It uses the right source operation automatically: ranked evidence for focused questions, chronological scan for every source-authored item, and aggregate facts for people or a whole-source account. Perform a bounded direct re-watch only when returned evidence is genuinely incomplete or conflicting. For requests that explicitly ask for every item, the full account, or everything said, set exhaustive=true and follow continuation.nextCursor until hasMore=false.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -84,7 +84,7 @@ export const AGENT_TOOLS = [
     workflow: 'evidence-query',
     evidenceInput: 'media-asset',
     systemPromptFragment:
-      'Use this action for media questions. It reads the existing indexed evidence first and only watches a bounded source moment when that evidence is incomplete or conflicting. Never trigger extra analysis merely to restate an answer the returned evidence already establishes. For an explicit every/all/complete-source request, call with exhaustive=true and keep calling with continuation.nextCursor until hasMore=false; do not mistake one top-K page for the complete answer. Never say you do not know or that the source lacks an answer before this action has attempted its available fallback. State an outcome, final result, identity, count, or exact visible fact only when established. Answer naturally as someone who watched and remembers the material: lead with the answer itself (for example, "X won" or "He wore Y"), not phrases such as "the video shows", "the analysis indicates", or "according to the retrieved evidence". Never mention retrieval, search, indexing, frames, tools, or analysis unless the user asks how the answer was found.',
+      'Use this action for media questions. It selects a source operation before asking a model to synthesize: focused questions use ranked evidence; complete source inventories use a chronological database scan; person and timeline questions may use a compact aggregate. Never turn a complete-source request into top-K retrieval. For an explicit every/all/complete-source request, call with exhaustive=true and keep calling with continuation.nextCursor until hasMore=false; do not mistake one page for the complete answer. Never say you do not know or that the source lacks an answer before this action has attempted its available fallback. State an outcome, final result, identity, count, or exact visible fact only when established. Answer naturally as someone who watched and remembers the material: lead with the answer itself (for example, "X won" or "He wore Y"), not phrases such as "the video shows", "the analysis indicates", or "according to the retrieved evidence". Never mention retrieval, search, indexing, frames, tools, or analysis unless the user asks how the answer was found.',
   },
   {
     name: 'inspectVideoKnowledge',
@@ -153,10 +153,104 @@ export function attachVideoIntelligenceAgentClient(
             (plan.requiresBroadCoverage === true && !plan.kinds.includes('evaluation'))),
       };
       const durationSecs = asset.durationSecs;
+      // Complete inventories are a deterministic database scan, never an
+      // expanded Top-K query. The chat route follows the opaque cursor itself,
+      // so a model cannot stop early or mistake its context window for source
+      // coverage.
+      if (plan.route === 'scan' && mediaEvidence.scan) {
+        const sourceInventory =
+          plan.kinds.includes('question-inventory') || plan.kinds.includes('source-inventory');
+        const scanned = await mediaEvidence.scan(input.mediaAssetId, {
+          kind: sourceInventory ? 'source-inventory' : 'all-evidence',
+          cursor: input.cursor,
+          limit: input.limit,
+        });
+        if (scanned) {
+          // A source inventory can contain headings, slides, and literal list
+          // items too. A question table must contain only source questions;
+          // the cursor still follows every raw record so coverage remains an
+          // exact chronological scan rather than a filtered Top-K search.
+          const scanRecords = plan.kinds.includes('question-inventory')
+            ? scanned.records.filter(
+                (record) =>
+                  record.kind === 'question' &&
+                  record.questionRole !== 'interactional' &&
+                  record.questionRole !== 'rhetorical',
+              )
+            : scanned.records;
+          const evidence = scanRecords.map(scanRecordToEvidence);
+          // A page is directly grounded when the indexed source coverage is
+          // complete. The chat host owns cursor-following and will withhold a
+          // final exhaustive rendering until the final page arrives.
+          const complete = scanned.coverage.complete;
+          void trackUsageEvent({
+            type: 'media_processing',
+            mediaType: asset.type === 'audio' ? 'audio' : 'video',
+            mediaOperation: 'investigation',
+            mediaAssetId: input.mediaAssetId,
+            queryKind: plan.kinds.join(','),
+            cache: 'hit',
+            evidenceCount: evidence.length,
+            frameCount: 0,
+            durationSecs: 0,
+            latencyMs: Date.now() - startedAt,
+            timestamp: new Date().toISOString(),
+          });
+          return {
+            success: true,
+            mediaAssetId: input.mediaAssetId,
+            fileName: asset.fileName,
+            evidence,
+            resultHandle: scanned.resultHandle,
+            claimVerification: {
+              status: complete ? 'directly-established' : 'needs-corroboration',
+              directlyEstablished: complete,
+              rule: complete
+                ? scanned.continuation.hasMore
+                  ? `This is a chronological page from complete active ${
+                      sourceInventory ? 'source inventory' : 'source evidence'
+                    }. Follow the cursor before presenting a complete answer.`
+                  : `This result is a complete chronological scan of active ${
+                      sourceInventory ? 'source inventory' : 'source evidence'
+                    }. Preserve every returned item and its timestamp.`
+                : (scanned.coverage.reason ??
+                  'The active index does not prove complete source coverage, so present these items as partial rather than complete.'),
+            },
+            investigation: {
+              answerPath: 'deterministic-scan',
+              responseTimeMs: Date.now() - startedAt,
+              analyzedRanges: [],
+              broadCoverage: true,
+              coverage: {
+                mode: 'broad',
+                totalChapters: 0,
+                totalScenes: 0,
+                representedRanges: scanned.coverage.scannedRecords,
+              },
+            },
+            continuation: {
+              exhaustive: true,
+              hasMore: scanned.continuation.hasMore,
+              ...(scanned.continuation.nextCursor !== undefined
+                ? { nextCursor: scanned.continuation.nextCursor }
+                : {}),
+              totalItems: scanned.continuation.totalRecords,
+              resultHandle: scanned.resultHandle,
+            },
+          };
+        }
+      }
+      const aggregate =
+        plan.route === 'aggregate' && mediaEvidence.aggregate
+          ? await mediaEvidence.aggregate(input.mediaAssetId)
+          : undefined;
       // Start with the index alone. Planning and visual locating are useful
       // fallbacks, but waiting for both before checking an already-complete RAG
       // answer made simple questions feel like analysis jobs.
-      let hits = await retrieve(mediaEvidence, focusedInput, plan, durationSecs);
+      let hits = mergeHits(
+        await retrieve(mediaEvidence, focusedInput, plan, durationSecs),
+        aggregate ? aggregateToHits(aggregate) : [],
+      );
       let investigation: VideoInvestigation;
       let locatedRanges: Array<{ startSecs: number; endSecs: number }> = [];
       let assessment = assessEvidence(hits, focusedInput.query, plan, durationSecs, undefined);
@@ -457,6 +551,7 @@ function evidenceHitsFor(
 
 type VideoPlan = {
   kinds: string[];
+  route?: 'search' | 'temporal' | 'aggregate' | 'scan' | 'export';
   requiresBothRanges?: boolean;
   requiresBroadCoverage?: boolean;
   requiresIdentityContext?: boolean;
@@ -466,6 +561,95 @@ type VideoPlan = {
 type MediaEvidence = NonNullable<AgentToolExecutionContext['mediaEvidence']>;
 type VideoKnowledgeSearchHit = Awaited<ReturnType<MediaEvidence['search']>>[number];
 type VideoInvestigation = Awaited<ReturnType<NonNullable<MediaEvidence['planInvestigation']>>>;
+
+function scanRecordToEvidence(
+  record: NonNullable<Awaited<ReturnType<NonNullable<MediaEvidence['scan']>>>>['records'][number],
+) {
+  const prefix =
+    record.kind === 'question'
+      ? `Source question (${record.channel ?? 'spoken'}${
+          record.questionRole ? `, ${record.questionRole}` : ''
+        }): ${record.text}`
+      : record.kind === 'evidence'
+        ? record.text
+        : `Source item (${record.kind}, ${record.channel ?? 'visible'}): ${record.text}`;
+  const text = [
+    prefix,
+    ...(record.taskId ? [`Source task id: ${record.taskId}`] : []),
+    ...(record.answer ? [`Source answer: ${record.answer}`] : []),
+    ...(record.respondent ? [`Source respondent: ${record.respondent}`] : []),
+  ].join('\n');
+  return {
+    id: record.id,
+    evidenceId: record.sourceEvidenceId,
+    modality: record.modality,
+    timeRange: record.timeRange,
+    payload: { text },
+    confidence: record.confidence,
+  };
+}
+
+function aggregateToHits(
+  aggregate: NonNullable<Awaited<ReturnType<NonNullable<MediaEvidence['aggregate']>>>>,
+): VideoKnowledgeSearchHit[] {
+  const createdAt = new Date().toISOString();
+  return [
+    ...aggregate.participants.map((participant, index) => ({
+      evidence: {
+        id: `${aggregate.resultHandle}:participant:${index}`,
+        modality: 'computed',
+        timeRange: participant.timeRange,
+        payload: {
+          text: `Reconciled participant: ${participant.name} — ${participant.description}`,
+        },
+        source: { kind: 'provider', provider: 'video-intelligence-index' },
+        confidence: { score: 0.8 },
+        createdAt,
+      },
+      score: 1,
+      conflict: false,
+    })),
+    ...aggregate.timeline.map((entry, index) => ({
+      evidence: {
+        id: `${aggregate.resultHandle}:timeline:${index}`,
+        modality: 'computed',
+        timeRange: entry.timeRange,
+        payload: { text: entry.text },
+        source: { kind: 'provider', provider: 'video-intelligence-index' },
+        confidence: { score: 0.75 },
+        createdAt,
+      },
+      score: 0.7,
+      conflict: false,
+    })),
+    ...aggregate.sourceItems.map((item, index) => ({
+      evidence: {
+        id: `${aggregate.resultHandle}:source-item:${index}`,
+        modality: 'computed',
+        timeRange: item.timeRange,
+        payload: {
+          text:
+            item.kind === 'question'
+              ? `Source question (${item.channel ?? 'spoken'}${
+                  item.questionRole ? `, ${item.questionRole}` : ''
+                }): ${item.text}`
+              : item.kind === 'structure'
+                ? `Source structure: ${item.text}${
+                    item.promptSlots === undefined
+                      ? ''
+                      : `\nSource prompt slots: ${item.promptSlots}`
+                  }`
+                : `Source item (${item.kind}): ${item.text}`,
+        },
+        source: { kind: 'provider', provider: 'video-intelligence-index' },
+        confidence: { score: 0.82 },
+        createdAt,
+      },
+      score: 0.8,
+      conflict: false,
+    })),
+  ] as VideoKnowledgeSearchHit[];
+}
 
 /**
  * What the question needs from the evidence, and whether the evidence has it.

@@ -6,6 +6,7 @@ import {
   collectQuestionMatchedDirectClaims,
   recoverEmptyUIMessageStream,
   formatDirectObservationAnswer,
+  formatParticipantInventory,
   formatExhaustiveMediaAnswer,
   formatOutcomeMediaAnswer,
   mediaClaimNeedsCorroboration,
@@ -117,6 +118,22 @@ describe('collectAnswerLevelMediaStatements', () => {
       }),
     ).toEqual([]);
   });
+
+  it('does not promote a partial source observation when a scan is complete', () => {
+    expect(
+      collectAnswerLevelMediaStatements({
+        success: true,
+        claimVerification: { status: 'directly-established' },
+        evidence: [
+          {
+            payload: {
+              text: 'Observed context (not a complete answer): Three people are visible.\nClaim verdict: partial',
+            },
+          },
+        ],
+      }),
+    ).toEqual([]);
+  });
 });
 
 describe('formatOutcomeMediaAnswer', () => {
@@ -223,6 +240,67 @@ describe('formatDirectObservationAnswer', () => {
       ),
     ).toBe('From left to right: one wears green, one white-red, one gray, and one white.');
   });
+
+  it('does not surface an upstream partial-observation marker as a final answer', () => {
+    expect(
+      formatDirectObservationAnswer({
+        success: true,
+        claimVerification: { status: 'directly-established' },
+        directObservation: {
+          readings: [
+            {
+              found: 'Observed context (not a complete answer): Three people are visible.',
+              confidence: 'high',
+              settlesQuestion: true,
+            },
+          ],
+        },
+      }),
+    ).toBeUndefined();
+  });
+});
+
+describe('formatParticipantInventory', () => {
+  it('renders verified aggregate participants as a compact timestamped table', () => {
+    expect(
+      formatParticipantInventory(
+        {
+          videoEvidence: {
+            success: true,
+            claimVerification: { status: 'directly-established' },
+            evidence: [
+              {
+                timeRange: { startSecs: 150 },
+                payload: {
+                  text: 'Reconciled participant: Zizo — contestant shown on the scoreboard',
+                },
+              },
+              {
+                timeRange: { startSecs: 180 },
+                text: 'Reconciled participant: Ramez — contestant seated on the left',
+              },
+            ],
+          },
+        },
+        'Create a table of every team member by name.',
+      ),
+    ).toBe(
+      '| Participant | Description | Timestamp |\n| --- | --- | --- |\n| Zizo | contestant shown on the scoreboard | [2:30] |\n| Ramez | contestant seated on the left | [3:00] |',
+    );
+  });
+
+  it('does not turn ordinary visual descriptions into an identity table', () => {
+    expect(
+      formatParticipantInventory(
+        {
+          success: true,
+          claimVerification: { status: 'directly-established' },
+          evidence: [{ payload: { text: 'A participant wears a black shirt.' } }],
+        },
+        'List every team member by name.',
+      ),
+    ).toBeUndefined();
+  });
 });
 
 describe('formatExhaustiveMediaAnswer', () => {
@@ -287,6 +365,54 @@ describe('formatExhaustiveMediaAnswer', () => {
         '- [0:12] Who scored?\n' +
         '- [0:42] Which team won?',
     );
+  });
+
+  it('renders a grounded question-and-respondent table without model synthesis', () => {
+    const answer = formatExhaustiveMediaAnswer(
+      {
+        success: true,
+        claimVerification: { status: 'directly-established' },
+        continuation: { exhaustive: true, hasMore: false },
+        evidence: [
+          {
+            timeRange: { startSecs: 12 },
+            payload: {
+              text: 'Source question (spoken): Who scored?\nSource answer: Blue\nSource respondent: Dana',
+            },
+          },
+        ],
+      },
+      'make a table with every question and who answered it',
+    );
+
+    expect(answer).toBe(
+      '| Question | Answered by | Answer |\n' +
+        '| --- | --- | --- |\n' +
+        '| [0:12] Who scored? | Dana | Blue |',
+    );
+  });
+
+  it('counts verified source prompts without delegating the count to a model', () => {
+    const answer = formatExhaustiveMediaAnswer(
+      {
+        success: true,
+        claimVerification: { status: 'directly-established' },
+        continuation: { exhaustive: true, hasMore: false },
+        evidence: [
+          {
+            timeRange: { startSecs: 12 },
+            payload: { text: 'Source question (visible, primary): One?' },
+          },
+          {
+            timeRange: { startSecs: 42 },
+            payload: { text: 'Source question (spoken, primary): Two?' },
+          },
+        ],
+      },
+      'how many questions are in this recording?',
+    );
+
+    expect(answer).toBe('Confirmed primary source prompts: 2.');
   });
 
   it('leaves a small ordinary timeline for natural answer synthesis', () => {
