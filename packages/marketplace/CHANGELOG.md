@@ -1,5 +1,11 @@
 # @larkup/marketplace
 
+## 0.2.9
+
+### Patch Changes
+
+- 87a6753: Fix Marketplace tool updates when local npm metadata or installed version records are stale.
+
 ## 0.2.8
 
 ### Patch Changes
