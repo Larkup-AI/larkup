@@ -37,6 +37,7 @@ export interface AgentToolExecutionContext {
     >;
     planQuestion: (question: string) => {
       kinds: string[];
+      route?: 'search' | 'temporal' | 'aggregate' | 'scan' | 'export';
       requiresInspectionWhenInsufficient: boolean;
       requiresBothRanges?: boolean;
       requiresBroadCoverage?: boolean;
@@ -146,6 +147,72 @@ export interface AgentToolExecutionContext {
           confidence: unknown;
         };
       }>
+    >;
+    /**
+     * Reads the active source in chronological pages. Unlike `search`, this
+     * operation has no relevance ranking and is used for complete inventories.
+     */
+    scan?: (
+      mediaAssetId: string,
+      input: { kind: 'source-inventory' | 'all-evidence'; cursor?: number; limit?: number },
+    ) => Promise<
+      | {
+          resultHandle: string;
+          records: Array<{
+            id: string;
+            sourceEvidenceId: string;
+            kind: string;
+            channel?: string;
+            questionRole?: 'primary' | 'interactional' | 'rhetorical';
+            taskId?: string;
+            text: string;
+            answer?: string;
+            respondent?: string;
+            timeRange: { startSecs: number; endSecs: number; precision?: string };
+            modality: string;
+            confidence: unknown;
+          }>;
+          continuation: {
+            cursor: number;
+            nextCursor?: number;
+            hasMore: boolean;
+            totalRecords: number;
+          };
+          coverage: {
+            complete: boolean;
+            scannedRecords: number;
+            totalRecords: number;
+            reason?: string;
+          };
+        }
+      | undefined
+    >;
+    /** A compact, durable navigation map built from all active source evidence. */
+    aggregate?: (mediaAssetId: string) => Promise<
+      | {
+          resultHandle: string;
+          cached: boolean;
+          participants: Array<{
+            name: string;
+            description: string;
+            timeRange: { startSecs: number; endSecs: number; precision?: string };
+          }>;
+          timeline: Array<{
+            text: string;
+            timeRange: { startSecs: number; endSecs: number; precision?: string };
+          }>;
+          sourceItems: Array<{
+            id: string;
+            kind: string;
+            channel?: string;
+            questionRole?: 'primary' | 'interactional' | 'rhetorical';
+            promptSlots?: number;
+            text: string;
+            timeRange: { startSecs: number; endSecs: number; precision?: string };
+          }>;
+          coverage: { inventoryComplete: boolean; activeEvidenceRecords: number };
+        }
+      | undefined
     >;
   };
 }
