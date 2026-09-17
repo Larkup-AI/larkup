@@ -936,12 +936,16 @@ function renderToolPart(
     const indeterminate = liveProgress ? isIndeterminateProgress(liveProgress.percent) : false;
 
     return (
-      <div key={index} className="flex flex-col gap-1.5 py-3">
-        <div className="flex items-center gap-2">
+      <div key={index} className="flex min-w-0 flex-col gap-1.5 py-3">
+        <div className="flex min-w-0 items-center gap-2">
           <div className="size-6.5 bg-white dark:bg-card border border-border rounded-full flex items-center justify-center p-1">
             <img src="/logo.png" alt="" className="size-4 animate-spin" />
           </div>
-          <span className="larkup-shimmer-text text-[13px] font-medium">
+          <span
+            className="larkup-shimmer-text min-w-0 break-words text-[13px] font-medium leading-5"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {liveProgress?.message || liveProgress?.label || behavior.pendingLabel || 'Working'}
           </span>
         </div>
@@ -1066,8 +1070,7 @@ function renderToolPart(
 
       case 'sandbox': {
         const result = output as SandboxResultConfig;
-        const code = input?.code;
-        return <ChatSandboxResult key={index} config={result} code={code} />;
+        return <ChatSandboxResult key={index} config={result} />;
       }
 
       case 'corpus': {

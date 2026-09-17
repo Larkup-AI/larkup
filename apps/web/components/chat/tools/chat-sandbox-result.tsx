@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { ChevronDown, Code2, Play, Clock, Image as ImageIcon, Table2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { ChevronDown, Play, Clock, Image as ImageIcon, Table2 } from 'lucide-react';
 import { ChatDataTable, type DataTableConfig } from '@/components/chat/tools/chat-data-table';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 
 interface SandboxArtifact {
   name: string;
@@ -24,14 +23,7 @@ function tryParseStdoutAsTable(stdout: string): DataTableConfig | null {
   return null;
 }
 
-export function ChatSandboxResult({
-  config,
-  code,
-}: {
-  config: SandboxResultConfig;
-  code?: string;
-}) {
-  const [showCode, setShowCode] = useState(false);
+export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
   const { stdout, stderr, exitCode, artifacts, executionTimeMs } = config;
 
   const images = useMemo(
@@ -50,52 +42,21 @@ export function ChatSandboxResult({
 
   return (
     <Card className="overflow-hidden  animate-in fade-in slide-in-from-bottom-2 duration-500">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <div
-            className={`flex h-6 w-6 items-center justify-center rounded-md ${
-              isSuccess
-                ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
-                : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-            }`}
-          >
-            <Play className="size-3" />
+      {/* A successful result speaks for itself; retain a clear header only for failures. */}
+      {!isSuccess && (
+        <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+              <Play className="size-3" />
+            </div>
+            <span className="text-xs font-medium text-foreground">Analysis failed</span>
           </div>
-          <span className="text-xs font-medium text-foreground">
-            {isSuccess ? 'Analysis completed' : 'Analysis failed'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground">
             <Clock className="size-3" />
             {executionTimeMs < 1000
               ? `${executionTimeMs}ms`
               : `${(executionTimeMs / 1000).toFixed(1)}s`}
           </span>
-          {/* {code && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowCode((o) => !o)}
-              className="h-7 gap-1 text-[11px] text-muted-foreground"
-            >
-              <Code2 className="size-3" />
-              {showCode ? 'Hide code' : 'View code'}
-              <ChevronDown
-                className={`size-3 transition-transform ${showCode ? 'rotate-180' : ''}`}
-              />
-            </Button>
-          )} */}
-        </div>
-      </div>
-
-      {/* Code block (collapsible) */}
-      {showCode && code && (
-        <div className="border-b border-border/40 bg-secondary/30 p-3">
-          <pre className="max-h-60 overflow-auto rounded-lg bg-secondary p-3 text-xs leading-relaxed text-foreground [&::-webkit-scrollbar]:hidden">
-            <code>{code}</code>
-          </pre>
         </div>
       )}
 
@@ -119,7 +80,7 @@ export function ChatSandboxResult({
       )}
 
       {/* Structured stdout (rendered as table) */}
-      {stdoutTable && images.length === 0 && (
+      {stdoutTable && (
         <CardContent className="p-3 pt-3">
           <div className="flex items-center gap-1.5 mb-2 text-xs text-muted-foreground">
             <Table2 className="size-3" />
@@ -130,7 +91,7 @@ export function ChatSandboxResult({
       )}
 
       {/* Plain stdout (only if not parsed as table) */}
-      {stdout && !stdoutTable && images.length === 0 && (
+      {stdout && !stdoutTable && (
         <div className="border-b border-border/40 px-4 py-3">
           <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-foreground [&::-webkit-scrollbar]:hidden">
             {stdout}

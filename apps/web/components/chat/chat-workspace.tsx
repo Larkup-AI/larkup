@@ -18,15 +18,6 @@ import {
   Plus,
   Globe,
   Paperclip,
-  FileText,
-  FileImage,
-  FileSpreadsheet,
-  FileAudio,
-  FileVideo,
-  FileArchive,
-  FileCode,
-  FileJson,
-  File as FileIcon,
   ListPlus,
 } from 'lucide-react';
 import useSWR from 'swr';

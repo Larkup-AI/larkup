@@ -350,10 +350,10 @@
 
 @keyframes larkup-shimmer-sweep {
   0% {
-    background-position: 180% 0;
+    background-position: 100% 0;
   }
   100% {
-    background-position: -80% 0;
+    background-position: 0% 0;
   }
 }
 
