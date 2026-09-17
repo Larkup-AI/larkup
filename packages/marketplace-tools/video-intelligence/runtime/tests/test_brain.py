@@ -13,7 +13,9 @@ from app.services.brain import (
     _select_synthesis_observations,
     _source_inventory_chunks,
     _source_inventory_prompt,
+    _validated_source_activity_structures,
     _validated_source_inventory,
+    _validated_source_task_instances,
     _synthesis_prompt,
     _fallback_knowledge_summary,
     _validated_knowledge_summary,
@@ -57,10 +59,161 @@ class AgentPlannerTests(unittest.TestCase):
             }
         )
         instructions = prompt.split("\nINPUT:\n", 1)[0].lower()
-        self.assertIn("questions actually asked", instructions)
+        self.assertIn("content-bearing prompt", instructions)
+        self.assertIn("interactional", instructions)
+        self.assertIn("declarative hint", instructions)
+        self.assertIn("grid", instructions)
+        self.assertIn("taskinstances", instructions)
         self.assertIn("slide", instructions)
+        self.assertIn("respondent", instructions)
         for domain_word in ("score", "team", "match", "lecture", "professor"):
             self.assertNotIn(domain_word, instructions)
+
+    def test_source_inventory_keeps_primary_prompts_and_clues_but_drops_banter(self) -> None:
+        source_chunk = {
+            "spokenEvidence": [
+                {
+                    "startMs": 0,
+                    "endMs": 8_000,
+                    "text": "How are you? Fine. Which city hosted the event?",
+                }
+            ],
+            "visibleEvidence": [
+                {
+                    "startMs": 8_000,
+                    "endMs": 12_000,
+                    "text": "I worked with Alpha, Beta, and Gamma",
+                }
+            ],
+        }
+        items = _validated_source_inventory(
+            {
+                "items": [
+                    {
+                        "kind": "question",
+                        "channel": "spoken",
+                        "questionRole": "interactional",
+                        "text": "How are you?",
+                        "answer": "Fine",
+                        "respondent": "",
+                        "startMs": 0,
+                        "endMs": 2_000,
+                    },
+                    {
+                        "kind": "question",
+                        "channel": "spoken",
+                        "questionRole": "primary",
+                        "text": "Which city hosted the event?",
+                        "answer": "",
+                        "respondent": "",
+                        "startMs": 3_000,
+                        "endMs": 8_000,
+                    },
+                    {
+                        "kind": "question",
+                        "channel": "visible",
+                        "questionRole": "primary",
+                        "text": "I worked with Alpha, Beta, and Gamma",
+                        "answer": "",
+                        "respondent": "",
+                        "startMs": 8_000,
+                        "endMs": 12_000,
+                    },
+                ]
+            },
+            12,
+            source_chunk,
+        )
+
+        self.assertEqual(
+            [(item["kind"], item["text"]) for item in items],
+            [
+                ("question", "Which city hosted the event?"),
+                ("clue", "I worked with Alpha, Beta, and Gamma"),
+            ],
+        )
+
+    def test_source_activity_structures_require_directly_evidenced_axes(self) -> None:
+        source_chunk = {
+            "spokenEvidence": [],
+            "visibleEvidence": [
+                {
+                    "startMs": 1_000,
+                    "endMs": 5_000,
+                    "text": "Topics: History, Science. Levels: 200, 400, 600.",
+                }
+            ],
+        }
+        structures = _validated_source_activity_structures(
+            {
+                "structures": [
+                    {
+                        "kind": "grid",
+                        "label": "",
+                        "dimensions": [
+                            {"label": "Topics", "values": ["History", "Science"]},
+                            {"label": "Levels", "values": ["200", "400", "600"]},
+                        ],
+                        "startMs": 1_000,
+                        "endMs": 5_000,
+                    },
+                    {
+                        "kind": "grid",
+                        "label": "Invented",
+                        "dimensions": [{"label": "Only one", "values": ["x"]}],
+                        "startMs": 1_000,
+                        "endMs": 5_000,
+                    },
+                ]
+            },
+            10,
+            source_chunk,
+        )
+
+        self.assertEqual(len(structures), 1)
+        self.assertEqual(structures[0]["kind"], "grid")
+        self.assertEqual(structures[0]["dimensions"][1]["values"], ["200", "400", "600"])
+        self.assertEqual(structures[0]["promptCount"], 6)
+
+    def test_source_task_instance_reuses_only_a_grounded_explicit_prompt(self) -> None:
+        source_chunk = {
+            "spokenEvidence": [],
+            "visibleEvidence": [
+                {
+                    "startMs": 1_000,
+                    "endMs": 9_000,
+                    "text": "Guess the person. They worked with Alpha and Beta. The answer is Mina.",
+                }
+            ],
+        }
+        tasks = _validated_source_task_instances(
+            {
+                "taskInstances": [
+                    {
+                        "prompt": "Guess the person",
+                        "channel": "visible",
+                        "answer": "Mina",
+                        "respondent": "",
+                        "startMs": 3_000,
+                        "endMs": 9_000,
+                    },
+                    {
+                        "prompt": "They worked with Alpha and Beta",
+                        "channel": "visible",
+                        "answer": "Mina",
+                        "respondent": "",
+                        "startMs": 3_000,
+                        "endMs": 9_000,
+                    },
+                ]
+            },
+            10,
+            source_chunk,
+        )
+
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0]["prompt"], "Guess the person")
+        self.assertEqual(tasks[0]["answer"], "Mina")
 
     def test_source_inventory_validation_clamps_ranges_and_discards_invalid_items(self) -> None:
         items = _validated_source_inventory(
@@ -136,6 +289,49 @@ class AgentPlannerTests(unittest.TestCase):
 
         self.assertEqual([item["text"] for item in items], ["في أي سنة حدث ذلك"])
 
+    def test_source_inventory_only_keeps_answer_metadata_grounded_near_the_question(self) -> None:
+        source_chunk = {
+            "spokenEvidence": [
+                {
+                    "startMs": 1_000,
+                    "endMs": 6_000,
+                    "text": "Who starts the round? Mina says I start the round.",
+                }
+            ],
+            "visibleEvidence": [],
+        }
+        items = _validated_source_inventory(
+            {
+                "items": [
+                    {
+                        "kind": "question",
+                        "channel": "spoken",
+                        "text": "Who starts the round?",
+                        "answer": "Mina starts the round",
+                        "respondent": "Mina",
+                        "startMs": 1_000,
+                        "endMs": 3_000,
+                    },
+                    {
+                        "kind": "question",
+                        "channel": "spoken",
+                        "text": "Who starts the round?",
+                        "answer": "Ziad starts the round",
+                        "respondent": "Ziad",
+                        "startMs": 1_000,
+                        "endMs": 3_000,
+                    },
+                ]
+            },
+            10,
+            source_chunk,
+        )
+
+        self.assertEqual(items[0]["answer"], "Mina starts the round")
+        self.assertEqual(items[0]["respondent"], "Mina")
+        self.assertEqual(items[1]["answer"], "")
+        self.assertEqual(items[1]["respondent"], "")
+
     @patch.dict(os.environ, {"LARKUP_VIDEO_AGENT_API_KEY": "test-key"}, clear=False)
     def test_source_inventory_maps_time_chunks_concurrently_and_merges_chronologically(self) -> None:
         planner = AgentPlanner()
@@ -174,6 +370,10 @@ class AgentPlannerTests(unittest.TestCase):
         self.assertEqual([item["startMs"] for item in items], [0, 900_000, 1_800_000])
         self.assertEqual(planner.diagnostics().requests, 3)
         self.assertEqual(planner.diagnostics().prompt_tokens, 30)
+        self.assertEqual(
+            planner.source_inventory_coverage,
+            {"complete": True, "totalWindows": 3, "processedWindows": 3},
+        )
 
     def test_deterministic_summary_retains_people_states_context_and_story(self) -> None:
         summary = _fallback_knowledge_summary(

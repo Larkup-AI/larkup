@@ -10,7 +10,7 @@ export type TabularChartConfig = {
 };
 
 export function requestsVisualization(text: string): boolean {
-  return /\b(chart|graph|plot|visuali[sz]e|distribution|breakdown|trend|compare|show\s+me)\b/i.test(
+  return /\b(chart|graph|plot|visuali[sz]e|distribution|breakdown|trends?|compare|show\s+me)\b/i.test(
     text,
   );
 }
@@ -25,7 +25,11 @@ export function createTabularVisualization(
   }
 
   const candidate = normalizeChartConfig({
-    chartType: /\b(trend|over time|time series)\b/i.test(requestText) ? 'line' : 'bar',
+    chartType: /\b(?:line(?:\s+\w+){0,2}\s+chart|trends?|over time|time series)\b/i.test(
+      requestText,
+    )
+      ? 'line'
+      : 'bar',
     title: 'Data chart',
     data: result.rows.slice(0, 50),
     xAxisKey: result.columns[0] ?? '',
@@ -39,7 +43,10 @@ export function createTabularVisualization(
     title: `Distribution by ${formatChartLabel(candidate.xAxisKey)}`,
     series: candidate.series.map((series) => ({
       ...series,
-      label: series.label ?? formatChartLabel(series.dataKey),
+      label:
+        !series.label || series.label === series.dataKey
+          ? formatChartLabel(series.dataKey)
+          : series.label,
     })),
     showLegend: candidate.showLegend ?? candidate.series.length > 1,
   };

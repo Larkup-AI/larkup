@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { isLikelyTabularQuestion, tabularToolsForStep } from './tabular-routing';
+import {
+  isLikelyTabularQuestion,
+  requiresTabularSandbox,
+  tabularToolsForStep,
+} from './tabular-routing';
 
 describe('isLikelyTabularQuestion', () => {
   it('routes a question that names one distinctive workbook metric', () => {
@@ -21,6 +25,26 @@ describe('isLikelyTabularQuestion', () => {
       }),
     ).toBe(false);
   });
+
+  it('does not mistake a requested table format for a tabular source', () => {
+    expect(
+      isLikelyTabularQuestion({
+        text: 'Create a table with each named team member and a clothing description from the video.',
+        datasetNames: ['Superstore.xlsx'],
+        columnNames: ['Order ID', 'Product Name', 'Sales'],
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps explicit data-table requests on the structured table path', () => {
+    expect(
+      isLikelyTabularQuestion({
+        text: 'Show the data table columns and rows for Superstore.',
+        datasetNames: ['Superstore.xlsx'],
+        columnNames: ['Order ID', 'Product Name', 'Sales'],
+      }),
+    ).toBe(true);
+  });
 });
 
 describe('tabularToolsForStep', () => {
@@ -29,5 +53,22 @@ describe('tabularToolsForStep', () => {
       toolChoice: { type: 'tool', toolName: 'queryTabularData' },
       activeTools: ['queryTabularData'],
     });
+  });
+
+  it('requires the sandbox for a cross-sheet join', () => {
+    expect(
+      tabularToolsForStep({
+        stepNumber: 0,
+        toolNames: ['queryTabularData', 'executeAnalysis'],
+        requiresSandbox: requiresTabularSandbox('Join the Orders and Returns sheets with Python.'),
+      }),
+    ).toEqual({
+      toolChoice: { type: 'tool', toolName: 'executeAnalysis' },
+      activeTools: ['executeAnalysis'],
+    });
+  });
+
+  it('does not require code for an ordinary grouped tabular question', () => {
+    expect(requiresTabularSandbox('Show total sales by region.')).toBe(false);
   });
 });

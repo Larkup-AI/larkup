@@ -63,6 +63,7 @@ function evidenceContext(overrides: {
   fileName?: string;
   planInvestigation?: () => Promise<unknown>;
   reWatch?: (...args: any[]) => Promise<unknown>;
+  scan?: (...args: any[]) => Promise<unknown>;
 }) {
   return {
     origin: 'https://larkup.example.test',
@@ -77,6 +78,7 @@ function evidenceContext(overrides: {
       planQuestion: () => overrides.plan,
       ...(overrides.planInvestigation ? { planInvestigation: overrides.planInvestigation } : {}),
       ...(overrides.reWatch ? { reWatch: overrides.reWatch } : {}),
+      ...(overrides.scan ? { scan: overrides.scan } : {}),
       search: async (
         _id: string,
         query: string,
@@ -104,9 +106,120 @@ describe('Video Intelligence chat extension', () => {
       ]),
     );
     const queryTool = AGENT_TOOLS.find((item) => item.name === 'queryVideoEvidence');
-    expect(queryTool?.description).toMatch(/RAG index first/i);
-    expect(queryTool?.systemPromptFragment).toContain('only watches a bounded source moment');
+    expect(queryTool?.description).toMatch(/chronological scan/i);
+    expect(queryTool?.systemPromptFragment).toContain(
+      'complete-source request into top-K retrieval',
+    );
     expect(queryTool?.systemPromptFragment).toContain('not phrases such as "the video shows"');
+  });
+
+  it('uses a deterministic source scan for every question instead of calling ranked retrieval', async () => {
+    const search = vi.fn(async () => [hit('should-not-run', 0, 'unrelated')]);
+    const scan = vi.fn(async () => ({
+      resultHandle: 'video-scan:v1:revision:source-inventory',
+      records: [
+        {
+          id: 'question-1',
+          sourceEvidenceId: 'evidence-1',
+          kind: 'question',
+          channel: 'spoken',
+          text: 'Who starts?',
+          answer: 'Mina starts.',
+          respondent: 'Rami',
+          timeRange: { startSecs: 18, endSecs: 22, precision: 'segment' },
+          modality: 'transcript',
+          confidence: { score: 0.9 },
+        },
+        {
+          id: 'question-chat',
+          sourceEvidenceId: 'evidence-chat',
+          kind: 'question',
+          channel: 'spoken',
+          questionRole: 'interactional',
+          text: 'How are you?',
+          timeRange: { startSecs: 17, endSecs: 18, precision: 'segment' },
+          modality: 'transcript',
+          confidence: { score: 0.9 },
+        },
+      ],
+      continuation: { cursor: 0, nextCursor: 1, hasMore: true, totalRecords: 2 },
+      coverage: { complete: true, scannedRecords: 1, totalRecords: 1 },
+    }));
+
+    const result: any = await agentClient(vi.fn() as any).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'list every question' },
+      evidenceContext({
+        plan: {
+          kinds: ['question-inventory', 'coverage'],
+          route: 'scan',
+          requiresBroadCoverage: true,
+          requiresInspectionWhenInsufficient: false,
+        },
+        search,
+        scan,
+      }),
+    );
+
+    expect(scan).toHaveBeenCalledWith('media-1', {
+      kind: 'source-inventory',
+      cursor: undefined,
+      limit: undefined,
+    });
+    expect(search).not.toHaveBeenCalled();
+    expect(result.investigation.answerPath).toBe('deterministic-scan');
+    expect(result.claimVerification.directlyEstablished).toBe(true);
+    expect(result.continuation.hasMore).toBe(true);
+    expect(result.evidence).toHaveLength(1);
+    expect(result.evidence[0].payload.text).toContain('Source respondent: Rami');
+    expect(result.evidence[0].payload.text).not.toContain('How are you?');
+  });
+
+  it('keeps headings out of a deterministic question table while preserving the raw scan cursor', async () => {
+    const scan = vi.fn(async () => ({
+      resultHandle: 'video-scan:v1:revision:source-inventory',
+      records: [
+        {
+          id: 'heading-1',
+          sourceEvidenceId: 'evidence-heading',
+          kind: 'heading',
+          channel: 'visible',
+          text: 'Round one',
+          timeRange: { startSecs: 10, endSecs: 12, precision: 'segment' },
+          modality: 'ocr',
+          confidence: { score: 0.9 },
+        },
+        {
+          id: 'question-1',
+          sourceEvidenceId: 'evidence-question',
+          kind: 'question',
+          channel: 'spoken',
+          text: 'Who starts?',
+          timeRange: { startSecs: 13, endSecs: 16, precision: 'segment' },
+          modality: 'transcript',
+          confidence: { score: 0.9 },
+        },
+      ],
+      continuation: { cursor: 0, nextCursor: 2, hasMore: true, totalRecords: 3 },
+      coverage: { complete: true, scannedRecords: 2, totalRecords: 3 },
+    }));
+
+    const result: any = await agentClient(vi.fn() as any).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'make a table with every question and who answered it' },
+      evidenceContext({
+        plan: {
+          kinds: ['question-inventory', 'coverage'],
+          route: 'scan',
+          requiresBroadCoverage: true,
+          requiresInspectionWhenInsufficient: false,
+        },
+        scan,
+      }),
+    );
+
+    expect(result.evidence).toHaveLength(1);
+    expect(result.evidence[0].payload.text).toContain('Who starts?');
+    expect(result.evidence[0].payload.text).not.toContain('Round one');
+    expect(result.continuation.nextCursor).toBe(2);
   });
 
   it('re-watches the source before dispatching a re-index, and answers from what it read', async () => {

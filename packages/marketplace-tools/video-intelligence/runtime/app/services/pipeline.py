@@ -1785,6 +1785,14 @@ def _run_pipeline(
             "narrative": [],
             "context": [],
             "sourceItems": [],
+            "sourceActivityStructures": [],
+            "sourceTaskInstances": [],
+            "sourceInventoryCoverage": {
+                "complete": False,
+                "totalWindows": 0,
+                "processedWindows": 0,
+                "reason": "interactive inspection does not run a full source inventory",
+            },
             "uncertainties": [],
         }
     else:
@@ -1810,6 +1818,9 @@ def _run_pipeline(
             semantic_observations=semantic_evidence,
             overlay_text=recurring_overlay_text,
         )
+        knowledge_summary["sourceActivityStructures"] = planner.source_activity_structures
+        knowledge_summary["sourceTaskInstances"] = planner.source_task_instances
+        knowledge_summary["sourceInventoryCoverage"] = planner.source_inventory_coverage
     elapsed_seconds = round(time.monotonic() - pipeline_started, 3)
     result = {
         "schemaVersion": 1,

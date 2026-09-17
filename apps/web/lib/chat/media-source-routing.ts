@@ -10,6 +10,18 @@ export type RoutableMediaAsset = {
   documentIds: string[];
 };
 
+/**
+ * A source-type reference such as “the indexed video” is enough to select a
+ * single available recording, even if a semantic search ranks another file.
+ * Deliberately leave plural or otherwise ambiguous media collections to
+ * retrieval and title matching.
+ */
+export function hasExplicitMediaIntent(query: string) {
+  return /\b(?:video|audio|recording|clip|episode|movie|film|footage|watch|listen)\b|(?:فيديو|مقطع|تسجيل|حلقة|صوت)/iu.test(
+    query,
+  );
+}
+
 /** Select a title only when it has a clear lexical lead over every other source. */
 export function clearlyTitleMatchedMediaAsset<T extends RoutableMediaAsset>(
   query: string,

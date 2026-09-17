@@ -9,7 +9,7 @@ import { readConfig } from '@larkup/core/config-store';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import { embedQuery } from '@larkup/core/indexing/embedder';
 import { runWithProject } from '@larkup/core/project-store';
-import { getTabularDataset, queryTabular } from '@larkup/core/tabular-store';
+import { getTabularDataset, listTabularDatasets, queryTabular } from '@larkup/core/tabular-store';
 import {
   getCorpusDocuments,
   exportCorpusAsCSV,
@@ -28,6 +28,10 @@ import {
   searchVideoKnowledge,
   videoKnowledgeRetrievalCapabilities,
 } from '@larkup/core/video-knowledge/retrieval';
+import {
+  aggregateVideoKnowledge,
+  scanVideoKnowledge,
+} from '@larkup/core/video-knowledge/query-engine';
 import { planVideoInvestigation as buildVideoInvestigationPlan } from '@larkup/core/video-knowledge/investigation';
 import { verifyMediaEvidence } from '@larkup/core/video-knowledge/verification';
 import { planVideoQuestion } from '@larkup/core/video-knowledge/query-planner';
@@ -66,11 +70,20 @@ import {
 import {
   activeMediaFollowUpResult,
   clearlyTitleMatchedMediaAsset,
+  hasExplicitMediaIntent,
   shouldKeepActiveMediaSource,
 } from '@/lib/chat/media-source-routing';
 import { createTabularVisualization } from '@/lib/chat/tabular-visualization';
 import { normalizeChartConfig } from '@/lib/chat/chart-config';
 import { inferTabularPlan } from '@/lib/chat/tabular-query-plan';
+import {
+  resolveTabularDatasetForQuestion,
+  selectTabularDatasetForQuestion,
+} from '@/lib/chat/tabular-dataset-routing';
+import {
+  createTabularSandboxFiles,
+  remapLegacyMultiDatasetReads,
+} from '@/lib/chat/tabular-sandbox-files';
 import { leadingMediaAssetId } from '@/lib/chat/media-retrieval-routing';
 import { findIndexedImageSource } from '@/lib/chat/visual-routing';
 import { indexedVideoEvidenceIsSufficient } from '@/lib/chat/video-rag-routing';
@@ -333,19 +346,19 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
         isDocumentAvailableInVideoRuntime(document, activeVideoRuntimeScope) &&
         (!document.groupId || !assistantDisabledGroups.has(document.groupId)),
     );
-    const directTitleMatchedAsset = clearlyTitleMatchedMediaAsset(
-      query,
-      mediaAssets.filter(
-        (asset) =>
-          asset.processingStatus === 'completed' &&
-          Boolean(asset.activeVideoKnowledgeRevisionId) &&
-          isMediaAssetAvailableInRuntime(asset, activeVideoRuntimeScope) &&
-          (asset.type === 'video' || asset.type === 'audio'),
-      ),
+    const activeMediaAssets = mediaAssets.filter(
+      (asset) =>
+        asset.processingStatus === 'completed' &&
+        Boolean(asset.activeVideoKnowledgeRevisionId) &&
+        isMediaAssetAvailableInRuntime(asset, activeVideoRuntimeScope) &&
+        (asset.type === 'video' || asset.type === 'audio'),
     );
-    const titleMatchedAsset = directTitleMatchedAsset
+    const directTitleMatchedAsset = clearlyTitleMatchedMediaAsset(query, activeMediaAssets);
+    const selectedMediaAsset = directTitleMatchedAsset
       ? newestEquivalentMediaAsset(directTitleMatchedAsset, mediaAssets)
-      : undefined;
+      : hasExplicitMediaIntent(query) && activeMediaAssets.length === 1
+        ? newestEquivalentMediaAsset(activeMediaAssets[0], mediaAssets)
+        : undefined;
     if (!documents.some((document) => document.status === 'indexed'))
       return uniqueCompletedMediaFallback(query, activeVideoRuntimeScope);
 
@@ -394,7 +407,7 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
       // here, so the generic chat router can force whichever installed
       // evidence-query action owns that source before a model answers.
       const resolvedMediaAssetId =
-        titleMatchedAsset?.id ??
+        selectedMediaAsset?.id ??
         (await findEvidenceFirstVideoAssetId(formatted, activeVideoRuntimeScope));
       const resolvedMediaAsset = resolvedMediaAssetId
         ? mediaAssets.find((asset) => asset.id === resolvedMediaAssetId)
@@ -402,11 +415,16 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
       const mediaAssetId = resolvedMediaAsset
         ? newestEquivalentMediaAsset(resolvedMediaAsset, mediaAssets).id
         : resolvedMediaAssetId;
-      const scopedHits = titleMatchedAsset
+      // Once retrieval has selected an active evidence-first media source,
+      // its tool is the authority for this turn. Keeping secondary clips in
+      // the answer context can both confuse source attribution and spend the
+      // answer model's budget on unrelated recordings.
+      const authoritativeMediaAsset = selectedMediaAsset ?? resolvedMediaAsset;
+      const scopedHits = authoritativeMediaAsset
         ? formatted.hits.filter(
             (hit: any) =>
-              hit.metadata?.mediaAssetId === titleMatchedAsset.id ||
-              titleMatchedAsset.documentIds.includes(String(hit.documentId ?? '')),
+              hit.metadata?.mediaAssetId === authoritativeMediaAsset.id ||
+              authoritativeMediaAsset.documentIds.includes(String(hit.documentId ?? '')),
           )
         : formatted.hits;
       const authoritativeHits = mediaAssetId
@@ -908,6 +926,22 @@ export async function getChatTools(context: {
           semanticScores: options.semanticScores ?? (await semanticScoresFor(mediaAssetId, query)),
         });
       return projectId ? runWithProject(projectId, search) : search();
+    },
+    // Complete-source questions must not use semantic rank as their coverage
+    // mechanism. The Core engine pages immutable active evidence in time order
+    // and stores aggregate results outside the model context.
+    scan: async (
+      mediaAssetId: string,
+      input: { kind: 'source-inventory' | 'all-evidence'; cursor?: number; limit?: number },
+    ) => {
+      if (!(await scopedAsset(mediaAssetId))) return undefined;
+      const scan = () => scanVideoKnowledge(mediaAssetId, input);
+      return projectId ? runWithProject(projectId, scan) : scan();
+    },
+    aggregate: async (mediaAssetId: string) => {
+      if (!(await scopedAsset(mediaAssetId))) return undefined;
+      const aggregate = () => aggregateVideoKnowledge(mediaAssetId);
+      return projectId ? runWithProject(projectId, aggregate) : aggregate();
     },
     /**
      * Re-reads bounded windows of the original source for this question. The
@@ -2382,11 +2416,13 @@ export async function getChatTools(context: {
           .array(
             z.object({
               column: z.string(),
-              op: z.enum(['sum', 'avg', 'count', 'min', 'max', 'median']),
+              op: z.enum(['sum', 'avg', 'count', 'countDistinct', 'min', 'max', 'median']),
             }),
           )
           .optional()
-          .describe('Aggregation operations to perform.'),
+          .describe(
+            'Aggregation operations to perform. Use countDistinct when the user asks for unique or distinct values.',
+          ),
         sortBy: z.string().optional().describe('Column to sort results by.'),
         sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction.'),
         limit: z.number().optional().describe('Max number of rows to return.'),
@@ -2401,9 +2437,18 @@ export async function getChatTools(context: {
       }),
       execute: async (params) => {
         try {
-          const dataset = await getTabularDataset(params.datasetId);
+          const availableDatasets = await listTabularDatasets();
+          const resolvedDatasetId = resolveTabularDatasetForQuestion(
+            requestText,
+            availableDatasets,
+            params.datasetId,
+          );
+          const dataset = await getTabularDataset(resolvedDatasetId);
           if (!dataset) throw new Error('Dataset not found');
-          const plan = inferTabularPlan(requestText, dataset, params);
+          const plan = inferTabularPlan(requestText, dataset, {
+            ...params,
+            datasetId: resolvedDatasetId,
+          });
           const result = await queryTabular(plan.request);
           const visualization = createTabularVisualization(requestText, result);
           if (visualization && plan.chartTitle) visualization.title = plan.chartTitle;
@@ -2469,18 +2514,25 @@ export async function getChatTools(context: {
 
     executeAnalysis: tool({
       description:
-        'Execute Python code in a secure sandbox for deep data analysis. Use this for complex statistical computations (correlations, regressions, clustering), data transformations, or when creating custom matplotlib visualizations. The code has access to pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Always print results to stdout and use plt.show() for charts.',
+        'Execute Python code in a secure sandbox for deep data analysis. Use this for complex statistical computations (correlations, regressions, clustering), data transformations, or when creating custom matplotlib visualizations. The code has access to pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Always print results to stdout and use plt.show() for charts. The sandbox already configures headless plotting and its cache directories: do not set MPLBACKEND, MPLCONFIGDIR, or XDG_CACHE_HOME in analysis code.',
       inputSchema: z.object({
         code: z
           .string()
           .describe(
-            'Python code to execute. Has pandas (2.0+), numpy, matplotlib, scipy, sklearn, seaborn available. ALWAYS use "ME" instead of "M" for resample frequency. Print results and use plt.show() for charts.',
+            'Python code to execute. Has pandas (2.0+), numpy, matplotlib, scipy, sklearn, seaborn available. ALWAYS use "ME" instead of "M" for resample frequency. Print results and use plt.show() for charts. Plot configuration is already prepared by the sandbox; do not set MPLBACKEND, MPLCONFIGDIR, or XDG_CACHE_HOME.',
           ),
         datasetId: z
           .string()
           .optional()
           .describe(
-            "If provided, the dataset CSV will be available as 'data.csv' in the working directory.",
+            "For one dataset, its CSV is available as 'data.csv' in the working directory.",
+          ),
+        datasetIds: z
+          .array(z.string())
+          .min(1)
+          .optional()
+          .describe(
+            "For a correlation, comparison, or join across related files or worksheets, provide every required dataset ID. Their CSV filenames and schemas are listed in 'datasets.json' in the working directory.",
           ),
         pdfDocumentId: z
           .string()
@@ -2489,34 +2541,36 @@ export async function getChatTools(context: {
             "Optional exact PDF documentId. Its original local file will be mounted as 'source.pdf' for pypdf/Pillow analysis.",
           ),
       }),
-      execute: async ({ code, datasetId, pdfDocumentId }) => {
+      execute: async ({ code, datasetId, datasetIds, pdfDocumentId }) => {
         try {
           const sandboxManager = new SandboxManager(resolveSandboxConfig(config));
           const files: SandboxFile[] = [];
 
-          if (datasetId) {
-            const dataset = await getTabularDataset(datasetId);
-            if (dataset && dataset.rows.length > 0) {
-              const cols = dataset.columns.map((c) => c.name);
-              const csvLines = [cols.join(',')];
-              for (const row of dataset.rows) {
-                csvLines.push(
-                  cols
-                    .map((c) => {
-                      const v = row[c];
-                      const s = String(v ?? '');
-                      return s.includes(',') || s.includes('"') || s.includes('\n')
-                        ? `"${s.replace(/"/g, '""')}"`
-                        : s;
-                    })
-                    .join(','),
-                );
-              }
-              files.push({
-                name: 'data.csv',
-                content: csvLines.join('\n'),
-              });
+          const requestedDatasetIds = [
+            ...new Set([...(datasetIds ?? []), ...(datasetId ? [datasetId] : [])]),
+          ];
+          // Some providers emit valid analysis code but omit an optional
+          // datasetId. When the request maps unambiguously to one indexed
+          // schema, stage it automatically so `data.csv` remains a reliable
+          // single-sheet contract. Ambiguous workbooks still require the
+          // model to make an explicit selection.
+          if (requestedDatasetIds.length === 0) {
+            const automaticDatasetId = selectTabularDatasetForQuestion(
+              requestText,
+              await listTabularDatasets(),
+            );
+            if (automaticDatasetId) requestedDatasetIds.push(automaticDatasetId);
+          }
+          if (requestedDatasetIds.length > 0) {
+            const datasets = await Promise.all(requestedDatasetIds.map(getTabularDataset));
+            const missingDatasetId = requestedDatasetIds.find((_, index) => !datasets[index]);
+            if (missingDatasetId) {
+              throw new Error(`Tabular dataset is not available: ${missingDatasetId}`);
             }
+            files.push(
+              ...createTabularSandboxFiles(datasets as NonNullable<(typeof datasets)[number]>[])
+                .files,
+            );
           }
 
           if (pdfDocumentId) {
@@ -2531,6 +2585,16 @@ export async function getChatTools(context: {
           finalCode = finalCode.replace(/^```python\s*\n?/m, '');
           finalCode = finalCode.replace(/^```\s*\n?/m, '');
           finalCode = finalCode.replace(/```\s*$/m, '');
+          // Generated notebook snippets occasionally use `os` only for
+          // plotting-cache setup. The execution wrapper already configures
+          // those paths, but importing os here makes such harmless snippets
+          // robust without changing the requested analysis.
+          if (
+            /\bos\.(?:environ|makedirs|path)\b/.test(finalCode) &&
+            !/^\s*(?:import|from)\s+os\b/m.test(finalCode)
+          ) {
+            finalCode = `import os\n${finalCode}`;
+          }
 
           let result = await sandboxManager.execute({
             code: finalCode,
@@ -2541,6 +2605,12 @@ export async function getChatTools(context: {
 
           // Auto-retry once if code crashes
           if (result.exitCode !== 0) {
+            if (
+              requestedDatasetIds.length > 1 &&
+              /(?:no such file|data\.csv)/i.test(result.stderr)
+            ) {
+              finalCode = remapLegacyMultiDatasetReads(finalCode, requestedDatasetIds.length);
+            }
             // Apply regex patches for common LLM mistakes
             finalCode = finalCode.replace(/resample\((['"])M(['"])\)/g, 'resample($1ME$2)');
             finalCode = finalCode.replace(/resample\((['"])Q(['"])\)/g, 'resample($1QE$2)');

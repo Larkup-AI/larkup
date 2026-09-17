@@ -276,13 +276,38 @@ interface VideoEvidence {
       evidence: Array<{ startMs: number; endMs: number }>;
     }>;
     sourceItems?: Array<{
-      kind: 'question' | 'heading' | 'slide-item' | 'board-item' | 'list-item';
+      kind: 'question' | 'clue' | 'heading' | 'slide-item' | 'board-item' | 'list-item';
       channel: 'spoken' | 'visible';
+      questionRole?: 'primary' | 'interactional' | 'rhetorical' | 'not-question';
       text: string;
       answer: string;
+      respondent?: string;
       startMs: number;
       endMs: number;
     }>;
+    sourceActivityStructures?: Array<{
+      kind: 'grid' | 'sequence' | 'collection';
+      label: string;
+      dimensions: Array<{ label: string; values: string[] }>;
+      promptCount?: number;
+      startMs: number;
+      endMs: number;
+    }>;
+    sourceTaskInstances?: Array<{
+      id: string;
+      prompt: string;
+      channel: 'spoken' | 'visible';
+      answer: string;
+      respondent?: string;
+      startMs: number;
+      endMs: number;
+    }>;
+    sourceInventoryCoverage?: {
+      complete: boolean;
+      totalWindows: number;
+      processedWindows: number;
+      reason?: string;
+    };
     uncertainties?: string[];
   };
   coverage?: {
@@ -1204,15 +1229,62 @@ function reconciledAccount(evidence: VideoEvidence): OfflineKnowledgeEvidenceInp
           ),
         ),
     ),
+    ...(summary.sourceInventoryCoverage
+      ? [
+          entry(
+            0,
+            durationSecs,
+            `Source inventory coverage: ${
+              summary.sourceInventoryCoverage.complete ? 'complete' : 'partial'
+            }${
+              summary.sourceInventoryCoverage.reason
+                ? ` (${summary.sourceInventoryCoverage.reason})`
+                : ''
+            }`,
+            summary.sourceInventoryCoverage.complete ? 0.9 : 0.5,
+          ),
+        ]
+      : []),
     ...(summary.sourceItems ?? []).map((item) =>
       entry(
         item.startMs / 1_000,
         item.endMs / 1_000,
         item.kind === 'question'
-          ? `Source question (${item.channel}): ${item.text}${
+          ? `Source question (${item.channel}${
+              item.questionRole ? `, ${item.questionRole}` : ''
+            }): ${item.text}${
               item.answer ? `\nSource answer: ${item.answer}` : ''
-            }`
+            }${item.respondent ? `\nSource respondent: ${item.respondent}` : ''}`
           : `Source item (${item.kind}, ${item.channel}): ${item.text}`,
+        0.82,
+      ),
+    ),
+    ...(summary.sourceTaskInstances ?? []).map((task) =>
+      entry(
+        task.startMs / 1_000,
+        task.endMs / 1_000,
+        `Source question (${task.channel}, primary): ${task.prompt}\nSource task id: ${task.id}${
+          task.answer ? `\nSource answer: ${task.answer}` : ''
+        }${task.respondent ? `\nSource respondent: ${task.respondent}` : ''}`,
+        0.82,
+      ),
+    ),
+    ...(summary.sourceActivityStructures ?? []).map((structure) =>
+      entry(
+        structure.startMs / 1_000,
+        structure.endMs / 1_000,
+        `Source structure (${structure.kind}): ${
+          structure.label ||
+          structure.dimensions
+            .map((dimension) => `${dimension.label}: ${dimension.values.join(', ')}`)
+            .join(' | ')
+        }\nSource dimensions: ${structure.dimensions
+          .map((dimension) => `${dimension.label} = ${dimension.values.join(', ')}`)
+          .join(' | ')}${
+          structure.promptCount === undefined
+            ? ''
+            : `\nSource prompt slots: ${structure.promptCount}`
+        }`,
         0.82,
       ),
     ),
@@ -1410,10 +1482,42 @@ export function evidenceToSegments(evidence: VideoEvidence): MediaEvidenceSegmen
   for (const item of summary?.sourceItems ?? []) {
     bucketFor(item.startMs / 1_000).visual.push(
       item.kind === 'question'
-        ? `Source question (${item.channel}): ${item.text}${
+        ? `Source question (${item.channel}${
+            item.questionRole ? `, ${item.questionRole}` : ''
+          }): ${item.text}${
             item.answer ? `\nSource answer: ${item.answer}` : ''
-          }`
+          }${item.respondent ? `\nSource respondent: ${item.respondent}` : ''}`
         : `Source item (${item.kind}, ${item.channel}): ${item.text}`,
+    );
+  }
+  for (const task of summary?.sourceTaskInstances ?? []) {
+    bucketFor(task.startMs / 1_000).visual.push(
+      `Source question (${task.channel}, primary): ${task.prompt}\nSource task id: ${task.id}${
+        task.answer ? `\nSource answer: ${task.answer}` : ''
+      }${task.respondent ? `\nSource respondent: ${task.respondent}` : ''}`,
+    );
+  }
+  for (const structure of summary?.sourceActivityStructures ?? []) {
+    bucketFor(structure.startMs / 1_000).visual.push(
+      `Source structure (${structure.kind}): ${
+        structure.label ||
+        structure.dimensions
+          .map((dimension) => `${dimension.label}: ${dimension.values.join(', ')}`)
+          .join(' | ')
+      }\nSource dimensions: ${structure.dimensions
+        .map((dimension) => `${dimension.label} = ${dimension.values.join(', ')}`)
+        .join(' | ')}${
+        structure.promptCount === undefined ? '' : `\nSource prompt slots: ${structure.promptCount}`
+      }`,
+    );
+  }
+  if (summary?.sourceInventoryCoverage) {
+    bucketFor(0).visual.push(
+      `Source inventory coverage: ${
+        summary.sourceInventoryCoverage.complete ? 'complete' : 'partial'
+      }${
+        summary.sourceInventoryCoverage.reason ? ` (${summary.sourceInventoryCoverage.reason})` : ''
+      }`,
     );
   }
   const guide = [
@@ -1514,10 +1618,45 @@ export function formatVideoKnowledgeSummary(evidence: VideoEvidence): string | n
       'Source inventory:',
       ...summary.sourceItems.map(
         (item) =>
-          `- [${time(item.startMs)}–${time(item.endMs)}] ${item.kind}: ${item.text}${
+          `- [${time(item.startMs)}–${time(item.endMs)}] ${item.kind}${
+            item.kind === 'question' && item.questionRole ? ` (${item.questionRole})` : ''
+          }: ${item.text}${
             item.answer ? ` — ${item.answer}` : ''
+          }${item.respondent ? ` (respondent: ${item.respondent})` : ''}`,
+      ),
+    );
+  }
+  if (summary.sourceActivityStructures?.length) {
+    lines.push(
+      'Source structures:',
+      ...summary.sourceActivityStructures.map(
+        (structure) =>
+          `- [${time(structure.startMs)}–${time(structure.endMs)}] ${structure.kind}: ${
+            structure.label || '—'
+          } (${structure.dimensions
+            .map((dimension) => `${dimension.label} = ${dimension.values.join(', ')}`)
+            .join(' | ')})${
+            structure.promptCount === undefined ? '' : ` — ${structure.promptCount} prompt slots`
           }`,
       ),
+    );
+  }
+  if (summary.sourceTaskInstances?.length) {
+    lines.push(
+      'Continued source tasks:',
+      ...summary.sourceTaskInstances.map(
+        (task) =>
+          `- [${time(task.startMs)}–${time(task.endMs)}] ${task.prompt}${
+            task.answer ? ` — ${task.answer}` : ''
+          }${task.respondent ? ` (respondent: ${task.respondent})` : ''}`,
+      ),
+    );
+  }
+  if (summary.sourceInventoryCoverage) {
+    lines.push(
+      `Source inventory coverage: ${summary.sourceInventoryCoverage.complete ? 'complete' : 'partial'}${
+        summary.sourceInventoryCoverage.reason ? ` (${summary.sourceInventoryCoverage.reason})` : ''
+      }`,
     );
   }
   if (summary.uncertainties?.length) {

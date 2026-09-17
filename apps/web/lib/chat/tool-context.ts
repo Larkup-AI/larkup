@@ -162,7 +162,17 @@ export function collectAnswerLevelMediaStatements(value: unknown): string[] {
       Array.isArray(record.evidence)
     ) {
       for (const item of record.evidence as Array<{ payload?: unknown }>) {
-        const statement = textOf(item?.payload)
+        const sourceText = textOf(item?.payload);
+        // Individual source readings can explicitly state that they are only
+        // partial context. A top-level scan being complete does not upgrade a
+        // partial reading into an answer to a different question.
+        if (
+          /^Observed context \(not a complete answer\):/i.test(sourceText.trim()) ||
+          /\nClaim verdict:\s*(?:partial|not-established)\b/i.test(sourceText)
+        ) {
+          continue;
+        }
+        const statement = sourceText
           .split(/\nClaim question:/i, 1)[0]
           .replace(/^(?:Reconciled|Indexed)\s+(?:state|event|context|overview):\s*/i, '')
           .trim()
@@ -306,8 +316,15 @@ export function formatDirectObservationAnswer(value: unknown, question = ''): st
             coverageComplete?: unknown;
           };
           if (typeof reading.found !== 'string' || !reading.found.trim()) continue;
-          if (reading.settlesQuestion === false) continue;
+          // This is a visible fallback, so it must only use a re-watch that
+          // explicitly answered the exact question. A related observation is
+          // still useful tool context for the answer model, but never a final
+          // answer by itself.
+          if (reading.settlesQuestion !== true) continue;
           if (reading.coverageComplete === false) continue;
+          if (/^Observed context \(not a complete answer\):/i.test(reading.found.trim())) {
+            continue;
+          }
           readings.push({
             found: reading.found.trim(),
             confidence: String(reading.confidence ?? ''),
@@ -342,6 +359,68 @@ export function formatDirectObservationAnswer(value: unknown, question = ''): st
     .trim();
 }
 
+/** Render a compact, source-grounded participant roster without relying on prose-model formatting. */
+export function formatParticipantInventory(value: unknown, question: string): string | undefined {
+  if (!planVideoQuestion(question).kinds.includes('entity-inventory')) return undefined;
+  const participants: Array<{ name: string; description: string; at: number }> = [];
+  const seen = new Set<string>();
+  const textOf = (payload: unknown) => {
+    if (typeof payload === 'string') return payload;
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      const text = (payload as { text?: unknown }).text;
+      if (typeof text === 'string') return text;
+    }
+    return '';
+  };
+  const visit = (candidate: unknown) => {
+    if (typeof candidate === 'string') {
+      try {
+        visit(JSON.parse(candidate));
+      } catch {
+        /* only structured verified media results qualify */
+      }
+      return;
+    }
+    if (Array.isArray(candidate)) return candidate.forEach(visit);
+    if (!candidate || typeof candidate !== 'object') return;
+    const record = candidate as Record<string, unknown>;
+    if (
+      record.success === true &&
+      mediaClaimIsAnswerLevel(record.claimVerification) &&
+      Array.isArray(record.evidence)
+    ) {
+      for (const item of record.evidence as Array<Record<string, unknown>>) {
+        const sourceText = textOf(item.payload) || (typeof item.text === 'string' ? item.text : '');
+        const match = sourceText.match(
+          /^Reconciled participant:\s*([^—\n]{1,120})\s*—\s*([^\n]+)/imu,
+        );
+        if (!match) continue;
+        const name = match[1]!.trim();
+        const description = match[2]!.trim();
+        const range = (item.timeRange ?? {}) as { startSecs?: unknown };
+        const at = Number(range.startSecs ?? item.startSecs ?? 0);
+        const key = name.normalize('NFKC').toLocaleLowerCase();
+        if (!name || !description || seen.has(key)) continue;
+        seen.add(key);
+        participants.push({ name, description, at: Number.isFinite(at) ? at : 0 });
+      }
+      return;
+    }
+    Object.values(record).forEach(visit);
+  };
+  visit(value);
+  if (participants.length === 0) return undefined;
+
+  const ordered = participants.sort((left, right) => left.at - right.at);
+  const escapeCell = (cell: string) => cell.replace(/\|/g, '\\|');
+  return `| Participant | Description | Timestamp |\n| --- | --- | --- |\n${ordered
+    .map(
+      (participant) =>
+        `| ${escapeCell(participant.name)} | ${escapeCell(participant.description)} | [${displayTimecode(participant.at)}] |`,
+    )
+    .join('\n')}`;
+}
+
 function displayTimecode(seconds: number) {
   const total = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(total / 3_600);
@@ -357,7 +436,13 @@ function displayTimecode(seconds: number) {
  * already-final source items through another model context window.
  */
 export function formatExhaustiveMediaAnswer(value: unknown, question: string): string | undefined {
-  type Item = { at: number; text: string; sourceInventory: boolean };
+  type Item = {
+    at: number;
+    text: string;
+    sourceInventory: boolean;
+    answer?: string;
+    respondent?: string;
+  };
   let complete: Item[] | undefined;
   const textOf = (payload: unknown) => {
     if (typeof payload === 'string') return payload;
@@ -369,9 +454,12 @@ export function formatExhaustiveMediaAnswer(value: unknown, question: string): s
   };
   const clean = (raw: string) => {
     const sourceLine = raw
-      .split(/\n(?=(?:Context|Answer|Claim question|Claim verdict|Claim answer):)/i, 1)[0]
+      .split(
+        /\n(?=(?:Context|Answer|Answered by|Source answer|Source respondent|Source task id|Claim question|Claim verdict|Claim answer):)/i,
+        1,
+      )[0]
       .replace(/^(?:Reconciled|Indexed)\s+(?:state|event|context|overview):\s*/i, '')
-      .replace(/^(?:Source (?:question|item)(?:\s*\([^)]*\))?|Question):\s*/i, '')
+      .replace(/^(?:Source (?:question|item|structure)(?:\s*\([^)]*\))?|Question):\s*/i, '')
       .trim();
     return sourceLine;
   };
@@ -401,12 +489,19 @@ export function formatExhaustiveMediaAnswer(value: unknown, question: string): s
           const range = (item.timeRange ?? {}) as { startSecs?: unknown };
           const at = Number(range.startSecs ?? item.startSecs ?? 0);
           const raw = textOf(item.payload);
+          const answer = raw.match(/^(?:Source answer|Answer):\s*(.+)$/imu)?.[1]?.trim();
+          const respondent = raw
+            .match(/^(?:Source respondent|Answered by):\s*(.+)$/imu)?.[1]
+            ?.trim();
           return {
             at: Number.isFinite(at) ? at : 0,
             text: clean(raw),
-            sourceInventory: /^(?:Source (?:question|item)(?:\s*\([^)]*\))?|Question):/i.test(
-              raw.trim(),
-            ),
+            ...(answer ? { answer } : {}),
+            ...(respondent ? { respondent } : {}),
+            sourceInventory:
+              /^(?:Source (?:question|item|structure)(?:\s*\([^)]*\))?|Question):/i.test(
+                raw.trim(),
+              ),
           };
         })
         .filter((item) => item.text)
@@ -428,6 +523,31 @@ export function formatExhaustiveMediaAnswer(value: unknown, question: string): s
   // natural synthesis. Source-authored inventory records are already the exact
   // requested units, and a large result must avoid another context window.
   if (items.length <= 48 && !items.every((item) => item.sourceInventory)) return undefined;
+  const tableRequested = /\b(?:table|columns?|rows?)\b|(?:جدول|أعمدة|اعمدة|صفوف)/iu.test(question);
+  const countRequested =
+    /\b(?:how\s+many|number\s+of|count|total)\b/iu.test(question) ||
+    /(?:كم|كام|عدد|إجمالي|اجمالي)/u.test(question);
+  if (countRequested && items.every((item) => item.sourceInventory)) {
+    return /\p{Script=Arabic}/u.test(question)
+      ? `عدد الـprompts الأساسية المؤكدة في المصدر: ${items.length}.`
+      : `Confirmed primary source prompts: ${items.length}.`;
+  }
+  if (tableRequested && items.every((item) => item.sourceInventory)) {
+    const arabic = /\p{Script=Arabic}/u.test(question);
+    const escapeCell = (cell: string | undefined) => (cell || '—').replace(/\|/g, '\\|');
+    const header = arabic
+      ? '| السؤال | أجاب عليه | الإجابة |'
+      : '| Question | Answered by | Answer |';
+    const divider = '| --- | --- | --- |';
+    return `${header}\n${divider}\n${items
+      .map(
+        (item) =>
+          `| [${displayTimecode(item.at)}] ${escapeCell(item.text)} | ${escapeCell(
+            item.respondent,
+          )} | ${escapeCell(item.answer)} |`,
+      )
+      .join('\n')}`;
+  }
   const intro = /\p{Script=Arabic}/u.test(question)
     ? 'دي القائمة الكاملة بالترتيب الزمني:'
     : 'Here is the complete list in chronological order:';
