@@ -9,13 +9,19 @@ export type VideoQuestionKind =
   | 'computation'
   | 'person-attribute'
   | 'question-inventory'
+  | 'activity-structure'
   | 'source-inventory'
   | 'entity-inventory'
   | 'evaluation'
   | 'coverage';
 
+/** The data-engine operation that answers a question without relying on a model's recall. */
+export type VideoQueryRoute = 'search' | 'temporal' | 'aggregate' | 'scan' | 'export';
+
 export interface VideoQueryPlan {
   kinds: VideoQuestionKind[];
+  /** The deterministic data operation to run before any answer generation. */
+  route: VideoQueryRoute;
   modalities: Array<'transcript' | 'ocr' | 'visual' | 'computed'>;
   requiresBothRanges: boolean;
   requiresInspectionWhenInsufficient: boolean;
@@ -230,6 +236,10 @@ export function planVideoQuestion(question: string): VideoQueryPlan {
     /(?:الأكثر|الاكثر|اكتر|أكتر).{0,30}(?:فعالية|فاعلية|مشاركة|تأثير|تفاعلا|تفاعل|كلاما|كلام)|(?:شارك|ساهم|تكلم|اتكلم).{0,20}(?:أكثر|اكتر|الأكثر|الاكثر)/u.test(
       text,
     );
+  const asksPersonAppearance =
+    /\b(?:appearance|look(?:s|ing)?|wear\w*|dress\w*|clothing|clothes|outfit|t-?shirt|shirt|jersey|jacket|coat)\b/.test(
+      text,
+    ) || /(?:المظهر|لابس|ملابس|قميص|تيشيرت|جاكيت|زي)/u.test(text);
 
   if (asksQuote) kinds.add('direct-speech');
   if (asksVisibleText) kinds.add('exact-ocr');
@@ -247,21 +257,37 @@ export function planVideoQuestion(question: string): VideoQueryPlan {
     /\b(?:all|every|each|entire|whole|complete(?:ly)?|full|throughout|overall)\b/.test(text) ||
     /(?:كل|كافة|جميع|كامل|بالكامل|بأكمله|طوال|إجمالا)/u.test(text);
   const representationTask =
-    /\b(?:summar(?:y|ise|ize|ised|ized)|overview|recap|outline|walk\s+me\s+through|list|enumerate|cover|breakdown|content|topics?|agenda|main\s+points?|key\s+points?)\b/.test(
+    /\b(?:summar(?:y|ise|ize|ised|ized)|overview|recap|outline|walk\s+me\s+through|list|enumerate|cover|breakdown|table|content|topics?|agenda|main\s+points?|key\s+points?)\b/.test(
       text,
     ) || /(?:لخص|ملخص|تلخيص|نظرة عامة|اسرد|اذكر|محتوى|مواضيع|موضوعات|النقاط|العناصر)/u.test(text);
+  const asksQuestionAnswerTable =
+    /\b(?:questions?|prompts?|queries)\b[^?.!]{0,120}\b(?:answer(?:ed|er|ing)?|respond\w*|who)\b/i.test(
+      text,
+    ) ||
+    /\btable\b[^?.!]{0,120}\b(?:questions?|prompts?|queries)\b/i.test(text) ||
+    /(?:الأسئلة|الاسئلة|الأسئله|الاسئله).{0,80}(?:أجاب|اجاب|المجيب|جاوب|جدول)/u.test(text) ||
+    /(?:جدول).{0,80}(?:الأسئلة|الاسئلة|الأسئله|الاسئله)/u.test(text);
+  const questionVocabulary =
+    /\b(?:questions?|prompts?|queries)\b/.test(text) ||
+    /(?:الأسئلة|الاسئلة|الأسئله|الاسئله|كل\s+سؤال)/u.test(text);
+  const asksQuestionCount = asksCount && questionVocabulary;
+  const asksQuestionInventory =
+    (wholeSourceQuantifier && questionVocabulary) || asksQuestionCount || asksQuestionAnswerTable;
+  const asksActivityStructure =
+    /\b(?:grid|matrix|board|categories?|sections?|levels?|tiers?|columns?|rows?|slots?)\b/.test(
+      text,
+    ) ||
+    /(?:شبكة|مصفوفة|لوح|سبورة|فئات|تصنيفات|أقسام|اقسام|مستويات|خانات|صفوف|أعمدة|اعمدة)/u.test(text);
   const broadCoverage =
     asksEvaluation ||
+    asksQuestionInventory ||
     (wholeSourceQuantifier && representationTask) ||
     (representationTask && /\b(?:video|recording|source|it|this)\b/.test(text)) ||
     (wholeSourceQuantifier && asksOrder) ||
     /(?:لخص|ملخص|تلخيص).{0,20}(?:الفيديو|التسجيل|المصدر)/u.test(text);
   if (broadCoverage) kinds.add('coverage');
-  const asksQuestionInventory =
-    wholeSourceQuantifier &&
-    (/\b(?:questions?|prompts?|queries)\b/.test(text) ||
-      /(?:الأسئلة|الاسئلة|الأسئله|الاسئله|كل\s+سؤال)/u.test(text));
   if (asksQuestionInventory) kinds.add('question-inventory');
+  if (asksActivityStructure) kinds.add('activity-structure');
   const asksSourceInventory =
     wholeSourceQuantifier &&
     (/\b(?:slides?|boards?|whiteboards?|headings?|titles?|bullets?|written|writing|displayed\s+(?:items?|content)|on-screen\s+(?:items?|content))\b/.test(
@@ -309,12 +335,18 @@ export function planVideoQuestion(question: string): VideoQueryPlan {
     );
   const asksEntityInventory =
     requiresIdentityContext &&
-    (representationTask || (asksWho && wholeSourceQuantifier)) &&
-    (/\b(?:name|names|identity|identities|participants?|speakers?|presenters?|attendees?|people|persons?)\b/.test(
+    (representationTask ||
+      (asksWho &&
+        (wholeSourceQuantifier ||
+          /\b(?:people|persons?|participants?|speakers?|presenters?|attendees?)\b/.test(text) ||
+          /(?:الأشخاص|الاشخاص|المشاركين|المتحدثين|الحاضرين)/u.test(text)))) &&
+    (/\b(?:name|names|identity|identities|participants?|members?|speakers?|presenters?|attendees?|people|persons?)\b/.test(
       text,
     ) ||
       /(?:اسم|أسماء|الاسم|هوية|المشاركين|المتحدثين|الحاضرين|الأشخاص|الاشخاص)/u.test(text));
   if (asksEntityInventory) kinds.add('entity-inventory');
+
+  if (asksPersonAppearance && requiresIdentityContext) kinds.add('person-attribute');
 
   // Uses the original question so names in any script and informal lower-case
   // phrasing can become a retrieval anchor.
@@ -323,12 +355,33 @@ export function planVideoQuestion(question: string): VideoQueryPlan {
 
   if (kinds.size === 0) kinds.add('visual-fact');
 
+  const route: VideoQueryRoute =
+    /\b(?:export|download)\b/.test(text) || /(?:تصدير|تحميل)/u.test(text)
+      ? 'export'
+      : kinds.has('question-inventory') || kinds.has('source-inventory')
+        ? 'scan'
+        : kinds.has('entity-inventory') ||
+            kinds.has('activity-structure') ||
+            (kinds.has('person-attribute') && requiresIdentityContext)
+          ? 'aggregate'
+          : broadCoverage
+            ? 'scan'
+            : kinds.has('outcome') ||
+                kinds.has('state-change') ||
+                kinds.has('comparison') ||
+                kinds.has('counting') ||
+                kinds.has('computation') ||
+                kinds.has('evaluation')
+              ? 'temporal'
+              : 'search';
+
   return {
     kinds: [...kinds],
+    route,
     modalities: ['transcript', 'ocr', 'visual', 'computed'],
     requiresBothRanges:
       kinds.has('comparison') || kinds.has('state-change') || kinds.has('coverage'),
-    requiresBroadCoverage: broadCoverage,
+    requiresBroadCoverage: broadCoverage || asksEntityInventory,
     requiresIdentityContext,
     requiresInspectionWhenInsufficient:
       kinds.has('exact-ocr') ||

@@ -49,6 +49,17 @@ test('planVideoQuestion: distinguishes a roster from an unfiltered source dump',
   assert.ok(plan.requiresIdentityContext);
 });
 
+test('planVideoQuestion: recognizes team members as a roster request', () => {
+  for (const question of [
+    'list every team member by name',
+    'create a table of every team member by name',
+  ]) {
+    const plan = planVideoQuestion(question);
+    assert.ok(plan.kinds.includes('entity-inventory'), question);
+    assert.equal(plan.route, 'aggregate', question);
+  }
+});
+
 test('planVideoQuestion: an effectiveness judgement requests broad evidence', () => {
   const plan = planVideoQuestion('which person was the most effective or participated most?');
   assert.ok(plan.kinds.includes('evaluation'));
@@ -60,6 +71,35 @@ test('planVideoQuestion: identifies a complete inventory of source questions', (
   assert.ok(plan.kinds.includes('question-inventory'));
   assert.ok(plan.kinds.includes('coverage'));
   assert.equal(plan.requiresBroadCoverage, true);
+  assert.equal(plan.route, 'scan');
+});
+
+test('planVideoQuestion: counts source prompts with the same exhaustive route', () => {
+  const plan = planVideoQuestion('how many questions are in this video?');
+  assert.ok(plan.kinds.includes('question-inventory'));
+  assert.equal(plan.route, 'scan');
+});
+
+test('planVideoQuestion: routes a source-established layout to the durable aggregate', () => {
+  const plan = planVideoQuestion('what categories and levels appear on the board?');
+  assert.ok(plan.kinds.includes('activity-structure'));
+  assert.equal(plan.route, 'aggregate');
+});
+
+test('planVideoQuestion: routes a question-and-respondent table to a source scan', () => {
+  const plan = planVideoQuestion('make a table with every question and who answered it');
+  assert.ok(plan.kinds.includes('question-inventory'));
+  assert.equal(plan.route, 'scan');
+});
+
+test('planVideoQuestion: routes named people and clothing to the durable aggregate', () => {
+  const plan = planVideoQuestion(
+    'who are the people in this video, with their names and t-shirt descriptions?',
+  );
+  assert.ok(plan.kinds.includes('person-attribute'));
+  assert.ok(plan.kinds.includes('entity-inventory'));
+  assert.equal(plan.requiresBroadCoverage, true);
+  assert.equal(plan.route, 'aggregate');
 });
 
 test('planVideoQuestion: identifies complete visible-source inventories generically', () => {
@@ -118,6 +158,7 @@ test('planVideoQuestion: whole-source questions request broad coverage', () => {
 test('planVideoQuestion: a plain summary request covers the whole source', () => {
   const plan = planVideoQuestion('summarize this video');
   assert.equal(plan.requiresBroadCoverage, true);
+  assert.equal(plan.route, 'scan');
 });
 
 test('planVideoQuestion: plural appearance questions are comparisons', () => {
@@ -181,6 +222,12 @@ test('planVideoQuestion: a resolution question is an outcome question', () => {
       `"${question}" should be planned as an outcome question`,
     );
   }
+});
+
+test('planVideoQuestion: final score and winner use a temporal operation', () => {
+  const plan = planVideoQuestion('what was the final score and winner?');
+  assert.ok(plan.kinds.includes('outcome'));
+  assert.equal(plan.route, 'temporal');
 });
 
 test('planVideoQuestion: choosing between named sides is a comparison', () => {

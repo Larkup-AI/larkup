@@ -62,6 +62,11 @@ function pythonEnvironment(virtualEnv?: string): NodeJS.ProcessEnv {
     env.VIRTUAL_ENV = virtualEnv;
     env.PYTHONNOUSERSITE = '1';
     env.PATH = `${path.dirname(virtualEnvPython(virtualEnv))}${path.delimiter}${env.PATH ?? ''}`;
+    // Persist Matplotlib and font caches with the managed runtime rather than
+    // recreating them in a disposable execution directory on every chart.
+    const cacheDirectory = path.join(virtualEnv, 'cache');
+    env.MPLCONFIGDIR = path.join(cacheDirectory, 'matplotlib');
+    env.XDG_CACHE_HOME = cacheDirectory;
   }
   return env;
 }
@@ -279,10 +284,24 @@ function assertSafeFileName(name: string) {
   }
 }
 
-function pythonWrapper(code: string, outputDir: string) {
-  return `import base64, os, sys, traceback
+/** Build a Python wrapper that saves charts and preserves the original traceback on Python 3.9+. */
+export function buildPythonExecutionWrapper(code: string, outputDir: string) {
+  return `import base64, logging, os, sys, traceback
+from contextlib import redirect_stdout
+from io import StringIO
 os.makedirs(${JSON.stringify(outputDir)}, exist_ok=True)
 os.environ.setdefault('MPLBACKEND', 'Agg')
+def _larkup_prepare_cache(name, fallback):
+    value = os.environ.get(name) or fallback
+    try:
+        os.makedirs(value, exist_ok=True)
+    except OSError:
+        value = fallback
+        os.makedirs(value, exist_ok=True)
+    os.environ[name] = value
+_larkup_prepare_cache('MPLCONFIGDIR', os.path.join(${JSON.stringify(outputDir)}, '.matplotlib'))
+_larkup_prepare_cache('XDG_CACHE_HOME', os.path.join(${JSON.stringify(outputDir)}, '.cache'))
+logging.getLogger('matplotlib').setLevel(logging.ERROR)
 try:
     import numpy as np
     import pandas as pd
@@ -302,13 +321,34 @@ try:
 except ImportError:
     pass
 try:
-    exec(compile(base64.b64decode(${JSON.stringify(
-      Buffer.from(code).toString('base64'),
-    )}), 'analysis.py', 'exec'))
+    _larkup_stdout = StringIO()
+    with redirect_stdout(_larkup_stdout):
+        exec(compile(base64.b64decode(${JSON.stringify(
+          Buffer.from(code).toString('base64'),
+        )}), 'analysis.py', 'exec'))
+    _larkup_output = _larkup_stdout.getvalue()
+    sys.stdout.write(_larkup_output)
+    if not _larkup_output.strip():
+        for _larkup_name, _larkup_value in reversed(list(globals().items())):
+            if _larkup_name.startswith('_'):
+                continue
+            try:
+                _larkup_length = len(_larkup_value)
+                _larkup_to_string = getattr(_larkup_value, 'to_string', None)
+                if not callable(_larkup_to_string) or not 0 < _larkup_length <= 50:
+                    continue
+                try:
+                    _larkup_preview = _larkup_to_string(index=False)
+                except TypeError:
+                    _larkup_preview = _larkup_to_string()
+                print(f'Analysis result preview ({_larkup_name}):\\n{str(_larkup_preview)[:4000]}')
+                break
+            except Exception:
+                continue
     if 'plt' in globals() and plt.get_fignums():
         plt.show()
 except Exception as error:
-    traceback.print_exception(error, file=sys.stderr)
+    traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
     sys.exit(1)
 `;
 }
@@ -376,7 +416,7 @@ export async function executeLocally(request: ExecutionRequest): Promise<Executi
 
     const script = path.join(tempDir, isPython ? 'run.py' : 'run.js');
     const source = isPython
-      ? pythonWrapper(request.code, outputDir)
+      ? buildPythonExecutionWrapper(request.code, outputDir)
       : `process.env.LARKUP_OUTPUT_DIR = ${JSON.stringify(outputDir)};\n${request.code}`;
     await fs.writeFile(script, source, 'utf8');
     const result = await run(

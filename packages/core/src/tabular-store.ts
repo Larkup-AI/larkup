@@ -118,6 +118,12 @@ function detectDateFormat(values: string[]): string {
   return 'YYYY-MM-DD';
 }
 
+function isStructuredDateValue(value: unknown) {
+  if (value instanceof Date) return !isNaN(value.getTime());
+  const text = String(value).trim();
+  return DATE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 function detectColumnType(values: any[]): ColumnType {
   const nonNull = values.filter((v) => v !== null && v !== undefined && v !== '');
   if (nonNull.length === 0) return 'mixed';
@@ -132,7 +138,10 @@ function detectColumnType(values: any[]): ColumnType {
       boolCount++;
     } else if (!isNaN(Number(str)) && str !== '') {
       numCount++;
-    } else if (DATE_PATTERNS.some((p) => p.test(str)) || !isNaN(Date.parse(str))) {
+      // Date.parse accepts surprising identifier-like values (for example,
+      // "CG-12520"), which can turn IDs into dates and corrupt later filters.
+      // Only classify values matching a supported, explicit date format.
+    } else if (isStructuredDateValue(v)) {
       dateCount++;
     }
   }
@@ -142,6 +151,38 @@ function detectColumnType(values: any[]): ColumnType {
   if (boolCount >= threshold) return 'boolean';
   if (dateCount >= threshold) return 'date';
   return 'string';
+}
+
+/**
+ * Older datasets may have been indexed while date detection trusted
+ * Date.parse. Repair only clearly invalid date metadata from the stored
+ * sample values, keeping the read path constant-size for large datasets.
+ */
+function repairLegacyDateMetadata(dataset: TabularDataset): TabularDataset {
+  let changed = false;
+  const columns = dataset.columns.map((column) => {
+    const samples = column.sampleValues ?? [];
+    if (
+      column.type !== 'date' ||
+      samples.length === 0 ||
+      samples.filter(isStructuredDateValue).length >= samples.length * 0.8
+    ) {
+      return column;
+    }
+    changed = true;
+    const { dateRange: _dateRange, ...withoutDateRange } = column;
+    return { ...withoutDateRange, type: 'string' as const };
+  });
+  if (!changed) return dataset;
+  return {
+    ...dataset,
+    columns,
+    summary: {
+      ...dataset.summary,
+      dateColumns: columns.filter((column) => column.type === 'date').length,
+      categoricalColumns: columns.filter((column) => column.type === 'string').length,
+    },
+  };
 }
 
 function computeNumericStats(values: number[]): ColumnStats {
@@ -229,7 +270,7 @@ async function readAll(): Promise<TabularDataset[]> {
   if (!file) return [];
   try {
     const raw = await fs.readFile(file, 'utf8');
-    return JSON.parse(raw) as TabularDataset[];
+    return (JSON.parse(raw) as TabularDataset[]).map(repairLegacyDateMetadata);
   } catch {
     return [];
   }
@@ -289,7 +330,7 @@ export async function deleteTabularDataset(id: string): Promise<void> {
   await writeAll(all.filter((d) => d.id !== id));
 }
 
-export type AggregationOp = 'sum' | 'avg' | 'count' | 'min' | 'max' | 'median';
+export type AggregationOp = 'sum' | 'avg' | 'count' | 'countDistinct' | 'min' | 'max' | 'median';
 
 export interface TabularFilter {
   column: string;
@@ -461,8 +502,8 @@ export async function queryTabular(query: TabularQueryRequest): Promise<TabularQ
       });
 
       for (const agg of query.aggregations) {
-        const values = groupRows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
-        result[`${agg.op}_${agg.column}`] = computeAgg(agg.op, values);
+        const values = groupRows.map((row) => row[agg.column]);
+        result[`${agg.op}_${agg.column}`] = aggregateTabularValues(agg.op, values);
       }
 
       aggregatedRows.push(result);
@@ -479,8 +520,8 @@ export async function queryTabular(query: TabularQueryRequest): Promise<TabularQ
   ) {
     aggregationResults = {};
     for (const agg of query.aggregations) {
-      const values = rows.map((r) => Number(r[agg.column])).filter((n) => !isNaN(n));
-      aggregationResults[`${agg.op}_${agg.column}`] = computeAgg(agg.op, values);
+      const values = rows.map((row) => row[agg.column]);
+      aggregationResults[`${agg.op}_${agg.column}`] = aggregateTabularValues(agg.op, values);
     }
   }
 
@@ -522,21 +563,33 @@ export async function queryTabular(query: TabularQueryRequest): Promise<TabularQ
   };
 }
 
-function computeAgg(op: AggregationOp, values: number[]): number {
-  if (values.length === 0) return 0;
+/** Aggregate tabular cell values without coercing text identifiers for counts. */
+export function aggregateTabularValues(op: AggregationOp, values: unknown[]): number {
+  const presentValues = values.filter(
+    (value) => value !== null && value !== undefined && String(value).trim() !== '',
+  );
+
+  if (op === 'count') return presentValues.length;
+  if (op === 'countDistinct') {
+    return new Set(presentValues.map((value) => `${typeof value}:${String(value)}`)).size;
+  }
+
+  const numericValues = presentValues
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+  if (numericValues.length === 0) return 0;
+
   switch (op) {
     case 'sum':
-      return Number(values.reduce((s, v) => s + v, 0).toFixed(4));
+      return Number(numericValues.reduce((s, v) => s + v, 0).toFixed(4));
     case 'avg':
-      return Number((values.reduce((s, v) => s + v, 0) / values.length).toFixed(4));
-    case 'count':
-      return values.length;
+      return Number((numericValues.reduce((s, v) => s + v, 0) / numericValues.length).toFixed(4));
     case 'min':
-      return Math.min(...values);
+      return Math.min(...numericValues);
     case 'max':
-      return Math.max(...values);
+      return Math.max(...numericValues);
     case 'median': {
-      const sorted = [...values].sort((a, b) => a - b);
+      const sorted = [...numericValues].sort((a, b) => a - b);
       const n = sorted.length;
       return n % 2 === 0
         ? Number(((sorted[n / 2 - 1] + sorted[n / 2]) / 2).toFixed(4))

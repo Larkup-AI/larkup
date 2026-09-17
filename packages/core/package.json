@@ -53,6 +53,7 @@
     "./video-knowledge/focus-ranges": "./src/video-knowledge/focus-ranges.ts",
     "./video-knowledge/information-gain": "./src/video-knowledge/information-gain.ts",
     "./video-knowledge/query-planner": "./src/video-knowledge/query-planner.ts",
+    "./video-knowledge/query-engine": "./src/video-knowledge/query-engine.ts",
     "./video-knowledge/investigation": "./src/video-knowledge/investigation.ts",
     "./video-knowledge/inspection-policy": "./src/video-knowledge/inspection-policy.ts",
     "./video-knowledge/inspection-chunking": "./src/video-knowledge/inspection-chunking.ts",
