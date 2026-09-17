@@ -8,6 +8,11 @@
   "publishConfig": {
     "access": "public"
   },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "CHANGELOG.md"
+  ],
   "type": "module",
   "exports": {
     "./types": "./src/types.ts",
