@@ -1,5 +1,14 @@
 # @larkup/tool-video-intelligence
 
+## 0.2.11
+
+### Patch Changes
+
+- 211071c: Use a provider-compatible minimum output-token limit when verifying configured models.
+- 211071c: Improve deterministic video evidence routing and complete-source retrieval.
+- Updated dependencies [211071c]
+  - @larkup/core@0.6.0
+
 ## 0.2.10
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @larkup/marketplace
 
+## 0.2.8
+
+### Patch Changes
+
+- 211071c: Improve deterministic video evidence routing and complete-source retrieval.
+- Updated dependencies [211071c]
+  - @larkup/core@0.6.0
+
 ## 0.2.7
 
 ### Patch Changes
