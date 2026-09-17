@@ -14,6 +14,7 @@ describe('published npm metadata', () => {
   it('keeps global installer dependencies compatible and current', () => {
     const webPackage = readJson('apps/web/package.json');
     const cliPackage = readJson('apps/cli/package.json');
+    const corePackage = readJson('packages/core/package.json');
     const marketplacePackage = readJson('packages/marketplace/package.json');
     const vectorStoresPackage = readJson('packages/vector-stores/package.json');
     const sandboxPackage = readJson('packages/sandbox/package.json');
@@ -47,6 +48,7 @@ describe('published npm metadata', () => {
       expect(webPackage.dependencies[dependency]).not.toContain('workspace:');
     }
     expect(webPackage.files).toEqual(['bin', '.next/standalone/apps/web']);
+    expect(corePackage.files).toEqual(['src', '!src/**/*.test.ts', 'CHANGELOG.md']);
   });
 
   it('scrubs local project state from every traced workspace before packing', () => {
