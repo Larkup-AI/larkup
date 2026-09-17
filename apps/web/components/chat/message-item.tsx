@@ -942,7 +942,7 @@ function renderToolPart(
             <img src="/logo.png" alt="" className="size-4 animate-spin" />
           </div>
           <span
-            className="larkup-shimmer-text min-w-0 break-words text-[13px] font-medium leading-5"
+            className="larkup-shimmer-text min-w-0 wrap-break-word text-[13px] font-medium leading-5"
             aria-live="polite"
             aria-atomic="true"
           >
