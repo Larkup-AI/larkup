@@ -1,5 +1,11 @@
 # larkup
 
+## 0.3.7
+
+### Patch Changes
+
+- ae70348: Fix wrapping for live analysis progress text in chat.
+
 ## 0.3.6
 
 ### Patch Changes
