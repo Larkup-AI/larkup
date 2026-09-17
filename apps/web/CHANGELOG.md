@@ -1,5 +1,19 @@
 # larkup
 
+## 0.3.6
+
+### Patch Changes
+
+- 211071c: Resolve spreadsheet questions against the sheet schema, preserve multiple requested measures in time-series charts, and make local plotting setup resilient during sandbox analysis.
+- 211071c: Improve deterministic video evidence routing and complete-source retrieval.
+- Updated dependencies [211071c]
+- Updated dependencies [211071c]
+  - @larkup/sandbox@0.1.7
+  - @larkup/core@0.6.0
+  - @larkup/marketplace@0.2.8
+  - @larkup/tool-doc-editor@0.2.24
+  - @larkup/scraper@0.1.45
+
 ## 0.3.5
 
 ### Patch Changes

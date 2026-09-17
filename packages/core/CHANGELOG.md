@@ -1,5 +1,11 @@
 # @larkup/core
 
+## 0.6.0
+
+### Minor Changes
+
+- 211071c: Improve deterministic video evidence routing and complete-source retrieval.
+
 ## 0.5.5
 
 ### Patch Changes
