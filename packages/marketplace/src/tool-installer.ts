@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import path from 'node:path';
-import { exec as execCb } from 'node:child_process';
+import { exec as execCb, execFile as execFileCb } from 'node:child_process';
 import { promisify } from 'node:util';
 import type {
   InstalledTool,
@@ -24,6 +24,7 @@ export function getOngoingOperations() {
 }
 
 const execAsync = promisify(execCb);
+const execFileAsync = promisify(execFileCb);
 
 // npm mutates a shared node_modules tree.
 let packageMutationChain: Promise<unknown> = Promise.resolve();
@@ -292,6 +293,19 @@ async function ensureToolsPackageJson(): Promise<void> {
   }
 }
 
+export function buildNpmInstallArgs(specifier: string, toolsDir: string): string[] {
+  return [
+    'install',
+    specifier,
+    '--prefix',
+    toolsDir,
+    '--save',
+    '--no-audit',
+    '--no-fund',
+    '--prefer-online',
+  ];
+}
+
 /**
  * Execute the actual package install into the isolated tools directory.
  */
@@ -321,9 +335,8 @@ async function execInstallUnlocked(
       await ensureToolsPackageJson();
 
       const install = async (specifier: string) => {
-        const installCmd = `npm install ${specifier} --prefix "${toolsDir}" --save --no-audit --no-fund --prefer-offline`;
         onProgress?.(`Running: npm install ${specifier}`);
-        const { stderr } = await execAsync(installCmd, {
+        const { stderr } = await execFileAsync('npm', buildNpmInstallArgs(specifier, toolsDir), {
           cwd: toolsDir,
           // Native tool dependencies can take longer under Docker Desktop's
           // amd64 emulation. Let the request finish instead of reporting a

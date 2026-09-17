@@ -63,7 +63,10 @@ export async function GET() {
     else if (installedTool) status = 'installed';
 
     const availableVersion = tool.version;
-    const installedVersion = installedTool?.version;
+    // An interrupted update can leave installed.json at the old version even
+    // when the package itself was already replaced. Its bundled manifest is
+    // the authoritative version for the update indicator.
+    const installedVersion = localById.get(tool.id)?.version ?? installedTool?.version;
 
     return {
       ...tool,
