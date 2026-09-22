@@ -1,5 +1,22 @@
 # @larkup/marketplace
 
+## 0.3.1
+
+### Patch Changes
+
+- Keep Marketplace update actions accurate after a successful install, and do not offer an npm update for a workspace-linked development tool that cannot be replaced by the installer.
+
+## 0.3.0
+
+### Minor Changes
+
+- Add language-neutral, model-issued video investigation directives, source-grounded chronological continuity, and an anonymous detection presence ledger for broad video investigation. Preserve the Media Panel indexing focus across local and remote imports, add source-wide coverage retrieval outside the model context, and make Marketplace tool updates settle to the verified installed version.
+
+### Patch Changes
+
+- Updated dependencies
+  - @larkup/core@0.7.0
+
 ## 0.2.9
 
 ### Patch Changes
