@@ -55,6 +55,17 @@ export interface VideoKnowledgeAggregate {
   resultHandle: string;
   cached: boolean;
   participants: Array<{ name: string; description: string; timeRange: TimeRange }>;
+  /**
+   * Frame-grounded sightings consolidated by the indexing protocol. These are
+   * observed intervals, not inferred continuous screen time between samples.
+   */
+  visibleSubjects: Array<{
+    identity: string;
+    identityBasis: 'source-named' | 'source-described' | 'unresolved';
+    appearances: TimeRange[];
+    observedDurationSecs: number;
+    observationCount: number;
+  }>;
   timeline: Array<{ text: string; timeRange: TimeRange }>;
   sourceItems: VideoKnowledgeScanRecord[];
   coverage: {
@@ -276,6 +287,140 @@ function isAggregate(value: MetadataValue): value is Record<string, MetadataValu
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+type VisibleSubjectBasis = 'source-named' | 'source-described' | 'unresolved';
+type VisibleSubjectObservation = {
+  identity: string;
+  identityBasis: VisibleSubjectBasis;
+  timeRange: TimeRange;
+};
+
+const visibleSubjectBases = new Set<VisibleSubjectBasis>([
+  'source-named',
+  'source-described',
+  'unresolved',
+]);
+
+/**
+ * Read the indexing protocol, not prose or question vocabulary. Both the
+ * per-frame protocol line and the reconciled summary are accepted so an
+ * active revision remains useful across indexer versions.
+ */
+function visibleSubjectObservations(evidence: EvidenceRevision[]): VisibleSubjectObservation[] {
+  const observations: VisibleSubjectObservation[] = [];
+  for (const item of evidence) {
+    const text = evidenceTextForRetrieval(item.payload);
+    for (const line of text.split(/\r?\n/)) {
+      const value = line.trim();
+      if (!value.startsWith('Visible subject: ')) continue;
+      try {
+        const subject = JSON.parse(value.slice('Visible subject: '.length)) as {
+          identity?: unknown;
+          identityBasis?: unknown;
+          startMs?: unknown;
+          endMs?: unknown;
+        };
+        const identity = typeof subject.identity === 'string' ? subject.identity.trim() : '';
+        const basis = subject.identityBasis;
+        const startSecs = Number(subject.startMs) / 1_000;
+        const endSecs = Number(subject.endMs) / 1_000;
+        if (
+          identity &&
+          typeof basis === 'string' &&
+          visibleSubjectBases.has(basis as VisibleSubjectBasis) &&
+          Number.isFinite(startSecs) &&
+          Number.isFinite(endSecs) &&
+          startSecs >= 0 &&
+          endSecs >= startSecs
+        ) {
+          observations.push({
+            identity,
+            identityBasis: basis as VisibleSubjectBasis,
+            timeRange: { startSecs, endSecs, precision: 'estimated' },
+          });
+        }
+      } catch {
+        // A malformed protocol record cannot establish a sighting.
+      }
+    }
+
+    const summary = text.match(
+      /^Reconciled visible subject:\s*([^\n]+)\nIdentity basis:\s*(source-named|source-described|unresolved)\nObserved appearances:\s*([^\n]+)/imu,
+    );
+    if (!summary) continue;
+    const identity = summary[1]!.trim();
+    const identityBasis = summary[2]! as VisibleSubjectBasis;
+    for (const appearance of summary[3]!.matchAll(/(\d+)-(\d+)ms\s*\((?:direct|partial)\)/gu)) {
+      const startSecs = Number(appearance[1]) / 1_000;
+      const endSecs = Number(appearance[2]) / 1_000;
+      if (
+        !identity ||
+        !Number.isFinite(startSecs) ||
+        !Number.isFinite(endSecs) ||
+        endSecs < startSecs
+      )
+        continue;
+      observations.push({
+        identity,
+        identityBasis,
+        timeRange: { startSecs, endSecs, precision: 'estimated' },
+      });
+    }
+  }
+  return observations;
+}
+
+function mergeObservedRanges(ranges: TimeRange[]) {
+  const merged: TimeRange[] = [];
+  for (const range of [...ranges].sort(
+    (left, right) => left.startSecs - right.startSecs || left.endSecs - right.endSecs,
+  )) {
+    const previous = merged.at(-1);
+    if (previous && range.startSecs <= previous.endSecs) {
+      previous.endSecs = Math.max(previous.endSecs, range.endSecs);
+    } else {
+      merged.push({ ...range });
+    }
+  }
+  return merged;
+}
+
+function aggregateVisibleSubjects(evidence: EvidenceRevision[]) {
+  const byIdentity = new Map<string, VisibleSubjectObservation[]>();
+  for (const observation of visibleSubjectObservations(evidence)) {
+    const key = observation.identity.normalize('NFKC').toLocaleLowerCase();
+    const group = byIdentity.get(key) ?? [];
+    group.push(observation);
+    byIdentity.set(key, group);
+  }
+  return [...byIdentity.values()]
+    .map((observations) => {
+      const sourceNamed = observations.find(
+        (observation) => observation.identityBasis === 'source-named',
+      );
+      const identity = sourceNamed?.identity ?? observations[0]!.identity;
+      const identityBasis: VisibleSubjectBasis = sourceNamed
+        ? 'source-named'
+        : observations.some((observation) => observation.identityBasis === 'source-described')
+          ? 'source-described'
+          : 'unresolved';
+      const appearances = mergeObservedRanges(
+        observations.map((observation) => observation.timeRange),
+      );
+      return {
+        identity,
+        identityBasis,
+        appearances,
+        observedDurationSecs: appearances.reduce(
+          (total, range) => total + range.endSecs - range.startSecs,
+          0,
+        ),
+        observationCount: observations.length,
+      };
+    })
+    .sort((left, right) => left.appearances[0]!.startSecs - right.appearances[0]!.startSecs)
+    .slice(0, 200);
+}
+
 /**
  * Builds a compact, revision-scoped navigation result from all active
  * evidence, then retains it outside the chat context as an artifact result.
@@ -288,7 +433,7 @@ export async function aggregateVideoKnowledge(
   if (!manifest) return undefined;
   // Bump the derived-artifact version when identity extraction changes so
   // existing indexed media receives the improved aggregate without re-indexing.
-  const resultHandle = `video-aggregate:v2:${manifest.knowledgeRevisionId}`;
+  const resultHandle = `video-aggregate:v3:${manifest.knowledgeRevisionId}`;
   const cached = await getCachedArtifactAnalysis(mediaAssetId, resultHandle);
   if (cached && isAggregate(cached)) {
     return { ...(cached as unknown as VideoKnowledgeAggregate), cached: true };
@@ -329,6 +474,7 @@ export async function aggregateVideoKnowledge(
     resultHandle,
     cached: false,
     participants: [...participants.values()].slice(0, 200),
+    visibleSubjects: aggregateVisibleSubjects(evidence),
     timeline: timeline.slice(0, 400),
     sourceItems: sourceItems.slice(0, 2_000),
     coverage: {

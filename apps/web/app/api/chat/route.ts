@@ -1,4 +1,5 @@
 import {
+  generateText,
   streamText,
   convertToModelMessages,
   createUIMessageStream,
@@ -24,9 +25,11 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGateway } from '@ai-sdk/gateway';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { CustomModelConfig } from '@larkup/core/types';
+import type { VideoInvestigationDirective } from '@larkup/core/video-knowledge/query-planner';
 import { getChatTools } from './tools';
 import { gatewayProviderOptions } from '@/lib/chat/gateway-fallbacks';
-import { canReuseKnowledgeBaseEvidence, retrievalToolsForStep } from '@/lib/chat/retrieval-routing';
+import { retrievalToolsForStep } from '@/lib/chat/retrieval-routing';
+import { collectExhaustiveVideoEvidencePages } from '@/lib/chat/video-rag-routing';
 import {
   extractConversationEvidence,
   contextualizeKnowledgeFollowUpQuery,
@@ -39,13 +42,14 @@ import { PERSONALIZED_RESPONSE_STYLE } from '@/lib/chat/response-style';
 import {
   compactToolContextForModel,
   collectAnswerLevelMediaStatements,
+  collectObservedSubjectLedger,
   containsAnswerLevelMediaEvidence,
   collectQuestionMatchedDirectClaims,
   recoverEmptyUIMessageStream,
   formatDirectObservationAnswer,
-  formatParticipantInventory,
   formatExhaustiveMediaAnswer,
-  formatOutcomeMediaAnswer,
+  formatLocatedObservedSubjectAnswer,
+  formatObservedAppearanceAnswer,
   mediaClaimNeedsCorroboration,
   withFinalAnswerNudge,
 } from '@/lib/chat/tool-context';
@@ -58,10 +62,14 @@ import {
 import {
   hasRetrievedImageEvidence,
   hasRetrievedPdfEvidence,
+  hasNumberedDocumentReference,
+  findRetrievedPdfSource,
+  latestNumberedDocumentReferenceText,
+  preferredPdfPagesForInspection,
+  requiresPdfVisualAnalysis,
   requestsImagePresentation,
   shouldInspectRetrievedImage,
 } from '@/lib/chat/visual-routing';
-import { collectExhaustiveVideoEvidencePages } from '@/lib/chat/video-rag-routing';
 import { executableTools } from '@/lib/chat/tool-registry';
 import { normalizeIncomingMessages } from '@/lib/chat/message-input';
 import { explicitMediaEvidenceAssetId } from '@/lib/chat/media-retrieval-routing';
@@ -120,7 +128,7 @@ function createChatModel(
 const CHAT_POLICY = `
 Answer only from the user's provided material.
 
-For each substantive question, get fresh evidence: use queryTabularData for CSV, Excel, or JSON facts; otherwise use searchKnowledgeBase. For a direct follow-up, reuse the compact recent evidence when it fully covers the request. Use one focused query first. Use code analysis only when the available data tool cannot answer the calculation. For a join or statistical analysis across files or worksheets, use executeAnalysis with every needed datasetId in datasetIds; read datasets.json to identify their mounted CSV files and never try to emulate the join with a cross-dataset table filter.
+For each substantive question, get fresh evidence: use queryTabularData for CSV, Excel, or JSON facts; otherwise use searchKnowledgeBase. A prior answer is context for resolving references, never a substitute for current source evidence. Use one focused query first. Use code analysis only when the available data tool cannot answer the calculation. For a join or statistical analysis across files or worksheets, use executeAnalysis with every needed datasetId in datasetIds; read datasets.json to identify their mounted CSV files and never try to emulate the join with a cross-dataset table filter.
 
 Do not repeat an evidence tool in the same response. After evidence is returned, answer directly or use one appropriate refinement when the evidence action requests it.
 
@@ -147,14 +155,16 @@ For every video claim, distinguish a direct observation from an inference. Do no
 When a user explicitly corrects a prior answer about media, acknowledge the correction and use source evidence for later factual answers; never overwrite the source record with a conversational correction.
 `;
 
-function latestUserText(messages: UIMessage[]): string {
-  const message = [...messages].reverse().find((candidate) => candidate.role === 'user') as any;
+function messageText(message: UIMessage | undefined): string {
   if (!message) return '';
-  if (typeof message.content === 'string') return message.content;
+  // `content` is retained only on legacy UI messages; current SDK messages
+  // store text in `parts`.
+  const legacyMessage = message as UIMessage & { content?: unknown };
+  if (typeof legacyMessage.content === 'string') return legacyMessage.content;
   const parts = Array.isArray(message.parts)
     ? message.parts
-    : Array.isArray(message.content)
-      ? message.content
+    : Array.isArray(legacyMessage.content)
+      ? legacyMessage.content
       : [];
   if (parts.length) {
     return parts
@@ -163,6 +173,40 @@ function latestUserText(messages: UIMessage[]): string {
       .join(' ');
   }
   return '';
+}
+
+function latestUserText(messages: UIMessage[]): string {
+  return messageText([...messages].reverse().find((candidate) => candidate.role === 'user'));
+}
+
+/**
+ * A terse follow-up such as "render it" often refers to a figure/table named
+ * in the immediately preceding answer. Keep that human-readable reference in
+ * the local PDF query, without replaying prior tool payloads into the model.
+ */
+function latestAssistantText(messages: UIMessage[]): string {
+  return messageText(
+    [...messages].reverse().find((candidate) => candidate.role === 'assistant'),
+  ).slice(0, 4_000);
+}
+
+/**
+ * A preview follow-up can refer to an object named by the user several turns
+ * earlier, even if the intervening assistant answer had no usable text part.
+ * Search only the preceding conversational text, never a tool payload.
+ */
+function precedingNumberedDocumentReference(messages: UIMessage[]): string | undefined {
+  let latestUserIndex = -1;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === 'user') {
+      latestUserIndex = index;
+      break;
+    }
+  }
+  if (latestUserIndex <= 0) return undefined;
+  return latestNumberedDocumentReferenceText(
+    messages.slice(0, latestUserIndex).map((message) => messageText(message)),
+  );
 }
 
 /**
@@ -221,6 +265,8 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
   const serialized = typeof safeOutput === 'string' ? safeOutput : JSON.stringify(safeOutput);
   const contextBudget = containsExhaustiveEvidence(safeOutput) ? 120_000 : 24_000;
   const directClaims = collectQuestionMatchedDirectClaims(result, question);
+  const directObservations = collectAnswerLevelMediaStatements(result);
+  const observedSubjectLedger = collectObservedSubjectLedger(result);
   const hasEstablishedMediaEvidence = containsAnswerLevelMediaEvidence(result);
   const mediaAssetId = explicitMediaEvidenceAssetId(result);
   if (
@@ -237,11 +283,202 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
           '\n',
         )}\n\n`
       : ''
+  }${
+    directObservations.length > 0
+      ? `BINDING SOURCE OBSERVATIONS (state every explicit time, recurrence, identity basis, and uncertainty exactly as written):\n${directObservations
+          .map((observation) => `- ${observation}`)
+          .join(
+            '\n',
+          )}\n\nDo not turn discrete observations into continuous presence. Do not say that something happened only once, did not recur, or was absent elsewhere unless that absence is directly established by the observations. Do not replace a source-described or unresolved identity with a proper name.\n\n`
+      : ''
+  }${
+    observedSubjectLedger.length > 0
+      ? `BINDING VISIBILITY LEDGER (these are discrete frame-grounded observations across the source):\n${observedSubjectLedger
+          .map((subject) => `- ${subject}`)
+          .join(
+            '\n',
+          )}\n\nWhen the request connects an observed subject or event at one position to elsewhere in the source, use this ledger for the other observed appearances. Do not replace a source-described identity with a proper name. Do not say the subject appeared only once, did not recur, or was absent elsewhere unless the supplied evidence directly establishes that absence.\n\n`
+      : ''
   }${serialized.slice(0, contextBudget)}\n\n${
     unverifiedMedia
       ? 'The verification status above limits certainty, not access to the source material. Give the most useful source-grounded answer that is supported.'
       : "Answer the user's question directly from this evidence."
   } Do not mention tools, retrieval, frames, transcripts, or analysis.`;
+}
+
+/**
+ * Turn a natural-language question into the content-neutral directive owned by
+ * the video evidence capability. The executor subsequently handles only this
+ * typed plan, so no route-level vocabulary, language, or media-genre rules are
+ * needed to interpret a time reference or a source-wide request.
+ */
+async function planVideoEvidenceQuery(input: {
+  model: any;
+  providerOptions: ReturnType<typeof gatewayProviderOptions>;
+  question: string;
+}): Promise<VideoInvestigationDirective | undefined> {
+  try {
+    const requestPlan = async (system: string, maxOutputTokens: number) => {
+      const { text } = await generateText({
+        model: input.model,
+        maxRetries: 0,
+        maxOutputTokens,
+        temperature: 0,
+        abortSignal: AbortSignal.timeout(12_000),
+        providerOptions: input.providerOptions,
+        system,
+        prompt: input.question,
+      });
+      return parseVideoInvestigationDirective(text);
+    };
+    const planned = await requestPlan(
+      'You are a media-query planner. Return exactly one JSON object and no prose. ' +
+        'Interpret the user request in its own language without assuming a video genre. ' +
+        'Use this exact shape: {"scope":"focused","goal":"answer","evidence":["visual"],"timeRange":{"startSecs":123,"endSecs":153},"timeRangeOrigin":"user-mentioned"}. Its fields are scope (focused, temporal, source), goal (answer, compare, trace, enumerate, synthesize), optional evidence (speech, visible-text, visual, computed), optional recordSet (all, source-authored, source-questions, observed), optional timeRange {startSecs,endSecs}, and optional timeRangeOrigin. ' +
+        'A directive is invalid if the user refers to any source position, time, range, or approximate moment and you omit timeRange: resolve it to numeric seconds and set timeRangeOrigin to user-mentioned, even when the request also asks about other moments. Never emit timeRange or timeRangeOrigin when the user did not constrain a source position; a topic occurring near an opening, closing, or any other position is not a user constraint. When the request names a coarse source unit without a smaller boundary, cover that whole named unit rather than an arbitrary part of it. When the user asks how a visible subject or event at an explicit source position relates to appearances or recurrence elsewhere, use temporal plus trace, visual evidence, and recordSet observed while retaining that position. Use source plus synthesize with no timeRange whenever the answer must combine two or more source facts from unrestricted positions. Use source plus enumerate and recordSet source-questions for a complete inventory of source-authored questions and their answers. Use temporal for a relationship or development across moments; use focused only for one local moment or one self-contained fact. ' +
+        'Do not answer the question or add fields.',
+      220,
+    );
+    if (planned) return planned;
+    // A compact recovery request is intentionally restricted to the protocol
+    // choices. It rescues providers that emit conversational prose on their
+    // first planning attempt without introducing source- or language-specific
+    // routing rules in the host.
+    return await requestPlan(
+      'Return only JSON: {"scope":"focused|temporal|source","goal":"answer|compare|trace|enumerate|synthesize","recordSet":"all|source-authored|source-questions|observed"}. Select source/enumerate/source-questions for a complete question-and-answer inventory from a recording; select source/synthesize for an unrestricted explanation; select focused/answer for one local fact. Do not include a timeRange unless the user explicitly supplied a source position.',
+      100,
+    );
+  } catch {
+    // The evidence action has a source-wide fallback. A planner outage must
+    // not turn an otherwise answerable source question into a chat error.
+    return undefined;
+  }
+}
+
+/**
+ * Validate the only planner decision that can discard most of a recording.
+ * This deliberately asks a separate, binary question: requesting timestamps
+ * in an answer is not itself a request to inspect a particular timestamp.
+ * Keeping this language-neutral gate independent prevents a rich planner from
+ * turning an unrestricted explanation into an invented opening slice.
+ */
+async function userSpecifiedSourcePosition(input: {
+  model: any;
+  providerOptions: ReturnType<typeof gatewayProviderOptions>;
+  question: string;
+}): Promise<
+  | {
+      hasPosition: boolean;
+      connectsBeyondPosition: boolean;
+    }
+  | undefined
+> {
+  try {
+    const { text } = await generateText({
+      model: input.model,
+      maxRetries: 0,
+      maxOutputTokens: 80,
+      temperature: 0,
+      abortSignal: AbortSignal.timeout(8_000),
+      providerOptions: input.providerOptions,
+      system:
+        'Return exactly one JSON object and no prose: {"kind":"input-location"|"answer-timestamp"|"none","locator":string|null,"connectsBeyondPosition":boolean}. Use input-location only when the user explicitly constrains where in the provided source to look; locator must be the exact corresponding substring from the user request. Use answer-timestamp when the user asks for timestamps in the answer but does not specify where to look; locator is null. Use none when neither is present. Set connectsBeyondPosition true only when the request explicitly relates the thing at its named source position to another point or portion of the source, such as recurrence, reappearance, a later/earlier occurrence, change, or comparison; otherwise false. Example: "Explain a subject and include timestamps" => {"kind":"answer-timestamp","locator":null,"connectsBeyondPosition":false}. Example: "What happens at 14:00?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":false}. Example: "Who is at 14:00 and where else do they appear?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":true}. Example: "Give the full story from beginning to conclusion" => {"kind":"none","locator":null,"connectsBeyondPosition":false} unless the user asks specifically about the beginning or conclusion. Interpret every language without assuming a source genre.',
+      prompt: input.question,
+    });
+    const serialized = text.match(/\{[\s\S]*\}/)?.[0];
+    if (!serialized) return undefined;
+    const parsed = JSON.parse(serialized) as {
+      kind?: unknown;
+      locator?: unknown;
+      connectsBeyondPosition?: unknown;
+    };
+    const connectsBeyondPosition = parsed.connectsBeyondPosition === true;
+    if (parsed.kind === 'answer-timestamp' || parsed.kind === 'none') {
+      return { hasPosition: false, connectsBeyondPosition };
+    }
+    if (parsed.kind !== 'input-location' || typeof parsed.locator !== 'string') return undefined;
+    // The quote need only occur in the user text. Its semantic role was
+    // established by the structured classifier, which supports any language.
+    return {
+      hasPosition: input.question.normalize('NFKC').includes(parsed.locator.normalize('NFKC')),
+      connectsBeyondPosition,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function parseVideoInvestigationDirective(value: string): VideoInvestigationDirective | undefined {
+  const candidate = value.match(/\{[\s\S]*\}/)?.[0];
+  if (!candidate) return undefined;
+  try {
+    const parsed = JSON.parse(candidate) as Partial<VideoInvestigationDirective>;
+    // Some providers preserve the range but omit the two default fields or
+    // serialize startSecs/endSecs as start/end. That is a schema-transport
+    // variation, not a reason to discard a model-resolved source position.
+    const scope = ['focused', 'temporal', 'source'].includes(String(parsed.scope))
+      ? (parsed.scope as VideoInvestigationDirective['scope'])
+      : 'focused';
+    const goal = ['answer', 'compare', 'trace', 'enumerate', 'synthesize'].includes(
+      String(parsed.goal),
+    )
+      ? (parsed.goal as VideoInvestigationDirective['goal'])
+      : 'answer';
+    const evidence = Array.isArray(parsed.evidence)
+      ? parsed.evidence.filter(
+          (item): item is NonNullable<VideoInvestigationDirective['evidence']>[number] =>
+            ['speech', 'visible-text', 'visual', 'computed'].includes(String(item)),
+        )
+      : undefined;
+    const recordSet = ['all', 'source-authored', 'source-questions', 'observed'].includes(
+      String(parsed.recordSet),
+    )
+      ? parsed.recordSet
+      : undefined;
+    const rawTimeRange = parsed.timeRange as
+      | (VideoInvestigationDirective['timeRange'] & {
+          start?: unknown;
+          end?: unknown;
+          startSeconds?: unknown;
+          endSeconds?: unknown;
+        })
+      | undefined;
+    const timeRangeOrigin = (parsed as { timeRangeOrigin?: unknown }).timeRangeOrigin;
+    const timeRange = rawTimeRange
+      ? {
+          startSecs: Number(
+            rawTimeRange.startSecs ?? rawTimeRange.startSeconds ?? rawTimeRange.start,
+          ),
+          endSecs: Number(rawTimeRange.endSecs ?? rawTimeRange.endSeconds ?? rawTimeRange.end),
+        }
+      : undefined;
+    if (
+      timeRange &&
+      (!Number.isFinite(timeRange.startSecs) ||
+        !Number.isFinite(timeRange.endSecs) ||
+        timeRange.startSecs < 0 ||
+        timeRange.endSecs < timeRange.startSecs)
+    ) {
+      return undefined;
+    }
+    // A numerical range must be attributable to a source position the user
+    // actually referenced.  Otherwise it is a plausible-looking but invented
+    // cut of the recording; safely broaden to source synthesis rather than
+    // silently hiding relevant material.  This rule operates on structured
+    // planner output only and therefore works in every user language.
+    const hasUnattributedRange = timeRange !== undefined && timeRangeOrigin !== 'user-mentioned';
+    return {
+      scope: hasUnattributedRange ? 'source' : scope,
+      goal: hasUnattributedRange ? 'synthesize' : goal,
+      ...(hasUnattributedRange ? {} : evidence?.length ? { evidence: [...new Set(evidence)] } : {}),
+      ...(hasUnattributedRange ? {} : recordSet ? { recordSet } : {}),
+      ...(!hasUnattributedRange && timeRange
+        ? { timeRange: { startSecs: timeRange.startSecs, endSecs: timeRange.endSecs } }
+        : {}),
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function containsExhaustiveEvidence(value: unknown): boolean {
@@ -739,6 +976,11 @@ ${fieldLines}`;
     })
     .join('\n\n');
   const userText = latestUserText(messagesToProcess);
+  const recentAssistantText = latestAssistantText(messagesToProcess);
+  const precedingReferenceText =
+    !hasNumberedDocumentReference(userText) && requestsImagePresentation(userText)
+      ? precedingNumberedDocumentReference(messagesToProcess)
+      : undefined;
   const reusableEvidence = extractConversationEvidence(evidenceMessages);
   // This compact string is used by retrieval only, not appended to model
   // history. It preserves the immediate topic while keeping the model context
@@ -769,22 +1011,11 @@ ${fieldLines}`;
     !tabularFollowUp &&
     !isExplicitVideoCorrection &&
     continuesRecentMediaTopic(userText, reusableEvidence);
-  const reusesPriorEvidence =
-    !imagePreviewFollowUp &&
-    !isExplicitVideoCorrection &&
-    reusableEvidence.sources.length > 0 &&
-    // A video follow-up may look conversational ("what about the shirts?")
-    // but it is a new source claim, not an answer continuation.  Reusing the
-    // prior RAG result here used to disable every tool for the turn, which
-    // prevented the evidence capability from requesting a bounded live read.
-    // Keep the rule source-driven: any continuing media topic gets fresh RAG
-    // followed by its installed evidence-query action.
-    // Use the larger compact-evidence window for routing. The model still
-    // receives only the bounded recent transcript plus the single latest
-    // source summary, so a long chat keeps its topic without replaying all
-    // historical messages or tool payloads.
-    canReuseKnowledgeBaseEvidence(userText, evidenceMessages) &&
-    !continuesMediaTopic;
+  // Previous results only help resolve a reference such as "show it". They
+  // are never treated as an answer cache: a new user message gets a fresh
+  // source lookup so a weak model cannot silently answer document questions
+  // from general knowledge or an unrelated earlier excerpt.
+  const reusesPriorEvidence = false;
   let systemPrompt =
     (config.systemPrompt ? `USER INSTRUCTIONS:\n${config.systemPrompt}\n` : '') +
     (skillInstructions ? `\nAVAILABLE AGENT SKILLS:\n${skillInstructions}\n` : '') +
@@ -800,6 +1031,7 @@ ${fieldLines}`;
     promptFragments: dynamicToolPromptFragments,
     dynamicToolNames,
     dynamicToolWorkflows,
+    dynamicToolEvidenceInputs,
   } = await getChatTools({
     projectId,
     docSessionId,
@@ -842,20 +1074,15 @@ ${fieldLines}`;
     /^(hi|hello|hey|thanks|thank you|ok|sure|yes|no|please|help|how are you|good morning|good afternoon|good evening|bye|goodbye)[.!\s]*$/i.test(
       userText.trim(),
     );
-  // When tabular data is present, we disable deterministic tool forcing
-  // and rely on the model's native tool selection, allowing it to smartly choose
-  // between searchKnowledgeBase, queryTabularData, and executeAnalysis.
   // Tool calling is not equally reliable across every supported provider.
-  // Make the first evidence lookup deterministic for ordinary chat so the
-  // answer model never has to decide whether retrieval is required.
+  // Make the first source lookup deterministic for ordinary chat so even a
+  // lightweight model starts from indexed evidence. Tabular questions retain
+  // their own authoritative structured-data path below.
   const forceKnowledgeBaseSearch = Boolean(
     userText.trim() &&
     !isGreeting &&
     !docSessionId &&
     (!hasTabularData || !tabularQuestion) &&
-    !tabularFollowUp &&
-    !reusesPriorEvidence &&
-    !imagePreviewFollowUp &&
     builtInTools.searchKnowledgeBase,
   );
 
@@ -876,7 +1103,10 @@ ${fieldLines}`;
     (name) => dynamicToolWorkflows[name] === 'evidence-refinement' && Boolean(allTools[name]),
   );
   const evidenceQueryTools = dynamicToolNames.filter(
-    (name) => dynamicToolWorkflows[name] === 'evidence-query' && Boolean(allTools[name]),
+    (name) =>
+      dynamicToolWorkflows[name] === 'evidence-query' &&
+      dynamicToolEvidenceInputs[name] === 'media-asset' &&
+      Boolean(allTools[name]),
   );
   const toolNames = Object.keys(tools) as Array<keyof typeof tools & string>;
 
@@ -892,49 +1122,8 @@ ${fieldLines}`;
       execute: async ({ writer }) => {
         let preloadedEvidence: unknown;
         let preloadedVideoEvidence = false;
+        let preloadedEvidenceQueryAttempted = false;
         const preflightToolCallId = `knowledge-${crypto.randomUUID()}`;
-
-        const previewImage = reusableEvidence.images[0];
-        if (imagePreviewFollowUp && previewImage && builtInTools.presentMedia) {
-          const previewCallId = `preview-${crypto.randomUUID()}`;
-          writer.write({ type: 'start' });
-          writer.write({
-            type: 'tool-input-available',
-            toolCallId: previewCallId,
-            toolName: 'presentMedia',
-            input: { imageUrl: previewImage.imageUrl },
-          });
-          let previewOutput: unknown;
-          try {
-            previewOutput = await (builtInTools.presentMedia as any).execute(
-              { imageUrl: previewImage.imageUrl },
-              { toolCallId: previewCallId },
-            );
-          } catch {
-            previewOutput = { success: false, error: 'The image preview is not available.' };
-          }
-          writer.write({
-            type: 'tool-output-available',
-            toolCallId: previewCallId,
-            output: previewOutput,
-          });
-          const previewSucceeded =
-            previewOutput &&
-            typeof previewOutput === 'object' &&
-            (previewOutput as { success?: unknown }).success === true;
-          const answerId = `answer-${crypto.randomUUID()}`;
-          writer.write({ type: 'text-start', id: answerId });
-          writer.write({
-            type: 'text-delta',
-            id: answerId,
-            delta: previewSucceeded
-              ? `Here is the${previewImage.title ? ` ${previewImage.title}` : ''} diagram preview.`
-              : 'I could not open that indexed image preview. Please re-index the PDF image and try again.',
-          });
-          writer.write({ type: 'text-end', id: answerId });
-          await mcp.close();
-          return;
-        }
 
         if (forceKnowledgeBaseSearch && builtInTools.searchKnowledgeBase) {
           // Open the message ourselves since a tool part is about to stream
@@ -970,64 +1159,298 @@ ${fieldLines}`;
             output: preloadedEvidence,
           });
 
-          const mediaAssetId = explicitMediaEvidenceAssetId(preloadedEvidence);
-          // Retrieval identifies the source; the installed capability verifies
-          // the claim. Dispatch the one unambiguous evidence-query action
-          // deterministically so every supported chat model follows the same
-          // RAG → live-analysis contract. The action remains a first-class,
-          // visible chat tool call (rather than hidden work inside search).
-          if (mediaAssetId && evidenceQueryTools.length === 1) {
-            const evidenceToolName = evidenceQueryTools[0];
-            const evidenceToolCallId = `evidence-${crypto.randomUUID()}`;
+          // A PDF hit is a document-level locator, not necessarily the exact
+          // page. Read its bounded local page evidence before asking the chat
+          // model to compose an answer. This works whether or not visual
+          // derivatives were enabled at upload time and avoids selecting the
+          // first embedded image (often a cover) for a later preview request.
+          const pdfSource = findRetrievedPdfSource(preloadedEvidence);
+          if (pdfSource && builtInTools.inspectPdfPages) {
+            const inspectionCallId = `pdf-pages-${crypto.randomUUID()}`;
+            const pdfInspectionQuestion = [
+              userText,
+              contextualKnowledgeQuery,
+              recentAssistantText,
+              precedingReferenceText,
+            ]
+              .filter((text): text is string => Boolean(text?.trim()))
+              .join('\n\n');
+            const preferredPageNumbers = preferredPdfPagesForInspection(
+              pdfSource.pageNumber,
+              pdfInspectionQuestion,
+            );
+            const inspectionInput = {
+              documentId: pdfSource.documentId,
+              // Resolve a terse follow-up ("render it") against the same
+              // compact source context used for the preceding retrieval and
+              // the immediately prior answer. An explicit Figure/Table/Eq
+              // reference intentionally lets the local PDF rank its own
+              // pages instead of blindly trusting an incidental vector hit.
+              question: pdfInspectionQuestion,
+              ...(preferredPageNumbers ? { pageNumbers: preferredPageNumbers } : {}),
+            };
             writer.write({
               type: 'tool-input-available',
-              toolCallId: evidenceToolCallId,
-              toolName: evidenceToolName,
-              input: { mediaAssetId, query: userText },
+              toolCallId: inspectionCallId,
+              toolName: 'inspectPdfPages',
+              input: inspectionInput,
             });
-            let videoEvidence: unknown;
+            let pdfInspection: unknown;
             try {
-              videoEvidence = await (allTools[evidenceToolName] as any).execute(
-                { mediaAssetId, query: userText },
-                { toolCallId: evidenceToolCallId },
-              );
-              videoEvidence = await collectExhaustiveVideoEvidencePages(
-                (allTools[evidenceToolName] as any).execute,
-                { mediaAssetId, query: userText },
-                videoEvidence,
-                evidenceToolCallId,
-              );
+              pdfInspection = await (builtInTools.inspectPdfPages as any).execute(inspectionInput, {
+                toolCallId: inspectionCallId,
+              });
             } catch (error) {
-              videoEvidence = {
+              pdfInspection = {
                 success: false,
-                mediaAssetId,
-                error:
-                  error instanceof Error ? error.message : 'Video evidence verification failed.',
+                error: error instanceof Error ? error.message : 'Could not inspect the source PDF.',
               };
             }
             writer.write({
               type: 'tool-output-available',
-              toolCallId: evidenceToolCallId,
-              output: videoEvidence,
+              toolCallId: inspectionCallId,
+              output: pdfInspection,
             });
-            preloadedVideoEvidence =
-              videoEvidence !== null &&
-              typeof videoEvidence === 'object' &&
-              (videoEvidence as { success?: unknown }).success === true;
             preloadedEvidence = {
-              ...(preloadedEvidence as Record<string, unknown>),
-              videoEvidence,
+              ...(preloadedEvidence &&
+              typeof preloadedEvidence === 'object' &&
+              !Array.isArray(preloadedEvidence)
+                ? (preloadedEvidence as Record<string, unknown>)
+                : { retrieval: preloadedEvidence }),
+              pdfInspection,
             };
+
+            // Presentation is deterministic once local page selection has
+            // succeeded. Returning the selected rendered page here keeps a
+            // weak chat model from substituting an arbitrary indexed image.
+            const inspectedPages =
+              pdfInspection && typeof pdfInspection === 'object'
+                ? (pdfInspection as { pages?: Array<{ pageNumber?: unknown }>; success?: unknown })
+                    .pages
+                : undefined;
+            const selectedPageNumbers = (inspectedPages ?? []).flatMap((page) =>
+              typeof page.pageNumber === 'number' && Number.isInteger(page.pageNumber)
+                ? [page.pageNumber]
+                : [],
+            );
+            const selectedPage = inspectedPages?.find(
+              (page) => typeof page.pageNumber === 'number' && Number.isInteger(page.pageNumber),
+            )?.pageNumber;
+
+            // The vision request is issued by the existing, analytics-tracked
+            // page-analysis tool. Running it from the deterministic evidence
+            // path means GPT-3.5-class chat models receive exact rendered-page
+            // readings instead of being asked to decide whether to call a
+            // second tool. It stays bounded to the three locally selected
+            // source pages.
+            if (
+              !requestsImagePresentation(userText) &&
+              requiresPdfVisualAnalysis(userText) &&
+              selectedPageNumbers.length > 0 &&
+              builtInTools.analyzePdfPages
+            ) {
+              const analysisCallId = `pdf-analysis-${crypto.randomUUID()}`;
+              const analysisInput = {
+                documentId: pdfSource.documentId,
+                pageNumbers: selectedPageNumbers,
+                prompt: userText,
+              };
+              writer.write({
+                type: 'tool-input-available',
+                toolCallId: analysisCallId,
+                toolName: 'analyzePdfPages',
+                input: analysisInput,
+              });
+              let pdfVisualAnalysis: unknown;
+              try {
+                pdfVisualAnalysis = await (builtInTools.analyzePdfPages as any).execute(
+                  analysisInput,
+                  { toolCallId: analysisCallId },
+                );
+              } catch (error) {
+                pdfVisualAnalysis = {
+                  success: false,
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : 'Could not analyze the rendered PDF pages.',
+                };
+              }
+              writer.write({
+                type: 'tool-output-available',
+                toolCallId: analysisCallId,
+                output: pdfVisualAnalysis,
+              });
+              preloadedEvidence = {
+                ...(preloadedEvidence &&
+                typeof preloadedEvidence === 'object' &&
+                !Array.isArray(preloadedEvidence)
+                  ? (preloadedEvidence as Record<string, unknown>)
+                  : { retrieval: preloadedEvidence }),
+                pdfVisualAnalysis,
+              };
+            }
+
+            if (requestsImagePresentation(userText) && selectedPage && builtInTools.presentMedia) {
+              const previewCallId = `pdf-preview-${crypto.randomUUID()}`;
+              const previewInput = { documentId: pdfSource.documentId, pageNumber: selectedPage };
+              writer.write({
+                type: 'tool-input-available',
+                toolCallId: previewCallId,
+                toolName: 'presentMedia',
+                input: previewInput,
+              });
+              let previewOutput: unknown;
+              try {
+                previewOutput = await (builtInTools.presentMedia as any).execute(previewInput, {
+                  toolCallId: previewCallId,
+                });
+              } catch (error) {
+                previewOutput = {
+                  success: false,
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : 'Could not render the selected PDF page.',
+                };
+              }
+              writer.write({
+                type: 'tool-output-available',
+                toolCallId: previewCallId,
+                output: previewOutput,
+              });
+              if (
+                previewOutput &&
+                typeof previewOutput === 'object' &&
+                (previewOutput as { success?: unknown }).success === true
+              ) {
+                const answerId = `answer-${crypto.randomUUID()}`;
+                writer.write({ type: 'text-start', id: answerId });
+                writer.write({
+                  type: 'text-delta',
+                  id: answerId,
+                  delta: `Here is ${pdfSource.title ?? 'the selected document'} page ${selectedPage}.`,
+                });
+                writer.write({ type: 'text-end', id: answerId });
+                await mcp.close();
+                return;
+              }
+            }
+          }
+
+          const mediaAssetId = explicitMediaEvidenceAssetId(preloadedEvidence);
+          // A completed source is already known. Invoke its one generic
+          // media-evidence capability directly instead of making the selected
+          // chat model construct a large tool payload before any evidence can
+          // be read. This is driven by the Marketplace capability contract,
+          // not a tool id, language, genre, or question word list.
+          if (mediaAssetId && evidenceQueryTools.length === 1) {
+            const evidenceToolName = evidenceQueryTools[0]!;
+            const evidenceCallId = `media-evidence-${crypto.randomUUID()}`;
+            // Planning is a small structured operation, not the answer model's
+            // prose task. Gateway projects use the fast general planner so a
+            // selected reasoning model cannot spend the interactive budget
+            // thinking before it emits the directive; direct providers retain
+            // the user's selected model and its own credentials.
+            const plannerModelId =
+              resolvedProvider === 'vercel_ai_gateway' ? 'openai/gpt-4o-mini' : chatModelId;
+            const plannerModel =
+              plannerModelId === chatModelId
+                ? model
+                : createChatModel(
+                    resolvedProvider,
+                    plannerModelId,
+                    apiKey,
+                    config.customChatModels,
+                  );
+            const plannerInput = {
+              model: plannerModel,
+              providerOptions: gatewayProviderOptions(resolvedProvider, plannerModelId),
+              question: userText,
+            };
+            const [plannedInvestigation, sourcePosition] = await Promise.all([
+              planVideoEvidenceQuery(plannerInput),
+              userSpecifiedSourcePosition(plannerInput),
+            ]);
+            const hasUserSpecifiedPosition = sourcePosition?.hasPosition;
+            const connectsBeyondPosition = sourcePosition?.connectsBeyondPosition === true;
+            // `trace` is already the planner's language-neutral declaration
+            // that the answer connects moments. Preserve its supplied source
+            // boundary and give the evidence capability its visibility record
+            // set even if the auxiliary binary classifier was inconclusive.
+            const tracesBeyondPosition =
+              connectsBeyondPosition || plannedInvestigation?.goal === 'trace';
+            const investigation =
+              hasUserSpecifiedPosition === false && plannedInvestigation?.timeRange
+                ? { scope: 'source' as const, goal: 'synthesize' as const }
+                : tracesBeyondPosition && plannedInvestigation?.timeRange
+                  ? {
+                      ...plannedInvestigation,
+                      scope: 'temporal' as const,
+                      goal: 'trace' as const,
+                      evidence: ['visual'] as const,
+                      recordSet: 'observed' as const,
+                    }
+                  : plannedInvestigation;
+            const evidenceInput = {
+              mediaAssetId,
+              query: userText,
+              ...(investigation ? { investigation } : {}),
+            };
+            preloadedEvidenceQueryAttempted = true;
+            writer.write({
+              type: 'tool-input-available',
+              toolCallId: evidenceCallId,
+              toolName: evidenceToolName,
+              input: evidenceInput,
+            });
+            let evidenceOutput: unknown;
+            try {
+              evidenceOutput = await (allTools[evidenceToolName] as any).execute(evidenceInput, {
+                toolCallId: evidenceCallId,
+              });
+            } catch (error) {
+              evidenceOutput = {
+                success: false,
+                mediaAssetId,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : 'The indexed media evidence could not be read.',
+              };
+            }
+            // A source-wide evidence action owns an opaque chronological
+            // cursor. Follow it here, before a prose model sees the result;
+            // otherwise a long lecture, interview, match, or recording is
+            // silently reduced to its first page. This is capability protocol
+            // handling, independent of the source's subject or language.
+            if (evidenceOutput && typeof evidenceOutput === 'object') {
+              evidenceOutput = await collectExhaustiveVideoEvidencePages(
+                (pageInput, options) =>
+                  (allTools[evidenceToolName] as any).execute(pageInput, options),
+                evidenceInput,
+                evidenceOutput,
+                evidenceCallId,
+              );
+            }
+            writer.write({
+              type: 'tool-output-available',
+              toolCallId: evidenceCallId,
+              output: evidenceOutput,
+            });
+            preloadedEvidence = evidenceOutput;
+            preloadedVideoEvidence = containsAnswerLevelMediaEvidence(evidenceOutput);
           }
         }
 
-        const deterministicAnswer = preloadedVideoEvidence
-          ? (formatExhaustiveMediaAnswer(preloadedEvidence, userText) ??
-            formatParticipantInventory(preloadedEvidence, userText) ??
-            collectQuestionMatchedDirectClaims(preloadedEvidence, userText)[0] ??
-            formatOutcomeMediaAnswer(preloadedEvidence, userText) ??
-            formatDirectObservationAnswer(preloadedEvidence, userText))
-          : undefined;
+        const deterministicAnswer =
+          formatExhaustiveMediaAnswer(preloadedEvidence, userText) ??
+          (preloadedVideoEvidence
+            ? (formatLocatedObservedSubjectAnswer(preloadedEvidence) ??
+              collectQuestionMatchedDirectClaims(preloadedEvidence, userText)[0] ??
+              formatDirectObservationAnswer(preloadedEvidence, userText) ??
+              formatObservedAppearanceAnswer(preloadedEvidence))
+            : undefined);
         if (deterministicAnswer) {
           const answerId = `answer-${crypto.randomUUID()}`;
           writer.write({ type: 'text-start', id: answerId });
@@ -1037,46 +1460,67 @@ ${fieldLines}`;
           return;
         }
 
+        // Once an evidence action has completed, composition is a short,
+        // grounded rendering task. Some selectable reasoning models consume a
+        // whole chat step before emitting prose, which leaves the user with an
+        // aborted stream despite a fast, verified index result. Gateway video
+        // answers therefore use the same low-latency grounded writer as the
+        // planner; non-video and direct-provider chats keep the selected model.
+        const hasPreloadedMediaEvidence = Boolean(explicitMediaEvidenceAssetId(preloadedEvidence));
+        const evidenceWriterModelId =
+          hasPreloadedMediaEvidence && resolvedProvider === 'vercel_ai_gateway'
+            ? 'openai/gpt-4o-mini'
+            : chatModelId;
+        const evidenceWriterModel =
+          evidenceWriterModelId === chatModelId
+            ? model
+            : createChatModel(
+                resolvedProvider,
+                evidenceWriterModelId,
+                apiKey,
+                config.customChatModels,
+              );
         const result = streamText({
-          model,
+          model: evidenceWriterModel,
           // The Gateway owns model failover. Retrying the same quota-limited model
           // only makes the user wait longer and consumes their request allowance.
           maxRetries: 0,
           // The evidence action has its own bounded budget. Once evidence is
           // ready, the answer model must not leave the user waiting forever.
-          timeout: preloadedVideoEvidence
-            ? {
-                // Retrieval and any bounded source check already finished.
-                // This last call only turns verified evidence into prose, but
-                // cross-modal evidence can still take a provider longer than a
-                // trivial text reply. Keep it bounded while allowing a normal
-                // complete answer instead of prematurely exposing recovery text.
-                totalMs: 45_000,
-                stepMs: 35_000,
-                firstChunkMs: 25_000,
-                chunkMs: 20_000,
-                toolMs: 20_000,
-              }
-            : requiresSandboxAnalysis
+          timeout:
+            preloadedVideoEvidence || preloadedEvidenceQueryAttempted
               ? {
-                  // A deep spreadsheet task needs time for the model to write
-                  // code, a bounded local execution, and a grounded response.
-                  // Keep this wider budget limited to explicit analytical
-                  // operations so ordinary table questions remain responsive.
-                  totalMs: 150_000,
-                  stepMs: 90_000,
-                  firstChunkMs: 70_000,
-                  chunkMs: 70_000,
-                  toolMs: 45_000,
-                }
-              : {
+                  // Retrieval and any bounded source check already finished.
+                  // This last call only turns verified evidence into prose, but
+                  // cross-modal evidence can still take a provider longer than a
+                  // trivial text reply. Keep it bounded while allowing a normal
+                  // complete answer instead of prematurely exposing recovery text.
                   totalMs: 45_000,
                   stepMs: 35_000,
                   firstChunkMs: 25_000,
                   chunkMs: 20_000,
-                  toolMs: 30_000,
-                },
-          providerOptions: gatewayProviderOptions(resolvedProvider, chatModelId),
+                  toolMs: 20_000,
+                }
+              : requiresSandboxAnalysis
+                ? {
+                    // A deep spreadsheet task needs time for the model to write
+                    // code, a bounded local execution, and a grounded response.
+                    // Keep this wider budget limited to explicit analytical
+                    // operations so ordinary table questions remain responsive.
+                    totalMs: 150_000,
+                    stepMs: 90_000,
+                    firstChunkMs: 70_000,
+                    chunkMs: 70_000,
+                    toolMs: 45_000,
+                  }
+                : {
+                    totalMs: 45_000,
+                    stepMs: 35_000,
+                    firstChunkMs: 25_000,
+                    chunkMs: 20_000,
+                    toolMs: 30_000,
+                  },
+          providerOptions: gatewayProviderOptions(resolvedProvider, evidenceWriterModelId),
           system: `${systemPrompt}${
             preloadedEvidence === undefined
               ? ''
@@ -1088,9 +1532,15 @@ ${fieldLines}`;
           maxOutputTokens:
             preloadedEvidence !== undefined && containsExhaustiveEvidence(preloadedEvidence)
               ? 8_000
-              : preloadedVideoEvidence
+              : hasPreloadedMediaEvidence && evidenceWriterModelId !== chatModelId
                 ? 1_200
-                : 2_400,
+                : preloadedVideoEvidence
+                  ? // Reasoning-capable providers may spend part of this budget
+                    // before emitting visible prose. A short answer ceiling here
+                    // therefore produced a truncated factual reply even after the
+                    // evidence action had completed quickly.
+                    3_600
+                  : 2_400,
           // Evidence loop: retrieve → verify → bounded inspect/refinement → retrieve
           // again → answer. The inspection tool itself cannot authorize a claim.
           // Most chats finish after their first answer. The upper bound leaves
@@ -1103,6 +1553,7 @@ ${fieldLines}`;
               const preloadedMediaAssetId = explicitMediaEvidenceAssetId(preloadedEvidence);
               if (
                 !preloadedVideoEvidence &&
+                !preloadedEvidenceQueryAttempted &&
                 preloadedMediaAssetId &&
                 evidenceQueryTools.length > 0 &&
                 stepNumber === 0
@@ -1120,30 +1571,44 @@ ${fieldLines}`;
                   messages: compactToolContextForModel(messages),
                 };
               }
-              // PDF text retrieval is only a locator. If no visual derivatives
-              // were indexed, inspect the original local file on demand and keep
-              // the selected page range bounded just as video inspection does.
-              if (
-                !hasRetrievedImageEvidence(preloadedEvidence) &&
-                hasRetrievedPdfEvidence(preloadedEvidence)
-              ) {
+              // The preflight above reads a bounded page set for every PDF
+              // hit. It is stronger evidence than a flattened extraction and
+              // applies equally to equations, captions, tables, scans, and
+              // vector diagrams. Only requests that depend on visual/layout
+              // fidelity need a second, rendered-page analysis pass.
+              if (hasRetrievedPdfEvidence(preloadedEvidence)) {
+                const inspection =
+                  preloadedEvidence && typeof preloadedEvidence === 'object'
+                    ? (preloadedEvidence as { pdfInspection?: { success?: unknown } }).pdfInspection
+                    : undefined;
+                const visualAnalysisAttempted =
+                  preloadedEvidence &&
+                  typeof preloadedEvidence === 'object' &&
+                  Object.prototype.hasOwnProperty.call(preloadedEvidence, 'pdfVisualAnalysis');
+                if (inspection?.success === true) {
+                  if (
+                    requiresPdfVisualAnalysis(userText) &&
+                    !visualAnalysisAttempted &&
+                    stepNumber === 0
+                  ) {
+                    return {
+                      toolChoice: { type: 'tool', toolName: 'analyzePdfPages' },
+                      activeTools: ['analyzePdfPages'],
+                      messages: compactToolContextForModel(messages),
+                    };
+                  }
+                  return {
+                    toolChoice: 'none' as const,
+                    activeTools: [],
+                    messages: withFinalAnswerNudge(compactToolContextForModel(messages)),
+                  };
+                }
                 if (stepNumber === 0) {
                   return {
+                    toolChoice: { type: 'tool', toolName: 'inspectPdfPages' },
                     activeTools: ['inspectPdfPages'],
                     messages: compactToolContextForModel(messages),
                   };
-                }
-                if (stepNumber === 1) {
-                  return requestsImagePresentation(userText)
-                    ? {
-                        toolChoice: { type: 'tool', toolName: 'presentMedia' },
-                        activeTools: ['presentMedia'],
-                        messages: compactToolContextForModel(messages),
-                      }
-                    : {
-                        activeTools: ['analyzePdfPages'],
-                        messages: compactToolContextForModel(messages),
-                      };
                 }
                 return {
                   toolChoice: 'none' as const,
@@ -1175,7 +1640,11 @@ ${fieldLines}`;
               // A retrieved PDF image is only a navigation hint. Structural
               // questions need one bounded visual read before they can be
               // answered; otherwise the model is forced to guess from captions.
-              if (hasRetrievedImageEvidence(preloadedEvidence) && stepNumber === 0) {
+              if (
+                !hasRetrievedPdfEvidence(preloadedEvidence) &&
+                hasRetrievedImageEvidence(preloadedEvidence) &&
+                stepNumber === 0
+              ) {
                 if (requestsImagePresentation(userText)) {
                   return {
                     toolChoice: { type: 'tool', toolName: 'presentMedia' },

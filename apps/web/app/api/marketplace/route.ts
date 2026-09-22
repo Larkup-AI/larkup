@@ -79,6 +79,10 @@ export async function GET() {
       installedVersion,
       updateAvailable:
         status === 'installed' &&
+        // A workspace-linked package is the development source itself, not an
+        // npm installation. Offering Update there can never change its files
+        // and leaves a permanently visible, misleading action.
+        installedTool?.source !== 'local' &&
         installedVersion !== undefined &&
         compareToolVersions(availableVersion, installedVersion) > 0,
     };

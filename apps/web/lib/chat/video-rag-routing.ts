@@ -14,6 +14,11 @@ export interface IndexedVideoAnswerSignal {
 // high enough for long recordings while still bounding the answer model's
 // context and the browser payload.
 export const MAX_EXHAUSTIVE_EVIDENCE_ITEMS = 800;
+// Structured inventories are rendered by the browser's paginated data table,
+// never supplied to the answer model. They therefore deserve a much higher
+// transport limit than prose evidence while still protecting a chat response
+// from an unbounded malformed source.
+export const MAX_EXHAUSTIVE_TABLE_ROWS = 10_000;
 
 /** Follow a tool-owned chronological cursor without relying on model tool use. */
 export async function collectExhaustiveVideoEvidencePages(
@@ -30,13 +35,20 @@ export async function collectExhaustiveVideoEvidencePages(
 
   const evidence = Array.isArray(first.evidence) ? [...first.evidence] : [];
   const seen = new Set(evidence.map((item: any) => item?.id ?? item?.evidenceId).filter(Boolean));
+  const rows = Array.isArray(first.rows) ? [...first.rows] : [];
+  const seenRows = new Set(
+    rows.map((row: any) => row?.id ?? row?._rowId).filter((id: unknown) => id != null),
+  );
+  const hasTable = Array.isArray(first.rows);
   let continuation = first.continuation;
   let lastPage = first;
 
   while (
     continuation?.hasMore === true &&
     Number.isFinite(continuation.nextCursor) &&
-    evidence.length < MAX_EXHAUSTIVE_EVIDENCE_ITEMS
+    (hasTable
+      ? rows.length < MAX_EXHAUSTIVE_TABLE_ROWS
+      : evidence.length < MAX_EXHAUSTIVE_EVIDENCE_ITEMS)
   ) {
     const cursor = Number(continuation.nextCursor);
     const next = await execute({ ...input, exhaustive: true, cursor, limit: 48 }, { toolCallId });
@@ -49,6 +61,15 @@ export async function collectExhaustiveVideoEvidencePages(
       evidence.push(item);
       if (evidence.length >= MAX_EXHAUSTIVE_EVIDENCE_ITEMS) break;
     }
+    if (hasTable) {
+      for (const row of Array.isArray(page.rows) ? page.rows : []) {
+        const id = row?.id ?? row?._rowId;
+        if (id != null && seenRows.has(id)) continue;
+        if (id != null) seenRows.add(id);
+        rows.push(row);
+        if (rows.length >= MAX_EXHAUSTIVE_TABLE_ROWS) break;
+      }
+    }
     lastPage = page;
     continuation = page.continuation;
     if (!continuation || Number(continuation.nextCursor) <= cursor) break;
@@ -57,11 +78,20 @@ export async function collectExhaustiveVideoEvidencePages(
   return {
     ...first,
     evidence,
+    ...(hasTable
+      ? {
+          columns: Array.isArray(first.columns) ? first.columns : [],
+          rows,
+          totalRows: rows.length,
+        }
+      : {}),
     continuation: {
       ...(lastPage.continuation ?? continuation ?? first.continuation),
-      aggregatedItems: evidence.length,
+      aggregatedItems: hasTable ? rows.length : evidence.length,
       contextLimitReached:
-        evidence.length >= MAX_EXHAUSTIVE_EVIDENCE_ITEMS && continuation?.hasMore === true,
+        (hasTable
+          ? rows.length >= MAX_EXHAUSTIVE_TABLE_ROWS
+          : evidence.length >= MAX_EXHAUSTIVE_EVIDENCE_ITEMS) && continuation?.hasMore === true,
     },
   };
 }

@@ -25,7 +25,12 @@ from typing import Any, Callable, Iterator
 import cv2
 import numpy as np
 
-from app.utils.timing import normalized_important_ranges, rebase_result_timestamps
+from app.utils.timing import (
+    bounded_visual_sampling_intervals,
+    normalized_important_ranges,
+    ocr_sampling_interval,
+    rebase_result_timestamps,
+)
 from app.services.brain import (
     AgentPlanner,
     ExtractionPlan,
@@ -213,6 +218,7 @@ class VisualOperators:
         with self._lock:
             if self._ocr is None:
                 try:
+                    # pyrefly: ignore [missing-import]
                     from paddleocr import PaddleOCR
 
                     self._ocr = (
@@ -492,9 +498,10 @@ def _intersection_over_union(left: list[float], right: list[float]) -> float:
 
 
 class AnonymousTracker:
-    def __init__(self) -> None:
+    def __init__(self, max_gap_ms: int = 6_000) -> None:
         self.next_id = 1
         self.tracks: dict[int, dict[str, Any]] = {}
+        self.max_gap_ms = max(1, int(max_gap_ms))
 
     def update(self, detections: list[dict[str, Any]], time_ms: int) -> None:
         claimed: set[int] = set()
@@ -504,7 +511,7 @@ class AnonymousTracker:
                 for track_id, track in self.tracks.items()
                 if track_id not in claimed
                 and track["label"] == detection["label"]
-                and time_ms - track["endMs"] <= 6_000
+                and time_ms - track["endMs"] <= self.max_gap_ms
             ]
             track_id, overlap = max(
                 candidates, key=lambda item: item[1], default=(0, 0.0)
@@ -545,6 +552,176 @@ class AnonymousTracker:
             }
             for track in self.tracks.values()
         ]
+
+
+def _anonymous_presence_ledger(
+    observations: list[dict[str, Any]],
+    tracks: list[dict[str, Any]],
+    sample_interval_secs: float | None = None,
+) -> dict[str, Any]:
+    """Preserve raw tracked-presence measurements without inventing identity."""
+    timestamps_by_track: dict[int, list[int]] = defaultdict(list)
+    label_counts_at_time: dict[str, list[tuple[int, int]]] = defaultdict(list)
+    for observation in observations:
+        time_ms = int(observation.get("timeMs") or 0)
+        counts: Counter[str] = Counter()
+        for detected in observation.get("objects") or []:
+            if not isinstance(detected, dict):
+                continue
+            label = str(detected.get("label") or "").strip()
+            track_id = detected.get("trackId")
+            if not label:
+                continue
+            counts[label] += 1
+            if isinstance(track_id, int):
+                timestamps_by_track[track_id].append(time_ms)
+        for label, count in counts.items():
+            label_counts_at_time[label].append((time_ms, count))
+
+    tracked = []
+    for track in tracks:
+        track_id = track.get("trackId")
+        if not isinstance(track_id, int):
+            continue
+        tracked.append(
+            {
+                **track,
+                "timestampsMs": sorted(set(timestamps_by_track.get(track_id, [])))[:512],
+            }
+        )
+    labels = []
+    for label, readings in sorted(label_counts_at_time.items()):
+        maximum = max((count for _, count in readings), default=0)
+        labels.append(
+            {
+                "label": label,
+                "distinctTrackCount": sum(
+                    1 for track in tracked if str(track.get("label") or "") == label
+                ),
+                "maximumSimultaneous": maximum,
+                "simultaneousTimestampsMs": [
+                    time_ms for time_ms, count in readings if count >= 2
+                ][:512],
+            }
+        )
+    return {
+        "method": "object-detection-anonymous-tracking",
+        "sampledFrames": len(observations),
+        **(
+            {"sampleIntervalSecs": round(sample_interval_secs, 3)}
+            if sample_interval_secs is not None
+            else {}
+        ),
+        "tracks": tracked,
+        "labels": labels,
+    }
+
+
+def _reconciled_visible_subjects(
+    semantic_observations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Aggregate only frame-grounded subject observations from semantic reads.
+
+    The VLM protocol emits a JSON object for each person it actually sees in a
+    numbered source frame. Discussed/off-camera names and detector track IDs
+    never enter this ledger, so a source-wide person question cannot turn
+    either into a fake visible participant.
+    """
+    records: list[tuple[str, str, int, int]] = []
+    allowed_basis = {"source-named", "source-described", "unresolved"}
+    for observation in semantic_observations:
+        observation_start = max(0, int(observation.get("startMs") or 0))
+        observation_end = max(
+            observation_start,
+            int(observation.get("endMs") or observation_start),
+        )
+        for line in str(observation.get("text") or "").splitlines():
+            if not line.startswith("Visible subject: "):
+                continue
+            try:
+                subject = json.loads(line.removeprefix("Visible subject: "))
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(subject, dict):
+                continue
+            identity = " ".join(str(subject.get("identity") or "").split())[:180]
+            basis = str(subject.get("identityBasis") or "").strip()
+            try:
+                start_ms = int(subject.get("startMs"))
+                end_ms = int(subject.get("endMs"))
+            except (TypeError, ValueError):
+                continue
+            if (
+                not identity
+                or basis not in allowed_basis
+                or start_ms > end_ms
+                or start_ms < observation_start
+                or end_ms > observation_end
+            ):
+                continue
+            records.append((identity, basis, start_ms, end_ms))
+
+    # A reader can emit a source-grounded name followed by a visual reminder in
+    # parentheses (for example, ``Name (person in green)``) while conservatively
+    # labelling the complete string as a description.  The named prefix is not
+    # a face-recognition guess: it is already an exact source-named anchor in
+    # this ledger.  Collapse that representation only when the entire prefix
+    # equals an anchored name.  Purely similar clothing/role descriptions stay
+    # separate, because no source evidence establishes that identity link.
+    named_keys = {
+        identity.casefold()
+        for identity, basis, _start_ms, _end_ms in records
+        if basis == "source-named"
+    }
+
+    def identity_key(identity: str) -> str:
+        direct = identity.casefold()
+        if direct in named_keys:
+            return direct
+        prefix = identity.split("(", 1)[0].strip().casefold()
+        return prefix if prefix in named_keys else direct
+
+    grouped: dict[str, list[tuple[str, str, int, int]]] = defaultdict(list)
+    for record in records:
+        grouped[identity_key(record[0])].append(record)
+
+    subjects: list[dict[str, Any]] = []
+    for records in sorted(
+        grouped.values(), key=lambda items: (min(item[2] for item in items), items[0][0].casefold())
+    ):
+        named = sorted({identity for identity, basis, _start, _end in records if basis == "source-named"}, key=str.casefold)
+        identity = named[0] if named else sorted({item[0] for item in records}, key=str.casefold)[0]
+        basis = (
+            "source-named"
+            if named
+            else "source-described"
+            if any(item[1] == "source-described" for item in records)
+            else "unresolved"
+        )
+        ranges = [(start_ms, end_ms) for _identity, _basis, start_ms, end_ms in records]
+        merged: list[list[int]] = []
+        for start_ms, end_ms in sorted(set(ranges)):
+            if merged and start_ms <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], end_ms)
+            else:
+                merged.append([start_ms, end_ms])
+        subjects.append(
+            {
+                "identity": identity,
+                "identityBasis": basis,
+                "appearances": [
+                    {
+                        "startMs": start_ms,
+                        "endMs": end_ms,
+                        "confidence": "direct",
+                    }
+                    for start_ms, end_ms in merged
+                ],
+                "observedDurationMs": sum(end_ms - start_ms for start_ms, end_ms in merged),
+                "observationCount": len(ranges),
+            }
+        )
+    return subjects
 
 
 def _retain_clip_frame(
@@ -838,7 +1015,7 @@ def _semantic_clip_budget(mode: str, duration_seconds: float, available: int) ->
     These rates keep chronological coverage while preventing a long source from
     turning into hundreds of nearly-identical model calls.
     """
-    clips_per_hour = {"fast": 30, "balanced": 60, "thorough": 180}.get(mode, 60)
+    clips_per_hour = {"fast": 30, "balanced": 60, "thorough": 90}.get(mode, 60)
     minimum = {"fast": 12, "balanced": 24, "thorough": 48}.get(mode, 24)
     return min(
         available, max(minimum, math.ceil(duration_seconds / 3_600 * clips_per_hour))
@@ -1451,6 +1628,24 @@ def _run_pipeline(
         plan = replace(plan, use_semantic_vision=False)
     elif brief.get("requireSemanticVision"):
         plan = replace(plan, use_semantic_vision=True)
+    covers_full_source = (
+        len(important_ranges) == 1
+        and important_ranges[0][0] <= 0.1
+        and important_ranges[0][1] >= probe.duration_seconds - 0.5
+    )
+    if not important_ranges or covers_full_source:
+        sample_interval_secs, priority_sample_interval_secs = bounded_visual_sampling_intervals(
+            plan.mode,
+            probe.duration_seconds,
+            plan.sample_interval_secs,
+            plan.priority_sample_interval_secs,
+            [(item.start_secs, item.end_secs) for item in plan.priority_ranges],
+        )
+        plan = replace(
+            plan,
+            sample_interval_secs=sample_interval_secs,
+            priority_sample_interval_secs=priority_sample_interval_secs,
+        )
     plan = replace(
         plan,
         estimated_seconds=estimate_plan_runtime(plan, probe.duration_seconds),
@@ -1506,7 +1701,20 @@ def _run_pipeline(
             if len(text) >= 2 and confidence >= 0.5:
                 text_occurrences[text].append(int(observation["timeMs"]))
                 text_confidence_totals[text] += confidence
-    tracker = AnonymousTracker()
+    tracker = AnonymousTracker(
+        max_gap_ms=math.ceil(
+            max(plan.sample_interval_secs, plan.priority_sample_interval_secs) * 1_500
+        )
+    )
+    ocr_interval_ms = round(
+        ocr_sampling_interval(
+            plan.mode,
+            probe.duration_seconds,
+            plan.sample_interval_secs,
+        )
+        * 1_000
+    )
+    next_ocr_sample_ms = -1
     clip_plan = scene_detector.plan_clips(
         path,
         important_ranges or [(0.0, probe.duration_seconds)],
@@ -1553,7 +1761,10 @@ def _run_pipeline(
         )
         detections = operators.detect(frame) if plan.use_object_detection else []
         tracker.update(detections, time_ms)
-        ocr_lines = operators.read_text(frame) if plan.use_ocr else []
+        ocr_lines = []
+        if plan.use_ocr and time_ms >= next_ocr_sample_ms:
+            ocr_lines = operators.read_text(frame)
+            next_ocr_sample_ms = time_ms + max(1, ocr_interval_ms)
         if plan.use_semantic_vision and clip_starts_ms:
             clip_index = min(
                 max(bisect.bisect_right(clip_starts_ms, time_ms) - 1, 0),
@@ -1817,11 +2028,31 @@ def _run_pipeline(
             transcript=transcript,
             semantic_observations=semantic_evidence,
             overlay_text=recurring_overlay_text,
+            on_progress=lambda completed, total: smooth.step(
+                "synthesize",
+                completed,
+                total,
+                f"Cataloging source units ({completed}/{total})",
+                PHASES["synthesize"],
+                span_seconds=max(12, total * 8),
+                unit="source windows",
+            ),
         )
         knowledge_summary["sourceActivityStructures"] = planner.source_activity_structures
         knowledge_summary["sourceTaskInstances"] = planner.source_task_instances
         knowledge_summary["sourceInventoryCoverage"] = planner.source_inventory_coverage
+    reconciled_visible_subjects = _reconciled_visible_subjects(semantic_evidence)
+    if reconciled_visible_subjects:
+        # The synthesis model is a compact narrative reader. Its selected
+        # excerpts must not discard the complete frame-grounded presence trail
+        # that the visual reader already produced across the source.
+        knowledge_summary["visibleSubjects"] = reconciled_visible_subjects
     elapsed_seconds = round(time.monotonic() - pipeline_started, 3)
+    retained_tracks = [
+        track
+        for track in tracker.summaries()
+        if int(track.get("observations") or 0) >= 2
+    ]
     result = {
         "schemaVersion": 1,
         "durationMs": round((source_duration_secs or probe.duration_seconds) * 1_000),
@@ -1834,11 +2065,12 @@ def _run_pipeline(
         "transcript": transcript,
         "detectedLanguage": detected_language,
         "visualObservations": observations,
-        "tracks": [
-            track
-            for track in tracker.summaries()
-            if int(track.get("observations") or 0) >= 2
-        ],
+        "tracks": retained_tracks,
+        "anonymousPresenceLedger": _anonymous_presence_ledger(
+            observations,
+            retained_tracks,
+            plan.sample_interval_secs,
+        ),
         "recurringOverlayText": recurring_overlay_text,
         # Gateway batches complete out of order. Persisting arrival order
         # makes chronological retrieval and timeline answers unnecessarily
@@ -1892,6 +2124,8 @@ def _run_pipeline(
             "sourceFrames": source_frames,
             "decodedFrames": decoded_frames,
             "analyzedFrames": analyzed_frames,
+            "visualSampleIntervalSecs": round(plan.sample_interval_secs, 3),
+            "ocrSampleIntervalSecs": round(ocr_interval_ms / 1_000, 3),
             "heavyOperatorsDisabled": skip_heavy_operators,
             "priorityRanges": [
                 {

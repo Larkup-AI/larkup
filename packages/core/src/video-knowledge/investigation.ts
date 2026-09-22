@@ -1,5 +1,5 @@
 import { readVideoKnowledgeState } from './store';
-import { planVideoQuestion } from './query-planner';
+import { planVideoQuestion, type VideoInvestigationDirective } from './query-planner';
 import type { TimeRange } from './types';
 
 export interface VideoHierarchyNode {
@@ -119,6 +119,7 @@ function compactRange(node: VideoHierarchyNode) {
 export async function planVideoInvestigation(
   mediaAssetId: string,
   question: string,
+  directive: VideoInvestigationDirective,
 ): Promise<VideoInvestigationPlan | undefined> {
   const state = await readVideoKnowledgeState();
   const manifest = state.manifests
@@ -126,7 +127,7 @@ export async function planVideoInvestigation(
     .sort((left, right) => right.activatedAt!.localeCompare(left.activatedAt!))[0];
   if (!manifest) return undefined;
   const terms = termsFor(question);
-  const queryPlan = planVideoQuestion(question);
+  const queryPlan = planVideoQuestion(question, directive);
   const broadCoverage = queryPlan.requiresBroadCoverage;
   const activeEvidenceIds = new Set(Object.values(manifest.activeEvidenceRevisionIds));
   const evidenceByLineage = new Map(
@@ -154,7 +155,6 @@ export async function planVideoInvestigation(
       (revision) => revision.id === revisionId,
     );
     current && !lineage.has(current.id);
-
   ) {
     lineage.add(current.id);
     const parentId: string | undefined = current.parentRevisionId;
@@ -257,10 +257,10 @@ export async function planVideoInvestigation(
       broadCoverage && (chapters.length > 0 || scenes.length > 0)
         ? 'establish-broad-context'
         : candidateRanges.length > 0
-        ? 'answer-from-evidence'
-        : chapters.length > 0 || scenes.length > 0
-        ? 'establish-broad-context'
-        : 'inspect-candidate-ranges',
+          ? 'answer-from-evidence'
+          : chapters.length > 0 || scenes.length > 0
+            ? 'establish-broad-context'
+            : 'inspect-candidate-ranges',
   };
   return value;
 }

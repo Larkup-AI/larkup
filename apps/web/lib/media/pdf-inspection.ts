@@ -21,12 +21,9 @@ let parserPromise: Promise<(typeof import('pdf-parse'))['PDFParse']> | undefined
 async function getPdfParser() {
   if (!parserPromise) {
     parserPromise = (async () => {
-      const canvas = await import('@napi-rs/canvas');
-      Object.assign(globalThis, {
-        DOMMatrix: canvas.DOMMatrix,
-        ImageData: canvas.ImageData,
-        Path2D: canvas.Path2D,
-      });
+      // PDF.js loads its compatible @napi-rs/canvas version in Node. Setting
+      // globals from the app's separate canvas dependency creates incompatible
+      // Path2D instances, which breaks page rendering for text-heavy PDFs.
       const { PDFParse } = await import('pdf-parse');
       PDFParse.setWorker(getData());
       return PDFParse;
@@ -55,8 +52,92 @@ export async function readStoredPdfBytes(source: PdfSource): Promise<Buffer> {
   return fs.readFile(filePath);
 }
 
+const LOW_SIGNAL_QUERY_TERMS = new Set([
+  'a',
+  'an',
+  'and',
+  'are',
+  'as',
+  'at',
+  'be',
+  'by',
+  'do',
+  'for',
+  'from',
+  'give',
+  'how',
+  'i',
+  'in',
+  'is',
+  'it',
+  'me',
+  'of',
+  'on',
+  'or',
+  'please',
+  'show',
+  'state',
+  'the',
+  'to',
+  'what',
+  'when',
+  'where',
+  'which',
+  'why',
+  'with',
+  'write',
+]);
+
 function queryTerms(question: string): string[] {
-  return [...new Set(question.toLocaleLowerCase().match(/[\p{L}\p{N}_]{2,}/gu) ?? [])];
+  return [
+    ...new Set(
+      (question.toLocaleLowerCase().match(/[\p{L}\p{N}_]{2,}/gu) ?? []).filter(
+        (term) => !LOW_SIGNAL_QUERY_TERMS.has(term),
+      ),
+    ),
+  ];
+}
+
+/** Numbered document references are stable, high-signal page anchors. */
+function referencedDocumentLabels(question: string): string[] {
+  const matches = [
+    ...question
+      .toLocaleLowerCase()
+      .matchAll(
+        /\b(fig(?:ure)?|diagram|chart|graph|illustration|table|eq(?:uation)?|section|chapter|appendix)\.?\s*(\d+(?:\.\d+)+)\b/gu,
+      ),
+  ];
+  const labels = matches.flatMap((match) => {
+    const kind = match[1];
+    const number = match[2];
+    if (!kind || !number) return [];
+    // Authors commonly call the same visual object a figure, diagram, chart,
+    // or illustration in questions while captions standardize on one of them.
+    // The number remains the precise anchor; these are document-generic
+    // caption aliases rather than a rule for any particular source.
+    if (/^(?:fig(?:ure)?|diagram|chart|graph|illustration)$/u.test(kind)) {
+      return [
+        `figure ${number}`,
+        `fig. ${number}`,
+        `diagram ${number}`,
+        `chart ${number}`,
+        `graph ${number}`,
+        `illustration ${number}`,
+      ];
+    }
+    return [`${kind} ${number}`];
+  });
+  return [...new Set(labels)];
+}
+
+/**
+ * A page can mention an object while the following page contains its caption
+ * and visual. A caption/declaration is therefore a stronger match than prose
+ * that only references the same numbered object.
+ */
+function declaredDocumentLabelScore(text: string, label: string): number {
+  const declaration = new RegExp(`(?:^|\\n)\\s*${escapeRegExp(label)}\\s*[:.\\-]`, 'iu');
+  return declaration.test(text) ? 100 : 0;
 }
 
 /** Rank pages only from their own extracted text; no document-specific assumptions. */
@@ -66,17 +147,34 @@ export function selectRelevantPdfPages(
   limit = MAX_PAGES,
 ): number[] {
   const terms = queryTerms(question);
+  const labels = referencedDocumentLabels(question);
   if (pages.length === 0) return [];
   if (terms.length === 0) return pages.slice(0, limit).map((page) => page.num);
+  const pageText = pages.map((page) => page.text.toLocaleLowerCase());
+  const documentFrequency = new Map(
+    terms.map((term) => [term, pageText.filter((text) => text.includes(term)).length]),
+  );
   return pages
-    .map((page) => {
-      const text = page.text.toLocaleLowerCase();
-      const score = terms.reduce(
-        (total, term) =>
-          total + (text.match(new RegExp(`\\b${escapeRegExp(term)}\\b`, 'gu'))?.length ?? 0),
+    .map((page, index) => {
+      const text = pageText[index];
+      const score = terms.reduce((total, term) => {
+        const count = text.match(new RegExp(`\\b${escapeRegExp(term)}\\b`, 'gu'))?.length ?? 0;
+        const frequency = documentFrequency.get(term) ?? pages.length;
+        // A term found on only one or two pages is a stronger page anchor
+        // than common prose found throughout the document or its contents.
+        const specificity = Math.log((pages.length + 1) / (frequency + 1)) + 1;
+        return total + count * specificity;
+      }, 0);
+      // A caption such as "Figure 5.1" is much more precise than its
+      // individual number tokens, which can occur throughout a long paper.
+      // Prefer the declaration/caption page over a preceding sentence that
+      // merely says "see Figure 5.1".
+      const labelScore = labels.reduce(
+        (total, label) =>
+          total + (text.includes(label) ? 20 : 0) + declaredDocumentLabelScore(text, label),
         0,
       );
-      return { pageNumber: page.num, score };
+      return { pageNumber: page.num, score: score + labelScore };
     })
     .sort((left, right) => right.score - left.score || left.pageNumber - right.pageNumber)
     .slice(0, limit)
@@ -91,6 +189,18 @@ function requestedPages(pages: number[] | undefined, total: number): number[] {
   return [...new Set(pages ?? [])]
     .filter((page) => Number.isInteger(page) && page >= 1 && page <= total)
     .slice(0, MAX_PAGES);
+}
+
+/** Preserve the ranked page order when a full extraction supplied the source text. */
+export function selectInspectedPdfPages<T extends { num: number }>(
+  pages: T[],
+  selected: number[],
+): T[] {
+  const byNumber = new Map(pages.map((page) => [page.num, page]));
+  return selected.flatMap((pageNumber) => {
+    const page = byNumber.get(pageNumber);
+    return page ? [page] : [];
+  });
 }
 
 export async function inspectStoredPdf(
@@ -110,6 +220,13 @@ export async function inspectStoredPdf(
         ? explicitPages
         : selectRelevantPdfPages(allText?.pages ?? [], question, MAX_PAGES);
     const textResult = allText ?? (await parser.getText({ partial: selectedPages }));
+    // When we read the full PDF to rank its pages, return the selected page
+    // objects rather than accidentally taking the first three pages from that
+    // full extraction. This keeps the ranking decision and the model evidence
+    // on the same source pages.
+    const textPages = allText
+      ? selectInspectedPdfPages(allText.pages, selectedPages)
+      : textResult.pages;
     let tablePages: Array<{ pageNumber?: number; tables?: unknown[] }> = [];
     try {
       const tables = await parser.getTable({ partial: selectedPages });
@@ -119,7 +236,7 @@ export async function inspectStoredPdf(
     }
     return {
       totalPages: info.total,
-      pages: textResult.pages.slice(0, MAX_PAGES).map((page) => ({
+      pages: textPages.slice(0, MAX_PAGES).map((page) => ({
         pageNumber: page.num,
         text: page.text.slice(0, MAX_PAGE_TEXT),
         tables:

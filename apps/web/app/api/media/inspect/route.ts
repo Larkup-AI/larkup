@@ -32,7 +32,6 @@ import { createAnalysisBundle } from '@/lib/media/video/analysis-bundle';
 import { analyzeBundle } from '@/lib/media/video/sandbox-analysis';
 import {
   evidenceToRefinementInputs,
-  hasVideoIntelligenceCapacity,
   runInstalledVideoIntelligence,
   VideoWorkerTimeoutError,
 } from '@/lib/media/video-intelligence-adapter';
@@ -176,20 +175,11 @@ export async function inspectMedia(req: Request) {
   const runtimeMode = projectConfig.toolConfigs?.['video-intelligence']?.runtimeMode;
   const usesManagedCloudRuntime = runtimeMode === undefined || runtimeMode === 'managed-cloud';
   const hasManagedCloudVideoIntelligence = hasVideoIntelligenceRuntime && usesManagedCloudRuntime;
-  const hasCloudVideoIntelligenceCapacity = hasManagedCloudVideoIntelligence
-    ? await hasVideoIntelligenceCapacity().catch(() => null)
-    : false;
-  if (hasManagedCloudVideoIntelligence && hasCloudVideoIntelligenceCapacity === false) {
-    return NextResponse.json(
-      {
-        error:
-          'Video analysis is already working on another request. Wait for that analysis to finish, then ask again.',
-        serviceBusy: true,
-      },
-      { status: 429, headers: { 'Retry-After': '15' } },
-    );
-  }
-  const decision = hasCloudVideoIntelligenceCapacity
+  // The managed control plane is the authority for both quota and concurrency
+  // when it accepts a job. Do not put its potentially slow reconciliation
+  // endpoint in front of an interactive inspection: that made a ready GPU
+  // wait on unrelated stale-job polling before it could receive the request.
+  const decision = hasManagedCloudVideoIntelligence
     ? {
         decision: ['high-res-ocr', 'count', 'track', 'code'].includes(purpose)
           ? ('required' as const)

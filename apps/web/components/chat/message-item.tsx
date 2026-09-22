@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import type { UIMessage } from 'ai';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import { MessageActions } from '@/components/chat/message-actions';
 import { ChatChart, type ChartConfig } from '@/components/chat/tools/chat-chart';
 import { ChatDataTable, type DataTableConfig } from '@/components/chat/tools/chat-data-table';
@@ -1309,6 +1311,26 @@ export function renderMarkdown(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+
+  // Math blocks \[ ... \] and $$ ... $$
+  html = html.replace(/\\\[([\s\S]+?)\\\]|\$\$([\s\S]+?)\$\$/g, (match, p1, p2) => {
+    const math = p1 || p2;
+    try {
+      return katex.renderToString(math, { displayMode: true, throwOnError: false });
+    } catch {
+      return match;
+    }
+  });
+
+  // Inline math \( ... \) and $ ... $
+  html = html.replace(/\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$/g, (match, p1, p2) => {
+    const math = p1 || p2;
+    try {
+      return katex.renderToString(math, { displayMode: false, throwOnError: false });
+    } catch {
+      return match;
+    }
+  });
 
   html = html.replace(
     /!\[([^\]]*)\]\([^)]*\)/g,

@@ -203,6 +203,26 @@ interface VideoEvidence {
     observations: number;
     confidence?: number;
   }>;
+  anonymousPresenceLedger?: {
+    method: 'object-detection-anonymous-tracking';
+    sampledFrames: number;
+    sampleIntervalSecs?: number;
+    tracks: Array<{
+      trackId: number;
+      label: string;
+      startMs: number;
+      endMs: number;
+      observations: number;
+      confidence?: number;
+      timestampsMs: number[];
+    }>;
+    labels: Array<{
+      label: string;
+      distinctTrackCount: number;
+      maximumSimultaneous: number;
+      simultaneousTimestampsMs: number[];
+    }>;
+  };
   recurringOverlayText?: Array<{
     text: string;
     firstSeenMs: number;
@@ -252,6 +272,15 @@ interface VideoEvidence {
       name: string;
       role: string;
       evidence: Array<{ startMs: number; endMs: number }>;
+    }>;
+    visibleSubjects?: Array<{
+      identity: string;
+      identityBasis: 'source-named' | 'source-described' | 'unresolved';
+      appearances: Array<{
+        startMs: number;
+        endMs: number;
+        confidence: 'direct' | 'partial';
+      }>;
     }>;
     stateHistory?: Array<{
       startMs: number;
@@ -439,7 +468,7 @@ export async function runInstalledVideoIntelligence(input: {
         input.asset.fileName,
       );
   const brief: Record<string, unknown> = enforceManagedSemanticBrief(config, {
-    ...normalizeBrief(input.asset),
+    ...createAssetVideoIndexingBrief(input.asset),
     ...(input.briefOverride ?? {}),
     // Managed indexing has a semantic reader for normal visual understanding.
     // Local indexing is offline-only, so it must retain OCR and detection as
@@ -1000,7 +1029,11 @@ export function evidenceToKnowledgeInputs(evidence: VideoEvidence) {
         observations: [
           {
             kind: 'action' as const,
-            value: observation.text,
+            value: normalizeVisibleSubjectProtocolTimestamps(
+              observation.text,
+              observation.startMs,
+              observation.endMs,
+            ),
             frameTimestamps: [observation.startMs / 1_000, observation.endMs / 1_000],
             confidence: Math.min(1, Math.max(0, observation.confidence)),
             uncertaintyReasons: [
@@ -1045,6 +1078,63 @@ export function evidenceToKnowledgeInputs(evidence: VideoEvidence) {
     ocrEvidence,
     reconciledEvidence: reconciledAccount(evidence),
   };
+}
+
+/**
+ * A bounded worker decodes an excerpt as a new media stream, while its
+ * enclosing semantic observation is anchored to the original source. Some
+ * vision providers consequently return `Visible subject` protocol times
+ * relative to that excerpt. Canonicalize only that typed protocol back to the
+ * enclosing source interval before it is persisted; ordinary prose and
+ * already-source-absolute protocol values remain unchanged.
+ */
+function normalizeVisibleSubjectProtocolTimestamps(
+  text: string,
+  observationStartMs: number,
+  observationEndMs: number,
+): string {
+  if (!text.includes('Visible subject: ')) return text;
+  const startMs = Math.max(0, Math.floor(observationStartMs));
+  const endMs = Math.max(startMs, Math.floor(observationEndMs));
+  const spanMs = endMs - startMs;
+  return text
+    .split(/(\r?\n)/u)
+    .map((line) => {
+      const prefix = 'Visible subject: ';
+      if (!line.startsWith(prefix)) return line;
+      try {
+        const subject = JSON.parse(line.slice(prefix.length)) as Record<string, unknown>;
+        const subjectStartMs = Number(subject.startMs);
+        const subjectEndMs = Number(subject.endMs);
+        if (
+          !Number.isFinite(subjectStartMs) ||
+          !Number.isFinite(subjectEndMs) ||
+          subjectEndMs < subjectStartMs ||
+          (subjectStartMs >= startMs && subjectEndMs <= endMs)
+        ) {
+          return line;
+        }
+        // Relative timestamps may have a tiny negative value when the first
+        // sampled frame precedes the decoded excerpt's zero point. Values far
+        // beyond the excerpt are neither reliable relative times nor safe to
+        // reinterpret, so leave them for the protocol validator to reject.
+        if (subjectStartMs < -1_000 || subjectEndMs > spanMs + 1_000) return line;
+        return (
+          prefix +
+          JSON.stringify({
+            ...subject,
+            startMs: Math.max(startMs, Math.min(endMs, Math.round(startMs + subjectStartMs))),
+            endMs: Math.max(
+              startMs,
+              Math.min(endMs, Math.round(startMs + Math.max(subjectStartMs, subjectEndMs))),
+            ),
+          })
+        );
+      } catch {
+        return line;
+      }
+    })
+    .join('');
 }
 
 /** Converts a bounded cloud re-analysis result into immutable refinement evidence. */
@@ -1127,11 +1217,45 @@ export function evidenceToRefinementInputs(
         },
       ]
     : [];
+  const anonymousPresence: OfflineKnowledgeEvidenceInput[] = evidence.anonymousPresenceLedger
+    ? [
+        {
+          modality: 'computed',
+          timeRange: {
+            startSecs: 0,
+            endSecs: evidence.durationMs / 1_000,
+            precision: 'estimated',
+          },
+          payload: {
+            text:
+              'Anonymous presence ledger from every indexed detection sample. It reports concurrent ' +
+              'subjects and continuous anonymous tracks, but does not claim that tracks across edits ' +
+              'belong to the same identity.',
+            ...evidence.anonymousPresenceLedger,
+          },
+          source: { kind: 'provider', provider: 'video-intelligence-tracking' },
+          confidence: {
+            score: 0.72,
+            source: 'provider',
+            calibrationStatus: 'uncalibrated',
+            uncertaintyReasons: [
+              'The ledger measures detections at indexed sample times, not every decoded frame.',
+              'Anonymous tracks can split when a subject is occluded, exits, re-enters, or a cut occurs.',
+            ],
+          },
+          observation: {
+            kind: 'computed',
+            value: evidence.anonymousPresenceLedger,
+          },
+        },
+      ]
+    : [];
   return [
     ...transcript,
     ...visual,
     ...inputs.ocrEvidence,
     ...tracking,
+    ...anonymousPresence,
     ...reconciledAccount(evidence),
   ];
 }
@@ -1217,6 +1341,33 @@ function reconciledAccount(evidence: VideoEvidence): OfflineKnowledgeEvidenceInp
           ),
         ),
     ),
+    ...(summary.visibleSubjects ?? []).flatMap((subject) => {
+      const appearances = subject.appearances
+        .filter((appearance) => appearance.endMs >= appearance.startMs)
+        .slice(0, 256);
+      if (!appearances.length) return [];
+      const startMs = Math.min(...appearances.map((appearance) => appearance.startMs));
+      const endMs = Math.max(...appearances.map((appearance) => appearance.endMs));
+      const observedDurationMs = appearances.reduce(
+        (total, appearance) => total + appearance.endMs - appearance.startMs,
+        0,
+      );
+      const direct = appearances.every((appearance) => appearance.confidence === 'direct');
+      return [
+        entry(
+          startMs / 1_000,
+          endMs / 1_000,
+          `Reconciled visible subject: ${subject.identity}\nIdentity basis: ${subject.identityBasis}\n` +
+            `Observed appearances: ${appearances
+              .map(
+                (appearance) =>
+                  `${appearance.startMs}-${appearance.endMs}ms (${appearance.confidence})`,
+              )
+              .join('; ')}\nObserved visible duration: ${observedDurationMs}ms`,
+          direct ? 0.8 : 0.6,
+        ),
+      ];
+    }),
     ...(summary.context ?? []).flatMap((context) =>
       context.evidence
         .slice(0, 1)
@@ -1291,7 +1442,22 @@ function reconciledAccount(evidence: VideoEvidence): OfflineKnowledgeEvidenceInp
   ];
 }
 
-function normalizeBrief(asset: MediaAsset): Record<string, unknown> {
+/**
+ * Resolve the uploader's free-form focus once, then use it everywhere that
+ * creates or audits a video index. It is deliberately opaque text: neither
+ * the host nor the worker infers a genre or applies subject-specific rules.
+ */
+export function resolveVideoIndexingHint(asset: MediaAsset): string | undefined {
+  const candidate = asset.toolInputs?.['video-intelligence'];
+  const input =
+    candidate && typeof candidate === 'object' ? (candidate as Record<string, unknown>) : {};
+  const surfaceGoal = typeof input.goal === 'string' ? input.goal.trim() : '';
+  const persistedInstructions = asset.indexingInstructions?.trim() || '';
+  const hint = surfaceGoal || persistedInstructions;
+  return hint ? hint.slice(0, 4_000) : undefined;
+}
+
+export function createAssetVideoIndexingBrief(asset: MediaAsset): Record<string, unknown> {
   const candidate = asset.toolInputs?.['video-intelligence'];
   const input =
     candidate && typeof candidate === 'object' ? (candidate as Record<string, unknown>) : {};
@@ -1300,7 +1466,7 @@ function normalizeBrief(asset: MediaAsset): Record<string, unknown> {
     ? rawIndexingMode
     : 'balanced';
   return {
-    goal: typeof input.goal === 'string' ? input.goal.slice(0, 4_000) : undefined,
+    goal: resolveVideoIndexingHint(asset),
     contentType:
       typeof input.contentType === 'string' && input.contentType.trim()
         ? input.contentType.trim().slice(0, 120)

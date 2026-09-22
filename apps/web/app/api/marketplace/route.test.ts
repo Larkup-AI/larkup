@@ -90,4 +90,28 @@ describe('marketplace catalog route', () => {
       updateAvailable: false,
     });
   });
+
+  it('does not offer an npm update for a workspace-linked tool', async () => {
+    mocks.getInstalledTools.mockResolvedValue([
+      {
+        id: 'video-intelligence',
+        version: '0.2.8',
+        source: 'local',
+        packageName: '@larkup/tool-video-intelligence',
+        resolvedPath: '/workspace/packages/marketplace-tools/video-intelligence',
+        config: {},
+        installedAt: '2026-09-13T00:00:00.000Z',
+      },
+    ]);
+    mocks.readFile.mockResolvedValue(JSON.stringify({ version: '0.2.8' }));
+
+    const response = await GET();
+    const body = (await response.json()) as { tools: Array<Record<string, unknown>> };
+
+    expect(body.tools[0]).toMatchObject({
+      installedVersion: '0.2.8',
+      availableVersion: '0.2.9',
+      updateAvailable: false,
+    });
+  });
 });

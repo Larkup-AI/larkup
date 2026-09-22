@@ -395,7 +395,15 @@ async function execInstallUnlocked(
       const packageJson = JSON.parse(
         await fs.readFile(path.join(resolvedPath, 'package.json'), 'utf8'),
       ) as { version?: string };
-      return { resolvedPath, version: packageJson.version ?? version };
+
+      const resolvedVersion = packageJson.version ?? version;
+      const { compareToolVersions } = await import('./tool-registry');
+
+      if (compareToolVersions(version, resolvedVersion) > 0) {
+        throw new Error(`Version ${version} is not yet available. Please try again later.`);
+      }
+
+      return { resolvedPath, version: resolvedVersion };
     }
 
     case 'serverless': {

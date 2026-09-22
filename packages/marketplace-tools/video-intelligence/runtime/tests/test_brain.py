@@ -41,7 +41,7 @@ class AgentPlannerTests(unittest.TestCase):
             overlay_text=[],
         )
 
-        self.assertEqual(len(chunks), 3)
+        self.assertEqual(len(chunks), 7)
         included = [
             item["text"]
             for chunk in chunks
@@ -69,7 +69,7 @@ class AgentPlannerTests(unittest.TestCase):
         for domain_word in ("score", "team", "match", "lecture", "professor"):
             self.assertNotIn(domain_word, instructions)
 
-    def test_source_inventory_keeps_primary_prompts_and_clues_but_drops_banter(self) -> None:
+    def test_source_inventory_trusts_the_source_mapper_role_in_every_language(self) -> None:
         source_chunk = {
             "spokenEvidence": [
                 {
@@ -129,7 +129,7 @@ class AgentPlannerTests(unittest.TestCase):
             [(item["kind"], item["text"]) for item in items],
             [
                 ("question", "Which city hosted the event?"),
-                ("clue", "I worked with Alpha, Beta, and Gamma"),
+                ("question", "I worked with Alpha, Beta, and Gamma"),
             ],
         )
 
@@ -188,6 +188,14 @@ class AgentPlannerTests(unittest.TestCase):
         }
         tasks = _validated_source_task_instances(
             {
+                "items": [
+                    {
+                        "kind": "question",
+                        "channel": "visible",
+                        "questionRole": "primary",
+                        "text": "Guess the person",
+                    }
+                ],
                 "taskInstances": [
                     {
                         "prompt": "Guess the person",
@@ -260,6 +268,7 @@ class AgentPlannerTests(unittest.TestCase):
                     {
                         "kind": "question",
                         "channel": "spoken",
+                        "questionRole": "primary",
                         "text": "في أي سنة حدث ذلك",
                         "answer": "",
                         "startMs": 1_000,
@@ -268,6 +277,7 @@ class AgentPlannerTests(unittest.TestCase):
                     {
                         "kind": "question",
                         "channel": "spoken",
+                        "questionRole": "not-question",
                         "text": "قال المشارك الإجابة الصحيحة",
                         "answer": "",
                         "startMs": 2_000,
@@ -276,6 +286,7 @@ class AgentPlannerTests(unittest.TestCase):
                     {
                         "kind": "question",
                         "channel": "spoken",
+                        "questionRole": "primary",
                         "text": "Who invented the missing machine?",
                         "answer": "",
                         "startMs": 2_000,
@@ -366,13 +377,22 @@ class AgentPlannerTests(unittest.TestCase):
                 semantic_observations=[],
             )
 
-        self.assertEqual(mocked.call_count, 3)
-        self.assertEqual([item["startMs"] for item in items], [0, 900_000, 1_800_000])
-        self.assertEqual(planner.diagnostics().requests, 3)
-        self.assertEqual(planner.diagnostics().prompt_tokens, 30)
+        self.assertEqual(mocked.call_count, 7)
+        self.assertEqual(
+            [item["startMs"] for item in items],
+            [0, 300_000, 600_000, 900_000, 1_200_000, 1_500_000, 1_800_000],
+        )
+        self.assertEqual(planner.diagnostics().requests, 7)
+        self.assertEqual(planner.diagnostics().prompt_tokens, 70)
         self.assertEqual(
             planner.source_inventory_coverage,
-            {"complete": True, "totalWindows": 3, "processedWindows": 3},
+            {
+                "complete": True,
+                "totalWindows": 7,
+                "processedWindows": 7,
+                "modelItems": 7,
+                "acceptedItems": 7,
+            },
         )
 
     def test_deterministic_summary_retains_people_states_context_and_story(self) -> None:
@@ -764,6 +784,15 @@ class AgentPlannerTests(unittest.TestCase):
                     },
                     {"name": "Unsupported", "role": "unknown", "evidence": []},
                 ],
+                "visibleSubjects": [
+                    {
+                        "identity": "Supported participant",
+                        "identityBasis": "source-named",
+                        "appearances": [
+                            {"startMs": -50, "endMs": 2_000, "confidence": "direct"}
+                        ],
+                    }
+                ],
                 "stateHistory": [
                     {
                         "startMs": 8_000,
@@ -788,6 +817,7 @@ class AgentPlannerTests(unittest.TestCase):
         )
         self.assertEqual(len(summary["participants"]), 1)
         self.assertEqual(summary["participants"][0]["evidence"][0]["startMs"], 0)
+        self.assertEqual(summary["visibleSubjects"][0]["appearances"][0]["startMs"], 0)
         self.assertEqual(summary["stateHistory"][0]["endMs"], 10_000)
         self.assertEqual(summary["narrative"][0]["endMs"], 10_000)
 

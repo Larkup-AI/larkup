@@ -167,8 +167,13 @@ async function importRemoteMedia(req: Request, config: Awaited<ReturnType<typeof
     estimateOnly?: boolean;
     mediaType?: 'image' | 'video' | 'audio';
     groupId?: string;
+    indexingInstructions?: string;
     toolInputs?: Record<string, unknown>;
   };
+  const indexingInstructions = body.indexingInstructions?.trim();
+  if (indexingInstructions && indexingInstructions.length > 4_000) {
+    return NextResponse.json({ error: 'Indexing guide is too large.' }, { status: 400 });
+  }
   if (
     body.toolInputs &&
     (typeof body.toolInputs !== 'object' ||
@@ -279,6 +284,7 @@ async function importRemoteMedia(req: Request, config: Awaited<ReturnType<typeof
       fileSize: 0,
       originalUrl: url,
       groupId,
+      indexingInstructions: indexingInstructions || undefined,
       toolInputs: body.toolInputs,
     };
   });

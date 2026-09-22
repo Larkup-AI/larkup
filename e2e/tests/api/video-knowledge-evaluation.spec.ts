@@ -5,7 +5,10 @@ import {
   decideInspection,
   LIMITS,
 } from '../../../packages/core/src/video-knowledge/inspection-policy';
-import { planVideoQuestion } from '../../../packages/core/src/video-knowledge/query-planner';
+import {
+  planVideoQuestion,
+  type VideoInvestigationDirective,
+} from '../../../packages/core/src/video-knowledge/query-planner';
 import {
   videoKnowledgeRetrievalCapabilities,
   searchVideoKnowledge,
@@ -158,75 +161,35 @@ test.describe('Evaluation scoring — extended corpus', () => {
 });
 
 /* ------------------------------------------------------------------ */
-/*  Query planner classification                                       */
+/*  Query planner directives                                           */
 /* ------------------------------------------------------------------ */
 
-test.describe('Query planner — question kind classification', () => {
-  test('classifies direct speech questions', () => {
-    const plan = planVideoQuestion('What did the speaker say about the budget?');
-    expect(plan.kinds).toContain('direct-speech');
-    expect(plan.modalities).toContain('transcript');
-  });
+test.describe('Query planner — content-neutral directives', () => {
+  const directive = (
+    scope: VideoInvestigationDirective['scope'],
+    goal: VideoInvestigationDirective['goal'],
+    evidence?: VideoInvestigationDirective['evidence'],
+  ): VideoInvestigationDirective => ({ scope, goal, ...(evidence ? { evidence } : {}) });
 
-  test('classifies exact OCR questions', () => {
-    const plan = planVideoQuestion('What text is shown on the screen?');
-    expect(plan.kinds).toContain('exact-ocr');
-    expect(plan.modalities).toContain('ocr');
-  });
-
-  test('classifies state-change questions and requires both ranges', () => {
-    const plan = planVideoQuestion(
-      'How did the displayed value change between the first and second section?',
+  test('uses the same operation for questions in different languages', () => {
+    const expected = planVideoQuestion(
+      'What changes over time?',
+      directive('temporal', 'trace', ['visual', 'computed']),
     );
-    expect(plan.kinds).toContain('state-change');
-    expect(plan.requiresBothRanges).toBe(true);
+    for (const question of ['ما الذي يتغير مع الوقت؟', '時間とともに何が変わりますか？']) {
+      expect(
+        planVideoQuestion(question, directive('temporal', 'trace', ['visual', 'computed'])),
+      ).toEqual(expected);
+    }
+    expect(expected.route).toBe('temporal');
+    expect(expected.requiresBothRanges).toBe(true);
   });
 
-  test('classifies comparison questions and requires both ranges', () => {
-    const plan = planVideoQuestion('Compare the two alternatives.');
-    expect(plan.kinds).toContain('comparison');
-    expect(plan.requiresBothRanges).toBe(true);
-  });
-
-  test('classifies outcome questions', () => {
-    const plan = planVideoQuestion('What was the final result?');
-    expect(plan.kinds).toContain('outcome');
-    expect(plan.modalities).toContain('visual');
-    expect(plan.modalities).toContain('transcript');
-    expect(plan.requiresInspectionWhenInsufficient).toBe(true);
-  });
-
-  test('classifies Arabic final-score questions as outcomes', () => {
-    const plan = planVideoQuestion('ما النتيجة النهائية ومن فاز في المباراة؟');
-    expect(plan.kinds).toContain('outcome');
-    expect(plan.requiresInspectionWhenInsufficient).toBe(true);
-  });
-
-  test('uses language-neutral cross-modal retrieval for an unclassified question', () => {
-    const plan = planVideoQuestion('この動画では何が起きましたか？');
-    expect(plan.kinds).toContain('visual-fact');
-    expect(plan.modalities).toEqual(
-      expect.arrayContaining(['transcript', 'ocr', 'visual', 'computed']),
-    );
-    expect(plan.requiresInspectionWhenInsufficient).toBe(true);
-  });
-
-  test('classifies counting questions', () => {
-    const plan = planVideoQuestion('How many items appeared?');
-    expect(plan.kinds).toContain('counting');
-    expect(plan.requiresInspectionWhenInsufficient).toBe(true);
-  });
-
-  test('classifies computation questions', () => {
-    const plan = planVideoQuestion('Calculate the average value per section.');
-    expect(plan.kinds).toContain('computation');
-    expect(plan.modalities).toContain('computed');
-  });
-
-  test('defaults to visual-fact for generic questions', () => {
-    const plan = planVideoQuestion('What is happening in this video?');
-    expect(plan.kinds).toContain('visual-fact');
-    expect(plan.modalities).toContain('visual');
+  test('maps source-wide enumeration to an exhaustive scan', () => {
+    const plan = planVideoQuestion('anything', directive('source', 'enumerate'));
+    expect(plan.route).toBe('scan');
+    expect(plan.requiresBroadCoverage).toBe(true);
+    expect(plan.modalities).toEqual(['transcript', 'ocr', 'visual', 'computed']);
   });
 });
 

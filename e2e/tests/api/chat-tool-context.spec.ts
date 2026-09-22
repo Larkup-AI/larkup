@@ -6,7 +6,10 @@ import {
 } from '../../../apps/web/lib/chat/tabular-visualization';
 import { inferTabularPlan } from '../../../apps/web/lib/chat/tabular-query-plan';
 import { normalizeChartConfig } from '../../../apps/web/lib/chat/chart-config';
-import { hasRetrievedPdfEvidence } from '../../../apps/web/lib/chat/visual-routing';
+import {
+  findRetrievedPdfSource,
+  hasRetrievedPdfEvidence,
+} from '../../../apps/web/lib/chat/visual-routing';
 import {
   isLikelyTabularQuestion,
   tabularToolsForStep,
@@ -202,10 +205,40 @@ test('keeps PDF questions on document retrieval when a workbook is also uploaded
   ).toBe(true);
 });
 
+test('does not route mathematical document questions to an unrelated workbook', () => {
+  const input = {
+    columnNames: ['Revenue', 'Fiscal quarter', 'Customer segment'],
+    datasetNames: ['quarterly-revenue.xlsx'],
+  };
+  for (const text of [
+    'Give the sinusoidal positional encoding and why it is useful.',
+    'State the warmup learning-rate schedule.',
+    'What is the gradient of the loss through softmax?',
+    'In Figure 5.1, what do the orange dashed lines mean?',
+  ]) {
+    expect(isLikelyTabularQuestion({ ...input, text })).toBe(false);
+  }
+});
+
 test('routes a PDF retrieval to live local page inspection even without indexed images', () => {
   expect(
     hasRetrievedPdfEvidence({
       hits: [{ documentId: 'pdf-1', title: 'source.pdf', url: '/api/uploads/source.pdf' }],
     }),
   ).toBe(true);
+});
+
+test('keeps a matched PDF visual page ahead of the document cover for preview routing', () => {
+  expect(
+    findRetrievedPdfSource({
+      hits: [
+        { documentId: 'paper', title: 'paper.pdf', url: '/api/uploads/paper.pdf' },
+        {
+          documentId: 'paper',
+          title: 'paper.pdf - Page 27',
+          metadata: { originalFile: 'paper.pdf', isImage: true, pageNumber: 27 },
+        },
+      ],
+    }),
+  ).toMatchObject({ documentId: 'paper', pageNumber: 27 });
 });

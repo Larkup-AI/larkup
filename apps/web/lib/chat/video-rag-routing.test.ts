@@ -51,6 +51,53 @@ describe('video RAG fallback routing', () => {
     expect(result.claimVerification).toEqual({ status: 'directly-established' });
   });
 
+  it('collects structured inventory rows outside the answer-model evidence limit', async () => {
+    const execute = async (input: Record<string, unknown>) => {
+      const cursor = Number(input.cursor);
+      return {
+        success: true,
+        rows: [
+          { id: cursor === 2 ? 'question-b' : 'question-c', Content: `Item ${cursor}` },
+          { id: cursor === 2 ? 'question-c' : 'question-d', Content: `Item ${cursor + 1}` },
+        ],
+        continuation: {
+          exhaustive: true,
+          cursor,
+          nextCursor: cursor + 2,
+          hasMore: cursor < 4,
+        },
+      };
+    };
+    const result = (await collectExhaustiveVideoEvidencePages(
+      execute,
+      { mediaAssetId: 'asset-1', query: 'enumerate source units' },
+      {
+        success: true,
+        columns: ['Content'],
+        rows: [
+          { id: 'question-a', Content: 'Item 0' },
+          { id: 'question-b', Content: 'Item 1' },
+        ],
+        continuation: { exhaustive: true, nextCursor: 2, hasMore: true },
+      },
+      'call-1',
+    )) as any;
+
+    expect(result.rows.map((row: any) => row.id)).toEqual([
+      'question-a',
+      'question-b',
+      'question-c',
+      'question-d',
+    ]);
+    expect(result.totalRows).toBe(4);
+    expect(result.continuation).toMatchObject({
+      exhaustive: true,
+      hasMore: false,
+      aggregatedItems: 4,
+      contextLimitReached: false,
+    });
+  });
+
   it('uses a semantically located indexed visual answer without live analysis', () => {
     expect(
       indexedVideoEvidenceIsSufficient({

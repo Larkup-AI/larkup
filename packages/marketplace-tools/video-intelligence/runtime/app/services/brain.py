@@ -16,7 +16,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 import requests
 
@@ -138,7 +138,7 @@ KNOWLEDGE_JSON_SCHEMA: dict[str, Any] = {
         "overview": {"type": "string", "maxLength": 1200},
         "participants": {
             "type": "array",
-            "maxItems": 64,
+            "maxItems": 16,
             "items": {
                 "type": "object",
                 "properties": {
@@ -154,9 +154,42 @@ KNOWLEDGE_JSON_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
             },
         },
+        "visibleSubjects": {
+            "type": "array",
+            "maxItems": 24,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "identity": {"type": "string", "maxLength": 180},
+                    "identityBasis": {
+                        "type": "string",
+                        "enum": ["source-named", "source-described", "unresolved"],
+                    },
+                    "appearances": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "startMs": {"type": "number"},
+                                "endMs": {"type": "number"},
+                                "confidence": {
+                                    "type": "string",
+                                    "enum": ["direct", "partial"],
+                                },
+                            },
+                            "required": ["startMs", "endMs", "confidence"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["identity", "identityBasis", "appearances"],
+                "additionalProperties": False,
+            },
+        },
         "stateHistory": {
             "type": "array",
-            "maxItems": 32,
+            "maxItems": 16,
             "items": {
                 "type": "object",
                 "properties": {
@@ -171,7 +204,7 @@ KNOWLEDGE_JSON_SCHEMA: dict[str, Any] = {
         },
         "keyEvents": {
             "type": "array",
-            "maxItems": 64,
+            "maxItems": 24,
             "items": {
                 "type": "object",
                 "properties": {
@@ -186,7 +219,7 @@ KNOWLEDGE_JSON_SCHEMA: dict[str, Any] = {
         },
         "narrative": {
             "type": "array",
-            "maxItems": 64,
+            "maxItems": 24,
             "items": {
                 "type": "object",
                 "properties": {
@@ -201,7 +234,7 @@ KNOWLEDGE_JSON_SCHEMA: dict[str, Any] = {
         },
         "context": {
             "type": "array",
-            "maxItems": 32,
+            "maxItems": 16,
             "items": {
                 "type": "object",
                 "properties": {
@@ -218,13 +251,14 @@ KNOWLEDGE_JSON_SCHEMA: dict[str, Any] = {
         },
         "uncertainties": {
             "type": "array",
-            "maxItems": 16,
+            "maxItems": 8,
             "items": {"type": "string", "maxLength": 240},
         },
     },
     "required": [
         "overview",
         "participants",
+        "visibleSubjects",
         "stateHistory",
         "keyEvents",
         "narrative",
@@ -239,7 +273,7 @@ SOURCE_INVENTORY_JSON_SCHEMA: dict[str, Any] = {
     "properties": {
         "items": {
             "type": "array",
-            "maxItems": 256,
+            "maxItems": 48,
             "items": {
                 "type": "object",
                 "properties": {
@@ -517,7 +551,7 @@ class PlannerDiagnostics:
 # bounds, but the bounds themselves do not overlap in the direction that
 # matters: the densest plan Fast can propose is still lighter than the
 # lightest plan Balanced can, and likewise for Balanced against Thorough. That
-# is what makes the three modes mean something -- with overlapping ranges a
+# is what makes the three modes mean something, with overlapping ranges a
 # Fast run could legitimately come out slower than a Balanced one, which is
 # what a user picking Fast is choosing against.
 MODE_BOUNDS: dict[str, dict[str, tuple[float, float]]] = {
@@ -754,6 +788,7 @@ class AgentPlanner:
             semantic_observations=semantic_observations,
             transcript=transcript,
             overlay_text=overlay_text or [],
+            compact=True,
         )
         started = time.monotonic()
         try:
@@ -762,21 +797,9 @@ class AgentPlanner:
                 self.requests += 1
                 try:
                     raw, usage = self._complete(
-                        (
-                            prompt
-                            if attempt == 0 and self.provider != "google"
-                            else _synthesis_prompt(
-                                brief=brief,
-                                duration_secs=duration_secs,
-                                plan=plan,
-                                semantic_observations=semantic_observations,
-                                transcript=transcript,
-                                overlay_text=overlay_text or [],
-                                compact=True,
-                            )
-                        ),
+                        prompt,
                         [],
-                        max_output_tokens=10_000,
+                        max_output_tokens=6_000,
                         timeout_seconds=75,
                         json_schema=KNOWLEDGE_JSON_SCHEMA,
                         request_attempts=1,
@@ -798,7 +821,7 @@ class AgentPlanner:
                         )
                     # The audit is a second read of the same evidence. It pays
                     # for itself only when the draft actually makes claims that
-                    # can contradict each other across time -- two states, or a
+                    # can contradict each other across time - two states, or a
                     # state plus an event that would move it.
                     if len(summary["stateHistory"]) >= 2 or (
                         summary["stateHistory"] and len(summary["keyEvents"]) >= 2
@@ -854,6 +877,7 @@ class AgentPlanner:
         transcript: list[dict[str, Any]],
         semantic_observations: list[dict[str, Any]],
         overlay_text: list[dict[str, Any]] | None = None,
+        on_progress: Callable[[int, int], None] | None = None,
     ) -> list[dict[str, Any]]:
         """Map source units and source-established layouts in bounded time chunks."""
         fallback = _fallback_source_inventory(semantic_observations, duration_secs)
@@ -885,6 +909,7 @@ class AgentPlanner:
         completed: dict[int, list[dict[str, Any]]] = {}
         completed_structures: dict[int, list[dict[str, Any]]] = {}
         completed_tasks: dict[int, list[dict[str, Any]]] = {}
+        completed_raw_item_counts: dict[int, int] = {}
         errors: list[str] = []
         usage_totals = {"promptTokens": 0, "completionTokens": 0}
 
@@ -892,8 +917,8 @@ class AgentPlanner:
             raw, usage = self._complete(
                 _source_inventory_prompt(chunk),
                 [],
-                max_output_tokens=10_000,
-                timeout_seconds=30,
+                max_output_tokens=6_000,
+                timeout_seconds=75,
                 json_schema=SOURCE_INVENTORY_JSON_SCHEMA,
                 request_attempts=1,
             )
@@ -924,13 +949,15 @@ class AgentPlanner:
                 items,
                 _validated_source_activity_structures(raw, duration_secs, chunk),
                 tasks,
+                len(raw.get("items") or []) if isinstance(raw, dict) else 0,
                 usage,
             )
 
         try:
-            # These requests contain disjoint time ranges and are independent.
-            # Four concurrent maps keep an hour-long source to one short wave.
-            with ThreadPoolExecutor(max_workers=min(4, len(chunks))) as executor:
+            # These requests contain disjoint time ranges. Two concurrent maps
+            # keep a long source responsive without making several transcript-
+            # sized requests contend for the same hosted-model window.
+            with ThreadPoolExecutor(max_workers=min(2, len(chunks))) as executor:
                 futures = {
                     executor.submit(map_chunk, index, chunk): index
                     for index, chunk in enumerate(chunks)
@@ -938,10 +965,11 @@ class AgentPlanner:
                 for future in as_completed(futures):
                     self.requests += 1
                     try:
-                        index, items, structures, tasks, usage = future.result()
+                        index, items, structures, tasks, raw_item_count, usage = future.result()
                         completed[index] = items
                         completed_structures[index] = structures
                         completed_tasks[index] = tasks
+                        completed_raw_item_counts[index] = raw_item_count
                         usage_totals["promptTokens"] += usage.get("promptTokens", 0)
                         usage_totals["completionTokens"] += usage.get("completionTokens", 0)
                     except Exception as error:
@@ -949,6 +977,8 @@ class AgentPlanner:
                             f"source inventory chunk {futures[future]}: "
                             f"{type(error).__name__}: {error}"[:500]
                         )
+                    if on_progress:
+                        on_progress(len(completed) + len(errors), len(chunks))
             self.prompt_tokens += usage_totals["promptTokens"]
             self.completion_tokens += usage_totals["completionTokens"]
             if errors:
@@ -957,6 +987,8 @@ class AgentPlanner:
                 "complete": len(completed) == len(chunks) and not errors,
                 "totalWindows": len(chunks),
                 "processedWindows": len(completed),
+                "modelItems": sum(completed_raw_item_counts.values()),
+                "acceptedItems": sum(len(items) for items in completed.values()),
                 **(
                     {}
                     if len(completed) == len(chunks) and not errors
@@ -1343,7 +1375,9 @@ def _source_inventory_chunks(
     semantic_observations: list[dict[str, Any]],
     overlay_text: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    window_ms = 15 * 60 * 1_000
+    # Keep each map within a bounded evidence window instead of forcing one
+    # completion to compress a quarter-hour of raw speech and visual notes.
+    window_ms = 5 * 60 * 1_000
     duration_ms = max(1, round(duration_secs * 1_000))
     chunks: list[dict[str, Any]] = []
     for start_ms in range(0, duration_ms, window_ms):
@@ -1413,7 +1447,8 @@ def _source_inventory_prompt(chunk: dict[str, Any]) -> str:
         "whose answer is a substantive part of the recording; headings or titles; individual slide, "
         "board, or explicitly enumerated list items; and declarative hints used to solve an explicit "
         "prompt. Use kind 'question' only for a standalone, content-bearing prompt that asks for an "
-        "answer. A greeting, social check-in, turn-management request, rhetorical question, or casual "
+        "answer. In a dialogue, a substantive turn that invites an explanation is a source question "
+        "even when phrased informally. A greeting, social check-in, turn-management request, rhetorical question, or casual "
         "banter is not a source question. Do not turn a declarative hint, a description, model "
         "instruction, or analysis prompt into a question: represent an explicit solving hint as kind "
         "'clue' and otherwise omit it. Preserve the source language and wording. For a spoken "
@@ -1435,7 +1470,7 @@ def _source_inventory_prompt(chunk: dict[str, Any]) -> str:
         "portion; its time range must cover that bundle, not the earlier title. A new card/title, an answer "
         "reveal, or another directly observed reset can establish a separate bundle. Do not create a task "
         "instance from a clue alone or carry a prompt in from another portion. Never infer missing words or "
-        "add outside facts. Return JSON only: {items:[{kind:'question'|'clue'|"
+        "add outside facts. Return at most 48 items for this bounded portion. JSON only: {items:[{kind:'question'|'clue'|"
         "'heading'|'slide-item'|'board-item'|'list-item',channel:'spoken'|'visible',questionRole:"
         "'primary'|'interactional'|'rhetorical'|'not-question',text:string,answer:string,"
         "respondent:string,startMs:number,endMs:number}],structures:[{kind:'grid'|'sequence'|"
@@ -1487,34 +1522,7 @@ def _source_task_instance_prompt(
 
 
 def _inventory_terms(value: str) -> list[str]:
-    return re.findall(r"[\w\u0600-\u06ff]+", value.casefold(), re.UNICODE)
-
-
-def _looks_like_explicit_prompt(value: str) -> bool:
-    """Accept a question/request, never a declarative hint with a guessed answer."""
-    text = value.strip()
-    if re.search(r"[?؟]\s*$", text):
-        return True
-    cue = re.compile(
-        r"^(?:who|what|when|where|why|how|which|whose|whom|is|are|was|were|do|does|did|"
-        r"can|could|would|will|name|list|identify|describe|tell|give|guess|choose|select|"
-        r"من|ما|ماذا|متى|أين|اين|كيف|كم|هل|أي|اي|لماذا|مين|إيه|ايه|فين|امتى|ازاي|"
-        r"اذكر|أذكر|حدد|سم|سمي|اختر|إختر|اكتشف|خمن|خمّن|توقع|أكمل|اكمل|رتب|رتِّب)$",
-        re.I,
-    )
-    terms = _inventory_terms(text)
-    if not terms:
-        return False
-    if cue.match(terms[0]):
-        return True
-    # Arabic (and other languages) can put a preposition before a question
-    # word, e.g. "في أي سنة…". Looking through every early token would make
-    # a declarative clue such as "لعبت … من الدوريات" look interrogative.
-    return (
-        len(terms) >= 2
-        and terms[0] in {"في", "ب", "على", "الى", "إلى"}
-        and cue.match(terms[1]) is not None
-    )
+    return re.findall(r"\w+", value.casefold(), re.UNICODE)
 
 
 def _inventory_item_is_grounded(
@@ -1638,15 +1646,6 @@ def _validated_source_inventory(
         if kind == "question":
             if question_role != "primary":
                 continue
-            if not _looks_like_explicit_prompt(text):
-                if channel != "visible":
-                    continue
-                # The text remains useful source evidence, but a declarative
-                # card is a clue to an implicit task—not a question in the
-                # requested question inventory. This is deliberately based on
-                # linguistic form, never a source genre or topic.
-                item["kind"] = "clue"
-                item["questionRole"] = "not-question"
         elif question_role != "not-question":
             continue
         if source_chunk is not None and not _inventory_item_is_grounded(item, source_chunk):
@@ -1767,13 +1766,29 @@ def _validated_source_task_instances(
 ) -> list[dict[str, Any]]:
     """Validate continued prompt instances without treating their clues as questions."""
     duration_ms = max(1, round(duration_secs * 1_000))
+    # A task can only continue a prompt the mapper already classified as a
+    # primary source question. This is a structural provenance check, not a
+    # vocabulary test for one language: the model is responsible for semantic
+    # question classification and the validator requires it to be consistent
+    # with its own source-backed inventory.
+    source_prompts = {
+        re.sub(r"\s+", " ", str(item.get("text") or "").casefold()).strip()
+        for item in raw.get("items") or []
+        if isinstance(item, dict)
+        and item.get("kind") == "question"
+        and item.get("questionRole", "primary") == "primary"
+        and str(item.get("text") or "").strip()
+    }
     tasks: list[dict[str, Any]] = []
     for candidate in raw.get("taskInstances") or []:
         if not isinstance(candidate, dict):
             continue
         prompt = str(candidate.get("prompt") or "").strip()[:600]
         channel = str(candidate.get("channel") or "").strip()
-        if channel not in {"spoken", "visible"} or not _looks_like_explicit_prompt(prompt):
+        if channel not in {"spoken", "visible"}:
+            continue
+        prompt_key = re.sub(r"\s+", " ", prompt.casefold()).strip()
+        if not prompt_key or prompt_key not in source_prompts:
             continue
         try:
             start_ms = min(duration_ms, max(0, round(float(candidate.get("startMs")))))
@@ -2039,6 +2054,13 @@ def _synthesis_prompt(
         "- A later close-up, label, caption, presentation, celebration, or reaction does not identify "
         "who performed an earlier action. Bind the name to that earlier actor only when an uninterrupted "
         "sequence tracks the same subject or the supplied evidence explicitly states the relationship.\n"
+        "- visibleSubjects is an appearance ledger. Include every named or source-distinguished visible "
+        "subject whose appearances the evidence supports. Each appearance range must be one supplied "
+        "range where that subject is actually present; keep separate appearances separate after a real "
+        "absence or edit. identityBasis is source-named only when source evidence binds the name, "
+        "source-described for a stable source-supported descriptor, and unresolved when the evidence "
+        "cannot safely distinguish the subject. Never merge two entries from resemblance alone, and do "
+        "not include a subject merely because they are discussed in speech.\n"
         "- stateHistory tracks things that persist and change: a displayed value, a location, a phase, "
         "a condition. Record each distinct value once with the span it held, and keep the sequence "
         "self-consistent -- one thing cannot hold two values at the same time, and a value it never "
@@ -2064,6 +2086,8 @@ def _synthesis_prompt(
         "where a display existed and when it changed. It never states what that text means: use it to "
         "corroborate or locate, never as a fact on its own.\n"
         "Return JSON only: {overview:string, participants:[{name,role,evidence:[{startMs,endMs}]}], "
+        "visibleSubjects:[{identity,identityBasis:'source-named'|'source-described'|'unresolved',"
+        "appearances:[{startMs,endMs,confidence:'direct'|'partial'}]}], "
         "stateHistory:[{startMs,endMs,state,confidence:'direct'|'partial'}], "
         "keyEvents:[{startMs,endMs,event,confidence:'direct'|'partial'}], "
         "narrative:[{startMs,endMs,text,confidence:'direct'|'partial'}], "
@@ -2309,6 +2333,46 @@ def _validated_knowledge_summary(
         if len(participants) == 50:
             break
 
+    visible_subjects: list[dict[str, Any]] = []
+    for candidate in raw.get("visibleSubjects") or []:
+        if not isinstance(candidate, dict):
+            continue
+        identity = str(candidate.get("identity") or "").strip()[:180]
+        identity_basis = candidate.get("identityBasis")
+        appearances = []
+        for appearance in candidate.get("appearances") or []:
+            if not isinstance(appearance, dict):
+                continue
+            evidence = source_range(appearance)
+            if not evidence:
+                continue
+            appearances.append(
+                {
+                    **evidence,
+                    "confidence": (
+                        appearance.get("confidence")
+                        if appearance.get("confidence") in {"direct", "partial"}
+                        else "partial"
+                    ),
+                }
+            )
+        if (
+            identity
+            and identity_basis in {"source-named", "source-described", "unresolved"}
+            and appearances
+        ):
+            visible_subjects.append(
+                {
+                    "identity": identity,
+                    "identityBasis": identity_basis,
+                    "appearances": sorted(
+                        appearances, key=lambda item: (item["startMs"], item["endMs"])
+                    )[:32],
+                }
+            )
+        if len(visible_subjects) == 96:
+            break
+
     def timeline(key: str, text_key: str, limit: int) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         for candidate in raw.get(key) or []:
@@ -2351,6 +2415,7 @@ def _validated_knowledge_summary(
     return {
         "overview": str(raw.get("overview") or "").strip()[:2_000],
         "participants": participants,
+        "visibleSubjects": visible_subjects,
         "stateHistory": timeline("stateHistory", "state", 80),
         "keyEvents": timeline("keyEvents", "event", 80),
         "narrative": timeline("narrative", "text", 64),
@@ -2490,6 +2555,7 @@ def _fallback_knowledge_summary(
     return {
         "overview": overview,
         "participants": list(participants_by_name.values())[:50],
+        "visibleSubjects": [],
         "stateHistory": state_history,
         "keyEvents": key_events,
         "narrative": narrative,

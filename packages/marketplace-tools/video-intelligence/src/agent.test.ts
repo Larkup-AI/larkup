@@ -110,7 +110,49 @@ describe('Video Intelligence chat extension', () => {
     expect(queryTool?.systemPromptFragment).toContain(
       'complete-source request into top-K retrieval',
     );
-    expect(queryTool?.systemPromptFragment).toContain('not phrases such as "the video shows"');
+    expect(queryTool?.parameters).toMatchObject({
+      required: ['mediaAssetId', 'query'],
+      properties: {
+        investigation: {
+          required: ['scope', 'goal'],
+        },
+      },
+    });
+    expect(queryTool?.systemPromptFragment).toContain('user’s meaning in their own language');
+    expect(queryTool?.systemPromptFragment).toContain('when natural say "I saw" or "I heard"');
+    expect(queryTool?.systemPromptFragment).toContain(
+      'reconciled frame-grounded visibility ledger',
+    );
+  });
+
+  it('forwards the model-issued investigation directive without interpreting question language', async () => {
+    const plan = {
+      kinds: ['coverage'],
+      route: 'aggregate',
+      requiresBroadCoverage: true,
+      requiresInspectionWhenInsufficient: true,
+    };
+    const context = evidenceContext({
+      plan,
+      search: async () => [directVerdict('answer', 15, '動画全体で何が起きた？', 'Confirmed.')],
+    });
+    const planQuestion = vi.fn(() => plan);
+    (context.mediaEvidence as any).planQuestion = planQuestion;
+
+    await agentClient(vi.fn() as any).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: '動画全体で何が起きた？',
+        investigation: { scope: 'source', goal: 'synthesize', evidence: ['speech', 'visual'] },
+      },
+      context,
+    );
+
+    expect(planQuestion).toHaveBeenCalledWith('動画全体で何が起きた?', {
+      scope: 'source',
+      goal: 'synthesize',
+      evidence: ['speech', 'visual'],
+    });
   });
 
   it('uses a deterministic source scan for every question instead of calling ranked retrieval', async () => {
@@ -147,7 +189,11 @@ describe('Video Intelligence chat extension', () => {
     }));
 
     const result: any = await agentClient(vi.fn() as any).queryVideoEvidence(
-      { mediaAssetId: 'media-1', query: 'list every question' },
+      {
+        mediaAssetId: 'media-1',
+        query: 'list every question',
+        investigation: { scope: 'source', goal: 'enumerate', recordSet: 'source-questions' },
+      },
       evidenceContext({
         plan: {
           kinds: ['question-inventory', 'coverage'],
@@ -172,6 +218,29 @@ describe('Video Intelligence chat extension', () => {
     expect(result.evidence).toHaveLength(1);
     expect(result.evidence[0].payload.text).toContain('Source respondent: Rami');
     expect(result.evidence[0].payload.text).not.toContain('How are you?');
+    expect(result.inventory).toEqual({
+      recordSet: 'source-questions',
+      coverage: { complete: true },
+    });
+    expect(result.columns).toEqual([
+      'Timestamp',
+      'Content',
+      'Answer',
+      'Respondent',
+      'Channel',
+      'Record type',
+    ]);
+    expect(result.rows).toEqual([
+      {
+        id: 'question-1',
+        Timestamp: '0:18',
+        Content: 'Who starts?',
+        Answer: 'Mina starts.',
+        Respondent: 'Rami',
+        Channel: 'spoken',
+        'Record type': 'question',
+      },
+    ]);
   });
 
   it('keeps headings out of a deterministic question table while preserving the raw scan cursor', async () => {
@@ -204,7 +273,11 @@ describe('Video Intelligence chat extension', () => {
     }));
 
     const result: any = await agentClient(vi.fn() as any).queryVideoEvidence(
-      { mediaAssetId: 'media-1', query: 'make a table with every question and who answered it' },
+      {
+        mediaAssetId: 'media-1',
+        query: 'make a table with every question and who answered it',
+        investigation: { scope: 'source', goal: 'enumerate', recordSet: 'source-questions' },
+      },
       evidenceContext({
         plan: {
           kinds: ['question-inventory', 'coverage'],
@@ -938,7 +1011,15 @@ describe('Video Intelligence chat extension', () => {
       { mediaAssetId: 'media-1', query: 'What colour was the front door?' },
       evidenceContext({
         durationSecs: 600,
-        plan: { kinds: ['visual-fact'], requiresInspectionWhenInsufficient: true },
+        plan: {
+          kinds: ['visual-fact'],
+          requiresInspectionWhenInsufficient: true,
+          investigation: {
+            scope: 'focused',
+            goal: 'answer',
+            timeRange: { startSecs: 0, endSecs: 15 },
+          },
+        },
         // Nothing indexed matches, which is the strongest reason to look.
         search: () => [],
       }),
@@ -985,7 +1066,15 @@ describe('Video Intelligence chat extension', () => {
       { mediaAssetId: 'media-1', query: 'What color is the background in the opening 15 seconds?' },
       evidenceContext({
         durationSecs: 3_000,
-        plan: { kinds: ['visual-fact'], requiresInspectionWhenInsufficient: true },
+        plan: {
+          kinds: ['visual-fact'],
+          requiresInspectionWhenInsufficient: true,
+          investigation: {
+            scope: 'focused',
+            goal: 'answer',
+            timeRange: { startSecs: 0, endSecs: 15 },
+          },
+        },
         search: () => [hit('similar-late-shot', 2_850, 'A studio background is visible.')],
       }),
     );
@@ -1321,7 +1410,7 @@ describe('Video Intelligence chat extension', () => {
     ]);
   });
 
-  it('rejects spoken answer fragments mislabeled as source questions', async () => {
+  it('preserves source-mapper question classifications without a language-specific filter', async () => {
     const result = (await agentClient(vi.fn() as any).queryVideoEvidence(
       { mediaAssetId: 'media-1', query: 'List every question asked.' },
       evidenceContext({
@@ -1350,10 +1439,11 @@ describe('Video Intelligence chat extension', () => {
     expect(result.evidence.map((item: any) => item.payload.text)).toEqual([
       'Question: Identify the player',
       'Question: في أي سنة حدث ذلك',
+      'Question: صح صح هما الاثنين صح ماشي',
     ]);
   });
 
-  it('prefers a nearby complete visible prompt and rejects deictic spoken banter', async () => {
+  it('deduplicates nearby source questions without a language-specific filter', async () => {
     const result = (await agentClient(vi.fn() as any).queryVideoEvidence(
       { mediaAssetId: 'media-1', query: 'List every question asked.' },
       evidenceContext({
@@ -1382,6 +1472,7 @@ describe('Video Intelligence chat extension', () => {
 
     expect(result.evidence.map((item: any) => item.payload.text)).toEqual([
       'Question: من هو مدرب بنما في كأس العالم 2018؟',
+      'Question: هي دي ايه بالظبط؟',
     ]);
   });
 
@@ -1494,8 +1585,8 @@ describe('Video Intelligence chat extension', () => {
     )) as any;
 
     expect(result.claimVerification.status).toBe('directly-established');
-    expect(result.evidence.map((item: any) => item.id)).toEqual(['heading', 'slide']);
-    expect(result.continuation).toMatchObject({ totalItems: 2, hasMore: false });
+    expect(result.evidence.map((item: any) => item.id)).toEqual(['heading', 'slide', 'board']);
+    expect(result.continuation).toMatchObject({ totalItems: 3, hasMore: false });
   });
 
   it('does not rank participation from one identity card and unrelated scenery', async () => {
@@ -1700,10 +1791,7 @@ describe('Video Intelligence chat extension', () => {
       }),
     );
 
-    expect(JSON.parse(fetcher.mock.calls[0][1].body).knownEntities).toEqual([
-      'Alpha Group',
-      'Beta Group',
-    ]);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it('answers a per-subject attribute question from corroborated RAG descriptions without waiting for analysis', async () => {
@@ -1712,13 +1800,13 @@ describe('Video Intelligence chat extension', () => {
     const visual = hit(
       'visual-outfits',
       30,
-      'The left participant wears an orange shirt; the right participant wears a dark green shirt.',
+      'Present: left subject — orange shirt\nPresent: right subject — dark green shirt',
     );
     const reconciled = {
       ...hit(
         'reconciled-outfits',
         30,
-        'Reconciled context: the left participant wears an orange shirt and the right participant wears a dark green shirt.',
+        'Reconciled context: source-supported attributes are recorded.\nPresent: left subject — orange shirt\nPresent: right subject — dark green shirt',
         { modality: 'computed' },
       ),
       evidence: {
@@ -1726,7 +1814,7 @@ describe('Video Intelligence chat extension', () => {
         id: 'reconciled-outfits',
         modality: 'computed',
         payload:
-          'Reconciled context: the left participant wears an orange shirt and the right participant wears a dark green shirt.',
+          'Reconciled context: source-supported attributes are recorded.\nPresent: left subject — orange shirt\nPresent: right subject — dark green shirt',
         source: { kind: 'provider', provider: 'video-intelligence-index' },
       },
     } as any;
@@ -1759,7 +1847,7 @@ describe('Video Intelligence chat extension', () => {
       ...hit(
         'indexed-outfits',
         30,
-        'The left participant wears an orange shirt; the right participant wears a dark green shirt.',
+        'Present: left subject — orange shirt\nPresent: right subject — dark green shirt',
       ),
       components: { semantic: 0.91, lexical: 0 },
     };
@@ -1783,6 +1871,240 @@ describe('Video Intelligence chat extension', () => {
     expect(result.claimVerification.rule).toContain(
       'personal name is not automatically established',
     );
+  });
+
+  it('answers visible-presence timing from the reconciled visibility ledger without live analysis', async () => {
+    const fetcher = vi.fn() as any;
+    const ledger = {
+      ...hit(
+        'visible-brian',
+        840,
+        'Reconciled visible subject: Brian Cox\n' +
+          'Identity basis: source-named\n' +
+          'Observed appearances: 840-905s; 920-950s\n' +
+          'Observed visible duration: 95s',
+        { modality: 'computed' },
+      ),
+      components: { semantic: 0.94, lexical: 0 },
+    };
+
+    const result = (await agentClient(fetcher).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'When was Brian Cox visibly present?' },
+      evidenceContext({
+        plan: {
+          kinds: ['visual-fact'],
+          requiresInspectionWhenInsufficient: true,
+        },
+        search: () => [ledger],
+      }),
+    )) as any;
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(result.investigation.answerPath).toBe('rag');
+    expect(result.claimVerification.status).toBe('directly-established');
+    expect(result.evidence).toEqual([expect.objectContaining({ id: 'visible-brian' })]);
+  });
+
+  it('does not treat a source-wide visibility ledger as proof for an unobserved requested moment', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: false,
+      json: async () => ({ error: 'not run' }),
+    })) as any;
+    const ledger = {
+      ...hit(
+        'distant-ledger',
+        5,
+        'Reconciled visible subject: A subject\n' +
+          'Identity basis: source-described\n' +
+          'Observed appearances: 10-20s\n' +
+          'Observed visible duration: 10s',
+        { modality: 'computed', timeRange: { startSecs: 5, endSecs: 1_000 } },
+      ),
+      components: { semantic: 0.94, lexical: 0 },
+    };
+
+    const result = (await agentClient(fetcher).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'Who appears at the requested moment?' },
+      evidenceContext({
+        plan: {
+          kinds: ['visual-fact'],
+          requiresInspectionWhenInsufficient: true,
+          investigation: {
+            scope: 'focused',
+            goal: 'answer',
+            timeRange: { startSecs: 840, endSecs: 870 },
+          },
+        },
+        search: () => [ledger],
+      }),
+    )) as any;
+
+    expect(fetcher).toHaveBeenCalled();
+    expect(result.claimVerification.status).toBe('needs-corroboration');
+  });
+
+  it('keeps recurrence intent alongside the reconciled visibility ledger', async () => {
+    const fetcher = vi.fn() as any;
+    const context = evidenceContext({
+      durationSecs: 1_000,
+      plan: {
+        kinds: ['visual-fact'],
+        route: 'temporal',
+        requiresInspectionWhenInsufficient: true,
+      },
+      search: () => [],
+    });
+    context.mediaEvidence.aggregate = async () => ({
+      resultHandle: 'aggregate-1',
+      participants: [],
+      timeline: [],
+      sourceItems: [],
+      visibleSubjects: [
+        {
+          identity: 'source-named subject',
+          identityBasis: 'source-named',
+          appearances: [{ startSecs: 920, endSecs: 950, precision: 'estimated' }],
+          observedDurationSecs: 30,
+          observationCount: 4,
+        },
+      ],
+      coverage: { inventoryComplete: true, activeEvidenceRecords: 1 },
+    });
+
+    const result: any = await agentClient(fetcher).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'At this moment, does the visible subject appear elsewhere?',
+        investigation: {
+          scope: 'temporal',
+          goal: 'trace',
+          recordSet: 'observed',
+          evidence: ['visual'],
+          timeRange: { startSecs: 840, endSecs: 870 },
+        },
+      },
+      context,
+    );
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      claimVerification: { status: 'directly-established' },
+      investigation: {
+        answerPath: 'rag',
+        directive: {
+          scope: 'temporal',
+          goal: 'trace',
+          recordSet: 'observed',
+          timeRange: { startSecs: 840, endSecs: 870 },
+        },
+      },
+      observedSubjects: [
+        expect.objectContaining({
+          identity: 'source-named subject',
+          appearances: [{ startSecs: 920, endSecs: 950, precision: 'estimated' }],
+        }),
+      ],
+    });
+  });
+
+  it('reads an explicitly requested moment before whole-source ranking', async () => {
+    const fetcher = vi.fn() as any;
+    const rangedSearches: Array<{ query: string; options?: Record<string, unknown> }> = [];
+    const result = (await agentClient(fetcher).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'من ظهر عند الدقيقة المطلوبة؟',
+        investigation: {
+          scope: 'focused',
+          goal: 'answer',
+          evidence: ['visual'],
+          timeRange: { startSecs: 840, endSecs: 900 },
+        },
+      },
+      evidenceContext({
+        durationSecs: 1_000,
+        plan: {
+          kinds: ['visual-fact'],
+          requiresInspectionWhenInsufficient: true,
+          investigation: {
+            scope: 'focused',
+            goal: 'answer',
+            timeRange: { startSecs: 840, endSecs: 900 },
+          },
+        },
+        search: (query, options) => {
+          if (options?.timeRange) {
+            rangedSearches.push({ query, options });
+            return [
+              {
+                ...hit(
+                  'requested-account',
+                  895,
+                  'A grey-haired person in a purple checkered shirt is seated in the room.',
+                  { modality: 'visual' },
+                ),
+                components: { semantic: 0, lexical: 0 },
+              },
+            ];
+          }
+          return [
+            hit('whole-source-overview', 0, 'An overview of the recording.', {
+              modality: 'computed',
+            }),
+          ];
+        },
+      }),
+    )) as any;
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(rangedSearches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          query: '',
+          options: expect.objectContaining({ timeRange: { startSecs: 840, endSecs: 900 } }),
+        }),
+      ]),
+    );
+    expect(result).toMatchObject({
+      claimVerification: { directlyEstablished: true },
+      investigation: { answerPath: 'rag' },
+      evidence: [{ id: 'requested-account' }],
+    });
+  });
+
+  it('does not promote a raw visual locator into a directly observed answer', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: false,
+      json: async () => ({ error: 'not run' }),
+    })) as any;
+    const rawLocator = {
+      ...hit('recurring-overlay', 840, {
+        subject: 'on-screen-text',
+        property: 'recurring-overlay',
+        value: '111',
+        observations: 9,
+      }),
+      components: { semantic: 0.94, lexical: 0 },
+    };
+
+    const result = (await agentClient(fetcher).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'Who appears at the requested moment?' },
+      evidenceContext({
+        plan: {
+          kinds: ['visual-fact'],
+          requiresInspectionWhenInsufficient: true,
+          investigation: {
+            scope: 'focused',
+            goal: 'answer',
+            timeRange: { startSecs: 840, endSecs: 870 },
+          },
+        },
+        search: () => [rawLocator],
+      }),
+    )) as any;
+
+    expect(fetcher).toHaveBeenCalled();
+    expect(result.claimVerification.status).toBe('needs-corroboration');
   });
 
   it('re-watches when a group count is wider than the people whose attributes were described', async () => {
@@ -1885,7 +2207,7 @@ describe('Video Intelligence chat extension', () => {
     });
   });
 
-  it('includes the widest indexed group moment when re-watching a per-person attribute', async () => {
+  it('does not infer an incomplete attribute set from a prose group count', async () => {
     const reWatch = vi.fn(async () => [
       {
         found: 'Four people are visible with distinct source-supported attributes.',
@@ -1909,17 +2231,21 @@ describe('Video Intelligence chat extension', () => {
             10,
             'Two people talk.\nPresent: Person A — person\nPresent: Person B — person',
           ),
-          hit('group', 300, 'Four people sit together in the room.'),
+          hit(
+            'group',
+            300,
+            'Present: subject one — source-described\nPresent: subject two — source-described\n' +
+              'Present: subject three — source-described\nPresent: subject four — source-described',
+          ),
         ],
         reWatch,
       }),
     );
 
-    const ranges = reWatch.mock.calls[0][2] as Array<{ startSecs: number; endSecs: number }>;
-    expect(ranges.some((range) => range.startSecs <= 300 && range.endSecs >= 300)).toBe(true);
+    expect(reWatch).not.toHaveBeenCalled();
   });
 
-  it('carries names established by reconciled state into identity comparison', async () => {
+  it('does not turn title-cased state text into identity hints', async () => {
     const fetcher = vi.fn(async () => Response.json({ evidence: [{ id: 'fresh' }] })) as any;
 
     await agentClient(fetcher).queryVideoEvidence(
@@ -1934,10 +2260,8 @@ describe('Video Intelligence chat extension', () => {
       }),
     );
 
-    expect(JSON.parse(fetcher.mock.calls[0][1].body).knownEntities).toEqual([
-      'Northwind Group',
-      'Contoso Labs',
-    ]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetcher.mock.calls[0][1].body).knownEntities).toBeUndefined();
   });
 
   it('answers ordered changes from a broad RAG timeline without launching analysis', async () => {
@@ -1994,8 +2318,13 @@ describe('Video Intelligence chat extension', () => {
       }),
     )) as any;
 
-    expect(result.evidence.map((item: any) => item.id)).toEqual(['state-1', 'change-1', 'state-2']);
-    expect(result.continuation).toMatchObject({ totalItems: 3, hasMore: false });
+    expect(result.evidence.map((item: any) => item.id)).toEqual([
+      'state-1',
+      'noise-event',
+      'change-1',
+      'state-2',
+    ]);
+    expect(result.continuation).toMatchObject({ totalItems: 4, hasMore: false });
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -2185,7 +2514,6 @@ describe('Video Intelligence chat extension', () => {
     const source = readFileSync(new URL('./agent.ts', import.meta.url), 'utf8').toLowerCase();
     for (const domainWord of [
       'scoreboard',
-      'goal',
       'assist',
       'winner',
       'football',

@@ -498,7 +498,7 @@ export function UploadPanel({
                         body: JSON.stringify({
                           base64: img.base64,
                           prompt:
-                            'Create accurate retrieval notes for this PDF visual. Capture the title, every clearly readable heading, label, view name, routine or item name, counts, and parent-child/group relationships. For diagrams, describe connected components and directions. Do not invent unreadable text; say when text is unclear. Use concise labeled bullets so later questions can be answered without re-reading the image.',
+                            'Create accurate retrieval notes for this rendered document page. Preserve captions, figure and table identifiers, equations and their grouping, readable labels, legends, headings, row/column relationships, and diagram connections. Do not invent unreadable text; say when text is unclear. Use concise labeled bullets so later questions can retrieve the correct page without re-reading the visual.',
                         }),
                       });
                       if (descRes.ok) {
@@ -557,6 +557,9 @@ export function UploadPanel({
             source: 'files',
             url: fileUrl ?? f.sourceUrl,
             metadata: {
+              ...(f.name.toLowerCase().endsWith('.pdf')
+                ? { mimeType: 'application/pdf', fileKind: 'pdf' }
+                : {}),
               ...(f.sourceUrl ? { originalUrl: f.sourceUrl } : {}),
               ...(uploadedImages.length > 0
                 ? {
@@ -659,14 +662,18 @@ export function UploadPanel({
       label: shouldLoadRemoteFile
         ? 'Load remote file'
         : saving
-          ? 'Add more files'
-          : `Save ${staged.length} file${staged.length === 1 ? '' : 's'}`,
+          ? 'Uploading...'
+          : staged.length === 0
+            ? 'Add more files'
+            : `Save ${staged.length} file${staged.length === 1 ? '' : 's'}`,
       onClick: shouldLoadRemoteFile
         ? () => void loadRemoteFile()
         : saving
-          ? () => inputRef.current?.click()
-          : ingest,
-      disabled: shouldLoadRemoteFile ? false : !saving && staged.length === 0,
+          ? () => undefined
+          : staged.length === 0
+            ? () => undefined
+            : ingest,
+      disabled: shouldLoadRemoteFile ? false : saving || staged.length === 0,
       loading: shouldLoadRemoteFile ? loadingRemoteFile : false,
     });
     return () => onActionChange?.(null);
@@ -1004,7 +1011,9 @@ export function UploadPanel({
             ? 'Load remote file'
             : saving && progress
               ? `Adding ${progress.current} of ${progress.total}`
-              : `Save ${staged.length} file${staged.length === 1 ? '' : 's'}`}
+              : staged.length === 0
+                ? 'Add more files'
+                : `Save ${staged.length} file${staged.length === 1 ? '' : 's'}`}
         </Button>
       )}
 

@@ -9,4 +9,11 @@ describe('chat tool progress behavior', () => {
   it('keeps measurable long-running tool progress enabled by default', () => {
     expect(getChatToolBehavior('queryVideoKnowledge').showProgressBar).not.toBe(false);
   });
+
+  it('renders structured media inventories with the generic data table', () => {
+    expect(getChatToolBehavior('queryVideoEvidence')).toMatchObject({
+      resultView: 'data-table',
+      compactResult: false,
+    });
+  });
 });

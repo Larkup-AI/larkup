@@ -11,9 +11,21 @@ source signals rather than selecting a hardcoded workflow for lectures, sports,
 films, entertainment, meetings, or other content. Visual verification records
 generic subject–relation–value bindings when a clip directly establishes them.
 
+For each chat question, the model first supplies a typed investigation
+directive: a local moment, a temporal relationship, or the whole source; then
+an answer, comparison, trace, enumeration, or synthesis operation. The
+evidence engine validates and executes that directive without routing from a
+language-specific keyword list. Whole-source enumeration reads chronological
+evidence rather than treating one highly ranked moment as the entire video.
+During indexing, vision works in chronological waves: identities become
+continuity candidates only when source evidence grounds them, and similarity of
+appearance alone is never treated as identity proof.
+
 ## Install the tool
 
 Open **Settings → Marketplace**, install **Video Intelligence (New)**, then open **Data → Media → Video**. Before indexing, the guide can collect an optional goal, known entities, and questions you expect to ask.
+
+The optional goal is a focus, not a filter: the index still keeps source-wide coverage, while the planner and semantic reader spend additional attention on the details the user named. Larkup stores that hint with the media asset, sends it in the ephemeral indexing brief for local or Cloud work, and records it with the resulting knowledge revision so a later reindex remains auditable. The hint text is never placed in usage analytics.
 
 ## What the index contains
 

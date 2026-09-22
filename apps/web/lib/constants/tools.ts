@@ -48,7 +48,10 @@ export const CHAT_TOOL_BEHAVIORS: Record<string, ChatToolBehavior> = {
   queryVideoEvidence: {
     placement: 'inline',
     pendingLabel: 'Reviewing indexed video context…',
-    resultView: 'none',
+    // Generic structured rows are rendered through ChatDataTable. Ordinary
+    // evidence results have no rows and remain citation/answer driven.
+    resultView: 'data-table',
+    compactResult: false,
   },
   inspectVideoKnowledge: {
     placement: 'inline',
