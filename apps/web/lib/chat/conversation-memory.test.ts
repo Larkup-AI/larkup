@@ -14,8 +14,8 @@ describe('continuesRecentMediaTopic', () => {
     expect(continuesRecentMediaTopic('Who scored all goals in order?', video)).toBe(true);
   });
 
-  it('allows an explicit different source to start a new retrieval', () => {
-    expect(continuesRecentMediaTopic('What happened in another video?', video)).toBe(false);
+  it('does not infer a source switch from user-language vocabulary', () => {
+    expect(continuesRecentMediaTopic('What happened in another video?', video)).toBe(true);
   });
 });
 

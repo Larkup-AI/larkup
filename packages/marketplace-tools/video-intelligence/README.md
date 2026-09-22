@@ -2,11 +2,15 @@
 
 An installable Marketplace v3 tool with a cloud-first Larkup Cloud connection. On first use, the app creates an opaque, device-scoped key automatically; administrators may also provide a replacement key in Installed Tools. The AWS GPU endpoint and raw key are never shown in the connection status. PyAV/FFmpeg, faster-whisper, RapidOCR/PaddleOCR, YOLOX, ONNX Runtime, and anonymous tracking are isolated in runtime images.
 
-The evidence pipeline is genre-neutral. Planning is driven by the user's goal,
-question shape, source duration, and measured visual/audio signals—not a fixed
-branch for sports, lectures, entertainment, films, meetings, or any other
-content type. Direct visual claims preserve generic `subject`, `relation`, and
-`value` bindings so the same corroboration logic works across every genre.
+The evidence pipeline is genre-neutral. The chat model turns the meaning of a
+question into a typed investigation directive: local, temporal, or whole-source
+scope plus an answer, comparison, trace, enumeration, or synthesis operation.
+The executor validates and performs that operation without selecting a workflow
+from question words, language, or video genre. Direct visual claims preserve
+generic `subject`, `relation`, and `value` bindings so the same corroboration
+logic works across every source. Captioning progresses in chronological waves:
+only identities grounded by source evidence become continuity candidates for a
+later wave, and visual resemblance alone never establishes identity.
 
 ## Where things live
 
@@ -249,6 +253,7 @@ These are self-hosted worker/service variables. Managed Cloud receives the corre
 | `LARKUP_VIDEO_AGENT_PROVIDER`                        | `vercel_ai_gateway`          | Defaults from the AI Models chat provider and can be overridden per tool; supports Gateway, Google, OpenAI, DeepSeek, Mistral, Cohere, and Anthropic.                                                                                                                                                                                                                                                 |
 | `LARKUP_VIDEO_AGENT_API_KEY`                         | unset                        | User-owned agent provider credential.                                                                                                                                                                                                                                                                                                                                                                 |
 | `LARKUP_VIDEO_AGENT_MODEL`                           | `openai/gpt-5-mini`          | Tool-brain model that chooses modalities, sampling density, priority ranges, and extraction focus.                                                                                                                                                                                                                                                                                                    |
+| `LARKUP_VIDEO_CONTINUITY_WAVE_BATCHES`               | `4`                          | Parallel vision batches per chronological wave. Only source-grounded continuity candidates cross from one wave to the next.                                                                                                                                                                                                                                                                             |
 | `LARKUP_VIDEO_GOOGLE_CONCURRENCY`                    | `4`                          | Maximum simultaneous native Gemini vision batches. Kept below Gateway concurrency to avoid direct-project burst limits.                                                                                                                                                                                                                                                                               |
 | `LARKUP_VIDEO_GOOGLE_MAX_IMAGES_PER_REQUEST`         | `8`                          | Bounds native Gemini request size so multi-clip structured responses remain within interactive provider timeouts.                                                                                                                                                                                                                                                                                     |
 | `LARKUP_VIDEO_GOOGLE_REQUESTS_PER_MINUTE`            | `12`                         | Sliding-window request limit for native Gemini vision calls, leaving quota headroom for the agent model.                                                                                                                                                                                                                                                                                              |

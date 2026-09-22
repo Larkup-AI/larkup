@@ -5,14 +5,111 @@ from unittest.mock import patch
 
 from app.services.brain import fallback_plan
 from app.services.pipeline import (
+    _anonymous_presence_ledger,
     _apply_video_embedding_policy,
     _link_chronological_notes,
+    _reconciled_visible_subjects,
     _require_semantic_coverage,
 )
 from app.db.schemas import VideoIndexingBrief
 
 
 class SemanticCoverageGateTests(unittest.TestCase):
+    def test_anonymous_presence_ledger_keeps_measurement_separate_from_identity(self) -> None:
+        ledger = _anonymous_presence_ledger(
+            [
+                {
+                    "timeMs": 1_000,
+                    "objects": [
+                        {"label": "person", "trackId": 1},
+                        {"label": "person", "trackId": 2},
+                        {"label": "dog", "trackId": 3},
+                    ],
+                },
+                {
+                    "timeMs": 2_000,
+                    "objects": [
+                        {"label": "person", "trackId": 1},
+                        {"label": "dog", "trackId": 3},
+                    ],
+                },
+            ],
+            [
+                {
+                    "trackId": 1,
+                    "label": "person",
+                    "startMs": 1_000,
+                    "endMs": 2_000,
+                    "observations": 2,
+                    "confidence": 0.9,
+                },
+                {
+                    "trackId": 2,
+                    "label": "person",
+                    "startMs": 1_000,
+                    "endMs": 1_000,
+                    "observations": 1,
+                    "confidence": 0.8,
+                },
+            ],
+            5.0,
+        )
+
+        self.assertEqual(ledger["method"], "object-detection-anonymous-tracking")
+        self.assertEqual(ledger["sampleIntervalSecs"], 5.0)
+        self.assertEqual(ledger["tracks"][0]["timestampsMs"], [1_000, 2_000])
+        person = next(item for item in ledger["labels"] if item["label"] == "person")
+        self.assertEqual(person["distinctTrackCount"], 2)
+        self.assertEqual(person["maximumSimultaneous"], 2)
+        self.assertEqual(person["simultaneousTimestampsMs"], [1_000])
+
+    def test_reconciles_only_frame_grounded_visible_subject_protocol_entries(self) -> None:
+        subjects = _reconciled_visible_subjects(
+            [
+                {
+                    "startMs": 1_000,
+                    "endMs": 4_000,
+                    "text": "Present: Discussed Name — never proof of visibility\n"
+                    'Visible subject: {"identity":"Mina","identityBasis":"source-named","startMs":1000,"endMs":2000}',
+                },
+                {
+                    "startMs": 4_000,
+                    "endMs": 7_000,
+                    "text": 'Visible subject: {"identity":"mina","identityBasis":"source-described","startMs":5000,"endMs":7000}',
+                },
+            ]
+        )
+
+        self.assertEqual([subject["identity"] for subject in subjects], ["Mina"])
+        self.assertEqual(subjects[0]["identityBasis"], "source-named")
+        self.assertEqual(
+            subjects[0]["appearances"],
+            [
+                {"startMs": 1_000, "endMs": 2_000, "confidence": "direct"},
+                {"startMs": 5_000, "endMs": 7_000, "confidence": "direct"},
+            ],
+        )
+        self.assertEqual(subjects[0]["observedDurationMs"], 3_000)
+
+    def test_reconciles_a_named_anchor_with_its_parenthesized_visual_reminder(self) -> None:
+        subjects = _reconciled_visible_subjects(
+            [
+                {
+                    "startMs": 0,
+                    "endMs": 1_000,
+                    "text": 'Visible subject: {"identity":"Mina","identityBasis":"source-named","startMs":0,"endMs":0}',
+                },
+                {
+                    "startMs": 2_000,
+                    "endMs": 3_000,
+                    "text": 'Visible subject: {"identity":"Mina (person in green)","identityBasis":"source-described","startMs":2000,"endMs":2000}',
+                },
+            ]
+        )
+
+        self.assertEqual([subject["identity"] for subject in subjects], ["Mina"])
+        self.assertEqual(subjects[0]["observationCount"], 2)
+
     def test_semantic_notes_are_ordered_without_fake_context(self) -> None:
         linked = _link_chronological_notes(
             [

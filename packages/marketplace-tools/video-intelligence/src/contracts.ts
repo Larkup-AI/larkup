@@ -139,6 +139,23 @@ export interface TrackEvidence {
   confidence: number;
 }
 
+/**
+ * Detection-backed presence facts. Track IDs deliberately remain anonymous:
+ * an edit, occlusion, or re-entry may create a new track for the same subject.
+ */
+export interface AnonymousPresenceLedger {
+  method: 'object-detection-anonymous-tracking';
+  sampledFrames: number;
+  sampleIntervalSecs?: number;
+  tracks: Array<TrackEvidence & { timestampsMs: number[] }>;
+  labels: Array<{
+    label: string;
+    distinctTrackCount: number;
+    maximumSimultaneous: number;
+    simultaneousTimestampsMs: number[];
+  }>;
+}
+
 export interface VisualObservation {
   timeMs: number;
   objects: Array<{
@@ -175,6 +192,7 @@ export interface VideoEvidenceBundle {
   detectedLanguage?: string;
   visualObservations: VisualObservation[];
   tracks: TrackEvidence[];
+  anonymousPresenceLedger?: AnonymousPresenceLedger;
   recurringOverlayText?: RecurringOverlayText[];
   entities: Array<{
     name: string;
@@ -240,6 +258,15 @@ export interface VideoEvidenceBundle {
       name: string;
       role: string;
       evidence: Array<{ startMs: number; endMs: number }>;
+    }>;
+    visibleSubjects?: Array<{
+      identity: string;
+      identityBasis: 'source-named' | 'source-described' | 'unresolved';
+      appearances: Array<{
+        startMs: number;
+        endMs: number;
+        confidence: 'direct' | 'partial';
+      }>;
     }>;
     stateHistory: Array<{
       startMs: number;

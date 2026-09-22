@@ -86,6 +86,37 @@ _SCHEMA = {
                             "required": ["name", "what", "howIdentified"],
                         },
                     },
+                    "visibleSubjects": {
+                        "type": "array",
+                        "maxItems": 12,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "identity": {"type": "string", "maxLength": 180},
+                                "identityBasis": {
+                                    "type": "string",
+                                    "enum": [
+                                        "source-named",
+                                        "source-described",
+                                        "unresolved",
+                                    ],
+                                },
+                                "appearances": {
+                                    "type": "array",
+                                    "maxItems": 12,
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "startFrame": {"type": "integer", "minimum": 0},
+                                            "endFrame": {"type": "integer", "minimum": 0},
+                                        },
+                                        "required": ["startFrame", "endFrame"],
+                                    },
+                                },
+                            },
+                            "required": ["identity", "identityBasis", "appearances"],
+                        },
+                    },
                     "visibleText": {
                         "type": "array",
                         "maxItems": 12,
@@ -311,6 +342,14 @@ def _build_prompt(
         "source genuinely never names them -- not merely because you are being cautious.\n"
         "- Name a person only where this clip shows a readable name label, synchronized speech binds "
         "the name to them, or the supplied evidence explicitly preserves that identity across the cut.\n"
+        "- A continuity candidate is a source-grounded name observed earlier in this same recording. "
+        "It can preserve a name across an uninterrupted source track or an explicit source handoff, "
+        "but it is never permission to identify a lookalike from facial or clothing resemblance alone.\n"
+        "- visibleSubjects is a separate ledger of people who are actually visible in the supplied "
+        "frames. Do not put someone there merely because they are heard, discussed, named in a caption, "
+        "or inferred to be off camera. For each observed appearance, return inclusive startFrame and "
+        "endFrame indexes using the numbered frame markers for that clip. Use source-named only for a "
+        "source-bound name; otherwise use a source-described stable descriptor or unresolved.\n"
         "- Note appearance where it distinguishes participants: colours of clothing or livery, and "
         "which group wears what. That is often how a viewer tells two groups apart.\n"
         "- Keep an individual's name distinct from a collective one. A group, organization, role, "
@@ -346,6 +385,8 @@ def _build_prompt(
         "markdown fence, with this exact top-level shape: "
         "{\"clips\":[{\"clipIndex\":0,\"summary\":\"the note\","
         "\"entities\":[{\"name\":\"...\",\"what\":\"...\",\"howIdentified\":\"...\"}],"
+        "\"visibleSubjects\":[{\"identity\":\"...\",\"identityBasis\":\"source-named|source-described|unresolved\","
+        "\"appearances\":[{\"startFrame\":0,\"endFrame\":0}]}],"
         "\"visibleText\":[{\"text\":\"exact text\",\"means\":\"what it conveys\"}],"
         "\"events\":[{\"what\":\"...\",\"basis\":\"read|inferred\"}],"
         "\"sourceQuestions\":[{\"text\":\"exact source question\",\"answer\":\"\","
@@ -365,9 +406,11 @@ def _build_prompt(
         prompt += " Questions to resolve: " + " | ".join(questions[:4])[:1600] + "."
     if known_entities:
         prompt += (
-            " Named people or entities that require visual grounding: "
+            " Continuity candidates from earlier clips: "
             + " | ".join(known_entities[:20])[:1200]
-            + "."
+            + ". These are leads, not proof: only reuse an identity when the current source "
+            "evidence or an uninterrupted visible track establishes it; never identify someone by "
+            "visual resemblance alone."
         )
     for index, clip in enumerate(batch):
         prompt += f"\n\nCLIP {index} covers {clip.start_ms / 1000:.1f}s-{clip.end_ms / 1000:.1f}s."
@@ -381,7 +424,14 @@ def _content_for_batch(batch: list[ClipCaptionRequest], urls_by_clip: dict[str, 
     content: list[dict[str, Any]] = []
     for index, clip in enumerate(batch):
         content.append({"type": "text", "text": f"--- CLIP {index} frames ---"})
-        for url in urls_by_clip[clip.clip_id]:
+        for frame_index, url in enumerate(urls_by_clip[clip.clip_id]):
+            time_ms = clip.frames[frame_index][0]
+            content.append(
+                {
+                    "type": "text",
+                    "text": f"CLIP {index} FRAME {frame_index} at {time_ms / 1000:.3f}s",
+                }
+            )
             content.append({"type": "image_url", "image_url": {"url": url}})
     return content
 
@@ -479,6 +529,51 @@ def _note_lines(entry: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _visible_subject_lines(entry: dict[str, Any], clip: ClipCaptionRequest) -> list[str]:
+    """Persist source-visible identities in a machine-readable evidence line.
+
+    The protocol describes the supplied frame indices rather than the user's
+    language or a video genre. It allows the later index to aggregate actual
+    observations without treating every discussed name as an on-screen person.
+    """
+    lines: list[str] = []
+    allowed_basis = {"source-named", "source-described", "unresolved"}
+    frame_times = [time_ms for time_ms, _frame in clip.frames]
+    if not frame_times:
+        return lines
+    for subject in entry.get("visibleSubjects") or []:
+        if not isinstance(subject, dict):
+            continue
+        identity = " ".join(str(subject.get("identity") or "").split())[:180]
+        basis = str(subject.get("identityBasis") or "").strip()
+        if not identity or basis not in allowed_basis:
+            continue
+        for appearance in subject.get("appearances") or []:
+            if not isinstance(appearance, dict):
+                continue
+            try:
+                start_index = int(appearance.get("startFrame"))
+                end_index = int(appearance.get("endFrame"))
+            except (TypeError, ValueError):
+                continue
+            if not (0 <= start_index <= end_index < len(frame_times)):
+                continue
+            lines.append(
+                "Visible subject: "
+                + json.dumps(
+                    {
+                        "identity": identity,
+                        "identityBasis": basis,
+                        "startMs": frame_times[start_index],
+                        "endMs": frame_times[end_index],
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+            )
+    return lines
+
+
 def _normalized_source_terms(value: str) -> list[str]:
     return re.findall(r"[\w]+", value.casefold(), re.UNICODE)
 
@@ -567,12 +662,7 @@ def _parse_response(
                                 {"subject": subject, "relation": relation, "value": value}
                             )
                 uncertainty = str(entry.get("uncertainty") or "").strip()
-                summary_prefix = (
-                    "Observed context (not a complete answer): "
-                    if claim_verdict == "partial" and summary
-                    else ""
-                )
-                parts = [summary_prefix + summary]
+                parts = [summary]
                 # Source-authored questions are an exhaustive retrieval surface,
                 # so keep them ahead of optional detail that may fill the note's
                 # bounded text budget.
@@ -597,6 +687,7 @@ def _parse_response(
                             parts.append(f"Source question ({source_basis}): {source_text}")
                             if source_answer:
                                 parts.append(f"Source answer: {source_answer}")
+                parts.extend(_visible_subject_lines(entry, batch[index]))
                 parts.extend(note_lines)
                 if isinstance(claims, list):
                     parts.extend(
@@ -660,6 +751,12 @@ class GatewayVisionClient:
         # parallelism shortens a full-video run without reducing coverage or
         # changing the visual evidence sent to the model.
         self.max_concurrency = max(1, min(24, int(os.getenv("LARKUP_VIDEO_GATEWAY_CONCURRENCY", "24"))))
+        # Earlier batches establish source-grounded continuity candidates for
+        # later batches. A wave still runs independently in parallel; only the
+        # compact, evidence-backed candidates cross its boundary.
+        self.continuity_wave_batches = max(
+            1, min(24, int(os.getenv("LARKUP_VIDEO_CONTINUITY_WAVE_BATCHES", "4")))
+        )
         self.limiter = GatewayRateLimiter(
             int(os.getenv("LARKUP_VIDEO_GATEWAY_REQUESTS_PER_MINUTE", "60"))
         )
@@ -1011,30 +1108,39 @@ class GatewayVisionClient:
         batches = self._batches_for(clips)
         results: dict[str, tuple[str, float]] = {}
         completed = 0
-        with ThreadPoolExecutor(max_workers=min(self.max_concurrency, len(batches))) as pool:
-            futures = {
-                pool.submit(
-                    self._describe_batch,
-                    batch,
-                    goal,
-                    questions,
-                    spoken_context,
-                    known_entities,
-                    model,
-                    max_output_tokens,
-                    reasoning_effort,
-                ): len(batch)
-                for batch in batches
-            }
-            for future in as_completed(futures):
-                batch_result = future.result()
-                results.update(batch_result)
-                # Report usable evidence, not merely finished HTTP requests.
-                # A rejected batch must not make live progress claim that its
-                # clips were analyzed before the coverage gate fails the job.
-                completed += len(batch_result)
-                if on_progress:
-                    on_progress(completed, len(clips))
+        continuity_entities = list(known_entities or [])
+        for start in range(0, len(batches), self.continuity_wave_batches):
+            wave = batches[start : start + self.continuity_wave_batches]
+            wave_results: list[tuple[int, dict[str, tuple[str, float]]]] = []
+            with ThreadPoolExecutor(max_workers=min(self.max_concurrency, len(wave))) as pool:
+                futures = {
+                    pool.submit(
+                        self._describe_batch,
+                        batch,
+                        goal,
+                        questions,
+                        spoken_context,
+                        continuity_entities,
+                        model,
+                        max_output_tokens,
+                        reasoning_effort,
+                    ): index
+                    for index, batch in enumerate(wave)
+                }
+                for future in as_completed(futures):
+                    batch_result = future.result()
+                    wave_results.append((futures[future], batch_result))
+                    results.update(batch_result)
+                    # Report usable evidence, not merely finished HTTP requests.
+                    # A rejected batch must not make live progress claim that its
+                    # clips were analyzed before the coverage gate fails the job.
+                    completed += len(batch_result)
+                    if on_progress:
+                        on_progress(completed, len(clips))
+            for _, batch_result in sorted(wave_results):
+                continuity_entities = self._merge_continuity_entities(
+                    continuity_entities, batch_result
+                )
         missing_count = len(clips) - len(results)
         if missing_count:
             provider_error = (
@@ -1048,6 +1154,52 @@ class GatewayVisionClient:
         else:
             self.last_error = None
         return results
+
+    @staticmethod
+    def _merge_continuity_entities(
+        existing: list[str], captions: dict[str, tuple[str, float]]
+    ) -> list[str]:
+        """Keep compact source-grounded identity candidates across clip waves.
+
+        The visible-subject protocol is the authoritative identity ledger.  The
+        older ``Present:`` prose remains useful for compatibility, but must not
+        be the only way a named subject survives into a later bounded reading.
+        """
+        merged: list[str] = []
+        seen: set[str] = set()
+        for candidate in existing:
+            value = str(candidate).strip()[:120]
+            key = value.casefold()
+            if value and key not in seen:
+                merged.append(value)
+                seen.add(key)
+        for text, _confidence in captions.values():
+            for line in text.splitlines():
+                if not line.startswith("Visible subject: "):
+                    continue
+                try:
+                    subject = json.loads(line.removeprefix("Visible subject: "))
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(subject, dict):
+                    continue
+                if str(subject.get("identityBasis") or "").strip() != "source-named":
+                    continue
+                value = " ".join(str(subject.get("identity") or "").split())[:120]
+                key = value.casefold()
+                if value and key not in seen:
+                    merged.append(value)
+                    seen.add(key)
+            for line in text.splitlines():
+                if not line.startswith("Present: "):
+                    continue
+                value = line.removeprefix("Present: ").split(" —", 1)[0]
+                value = value.split(" (identified by", 1)[0].strip()[:120]
+                key = value.casefold()
+                if value and key not in seen:
+                    merged.append(value)
+                    seen.add(key)
+        return merged[:40]
 
     def _batches_for(self, clips: list[ClipCaptionRequest]) -> list[list[ClipCaptionRequest]]:
         batches: list[list[ClipCaptionRequest]] = []
@@ -1123,7 +1275,12 @@ class GeminiVisionClient(GatewayVisionClient):
         parts: list[dict[str, Any]] = []
         for index, clip in enumerate(batch):
             parts.append({"text": f"--- CLIP {index} frames ---"})
-            for _, frame in clip.frames:
+            for frame_index, (time_ms, frame) in enumerate(clip.frames):
+                parts.append(
+                    {
+                        "text": f"CLIP {index} FRAME {frame_index} at {time_ms / 1000:.3f}s",
+                    }
+                )
                 parts.append({"inline_data": _frame_to_inline_data(frame)})
         parts.append(
             {

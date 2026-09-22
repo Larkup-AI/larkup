@@ -57,6 +57,7 @@ import {
   evidenceToKnowledgeInputs,
   formatVideoKnowledgeSummary,
   getReconciledVideoIntelligenceUsage,
+  resolveVideoIndexingHint,
   runInstalledVideoIntelligence,
   validateVideoIntelligenceConfiguration,
 } from '@/lib/media/video-intelligence-adapter';
@@ -1369,6 +1370,18 @@ async function processWithInstalledVideoIntelligence(
   let indexAttempted = false;
   let knowledgeRun: Awaited<ReturnType<typeof beginVideoKnowledgeRun>> | undefined;
   try {
+    const indexingHint = resolveVideoIndexingHint(asset);
+    if (indexingHint) {
+      // Record adoption, never the user's private hint text. The worker gets
+      // the text in its ephemeral job brief; analytics only measures use.
+      void trackUsageEvent({
+        type: 'media_processing',
+        mediaType: 'video',
+        mediaOperation: 'guidance',
+        mediaAssetId: asset.id,
+        timestamp: new Date().toISOString(),
+      });
+    }
     if (!localFile) await fs.writeFile(mediaPath, await storage.retrieve(asset.storageUri));
     const assetForCloud = await ensureCloudVideoDuration(asset, mediaPath, reportStage);
     // A durable canonical copy already exists at asset.storageUri (S3), so
@@ -1629,13 +1642,14 @@ async function beginVideoKnowledgeRun(input: {
   // A user-triggered reindex must never append new provider output into an
   // already-published revision. Keep the previous revision immutable and make
   // the new run independently auditable, even when the video bytes match.
+  const indexingHint = resolveVideoIndexingHint(input.asset);
   const revision = await createVideoKnowledgeRevision({
     mediaAssetId: input.asset.id,
     sourceFingerprint,
     pipelineVersion,
     parentRevisionId: previousRevision?.id,
-    guidance: input.asset.indexingInstructions?.trim()
-      ? { text: input.asset.indexingInstructions.trim(), createdAt: new Date().toISOString() }
+    guidance: indexingHint
+      ? { text: indexingHint, createdAt: new Date().toISOString() }
       : undefined,
     budget: {
       maxDurationSecs: input.maxDurationSecs,

@@ -71,9 +71,15 @@ app = modal.App(APP_NAME)
     # Indexing is commonly followed by several chat refinements. Reuse the
     # loaded OCR/transcription models across that interactive window.
     scaledown_window=10 * 60,
+    # Keep one GPU worker ready for the normal interactive API path.  A chat
+    # refinement has a short response budget and must not spend it waiting for
+    # an image, model downloads, and CUDA initialization on a cold container.
+    min_containers=1,
     env={
-        "LARKUP_VIDEO_GATEWAY_CONCURRENCY": "4",
-        "LARKUP_VIDEO_GATEWAY_REQUESTS_PER_MINUTE": "10",
+        "LARKUP_VIDEO_GATEWAY_CONCURRENCY": "8",
+        "LARKUP_VIDEO_GATEWAY_REQUESTS_PER_MINUTE": "24",
+        "LARKUP_VIDEO_GATEWAY_BATCH_SIZE": "8",
+        "LARKUP_VIDEO_GATEWAY_MAX_IMAGES_PER_REQUEST": "32",
         # Structured output prevents a dense interactive visual read from
         # becoming unusable prose or truncated markdown before the evidence
         # parser can retain it. Gateway clients that do not support schemas

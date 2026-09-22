@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   compactToolContextForModel,
   collectAnswerLevelMediaStatements,
+  collectObservedSubjectLedger,
   containsAnswerLevelMediaEvidence,
   collectQuestionMatchedDirectClaims,
   recoverEmptyUIMessageStream,
   formatDirectObservationAnswer,
   formatParticipantInventory,
   formatExhaustiveMediaAnswer,
+  formatLocatedObservedSubjectAnswer,
+  formatObservedAppearanceAnswer,
   formatOutcomeMediaAnswer,
   mediaClaimNeedsCorroboration,
   withFinalAnswerNudge,
@@ -136,6 +139,165 @@ describe('collectAnswerLevelMediaStatements', () => {
   });
 });
 
+describe('collectObservedSubjectLedger', () => {
+  it('keeps the source-wide recurrence ledger when a local direct observation also answered', () => {
+    expect(
+      collectObservedSubjectLedger({
+        videoEvidence: {
+          success: true,
+          claimVerification: { status: 'directly-established' },
+          directObservation: { readings: [{ found: 'The requested moment is established.' }] },
+          observedSubjects: [
+            {
+              identity: 'grey-haired person in a purple checkered shirt',
+              identityBasis: 'source-described',
+              appearances: [
+                { startSecs: 55.022, endSecs: 55.022 },
+                { startSecs: 895.022, endSecs: 895.022 },
+              ],
+            },
+          ],
+        },
+      }),
+    ).toEqual([
+      'Reconciled visible subject: grey-haired person in a purple checkered shirt\n' +
+        'Identity basis: source-described\n' +
+        'Observed appearances: 55.022-55.022s; 895.022-895.022s',
+    ]);
+  });
+
+  it('does not expose a ledger attached to an unverified media result', () => {
+    expect(
+      collectObservedSubjectLedger({
+        success: true,
+        claimVerification: { status: 'needs-corroboration' },
+        observedSubjects: [
+          {
+            identity: 'unverified subject',
+            identityBasis: 'source-described',
+            appearances: [{ startSecs: 10, endSecs: 20 }],
+          },
+        ],
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe('formatLocatedObservedSubjectAnswer', () => {
+  it('does not attach a remote proper name to an unnamed subject at the requested position', () => {
+    expect(
+      formatLocatedObservedSubjectAnswer({
+        success: true,
+        claimVerification: { status: 'directly-established' },
+        investigation: {
+          directive: {
+            scope: 'temporal',
+            goal: 'trace',
+            recordSet: 'observed',
+            timeRange: { startSecs: 840, endSecs: 900 },
+          },
+        },
+        evidence: [
+          {
+            payload: {
+              text:
+                'A grey-haired person speaks into a microphone.\n' +
+                'Visible subject: {"identity":"grey-haired person in a purple checkered shirt","identityBasis":"source-described","startMs":830000,"endMs":858028}',
+            },
+          },
+        ],
+        observedSubjects: [
+          {
+            identity: 'Brian Cox',
+            identityBasis: 'source-named',
+            appearances: [{ startSecs: 58, endSecs: 64 }],
+          },
+          {
+            identity: 'grey-haired person in a purple checkered shirt',
+            identityBasis: 'source-described',
+            appearances: [{ startSecs: 830, endSecs: 858.028 }],
+          },
+        ],
+      }),
+    ).toBe(
+      'I saw grey-haired person in a purple checkered shirt at 13:50–14:18. ' +
+        'This is a source-described identification, so I cannot safely equate it with a separately named appearance. ' +
+        'The recorded interval for this exact description: 13:50–14:18.',
+    );
+  });
+});
+
+describe('formatObservedAppearanceAnswer', () => {
+  it('preserves every repeated protocol-backed appearance without inferring continuity', () => {
+    expect(
+      formatObservedAppearanceAnswer({
+        videoEvidence: {
+          success: true,
+          claimVerification: { status: 'directly-established' },
+          evidence: [
+            {
+              payload: {
+                text:
+                  'Reconciled visible subject: grey-haired person in a purple checkered shirt\n' +
+                  'Identity basis: source-described\n' +
+                  'Observed appearances: 55.022-55.022s; 895.022-895.022s',
+              },
+            },
+          ],
+        },
+      }),
+    ).toBe(
+      'I saw grey-haired person in a purple checkered shirt at 00:55.022 and 14:55.022. These are separate observed moments, not continuous visibility.',
+    );
+  });
+
+  it('does not turn a single observed moment into a recurrence answer', () => {
+    expect(
+      formatObservedAppearanceAnswer({
+        success: true,
+        claimVerification: { status: 'directly-established' },
+        evidence: [
+          {
+            payload: {
+              text:
+                'Reconciled visible subject: blue bird\n' +
+                'Identity basis: source-described\n' +
+                'Observed appearances: 12.000-15.000s',
+            },
+          },
+        ],
+      }),
+    ).toBeUndefined();
+  });
+
+  it('leaves a multi-subject source result to the grounded prose renderer', () => {
+    expect(
+      formatObservedAppearanceAnswer({
+        success: true,
+        claimVerification: { status: 'directly-established' },
+        evidence: [
+          {
+            payload: {
+              text:
+                'Reconciled visible subject: blue bird\n' +
+                'Identity basis: source-described\n' +
+                'Observed appearances: 12.000-15.000s; 30.000-35.000s',
+            },
+          },
+          {
+            payload: {
+              text:
+                'Reconciled visible subject: red fox\n' +
+                'Identity basis: source-described\n' +
+                'Observed appearances: 18.000-20.000s; 45.000-50.000s',
+            },
+          },
+        ],
+      }),
+    ).toBeUndefined();
+  });
+});
+
 describe('formatOutcomeMediaAnswer', () => {
   it('answers from the latest verified state instead of dumping the whole trail', () => {
     const answer = formatOutcomeMediaAnswer(
@@ -151,7 +313,7 @@ describe('formatOutcomeMediaAnswer', () => {
           },
         },
       },
-      'Who won the match?',
+      { scope: 'temporal', goal: 'trace' },
     );
 
     expect(answer).toBe('Beta won, 1400–1200 over Alpha.');
@@ -167,7 +329,7 @@ describe('formatOutcomeMediaAnswer', () => {
             readings: [{ atSecs: 10, text: 'Reconciled state: Alpha=1, Beta=2' }],
           },
         },
-        'What were the participants wearing?',
+        { scope: 'focused', goal: 'answer' },
       ),
     ).toBeUndefined();
   });
@@ -187,7 +349,7 @@ describe('formatOutcomeMediaAnswer', () => {
             ],
           },
         },
-        'Who won this match?',
+        { scope: 'temporal', goal: 'trace' },
       ),
     ).toBe('الزمالك المصري won, 2–1 over الهلال السعودي.');
   });
@@ -340,6 +502,34 @@ describe('formatExhaustiveMediaAnswer', () => {
     ).toBeUndefined();
   });
 
+  it('renders an indexed partial structured inventory without asking a model to fill the gaps', () => {
+    const answer = formatExhaustiveMediaAnswer(
+      {
+        success: true,
+        inventory: {
+          recordSet: 'source-questions',
+          coverage: { complete: false, reason: 'One source window was not inventoried.' },
+        },
+        columns: ['Timestamp', 'Content', 'Answer'],
+        rows: [
+          {
+            id: 'question-1',
+            Timestamp: '0:12',
+            Content: 'What changed?',
+            Answer: 'The total rose.',
+          },
+          { id: 'question-2', Timestamp: '0:42', Content: 'Why?', Answer: 'A new entry arrived.' },
+        ],
+        continuation: { exhaustive: true, hasMore: false },
+      },
+      'list every question and answer',
+    );
+
+    expect(answer).toBe(
+      'I completed a scan of 2 indexed source-questions records. The table above contains every matching record currently available, but it is not a guarantee of complete source coverage: One source window was not inventoried.',
+    );
+  });
+
   it('renders the compact verified Question records returned by the evidence tool', () => {
     const answer = formatExhaustiveMediaAnswer(
       {
@@ -392,7 +582,7 @@ describe('formatExhaustiveMediaAnswer', () => {
     );
   });
 
-  it('counts verified source prompts without delegating the count to a model', () => {
+  it('renders legacy source prompts without matching the user language or vocabulary', () => {
     const answer = formatExhaustiveMediaAnswer(
       {
         success: true,
@@ -409,10 +599,12 @@ describe('formatExhaustiveMediaAnswer', () => {
           },
         ],
       },
-      'how many questions are in this recording?',
+      'كم سؤال موجود؟',
     );
 
-    expect(answer).toBe('Confirmed primary source prompts: 2.');
+    expect(answer).toBe(
+      'Here is the complete list in chronological order:\n\n' + '- [0:12] One?\n' + '- [0:42] Two?',
+    );
   });
 
   it('leaves a small ordinary timeline for natural answer synthesis', () => {
@@ -586,6 +778,29 @@ describe('compactToolContextForModel', () => {
     expect(output.documentId).toBe('pdf-1');
     expect(output.pages).toHaveLength(3);
     expect(output.pages[0].text).toHaveLength(1_600);
+  });
+
+  it('retains bounded PDF page evidence attached to a deterministic search', () => {
+    const [message] = compactToolContextForModel([
+      toolResultMessage('searchKnowledgeBase', {
+        query: 'What does Figure 5.1 show?',
+        hits: [{ documentId: 'pdf-1', title: 'source.pdf', url: '/api/uploads/source.pdf' }],
+        pdfInspection: {
+          success: true,
+          documentId: 'pdf-1',
+          pages: [{ pageNumber: 27, text: 'x'.repeat(5_000) }],
+        },
+        pdfVisualAnalysis: {
+          success: true,
+          documentId: 'pdf-1',
+          pages: [{ pageNumber: 27, analysis: 'a'.repeat(5_000) }],
+        },
+      }),
+    ]);
+    const output = (message.content[0] as any).output;
+    expect(output.pdfInspection.pages[0].pageNumber).toBe(27);
+    expect(output.pdfInspection.pages[0].text).toHaveLength(1_600);
+    expect(output.pdfVisualAnalysis.pages[0].analysis).toHaveLength(3_000);
   });
 });
 

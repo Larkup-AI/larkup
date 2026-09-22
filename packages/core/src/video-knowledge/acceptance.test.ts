@@ -218,8 +218,12 @@ test('acceptance: retrieves a terminal spoken outcome even when team names are a
       });
 
       const question = 'من فاز في هذه المباراة: دكتور عبد العزيز ومعتز ضد رجب ورمزي؟';
-      const plan = planVideoQuestion(question);
-      assert.ok(plan.kinds.includes('outcome'));
+      const plan = planVideoQuestion(question, {
+        scope: 'source',
+        goal: 'trace',
+        evidence: ['speech', 'visual'],
+      });
+      assert.ok(plan.kinds.includes('state-change'));
       const hits = await searchVideoKnowledge(mediaAssetId, question, 8, {
         queryPlan: plan,
         videoDurationSecs: 4357,
@@ -295,7 +299,11 @@ test('acceptance: a single outcome result prefers the strongest terminal evidenc
       const question = 'what was the final status?';
       const hit = await searchVideoKnowledge(mediaAssetId, question, 1, {
         modalities: ['visual'],
-        queryPlan: planVideoQuestion(question),
+        queryPlan: planVideoQuestion(question, {
+          scope: 'temporal',
+          goal: 'trace',
+          evidence: ['visual'],
+        }),
         videoDurationSecs: 900,
         minimumRangeDistanceSecs: 0,
       });
@@ -377,8 +385,12 @@ test('acceptance: a later, unrelated segment does not leak into an already-answe
       });
 
       const question = 'who won Alpha versus Beta';
-      const plan = planVideoQuestion(question);
-      assert.ok(plan.kinds.includes('outcome'));
+      const plan = planVideoQuestion(question, {
+        scope: 'source',
+        goal: 'trace',
+        evidence: ['speech', 'visual'],
+      });
+      assert.ok(plan.kinds.includes('state-change'));
       const hits = await searchVideoKnowledge(mediaAssetId, question, 8, {
         queryPlan: plan,
         videoDurationSecs,

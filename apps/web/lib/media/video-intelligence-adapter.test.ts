@@ -13,8 +13,10 @@ import {
   evidenceToKnowledgeInputs,
   evidenceToRefinementInputs,
   enforceManagedSemanticBrief,
+  createAssetVideoIndexingBrief,
   inferLanguageHintFromTitle,
   formatVideoKnowledgeSummary,
+  resolveVideoIndexingHint,
   resolveVideoJobModelConfiguration,
 } from './video-intelligence-adapter';
 
@@ -27,6 +29,51 @@ describe('inferLanguageHintFromTitle', () => {
 
   it('leaves ambiguous Latin titles on automatic multilingual recognition', () => {
     expect(inferLanguageHintFromTitle('Champions League Final')).toBeUndefined();
+  });
+});
+
+describe('asset indexing hints', () => {
+  it('sends the Media Panel hint unchanged to the cloud brief and preserves it for audit', () => {
+    const asset = {
+      id: 'asset-1',
+      type: 'video',
+      fileName: 'unclassified-recording.mp4',
+      indexingInstructions: 'Older import hint',
+      toolInputs: {
+        'video-intelligence': {
+          goal: 'Follow every handoff and preserve the exact times.',
+          indexingMode: 'thorough',
+        },
+      },
+    } as unknown as MediaAsset;
+
+    expect(resolveVideoIndexingHint(asset)).toBe(
+      'Follow every handoff and preserve the exact times.',
+    );
+    expect(createAssetVideoIndexingBrief(asset)).toMatchObject({
+      goal: 'Follow every handoff and preserve the exact times.',
+      contentType: 'general',
+      indexingMode: 'thorough',
+    });
+    expect(
+      createVideoIntelligenceSubmitRequest({
+        source: { uploadId: 'upload-1' },
+        brief: createAssetVideoIndexingBrief(asset),
+      }),
+    ).toMatchObject({
+      brief: { goal: 'Follow every handoff and preserve the exact times.' },
+    });
+  });
+
+  it('uses the persisted initial hint when a source was imported without tool inputs', () => {
+    expect(
+      resolveVideoIndexingHint({
+        id: 'asset-2',
+        type: 'video',
+        fileName: 'recording.mp4',
+        indexingInstructions: 'Keep detailed evidence of every chemical reaction.',
+      } as unknown as MediaAsset),
+    ).toBe('Keep detailed evidence of every chemical reaction.');
   });
 });
 
@@ -523,6 +570,16 @@ describe('reconciled account as evidence', () => {
       participants: [
         { name: 'A. Rivera', role: 'chair', evidence: [{ startMs: 0, endMs: 5_000 }] },
       ],
+      visibleSubjects: [
+        {
+          identity: 'A. Rivera',
+          identityBasis: 'source-named',
+          appearances: [
+            { startMs: 0, endMs: 5_000, confidence: 'direct' },
+            { startMs: 500_000, endMs: 540_000, confidence: 'direct' },
+          ],
+        },
+      ],
       stateHistory: [
         { startMs: 10_000, endMs: 20_000, state: 'motion under discussion', confidence: 'direct' },
         { startMs: 500_000, endMs: 540_000, state: 'motion carried', confidence: 'direct' },
@@ -556,6 +613,9 @@ describe('reconciled account as evidence', () => {
     expect(texts).toContain('Reconciled state: motion carried');
     expect(texts).toContain('Reconciled event: the chair calls the vote');
     expect(texts).toContain('Reconciled participant: A. Rivera — chair');
+    expect(texts.some((text) => text.startsWith('Reconciled visible subject: A. Rivera'))).toBe(
+      true,
+    );
     expect(texts).toContain(
       'Chronological note: The chair moves from discussion to the vote, and the motion carries.',
     );
@@ -580,6 +640,64 @@ describe('reconciled account as evidence', () => {
     expect(carried?.timeRange).toMatchObject({ startSecs: 500, endSecs: 540 });
     // A reconciled claim carries the doubt the cross-check left open.
     expect(carried?.confidence.uncertaintyReasons).toContain('One speaker was not named.');
+  });
+
+  it('anchors a bounded visible-subject protocol time to the original source range', () => {
+    const inputs = evidenceToRefinementInputs({
+      ...bundle,
+      semanticObservations: [
+        {
+          startMs: 840_000,
+          endMs: 870_000,
+          confidence: 0.9,
+          text:
+            'A presenter is visible.\n' +
+            'Visible subject: {"identity":"presenter in a checkered shirt","identityBasis":"source-described","startMs":-67,"endMs":28028}',
+        },
+      ],
+    });
+    const visual = inputs.find((input) => input.modality === 'visual');
+
+    expect(visual?.timeRange).toMatchObject({ startSecs: 840, endSecs: 870 });
+    expect((visual?.payload as { text: string }).text).toContain('"startMs":840000,"endMs":868028');
+  });
+
+  it('publishes the anonymous presence ledger without claiming track identity', () => {
+    const inputs = evidenceToRefinementInputs({
+      ...bundle,
+      anonymousPresenceLedger: {
+        method: 'object-detection-anonymous-tracking',
+        sampledFrames: 3,
+        tracks: [
+          {
+            trackId: 1,
+            label: 'person',
+            startMs: 0,
+            endMs: 5_000,
+            observations: 3,
+            confidence: 0.9,
+            timestampsMs: [0, 2_000, 5_000],
+          },
+        ],
+        labels: [
+          {
+            label: 'person',
+            distinctTrackCount: 1,
+            maximumSimultaneous: 2,
+            simultaneousTimestampsMs: [2_000],
+          },
+        ],
+      },
+    });
+    const presence = inputs.find(
+      (input) =>
+        (input.payload as { method?: string }).method === 'object-detection-anonymous-tracking',
+    );
+
+    expect(presence?.timeRange).toMatchObject({ startSecs: 0, endSecs: 600 });
+    expect(presence?.confidence.uncertaintyReasons).toContain(
+      'Anonymous tracks can split when a subject is occluded, exits, re-enters, or a cut occurs.',
+    );
   });
 
   it('adds nothing when the runtime produced no reconciled account', () => {

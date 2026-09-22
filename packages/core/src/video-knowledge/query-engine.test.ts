@@ -141,6 +141,7 @@ test('aggregateVideoKnowledge: retains a revision-scoped navigation map outside 
           activeEvidenceRevisionIds: {
             present: 'present-evidence',
             person: 'person-evidence',
+            sightings: 'sightings-evidence',
             inventory: 'inventory-evidence',
           },
           activeObservationRevisionIds: {},
@@ -182,6 +183,23 @@ test('aggregateVideoKnowledge: retains a revision-scoped navigation map outside 
             createdAt,
           },
           {
+            id: 'sightings-evidence',
+            lineageId: 'sightings',
+            mediaAssetId,
+            knowledgeRevisionId,
+            modality: 'visual',
+            timeRange: { startSecs: 20, endSecs: 27, precision: 'frame' },
+            payload: {
+              text:
+                'Visible subject: {"identity":"Rami","identityBasis":"source-named","startMs":20000,"endMs":24000}\n' +
+                'Visible subject: {"identity":"Rami","identityBasis":"source-named","startMs":23000,"endMs":27000}',
+            },
+            source: { kind: 'provider', provider: 'test' },
+            confidence: DEFAULT_VIDEO_CONFIDENCE,
+            schemaVersion: 1,
+            createdAt,
+          },
+          {
             id: 'inventory-evidence',
             lineageId: 'inventory',
             mediaAssetId,
@@ -210,6 +228,15 @@ test('aggregateVideoKnowledge: retains a revision-scoped navigation map outside 
           name: 'Rami',
           description: 'wearing a black t-shirt',
           timeRange: { startSecs: 20, endSecs: 24, precision: 'frame' },
+        },
+      ]);
+      assert.deepEqual(first.visibleSubjects, [
+        {
+          identity: 'Rami',
+          identityBasis: 'source-named',
+          appearances: [{ startSecs: 20, endSecs: 27, precision: 'estimated' }],
+          observedDurationSecs: 7,
+          observationCount: 2,
         },
       ]);
       const cached = await aggregateVideoKnowledge(mediaAssetId);

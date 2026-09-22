@@ -1352,10 +1352,23 @@ function MediaContent({
 
     setImportingUrls(true);
     try {
+      const surfaceValues = indexingSurface ? toolInputs?.[indexingSurface.toolId] : undefined;
+      const indexingInstructions =
+        surfaceValues &&
+        typeof surfaceValues === 'object' &&
+        typeof (surfaceValues as { goal?: unknown }).goal === 'string'
+          ? (surfaceValues as { goal: string }).goal.trim()
+          : undefined;
       const res = await fetch(mediaApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls, mediaType: remoteType, groupId, toolInputs }),
+        body: JSON.stringify({
+          urls,
+          mediaType: remoteType,
+          groupId,
+          toolInputs,
+          ...(indexingInstructions ? { indexingInstructions } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Media import failed');

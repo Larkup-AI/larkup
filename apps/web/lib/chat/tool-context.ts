@@ -1,5 +1,3 @@
-import { planVideoQuestion } from '@larkup/core/video-knowledge/query-planner';
-
 type ToolResultPart = {
   type?: string;
   toolName?: string;
@@ -190,9 +188,336 @@ export function collectAnswerLevelMediaStatements(value: unknown): string[] {
   return exhaustive ? statements.slice(0, 2_000) : statements.slice(-8);
 }
 
+/**
+ * Collect the visibility protocol without trying to interpret the user's
+ * language. The reply model receives this separately from ranked snippets so
+ * a direct re-watch of one moment cannot hide the reconciled recurrence data.
+ */
+export function collectObservedSubjectLedger(value: unknown): string[] {
+  type Appearance = { startSecs: number; endSecs: number };
+  const lines = new Set<string>();
+  const visit = (candidate: unknown) => {
+    if (typeof candidate === 'string') {
+      try {
+        visit(JSON.parse(candidate));
+      } catch {
+        /* ordinary text is not a structured evidence result */
+      }
+      return;
+    }
+    if (Array.isArray(candidate)) return candidate.forEach(visit);
+    if (!candidate || typeof candidate !== 'object') return;
+    const record = candidate as Record<string, unknown>;
+    if (record.success === true && mediaClaimIsAnswerLevel(record.claimVerification)) {
+      const observedSubjects = record.observedSubjects;
+      if (!Array.isArray(observedSubjects)) return;
+      for (const subject of observedSubjects) {
+        if (!subject || typeof subject !== 'object') continue;
+        const identity =
+          typeof (subject as { identity?: unknown }).identity === 'string'
+            ? (subject as { identity: string }).identity.trim()
+            : '';
+        const identityBasis =
+          typeof (subject as { identityBasis?: unknown }).identityBasis === 'string'
+            ? (subject as { identityBasis: string }).identityBasis.trim()
+            : '';
+        const appearances = Array.isArray((subject as { appearances?: unknown }).appearances)
+          ? (subject as { appearances: unknown[] }).appearances
+              .map((appearance) => {
+                if (!appearance || typeof appearance !== 'object') return undefined;
+                const startSecs = Number((appearance as { startSecs?: unknown }).startSecs);
+                const endSecs = Number((appearance as { endSecs?: unknown }).endSecs);
+                return Number.isFinite(startSecs) &&
+                  Number.isFinite(endSecs) &&
+                  endSecs >= startSecs
+                  ? ({ startSecs, endSecs } satisfies Appearance)
+                  : undefined;
+              })
+              .filter((appearance): appearance is Appearance => Boolean(appearance))
+          : [];
+        if (!identity || !identityBasis || appearances.length === 0) continue;
+        lines.add(
+          `Reconciled visible subject: ${identity}\n` +
+            `Identity basis: ${identityBasis}\n` +
+            `Observed appearances: ${appearances
+              .map((appearance) => `${appearance.startSecs}-${appearance.endSecs}s`)
+              .join('; ')}`,
+        );
+      }
+      return;
+    }
+    Object.values(record).forEach(visit);
+  };
+  visit(value);
+  return [...lines].slice(0, 200);
+}
+
+/**
+ * Render a source-position-to-recurrence answer when the local visual subject
+ * is described but not named. This protocol guard prevents a prose model from
+ * borrowing a proper name from another timestamp and attaching it to the
+ * requested moment.
+ */
+export function formatLocatedObservedSubjectAnswer(value: unknown): string | undefined {
+  type Appearance = { startSecs: number; endSecs: number };
+  type Subject = {
+    identity: string;
+    identityBasis: string;
+    appearances: Appearance[];
+  };
+  type LocalSubject = Subject & { localAppearance: Appearance };
+  const localSubjects: LocalSubject[] = [];
+  const visit = (candidate: unknown) => {
+    if (typeof candidate === 'string') {
+      try {
+        visit(JSON.parse(candidate));
+      } catch {
+        /* only structured media evidence establishes this protocol */
+      }
+      return;
+    }
+    if (Array.isArray(candidate)) return candidate.forEach(visit);
+    if (!candidate || typeof candidate !== 'object') return;
+    const record = candidate as Record<string, unknown>;
+    if (record.success !== true || !mediaClaimIsAnswerLevel(record.claimVerification)) {
+      Object.values(record).forEach(visit);
+      return;
+    }
+    const directive = (record.investigation as { directive?: unknown } | undefined)?.directive as
+      { scope?: unknown; recordSet?: unknown; timeRange?: unknown } | undefined;
+    const requestedRange = directive?.timeRange as
+      { startSecs?: unknown; endSecs?: unknown } | undefined;
+    const startSecs = Number(requestedRange?.startSecs);
+    const endSecs = Number(requestedRange?.endSecs);
+    if (
+      directive?.scope !== 'temporal' ||
+      directive.recordSet !== 'observed' ||
+      !Number.isFinite(startSecs) ||
+      !Number.isFinite(endSecs) ||
+      endSecs <= startSecs ||
+      !Array.isArray(record.evidence) ||
+      !Array.isArray(record.observedSubjects)
+    ) {
+      return;
+    }
+    const ledger = (record.observedSubjects as unknown[])
+      .map((item): Subject | undefined => {
+        if (!item || typeof item !== 'object') return undefined;
+        const identity =
+          typeof (item as { identity?: unknown }).identity === 'string'
+            ? (item as { identity: string }).identity.trim()
+            : '';
+        const identityBasis =
+          typeof (item as { identityBasis?: unknown }).identityBasis === 'string'
+            ? (item as { identityBasis: string }).identityBasis.trim()
+            : '';
+        const appearances = Array.isArray((item as { appearances?: unknown }).appearances)
+          ? (item as { appearances: unknown[] }).appearances
+              .map((appearance): Appearance | undefined => {
+                if (!appearance || typeof appearance !== 'object') return undefined;
+                const startSecs = Number((appearance as { startSecs?: unknown }).startSecs);
+                const endSecs = Number((appearance as { endSecs?: unknown }).endSecs);
+                return Number.isFinite(startSecs) &&
+                  Number.isFinite(endSecs) &&
+                  endSecs >= startSecs
+                  ? { startSecs, endSecs }
+                  : undefined;
+              })
+              .filter((appearance): appearance is Appearance => Boolean(appearance))
+          : [];
+        return identity && identityBasis && appearances.length > 0
+          ? { identity, identityBasis, appearances }
+          : undefined;
+      })
+      .filter((subject): subject is Subject => Boolean(subject));
+    for (const item of record.evidence as unknown[]) {
+      if (!item || typeof item !== 'object') continue;
+      const payload = (item as { payload?: unknown }).payload;
+      const text =
+        typeof payload === 'string'
+          ? payload
+          : payload && typeof payload === 'object' && !Array.isArray(payload)
+            ? (payload as { text?: unknown }).text
+            : undefined;
+      if (typeof text !== 'string') continue;
+      const encoded = text.match(/^Visible subject:\s*(\{.+\})$/imu)?.[1];
+      if (!encoded) continue;
+      try {
+        const parsed = JSON.parse(encoded) as {
+          identity?: unknown;
+          identityBasis?: unknown;
+          startMs?: unknown;
+          endMs?: unknown;
+        };
+        const identity = typeof parsed.identity === 'string' ? parsed.identity.trim() : '';
+        const identityBasis =
+          typeof parsed.identityBasis === 'string' ? parsed.identityBasis.trim() : '';
+        const localStartSecs = Number(parsed.startMs) / 1_000;
+        const localEndSecs = Number(parsed.endMs) / 1_000;
+        if (
+          !identity ||
+          !['source-described', 'unresolved'].includes(identityBasis) ||
+          !Number.isFinite(localStartSecs) ||
+          !Number.isFinite(localEndSecs) ||
+          localEndSecs < localStartSecs ||
+          localStartSecs >= endSecs ||
+          localEndSecs <= startSecs
+        ) {
+          continue;
+        }
+        const matched = ledger.find(
+          (subject) => subject.identity === identity && subject.identityBasis === identityBasis,
+        );
+        localSubjects.push({
+          identity,
+          identityBasis,
+          appearances: matched?.appearances ?? [
+            { startSecs: localStartSecs, endSecs: localEndSecs },
+          ],
+          localAppearance: { startSecs: localStartSecs, endSecs: localEndSecs },
+        });
+      } catch {
+        /* a malformed protocol record cannot produce a deterministic answer */
+      }
+    }
+  };
+  visit(value);
+  const subject = localSubjects[0];
+  if (!subject) return undefined;
+  const formatTime = (seconds: number) => displayTimecode(seconds);
+  const uniqueAppearances = subject.appearances.filter(
+    (appearance, index, appearances) =>
+      index === 0 ||
+      appearance.startSecs !== appearances[index - 1]?.startSecs ||
+      appearance.endSecs !== appearances[index - 1]?.endSecs,
+  );
+  const ranges = uniqueAppearances
+    .map((appearance) =>
+      appearance.endSecs > appearance.startSecs
+        ? `${formatTime(appearance.startSecs)}–${formatTime(appearance.endSecs)}`
+        : formatTime(appearance.startSecs),
+    )
+    .join(', ');
+  return (
+    `I saw ${subject.identity} at ${formatTime(subject.localAppearance.startSecs)}–${formatTime(
+      subject.localAppearance.endSecs,
+    )}. ` +
+    `This is a ${subject.identityBasis} identification, so I cannot safely equate it with a separately named appearance. ` +
+    `The recorded interval${uniqueAppearances.length === 1 ? '' : 's'} for this exact description: ${ranges}.`
+  );
+}
+
+/**
+ * Render a repeated visual appearance directly from the evidence protocol.
+ * This is intentionally protocol-driven: a subject can be a person, animal,
+ * object, character, or anything else the visual index describes.  It avoids
+ * asking a prose model to reinterpret explicit discrete moments as one
+ * continuous appearance or as an absence claim.
+ */
+export function formatObservedAppearanceAnswer(value: unknown): string | undefined {
+  type Appearance = { startSecs: number; endSecs: number };
+  type Subject = { identity: string; basis: string; appearances: Appearance[] };
+  const subjects = new Map<string, Subject>();
+  const textOf = (payload: unknown) => {
+    if (typeof payload === 'string') return payload;
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      const text = (payload as { text?: unknown }).text;
+      if (typeof text === 'string') return text;
+    }
+    return '';
+  };
+  const parseAppearances = (line: string): Appearance[] => {
+    const milliseconds = [...line.matchAll(/(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)ms\b/gu)].map(
+      (match) => ({ startSecs: Number(match[1]) / 1_000, endSecs: Number(match[2]) / 1_000 }),
+    );
+    if (milliseconds.length > 0) return milliseconds;
+    return [...line.matchAll(/(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)s\b/gu)].map((match) => ({
+      startSecs: Number(match[1]),
+      endSecs: Number(match[2]),
+    }));
+  };
+  const addEvidence = (evidence: unknown) => {
+    if (!Array.isArray(evidence)) return;
+    for (const item of evidence) {
+      if (!item || typeof item !== 'object') continue;
+      const text = textOf((item as { payload?: unknown }).payload);
+      const match = text.match(
+        /^Reconciled visible subject:\s*([^\n]+)\nIdentity basis:\s*([^\n]+)\nObserved appearances:\s*([^\n]+)/im,
+      );
+      if (!match) continue;
+      const identity = match[1]?.trim();
+      const basis = match[2]?.trim();
+      const appearances = parseAppearances(match[3] ?? '').filter(
+        (range) => Number.isFinite(range.startSecs) && Number.isFinite(range.endSecs),
+      );
+      if (!identity || !basis || appearances.length === 0) continue;
+      const key = `${basis}\u0000${identity}`;
+      const subject = subjects.get(key) ?? { identity, basis, appearances: [] };
+      subject.appearances.push(...appearances);
+      subjects.set(key, subject);
+    }
+  };
+  const visit = (candidate: unknown) => {
+    if (typeof candidate === 'string') {
+      try {
+        visit(JSON.parse(candidate));
+      } catch {
+        /* plain text is not a structured answer-level media result */
+      }
+      return;
+    }
+    if (Array.isArray(candidate)) return candidate.forEach(visit);
+    if (!candidate || typeof candidate !== 'object') return;
+    const record = candidate as Record<string, unknown>;
+    if (record.success === true && mediaClaimIsAnswerLevel(record.claimVerification)) {
+      addEvidence(record.evidence);
+      return;
+    }
+    Object.values(record).forEach(visit);
+  };
+  visit(value);
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainder = seconds - minutes * 60;
+    return `${String(minutes).padStart(2, '0')}:${remainder.toFixed(3).padStart(6, '0')}`;
+  };
+  const rendered = [...subjects.values()]
+    .map((subject) => ({
+      ...subject,
+      appearances: subject.appearances
+        .sort((left, right) => left.startSecs - right.startSecs || left.endSecs - right.endSecs)
+        .filter(
+          (range, index, ranges) =>
+            index === 0 ||
+            range.startSecs !== ranges[index - 1]?.startSecs ||
+            range.endSecs !== ranges[index - 1]?.endSecs,
+        ),
+    }))
+    .filter((subject) => subject.appearances.length > 1)
+    .map(
+      (subject) =>
+        `I saw ${subject.identity} at ${subject.appearances
+          .map((range) =>
+            range.endSecs > range.startSecs
+              ? `${formatTime(range.startSecs)}–${formatTime(range.endSecs)}`
+              : formatTime(range.startSecs),
+          )
+          .join(' and ')}.`,
+    );
+  // Several subjects in the selected evidence are source context, not proof
+  // that a visibility inventory is the requested answer.  A single recurring
+  // subject is unambiguous and can safely bypass prose re-interpretation.
+  return rendered.length === 1
+    ? `${rendered[0]} These are separate observed moments, not continuous visibility.`
+    : undefined;
+}
+
 /** Render a final two-sided numeric outcome without waiting on a slow prose model. */
-export function formatOutcomeMediaAnswer(value: unknown, question: string): string | undefined {
-  if (!planVideoQuestion(question).kinds.includes('outcome')) return undefined;
+export function formatOutcomeMediaAnswer(
+  value: unknown,
+  investigation: VideoInvestigationDirective,
+): string | undefined {
+  if (investigation.goal !== 'trace') return undefined;
   type Reading = { at: number; text: string };
   const readings: Reading[] = [];
   const visit = (candidate: unknown) => {
@@ -273,19 +598,12 @@ export function formatOutcomeMediaAnswer(value: unknown, question: string): stri
   const settled = scorelineCandidates.at(-1) ?? candidates.at(-1);
   if (!settled) return undefined;
   const [left, right] = settled.pairs;
-  const mostlyArabic =
-    /\p{Script=Arabic}/u.test(question) &&
-    !/\b(?:who|which|won|winner|score|result|match)\b/i.test(question);
   if (left.value === right.value) {
-    return mostlyArabic
-      ? `انتهت بالتعادل ${left.value}–${right.value}.`
-      : `It ended level at ${left.value}–${right.value}.`;
+    return `It ended level at ${left.value}–${right.value}.`;
   }
   const winner = left.value > right.value ? left : right;
   const runnerUp = winner === left ? right : left;
-  return mostlyArabic
-    ? `فاز ${winner.label} بنتيجة ${winner.value} مقابل ${runnerUp.value} لـ${runnerUp.label}.`
-    : `${winner.label} won, ${winner.value}–${runnerUp.value} over ${runnerUp.label}.`;
+  return `${winner.label} won, ${winner.value}–${runnerUp.value} over ${runnerUp.label}.`;
 }
 
 /** Use the strongest bounded source reading directly when it already settled the question. */
@@ -361,7 +679,6 @@ export function formatDirectObservationAnswer(value: unknown, question = ''): st
 
 /** Render a compact, source-grounded participant roster without relying on prose-model formatting. */
 export function formatParticipantInventory(value: unknown, question: string): string | undefined {
-  if (!planVideoQuestion(question).kinds.includes('entity-inventory')) return undefined;
   const participants: Array<{ name: string; description: string; at: number }> = [];
   const seen = new Set<string>();
   const textOf = (payload: unknown) => {
@@ -435,7 +752,7 @@ function displayTimecode(seconds: number) {
  * Render a verified complete media inventory without putting hundreds of
  * already-final source items through another model context window.
  */
-export function formatExhaustiveMediaAnswer(value: unknown, question: string): string | undefined {
+export function formatExhaustiveMediaAnswer(value: unknown, _question: string): string | undefined {
   type Item = {
     at: number;
     text: string;
@@ -444,6 +761,7 @@ export function formatExhaustiveMediaAnswer(value: unknown, question: string): s
     respondent?: string;
   };
   let complete: Item[] | undefined;
+  let inventorySummary: string | undefined;
   const textOf = (payload: unknown) => {
     if (typeof payload === 'string') return payload;
     if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
@@ -476,7 +794,32 @@ export function formatExhaustiveMediaAnswer(value: unknown, question: string): s
     if (!candidate || typeof candidate !== 'object') return;
     const record = candidate as Record<string, unknown>;
     const continuation = record.continuation as
-      { exhaustive?: unknown; hasMore?: unknown } | undefined;
+      { exhaustive?: unknown; hasMore?: unknown; contextLimitReached?: unknown } | undefined;
+    const inventory = record.inventory as
+      { recordSet?: unknown; coverage?: { complete?: unknown; reason?: unknown } } | undefined;
+    // A structured inventory is already a final data result. It must never be
+    // handed back to a prose model just because the source correctly reports
+    // partial coverage. The UI has the complete returned table; this message
+    // only explains its scope and truth status.
+    if (
+      record.success === true &&
+      continuation?.exhaustive === true &&
+      continuation.hasMore !== true &&
+      continuation.contextLimitReached !== true &&
+      inventory &&
+      typeof inventory === 'object' &&
+      typeof inventory.recordSet === 'string' &&
+      Array.isArray(record.rows)
+    ) {
+      const count = record.rows.length;
+      const completeCoverage = inventory.coverage?.complete === true;
+      const reason =
+        typeof inventory.coverage?.reason === 'string' ? inventory.coverage.reason.trim() : '';
+      inventorySummary = completeCoverage
+        ? `I completed the source-wide ${inventory.recordSet} inventory: ${count} records. The full searchable and downloadable table is above.`
+        : `I completed a scan of ${count} indexed ${inventory.recordSet} records. The table above contains every matching record currently available, but it is not a guarantee of complete source coverage${reason ? `: ${reason}` : '.'}`;
+      return;
+    }
     if (
       record.success === true &&
       continuation?.exhaustive === true &&
@@ -511,6 +854,7 @@ export function formatExhaustiveMediaAnswer(value: unknown, question: string): s
     Object.values(record).forEach(visit);
   };
   visit(value);
+  if (inventorySummary) return inventorySummary;
   if (!complete || complete.length === 0) return undefined;
   const seen = new Set<string>();
   const items = complete.filter((item) => {
@@ -523,21 +867,13 @@ export function formatExhaustiveMediaAnswer(value: unknown, question: string): s
   // natural synthesis. Source-authored inventory records are already the exact
   // requested units, and a large result must avoid another context window.
   if (items.length <= 48 && !items.every((item) => item.sourceInventory)) return undefined;
-  const tableRequested = /\b(?:table|columns?|rows?)\b|(?:جدول|أعمدة|اعمدة|صفوف)/iu.test(question);
-  const countRequested =
-    /\b(?:how\s+many|number\s+of|count|total)\b/iu.test(question) ||
-    /(?:كم|كام|عدد|إجمالي|اجمالي)/u.test(question);
-  if (countRequested && items.every((item) => item.sourceInventory)) {
-    return /\p{Script=Arabic}/u.test(question)
-      ? `عدد الـprompts الأساسية المؤكدة في المصدر: ${items.length}.`
-      : `Confirmed primary source prompts: ${items.length}.`;
-  }
-  if (tableRequested && items.every((item) => item.sourceInventory)) {
-    const arabic = /\p{Script=Arabic}/u.test(question);
+  // Legacy tool records have no structured `rows` field. When they carry
+  // answer columns, render their data shape directly; this is independent of
+  // the user's vocabulary or language. Newer records take the data-table path
+  // above and never reach this compatibility branch.
+  if (items.every((item) => item.sourceInventory) && items.some((item) => item.respondent)) {
     const escapeCell = (cell: string | undefined) => (cell || '—').replace(/\|/g, '\\|');
-    const header = arabic
-      ? '| السؤال | أجاب عليه | الإجابة |'
-      : '| Question | Answered by | Answer |';
+    const header = '| Question | Answered by | Answer |';
     const divider = '| --- | --- | --- |';
     return `${header}\n${divider}\n${items
       .map(
@@ -548,10 +884,7 @@ export function formatExhaustiveMediaAnswer(value: unknown, question: string): s
       )
       .join('\n')}`;
   }
-  const intro = /\p{Script=Arabic}/u.test(question)
-    ? 'دي القائمة الكاملة بالترتيب الزمني:'
-    : 'Here is the complete list in chronological order:';
-  return `${intro}\n\n${items
+  return `Here is the complete list in chronological order:\n\n${items
     .map((item) => `- [${displayTimecode(item.at)}] ${item.text}`)
     .join('\n')}`;
 }
@@ -613,6 +946,9 @@ function compactMediaEvidence(value: unknown): unknown {
     supportingClip: result.supportingClip,
     claimVerification: result.claimVerification,
     investigation: result.investigation,
+    observedSubjects: Array.isArray(result.observedSubjects)
+      ? result.observedSubjects.slice(0, 200)
+      : undefined,
     continuation: result.continuation,
     directObservation: result.directObservation
       ? {
@@ -651,6 +987,26 @@ function compactMediaEvidence(value: unknown): unknown {
             (typeof item.text === 'string' ? item.text.slice(0, payloadLimit) : item.text)),
       confidence: item.confidence,
       conflicted: item.conflicted,
+    })),
+  };
+}
+
+/** Keep page-local text and visual readings when they travel with a search result. */
+function compactPdfPageEvidence(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const result = value as Record<string, any>;
+  if (!Array.isArray(result.pages)) return undefined;
+  return {
+    success: result.success,
+    documentId: result.documentId,
+    title: result.title,
+    totalPages: result.totalPages,
+    pages: result.pages.slice(0, 3).map((page: any) => ({
+      pageNumber: page.pageNumber,
+      text: typeof page.text === 'string' ? page.text.slice(0, 1_600) : undefined,
+      tables: Array.isArray(page.tables) ? page.tables.slice(0, 2) : undefined,
+      analysis: typeof page.analysis === 'string' ? page.analysis.slice(0, 3_000) : undefined,
+      previewUrl: page.previewUrl,
     })),
   };
 }
@@ -703,6 +1059,12 @@ function compactValue(value: unknown, toolName?: string): unknown {
       ...(result.videoEvidence !== undefined
         ? { videoEvidence: compactMediaEvidence(result.videoEvidence) }
         : {}),
+      ...(compactPdfPageEvidence(result.pdfInspection)
+        ? { pdfInspection: compactPdfPageEvidence(result.pdfInspection) }
+        : {}),
+      ...(compactPdfPageEvidence(result.pdfVisualAnalysis)
+        ? { pdfVisualAnalysis: compactPdfPageEvidence(result.pdfVisualAnalysis) }
+        : {}),
     };
   } else if (typeof result.mediaAssetId === 'string' && Array.isArray(result.evidence)) {
     compact = compactMediaEvidence(result) as Record<string, any>;
@@ -723,19 +1085,7 @@ function compactValue(value: unknown, toolName?: string): unknown {
     (toolName === 'inspectPdfPages' || toolName === 'analyzePdfPages') &&
     Array.isArray(result.pages)
   ) {
-    compact = {
-      success: result.success,
-      documentId: result.documentId,
-      title: result.title,
-      totalPages: result.totalPages,
-      pages: result.pages.slice(0, 3).map((page: any) => ({
-        pageNumber: page.pageNumber,
-        text: typeof page.text === 'string' ? page.text.slice(0, 1_600) : undefined,
-        tables: Array.isArray(page.tables) ? page.tables.slice(0, 2) : undefined,
-        analysis: typeof page.analysis === 'string' ? page.analysis.slice(0, 3_000) : undefined,
-        previewUrl: page.previewUrl,
-      })),
-    };
+    compact = compactPdfPageEvidence(result);
   }
 
   if (!compact) return value;
@@ -796,3 +1146,4 @@ export function compactToolContextForModel(messages: readonly any[]): any[] {
     };
   });
 }
+import type { VideoInvestigationDirective } from '@larkup/core/video-knowledge/query-planner';

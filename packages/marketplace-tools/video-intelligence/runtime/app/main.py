@@ -1,7 +1,3 @@
-"""FastAPI app entry point: creates the app, wires CORS and exception
-handlers, and mounts the v1 API. Run with `uv run larkup-video-runtime`.
-"""
-
 from __future__ import annotations
 
 from fastapi import FastAPI

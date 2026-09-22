@@ -144,6 +144,48 @@ class GatewayResponseParsingTests(unittest.TestCase):
         # Retrieval strips the claim envelope, so the notes have to precede it.
         self.assertLess(text.index("Present: A. Rivera"), text.index("Claim question:"))
 
+    def test_visible_subjects_are_persisted_with_their_observed_frame_times(self) -> None:
+        batch = [
+            ClipCaptionRequest(
+                "clip_0",
+                1_000,
+                4_000,
+                [(1_000, object()), (2_500, object()), (4_000, object())],
+            )
+        ]
+        text, _confidence = _parse_response(
+            '{"clips":[{"clipIndex":0,"summary":"Two people take turns.",'
+            '"visibleSubjects":[{"identity":"Mina","identityBasis":"source-named",'
+            '"appearances":[{"startFrame":0,"endFrame":1}]},'
+            '{"identity":"speaker on the right","identityBasis":"source-described",'
+            '"appearances":[{"startFrame":2,"endFrame":2}]}]}]}',
+            batch,
+        )["clip_0"]
+
+        self.assertIn(
+            'Visible subject: {"identity":"Mina","identityBasis":"source-named","startMs":1000,"endMs":2500}',
+            text,
+        )
+        self.assertIn(
+            'Visible subject: {"identity":"speaker on the right","identityBasis":"source-described","startMs":4000,"endMs":4000}',
+            text,
+        )
+
+    def test_continuity_keeps_only_source_named_visible_subjects(self) -> None:
+        merged = GatewayVisionClient._merge_continuity_entities(
+            ["Earlier anchor"],
+            {
+                "clip": (
+                    'Visible subject: {"identity":"Mina","identityBasis":"source-named","startMs":0,"endMs":1}\n'
+                    'Visible subject: {"identity":"person in blue","identityBasis":"source-described","startMs":0,"endMs":1}\n'
+                    'Present: Omar — a source-described participant',
+                    0.9,
+                )
+            },
+        )
+
+        self.assertEqual(merged, ["Earlier anchor", "Mina", "Omar"])
+
     def test_source_questions_and_answers_reach_the_indexed_text(self) -> None:
         batch = [ClipCaptionRequest("clip_0", 0, 6_000, [])]
         text, _confidence = _parse_response(
@@ -211,7 +253,8 @@ class GatewayResponseParsingTests(unittest.TestCase):
             ["What was this person wearing?"],
             known_entities=["A named participant"],
         )
-        self.assertIn("Named people or entities that require visual grounding", prompt)
+        self.assertIn("Continuity candidates from earlier clips", prompt)
+        self.assertIn("never identify someone by visual resemblance alone", prompt)
         self.assertIn("A named participant", prompt)
 
     def test_bulk_gateway_uses_minimal_reasoning_to_preserve_answer_latency(self) -> None:
@@ -495,6 +538,42 @@ class GatewayResponseParsingTests(unittest.TestCase):
         self.assertIn("1/2 clips", client.last_error or "")
         self.assertIn("parallel batch failed", client.last_error or "")
 
+    def test_continuity_waves_pass_source_grounded_candidates_to_later_clips(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "AI_GATEWAY_API_KEY": "test-key",
+                "LARKUP_VIDEO_GATEWAY_BATCH_SIZE": "1",
+                "LARKUP_VIDEO_CONTINUITY_WAVE_BATCHES": "1",
+            },
+            clear=True,
+        ):
+            client = GatewayVisionClient()
+            clips = [
+                ClipCaptionRequest("clip_0", 0, 6_000, [(0, object())]),
+                ClipCaptionRequest("clip_1", 6_000, 12_000, [(6_000, object())]),
+            ]
+            candidates_by_clip: list[tuple[str, list[str]]] = []
+
+            def describe(batch, _goal, _questions, _spoken, known_entities, *_args):
+                clip_id = batch[0].clip_id
+                candidates_by_clip.append((clip_id, list(known_entities or [])))
+                if clip_id == "clip_0":
+                    return {
+                        clip_id: (
+                            "A presenter speaks.\nPresent: Mina — answers the question "
+                            "(identified by visible name caption)",
+                            0.62,
+                        )
+                    }
+                return {clip_id: ("The conversation continues.", 0.58)}
+
+            with patch.object(client, "_describe_batch", side_effect=describe):
+                client.describe_clips(clips, "", [])
+
+        self.assertEqual(candidates_by_clip[0], ("clip_0", []))
+        self.assertEqual(candidates_by_clip[1], ("clip_1", ["Mina"]))
+
     def test_keeps_structured_claims_and_uncertainty_as_retrievable_text(self) -> None:
         batch = [ClipCaptionRequest("clip_0", 0, 6000, [])]
         results = _parse_response(
@@ -521,7 +600,7 @@ class GatewayResponseParsingTests(unittest.TestCase):
         self.assertIn("Claim question: What is the final result?", text)
         self.assertIn("Claim verdict: partial", text)
         self.assertNotIn("Claim answer:", text)
-        self.assertIn("Observed context (not a complete answer)", text)
+        self.assertNotIn("Observed context (not a complete answer)", text)
 
     def test_partial_claims_are_lower_confidence_direct_components(self) -> None:
         batch = [ClipCaptionRequest("clip_0", 0, 6000, [])]

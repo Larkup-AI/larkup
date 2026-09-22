@@ -65,18 +65,21 @@ test('chat exposes the evidence-first video tools instead of ordinary search alo
   expect(route).toContain('hasMediaAsset: recentMediaAssetIds.length > 0');
   expect(route).toContain('mediaAssetId');
   expect(route).toContain('if (mediaFlow.hasMediaAsset && evidenceQueryTools.length > 0)');
-  expect(route).toContain('Dispatch the one unambiguous evidence-query action');
-  expect(route).toContain('preloadedVideoEvidence = true');
-  expect(route).toContain('toolName: evidenceToolName');
-  expect(route).toContain('input: { mediaAssetId, query: userText }');
-  expect(route).toContain('canReuseKnowledgeBaseEvidence(userText, messagesToProcess) &&');
+  expect(route).toContain('typed investigation directive');
+  expect(route).toContain("the chat model understands the user's language");
+  expect(route).not.toContain('input: { mediaAssetId, query: userText }');
+  expect(tools).toContain('sourceWideVisualEvidenceRequested');
+  expect(tools).toContain('Required language-model interpretation');
+  expect(tools).not.toContain('groupOverviewEvidence');
+  expect(tools).not.toContain('اثنان|اثنين');
+  expect(route).toContain('canReuseKnowledgeBaseEvidence(userText, evidenceMessages) &&');
   expect(route).toContain('!continuesMediaTopic');
-  expect(route).toContain('you could not confirm the specific detail in the video');
+  expect(route).toContain('Speak as someone who watched the material');
   expect(route).toContain('function findUnverifiedMediaEvidence(');
   expect(route).toContain('mediaClaimNeedsCorroboration(verification)');
   const toolContext = await readFile(`${repoRoot}/apps/web/lib/chat/tool-context.ts`, 'utf8');
   expect(toolContext).toContain("verification.status === 'established-by-trail'");
-  expect(route).toContain('The evidence gate above is authoritative');
+  expect(route).toContain('Follow claimVerification.rule');
   expect(route).toContain('Do not recommend a search engine, public website, or outside source');
   const messageItem = await readFile(
     `${repoRoot}/apps/web/components/chat/message-item.tsx`,
@@ -212,7 +215,10 @@ test('grounds a named person before presenting an appearance claim', async () =>
   expect(inspectRoute.replace(/\s+/g, ' ')).toContain("knownEntities.length > 0 ? 'thorough'");
   expect(vision).toContain('Name a person only where this clip shows a readable name label');
   expect(vision).toContain('Aligned evidence context for this clip');
-  expect(vision).toContain('Named people or entities that require visual grounding');
+  expect(vision).toContain(
+    'the supplied evidence explicitly preserves that identity across the cut',
+  );
+  expect(vision).toContain('source-grounded identity candidates across clip waves');
 });
 
 test('publishes a reindex as a fresh revision without one state write per projection', async () => {
@@ -345,4 +351,24 @@ test('indexes any fetched source transcript before paid audio transcription', as
   // never import a vendored copy of the tool's source.
   expect(adapter).toContain("await loadToolExtension<VideoClient>('video-intelligence')");
   expect(adapter).not.toContain('archive/video-audio');
+});
+
+test('carries the initial Media Panel focus through imported-video indexing', async () => {
+  const mediaPanel = await readFile(`${repoRoot}/apps/web/components/data/media-panel.tsx`, 'utf8');
+  const mediaRoute = await readFile(`${repoRoot}/apps/web/app/api/media/route.ts`, 'utf8');
+  const processRoute = await readFile(
+    `${repoRoot}/apps/web/app/api/media/process/route.ts`,
+    'utf8',
+  );
+  const adapter = await readFile(
+    `${repoRoot}/apps/web/lib/media/video-intelligence-adapter.ts`,
+    'utf8',
+  );
+
+  expect(mediaPanel).toContain('...(indexingInstructions ? { indexingInstructions } : {})');
+  expect(mediaRoute).toContain('indexingInstructions: indexingInstructions || undefined');
+  expect(adapter).toContain('export function resolveVideoIndexingHint');
+  expect(adapter).toContain('goal: resolveVideoIndexingHint(asset)');
+  expect(processRoute).toContain('guidance: indexingHint');
+  expect(processRoute).toContain("mediaOperation: 'guidance'");
 });

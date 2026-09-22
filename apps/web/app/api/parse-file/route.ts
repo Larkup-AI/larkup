@@ -7,22 +7,14 @@ export const dynamic = 'force-dynamic';
 
 // Use pdf-parse's packaged worker payload. Unlike a filesystem path, it is
 // preserved in Next's standalone output and always matches the parser version.
-let pdfParserPromise: Promise<typeof import('pdf-parse')['PDFParse']> | undefined;
+let pdfParserPromise: Promise<(typeof import('pdf-parse'))['PDFParse']> | undefined;
 
 async function getPdfParser() {
   if (!pdfParserPromise) {
     pdfParserPromise = (async () => {
-      // pdfjs-dist needs these globals while its Node build is evaluated. The
-      // static import used to run first in the standalone server, where the
-      // transitive optional canvas package was not traced, causing every PDF
-      // upload to fail with "DOMMatrix is not defined".
-      const canvas = await import('@napi-rs/canvas');
-      Object.assign(globalThis, {
-        DOMMatrix: canvas.DOMMatrix,
-        ImageData: canvas.ImageData,
-        Path2D: canvas.Path2D,
-      });
-
+      // Let PDF.js load its own compatible Node canvas implementation. Mixing
+      // it with the app-level canvas package creates incompatible Path2D
+      // instances and prevents the same PDF from being rendered later.
       const { PDFParse } = await import('pdf-parse');
       PDFParse.setWorker(getData());
       return PDFParse;

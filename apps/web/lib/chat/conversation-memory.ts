@@ -334,25 +334,18 @@ export function isTabularFollowUp(text: string, evidence: ConversationEvidence):
 
 export function isImagePreviewFollowUp(text: string, evidence: ConversationEvidence): boolean {
   if (evidence.images.length === 0) return false;
-  return /\b(?:show|preview|display|open|view)\b[\s\S]{0,40}\b(?:image|picture|diagram|page|it)\b|\b(?:image|picture|diagram)\s+preview\b/i.test(
+  return /\b(?:show|preview|display|open|view|render)\b[\s\S]{0,40}\b(?:image|picture|diagram|page|figure|it)\b|\b(?:image|picture|diagram|figure)\s+preview\b/i.test(
     text,
   );
 }
 
 /**
- * A new question immediately after a video-backed answer normally continues
- * that source, even when it does not repeat "this video". Preserve the
- * user's active media context unless they explicitly introduce a different
- * source. This keeps follow-up questions from being reranked onto an
- * unrelated upload with similar transcript terms.
+ * A source is selected by structured evidence from the immediately preceding
+ * turn. Keep it until a later source-selection event replaces it; never infer
+ * a source switch from vocabulary in the question.
  */
 export function continuesRecentMediaTopic(text: string, evidence: ConversationEvidence): boolean {
-  if (evidence.mediaAssetIds.length === 0) return false;
-  const normalized = text.trim();
-  if (!normalized) return false;
-  return !/\b(?:another|different|new|other)\s+(?:video|recording|match|episode|file|upload|source)\b/i.test(
-    normalized,
-  );
+  return evidence.mediaAssetIds.length === 1 && text.trim().length > 0;
 }
 
 const SOURCE_SWITCH_LANGUAGE =

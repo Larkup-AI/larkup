@@ -10,18 +10,6 @@ export type RoutableMediaAsset = {
   documentIds: string[];
 };
 
-/**
- * A source-type reference such as “the indexed video” is enough to select a
- * single available recording, even if a semantic search ranks another file.
- * Deliberately leave plural or otherwise ambiguous media collections to
- * retrieval and title matching.
- */
-export function hasExplicitMediaIntent(query: string) {
-  return /\b(?:video|audio|recording|clip|episode|movie|film|footage|watch|listen)\b|(?:فيديو|مقطع|تسجيل|حلقة|صوت)/iu.test(
-    query,
-  );
-}
-
 /** Select a title only when it has a clear lexical lead over every other source. */
 export function clearlyTitleMatchedMediaAsset<T extends RoutableMediaAsset>(
   query: string,
@@ -39,19 +27,18 @@ export function clearlyTitleMatchedMediaAsset<T extends RoutableMediaAsset>(
 }
 
 /**
- * A prior clip is a useful conversational default only when it is the sole
- * completed source or the new wording clearly repeats that clip's title.
- * Otherwise retrieval must get a chance to select another indexed video.
+ * A conversation carries a source selection as structured state. Once a
+ * source is selected, do not reinterpret ordinary user prose in an attempt
+ * to switch it: that is language- and genre-dependent, and can silently send
+ * a precise question to a different recording. A source switch must be
+ * represented by a new selected source in the conversation.
  */
 export function shouldKeepActiveMediaSource<T extends RoutableMediaAsset>(
-  query: string,
+  _query: string,
   activeAsset: T,
   availableAssets: readonly T[],
 ) {
-  return (
-    availableAssets.length <= 1 ||
-    clearlyTitleMatchedMediaAsset(query, availableAssets)?.id === activeAsset.id
-  );
+  return availableAssets.some((asset) => asset.id === activeAsset.id);
 }
 
 /** A conversational follow-up stays on its active source and skips global reranking. */

@@ -53,7 +53,7 @@ class Settings:
             ),
             disable_heavy_operators=_bool("LARKUP_VIDEO_DISABLE_HEAVY_OPERATORS", False),
             semantic_vision_enabled=_bool("LARKUP_VIDEO_SEMANTIC_VISION", True),
-            # Vercel AI Gateway model ids, not local HuggingFace paths -- both
+            # Vercel AI Gateway model ids, not local HuggingFace paths, both
             # run entirely through gateway_vision.GatewayVisionClient, which
             # reads these same env vars itself. Kept here too so /v1/health
             # can report them. The bulk model captions every clip cheaply;

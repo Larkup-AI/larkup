@@ -1,5 +1,6 @@
 import type { AgentToolDefinition, AgentToolExecutionContext } from '@larkup/marketplace/extension';
 import { trackUsageEvent } from '@larkup/core/analytics-store';
+import type { VideoInvestigationDirective } from '@larkup/core/video-knowledge/query-planner';
 import type { VideoIntelligenceClient } from './client.js';
 
 const MAX_INSPECTION_CHUNK_SECS = 60;
@@ -9,18 +10,9 @@ const TARGET_PADDING_SECS = 8;
 /** Independent looks dispatched together before the next wave starts. */
 const MAX_PARALLEL_INSPECTIONS = 4;
 /** The whole evidence-query fallback shares one deadline, including re-watch. */
-const INTERACTIVE_INSPECTION_BUDGET_MS = 45_000;
+const INTERACTIVE_INSPECTION_BUDGET_MS = 30_000;
 /** Leave part of the shared deadline for a provider-backed inspection if needed. */
-const INTERACTIVE_REWATCH_BUDGET_MS = 20_000;
-const TRANSITION_LANGUAGE = /chang|updat|finish|final|result|conclud|resolv|settl/i;
-const HUMAN_ROLE_LANGUAGE =
-  /\b(?:person|people|individual|man|woman|participant|contestant|player|member|speaker|presenter|host|guest|attendee)\b/i;
-const GENERIC_IDENTITY_LANGUAGE =
-  /^(?:(?:unknown|unidentified|unnamed)(?:\s+(?:person|people|participant|contestant|player|member|speaker|presenter|host|guest|attendee|individual|man|woman))?|person|people|participant|contestant|player|member|speaker|presenter|host|guest|attendee|individual|man|woman|team|group|studio participants?)(?:\s+\d+)?$/i;
-const ATTRIBUTE_ACTION_LANGUAGE =
-  /\b(?:wear\w*|dress\w*|clothing|clothes|outfit|shirt|jersey|jacket|coat|trousers|pants|skirt|shoe\w*|hat|hold\w*|carr\w*|stand\w*|sit\w*|driv\w*|eat\w*|drink\w*)\b|(?:يرتدي|لابس|ملابس|قميص|تيشيرت|جاكيت|بنطلون|حذاء|قبعة|يمسك|يحمل|يقف|يجلس|يقود|يأكل|يشرب)/iu;
-const LIMITATION_LANGUAGE =
-  /\b(?:no explicit|not explicit|does not explicit|not (?:a )?complete|not established|not shown|unclear|unknown|unresolved|incomplete)\b/i;
+const INTERACTIVE_REWATCH_BUDGET_MS = 12_000;
 
 type InspectionPurpose = 'verify-visual' | 'high-res-ocr' | 'compare' | 'count' | 'track' | 'code';
 type AnalysisMode = 'fast' | 'balanced' | 'thorough';
@@ -46,6 +38,12 @@ interface InspectVideoKnowledgeInput {
 interface QueryVideoEvidenceInput {
   mediaAssetId: string;
   query: string;
+  /**
+   * Optional semantic instruction produced by the chat model. The evidence
+   * action still has a safe focused retrieval path when a weak model cannot
+   * construct the richer directive.
+   */
+  investigation?: VideoInvestigationDirective;
   limit?: number;
   exhaustive?: boolean;
   cursor?: number;
@@ -67,7 +65,7 @@ export const AGENT_TOOLS = [
   {
     name: 'queryVideoEvidence',
     description:
-      'Answer a question about an indexed video. It uses the right source operation automatically: ranked evidence for focused questions, chronological scan for every source-authored item, and aggregate facts for people or a whole-source account. Perform a bounded direct re-watch only when returned evidence is genuinely incomplete or conflicting. For requests that explicitly ask for every item, the full account, or everything said, set exhaustive=true and follow continuation.nextCursor until hasMore=false.',
+      'Answer a question about an indexed video. It uses ranked evidence for focused questions, a chronological scan for source-authored or observed inventories, and a durable aggregate for a whole-source account. Perform a bounded direct re-watch only when returned evidence is genuinely incomplete or conflicting. For a full-source request, follow continuation.nextCursor until hasMore=false.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -75,6 +73,36 @@ export const AGENT_TOOLS = [
       properties: {
         mediaAssetId: { type: 'string', minLength: 1 },
         query: { type: 'string', minLength: 1, maxLength: 2_000 },
+        investigation: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['scope', 'goal'],
+          properties: {
+            scope: { type: 'string', enum: ['focused', 'temporal', 'source'] },
+            goal: {
+              type: 'string',
+              enum: ['answer', 'compare', 'trace', 'enumerate', 'synthesize'],
+            },
+            evidence: {
+              type: 'array',
+              maxItems: 4,
+              items: { type: 'string', enum: ['speech', 'visible-text', 'visual', 'computed'] },
+            },
+            recordSet: {
+              type: 'string',
+              enum: ['all', 'source-authored', 'source-questions', 'observed'],
+            },
+            timeRange: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['startSecs', 'endSecs'],
+              properties: {
+                startSecs: { type: 'number', minimum: 0 },
+                endSecs: { type: 'number', minimum: 0 },
+              },
+            },
+          },
+        },
         limit: { type: 'integer', minimum: 1, maximum: 48 },
         exhaustive: { type: 'boolean' },
         cursor: { type: 'integer', minimum: 0 },
@@ -84,7 +112,7 @@ export const AGENT_TOOLS = [
     workflow: 'evidence-query',
     evidenceInput: 'media-asset',
     systemPromptFragment:
-      'Use this action for media questions. It selects a source operation before asking a model to synthesize: focused questions use ranked evidence; complete source inventories use a chronological database scan; person and timeline questions may use a compact aggregate. Never turn a complete-source request into top-K retrieval. For an explicit every/all/complete-source request, call with exhaustive=true and keep calling with continuation.nextCursor until hasMore=false; do not mistake one page for the complete answer. Never say you do not know or that the source lacks an answer before this action has attempted its available fallback. State an outcome, final result, identity, count, or exact visible fact only when established. Answer naturally as someone who watched and remembers the material: lead with the answer itself (for example, "X won" or "He wore Y"), not phrases such as "the video shows", "the analysis indicates", or "according to the retrieved evidence". Never mention retrieval, search, indexing, frames, tools, or analysis unless the user asks how the answer was found.',
+      'Use this action for media questions. On every call, derive investigation from the user’s meaning in their own language: use focused for one local moment, temporal for a relationship or development across moments, and source when the answer must account for the recording as a whole. Set answer, compare, trace, enumerate, or synthesize according to the reasoning operation—not the video genre or a word list. If the user supplies a specific source time or range, put its resolved seconds in investigation.timeRange; otherwise omit it. For a source enumeration, set recordSet to source-authored for units authored in the recording, source-questions for only authored questions and their answers, observed for time-grounded observed facts, or all when both are needed. Choose source plus synthesize for the overall narrative. Focused questions use ranked evidence; source enumerations use a chronological database scan; source explanations use a durable navigation aggregate. Never turn a complete-source request into top-K retrieval. For an exhaustive result, follow continuation.nextCursor until hasMore=false; do not mistake one page for the complete answer. Never say you do not know or that the source lacks an answer before this action has attempted its available fallback. State a value, identity, count, or exact visible fact only when established. observedSubjects, when present, is the reconciled frame-grounded visibility ledger: use its ranges for visible-presence and timing claims, never speech, titles, or a source name. Its durations are observed intervals, not inferred continuous screen time. Answer as a viewer who remembers the material: lead with the answer itself, and when natural say "I saw" or "I heard" rather than describing a system. Do not say "the video shows", "the analysis indicates", or "according to retrieved evidence". Never mention retrieval, search, indexing, frames, tools, or analysis unless the user asks how the answer was found.',
   },
   {
     name: 'inspectVideoKnowledge',
@@ -135,22 +163,23 @@ export function attachVideoIntelligenceAgentClient(
         return { success: false, error: 'A completed video asset is required.' };
 
       const focusedQuery = focusQuestion(input.query, asset.fileName);
-      const plan: VideoPlan = mediaEvidence.planQuestion(focusedQuery);
+      const directive = validInvestigation(input.investigation)
+        ? input.investigation
+        : // If the conversational planner is unavailable, preserving the full
+          // source is safer than silently reducing an arbitrary question to a
+          // Top-K local match. A later planner result may optimize this, but the
+          // evidence capability must have a source-complete fallback for every
+          // language and kind of recording.
+          { scope: 'source' as const, goal: 'synthesize' as const };
+      const plan: VideoPlan = mediaEvidence.planQuestion(focusedQuery, directive);
       const focusedInput = {
         ...input,
         query: focusedQuery,
+        investigation: directive,
         // Requests that span a whole recording need deterministic pagination
         // through the index. Callers should not need to know this tool's query
         // planner well enough to opt into exhaustive retrieval themselves.
-        exhaustive:
-          input.exhaustive ??
-          (plan.kinds.some(
-            (kind) =>
-              kind === 'question-inventory' ||
-              kind === 'source-inventory' ||
-              kind === 'entity-inventory',
-          ) ||
-            (plan.requiresBroadCoverage === true && !plan.kinds.includes('evaluation'))),
+        exhaustive: input.exhaustive ?? plan.requiresBroadCoverage === true,
       };
       const durationSecs = asset.durationSecs;
       // Complete inventories are a deterministic database scan, never an
@@ -159,7 +188,8 @@ export function attachVideoIntelligenceAgentClient(
       // coverage.
       if (plan.route === 'scan' && mediaEvidence.scan) {
         const sourceInventory =
-          plan.kinds.includes('question-inventory') || plan.kinds.includes('source-inventory');
+          focusedInput.investigation.recordSet === 'source-authored' ||
+          focusedInput.investigation.recordSet === 'source-questions';
         const scanned = await mediaEvidence.scan(input.mediaAssetId, {
           kind: sourceInventory ? 'source-inventory' : 'all-evidence',
           cursor: input.cursor,
@@ -170,15 +200,21 @@ export function attachVideoIntelligenceAgentClient(
           // items too. A question table must contain only source questions;
           // the cursor still follows every raw record so coverage remains an
           // exact chronological scan rather than a filtered Top-K search.
-          const scanRecords = plan.kinds.includes('question-inventory')
-            ? scanned.records.filter(
-                (record) =>
-                  record.kind === 'question' &&
-                  record.questionRole !== 'interactional' &&
-                  record.questionRole !== 'rhetorical',
-              )
-            : scanned.records;
+          const scanRecords =
+            focusedInput.investigation.recordSet === 'source-questions'
+              ? scanned.records.filter(
+                  (record) =>
+                    record.kind === 'question' &&
+                    record.questionRole !== 'interactional' &&
+                    record.questionRole !== 'rhetorical',
+                )
+              : scanned.records;
           const evidence = scanRecords.map(scanRecordToEvidence);
+          // Inventory rows are a source-data contract, not prose for the
+          // answer model to interpret. The host can aggregate every cursor
+          // page and render/search/export the complete result without putting
+          // a long recording's authored units in an LLM context window.
+          const rows = scanRecords.map(scanRecordToRow);
           // A page is directly grounded when the indexed source coverage is
           // complete. The chat host owns cursor-following and will withhold a
           // final exhaustive rendering until the final page arrives.
@@ -201,6 +237,16 @@ export function attachVideoIntelligenceAgentClient(
             mediaAssetId: input.mediaAssetId,
             fileName: asset.fileName,
             evidence,
+            inventory: {
+              recordSet: focusedInput.investigation.recordSet ?? 'all',
+              coverage: {
+                complete,
+                ...(scanned.coverage.reason ? { reason: scanned.coverage.reason } : {}),
+              },
+            },
+            columns: SOURCE_INVENTORY_COLUMNS,
+            rows,
+            totalRows: rows.length,
             resultHandle: scanned.resultHandle,
             claimVerification: {
               status: complete ? 'directly-established' : 'needs-corroboration',
@@ -240,24 +286,47 @@ export function attachVideoIntelligenceAgentClient(
           };
         }
       }
-      const aggregate =
-        plan.route === 'aggregate' && mediaEvidence.aggregate
-          ? await mediaEvidence.aggregate(input.mediaAssetId)
-          : undefined;
+      // The compact aggregate is revision-cached and carries protocol-backed
+      // source questions and visual sightings that ranked snippets can split
+      // apart. It is navigation material, not a substitute for source truth.
+      const aggregate = mediaEvidence.aggregate
+        ? await mediaEvidence.aggregate(input.mediaAssetId)
+        : undefined;
       // Start with the index alone. Planning and visual locating are useful
       // fallbacks, but waiting for both before checking an already-complete RAG
       // answer made simple questions feel like analysis jobs.
+      // A source position supplied by the user is a retrieval boundary, not
+      // merely another ranking signal.  Read that bounded part of the index
+      // first so a whole-recording overview cannot displace its evidence.
+      const explicitRanges = directiveTimeRange(directive, durationSecs);
+      const [rankedHits, explicitlyScopedHits] = await Promise.all([
+        retrieve(mediaEvidence, focusedInput, plan, durationSecs),
+        explicitRanges.length > 0
+          ? retrieveEvidenceInRanges(
+              mediaEvidence,
+              focusedInput,
+              plan,
+              durationSecs,
+              explicitRanges,
+            )
+          : Promise.resolve([]),
+      ]);
       let hits = mergeHits(
-        await retrieve(mediaEvidence, focusedInput, plan, durationSecs),
+        explicitlyScopedHits,
+        rankedHits,
         aggregate ? aggregateToHits(aggregate) : [],
       );
       let investigation: VideoInvestigation;
-      let locatedRanges: Array<{ startSecs: number; endSecs: number }> = [];
+      let locatedRanges: Array<{ startSecs: number; endSecs: number }> = explicitRanges;
       let assessment = assessEvidence(hits, focusedInput.query, plan, durationSecs, undefined);
 
       if (!assessment.sufficient) {
-        [investigation, locatedRanges] = await Promise.all([
-          mediaEvidence.planInvestigation?.(input.mediaAssetId, focusedInput.query),
+        const [plannedInvestigation, semanticRanges] = await Promise.all([
+          mediaEvidence.planInvestigation?.(
+            input.mediaAssetId,
+            focusedInput.query,
+            focusedInput.investigation,
+          ),
           // Where independent indexed signals agree the answer is. This is
           // measured navigation, not evidence, and only runs after the fast
           // indexed answer test has failed.
@@ -266,12 +335,15 @@ export function attachVideoIntelligenceAgentClient(
             maxWindowSecs: MAX_INSPECTION_CHUNK_SECS,
           }) ?? Promise.resolve([]),
         ]);
+        investigation = plannedInvestigation;
+        const additionalRanges = uniqueRanges(semanticRanges);
+        locatedRanges = uniqueRanges([...explicitRanges, ...additionalRanges]);
         const locatedEvidence = await retrieveEvidenceInRanges(
           mediaEvidence,
           focusedInput,
           plan,
           durationSecs,
-          locatedRanges,
+          additionalRanges,
         );
         hits = mergeHits(locatedEvidence, hits);
         assessment = assessEvidence(hits, focusedInput.query, plan, durationSecs, investigation);
@@ -373,7 +445,11 @@ export function attachVideoIntelligenceAgentClient(
                 analyzedRanges: established.map((reading) => reading.range),
                 broadCoverage: plan.requiresBroadCoverage === true,
                 coverage: investigation?.coverage,
+                directive: investigationDirectiveForOutput(focusedInput.investigation),
               },
+              ...(shouldIncludeObservedSubjects(aggregate, focusedInput.investigation, plan)
+                ? { observedSubjects: aggregate!.visibleSubjects }
+                : {}),
               ...(focusedInput.exhaustive
                 ? { continuation: exhaustiveContinuation(hits, assessment, focusedInput) }
                 : {}),
@@ -444,6 +520,16 @@ export function attachVideoIntelligenceAgentClient(
       const supportingClip = plan.kinds.includes('outcome')
         ? evidence.at(-1)?.timeRange
         : evidence[0]?.timeRange;
+      // A complete visibility ledger is useful for a source-wide or temporal
+      // question, but it is dangerous extra context for a single requested
+      // moment: a renderer can accidentally combine a remote appearance with
+      // that moment.  The selected evidence already carries any ledger entry
+      // whose explicit interval overlaps the focused request.
+      const includeObservedSubjects = shouldIncludeObservedSubjects(
+        aggregate,
+        focusedInput.investigation,
+        plan,
+      );
       const responseTimeMs = Date.now() - startedAt;
       const answerPath = analyzedRanges.length > 0 ? 'rag+analysis' : 'rag';
       void trackUsageEvent({
@@ -491,7 +577,9 @@ export function attachVideoIntelligenceAgentClient(
           analyzedRanges,
           broadCoverage: plan.requiresBroadCoverage === true,
           coverage: investigation?.coverage,
+          directive: investigationDirectiveForOutput(focusedInput.investigation),
         },
+        ...(includeObservedSubjects ? { observedSubjects: aggregate!.visibleSubjects } : {}),
         ...(focusedInput.exhaustive
           ? { continuation: exhaustiveContinuation(hits, assessment, focusedInput) }
           : {}),
@@ -544,9 +632,40 @@ function evidenceHitsFor(
   input: QueryVideoEvidenceInput,
   durationSecs: number | undefined,
 ) {
-  return selectAnswerEvidence(hits, assessment, plan, input, durationSecs).map((hit) =>
-    toEvidence(hit, plan),
+  // A request can both name a source position and ask for a relationship to
+  // the rest of the recording. Keep a direct account of that named position
+  // beside the broader trail: otherwise a renderer can attach a remote named
+  // subject to the local, merely described subject. This relies only on the
+  // typed time boundary, so it applies to any language and kind of media.
+  const localAnchor = explicitlyRequestedMomentEvidence(hits, plan, durationSecs);
+  return mergeHits(
+    localAnchor,
+    selectAnswerEvidence(hits, assessment, plan, input, durationSecs),
+  ).map((hit) => toEvidence(hit, plan));
+}
+
+function explicitlyRequestedMomentEvidence(
+  hits: VideoKnowledgeSearchHit[],
+  plan: VideoPlan,
+  durationSecs: number | undefined,
+) {
+  const requestedRanges = directiveTimeRange(plan.investigation, durationSecs);
+  if (requestedRanges.length === 0) return [];
+  const scoped = hits.filter((hit) =>
+    requestedRanges.some(
+      (range) =>
+        hit.evidence.timeRange.startSecs < range.endSecs &&
+        hit.evidence.timeRange.endSecs > range.startSecs,
+    ),
   );
+  return mergeHits(
+    scoped.filter((hit) => hit.evidence.modality === 'visual' && isAccountOfMoment(hit)),
+    scoped.filter((hit) => {
+      const text = evidenceText(hit.evidence.payload);
+      return /^Reconciled visible subject:\s*[^\n]+\nIdentity basis:/im.test(text);
+    }),
+    scoped.filter(isAccountOfMoment),
+  ).slice(0, 4);
 }
 
 type VideoPlan = {
@@ -557,10 +676,38 @@ type VideoPlan = {
   requiresIdentityContext?: boolean;
   requiresInspectionWhenInsufficient: boolean;
   subjectName?: string;
+  investigation?: VideoInvestigationDirective;
 };
 type MediaEvidence = NonNullable<AgentToolExecutionContext['mediaEvidence']>;
 type VideoKnowledgeSearchHit = Awaited<ReturnType<MediaEvidence['search']>>[number];
 type VideoInvestigation = Awaited<ReturnType<NonNullable<MediaEvidence['planInvestigation']>>>;
+
+/**
+ * Keep the source-navigation decision alongside the evidence it governed.
+ * The renderer uses this typed provenance to distinguish a local sighting
+ * from a request that also asks how that sighting relates to the full source.
+ */
+function investigationDirectiveForOutput(directive: VideoInvestigationDirective) {
+  return {
+    scope: directive.scope,
+    goal: directive.goal,
+    ...(directive.recordSet ? { recordSet: directive.recordSet } : {}),
+    ...(directive.timeRange ? { timeRange: directive.timeRange } : {}),
+  };
+}
+
+function shouldIncludeObservedSubjects(
+  aggregate: Awaited<ReturnType<NonNullable<MediaEvidence['aggregate']>>> | undefined,
+  directive: VideoInvestigationDirective,
+  plan: VideoPlan,
+): boolean {
+  return Boolean(
+    aggregate?.visibleSubjects &&
+    (directive.recordSet === 'observed' ||
+      directive.scope !== 'focused' ||
+      plan.requiresBroadCoverage === true),
+  );
+}
 
 function scanRecordToEvidence(
   record: NonNullable<Awaited<ReturnType<NonNullable<MediaEvidence['scan']>>>>['records'][number],
@@ -587,6 +734,42 @@ function scanRecordToEvidence(
     payload: { text },
     confidence: record.confidence,
   };
+}
+
+const SOURCE_INVENTORY_COLUMNS = [
+  'Timestamp',
+  'Content',
+  'Answer',
+  'Respondent',
+  'Channel',
+  'Record type',
+] as const;
+
+/** Keep the scan's original authored fields intact for generic data-table rendering. */
+function scanRecordToRow(
+  record: NonNullable<Awaited<ReturnType<NonNullable<MediaEvidence['scan']>>>>['records'][number],
+) {
+  return {
+    // This stable key is intentionally not a displayed column. It lets the
+    // host de-duplicate opaque cursor pages without guessing from content.
+    id: record.id,
+    Timestamp: formatSourceTimestamp(record.timeRange.startSecs),
+    Content: record.text,
+    Answer: record.answer ?? '',
+    Respondent: record.respondent ?? '',
+    Channel: record.channel ?? '',
+    'Record type': record.kind,
+  };
+}
+
+function formatSourceTimestamp(seconds: number) {
+  const total = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(total / 3_600);
+  const minutes = Math.floor((total % 3_600) / 60);
+  const remainder = total % 60;
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
+    : `${minutes}:${String(remainder).padStart(2, '0')}`;
 }
 
 function aggregateToHits(
@@ -632,7 +815,9 @@ function aggregateToHits(
             item.kind === 'question'
               ? `Source question (${item.channel ?? 'spoken'}${
                   item.questionRole ? `, ${item.questionRole}` : ''
-                }): ${item.text}`
+                }): ${item.text}${item.answer ? `\nSource answer: ${item.answer}` : ''}${
+                  item.respondent ? `\nSource respondent: ${item.respondent}` : ''
+                }`
               : item.kind === 'structure'
                 ? `Source structure: ${item.text}${
                     item.promptSlots === undefined
@@ -643,6 +828,31 @@ function aggregateToHits(
         },
         source: { kind: 'provider', provider: 'video-intelligence-index' },
         confidence: { score: 0.82 },
+        createdAt,
+      },
+      score: 0.8,
+      conflict: false,
+    })),
+    ...aggregate.visibleSubjects.map((subject, index) => ({
+      evidence: {
+        id: `${aggregate.resultHandle}:visible-subject:${index}`,
+        modality: 'computed',
+        timeRange: {
+          startSecs: subject.appearances[0]?.startSecs ?? 0,
+          endSecs: subject.appearances.at(-1)?.endSecs ?? subject.appearances[0]?.endSecs ?? 0,
+          precision: 'estimated',
+        },
+        payload: {
+          text:
+            `Reconciled visible subject: ${subject.identity}\n` +
+            `Identity basis: ${subject.identityBasis}\n` +
+            `Observed appearances: ${subject.appearances
+              .map((range) => `${range.startSecs}-${range.endSecs}s`)
+              .join('; ')}\n` +
+            `Observed visible duration: ${subject.observedDurationSecs}s`,
+        },
+        source: { kind: 'provider', provider: 'video-intelligence-index' },
+        confidence: { score: subject.identityBasis === 'source-named' ? 0.8 : 0.6 },
         createdAt,
       },
       score: 0.8,
@@ -786,12 +996,18 @@ async function retrieveEvidenceInRanges(
     minimumRangeDistanceSecs: 0,
   };
   const groups = await Promise.all(
-    ranges.map((range) =>
-      mediaEvidence.search(input.mediaAssetId, input.query, 24, {
-        ...options,
-        timeRange: range,
-      }),
-    ),
+    ranges.map(async (range) => {
+      const rangeOptions = { ...options, timeRange: range };
+      // Query matching can fail across languages or when an observation uses
+      // a natural description instead of the user's wording.  The bounded
+      // unranked read preserves all accounts from the requested moment; the
+      // normal query remains alongside it for relevance ordering.
+      const [ranked, bounded] = await Promise.all([
+        mediaEvidence.search(input.mediaAssetId, input.query, 24, rangeOptions),
+        mediaEvidence.search(input.mediaAssetId, '', 48, rangeOptions),
+      ]);
+      return mergeHits(ranked, bounded);
+    }),
   );
   return mergeHits(...groups);
 }
@@ -897,7 +1113,7 @@ function assessEvidence(
     };
   }
 
-  const direct = answerEstablishedHits(hits, question, plan.kinds, watched, durationSecs);
+  const direct = answerEstablishedHits(hits, question, plan, watched);
   const reconciled =
     direct.length === 0 ? indexedReconciledAnswerHits(hits, plan, durationSecs) : [];
   const trail =
@@ -954,36 +1170,16 @@ function assessEvidence(
   };
 }
 
-/** Keep compact records that actually bind identities, roles, or memberships. */
-function identityInventoryHits(hits: VideoKnowledgeSearchHit[], question: string) {
-  const asksForPeople =
-    /\b(?:people|persons?|participants?|contestants?|players?|members?|speakers?|presenters?|hosts?|guests?|attendees?|men|women)\b/i.test(
-      question,
-    ) ||
-    /(?:الأشخاص|الاشخاص|المشاركين|المتسابقين|اللاعبين|الأعضاء|الاعضاء|المتحدثين|المقدمين|الضيوف|الرجال|السيدات)/u.test(
-      question,
-    );
-  const groupedRequest =
-    /\b(?:each|every|both)\s+(?:team|group|side|department|organization|organisation|class|panel)\b|\bof\s+(?:each|every|both)\b/i.test(
-      question,
-    ) || /(?:كل|كلا)\s+(?:فريق|مجموعة|قسم|منظمة|فصل)/u.test(question);
+/** Keep compact records that actually bind an entity to source evidence. */
+function identityInventoryHits(hits: VideoKnowledgeSearchHit[], _question: string) {
   const selected = chronological(hits).filter((hit) => {
     const text = evidenceText(hit.evidence.payload);
-    if (/^(?:Reconciled|Indexed) participant:\s*[^—\n]{2,120}/im.test(text)) return true;
-    const present = [...text.matchAll(/^Present:\s*([^—\n]{2,120})\s*—\s*([^\n]+)/gim)];
-    if (!asksForPeople) return present.length > 0;
-    return present.some((match) => {
-      const name = match[1]?.trim() ?? '';
-      const role = match[2] ?? '';
-      return HUMAN_ROLE_LANGUAGE.test(role) && !GENERIC_IDENTITY_LANGUAGE.test(name);
-    });
-  });
-  if (groupedRequest) {
-    const ranked = [...selected].sort(
-      (left, right) => groupedIdentityStrength(right) - groupedIdentityStrength(left),
+    return (
+      /^(?:Reconciled|Indexed)\s+(?:participant|visible subject):\s*[^\n]{2,180}/im.test(text) ||
+      /^Visible subject:\s*\{/im.test(text) ||
+      /^Present:\s*[^—\n]{2,120}\s*—/im.test(text)
     );
-    if (ranked.length > 0 && groupedIdentityStrength(ranked[0]) >= 20) return [ranked[0]];
-  }
+  });
   const seen = new Set<string>();
   return selected
     .filter((hit) => {
@@ -998,26 +1194,19 @@ function identityInventoryHits(hits: VideoKnowledgeSearchHit[], question: string
 
 function groupedIdentityStrength(hit: VideoKnowledgeSearchHit) {
   const text = primaryAccount(evidenceText(hit.evidence.payload));
-  const namedPeople = [...text.matchAll(/^Present:\s*([^—\n]{2,120})\s*—\s*([^\n]+)/gim)].filter(
-    (match) =>
-      HUMAN_ROLE_LANGUAGE.test(match[2] ?? '') &&
-      !GENERIC_IDENTITY_LANGUAGE.test(match[1]?.trim() ?? ''),
-  ).length;
+  const anchoredSubjects = subjectEvidenceCount(text);
   let groupedBindings = 0;
   const serializedBindings = text.match(/^Claim bindings:\s*(.+)$/im)?.[1];
   if (serializedBindings) {
     try {
       const bindings = JSON.parse(serializedBindings) as Array<{ subject?: unknown }>;
-      groupedBindings = bindings.filter(
-        (binding) =>
-          typeof binding?.subject === 'string' && /\s(?:and|&|و)\s|،|,/iu.test(binding.subject),
-      ).length;
+      groupedBindings = bindings.filter((binding) => typeof binding?.subject === 'string').length;
     } catch {
       groupedBindings = 0;
     }
   }
   return (
-    namedPeople * 4 +
+    anchoredSubjects * 4 +
     groupedBindings * 8 +
     Number((hit as VideoKnowledgeSearchHit & { score?: number }).score ?? 0)
   );
@@ -1052,39 +1241,29 @@ function evaluationEvidenceHits(hits: VideoKnowledgeSearchHit[]) {
   return evenlySpaced(useful, 36);
 }
 
-/** A comparative judgement needs repeated named human activity, not scenery or score displays. */
+/** A comparative judgement needs repeated source-anchored activity. */
 function evaluationEvidenceReady(hits: VideoKnowledgeSearchHit[]) {
-  const momentsByPerson = new Map<string, Set<number>>();
+  const momentsBySubject = new Map<string, Set<number>>();
   for (const hit of hits) {
     const text = primaryAccount(evidenceText(hit.evidence.payload));
-    for (const match of text.matchAll(/^Present:\s*([^—\n]{2,120})\s*—\s*([^\n]+)/gim)) {
-      const name = match[1]?.trim() ?? '';
-      if (!HUMAN_ROLE_LANGUAGE.test(match[2] ?? '') || GENERIC_IDENTITY_LANGUAGE.test(name)) {
-        continue;
-      }
-      const key = name.normalize('NFKC').toLocaleLowerCase();
-      const moments = momentsByPerson.get(key) ?? new Set<number>();
+    for (const identity of subjectIdentities(text)) {
+      const key = identity.normalize('NFKC').toLocaleLowerCase();
+      const moments = momentsBySubject.get(key) ?? new Set<number>();
       moments.add(Math.floor(hit.evidence.timeRange.startSecs / 15));
-      momentsByPerson.set(key, moments);
+      momentsBySubject.set(key, moments);
     }
   }
-  return [...momentsByPerson.values()].filter((moments) => moments.size >= 2).length >= 2;
+  return [...momentsBySubject.values()].filter((moments) => moments.size >= 2).length >= 2;
 }
 
-/** Source-wide visible units extracted during indexing, kept separate from narrative notes. */
-function sourceInventoryHits(hits: VideoKnowledgeSearchHit[], question: string) {
-  const text = question.normalize('NFKC').toLocaleLowerCase();
-  const wantsSlides = /\bslides?\b|(?:الشرائح|السلايدز)/u.test(text);
-  const wantsBoard = /\b(?:boards?|whiteboards?)\b|(?:السبورة|اللوح)/u.test(text);
+/** Source-wide authored units extracted during indexing, independent of genre or language. */
+function sourceInventoryHits(hits: VideoKnowledgeSearchHit[], _question: string) {
   const records = chronological(hits).filter((hit) => {
     const account = evidenceText(hit.evidence.payload);
     const kind = account.match(
       /^Source item \((heading|slide-item|board-item|list-item),\s*(?:spoken|visible)\):/im,
     )?.[1];
-    if (!kind) return false;
-    if (wantsSlides) return kind === 'heading' || kind === 'slide-item';
-    if (wantsBoard) return kind === 'heading' || kind === 'board-item';
-    return true;
+    return Boolean(kind);
   });
   const seen = new Set<string>();
   return records.filter((hit) => {
@@ -1100,10 +1279,7 @@ function temporalSequenceHits(hits: VideoKnowledgeSearchHit[]) {
   const reconciled = chronological(hits).filter((hit) => {
     if (hit.evidence.source?.provider !== 'video-intelligence-index') return false;
     const text = evidenceText(hit.evidence.payload).trim();
-    return (
-      /^Reconciled state:/i.test(text) ||
-      (/^Reconciled event:/i.test(text) && TRANSITION_LANGUAGE.test(text))
-    );
+    return /^(?:Reconciled|Indexed)\s+(?:state|event):/i.test(text);
   });
   // Older indexes may not contain a synthesized trajectory. Preserve their
   // broad raw account so a targeted inspection can still use it.
@@ -1111,7 +1287,7 @@ function temporalSequenceHits(hits: VideoKnowledgeSearchHit[]) {
 }
 
 /** Keep only source-authored prompts for an exhaustive question inventory. */
-function questionInventoryHits(hits: VideoKnowledgeSearchHit[], query: string) {
+function questionInventoryHits(hits: VideoKnowledgeSearchHit[], _query: string) {
   const seen = new Set<string>();
   const candidates = chronological(hits).flatMap((hit) => {
     // A later chat inspection can itself contain the user's question. It is
@@ -1119,14 +1295,7 @@ function questionInventoryHits(hits: VideoKnowledgeSearchHit[], query: string) {
     if (hit.evidence.source?.provider === 'video-intelligence-vision') return [];
     return sourceQuestionRecordsFromHit(hit).flatMap((record, index) => {
       const normalizedQuestion = normalizeInventoryText(record.question);
-      if (
-        !normalizedQuestion ||
-        /what the person reading (?:these|the) notes cares about|what the (?:viewer|reader) cares about/i.test(
-          normalizedQuestion,
-        )
-      ) {
-        return [];
-      }
+      if (!normalizedQuestion) return [];
       const key = [
         normalizedQuestion,
         normalizeInventoryText(record.context ?? ''),
@@ -1152,64 +1321,16 @@ function questionInventoryHits(hits: VideoKnowledgeSearchHit[], query: string) {
       ];
     });
   });
-  const asksForFormalPromptSection =
-    /\b(?:competition|contest|quiz|game|exam|test|challenge|round)\b|(?:مسابقة|المسابقة|اختبار|تحدي|جولة|لعبة)/iu.test(
-      query,
-    );
-  const visibleMoments = candidates
-    .filter(
-      (candidate) =>
-        (candidate as typeof candidate & { sourceQuestionChannel?: string })
-          .sourceQuestionChannel === 'visible',
-    )
-    .map((candidate) => candidate.evidence.timeRange.startSecs);
-  const sectionCandidates =
-    asksForFormalPromptSection && visibleMoments.length > 0
-      ? candidates.filter((candidate) => {
-          const record = candidate as typeof candidate & {
-            sourceQuestionChannel?: string;
-            sourceQuestionText?: string;
-          };
-          if (record.sourceQuestionChannel === 'visible') return true;
-          const at = candidate.evidence.timeRange.startSecs;
-          if (at < Math.min(...visibleMoments) - 60 || at > Math.max(...visibleMoments) + 60)
-            return false;
-          // A standalone prompt should not contain the first-person planning
-          // and turn-taking language typical of a reaction or answer fragment.
-          const sourceText = record.sourceQuestionText ?? '';
-          if (
-            /\b(?:i|i'm|ive|i've|you know|let me|look|wait)\b|(?:\bانا\b|\bأنا\b|\bشوف\b|\bبينا\b|\bيلا\b|\bبعرف\b|\bعارف\b|\bهسه\b)/iu.test(
-              sourceText,
-            )
-          )
-            return false;
-          const questionCues =
-            sourceText
-              .toLocaleLowerCase()
-              .match(/[\p{Letter}\p{Number}][\p{Letter}\p{Mark}\p{Number}_-]*/gu)
-              ?.filter((word) =>
-                /^(?:who|what|which|how|why|when|where|من|مين|ما|ماذا|كيف|كم|ايه|إيه|أي|اي)$/iu.test(
-                  word,
-                ),
-              ) ?? [];
-          return !questionCues.some(
-            (cue, index) =>
-              questionCues.findIndex(
-                (other) => normalizeInventoryText(other) === normalizeInventoryText(cue),
-              ) !== index,
-          );
-        })
-      : candidates;
   // OCR and ASR often capture the same prompt with slight spelling or
   // transcription differences. Collapse nearby copies and retain the visible
   // or fullest reading, while preserving genuine repeats later in the source.
-  return sectionCandidates.filter((candidate) => {
+  return candidates.filter((candidate) => {
     const candidateRecord = candidate as typeof candidate & {
       sourceQuestionChannel?: string;
       sourceQuestionText?: string;
     };
     if (!candidateRecord.sourceQuestionText) return true;
-    const nearbyCopies = sectionCandidates.filter((other) => {
+    const nearbyCopies = candidates.filter((other) => {
       const otherText = (other as typeof other & { sourceQuestionText?: string })
         .sourceQuestionText;
       return (
@@ -1254,19 +1375,12 @@ function normalizeInventoryText(value: string) {
 }
 
 function inventoryQuestionTokens(value: string) {
-  const normalized = value
-    .normalize('NFKD')
-    .replace(/[\u064b-\u065f\u0670]/gu, '')
-    .replace(/[أإآٱ]/gu, 'ا')
-    .replace(/ى/gu, 'ي')
-    .toLocaleLowerCase();
-  const words = normalized.match(/[\p{Letter}\p{Number}][\p{Letter}\p{Mark}\p{Number}_-]*/gu) ?? [];
-  const firstCue = words.findIndex((word) =>
-    /^(?:who|what|when|where|why|how|which|whose|whom|is|are|was|were|do|does|did|can|could|would|will|name|list|identify|describe|tell|give|من|ما|ماذا|متي|اين|كيف|كم|هل|اي|لماذا|مين|ايه|فين|امتي|ازاي|اذكر|حدد|سم|سمي)$/iu.test(
-      word,
-    ),
+  return new Set(
+    value
+      .normalize('NFKC')
+      .toLocaleLowerCase()
+      .match(/[\p{Letter}\p{Number}][\p{Letter}\p{Mark}\p{Number}_-]*/gu) ?? [],
   );
-  return new Set(firstCue > 0 ? words.slice(firstCue) : words);
 }
 
 function inventoryQuestionsMatch(left: string, right: string) {
@@ -1278,26 +1392,10 @@ function inventoryQuestionsMatch(left: string, right: string) {
 }
 
 function isWellFormedSourceQuestion(record: SourceQuestionRecord) {
-  const question = record.question.normalize('NFKC').trim();
-  if (question.length < 4) return false;
-  if (record.channel === 'visible') return true;
-  const punctuated = /[?؟]\s*$/u.test(question);
-  // ASR commonly drops question marks. Require a source-language question or
-  // request cue near the start; an answer/reaction that happens to contain a
-  // question word much later must not become a source inventory item.
-  const words =
-    question
-      .toLocaleLowerCase()
-      .match(/[\p{Letter}\p{Number}][\p{Letter}\p{Mark}\p{Number}_-]*/gu) ?? [];
-  const cue =
-    /^(?:who|what|when|where|why|how|which|whose|whom|is|are|was|were|do|does|did|can|could|would|will|name|list|identify|describe|tell|give|من|ما|ماذا|متى|أين|اين|كيف|كم|هل|أي|اي|لماذا|مين|إيه|ايه|فين|امتى|ازاي|اذكر|أذكر|حدد|سم|سمي)$/iu;
-  const cueIndex = words.slice(0, 4).findIndex((word) => cue.test(word));
-  if (cueIndex < 0) return punctuated;
-  const meaningful = new Set(words.slice(cueIndex + 1));
-  const deictic =
-    /^(?:this|that|it|one|thing|exactly|first|second|third|دي|ده|دا|هذه|هذا|هي|هو|بالظبط|بالضبط|الاولى|الأولى|الثانية|الثالثة)$/iu;
-  if (meaningful.size === 1 && [...meaningful].every((word) => deictic.test(word))) return false;
-  return true;
+  // The source mapper has already semantically classified this record.  The
+  // executor only guards the transport shape and never applies a language
+  // list to decide whether a source sentence is a question.
+  return record.question.normalize('NFKC').trim().length >= 4;
 }
 
 function sourceQuestionRecordsFromHit(hit: VideoKnowledgeSearchHit): SourceQuestionRecord[] {
@@ -1436,7 +1534,7 @@ function indexedReconciledAnswerHits(
       text.length >= 20 &&
       (semantic >= 0.05 || lexical >= 0.2) &&
       !hasNegativeVerdict(hit) &&
-      !LIMITATION_LANGUAGE.test(text) &&
+      !hasNegativeVerdict(hit) &&
       !spansWholeSource(hit, durationSecs)
     );
   });
@@ -1466,27 +1564,8 @@ function indexedUnboundSubjectAttributes(
         (hit.evidence.modality === 'computed' &&
           hit.evidence.source?.provider === 'video-intelligence-index')) &&
       isAccountOfMoment(hit) &&
-      // Similarity locates a scene, but a scene can be semantically close
-      // while describing a different attribute entirely. The account itself
-      // must contain the generic action/appearance relation requested here.
-      attributeEvidenceMatchesQuestion(
-        primaryAccount(evidenceText(hit.evidence.payload)),
-        question,
-      ) &&
       !hasNegativeVerdictForQuestion(hit, question),
   );
-}
-
-function attributeEvidenceMatchesQuestion(evidence: string, question: string) {
-  if (!ATTRIBUTE_ACTION_LANGUAGE.test(evidence)) return false;
-  const requested = question.match(new RegExp(ATTRIBUTE_ACTION_LANGUAGE.source, 'giu')) ?? [];
-  if (requested.length === 0) return true;
-  const source = evidence.normalize('NFKC').toLocaleLowerCase();
-  return requested.some((term) => {
-    const normalized = term.normalize('NFKC').toLocaleLowerCase();
-    const root = normalized.length >= 5 ? normalized.slice(0, 4) : normalized;
-    return root.length >= 3 && source.includes(root);
-  });
 }
 
 /** Do not call a two-person description complete when the index establishes a wider group. */
@@ -1500,63 +1579,42 @@ function attributeCoverageReady(
 }
 
 function explicitAttributedPeopleInAccount(hit: VideoKnowledgeSearchHit) {
-  const text = primaryAccount(evidenceText(hit.evidence.payload));
-  const clauses = text
-    .split(/[;؛.\n]+/u)
-    .map((clause) => clause.trim())
-    .filter((clause) => HUMAN_ROLE_LANGUAGE.test(clause) && ATTRIBUTE_ACTION_LANGUAGE.test(clause));
-  const positions = new Set(
-    clauses.flatMap((clause) =>
-      [
-        ...clause.matchAll(
-          /\b(left|right|middle|center|centre|front|back)\s+(?:person|participant|contestant|player|member|speaker|presenter|host|guest|attendee|individual|man|woman)\b/gi,
-        ),
-      ].map((match) => match[0].toLocaleLowerCase()),
-    ),
-  ).size;
-  const present = [...text.matchAll(/^Present:\s*([^—\n]{2,120})\s*—\s*([^\n]+)/gim)].filter(
-    (match) => ATTRIBUTE_ACTION_LANGUAGE.test(match[2] ?? ''),
-  ).length;
-  const participantRecords = clauses.filter((clause) =>
-    /^(?:Reconciled|Indexed) participant:/i.test(clause),
-  ).length;
-  return Math.max(positions, present, participantRecords, clauses.length, 0);
+  return subjectEvidenceCount(primaryAccount(evidenceText(hit.evidence.payload)));
 }
 
 function explicitPeopleInAccount(hit: VideoKnowledgeSearchHit) {
-  const text = primaryAccount(evidenceText(hit.evidence.payload));
-  const present = [...text.matchAll(/^Present:\s*([^—\n]{2,120})\s*—\s*([^\n]+)/gim)].filter(
-    (match) => HUMAN_ROLE_LANGUAGE.test(match[2] ?? ''),
-  ).length;
-  const numeric = [
-    ...text.matchAll(
-      /\b(\d{1,2})\s+(?:people|persons?|participants?|contestants?|players?|members?|speakers?|presenters?|hosts?|guests?|attendees?|men|women)\b/gi,
-    ),
-  ].map((match) => Number(match[1]));
-  const wordCounts: Record<string, number> = {
-    two: 2,
-    three: 3,
-    four: 4,
-    five: 5,
-    six: 6,
-    seven: 7,
-    eight: 8,
-    nine: 9,
-    ten: 10,
-  };
-  const words = [
-    ...text.matchAll(
-      /\b(two|three|four|five|six|seven|eight|nine|ten)\s+(?:people|persons?|participants?|contestants?|players?|members?|speakers?|presenters?|hosts?|guests?|attendees?|men|women)\b/gi,
-    ),
-  ].map((match) => wordCounts[match[1].toLocaleLowerCase()] ?? 0);
-  const positionalSubjects = new Set(
-    [
-      ...text.matchAll(
-        /\b(left|right|middle|center|centre|front|back)\s+(?:person|participant|contestant|player|member|speaker|presenter|host|guest|attendee|individual|man|woman)\b/gi,
-      ),
-    ].map((match) => match[0].toLocaleLowerCase()),
-  ).size;
-  return Math.max(present, positionalSubjects, ...numeric, ...words, 0);
+  return subjectEvidenceCount(primaryAccount(evidenceText(hit.evidence.payload)));
+}
+
+/** Read only the internal evidence protocol, never a user-language role list. */
+function subjectIdentities(text: string) {
+  const identities = new Set<string>();
+  for (const match of text.matchAll(
+    /^(?:Reconciled|Indexed)\s+(?:participant|visible subject):\s*([^\n—]{1,180})/gim,
+  )) {
+    const value = match[1]?.trim();
+    if (value) identities.add(value);
+  }
+  for (const match of text.matchAll(/^Present:\s*([^—\n]{1,180})\s*—/gim)) {
+    const value = match[1]?.trim();
+    if (value) identities.add(value);
+  }
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith('Visible subject: ')) continue;
+    try {
+      const subject = JSON.parse(line.slice('Visible subject: '.length)) as { identity?: unknown };
+      if (typeof subject.identity === 'string' && subject.identity.trim()) {
+        identities.add(subject.identity.trim());
+      }
+    } catch {
+      // A malformed note is not source evidence.
+    }
+  }
+  return [...identities];
+}
+
+function subjectEvidenceCount(text: string) {
+  return subjectIdentities(text).length;
 }
 
 function primaryAccount(text: string) {
@@ -1582,11 +1640,9 @@ function indexedCrossEvidenceTrail(
   const seeds = [...candidates]
     .sort((left, right) => {
       const strength = (hit: VideoKnowledgeSearchHit) => {
-        const text = evidenceText(hit.evidence.payload);
         return (
           Number((hit as { score?: unknown }).score ?? 0) +
-          (transitionQuestion && TRANSITION_LANGUAGE.test(text) ? 0.25 : 0) -
-          (LIMITATION_LANGUAGE.test(text) ? 0.35 : 0) +
+          (hasNegativeVerdict(hit) ? -0.35 : 0) +
           (transitionQuestion && durationSecs
             ? Math.min(0.1, (hit.evidence.timeRange.endSecs / durationSecs) * 0.1)
             : 0)
@@ -1712,7 +1768,7 @@ function inspectionTargets(
   // "at the beginning" should inspect the beginning even when a visually
   // similar later moment scores higher. These are generic timeline cues, not
   // assumptions about any particular video genre.
-  const requestedPosition = temporalQuestionRanges(question, durationSecs);
+  const requestedPosition = directiveTimeRange(plan.investigation, durationSecs);
   // Who is present is usually established early -- a roster, a title card, an
   // introduction -- so a question about identity is worth one look at the
   // opening. A question about how something concluded is not: its answer is at
@@ -1785,27 +1841,17 @@ function inspectionTargets(
   return uniqueRanges([...transitions, ...spread]).slice(0, budget);
 }
 
-function temporalQuestionRanges(question: string, durationSecs: number | undefined): TimeRange[] {
-  if (!durationSecs || !Number.isFinite(durationSecs) || durationSecs <= 0) return [];
-  const text = question.normalize('NFKC').toLocaleLowerCase();
-  const opening =
-    /\b(?:opening|beginning|start|initial)\b|(?:بداية|بدايه|في\s+الأول|في\s+الاول)/u.test(text);
-  const ending = /\b(?:ending|closing|final)\b|(?:النهاية|النهايه|في\s+الآخر|في\s+الاخر)/u.test(
-    text,
-  );
-  const span = (side: 'opening' | 'ending') => {
-    const match = text.match(
-      /(?:first|opening|beginning|initial|last|ending|closing|final)\s+(\d+(?:\.\d+)?)\s*(seconds?|secs?|minutes?|mins?)/u,
-    );
-    const amount = match ? Number(match[1]) * (/min/i.test(match[2]) ? 60 : 1) : 60;
-    const window = Math.min(durationSecs, Math.max(1, amount));
-    return side === 'opening'
-      ? { startSecs: 0, endSecs: window }
-      : { startSecs: Math.max(0, durationSecs - window), endSecs: durationSecs };
-  };
-  if (opening && !ending) return [span('opening')];
-  if (ending && !opening) return [span('ending')];
-  return [];
+function directiveTimeRange(
+  directive: VideoInvestigationDirective | undefined,
+  durationSecs: number | undefined,
+): TimeRange[] {
+  const requested = directive?.timeRange;
+  if (!requested) return [];
+  const limit =
+    durationSecs && Number.isFinite(durationSecs) && durationSecs > 0 ? durationSecs : Infinity;
+  const startSecs = Math.max(0, Math.min(limit, requested.startSecs));
+  const endSecs = Math.max(startSecs, Math.min(limit, requested.endSecs));
+  return endSecs > startSecs ? [{ startSecs, endSecs }] : [];
 }
 
 /**
@@ -1823,8 +1869,9 @@ function outcomeTransitionRanges(
     if (!isAccountOfMoment(hit) || hasNegativeVerdict(hit) || spansWholeSource(hit, durationSecs)) {
       return false;
     }
-    const text = evidenceText(hit.evidence.payload);
-    return TRANSITION_LANGUAGE.test(text) && !LIMITATION_LANGUAGE.test(text);
+    return /^(?:Reconciled|Indexed)\s+(?:state|event):/i.test(
+      evidenceText(hit.evidence.payload).trim(),
+    );
   });
   if (accounts.length === 0) return [];
   // A question about a conclusion looks late; a question about the whole
@@ -2067,21 +2114,7 @@ function inspectionEntityHints(hits: VideoKnowledgeSearchHit[], plan: VideoPlan)
       )) {
         if (match[1]?.trim()) hints.push(match[1].trim());
       }
-      if (/^(?:Reconciled|Indexed)\s+(?:state|event|context|overview):/i.test(text)) {
-        const account = text.replace(
-          /^(?:Reconciled|Indexed)\s+(?:state|event|context|overview):\s*/i,
-          '',
-        );
-        // A reconciled display/state can establish names that are not people
-        // and therefore do not belong in the participant list. Preserve
-        // ordinary title-cased names as reader hints; they remain hints, not
-        // identity claims, until the bounded source pass binds them.
-        for (const match of account.matchAll(
-          /\b[A-Z][\p{Letter}\p{Mark}'’.-]{2,}(?:\s+[A-Z][\p{Letter}\p{Mark}'’.-]{2,}){0,3}\b/gu,
-        )) {
-          hints.push(match[0]);
-        }
-      }
+      hints.push(...subjectIdentities(text));
     }
   }
   return [...new Map(hints.map((hint) => [hint.toLocaleLowerCase(), hint])).values()].slice(0, 20);
@@ -2168,9 +2201,7 @@ function selectAnswerEvidence(
     const stateChanges = hits
       .filter((hit) => {
         const text = evidenceText(hit.evidence.payload);
-        return (
-          TRANSITION_LANGUAGE.test(text) || /^(?:Reconciled|Indexed)\s+(?:state|event):/i.test(text)
-        );
+        return /^(?:Reconciled|Indexed)\s+(?:state|event):/i.test(text);
       })
       .sort(
         (left, right) => right.evidence.timeRange.startSecs - left.evidence.timeRange.startSecs,
@@ -2190,7 +2221,7 @@ function selectAnswerEvidence(
   // Those supporting records remain available when no direct answer exists.
   if (
     assessment.sufficient &&
-    assessment.established.some((hit) => isDirectVerdict(hit, input.query))
+    assessment.established.some((hit) => isDirectVerdict(hit, input.query, plan))
   ) {
     return reconciledFirst(assessment.established).slice(0, limit);
   }
@@ -2617,20 +2648,10 @@ function inspectionPurpose(kinds: VideoPlan['kinds']): InspectionPurpose {
   return 'verify-visual';
 }
 
-function isDirectVerdict(hit: VideoKnowledgeSearchHit, question: string, durationSecs?: number) {
+function isDirectVerdict(hit: VideoKnowledgeSearchHit, question: string, plan?: VideoPlan) {
   const payload = evidenceText(hit.evidence.payload);
   const questionMatch = payload.match(/Claim question:\s*([^\n"]+)/i);
-  const requestedRanges = temporalQuestionRanges(question, durationSecs);
-  const asksIndividualNames =
-    /\b(?:player|person|people|participant|speaker|presenter|guest)s?\b[^\n]*\bname|\bname(?:s)?\b[^\n]*\b(?:player|person|people|participant|speaker|presenter|guest)s?\b|(?:اسم|أسماء).{0,40}(?:لاعب|لاعبين|شخص|أشخاص|مشارك)/iu.test(
-      question,
-    );
-  const claimAnswer = payload.match(/Claim answer:\s*([^\n]+)/i)?.[1] ?? '';
-  const substitutesCollectiveForPerson =
-    asksIndividualNames &&
-    /\b(?:team|group|organization|organisation|company|side)s?\s+names?\b|(?:أسماء\s+(?:الفرق|المجموعات|المنظمات))/iu.test(
-      claimAnswer,
-    );
+  const requestedRanges = directiveTimeRange(plan?.investigation, undefined);
   const isInRequestedRange =
     requestedRanges.length === 0 ||
     requestedRanges.some(
@@ -2642,7 +2663,6 @@ function isDirectVerdict(hit: VideoKnowledgeSearchHit, question: string, duratio
     payload.includes('Claim verdict: direct') &&
     questionMatch !== null &&
     isInRequestedRange &&
-    !substitutesCollectiveForPerson &&
     // A bounded reader receives the user's question plus a concise inspection
     // instruction. Its direct claim remains the same question, even though
     // that extra guidance lowers token overlap.
@@ -2658,11 +2678,10 @@ function isDirectVerdict(hit: VideoKnowledgeSearchHit, question: string, duratio
 function answerEstablishedHits(
   hits: VideoKnowledgeSearchHit[],
   question: string,
-  kinds: string[],
+  plan: VideoPlan,
   watched: WatchedRanges = { ranges: [], since: '' },
-  durationSecs?: number,
 ) {
-  const verified = hits.filter((hit) => isDirectVerdict(hit, question, durationSecs));
+  const verified = hits.filter((hit) => isDirectVerdict(hit, question, plan));
   if (verified.length > 0) return verified;
   // Evidence recorded *by* watching a range for this question answers it by
   // provenance: that is the whole reason the range was watched. Matching on
@@ -2698,7 +2717,7 @@ function answerEstablishedHits(
   // immediately. Aggregates, comparisons, identity attribution, and
   // conclusions stay stricter because they require reasoning across
   // observations rather than reading one source-backed fact.
-  const requiresCrossEvidenceReasoning = kinds.some((kind) =>
+  const requiresCrossEvidenceReasoning = plan.kinds.some((kind) =>
     [
       'outcome',
       'state-change',
@@ -2706,11 +2725,10 @@ function answerEstablishedHits(
       'counting',
       'computation',
       'person-attribute',
-      'visual-fact',
     ].includes(kind),
   );
   if (requiresCrossEvidenceReasoning) return [];
-  return hits.filter((hit) => isIndexedDirectObservation(hit, question));
+  return hits.filter((hit) => isIndexedDirectObservation(hit, question, plan));
 }
 
 /**
@@ -2732,14 +2750,52 @@ function isAccountOfMoment(hit: VideoKnowledgeSearchHit) {
   return typeof text === 'string' && text.trim().length > 0;
 }
 
-function isIndexedDirectObservation(hit: VideoKnowledgeSearchHit, question: string) {
-  if (!['transcript', 'ocr', 'visual'].includes(hit.evidence.modality)) return false;
+function isIndexedDirectObservation(
+  hit: VideoKnowledgeSearchHit,
+  question: string,
+  plan?: VideoPlan,
+) {
+  const text = evidenceText(hit.evidence.payload);
+  // The durable aggregate is normally navigation context, not a direct fact.
+  // Its visibility ledger is the exception: it is emitted from a typed visual
+  // observation protocol and is precisely the merged record required for an
+  // appearance/timing answer. Keeping this exception protocol-bound prevents
+  // an arbitrary computed summary from bypassing source corroboration.
+  const reconciledVisibility =
+    hit.evidence.modality === 'computed' &&
+    /^Reconciled visible subject:\s*[^\n]+\nIdentity basis:\s*(?:source-named|source-described|unresolved)\nObserved appearances:\s*\d/im.test(
+      text,
+    );
+  if (!['transcript', 'ocr', 'visual'].includes(hit.evidence.modality) && !reconciledVisibility)
+    return false;
+  // Raw OCR/detection payloads locate a moment but do not recount what was
+  // observed there. A broad recurring overlay must never become evidence that
+  // a person, animal, event, or other subject was present at that timestamp.
+  if (!reconciledVisibility && !isAccountOfMoment(hit)) return false;
   const confidence =
     typeof hit.evidence.confidence === 'object' && hit.evidence.confidence !== null
       ? Number((hit.evidence.confidence as { score?: unknown }).score)
       : 0;
   if (!Number.isFinite(confidence) || confidence < 0.45) return false;
   if (hasNegativeVerdictForQuestion(hit, question)) return false;
+  // A previous direct-verdict record is reusable only through
+  // `isDirectVerdict` above, which checks its original question. Letting its
+  // generic semantic score through here would silently reuse a nearby answer
+  // for a different question.
+  if (/Claim question:\s*/i.test(text)) return false;
+  const requestedRanges = directiveTimeRange(plan?.investigation, undefined);
+  const establishedRanges = reconciledVisibility ? observedAppearanceRanges(text) : [];
+  if (
+    requestedRanges.length > 0 &&
+    !(establishedRanges.length > 0 ? establishedRanges : [hit.evidence.timeRange]).some(
+      (candidate) =>
+        requestedRanges.some(
+          (range) => candidate.startSecs < range.endSecs && candidate.endSecs > range.startSecs,
+        ),
+    )
+  ) {
+    return false;
+  }
   // Retrieval can return a high-quality neighbouring scene even when it does
   // not contain the fact the user asked for. Treat an indexed observation as
   // answer-level evidence only when it shares a meaningful query term or the
@@ -2747,7 +2803,20 @@ function isIndexedDirectObservation(hit: VideoKnowledgeSearchHit, question: stri
   // bounded live reader gets the opportunity to inspect the candidate range.
   const semanticMatch =
     Number((hit as { components?: { semantic?: unknown } }).components?.semantic ?? 0) > 0;
-  if (semanticMatch) return true;
+  // A human-selected source range is itself a strict relevance constraint.
+  // Within it, a full visual account can answer even when the question and
+  // account use different languages or different descriptions.  Raw
+  // locators remain excluded above, and broad evidence still requires a
+  // lexical or semantic match.
+  const directlyRequestedMoment =
+    requestedRanges.length > 0 &&
+    (establishedRanges.length > 0 ? establishedRanges : [hit.evidence.timeRange]).some(
+      (candidate) =>
+        requestedRanges.some(
+          (range) => candidate.startSecs < range.endSecs && candidate.endSecs > range.startSecs,
+        ),
+    );
+  if (semanticMatch || directlyRequestedMoment) return true;
   const questionTerms = new Set(
     question
       .normalize('NFKC')
@@ -2757,12 +2826,26 @@ function isIndexedDirectObservation(hit: VideoKnowledgeSearchHit, question: stri
   );
   if (questionTerms.size === 0) return false;
   const sourceTerms = new Set(
-    evidenceText(hit.evidence.payload)
+    text
       .normalize('NFKC')
       .toLocaleLowerCase()
       .match(/[\p{Letter}\p{Number}][\p{Letter}\p{Number}\p{Mark}_-]*/gu) ?? [],
   );
   return [...questionTerms].some((term) => sourceTerms.has(term));
+}
+
+/** Read only the visibility-ledger protocol's explicit intervals. */
+function observedAppearanceRanges(text: string): TimeRange[] {
+  const appearances = text.match(/^Observed appearances:\s*([^\n]+)/im)?.[1];
+  if (!appearances) return [];
+  const milliseconds = [...appearances.matchAll(/(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)ms\b/gu)].map(
+    (match) => ({ startSecs: Number(match[1]) / 1_000, endSecs: Number(match[2]) / 1_000 }),
+  );
+  if (milliseconds.length > 0) return milliseconds;
+  return [...appearances.matchAll(/(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)s\b/gu)].map((match) => ({
+    startSecs: Number(match[1]),
+    endSecs: Number(match[2]),
+  }));
 }
 
 function hasNegativeVerdictForQuestion(hit: VideoKnowledgeSearchHit, question: string) {
@@ -2843,8 +2926,8 @@ function focusQuestion(question: string, fileName?: string) {
   if (!fileName) return normalized;
   const comparableTerm = (term: string) =>
     term
+      .normalize('NFKC')
       .toLocaleLowerCase()
-      .replace(/ى/g, 'ي')
       .replace(/\p{Mark}/gu, '');
   const titleTerms = new Set(
     fileName
@@ -2878,6 +2961,23 @@ function isValidQueryInput(input: QueryVideoEvidenceInput): boolean {
     input.mediaAssetId.length > 0 &&
     typeof input.query === 'string' &&
     input.query.trim().length > 0
+  );
+}
+
+function validInvestigation(value: unknown): value is VideoInvestigationDirective {
+  if (!value || typeof value !== 'object') return false;
+  const directive = value as Partial<VideoInvestigationDirective>;
+  const timeRange = directive.timeRange;
+  return (
+    ['focused', 'temporal', 'source'].includes(String(directive.scope)) &&
+    ['answer', 'compare', 'trace', 'enumerate', 'synthesize'].includes(String(directive.goal)) &&
+    (directive.recordSet === undefined ||
+      ['all', 'source-authored', 'source-questions', 'observed'].includes(directive.recordSet)) &&
+    (timeRange === undefined ||
+      (Number.isFinite(timeRange.startSecs) &&
+        Number.isFinite(timeRange.endSecs) &&
+        timeRange.startSecs >= 0 &&
+        timeRange.endSecs >= timeRange.startSecs))
   );
 }
 

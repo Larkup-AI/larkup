@@ -35,7 +35,16 @@ export interface AgentToolExecutionContext {
         }
       | undefined
     >;
-    planQuestion: (question: string) => {
+    planQuestion: (
+      question: string,
+      directive: {
+        scope: 'focused' | 'temporal' | 'source';
+        goal: 'answer' | 'compare' | 'trace' | 'enumerate' | 'synthesize';
+        evidence?: Array<'speech' | 'visible-text' | 'visual' | 'computed'>;
+        recordSet?: 'all' | 'source-authored' | 'source-questions' | 'observed';
+        timeRange?: { startSecs: number; endSecs: number };
+      },
+    ) => {
       kinds: string[];
       route?: 'search' | 'temporal' | 'aggregate' | 'scan' | 'export';
       requiresInspectionWhenInsufficient: boolean;
@@ -67,6 +76,13 @@ export interface AgentToolExecutionContext {
     planInvestigation?: (
       mediaAssetId: string,
       question: string,
+      directive: {
+        scope: 'focused' | 'temporal' | 'source';
+        goal: 'answer' | 'compare' | 'trace' | 'enumerate' | 'synthesize';
+        evidence?: Array<'speech' | 'visible-text' | 'visual' | 'computed'>;
+        recordSet?: 'all' | 'source-authored' | 'source-questions' | 'observed';
+        timeRange?: { startSecs: number; endSecs: number };
+      },
     ) => Promise<
       | {
           candidateRanges: Array<{
@@ -197,6 +213,17 @@ export interface AgentToolExecutionContext {
             description: string;
             timeRange: { startSecs: number; endSecs: number; precision?: string };
           }>;
+          visibleSubjects: Array<{
+            identity: string;
+            identityBasis: 'source-named' | 'source-described' | 'unresolved';
+            appearances: Array<{
+              startSecs: number;
+              endSecs: number;
+              precision?: string;
+            }>;
+            observedDurationSecs: number;
+            observationCount: number;
+          }>;
           timeline: Array<{
             text: string;
             timeRange: { startSecs: number; endSecs: number; precision?: string };
@@ -208,6 +235,8 @@ export interface AgentToolExecutionContext {
             questionRole?: 'primary' | 'interactional' | 'rhetorical';
             promptSlots?: number;
             text: string;
+            answer?: string;
+            respondent?: string;
             timeRange: { startSecs: number; endSecs: number; precision?: string };
           }>;
           coverage: { inventoryComplete: boolean; activeEvidenceRecords: number };

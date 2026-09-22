@@ -29,83 +29,25 @@ export async function extractImagesFromPDF(
   for (let i = 1; i <= numPages; i++) {
     try {
       const page = await pdf.getPage(i);
-      const opList = await page.getOperatorList();
-      const pageStartCount = images.length;
-
-      const imageOps = [];
-      for (let j = 0; j < opList.fnArray.length; j++) {
-        if (
-          opList.fnArray[j] === pdfjsLib.OPS.paintImageXObject ||
-          opList.fnArray[j] === pdfjsLib.OPS.paintInlineImageXObject
-        ) {
-          imageOps.push(opList.argsArray[j][0]);
-        }
-      }
-
-      for (const objId of imageOps) {
-        try {
-          const img = await new Promise<any>((resolve) => {
-            try {
-              page.objs.get(objId, (result: any) => resolve(result));
-            } catch (e) {
-              resolve(null);
-            }
-          });
-          if (img && img.bitmap) {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.bitmap.width || img.width;
-            canvas.height = img.bitmap.height || img.height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(img.bitmap, 0, 0);
-              images.push({
-                base64: toDataUrl(canvas),
-                pageNumber: i,
-                index: imageIndex++,
-              });
-            }
-          } else if (img && img.data && img.width && img.height) {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              const imageData = new ImageData(
-                new Uint8ClampedArray(img.data),
-                img.width,
-                img.height,
-              );
-              ctx.putImageData(imageData, 0, 0);
-              images.push({
-                base64: toDataUrl(canvas),
-                pageNumber: i,
-                index: imageIndex++,
-              });
-            }
-          }
-        } catch (err) {
-          console.error(`Error extracting image ${objId} on page ${i}`, err);
-        }
-      }
-
-      if (images.length === pageStartCount) {
-        try {
-          const viewport = page.getViewport({ scale: 1 });
-          const maxDimension = 1_600;
-          const scale = Math.min(1, maxDimension / Math.max(viewport.width, viewport.height));
-          const renderedViewport = page.getViewport({ scale: Math.max(scale, 0.1) });
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.max(1, Math.round(renderedViewport.width));
-          canvas.height = Math.max(1, Math.round(renderedViewport.height));
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            await page.render({ canvas, viewport: renderedViewport }).promise;
-            images.push({ base64: toDataUrl(canvas), pageNumber: i, index: imageIndex++ });
-          }
-        } catch (err) {
-          console.error(`Error rendering PDF page ${i} for visual indexing`, err);
-        }
-      }
+      // A PDF page is a composite visual: diagrams are commonly vector
+      // drawings, while their caption, legend, and table may be text or
+      // separate XObjects. Indexing XObjects individually loses that context
+      // and makes image zero (often a cover) look like the best preview.
+      // One crisp rendered page preserves the complete source relationship.
+      const baseViewport = page.getViewport({ scale: 1 });
+      const desiredLongestEdge = 1_600;
+      const scale = Math.min(
+        2.5,
+        Math.max(1, desiredLongestEdge / Math.max(baseViewport.width, baseViewport.height)),
+      );
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(viewport.width));
+      canvas.height = Math.max(1, Math.round(viewport.height));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+      await page.render({ canvas, viewport }).promise;
+      images.push({ base64: toDataUrl(canvas), pageNumber: i, index: imageIndex++ });
     } catch (err) {
       console.error(`Error processing page ${i}`, err);
     }

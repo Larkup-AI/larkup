@@ -1,4 +1,4 @@
-"""Video-clip embeddings for cross-modal search -- "find the clip where this
+"""Video-clip embeddings for cross-modal search  "find the clip where this
 happens" from a free-text query. Distinct from vision.py's captions: a
 caption describes a clip in words, which can miss an action a viewer would
 recognize but a VLM never put into text. An embedding catches that by

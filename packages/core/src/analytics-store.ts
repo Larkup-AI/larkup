@@ -48,6 +48,7 @@ export interface UsageEvent {
   mediaOperation?:
     | 'acquisition'
     | 'probe'
+    | 'guidance'
     | 'extraction'
     | 'transcription'
     | 'source_transcript'

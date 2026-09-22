@@ -34,7 +34,10 @@ import {
 } from '@larkup/core/video-knowledge/query-engine';
 import { planVideoInvestigation as buildVideoInvestigationPlan } from '@larkup/core/video-knowledge/investigation';
 import { verifyMediaEvidence } from '@larkup/core/video-knowledge/verification';
-import { planVideoQuestion } from '@larkup/core/video-knowledge/query-planner';
+import {
+  planVideoQuestion,
+  type VideoInvestigationDirective,
+} from '@larkup/core/video-knowledge/query-planner';
 import { decideInspection, LIMITS } from '@larkup/core/video-knowledge/inspection-policy';
 import { chunkTimeRange } from '@larkup/core/video-knowledge/inspection-chunking';
 import { expandInvestigationRange } from '@larkup/core/video-knowledge/range-expansion';
@@ -70,7 +73,6 @@ import {
 import {
   activeMediaFollowUpResult,
   clearlyTitleMatchedMediaAsset,
-  hasExplicitMediaIntent,
   shouldKeepActiveMediaSource,
 } from '@/lib/chat/media-source-routing';
 import { createTabularVisualization } from '@/lib/chat/tabular-visualization';
@@ -356,7 +358,7 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
     const directTitleMatchedAsset = clearlyTitleMatchedMediaAsset(query, activeMediaAssets);
     const selectedMediaAsset = directTitleMatchedAsset
       ? newestEquivalentMediaAsset(directTitleMatchedAsset, mediaAssets)
-      : hasExplicitMediaIntent(query) && activeMediaAssets.length === 1
+      : activeMediaAssets.length === 1
         ? newestEquivalentMediaAsset(activeMediaAssets[0], mediaAssets)
         : undefined;
     if (!documents.some((document) => document.status === 'indexed'))
@@ -696,10 +698,10 @@ async function formatKnowledgeHits(
         // document, rather than creating media-library assets. Expose those
         // URLs explicitly so the presentation tool can validate and render
         // them in chat.
+        // A visual chunk is a precise match. Keep it ahead of the parent
+        // document's full image catalog so a request to preview a retrieved
+        // diagram cannot silently fall back to image zero (often a cover).
         images:
-          hit.metadata?.images ??
-          sourceDocument?.metadata?.images ??
-          (relatedDocumentImages.length > 0 ? relatedDocumentImages : undefined) ??
           (hit.metadata?.isImage && hit.metadata?.imageUrl
             ? [
                 {
@@ -709,7 +711,10 @@ async function formatKnowledgeHits(
                   description: hit.metadata.description,
                 },
               ]
-            : undefined),
+            : undefined) ??
+          hit.metadata?.images ??
+          sourceDocument?.metadata?.images ??
+          (relatedDocumentImages.length > 0 ? relatedDocumentImages : undefined),
         metadata: {
           ...hit.metadata,
           usesEvidenceFirstVideoKnowledge,
@@ -907,10 +912,15 @@ export async function getChatTools(context: {
   // tool remains responsible for retrieval, inspection, and grounding.
   const mediaEvidence = {
     getAsset: scopedAsset,
-    planQuestion: (question: string) => planVideoQuestion(question),
-    planInvestigation: async (mediaAssetId: string, question: string) => {
+    planQuestion: (question: string, directive: VideoInvestigationDirective) =>
+      planVideoQuestion(question, directive),
+    planInvestigation: async (
+      mediaAssetId: string,
+      question: string,
+      directive: VideoInvestigationDirective,
+    ) => {
       if (!(await scopedAsset(mediaAssetId))) return undefined;
-      const plan = () => buildVideoInvestigationPlan(mediaAssetId, question);
+      const plan = () => buildVideoInvestigationPlan(mediaAssetId, question, directive);
       return projectId ? runWithProject(projectId, plan) : plan();
     },
     search: async (
@@ -943,39 +953,42 @@ export async function getChatTools(context: {
       const aggregate = () => aggregateVideoKnowledge(mediaAssetId);
       return projectId ? runWithProject(projectId, aggregate) : aggregate();
     },
-    /**
-     * Re-reads bounded windows of the original source for this question. The
-     * host owns source access and the vision capability; the tool decides when
-     * a claim is worth re-reading and what to do with the result.
-     */
-    reWatch: async (
-      mediaAssetId: string,
-      question: string,
-      ranges: Array<{ startSecs: number; endSecs: number; lookingFor?: string }>,
-      options?: { maxWaitMs?: number; knownEntities?: string[] },
-    ) => {
-      const asset = await scopedAsset(mediaAssetId);
-      if (!asset || asset.type !== 'video' || asset.processingStatus !== 'completed') return [];
-      const run = async () => {
-        const outcome = await reWatchSource({
-          asset,
-          question,
-          mediaAssetId,
-          ranges: ranges.map((range) => ({ ...range, label: range.lookingFor })),
-          maxWaitMs: options?.maxWaitMs,
-          knownEntities: options?.knownEntities,
-        });
-        return (outcome?.findings ?? []).map((finding) => ({
-          range: finding.range,
-          at: finding.at,
-          found: finding.found,
-          read: finding.read,
-          confidence: finding.confidence,
-          settlesQuestion: finding.settlesQuestion,
-        }));
-      };
-      return projectId ? runWithProject(projectId, run) : run();
-    },
+    // Cloud projects have an explicit normal inspection API backed by their
+    // managed runtime. Do not silently fall back to a local multimodal call
+    // with the chat model, which may not even accept image inputs.
+    ...(activeVideoRuntimeScope === 'local'
+      ? {
+          reWatch: async (
+            mediaAssetId: string,
+            question: string,
+            ranges: Array<{ startSecs: number; endSecs: number; lookingFor?: string }>,
+            options?: { maxWaitMs?: number; knownEntities?: string[] },
+          ) => {
+            const asset = await scopedAsset(mediaAssetId);
+            if (!asset || asset.type !== 'video' || asset.processingStatus !== 'completed')
+              return [];
+            const run = async () => {
+              const outcome = await reWatchSource({
+                asset,
+                question,
+                mediaAssetId,
+                ranges: ranges.map((range) => ({ ...range, label: range.lookingFor })),
+                maxWaitMs: options?.maxWaitMs,
+                knownEntities: options?.knownEntities,
+              });
+              return (outcome?.findings ?? []).map((finding) => ({
+                range: finding.range,
+                at: finding.at,
+                found: finding.found,
+                read: finding.read,
+                confidence: finding.confidence,
+                settlesQuestion: finding.settlesQuestion,
+              }));
+            };
+            return projectId ? runWithProject(projectId, run) : run();
+          },
+        }
+      : {}),
     /**
      * Ranked windows worth looking at, fused from every timestamped signal the
      * host holds. An installed tool decides what to do with them; this only
@@ -1182,85 +1195,109 @@ export async function getChatTools(context: {
       inputSchema: z.object({
         mediaAssetId: z.string().describe('Exact mediaAssetId returned by searchKnowledgeBase.'),
         query: z.string().describe('The user’s focused question or sub-question about this media.'),
+        investigation: z
+          .object({
+            scope: z.enum(['focused', 'temporal', 'source']),
+            goal: z.enum(['answer', 'compare', 'trace', 'enumerate', 'synthesize']),
+            evidence: z
+              .array(z.enum(['speech', 'visible-text', 'visual', 'computed']))
+              .max(4)
+              .optional(),
+            recordSet: z
+              .enum(['all', 'source-authored', 'source-questions', 'observed'])
+              .optional(),
+            timeRange: z
+              .object({ startSecs: z.number().min(0), endSecs: z.number().min(0) })
+              .optional(),
+          })
+          .describe(
+            'Required language-model interpretation of the evidence scope and reasoning operation.',
+          ),
         limit: z.number().int().min(1).max(12).optional(),
       }),
-      execute: async ({ mediaAssetId, query, limit }, { toolCallId }) => {
+      execute: async ({ mediaAssetId, query, investigation, limit }, { toolCallId }) => {
         mediaAssetId = await authoritativeMediaAssetId(mediaAssetId);
         const run = async (allowAutomaticInspection = true): Promise<any> => {
           const asset = await scopedAsset(mediaAssetId);
           if (!asset || asset.processingStatus !== 'completed') {
             return { success: false, error: 'That indexed media asset is no longer available.' };
           }
-          const plan = planVideoQuestion(query);
+          const plan = planVideoQuestion(query, investigation);
+          const sourceWideVisualEvidenceRequested =
+            plan.investigation?.scope === 'source' &&
+            (!plan.investigation.evidence ||
+              plan.investigation.evidence.some(
+                (modality) => modality === 'visual' || modality === 'computed',
+              ));
           // These four locators are independent and each costs a network round
           // trip or a full state scan. Running them concurrently is most of the
           // difference between a chat answer that feels immediate and one that
           // reads as hung before any evidence has even been ranked.
-          const [investigation, semantic, visualMatches, semanticEvidence, groupOverviewEvidence] =
-            await Promise.all([
-              buildVideoInvestigationPlan(mediaAssetId, query),
-              // The regular RAG retriever owns embeddings/vector providers. Join
-              // its media projection hits back to active Core evidence so video
-              // answers get hybrid semantic + lexical retrieval without treating
-              // vector documents as source truth.
-              queryKnowledgeBase(query, 24, null),
-              // Video-clip embeddings catch visual actions no caption/OCR/
-              // transcript ever put into words. There is no existing evidence
-              // record to join these to (the embedding IS the signal), so they
-              // surface as candidate ranges for the agent to inspect via
-              // watch_original/read_evidence, not as evidence themselves.
-              queryVideoEmbeddings(mediaAssetId, query, 6),
-              // Evidence-granular semantic retrieval. The corpus above matches
-              // chapter-sized documents, which locates a fifteen-minute span
-              // rather than a moment, and lexical scoring finds nothing at all
-              // when the question and the source are in different languages.
-              // This ranks the individual readings at their own timestamps.
-              searchSemanticEvidence(mediaAssetId, query, { topK: 60 }),
-              plan.kinds.includes('person-attribute') && !plan.subjectName
-                ? searchVideoKnowledge(mediaAssetId, '', 2_000, {
-                    modalities: ['visual', 'computed'],
-                    minimumRangeDistanceSecs: 0,
-                    videoDurationSecs: asset.durationSecs,
-                  }).then((candidates) => {
-                    const groupMoments = candidates.filter((candidate) => {
-                      const range = candidate.evidence.timeRange;
-                      const span = range.endSecs - range.startSecs;
-                      if (span < 15 || span > 90) return false;
-                      const text = evidenceText(candidate.evidence.payload);
-                      return /\b(?:two|three|four|five|six|seven|eight|\d+)\s+(?:people|persons|participants|contestants|men|women|speakers|hosts|guests)\b|(?:اثنان|اثنين|ثلاثة|ثلاث|أربعة|اربعة|خمسة|ستة|سبعة|ثمانية|\d+)\s+(?:أشخاص|اشخاص|مشاركين|مشاركون|متنافسين|متنافسون|رجال|سيدات)/iu.test(
-                        text,
-                      );
-                    });
-                    // Opening title cards and fast-cut introductions often show
-                    // everyone but are poor evidence for individual attributes.
-                    // Prefer a later stable group view when one exists, without
-                    // excluding the opening of genuinely short sources.
-                    const stable = groupMoments.filter(
-                      (candidate) => candidate.evidence.timeRange.startSecs >= 60,
-                    );
-                    const pool = stable.length > 0 ? stable : groupMoments;
-                    const selected: typeof pool = [];
-                    for (const candidate of pool.sort(
-                      (left, right) =>
-                        left.evidence.timeRange.startSecs - right.evidence.timeRange.startSecs,
-                    )) {
-                      if (
-                        selected.some(
-                          (existing) =>
-                            Math.abs(
-                              existing.evidence.timeRange.startSecs -
-                                candidate.evidence.timeRange.startSecs,
-                            ) < 20,
-                        )
+          const [
+            investigationPlan,
+            semantic,
+            visualMatches,
+            semanticEvidence,
+            sourceWideVisualOverviewEvidence,
+          ] = await Promise.all([
+            buildVideoInvestigationPlan(mediaAssetId, query, investigation),
+            // The regular RAG retriever owns embeddings/vector providers. Join
+            // its media projection hits back to active Core evidence so video
+            // answers get hybrid semantic + lexical retrieval without treating
+            // vector documents as source truth.
+            queryKnowledgeBase(query, 24, null),
+            // Video-clip embeddings catch visual actions no caption/OCR/
+            // transcript ever put into words. There is no existing evidence
+            // record to join these to (the embedding IS the signal), so they
+            // surface as candidate ranges for the agent to inspect via
+            // watch_original/read_evidence, not as evidence themselves.
+            queryVideoEmbeddings(mediaAssetId, query, 6),
+            // Evidence-granular semantic retrieval. The corpus above matches
+            // chapter-sized documents, which locates a fifteen-minute span
+            // rather than a moment, and lexical scoring finds nothing at all
+            // when the question and the source are in different languages.
+            // This ranks the individual readings at their own timestamps.
+            searchSemanticEvidence(mediaAssetId, query, { topK: 60 }),
+            sourceWideVisualEvidenceRequested
+              ? searchVideoKnowledge(mediaAssetId, '', 2_000, {
+                  modalities: ['visual', 'computed'],
+                  minimumRangeDistanceSecs: 0,
+                  videoDurationSecs: asset.durationSecs,
+                }).then((candidates) => {
+                  const sourceWideMoments = candidates.filter((candidate) => {
+                    const range = candidate.evidence.timeRange;
+                    const span = range.endSecs - range.startSecs;
+                    return span >= 15 && span <= 90;
+                  });
+                  // This source-wide directive is a structural retrieval
+                  // decision, independent of language, genre, subject, or
+                  // claim-specific vocabulary.
+                  const stable = sourceWideMoments.filter(
+                    (candidate) => candidate.evidence.timeRange.startSecs >= 60,
+                  );
+                  const pool = stable.length > 0 ? stable : sourceWideMoments;
+                  const selected: typeof pool = [];
+                  for (const candidate of pool.sort(
+                    (left, right) =>
+                      left.evidence.timeRange.startSecs - right.evidence.timeRange.startSecs,
+                  )) {
+                    if (
+                      selected.some(
+                        (existing) =>
+                          Math.abs(
+                            existing.evidence.timeRange.startSecs -
+                              candidate.evidence.timeRange.startSecs,
+                          ) < 20,
                       )
-                        continue;
-                      selected.push(candidate);
-                      if (selected.length >= 4) break;
-                    }
-                    return selected;
-                  })
-                : Promise.resolve([]),
-            ]);
+                    )
+                      continue;
+                    selected.push(candidate);
+                    if (selected.length >= 4) break;
+                  }
+                  return selected;
+                })
+              : Promise.resolve([]),
+          ]);
           const semanticDocumentIds = semantic.hits
             .filter((hit: any) => hit.metadata?.mediaAssetId === mediaAssetId)
             .map((hit: any) => String(hit.documentId));
@@ -1441,12 +1478,12 @@ export async function getChatTools(context: {
           // chapter, so agreement between independent signals locates it far
           // more reliably than any single one of them.
           const focusSignals: FocusSignal[] = [
-            ...groupOverviewEvidence.slice(0, 3).map((hit) => ({
+            ...sourceWideVisualOverviewEvidence.slice(0, 3).map((hit) => ({
               kind: 'lexical' as const,
               startSecs: hit.evidence.timeRange.startSecs,
               endSecs: hit.evidence.timeRange.endSecs,
               score: 2,
-              label: 'bounded multi-subject view',
+              label: 'source-wide visual reading',
             })),
             ...semanticEvidence
               .filter((hit) => hit.endSecs - hit.startSecs <= 180)
@@ -1474,7 +1511,7 @@ export async function getChatTools(context: {
                 endSecs: hit.evidence.timeRange.endSecs,
                 score: hit.score,
               })),
-            ...(investigation?.candidateRanges ?? []).slice(0, 6).map((range, position) => ({
+            ...(investigationPlan?.candidateRanges ?? []).slice(0, 6).map((range, position) => ({
               kind: 'hierarchy' as const,
               startSecs: range.startSecs,
               endSecs: range.endSecs,
@@ -1609,7 +1646,7 @@ export async function getChatTools(context: {
             })),
             focusSources: topFocusRange?.sources,
             durationSecs: asset.durationSecs,
-            hierarchyRanges: investigation?.coverage?.representedRanges,
+            hierarchyRanges: investigationPlan?.coverage?.representedRanges,
           });
           const requiresFreshInspection =
             !indexAlreadyAnswers &&
@@ -1710,18 +1747,16 @@ export async function getChatTools(context: {
                   asset,
                   question: query,
                   ranges:
-                    groupOverviewEvidence.length > 0
-                      ? groupOverviewEvidence.slice(0, 1).map((hit) => ({
+                    sourceWideVisualOverviewEvidence.length > 0
+                      ? sourceWideVisualOverviewEvidence.slice(0, 1).map((hit) => ({
                           startSecs: hit.evidence.timeRange.startSecs,
                           endSecs: hit.evidence.timeRange.endSecs,
-                          label: 'bounded multi-subject view',
+                          label: 'source-wide visual reading',
                         }))
-                      : plan.kinds.includes('person-attribute') && !plan.subjectName
-                        ? [recommendedInspection]
-                        : (focusRanges.length > 0 ? focusRanges : [recommendedInspection]).slice(
-                            0,
-                            3,
-                          ),
+                      : (focusRanges.length > 0 ? focusRanges : [recommendedInspection]).slice(
+                          0,
+                          3,
+                        ),
                   subjectName: plan.subjectName,
                   mediaAssetId,
                 })
@@ -1981,12 +2016,12 @@ export async function getChatTools(context: {
             // for no gain, so what ships here is a navigable map: timecodes
             // and titles only. `planVideoInvestigation` still returns the
             // detail when the model deliberately asks for it.
-            ...(investigation
+            ...(investigationPlan
               ? {
                   timeline: {
-                    strategy: investigation.strategy,
-                    coverage: investigation.coverage,
-                    chapters: investigation.timeline.map((chapter) => ({
+                    strategy: investigationPlan.strategy,
+                    coverage: investigationPlan.coverage,
+                    chapters: investigationPlan.timeline.map((chapter) => ({
                       at: `${formatTimecode(chapter.startSecs)}–${formatTimecode(chapter.endSecs)}`,
                       startSecs: chapter.startSecs,
                       endSecs: chapter.endSecs,
@@ -2137,15 +2172,27 @@ export async function getChatTools(context: {
       inputSchema: z.object({
         mediaAssetId: z.string().describe('Exact mediaAssetId returned by searchKnowledgeBase.'),
         question: z.string().describe('The full user question, including any temporal conditions.'),
+        investigation: z.object({
+          scope: z.enum(['focused', 'temporal', 'source']),
+          goal: z.enum(['answer', 'compare', 'trace', 'enumerate', 'synthesize']),
+          evidence: z
+            .array(z.enum(['speech', 'visible-text', 'visual', 'computed']))
+            .max(4)
+            .optional(),
+          recordSet: z.enum(['all', 'source-authored', 'source-questions', 'observed']).optional(),
+          timeRange: z
+            .object({ startSecs: z.number().min(0), endSecs: z.number().min(0) })
+            .optional(),
+        }),
       }),
-      execute: async ({ mediaAssetId, question }) => {
+      execute: async ({ mediaAssetId, question, investigation }) => {
         const run = async () => {
           const asset = await scopedAsset(mediaAssetId);
           if (!asset || asset.processingStatus !== 'completed') {
             return { success: false, error: 'That indexed media asset is no longer available.' };
           }
-          const investigation = await buildVideoInvestigationPlan(mediaAssetId, question);
-          if (!investigation)
+          const plan = await buildVideoInvestigationPlan(mediaAssetId, question, investigation);
+          if (!plan)
             return { success: false, error: 'No active video knowledge revision is available.' };
           void trackUsageEvent({
             type: 'media_processing',
@@ -2154,7 +2201,7 @@ export async function getChatTools(context: {
             queryKind: 'planner',
             timestamp: new Date().toISOString(),
           });
-          return { success: true, ...investigation };
+          return { success: true, ...plan };
         };
         return projectId ? runWithProject(projectId, run) : run();
       },
@@ -3150,6 +3197,10 @@ export async function getChatTools(context: {
   // tool's id, schema, or behavior.
   const dynamicToolNames: string[] = [];
   const dynamicToolWorkflows: Record<string, NonNullable<AgentToolDefinition['workflow']>> = {};
+  const dynamicToolEvidenceInputs: Record<
+    string,
+    NonNullable<AgentToolDefinition['evidenceInput']>
+  > = {};
   const promptFragments: string[] = [];
 
   try {
@@ -3208,6 +3259,7 @@ export async function getChatTools(context: {
           });
           dynamicToolNames.push(def.name);
           if (def.workflow) dynamicToolWorkflows[def.name] = def.workflow;
+          if (def.evidenceInput) dynamicToolEvidenceInputs[def.name] = def.evidenceInput;
           if (def.systemPromptFragment) promptFragments.push(def.systemPromptFragment);
         }
         continue;
@@ -3242,7 +3294,13 @@ export async function getChatTools(context: {
     dynamicToolNames.push(enterpriseTool.id);
   }
 
-  return { tools: finalTools, promptFragments, dynamicToolNames, dynamicToolWorkflows };
+  return {
+    tools: finalTools,
+    promptFragments,
+    dynamicToolNames,
+    dynamicToolWorkflows,
+    dynamicToolEvidenceInputs,
+  };
 }
 
 function isValidAgentToolDefinition(definition: AgentToolDefinition): boolean {

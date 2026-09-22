@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   activeMediaFollowUpResult,
   clearlyTitleMatchedMediaAsset,
-  hasExplicitMediaIntent,
   shouldKeepActiveMediaSource,
   type RoutableMediaAsset,
 } from './media-source-routing';
@@ -17,13 +16,6 @@ const asset = (id: string, fileName: string): RoutableMediaAsset => ({
 });
 
 describe('media source routing', () => {
-  it('recognizes an explicit media source reference without depending on a title', () => {
-    expect(
-      hasExplicitMediaIntent('Create a timestamped table from the indexed competition video.'),
-    ).toBe(true);
-    expect(hasExplicitMediaIntent('Summarize the sales report.')).toBe(false);
-  });
-
   it('keeps a follow-up on the active source without exposing unrelated global hits', () => {
     expect(
       activeMediaFollowUpResult(
@@ -84,7 +76,7 @@ describe('media source routing', () => {
     ).toBe('semi');
   });
 
-  it('re-runs retrieval for another video or an ambiguous multi-video question', () => {
+  it('keeps an explicit conversation source even with other indexed videos', () => {
     const final = asset('final', 'Spain vs Argentina final highlights');
     const semifinal = asset('semi', 'France vs Spain semifinal highlights');
 
@@ -93,8 +85,8 @@ describe('media source routing', () => {
         final,
         semifinal,
       ]),
-    ).toBe(false);
-    expect(shouldKeepActiveMediaSource('who won?', final, [final, semifinal])).toBe(false);
+    ).toBe(true);
+    expect(shouldKeepActiveMediaSource('who won?', final, [final, semifinal])).toBe(true);
     expect(
       shouldKeepActiveMediaSource('what happened in the Argentina final', final, [
         final,

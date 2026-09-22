@@ -11,7 +11,13 @@ from app.services.pipeline import (
     _iter_frames,
     _recurring_overlay_text,
 )
-from app.utils.timing import normalized_important_ranges, rebase_result_timestamps, visual_sampling_interval
+from app.utils.timing import (
+    bounded_visual_sampling_intervals,
+    normalized_important_ranges,
+    ocr_sampling_interval,
+    rebase_result_timestamps,
+    visual_sampling_interval,
+)
 
 
 class TimingUtilsTests(unittest.TestCase):
@@ -43,6 +49,10 @@ class TimingUtilsTests(unittest.TestCase):
             ],
             "visualObservations": [{"timeMs": 600}],
             "tracks": [{"startMs": 100, "endMs": 700}],
+            "anonymousPresenceLedger": {
+                "tracks": [{"startMs": 100, "endMs": 700, "timestampsMs": [100, 700]}],
+                "labels": [{"simultaneousTimestampsMs": [700]}],
+            },
             "recurringOverlayText": [
                 {"firstSeenMs": 700, "lastSeenMs": 800, "timestampsMs": [700, 800]}
             ],
@@ -53,6 +63,9 @@ class TimingUtilsTests(unittest.TestCase):
                 "stateHistory": [{"startMs": 100, "endMs": 200}],
                 "keyEvents": [{"startMs": 300, "endMs": 400}],
                 "participants": [{"evidence": [{"startMs": 500, "endMs": 600}]}],
+                "visibleSubjects": [
+                    {"appearances": [{"startMs": 700, "endMs": 800}]}
+                ],
                 "context": [{"evidence": [{"startMs": 700, "endMs": 800}]}],
             },
         }
@@ -63,6 +76,8 @@ class TimingUtilsTests(unittest.TestCase):
         self.assertEqual(result["transcript"][0]["words"][0]["endMs"], 120_400)
         self.assertEqual(result["visualObservations"][0]["timeMs"], 120_600)
         self.assertEqual(result["tracks"][0]["endMs"], 120_700)
+        self.assertEqual(result["anonymousPresenceLedger"]["tracks"][0]["timestampsMs"], [120_100, 120_700])
+        self.assertEqual(result["anonymousPresenceLedger"]["labels"][0]["simultaneousTimestampsMs"], [120_700])
         self.assertEqual(result["recurringOverlayText"][0]["lastSeenMs"], 120_800)
         self.assertEqual(result["recurringOverlayText"][0]["firstSeenMs"], 120_700)
         self.assertEqual(result["recurringOverlayText"][0]["timestampsMs"], [120_700, 120_800])
@@ -74,6 +89,10 @@ class TimingUtilsTests(unittest.TestCase):
         self.assertEqual(
             result["knowledgeSummary"]["participants"][0]["evidence"][0]["startMs"],
             120_500,
+        )
+        self.assertEqual(
+            result["knowledgeSummary"]["visibleSubjects"][0]["appearances"][0]["startMs"],
+            120_700,
         )
         self.assertEqual(
             result["knowledgeSummary"]["context"][0]["evidence"][0]["endMs"],
@@ -89,6 +108,22 @@ class TimingUtilsTests(unittest.TestCase):
 
     def test_short_thorough_inspection_keeps_its_requested_density(self) -> None:
         self.assertEqual(visual_sampling_interval("thorough", 60), 0.75)
+
+    def test_full_source_navigation_has_a_mode_bound_without_weakening_priority_ranges(self) -> None:
+        sample, priority = bounded_visual_sampling_intervals(
+            "thorough",
+            72 * 60,
+            2.5,
+            0.5,
+            [(600, 660)],
+        )
+
+        self.assertGreaterEqual(sample, (72 * 60) / 540)
+        self.assertGreaterEqual(priority, 0.5)
+        self.assertLessEqual(priority, sample)
+
+    def test_ocr_has_its_own_bounded_navigation_cadence(self) -> None:
+        self.assertEqual(ocr_sampling_interval("thorough", 72 * 60, 6), 14.4)
 
     def test_recurring_overlay_text_needs_repetition_whatever_the_text_is(self) -> None:
         overlays = _recurring_overlay_text(

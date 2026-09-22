@@ -1,6 +1,19 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Iterable
+
+
+FULL_SOURCE_VISUAL_SAMPLE_BUDGET = {
+    "fast": 240,
+    "balanced": 480,
+    "thorough": 720,
+}
+
+FULL_SOURCE_OCR_SAMPLE_BUDGET = {
+    "fast": 90,
+    "balanced": 180,
+    "thorough": 300,
+}
 
 
 def normalized_important_ranges(
@@ -33,6 +46,48 @@ def visual_sampling_interval(mode: str, duration_seconds: float) -> float:
     return max(base_intervals[mode], duration_seconds / max_samples[mode])
 
 
+def bounded_visual_sampling_intervals(
+    mode: str,
+    covered_duration_secs: float,
+    sample_interval_secs: float,
+    priority_sample_interval_secs: float,
+    priority_ranges: Iterable[tuple[float, float]],
+) -> tuple[float, float]:
+    """Caps a full-source navigation pass while preserving priority detail.
+
+    A first index is a searchable map, not a substitute for the later bounded
+    close-read. The cap is expressed only in source duration and user-selected
+    mode, so it applies equally to every language and video subject.
+    """
+    budget = FULL_SOURCE_VISUAL_SAMPLE_BUDGET.get(mode, FULL_SOURCE_VISUAL_SAMPLE_BUDGET["balanced"])
+    duration = max(0.001, float(covered_duration_secs))
+    priority_duration = sum(
+        max(0.0, min(duration, float(end)) - max(0.0, float(start)))
+        for start, end in priority_ranges
+    )
+    priority_budget = max(1, round(budget * 0.25)) if priority_duration > 0 else 0
+    base_budget = max(1, budget - priority_budget)
+    bounded_sample = max(float(sample_interval_secs), duration / base_budget)
+    bounded_priority = max(
+        float(priority_sample_interval_secs),
+        priority_duration / priority_budget if priority_budget else 0.0,
+    )
+    return bounded_sample, min(bounded_sample, bounded_priority)
+
+
+def ocr_sampling_interval(
+    mode: str,
+    covered_duration_secs: float,
+    frame_sample_interval_secs: float,
+) -> float:
+    """Keeps OCR navigable without making every visual sample a text pass."""
+    budget = FULL_SOURCE_OCR_SAMPLE_BUDGET.get(mode, FULL_SOURCE_OCR_SAMPLE_BUDGET["balanced"])
+    return max(
+        float(frame_sample_interval_secs),
+        max(0.001, float(covered_duration_secs)) / budget,
+    )
+
+
 def rebase_result_timestamps(result: dict[str, Any], offset_secs: float) -> None:
     """Translates clip-relative evidence (a bounded/rebased inspection) to the source clock."""
     offset_ms = round(offset_secs * 1_000)
@@ -55,6 +110,25 @@ def rebase_result_timestamps(result: dict[str, Any], offset_secs: float) -> None
     for track in result.get("tracks", []):
         if isinstance(track, dict):
             shift(track, "startMs", "endMs")
+    ledger = result.get("anonymousPresenceLedger")
+    if isinstance(ledger, dict):
+        for track in ledger.get("tracks", []):
+            if not isinstance(track, dict):
+                continue
+            shift(track, "startMs", "endMs")
+            if isinstance(track.get("timestampsMs"), list):
+                track["timestampsMs"] = [
+                    round(float(timestamp)) + offset_ms
+                    for timestamp in track["timestampsMs"]
+                    if isinstance(timestamp, (int, float))
+                ]
+        for label in ledger.get("labels", []):
+            if isinstance(label, dict) and isinstance(label.get("simultaneousTimestampsMs"), list):
+                label["simultaneousTimestampsMs"] = [
+                    round(float(timestamp)) + offset_ms
+                    for timestamp in label["simultaneousTimestampsMs"]
+                    if isinstance(timestamp, (int, float))
+                ]
     for overlay in result.get("recurringOverlayText", []):
         if not isinstance(overlay, dict):
             continue
@@ -86,7 +160,7 @@ def rebase_result_timestamps(result: dict[str, Any], offset_secs: float) -> None
     summary = result.get("knowledgeSummary")
     if not isinstance(summary, dict):
         return
-    for key in ("stateHistory", "keyEvents"):
+    for key in ("stateHistory", "keyEvents", "narrative"):
         for item in summary.get(key, []):
             if isinstance(item, dict):
                 shift(item, "startMs", "endMs")
@@ -97,3 +171,9 @@ def rebase_result_timestamps(result: dict[str, Any], offset_secs: float) -> None
             for evidence in item.get("evidence", []):
                 if isinstance(evidence, dict):
                     shift(evidence, "startMs", "endMs")
+    for subject in summary.get("visibleSubjects", []):
+        if not isinstance(subject, dict):
+            continue
+        for appearance in subject.get("appearances", []):
+            if isinstance(appearance, dict):
+                shift(appearance, "startMs", "endMs")

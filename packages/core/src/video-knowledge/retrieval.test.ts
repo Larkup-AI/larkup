@@ -204,7 +204,10 @@ test('searchVideoKnowledge: an echoed failed request cannot outrank source evide
       ]);
 
       const hits = await searchVideoKnowledge(MEDIA_ASSET_ID, 'which side finished ahead', 5, {
-        queryPlan: planVideoQuestion('which side finished ahead'),
+        queryPlan: planVideoQuestion('which side finished ahead', {
+          scope: 'temporal',
+          goal: 'compare',
+        }),
         videoDurationSecs: 3_000,
       });
       assert.equal(hits[0]?.evidence.id, 'source-reading');
@@ -241,7 +244,10 @@ test('searchVideoKnowledge: duplicate revisions are collapsed before temporal ca
 
       const question = 'which side finished ahead';
       const hits = await searchVideoKnowledge(MEDIA_ASSET_ID, question, 16, {
-        queryPlan: planVideoQuestion(question),
+        queryPlan: planVideoQuestion(question, {
+          scope: 'temporal',
+          goal: 'compare',
+        }),
         videoDurationSecs: 3_000,
       });
       assert.ok(hits.some((hit) => hit.evidence.id === 'later-source-reading'));
