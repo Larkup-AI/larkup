@@ -29,6 +29,8 @@ export interface CorpusFilter {
   createdAfter?: string;
   /** Only docs created on or before this ISO date */
   createdBefore?: string;
+  /** Internal access boundary used by the Assistant before exporting raw corpus data. */
+  documentIds?: readonly string[];
 }
 
 /** Lightweight document record returned by getCorpusDocuments (no content by default). */
@@ -63,7 +65,10 @@ export interface CorpusPage {
 function applyFilters(docs: SourceDocument[], filter?: CorpusFilter): SourceDocument[] {
   if (!filter) return docs;
 
+  const allowedIds = filter.documentIds ? new Set(filter.documentIds) : undefined;
+
   return docs.filter((doc) => {
+    if (allowedIds && !allowedIds.has(doc.id)) return false;
     if (filter.source && doc.source !== filter.source) return false;
     if (filter.status && doc.status !== filter.status) return false;
 

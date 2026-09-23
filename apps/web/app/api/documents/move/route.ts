@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateDocumentsGroup } from '@larkup/core/documents-store';
-import { updateMediaAssetsGroup } from '@larkup/core/media-store';
+import { readMediaAssets, updateMediaAssetsGroup } from '@larkup/core/media-store';
 import { resolveGroupId } from '@larkup/core/groups-store';
 
 export const runtime = 'nodejs';
@@ -31,9 +31,31 @@ export async function PATCH(request: Request) {
   }
 
   const groupId = await resolveGroupId(body.groupId);
+  // Media source state is split between the asset and its derived documents.
+  // Always move both sides together, including for API callers that selected
+  // only one side. Otherwise the unchanged side can remain retrievable via a
+  // stale vector/evidence path after the visible source was moved.
+  const requestedDocumentIds = new Set(documentIds);
+  const requestedMediaAssetIds = new Set(mediaAssetIds);
+  const relatedMediaAssets = (await readMediaAssets()).filter(
+    (asset) =>
+      requestedMediaAssetIds.has(asset.id) ||
+      asset.documentIds.some((documentId) => requestedDocumentIds.has(documentId)) ||
+      asset.pendingDocumentIds?.some((documentId) => requestedDocumentIds.has(documentId)) ||
+      asset.supersededDocumentIds?.some((documentId) => requestedDocumentIds.has(documentId)),
+  );
+  const relatedDocumentIds = relatedMediaAssets.flatMap((asset) => [
+    ...asset.documentIds,
+    ...(asset.pendingDocumentIds ?? []),
+    ...(asset.supersededDocumentIds ?? []),
+  ]);
+  const allDocumentIds = [...new Set([...documentIds, ...relatedDocumentIds])];
+  const allMediaAssetIds = [
+    ...new Set([...mediaAssetIds, ...relatedMediaAssets.map((asset) => asset.id)]),
+  ];
   const [documents, mediaAssets] = await Promise.all([
-    updateDocumentsGroup(documentIds, groupId),
-    updateMediaAssetsGroup(mediaAssetIds, groupId),
+    updateDocumentsGroup(allDocumentIds, groupId),
+    updateMediaAssetsGroup(allMediaAssetIds, groupId),
   ]);
   return NextResponse.json({
     groupId,

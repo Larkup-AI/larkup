@@ -249,7 +249,23 @@ export async function DELETE(req: Request) {
     ];
     await deleteDocuments(deletedIds);
   } else {
+    // A corpus reset is a complete data reset, not just a documents.json
+    // reset. Media assets keep their own durable evidence/cache records and
+    // would otherwise remain answerable through the media fallback path.
+    const { readMediaAssets } = await import('@larkup/core/media-store');
+    for (const asset of await readMediaAssets()) {
+      await removeLinkedMediaAsset(asset.id);
+    }
     await clearDocuments();
+
+    await Promise.all([
+      import('@larkup/core/tabular-store').then(({ clearTabularDatasets }) =>
+        clearTabularDatasets(),
+      ),
+      import('@larkup/core/image-analysis-cache').then(({ clearImageAnalysisCache }) =>
+        clearImageAnalysisCache(),
+      ),
+    ]);
 
     try {
       const config = await readConfig();
@@ -281,6 +297,11 @@ export async function DELETE(req: Request) {
     } catch (err) {
       console.error('Failed to delete vectors for specific documents:', err);
     }
+    // Image analysis is derived source data. Clear it on a source deletion so
+    // a deleted visual can never be reused if its URL is later reintroduced.
+    await import('@larkup/core/image-analysis-cache').then(({ clearImageAnalysisCache }) =>
+      clearImageAnalysisCache(),
+    );
   }
   return NextResponse.json({ ok: true });
 }

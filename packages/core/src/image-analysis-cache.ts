@@ -56,3 +56,12 @@ export async function cacheImageAnalysis(imageUrl: string, prompt: string, analy
   await fs.writeFile(temp, JSON.stringify(cache, null, 2), 'utf8');
   await fs.rename(temp, file);
 }
+
+/** Clears derived image answers when the containing knowledge base is cleared. */
+export async function clearImageAnalysisCache(): Promise<void> {
+  const file = await cachePath(false);
+  if (!file) return;
+  await fs.unlink(file).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== 'ENOENT') throw error;
+  });
+}

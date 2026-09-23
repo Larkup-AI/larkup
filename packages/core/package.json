@@ -24,6 +24,7 @@
     "./deployments-store": "./src/deployments-store.ts",
     "./documents-store": "./src/documents-store.ts",
     "./groups-store": "./src/groups-store.ts",
+    "./assistant-data-scope": "./src/assistant-data-scope.ts",
     "./jobs-store": "./src/jobs-store.ts",
     "./index-store": "./src/index-store.ts",
     "./mcp-store": "./src/mcp-store.ts",
