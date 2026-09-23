@@ -1,5 +1,16 @@
 # larkup
 
+## 0.4.2
+
+### Patch Changes
+
+- d3ead95: Prevent removed or disabled-group data from remaining available to chat retrieval.
+- Updated dependencies [d3ead95]
+  - @larkup/core@0.7.1
+  - @larkup/marketplace@0.3.2
+  - @larkup/tool-doc-editor@0.2.26
+  - @larkup/scraper@0.1.47
+
 ## 0.4.1
 
 ### Patch Changes
