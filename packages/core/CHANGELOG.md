@@ -1,5 +1,11 @@
 # @larkup/core
 
+## 0.7.1
+
+### Patch Changes
+
+- d3ead95: Prevent removed or disabled-group data from remaining available to chat retrieval.
+
 ## 0.7.0
 
 ### Minor Changes

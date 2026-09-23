@@ -1,6 +1,6 @@
 {
   "name": "@larkup/core",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "scripts": {
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "type-check": "tsc --noEmit"

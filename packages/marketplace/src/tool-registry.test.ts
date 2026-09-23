@@ -9,7 +9,7 @@ describe('tool registry fallback catalog', () => {
     expect(registry['video-intelligence']).toMatchObject({
       id: 'video-intelligence',
       packageName: '@larkup/tool-video-intelligence',
-      version: '0.3.0',
+      version: '0.3.1',
     });
   });
 });
