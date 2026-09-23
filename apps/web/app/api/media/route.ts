@@ -349,6 +349,13 @@ async function removeMedia(req: Request) {
     await deleteMediaAssets(idList);
   }
 
+  if (id || ids) {
+    // The cache is source-derived and keyed by an image URL. Purge it with
+    // the media source so an old visual answer cannot survive the deletion.
+    const { clearImageAnalysisCache } = await import('@larkup/core/image-analysis-cache');
+    await clearImageAnalysisCache();
+  }
+
   return NextResponse.json({ ok: true });
 }
 

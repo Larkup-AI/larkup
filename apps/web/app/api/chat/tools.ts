@@ -25,6 +25,10 @@ import { readDocuments } from '@larkup/core/documents-store';
 import { readGroups } from '@larkup/core/groups-store';
 import { readMediaAssets } from '@larkup/core/media-store';
 import {
+  filterDocumentsAvailableToAssistant,
+  filterMediaAssetsAvailableToAssistant,
+} from '@larkup/core/assistant-data-scope';
+import {
   searchVideoKnowledge,
   videoKnowledgeRetrievalCapabilities,
 } from '@larkup/core/video-knowledge/retrieval';
@@ -283,8 +287,13 @@ function isMediaAssetAvailableInRuntime(
     : asset.videoRuntimeScope === activeScope;
 }
 
-async function uniqueCompletedMediaFallback(query: string, activeScope: VideoRuntimeScope) {
-  const assets = (await readMediaAssets()).filter(
+function uniqueCompletedMediaFallback(
+  query: string,
+  activeScope: VideoRuntimeScope,
+  mediaAssets: Awaited<ReturnType<typeof readMediaAssets>>,
+  groups: Awaited<ReturnType<typeof readGroups>>,
+) {
+  const assets = filterMediaAssetsAvailableToAssistant(mediaAssets, groups).filter(
     (asset) =>
       asset.processingStatus === 'completed' &&
       Boolean(asset.activeVideoKnowledgeRevisionId) &&
@@ -339,16 +348,11 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
       readGroups(),
       readMediaAssets(),
     ]);
-    const assistantDisabledGroups = new Set(
-      groups.filter((group) => !group.assistantEnabled).map((group) => group.id),
+    const documents = filterDocumentsAvailableToAssistant(allDocuments, groups).filter((document) =>
+      isDocumentAvailableInVideoRuntime(document, activeVideoRuntimeScope),
     );
-    const documents = allDocuments.filter(
-      (document) =>
-        document.enabled !== false &&
-        isDocumentAvailableInVideoRuntime(document, activeVideoRuntimeScope) &&
-        (!document.groupId || !assistantDisabledGroups.has(document.groupId)),
-    );
-    const activeMediaAssets = mediaAssets.filter(
+    const availableMediaAssets = filterMediaAssetsAvailableToAssistant(mediaAssets, groups);
+    const activeMediaAssets = availableMediaAssets.filter(
       (asset) =>
         asset.processingStatus === 'completed' &&
         Boolean(asset.activeVideoKnowledgeRevisionId) &&
@@ -357,12 +361,12 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
     );
     const directTitleMatchedAsset = clearlyTitleMatchedMediaAsset(query, activeMediaAssets);
     const selectedMediaAsset = directTitleMatchedAsset
-      ? newestEquivalentMediaAsset(directTitleMatchedAsset, mediaAssets)
+      ? newestEquivalentMediaAsset(directTitleMatchedAsset, availableMediaAssets)
       : activeMediaAssets.length === 1
-        ? newestEquivalentMediaAsset(activeMediaAssets[0], mediaAssets)
+        ? newestEquivalentMediaAsset(activeMediaAssets[0], availableMediaAssets)
         : undefined;
     if (!documents.some((document) => document.status === 'indexed'))
-      return uniqueCompletedMediaFallback(query, activeVideoRuntimeScope);
+      return uniqueCompletedMediaFallback(query, activeVideoRuntimeScope, mediaAssets, groups);
 
     try {
       const vector = await embedQuery(config, query);
@@ -401,9 +405,15 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
           }));
         if (titleMatched.length > 0) hits.push(...titleMatched);
       }
-      const formatted = await formatKnowledgeHits(query, hits, topK, documents);
+      const formatted = await formatKnowledgeHits(
+        query,
+        hits,
+        topK,
+        documents,
+        availableMediaAssets,
+      );
       if (formatted.hits.length === 0)
-        return uniqueCompletedMediaFallback(query, activeVideoRuntimeScope);
+        return uniqueCompletedMediaFallback(query, activeVideoRuntimeScope, mediaAssets, groups);
       // A vector row created before the evidence-first media revision may
       // carry only a document id. Resolve it against the active media source
       // here, so the generic chat router can force whichever installed
@@ -412,10 +422,10 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
         selectedMediaAsset?.id ??
         (await findEvidenceFirstVideoAssetId(formatted, activeVideoRuntimeScope));
       const resolvedMediaAsset = resolvedMediaAssetId
-        ? mediaAssets.find((asset) => asset.id === resolvedMediaAssetId)
+        ? availableMediaAssets.find((asset) => asset.id === resolvedMediaAssetId)
         : undefined;
       const mediaAssetId = resolvedMediaAsset
-        ? newestEquivalentMediaAsset(resolvedMediaAsset, mediaAssets).id
+        ? newestEquivalentMediaAsset(resolvedMediaAsset, availableMediaAssets).id
         : resolvedMediaAssetId;
       // Once retrieval has selected an active evidence-first media source,
       // its tool is the authority for this turn. Keeping secondary clips in
@@ -448,7 +458,7 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
       // implementation details. The chat policy handles an empty result with
       // its normal, user-facing uncertainty response.
       console.error('[chat] knowledge-base retrieval failed:', error);
-      return uniqueCompletedMediaFallback(query, activeVideoRuntimeScope);
+      return uniqueCompletedMediaFallback(query, activeVideoRuntimeScope, mediaAssets, groups);
     }
   };
 
@@ -460,9 +470,14 @@ async function formatKnowledgeHits(
   rawHits: any[],
   topK: number,
   indexedDocuments?: Awaited<ReturnType<typeof readDocuments>>,
+  indexedMediaAssets?: Awaited<ReturnType<typeof readMediaAssets>>,
 ) {
-  const [storedDocuments, mediaAssets] = await Promise.all([readDocuments(), readMediaAssets()]);
+  const [storedDocuments, storedMediaAssets] = await Promise.all([
+    readDocuments(),
+    readMediaAssets(),
+  ]);
   const documents = indexedDocuments ?? storedDocuments;
+  const mediaAssets = indexedMediaAssets ?? storedMediaAssets;
   const documentsById = new Map(documents.map((document) => [document.id, document]));
   const activeMediaDocumentIds = new Set(mediaAssets.flatMap((asset) => asset.documentIds));
   const hydrated = rankKnowledgeHits(
@@ -738,10 +753,11 @@ async function findEvidenceFirstVideoAssetId(
   activeScope: VideoRuntimeScope,
   projectId?: string,
 ) {
-  const readAssets = () => readMediaAssets();
-  const activeVideoAssets = (
-    projectId ? await runWithProject(projectId, readAssets) : await readAssets()
-  ).filter(
+  const readAssetsAndGroups = async () => Promise.all([readMediaAssets(), readGroups()] as const);
+  const [assets, groups] = projectId
+    ? await runWithProject(projectId, readAssetsAndGroups)
+    : await readAssetsAndGroups();
+  const activeVideoAssets = filterMediaAssetsAvailableToAssistant(assets, groups).filter(
     (asset) =>
       asset.processingStatus === 'completed' &&
       Boolean(asset.activeVideoKnowledgeRevisionId) &&
@@ -821,22 +837,38 @@ export async function getChatTools(context: {
     ? await runWithProject(projectId, () => readConfig())
     : config;
   const activeVideoRuntimeScope = videoRuntimeScopeFromConfig(activeProjectConfig);
+  const inActiveProject = <T>(operation: () => Promise<T>): Promise<T> =>
+    projectId ? runWithProject(projectId, operation) : operation();
+  // Read this scope at tool-execution time instead of capturing it when the
+  // chat request starts. A group can be moved or disabled while a request is
+  // in flight, and residual vectors/evidence must not bridge that change.
+  const readAssistantSourceScope = () =>
+    inActiveProject(async () => {
+      const [allDocuments, groups, allMediaAssets] = await Promise.all([
+        readDocuments(),
+        readGroups(),
+        readMediaAssets(),
+      ]);
+      return {
+        groups,
+        documents: filterDocumentsAvailableToAssistant(allDocuments, groups),
+        mediaAssets: filterMediaAssetsAvailableToAssistant(allMediaAssets, groups),
+      };
+    });
   const scopedAsset = async (mediaAssetId: string) => {
-    const read = async () => (await readMediaAssets()).find((asset) => asset.id === mediaAssetId);
-    const asset = projectId ? await runWithProject(projectId, read) : await read();
+    const { mediaAssets } = await readAssistantSourceScope();
+    const asset = mediaAssets.find((candidate) => candidate.id === mediaAssetId);
     return asset && isMediaAssetAvailableInRuntime(asset, activeVideoRuntimeScope)
       ? asset
       : undefined;
   };
   const authoritativeMediaAssetId = async (mediaAssetId: string) => {
-    const read = async () => {
-      const assets = await readMediaAssets();
-      const requested = assets.find((asset) => asset.id === mediaAssetId);
-      return requested ? newestEquivalentMediaAsset(requested, assets).id : mediaAssetId;
-    };
-    return projectId ? runWithProject(projectId, read) : read();
+    const { mediaAssets } = await readAssistantSourceScope();
+    const requested = mediaAssets.find((asset) => asset.id === mediaAssetId);
+    return requested ? newestEquivalentMediaAsset(requested, mediaAssets).id : mediaAssetId;
   };
   const indexedMediaContext = async (mediaAssetId: string) => {
+    if (!(await scopedAsset(mediaAssetId))) return '';
     const read = async () => {
       const observations = await searchVideoKnowledge(mediaAssetId, '', 2_000, {
         modalities: ['computed', 'visual'],
@@ -873,8 +905,10 @@ export async function getChatTools(context: {
     return projectId ? runWithProject(projectId, read) : read();
   };
   const scopedDocument = async (documentId: string) => {
-    const read = async () => (await readDocuments()).find((document) => document.id === documentId);
-    return projectId ? runWithProject(projectId, read) : read();
+    const { documents } = await readAssistantSourceScope();
+    return documents.find(
+      (document) => document.id === documentId && document.status === 'indexed',
+    );
   };
   const pdfPagePreviewUrl = (documentId: string, pageNumber: number) => {
     const query = new URLSearchParams({ documentId, page: String(pageNumber) });
@@ -1042,13 +1076,11 @@ export async function getChatTools(context: {
           ? await mediaEvidence.getAsset(preferredMediaAssetId)
           : undefined;
         if (continuingAsset?.processingStatus === 'completed') {
-          const config = await readConfig();
-          const activeScope = videoRuntimeScopeFromConfig(config);
-          const completedMedia = (await readMediaAssets()).filter(
+          const completedMedia = (await readAssistantSourceScope()).mediaAssets.filter(
             (asset) =>
               asset.processingStatus === 'completed' &&
               Boolean(asset.activeVideoKnowledgeRevisionId) &&
-              isMediaAssetAvailableInRuntime(asset, activeScope) &&
+              isMediaAssetAvailableInRuntime(asset, activeVideoRuntimeScope) &&
               (asset.type === 'video' || asset.type === 'audio'),
           );
           // Continuing on an unambiguous source keeps ordinary follow-ups
@@ -2366,7 +2398,7 @@ export async function getChatTools(context: {
             };
           }
           if (imageUrl) {
-            const documents = await readDocuments();
+            const { documents } = await readAssistantSourceScope();
             const indexedImage = findIndexedImageSource(documents, imageUrl);
             if (!indexedImage) {
               return {
@@ -2714,7 +2746,7 @@ export async function getChatTools(context: {
             // A model may only inspect an image that is actually part of the
             // active corpus. This prevents guessed URLs from becoming a chat
             // preview or an image-analysis request.
-            const documents = await readDocuments();
+            const { documents } = await readAssistantSourceScope();
             const isIndexedImage = documents.some(
               (document) =>
                 document.status === 'indexed' &&
@@ -2813,9 +2845,13 @@ export async function getChatTools(context: {
         try {
           const maxLimit = includeContent ? 20 : 100;
           const actualLimit = Math.min(limit ?? (includeContent ? 20 : 100), maxLimit);
+          const { documents } = await readAssistantSourceScope();
 
           return await getCorpusDocuments(
-            filter as CorpusFilter | undefined,
+            {
+              ...(filter as CorpusFilter | undefined),
+              documentIds: documents.map((document) => document.id),
+            },
             actualLimit,
             offset ?? 0,
             includeContent ?? false,
@@ -2856,10 +2892,16 @@ export async function getChatTools(context: {
       execute: async ({ code, format }) => {
         try {
           const sandboxManager = new SandboxManager(resolveSandboxConfig(config));
+          const { documents } = await readAssistantSourceScope();
+          const assistantCorpusFilter: CorpusFilter = {
+            documentIds: documents.map((document) => document.id),
+          };
 
           // Export corpus in the requested format
           const corpusData =
-            format === 'jsonl' ? await exportCorpusAsJSONL() : await exportCorpusAsCSV();
+            format === 'jsonl'
+              ? await exportCorpusAsJSONL(assistantCorpusFilter)
+              : await exportCorpusAsCSV(assistantCorpusFilter);
 
           if (!corpusData) {
             return {

@@ -269,6 +269,14 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
   const observedSubjectLedger = collectObservedSubjectLedger(result);
   const hasEstablishedMediaEvidence = containsAnswerLevelMediaEvidence(result);
   const mediaAssetId = explicitMediaEvidenceAssetId(result);
+  const hasCurrentKnowledgeHits =
+    Boolean(result) &&
+    typeof result === 'object' &&
+    Array.isArray((result as { hits?: unknown }).hits) &&
+    (result as { hits: unknown[] }).hits.length > 0;
+  if (!hasCurrentKnowledgeHits && !mediaAssetId) {
+    return '\n\nNO CURRENTLY ACCESSIBLE SOURCE EVIDENCE WAS FOUND FOR THIS TURN. Source access can change after a previous answer, so do not repeat or infer facts from prior assistant messages. Explain briefly that the current knowledge base does not contain an answer.';
+  }
   if (
     mediaAssetId &&
     directClaims.length === 0 &&
@@ -999,12 +1007,9 @@ ${fieldLines}`;
     );
   const imagePreviewFollowUp = isImagePreviewFollowUp(userText, reusableEvidence);
   const tabularFollowUp = isTabularFollowUp(userText, reusableEvidence);
-  const canAnswerFromRecentTable = Boolean(
-    reusableEvidence.tabular &&
-    reusableEvidence.tabular.totalRows <= reusableEvidence.tabular.rows.length,
-  );
-  // A text answer can reuse a complete bounded result. A visual request must
-  // execute the tabular tool so the UI receives a structured chart payload.
+  // A prior table is useful to resolve a follow-up, but never as answer
+  // evidence: the source can be deleted or moved between chat turns.
+  const canAnswerFromRecentTable = false;
   const tabularFollowUpNeedsVisualization = tabularFollowUp && requestsVisualization(userText);
   const continuesMediaTopic =
     !imagePreviewFollowUp &&

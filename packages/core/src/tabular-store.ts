@@ -330,6 +330,11 @@ export async function deleteTabularDataset(id: string): Promise<void> {
   await writeAll(all.filter((d) => d.id !== id));
 }
 
+/** Removes raw tabular sidecar data when the whole knowledge base is cleared. */
+export async function clearTabularDatasets(): Promise<void> {
+  await writeAll([]);
+}
+
 export type AggregationOp = 'sum' | 'avg' | 'count' | 'countDistinct' | 'min' | 'max' | 'median';
 
 export interface TabularFilter {
