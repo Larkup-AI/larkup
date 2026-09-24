@@ -1,5 +1,11 @@
 # larkup
 
+## 0.4.3
+
+### Patch Changes
+
+- 8196ad2: Keep selected groups across every Add Data flow, and compose concise, evidence-grounded video answers unless the user explicitly asks for a complete source inventory.
+
 ## 0.4.2
 
 ### Patch Changes
