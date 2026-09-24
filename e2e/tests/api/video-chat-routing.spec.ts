@@ -193,6 +193,17 @@ test('keeps video conclusions evidence-first without scenario-specific outcome r
   expect(tools).not.toContain("cache: 'durable-hit' as const");
 });
 
+test('reserves exhaustive evidence rendering for an explicit source inventory', async () => {
+  const toolContext = await readFile(`${repoRoot}/apps/web/lib/chat/tool-context.ts`, 'utf8');
+  const route = await readFile(`${repoRoot}/apps/web/app/api/chat/route.ts`, 'utf8');
+
+  expect(toolContext).toContain('const isExplicitSourceInventory =');
+  expect(toolContext).toContain("directive?.scope === 'source' && directive.goal === 'enumerate'");
+  expect(toolContext).toContain('(!directive || isExplicitSourceInventory)');
+  expect(route).toContain('const explicitSourceInventory =');
+  expect(route).toContain('(!directive || structuredInventory || explicitSourceInventory)');
+});
+
 test('grounds a named person before presenting an appearance claim', async () => {
   const inspectRoute = await readFile(
     `${repoRoot}/apps/web/app/api/media/inspect/route.ts`,

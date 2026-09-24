@@ -501,10 +501,17 @@ function containsExhaustiveEvidence(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
   const continuation = record.continuation;
+  const directive = (record.investigation as { directive?: unknown } | undefined)?.directive as
+    { scope?: unknown; goal?: unknown } | undefined;
+  const structuredInventory = record.inventory !== undefined && Array.isArray(record.rows);
+  const explicitSourceInventory = directive?.scope === 'source' && directive.goal === 'enumerate';
   if (
     continuation &&
     typeof continuation === 'object' &&
-    (continuation as { exhaustive?: unknown }).exhaustive === true
+    (continuation as { exhaustive?: unknown }).exhaustive === true &&
+    // Legacy evidence had no directive. Preserve its behavior, but modern
+    // source synthesis must remain a concise answer task rather than a dump.
+    (!directive || structuredInventory || explicitSourceInventory)
   ) {
     return true;
   }

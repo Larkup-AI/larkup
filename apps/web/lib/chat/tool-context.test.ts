@@ -502,6 +502,26 @@ describe('formatExhaustiveMediaAnswer', () => {
     ).toBeUndefined();
   });
 
+  it('leaves an exhaustive outcome investigation for concise answer synthesis', () => {
+    const evidence = Array.from({ length: 60 }, (_, index) => ({
+      timeRange: { startSecs: index * 60 },
+      payload: { text: `Reconciled state: Spain ${index + 1}, Argentina 0` },
+    }));
+
+    expect(
+      formatExhaustiveMediaAnswer(
+        {
+          success: true,
+          claimVerification: { status: 'directly-established' },
+          investigation: { directive: { scope: 'source', goal: 'synthesize' } },
+          continuation: { exhaustive: true, hasMore: false },
+          evidence,
+        },
+        'Who won the match?',
+      ),
+    ).toBeUndefined();
+  });
+
   it('renders an indexed partial structured inventory without asking a model to fill the gaps', () => {
     const answer = formatExhaustiveMediaAnswer(
       {
