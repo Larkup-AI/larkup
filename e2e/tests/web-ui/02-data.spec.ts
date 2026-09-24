@@ -51,6 +51,68 @@ test.describe.serial('Data Page', () => {
     ).toBeVisible();
   });
 
+  test('adds pasted text to the group selected on the add page', async ({ page }) => {
+    const groups = [
+      { id: 'default', name: 'Default', icon: '📚', createdAt: '2026-01-01' },
+      { id: 'research', name: 'Research', icon: '◆', createdAt: '2026-01-01' },
+    ];
+    let createRequest: Record<string, unknown> | undefined;
+
+    await page.route('**/api/documents', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            documents: [],
+            groups,
+            stats: { docCount: 0, charCount: 0, bySource: {} },
+          }),
+        });
+        return;
+      }
+
+      if (route.request().method() === 'POST') {
+        createRequest = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            document: {
+              id: 'grouped-text',
+              title: createRequest.title,
+              content: createRequest.content,
+              source: 'text',
+              groupId: createRequest.groupId,
+            },
+          }),
+        });
+        return;
+      }
+
+      await route.continue();
+    });
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Add Websites', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Text', exact: true }).click();
+    await page.getByLabel('Title').fill('Research note');
+    await page.getByLabel('Content').fill('This belongs in Research.');
+    await page.getByRole('combobox', { name: 'Data group' }).click();
+    await page.getByRole('option', { name: /Research/ }).click();
+    await expect(page.getByRole('combobox', { name: 'Data group' })).toContainText('Research');
+
+    await page.getByRole('button', { name: 'Add text', exact: true }).click();
+
+    await expect
+      .poll(() => createRequest)
+      .toEqual({
+        title: 'Research note',
+        content: 'This belongs in Research.',
+        source: 'text',
+        groupId: 'research',
+      });
+  });
+
   test('stages a remote file from the Files URL importer', async ({ page }) => {
     await page.getByRole('button', { name: 'Files', exact: true }).click();
     await page.route('**/api/files/remote', async (route) => {

@@ -60,7 +60,7 @@ export function PastePanel({
       loading: saving,
     });
     return () => onActionChange?.(null);
-  }, [title, content, saving, onActionChange]);
+  }, [title, content, saving, groupId, onActionChange]);
 
   return (
     <div className="space-y-4 w-full">

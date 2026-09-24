@@ -24,7 +24,7 @@ import { CorpusPanel } from '@/components/data/corpus-panel';
 import type { DataPrimaryAction } from '@/components/data/data-primary-action';
 import { useProject } from '@/components/projects/project-provider';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectTrigger } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { videoRuntimeScopeFromConfig } from '@/lib/media/video-runtime-scope';
 
@@ -327,8 +327,8 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
 
   const activeSubTabIntro = SUB_TAB_INTRO[activeSubTab];
 
-  const toggleGroup = (groupId: string) => {
-    const next = groupId === 'default' || selectedGroupIds[0] === groupId ? [] : [groupId];
+  const selectGroup = (groupId: string | null) => {
+    const next = !groupId || groupId === 'default' ? [] : [groupId];
     setSelectedGroupIds(next);
 
     const params = new URLSearchParams(searchParams.toString());
@@ -415,7 +415,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
               })}
             </div>
             <div className="flex items-center gap-2 pb-1.5">
-              <Select>
+              <Select value={targetGroupId} onValueChange={selectGroup}>
                 <SelectTrigger
                   aria-label="Data group"
                   className="h-9 min-w-42 max-w-56 bg-white text-xs"
@@ -431,26 +431,14 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
                   </span>
                 </SelectTrigger>
                 <SelectContent>
-                  <div className="p-1 space-y-1">
+                  <div className="space-y-1 p-1">
                     {groups.map((group) => (
-                      <div
-                        key={group.id}
-                        className={cn(
-                          'flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm cursor-pointer hover:bg-accent',
-                          selectedGroupIds.includes(group.id) && 'bg-accent/50',
-                        )}
-                        onClick={() => toggleGroup(group.id)}
-                      >
-                        <div className="flex size-4 items-center justify-center rounded-full border border-primary/50 shrink-0">
-                          {selectedGroupIds.includes(group.id) && (
-                            <div className="size-2 rounded-full bg-primary" />
-                          )}
-                        </div>
+                      <SelectItem key={group.id} value={group.id} className="px-2 py-1.5 text-sm">
                         <span className="truncate">
                           {group.icon ? `${group.icon} ` : ''}
                           {group.name}
                         </span>
-                      </div>
+                      </SelectItem>
                     ))}
                   </div>
                 </SelectContent>

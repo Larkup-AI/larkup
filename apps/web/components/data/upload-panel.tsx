@@ -677,7 +677,7 @@ export function UploadPanel({
       loading: shouldLoadRemoteFile ? loadingRemoteFile : false,
     });
     return () => onActionChange?.(null);
-  }, [entryTab, staged, saving, remoteUrl, loadingRemoteFile, onActionChange]);
+  }, [entryTab, staged, saving, remoteUrl, loadingRemoteFile, groupId, onActionChange]);
 
   function updateEditingFile(patch: Partial<StagedFile>) {
     setStaged((prev) => prev.map((f) => (f.id === editingFileId ? { ...f, ...patch } : f)));
