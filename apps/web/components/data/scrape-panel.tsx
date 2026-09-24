@@ -780,6 +780,7 @@ export function ScrapePanel({
     searching,
     starting,
     selectedUrls.length,
+    groupId,
     onActionChange,
   ]);
 
