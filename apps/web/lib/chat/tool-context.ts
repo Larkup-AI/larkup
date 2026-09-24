@@ -797,6 +797,13 @@ export function formatExhaustiveMediaAnswer(value: unknown, _question: string): 
       { exhaustive?: unknown; hasMore?: unknown; contextLimitReached?: unknown } | undefined;
     const inventory = record.inventory as
       { recordSet?: unknown; coverage?: { complete?: unknown; reason?: unknown } } | undefined;
+    const directive = (record.investigation as { directive?: unknown } | undefined)?.directive as
+      { scope?: unknown; goal?: unknown } | undefined;
+    // An exhaustive evidence page is a retrieval property, not an instruction
+    // to recite it. Modern video evidence carries the agent's investigation
+    // directive: only an explicit source inventory may bypass answer synthesis.
+    const isExplicitSourceInventory =
+      directive?.scope === 'source' && directive.goal === 'enumerate';
     // A structured inventory is already a final data result. It must never be
     // handed back to a prose model just because the source correctly reports
     // partial coverage. The UI has the complete returned table; this message
@@ -825,6 +832,7 @@ export function formatExhaustiveMediaAnswer(value: unknown, _question: string): 
       continuation?.exhaustive === true &&
       continuation.hasMore !== true &&
       mediaClaimIsAnswerLevel(record.claimVerification) &&
+      (!directive || isExplicitSourceInventory) &&
       Array.isArray(record.evidence)
     ) {
       complete = (record.evidence as Array<Record<string, unknown>>)
