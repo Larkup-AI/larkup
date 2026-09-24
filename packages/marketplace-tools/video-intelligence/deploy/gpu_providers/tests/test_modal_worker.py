@@ -5,6 +5,9 @@ import unittest
 from unittest.mock import patch
 
 from gpu_providers.modal_worker_entrypoint import (
+    GPU_IDLE_TIMEOUT_SECONDS,
+    GPU_MAX_CONTAINERS,
+    GPU_TYPE,
     _is_full_source_range,
     preparation_progress,
 )
@@ -12,6 +15,11 @@ from app.model_configuration import temporary_model_environment
 
 
 class ModalWorkerEnvironmentTests(unittest.TestCase):
+    def test_worker_uses_one_cost_optimized_gpu_and_scales_to_zero(self) -> None:
+        self.assertEqual(GPU_TYPE, "T4")
+        self.assertEqual(GPU_MAX_CONTAINERS, 1)
+        self.assertEqual(GPU_IDLE_TIMEOUT_SECONDS, 15 * 60)
+
     def test_whole_source_range_is_not_treated_as_bounded_clip(self) -> None:
         self.assertTrue(_is_full_source_range([(0.0, 3600.0)], 3600.0))
         self.assertFalse(_is_full_source_range([(120.0, 180.0)], 3600.0))

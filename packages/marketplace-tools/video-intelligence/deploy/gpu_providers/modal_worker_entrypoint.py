@@ -40,6 +40,9 @@ from .remote_source import (
 APP_NAME = "larkup-video-intelligence"
 FUNCTION_NAME = "process_video_job"
 PROGRESS_DICT_NAME = "larkup-video-intelligence-progress"
+GPU_TYPE = "T4"
+GPU_MAX_CONTAINERS = 1
+GPU_IDLE_TIMEOUT_SECONDS = 15 * 60
 YOLOX_MODEL_URL = "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_s.onnx"
 
 WORKER_IMAGE = (
@@ -66,15 +69,14 @@ app = modal.App(APP_NAME)
 
 @app.function(
     image=WORKER_IMAGE,
-    gpu="A10G",
+    # A single T4 keeps this batch-oriented workload on a modest GPU class.
+    # It scales from zero, so idle GPU time is not billed.
+    gpu=GPU_TYPE,
+    max_containers=GPU_MAX_CONTAINERS,
     timeout=6 * 60 * 60,
-    # Indexing is commonly followed by several chat refinements. Reuse the
-    # loaded OCR/transcription models across that interactive window.
-    scaledown_window=10 * 60,
-    # Keep one GPU worker ready for the normal interactive API path.  A chat
-    # refinement has a short response budget and must not spend it waiting for
-    # an image, model downloads, and CUDA initialization on a cold container.
-    min_containers=1,
+    # Reuse a container briefly for follow-up work, then release the GPU.
+    # No min_containers value means the worker scales fully to zero when idle.
+    scaledown_window=GPU_IDLE_TIMEOUT_SECONDS,
     env={
         "LARKUP_VIDEO_GATEWAY_CONCURRENCY": "8",
         "LARKUP_VIDEO_GATEWAY_REQUESTS_PER_MINUTE": "24",
