@@ -111,44 +111,9 @@ export function saveGroundedAnswerCacheEntry(input: {
           updatedAt: now,
         };
     const entries = [
-      ...state.entries.filter((candidate) => candidate.questionKey !== questionKey),
-      entry,
-    ]
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-      .slice(0, MAX_ENTRIES);
-    await writeState(file, { entries });
-    return entry;
-  });
-}
-
-/** Keeps negative feedback globally without retaining the rejected answer. */
-export function saveGroundedAnswerDislike(input: {
-  question: string;
-  sourceScopeFingerprint: string;
-}) {
-  return serialize(async () => {
-    const question = input.question.trim();
-    const questionKey = normalizeGroundedAnswerQuestion(question);
-    if (!questionKey || !input.sourceScopeFingerprint) {
-      throw new Error('A disliked grounded answer needs a question and source scope.');
-    }
-
-    const file = await cachePath(true);
-    if (!file) throw new Error('An active Project is required.');
-    const state = await readState();
-    const now = new Date().toISOString();
-    const current = state.entries.find((entry) => entry.questionKey === questionKey);
-    const entry: GroundedAnswerCacheEntry = {
-      id: current?.id ?? randomUUID(),
-      question,
-      questionKey,
-      feedback: 'disliked',
-      sourceScopeFingerprint: input.sourceScopeFingerprint,
-      createdAt: current?.createdAt ?? now,
-      updatedAt: now,
-    };
-    const entries = [
-      ...state.entries.filter((candidate) => candidate.questionKey !== questionKey),
+      ...state.entries.filter(
+        (candidate) => candidate.feedback === 'liked' && candidate.questionKey !== questionKey,
+      ),
       entry,
     ]
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
@@ -166,7 +131,14 @@ export function deleteGroundedAnswerCacheEntry(question: string) {
     const file = await cachePath(false);
     if (!file) return false;
     const state = await readState();
-    const entries = state.entries.filter((entry) => entry.questionKey !== questionKey);
+    const removed = state.entries.some(
+      (entry) => entry.feedback === 'liked' && entry.questionKey === questionKey,
+    );
+    // Dislikes belong to durable chat history, not the reusable answer cache.
+    // Prune legacy dislike records whenever this cache is next updated.
+    const entries = state.entries.filter(
+      (entry) => entry.feedback === 'liked' && entry.questionKey !== questionKey,
+    );
     if (entries.length === state.entries.length) return false;
     if (entries.length === 0) {
       await fs.unlink(file).catch((error: NodeJS.ErrnoException) => {
@@ -175,7 +147,7 @@ export function deleteGroundedAnswerCacheEntry(question: string) {
     } else {
       await writeState(file, { entries });
     }
-    return true;
+    return removed;
   });
 }
 

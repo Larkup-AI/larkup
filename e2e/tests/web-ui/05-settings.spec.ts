@@ -28,7 +28,7 @@ test.describe('Settings Page', () => {
               available: true,
               exists: false,
               sizeBytes: 0,
-              answerFeedback: { likedEntries: 0, dislikedEntries: 0, sizeBytes: 0 },
+              answerFeedback: { likedEntries: 0, sizeBytes: 0 },
             },
             clearedBytes,
           }),
@@ -42,7 +42,7 @@ test.describe('Settings Page', () => {
             available: true,
             exists: cacheSize > 0,
             sizeBytes: cacheSize,
-            answerFeedback: { likedEntries: 2, dislikedEntries: 1, sizeBytes: 640 },
+            answerFeedback: { likedEntries: 2, sizeBytes: 640 },
           },
         }),
       });
@@ -52,7 +52,7 @@ test.describe('Settings Page', () => {
     const cacheCard = page.locator('[data-slot="card"]', { hasText: 'Larkup cache' });
     await expect(cacheCard.getByText('0.4 KB')).toBeVisible();
     await expect(cacheCard.getByTestId('answer-cache-counts')).toHaveText(
-      'Across all projects: 2 liked answers and 1 disliked answer tracked.',
+      'Across all projects: 2 liked answers cached.',
     );
     await cacheCard.getByRole('button', { name: 'Clear cache' }).click();
     await expect(page.getByRole('alertdialog')).toContainText(
@@ -65,7 +65,7 @@ test.describe('Settings Page', () => {
     await page.getByRole('alertdialog').getByRole('button', { name: 'Clear cache' }).click();
     await expect(cacheCard.getByText('0 B')).toBeVisible();
     await expect(cacheCard.getByTestId('answer-cache-counts')).toHaveText(
-      'Across all projects: 0 liked answers and 0 disliked answers tracked.',
+      'Across all projects: 0 liked answers cached.',
     );
     expect(deleteRequests).toBe(1);
   });

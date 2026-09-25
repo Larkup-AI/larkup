@@ -20,7 +20,7 @@ import {
   Paperclip,
   ListPlus,
 } from 'lucide-react';
-import useSWR from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 import { MessageItem } from '@/components/chat/message-item';
 import { MessageQueue, type QueuedMessage } from '@/components/chat/message-queue';
 import { ChatSettingsModal } from '@/components/chat/chat-settings-modal';
@@ -512,6 +512,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
         .then(async (response) => {
           const result = (await response.json().catch(() => null)) as {
             cached?: boolean;
+            removed?: boolean;
             error?: string;
           } | null;
           if (!response.ok) {
@@ -519,7 +520,10 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
           }
           if (feedback === 'liked' && result?.cached) {
             toast.success('Answer saved to Larkup cache');
+          } else if (feedback === 'disliked' && result?.removed) {
+            toast.success('Cached answer removed');
           }
+          void globalMutate('/api/system/cache');
         })
         .catch((feedbackError) => {
           if (feedbackSyncRevision.current[messageId] !== revision) return;

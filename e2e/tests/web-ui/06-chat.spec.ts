@@ -182,13 +182,15 @@ test.describe.serial('Chat Page', () => {
         response.url().endsWith('/api/chat/feedback') && response.request().method() === 'POST',
     );
     await page.getByRole('button', { name: 'Dislike', exact: true }).click();
-    expect((await dislikeSaved).ok()).toBe(true);
+    const dislikeResponse = await dislikeSaved;
+    expect(dislikeResponse.ok()).toBe(true);
+    expect(await dislikeResponse.json()).toMatchObject({ cached: false, removed: true });
     await expect(
-      page.getByRole('button', { name: /Disliked — exact repeats will refresh/ }),
+      page.getByRole('button', { name: /Disliked — cached answer removed/ }),
     ).toHaveAttribute('aria-pressed', 'true');
     await page.reload();
     await expect(
-      page.getByRole('button', { name: /Disliked — exact repeats will refresh/ }),
+      page.getByRole('button', { name: /Disliked — cached answer removed/ }),
     ).toHaveAttribute('aria-pressed', 'true');
   });
 

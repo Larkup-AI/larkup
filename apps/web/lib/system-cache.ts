@@ -7,7 +7,6 @@ export interface BuildCacheStatus {
   sizeBytes: number;
   answerFeedback?: {
     likedEntries: number;
-    dislikedEntries: number;
     sizeBytes: number;
   };
 }
@@ -110,21 +109,24 @@ async function generalCachePaths(startDirectory: string, dataDirectory?: string)
 
 async function answerFeedbackCacheStats(file: string) {
   const sizeBytes = await existingPathSize(file);
-  if (sizeBytes === 0) return { sizeBytes: 0, likedEntries: 0, dislikedEntries: 0 };
+  if (sizeBytes === 0) return { sizeBytes: 0, likedEntries: 0 };
   try {
     const state = JSON.parse(await readFile(file, 'utf8')) as {
       entries?: Array<{ feedback?: unknown }>;
     };
     const entries = Array.isArray(state.entries) ? state.entries : [];
+    const likedEntries = entries.filter((entry) => entry.feedback !== 'disliked');
     return {
-      sizeBytes,
+      sizeBytes:
+        likedEntries.length > 0
+          ? Buffer.byteLength(JSON.stringify({ entries: likedEntries }, null, 2))
+          : 0,
       // Cache files created before explicit feedback state contained only
       // liked answers, so a missing field remains a positive entry.
-      likedEntries: entries.filter((entry) => entry.feedback !== 'disliked').length,
-      dislikedEntries: entries.filter((entry) => entry.feedback === 'disliked').length,
+      likedEntries: likedEntries.length,
     };
   } catch {
-    return { sizeBytes, likedEntries: 0, dislikedEntries: 0 };
+    return { sizeBytes, likedEntries: 0 };
   }
 }
 
@@ -234,9 +236,8 @@ export async function getGeneralCacheStatus(
     (total, current) => ({
       sizeBytes: total.sizeBytes + current.sizeBytes,
       likedEntries: total.likedEntries + current.likedEntries,
-      dislikedEntries: total.dislikedEntries + current.dislikedEntries,
     }),
-    { sizeBytes: 0, likedEntries: 0, dislikedEntries: 0 },
+    { sizeBytes: 0, likedEntries: 0 },
   );
   const sizeBytes =
     sizes.reduce((total, size) => total + size, 0) + answerFeedbackSummary.sizeBytes;

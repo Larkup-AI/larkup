@@ -13,7 +13,6 @@ test('grounded answer cache is exact-question, project, and source-scope aware',
     const {
       deleteGroundedAnswerCacheEntry,
       getGroundedAnswerCacheEntry,
-      saveGroundedAnswerDislike,
       saveGroundedAnswerCacheEntry,
     } = await import('./grounded-answer-cache');
     const firstProject = { id: 'first-project', name: 'First cache', port: 8080 };
@@ -44,13 +43,8 @@ test('grounded answer cache is exact-question, project, and source-scope aware',
       assert.equal(hit?.feedback, 'liked');
       assert.equal(hit?.sourceScopeFingerprint, 'scope-1');
 
-      await saveGroundedAnswerDislike({
-        question: 'what is my favorite anime?',
-        sourceScopeFingerprint: 'scope-1',
-      });
-      const disliked = await getGroundedAnswerCacheEntry('What is my favorite anime?');
-      assert.equal(disliked?.feedback, 'disliked');
-      assert.equal(disliked?.answer, undefined);
+      assert.equal(await deleteGroundedAnswerCacheEntry('what is my favorite anime?'), true);
+      assert.equal(await getGroundedAnswerCacheEntry('What is my favorite anime?'), undefined);
     });
 
     await runWithProject(secondProject.id, async () => {
@@ -58,7 +52,7 @@ test('grounded answer cache is exact-question, project, and source-scope aware',
     });
 
     await runWithProject(firstProject.id, async () => {
-      assert.equal(await deleteGroundedAnswerCacheEntry('what is my favorite anime?'), true);
+      assert.equal(await deleteGroundedAnswerCacheEntry('what is my favorite anime?'), false);
       assert.equal(await getGroundedAnswerCacheEntry('What is my favorite anime?'), undefined);
     });
   } finally {

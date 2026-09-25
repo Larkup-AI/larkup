@@ -44,7 +44,7 @@ export function MessageActions({
               <ThumbsUp className={cn('size-3.5', liked && 'fill-current text-emerald-500')} />
             </ActionButton>
             <ActionButton
-              label={disliked ? 'Disliked — exact repeats will refresh' : 'Dislike'}
+              label={disliked ? 'Disliked — cached answer removed' : 'Dislike'}
               onClick={onDislike}
               pressed={disliked}
             >

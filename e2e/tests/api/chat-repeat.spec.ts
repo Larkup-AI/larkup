@@ -88,7 +88,7 @@ test('liked grounded answers enter general cache and work in a new chat', async 
   const before = (await beforeResponse.json()) as {
     cache: {
       sizeBytes: number;
-      answerFeedback: { likedEntries: number; dislikedEntries: number; sizeBytes: number };
+      answerFeedback: { likedEntries: number; sizeBytes: number };
     };
   };
   const feedbackResponse = await request.post('/api/chat/feedback', {
@@ -108,9 +108,6 @@ test('liked grounded answers enter general cache and work in a new chat', async 
   expect(afterLike.cache.sizeBytes).toBeGreaterThan(before.cache.sizeBytes);
   expect(afterLike.cache.answerFeedback.likedEntries).toBe(
     before.cache.answerFeedback.likedEntries + 1,
-  );
-  expect(afterLike.cache.answerFeedback.dislikedEntries).toBe(
-    before.cache.answerFeedback.dislikedEntries,
   );
 
   const cachedChatResponse = await request.post('/api/chat', {
@@ -141,7 +138,7 @@ test('liked grounded answers enter general cache and work in a new chat', async 
   });
   const dislikeBody = await dislikeResponse.json();
   expect(dislikeResponse.ok(), JSON.stringify(dislikeBody)).toBe(true);
-  expect(dislikeBody).toMatchObject({ cached: false, feedbackStored: true });
+  expect(dislikeBody).toMatchObject({ cached: false, removed: true });
 
   const afterDislikeResponse = await request.get('/api/system/cache');
   const afterDislike = (await afterDislikeResponse.json()) as typeof before;
@@ -149,9 +146,7 @@ test('liked grounded answers enter general cache and work in a new chat', async 
   expect(afterDislike.cache.answerFeedback.likedEntries).toBe(
     before.cache.answerFeedback.likedEntries,
   );
-  expect(afterDislike.cache.answerFeedback.dislikedEntries).toBe(
-    before.cache.answerFeedback.dislikedEntries + 1,
-  );
+  expect(afterDislike.cache.answerFeedback.sizeBytes).toBe(before.cache.answerFeedback.sizeBytes);
 
   const unlikeResponse = await request.post('/api/chat/feedback', {
     data: {
@@ -161,13 +156,10 @@ test('liked grounded answers enter general cache and work in a new chat', async 
   });
   const unlikeBody = await unlikeResponse.json();
   expect(unlikeResponse.ok(), JSON.stringify(unlikeBody)).toBe(true);
-  expect(unlikeBody).toMatchObject({ cached: false, removed: true });
+  expect(unlikeBody).toMatchObject({ cached: false, removed: false });
 
   const afterUnlike = (await (await request.get('/api/system/cache')).json()) as typeof before;
   expect(afterUnlike.cache.answerFeedback.likedEntries).toBe(
     before.cache.answerFeedback.likedEntries,
-  );
-  expect(afterUnlike.cache.answerFeedback.dislikedEntries).toBe(
-    before.cache.answerFeedback.dislikedEntries,
   );
 });
