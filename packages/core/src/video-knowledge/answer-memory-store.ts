@@ -180,3 +180,35 @@ export function clearVideoAnswerMemory(mediaAssetId: string) {
     return { cleared: before - state.answerMemory.length };
   });
 }
+
+/**
+ * Clears rebuildable answer/analysis caches while preserving user-authored
+ * corrections and all indexed source evidence.
+ */
+export async function clearVideoKnowledgeRuntimeCaches() {
+  const current = await readVideoKnowledgeState();
+  if (
+    current.artifactAnalysisCache.length === 0 &&
+    current.answerMemory.every((entry) => Boolean(entry.userCorrection))
+  ) {
+    return { clearedArtifactEntries: 0, clearedAnswerEntries: 0 };
+  }
+  return mutateVideoKnowledgeState((state) => {
+    const artifactEntries = state.artifactAnalysisCache.length;
+    const answerEntries = state.answerMemory.length;
+    state.artifactAnalysisCache = [];
+    state.answerMemory = state.answerMemory
+      .filter((entry) => entry.userCorrection)
+      .map((entry) => ({
+        ...entry,
+        answer: undefined,
+        evidenceIds: [],
+        unansweredCount: 0,
+        lastUnansweredAt: undefined,
+      }));
+    return {
+      clearedArtifactEntries: artifactEntries,
+      clearedAnswerEntries: answerEntries - state.answerMemory.length,
+    };
+  });
+}

@@ -36,10 +36,18 @@ export function MessageActions({
         </ActionButton>
         {onLike && onDislike ? (
           <>
-            <ActionButton label={liked ? 'Liked — cached for next time' : 'Like'} onClick={onLike}>
+            <ActionButton
+              label={liked ? 'Liked — saved with this chat' : 'Like'}
+              onClick={onLike}
+              pressed={liked}
+            >
               <ThumbsUp className={cn('size-3.5', liked && 'fill-current text-emerald-500')} />
             </ActionButton>
-            <ActionButton label={disliked ? 'Disliked' : 'Dislike'} onClick={onDislike}>
+            <ActionButton
+              label={disliked ? 'Disliked — exact repeats will refresh' : 'Dislike'}
+              onClick={onDislike}
+              pressed={disliked}
+            >
               <ThumbsDown className={cn('size-3.5', disliked && 'fill-current text-destructive')} />
             </ActionButton>
           </>
@@ -58,10 +66,12 @@ function ActionButton({
   label,
   onClick,
   children,
+  pressed,
 }: {
   label: string;
   onClick: () => void;
   children: ReactNode;
+  pressed?: boolean;
 }) {
   return (
     <Tooltip>
@@ -72,6 +82,8 @@ function ActionButton({
             variant="ghost"
             size="icon-xs"
             onClick={onClick}
+            aria-label={label}
+            aria-pressed={pressed}
             className="text-muted-foreground hover:text-foreground"
           />
         }

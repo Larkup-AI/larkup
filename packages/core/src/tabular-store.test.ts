@@ -6,6 +6,8 @@ import {
   boundTabularRows,
   DEFAULT_TABULAR_RESULT_LIMIT,
   MAX_TABULAR_RESULT_LIMIT,
+  resolveTabularDatasetGroups,
+  type TabularDatasetMeta,
 } from './tabular-store';
 
 test('counts text values and distinct identifiers without numeric coercion', () => {
@@ -61,4 +63,41 @@ test('marks a complete small tabular result as untruncated', () => {
   assert.equal(page.rows.length, 2);
   assert.equal(page.totalRows, 2);
   assert.equal(page.truncated, false);
+});
+
+test('resolves new and legacy tabular sidecars to their owning document group', () => {
+  const base = {
+    columns: [],
+    summary: {
+      totalRows: 2,
+      totalColumns: 0,
+      numericColumns: 0,
+      categoricalColumns: 0,
+      dateColumns: 0,
+    },
+    rowCount: 2,
+    createdAt: '2026-09-25T00:00:00.000Z',
+  };
+  const datasets: TabularDatasetMeta[] = [
+    { ...base, id: 'linked', fileName: 'linked.csv' },
+    { ...base, id: 'legacy', fileName: 'legacy.csv' },
+    { ...base, id: 'explicit', fileName: 'explicit.csv', groupId: 'stored-group' },
+  ];
+  const documents = [
+    {
+      title: 'linked.csv',
+      groupId: 'linked-group',
+      metadata: { tabularDatasetId: 'linked', rowCount: 2, fileName: 'linked.csv' },
+    },
+    {
+      title: 'legacy.csv',
+      groupId: 'legacy-group',
+      metadata: { rowCount: 2, fileName: 'legacy.csv' },
+    },
+  ];
+
+  assert.deepEqual(
+    resolveTabularDatasetGroups(datasets, documents).map((dataset) => dataset.groupId),
+    ['linked-group', 'legacy-group', 'stored-group'],
+  );
 });

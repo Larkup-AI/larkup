@@ -1,10 +1,15 @@
-import { access, lstat, opendir, rm } from 'node:fs/promises';
+import { access, lstat, opendir, readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 
 export interface BuildCacheStatus {
   available: boolean;
   exists: boolean;
   sizeBytes: number;
+  answerFeedback?: {
+    likedEntries: number;
+    dislikedEntries: number;
+    sizeBytes: number;
+  };
 }
 
 async function pathExists(candidate: string): Promise<boolean> {
@@ -48,6 +53,121 @@ async function directorySizeBytes(directory: string): Promise<number> {
     }
   }
   return total;
+}
+
+async function existingPathSize(candidate: string): Promise<number> {
+  try {
+    const stats = await lstat(candidate);
+    if (stats.isSymbolicLink()) return 0;
+    return await directorySizeBytes(candidate);
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? error.code : undefined;
+    if (code === 'ENOENT') return 0;
+    throw error;
+  }
+}
+
+async function childDirectories(directory: string): Promise<string[]> {
+  try {
+    return (await readdir(directory, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink())
+      .map((entry) => path.join(directory, entry.name));
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? error.code : undefined;
+    if (code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
+function dataRoot(startDirectory: string, override?: string): string {
+  if (override) return path.resolve(override);
+  const configured = process.env.LARKUP_DATA_DIR?.trim();
+  return configured ? path.resolve(configured) : path.join(path.resolve(startDirectory), '.larkup');
+}
+
+async function generalCachePaths(startDirectory: string, dataDirectory?: string) {
+  const buildCache = await resolveBuildCache(startDirectory);
+  const root = dataRoot(startDirectory, dataDirectory);
+  const projects = await childDirectories(path.join(root, 'projects'));
+  const servers = await childDirectories(path.join(root, 'servers'));
+  return {
+    removable: [
+      ...(buildCache ? [buildCache] : []),
+      path.join(root, 'tools', '.npm-cache'),
+      ...servers.map((server) => path.join(server, 'generated-server', '.npm-cache')),
+    ],
+    answerFeedbackFiles: projects.map((project) =>
+      path.join(project, 'grounded-answer-cache.json'),
+    ),
+    derivedFiles: projects.flatMap((project) => [
+      path.join(project, 'image-analysis-cache.json'),
+      path.join(project, 'video-semantic-index.json'),
+    ]),
+    videoKnowledgeFiles: projects.map((project) => path.join(project, 'video-knowledge.json')),
+    available: buildCache !== null || (await pathExists(root)),
+  };
+}
+
+async function answerFeedbackCacheStats(file: string) {
+  const sizeBytes = await existingPathSize(file);
+  if (sizeBytes === 0) return { sizeBytes: 0, likedEntries: 0, dislikedEntries: 0 };
+  try {
+    const state = JSON.parse(await readFile(file, 'utf8')) as {
+      entries?: Array<{ feedback?: unknown }>;
+    };
+    const entries = Array.isArray(state.entries) ? state.entries : [];
+    return {
+      sizeBytes,
+      // Cache files created before explicit feedback state contained only
+      // liked answers, so a missing field remains a positive entry.
+      likedEntries: entries.filter((entry) => entry.feedback !== 'disliked').length,
+      dislikedEntries: entries.filter((entry) => entry.feedback === 'disliked').length,
+    };
+  } catch {
+    return { sizeBytes, likedEntries: 0, dislikedEntries: 0 };
+  }
+}
+
+async function embeddedVideoCacheSize(file: string): Promise<number> {
+  try {
+    const state = JSON.parse(await readFile(file, 'utf8')) as {
+      artifactAnalysisCache?: unknown[];
+      answerMemory?: Array<{ userCorrection?: unknown }>;
+    };
+    const generatedAnswerMemory = (state.answerMemory ?? [])
+      .map((entry) => {
+        if (!entry.userCorrection) return entry;
+        const cache: Record<string, unknown> = {};
+        const value = entry as {
+          answer?: unknown;
+          evidenceIds?: unknown[];
+          unansweredCount?: number;
+          lastUnansweredAt?: string;
+        };
+        if (value.answer !== undefined) cache.answer = value.answer;
+        if (value.evidenceIds?.length) cache.evidenceIds = value.evidenceIds;
+        if ((value.unansweredCount ?? 0) > 0) cache.unansweredCount = value.unansweredCount;
+        if (value.lastUnansweredAt) cache.lastUnansweredAt = value.lastUnansweredAt;
+        return cache;
+      })
+      .filter((entry) => Object.keys(entry).length > 0);
+    const artifactAnalysisCache = state.artifactAnalysisCache ?? [];
+    // The durable video-knowledge file may remain because it contains source
+    // evidence or user corrections. Its two empty cache arrays are structure,
+    // not cached data; counting their 46-byte JSON wrapper made a successful
+    // clear appear incomplete in Settings.
+    if (artifactAnalysisCache.length === 0 && generatedAnswerMemory.length === 0) return 0;
+    return Buffer.byteLength(
+      JSON.stringify({
+        artifactAnalysisCache,
+        answerMemory: generatedAnswerMemory,
+      }),
+    );
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? error.code : undefined;
+    if (code === 'ENOENT') return 0;
+    throw error;
+  }
 }
 
 async function resolveBuildCache(startDirectory: string) {
@@ -94,4 +214,52 @@ export async function clearBuildCache(startDirectory = process.cwd()): Promise<n
   const { sizeBytes } = await getBuildCacheStatus(startDirectory);
   await rm(cacheDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   return sizeBytes;
+}
+
+/** Reports all rebuildable Larkup caches without counting projects or indexes. */
+export async function getGeneralCacheStatus(
+  startDirectory = process.cwd(),
+  dataDirectory?: string,
+): Promise<BuildCacheStatus> {
+  const paths = await generalCachePaths(startDirectory, dataDirectory);
+  const [sizes, answerFeedback] = await Promise.all([
+    Promise.all([
+      ...paths.removable.map(existingPathSize),
+      ...paths.derivedFiles.map(existingPathSize),
+      ...paths.videoKnowledgeFiles.map(embeddedVideoCacheSize),
+    ]),
+    Promise.all(paths.answerFeedbackFiles.map(answerFeedbackCacheStats)),
+  ]);
+  const answerFeedbackSummary = answerFeedback.reduce(
+    (total, current) => ({
+      sizeBytes: total.sizeBytes + current.sizeBytes,
+      likedEntries: total.likedEntries + current.likedEntries,
+      dislikedEntries: total.dislikedEntries + current.dislikedEntries,
+    }),
+    { sizeBytes: 0, likedEntries: 0, dislikedEntries: 0 },
+  );
+  const sizeBytes =
+    sizes.reduce((total, size) => total + size, 0) + answerFeedbackSummary.sizeBytes;
+  return {
+    available: paths.available,
+    exists: sizeBytes > 0,
+    sizeBytes,
+    answerFeedback: answerFeedbackSummary,
+  };
+}
+
+/** Clears build/package caches; project-derived caches are cleared through core locks. */
+export async function clearGeneralFilesystemCaches(
+  startDirectory = process.cwd(),
+  dataDirectory?: string,
+): Promise<void> {
+  const { removable, derivedFiles, answerFeedbackFiles } = await generalCachePaths(
+    startDirectory,
+    dataDirectory,
+  );
+  await Promise.all(
+    [...removable, ...derivedFiles, ...answerFeedbackFiles].map((candidate) =>
+      rm(candidate, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }),
+    ),
+  );
 }

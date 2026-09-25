@@ -9,7 +9,12 @@ import { readConfig } from '@larkup/core/config-store';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import { embedQuery } from '@larkup/core/indexing/embedder';
 import { runWithProject } from '@larkup/core/project-store';
-import { getTabularDataset, listTabularDatasets, queryTabular } from '@larkup/core/tabular-store';
+import {
+  getTabularDataset,
+  listTabularDatasets,
+  queryTabular,
+  resolveTabularDatasetGroups,
+} from '@larkup/core/tabular-store';
 import {
   getCorpusDocuments,
   exportCorpusAsCSV,
@@ -26,6 +31,7 @@ import { readGroups } from '@larkup/core/groups-store';
 import { readMediaAssets } from '@larkup/core/media-store';
 import {
   filterDocumentsAvailableToAssistant,
+  filterGroupOwnedDataAvailableToAssistant,
   filterMediaAssetsAvailableToAssistant,
 } from '@larkup/core/assistant-data-scope';
 import {
@@ -81,6 +87,8 @@ import {
 } from '@/lib/chat/media-source-routing';
 import { createTabularVisualization } from '@/lib/chat/tabular-visualization';
 import { normalizeChartConfig } from '@/lib/chat/chart-config';
+import { createDataExport } from '@/lib/chat/data-export';
+import { assistantSourceScopeFingerprint } from '@/lib/chat/assistant-source-scope';
 import { inferTabularPlan } from '@/lib/chat/tabular-query-plan';
 import {
   resolveTabularDatasetForQuestion,
@@ -819,6 +827,13 @@ export async function getChatTools(context: {
   origin?: string;
   /** Media source from the immediately preceding evidence-backed turn. */
   preferredMediaAssetId?: string;
+  /** Exact bounded result from the immediately preceding answer, for direct export follow-ups. */
+  recentExportTable?: {
+    columns: string[];
+    rows: Array<Record<string, unknown>>;
+  };
+  /** Conversational answer fallback when no structured table preceded the export request. */
+  recentAnswerText?: string;
 }) {
   const {
     projectId,
@@ -828,6 +843,8 @@ export async function getChatTools(context: {
     requestText,
     preferredMediaAssetId,
     contextualKnowledgeQuery,
+    recentExportTable,
+    recentAnswerText,
   } = context;
   // Installed tools are shared, while their connection/runtime selection is
   // project-scoped. Resolve that configuration once before constructing any
@@ -855,6 +872,27 @@ export async function getChatTools(context: {
         mediaAssets: filterMediaAssetsAvailableToAssistant(allMediaAssets, groups),
       };
     });
+  const readAssistantTabularDatasets = () =>
+    inActiveProject(async () => {
+      const [datasets, groups, documents] = await Promise.all([
+        listTabularDatasets(),
+        readGroups(),
+        readDocuments(),
+      ]);
+      return filterGroupOwnedDataAvailableToAssistant(
+        resolveTabularDatasetGroups(datasets, documents),
+        groups,
+      );
+    });
+  const readAssistantSourceFingerprint = async () => {
+    const [{ documents }, currentConfig] = await Promise.all([
+      readAssistantSourceScope(),
+      inActiveProject(() => readConfig()),
+    ]);
+    return assistantSourceScopeFingerprint(documents, {
+      configUpdatedAt: currentConfig.updatedAt,
+    });
+  };
   const scopedAsset = async (mediaAssetId: string) => {
     const { mediaAssets } = await readAssistantSourceScope();
     const asset = mediaAssets.find((candidate) => candidate.id === mediaAssetId);
@@ -1107,8 +1145,16 @@ export async function getChatTools(context: {
           contextualKnowledgeQuery && query.trim() === requestText?.trim()
             ? contextualKnowledgeQuery
             : query;
+        const fingerprintBeforeSearch = await readAssistantSourceFingerprint();
         const retrieval = await queryKnowledgeBase(retrievalQuery, 4, projectId ?? null);
-        return retrievalQuery === query ? retrieval : { ...retrieval, query };
+        const fingerprintAfterSearch = await readAssistantSourceFingerprint();
+        return {
+          ...retrieval,
+          ...(retrievalQuery === query ? {} : { query }),
+          ...(fingerprintBeforeSearch === fingerprintAfterSearch
+            ? { sourceScopeFingerprint: fingerprintAfterSearch }
+            : {}),
+        };
       },
     }),
 
@@ -2516,13 +2562,16 @@ export async function getChatTools(context: {
       }),
       execute: async (params) => {
         try {
-          const availableDatasets = await listTabularDatasets();
+          const availableDatasets = await readAssistantTabularDatasets();
           const resolvedDatasetId = resolveTabularDatasetForQuestion(
             requestText,
             availableDatasets,
             params.datasetId,
           );
-          const dataset = await getTabularDataset(resolvedDatasetId);
+          if (!availableDatasets.some((dataset) => dataset.id === resolvedDatasetId)) {
+            throw new Error('Dataset not found');
+          }
+          const dataset = await inActiveProject(() => getTabularDataset(resolvedDatasetId));
           if (!dataset) throw new Error('Dataset not found');
           const plan = inferTabularPlan(requestText, dataset, {
             ...params,
@@ -2543,9 +2592,57 @@ export async function getChatTools(context: {
       },
     }),
 
+    createDataExport: tool({
+      description:
+        'Create a real downloadable Excel, CSV, or PDF file from answer data already established in this conversation. Use this whenever the user asks to export, save, download, or convert an answer/result to one of these formats. Never write a Markdown download link. For a direct follow-up, omit columns and rows so the exact preceding result is reused. When exporting a result obtained earlier in this same turn, pass only those returned rows and columns.',
+      inputSchema: z.object({
+        format: z.enum(['xlsx', 'csv', 'pdf']).describe('The requested file format.'),
+        title: z.string().max(100).optional().describe('A short human-readable file title.'),
+        fileName: z
+          .string()
+          .max(100)
+          .optional()
+          .describe('Optional file name without relying on a Markdown link.'),
+        columns: z
+          .array(z.string())
+          .max(50)
+          .optional()
+          .describe('Columns from a result obtained in this same turn.'),
+        rows: z
+          .array(z.record(z.string(), z.any()))
+          .max(500)
+          .optional()
+          .describe('Rows from a result obtained in this same turn.'),
+      }),
+      execute: async ({ format, title, fileName, columns, rows }) => {
+        try {
+          const source = recentExportTable?.rows.length
+            ? recentExportTable
+            : columns?.length && rows?.length
+              ? { columns, rows }
+              : recentAnswerText?.trim()
+                ? { columns: ['Answer'], rows: [{ Answer: recentAnswerText.trim() }] }
+                : undefined;
+          if (!source) throw new Error('There is no completed answer available to export yet.');
+          return await createDataExport({
+            format,
+            title: title || 'Larkup answer',
+            fileName,
+            columns: source.columns,
+            rows: source.rows,
+          });
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'The export could not be created.',
+          };
+        }
+      },
+    }),
+
     generateVisualization: tool({
       description:
-        'Generate an interactive chart visualization from evidence already returned by a tool. Call this tool instead of writing JSON, Markdown, or an ASCII chart in your answer. Copy the exact rows to data. xAxisKey and every series.dataKey must exactly match fields in those rows; never use placeholder names such as EMPTY, null, or undefined. The UI renders the result automatically, so after calling it only summarize the finding in prose.',
+        'Generate an interactive chart visualization from evidence already returned by a tool. Call this tool instead of writing JSON, Markdown, or an ASCII chart in your answer. Copy the exact rows to data. xAxisKey and every series.dataKey must exactly match fields in those rows; never use placeholder names such as EMPTY, null, or undefined. Supply clear human-readable xAxisLabel and yAxisLabel values, including the unit when known. The UI renders the result automatically, so after calling it only summarize the finding in prose.',
       inputSchema: z.object({
         chartType: z
           .enum(['bar', 'area', 'line', 'pie', 'scatter', 'radar'])
@@ -2580,8 +2677,14 @@ export async function getChatTools(context: {
           ),
         stacked: z.boolean().optional().describe('Whether to stack bar/area charts.'),
         showLegend: z.boolean().optional().default(true).describe('Whether to show the legend.'),
-        xAxisLabel: z.string().optional().describe('Label for the X axis.'),
-        yAxisLabel: z.string().optional().describe('Label for the Y axis.'),
+        xAxisLabel: z
+          .string()
+          .optional()
+          .describe('Human-readable X-axis name, including its unit when relevant.'),
+        yAxisLabel: z
+          .string()
+          .optional()
+          .describe('Human-readable Y-axis name, including its unit when relevant.'),
       }),
       execute: async (config) => {
         // Treat model tool arguments as untrusted. The renderer repeats this
@@ -2628,6 +2731,7 @@ export async function getChatTools(context: {
           const requestedDatasetIds = [
             ...new Set([...(datasetIds ?? []), ...(datasetId ? [datasetId] : [])]),
           ];
+          const availableDatasets = await readAssistantTabularDatasets();
           // Some providers emit valid analysis code but omit an optional
           // datasetId. When the request maps unambiguously to one indexed
           // schema, stage it automatically so `data.csv` remains a reliable
@@ -2636,12 +2740,21 @@ export async function getChatTools(context: {
           if (requestedDatasetIds.length === 0) {
             const automaticDatasetId = selectTabularDatasetForQuestion(
               requestText,
-              await listTabularDatasets(),
+              availableDatasets,
             );
             if (automaticDatasetId) requestedDatasetIds.push(automaticDatasetId);
           }
           if (requestedDatasetIds.length > 0) {
-            const datasets = await Promise.all(requestedDatasetIds.map(getTabularDataset));
+            const availableDatasetIds = new Set(availableDatasets.map((dataset) => dataset.id));
+            const unavailableDatasetId = requestedDatasetIds.find(
+              (requestedId) => !availableDatasetIds.has(requestedId),
+            );
+            if (unavailableDatasetId) {
+              throw new Error(`Tabular dataset is not available: ${unavailableDatasetId}`);
+            }
+            const datasets = await inActiveProject(() =>
+              Promise.all(requestedDatasetIds.map(getTabularDataset)),
+            );
             const missingDatasetId = requestedDatasetIds.find((_, index) => !datasets[index]);
             if (missingDatasetId) {
               throw new Error(`Tabular dataset is not available: ${missingDatasetId}`);
@@ -3210,6 +3323,7 @@ export async function getChatTools(context: {
         // experience. Keep them available even when a legacy enabled-tools
         // configuration only lists marketplace tools.
         'queryTabularData',
+        'createDataExport',
         'generateVisualization',
         'executeAnalysis',
         // PDF/image hits can require one visual pass after retrieval. This is

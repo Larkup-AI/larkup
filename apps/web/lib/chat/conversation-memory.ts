@@ -1,3 +1,5 @@
+import { answerFeedbackForMessage } from './message-feedback';
+
 type ToolPart = {
   type?: string;
   toolName?: string;
@@ -15,6 +17,12 @@ type ChatMessage = {
   role?: string;
   parts?: unknown;
   toolInvocations?: unknown;
+  metadata?: unknown;
+};
+
+export type ExactGroundedAnswer = {
+  answer: string;
+  sourceScopeFingerprint: string;
 };
 
 export type ReusableImageEvidence = {
@@ -36,6 +44,8 @@ export type ConversationEvidence = {
   images: ReusableImageEvidence[];
   /** Compact IDs let a direct correction address the same video without a fresh search. */
   mediaAssetIds: string[];
+  /** Last question sent to the selected media capability, used only to resolve a follow-up. */
+  mediaQuestion?: string;
   /** The latest bounded table result is safe to reuse for a direct follow-up. */
   tabular?: ReusableTabularEvidence;
 };
@@ -107,6 +117,87 @@ function toolParts(
       output: invocation.result,
     })),
   ];
+}
+
+function conversationalText(message: ChatMessage): string {
+  if (!Array.isArray(message.parts)) return '';
+  return (message.parts as ToolPart[])
+    .filter((part) => part.type === 'text' && typeof (part as { text?: unknown }).text === 'string')
+    .map((part) => String((part as { text?: unknown }).text))
+    .join('')
+    .trim();
+}
+
+function normalizedExactQuestion(value: string) {
+  return value.normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
+}
+
+/**
+ * Find an immediately repeated plain-document question whose prior answer was
+ * backed only by a completed local search. Media, tabular, and multi-tool
+ * answers keep their specialized verification paths and are never reused here.
+ */
+export function findImmediateExactGroundedAnswer(
+  messages: readonly ChatMessage[],
+  currentQuestion: string,
+): ExactGroundedAnswer | undefined {
+  if (messages.length < 3) return undefined;
+  let currentUserIndex = -1;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === 'user') {
+      currentUserIndex = index;
+      break;
+    }
+  }
+  if (currentUserIndex < 2) return undefined;
+  const normalizedQuestion = normalizedExactQuestion(currentQuestion);
+  let turnEnd = currentUserIndex;
+  let nearestAnswer = '';
+
+  // A direct cache hit contains text but no repeated search tool result. Walk
+  // through a consecutive chain of the same question until reaching its last
+  // grounded search, so a third/fourth repeat remains just as fast as the first.
+  for (let index = currentUserIndex - 1; index >= 0; index -= 1) {
+    if (messages[index].role !== 'user') continue;
+    const previousQuestion = conversationalText(messages[index]);
+    if (!previousQuestion || normalizedExactQuestion(previousQuestion) !== normalizedQuestion) {
+      return undefined;
+    }
+
+    const assistantMessages = messages
+      .slice(index + 1, turnEnd)
+      .filter((message) => message.role === 'assistant');
+    if (assistantMessages.length === 0) return undefined;
+    // A negative rating is an explicit request not to repeat the same answer.
+    // Positive and unrated grounded answers remain reusable while their source
+    // fingerprint is unchanged, preserving the fast exact-repeat experience.
+    if (assistantMessages.some((message) => answerFeedbackForMessage(message) === 'disliked')) {
+      return undefined;
+    }
+
+    const answer = assistantMessages.map(conversationalText).filter(Boolean).join('\n\n').trim();
+    if (!answer) return undefined;
+    nearestAnswer ||= answer;
+
+    const parts = assistantMessages.flatMap(toolParts);
+    if (parts.some((part) => part.name && part.name !== 'searchKnowledgeBase')) return undefined;
+    const search = parts
+      .filter((part) => part.name === 'searchKnowledgeBase')
+      .map((part) => unwrapJson(part.output) as Record<string, unknown> | undefined)
+      .find((output) => Array.isArray(output?.hits) && output.hits.length > 0);
+    if (search) {
+      if (typeof search.sourceScopeFingerprint !== 'string') return undefined;
+      const hasMedia = (search.hits as Array<Record<string, any>>).some(
+        (hit) => hit?.metadata?.mediaAssetId || hit?.mediaAssetId,
+      );
+      if (hasMedia || search.videoEvidence) return undefined;
+      return { answer: nearestAnswer, sourceScopeFingerprint: search.sourceScopeFingerprint };
+    }
+    if (parts.some((part) => part.name === 'searchKnowledgeBase')) return undefined;
+    turnEnd = index;
+  }
+
+  return undefined;
 }
 
 function imageEvidence(value: unknown, title?: string): ReusableImageEvidence[] {
@@ -270,10 +361,30 @@ export function extractConversationEvidence(
     // an explicitly routed `videoEvidence` above remain authoritative.
     const leadingMediaAssetId = (hits[0] as any)?.metadata?.mediaAssetId;
     if (typeof leadingMediaAssetId === 'string') mediaAssetIds.add(leadingMediaAssetId);
+    const directMediaQuestion = [...parts]
+      .reverse()
+      .map((part) => {
+        const output = unwrapJson(part.output) as { mediaAssetId?: unknown } | undefined;
+        const input = unwrapJson(part.input) as { query?: unknown } | undefined;
+        return typeof output?.mediaAssetId === 'string' && typeof input?.query === 'string'
+          ? input.query.trim()
+          : '';
+      })
+      .find(Boolean);
+    const selectedSearchQuestion = parts
+      .filter((part) => part.name === 'searchKnowledgeBase')
+      .map((part) => {
+        const input = unwrapJson(part.input) as { query?: unknown } | undefined;
+        return typeof input?.query === 'string' ? input.query.trim() : '';
+      })
+      .find(Boolean);
     return {
       sources,
       images: [...images.values()].slice(0, 4),
       mediaAssetIds: [...mediaAssetIds].slice(0, 2),
+      ...(directMediaQuestion || selectedSearchQuestion
+        ? { mediaQuestion: directMediaQuestion || selectedSearchQuestion }
+        : {}),
     };
   }
   return { sources: [], images: [], mediaAssetIds: [] };
@@ -355,6 +466,31 @@ const TOPIC_REFERENCE_LANGUAGE =
 const SHORT_FOLLOW_UP_LANGUAGE =
   /^(?:how|when|where|who|what|which|can|could|do|does|is|are|will|would)\b/i;
 const MAX_FOLLOW_UP_TOPIC_CHARS = 1_200;
+
+/**
+ * Resolve a short parallel preference question without carrying the previous
+ * answer forward. "What is my favorite anime?" → "and fruits" must search
+ * for favorite fruits, not treat Naruto as evidence for the new subject.
+ */
+export function resolveParallelPreferenceQuestion(
+  currentQuestion: string,
+  previousQuestion: string,
+): string | undefined {
+  const parallel = currentQuestion
+    .trim()
+    .match(/^(?:and|also)\s+(?:what\s+about\s+)?(.+?)[?.!]*$/i);
+  const rawSubject = parallel?.[1]?.trim();
+  const subject =
+    rawSubject?.match(/^(?:my\s+)?(?:fav(?:ou?rite)?|preferred)\s+(.+)$/i)?.[1]?.trim() ??
+    rawSubject;
+  if (!subject || /^(?:it|this|that|them|those|these|more)$/i.test(subject)) return undefined;
+
+  const preference = previousQuestion
+    .trim()
+    .match(/^(.*\b(?:fav(?:ou?rite)?|preferred)\s+)(.+?)[?.!]*$/i);
+  if (!preference?.[1]) return undefined;
+  return `${preference[1]}${subject}?`;
+}
 
 /**
  * Qualify a vague immediate follow-up with the prior non-media source before

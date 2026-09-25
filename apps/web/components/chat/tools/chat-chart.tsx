@@ -132,7 +132,7 @@ const AXIS_LINE_STYLE = {
   stroke: 'var(--border)',
 };
 
-const LEGEND_WRAPPER_STYLE = { fontSize: 11, paddingTop: 8 };
+const LEGEND_WRAPPER_STYLE = { fontSize: 11, paddingTop: 32 };
 const LEGEND_WRAPPER_STYLE_PIE = { fontSize: 11 };
 const PIE_LABEL_LINE = { stroke: 'var(--muted-foreground)', strokeWidth: 1 };
 const SCATTER_CURSOR = { strokeDasharray: '3 3' };
@@ -140,6 +140,13 @@ const POLAR_ANGLE_TICK = { fontSize: 11, fill: 'var(--muted-foreground)' };
 const POLAR_RADIUS_TICK = { fontSize: 10, fill: 'var(--muted-foreground)' };
 const ACTIVE_DOT = { r: 4, strokeWidth: 2, stroke: 'var(--card)' };
 const BAR_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
+const CARTESIAN_CHART_MARGIN = { top: 8, right: 16, bottom: 18, left: 36 };
+const X_AXIS_HEIGHT = 72;
+const Y_AXIS_WIDTH = 76;
+const AXIS_TICK_MARGIN = 10;
+const X_AXIS_MIN_TICK_GAP = 24;
+const X_AXIS_LABEL_OFFSET = -8;
+const Y_AXIS_LABEL_OFFSET = -20;
 
 const renderPieLabel = ({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`;
 
@@ -208,7 +215,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
         ? {
             value: xAxisLabel,
             position: 'insideBottom',
-            offset: -5,
+            offset: X_AXIS_LABEL_OFFSET,
             style: { fontSize: 11, fill: 'var(--muted-foreground)' },
           }
         : undefined,
@@ -222,6 +229,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
             value: yAxisLabel,
             angle: -90,
             position: 'insideLeft',
+            offset: Y_AXIS_LABEL_OFFSET,
             style: { fontSize: 11, fill: 'var(--muted-foreground)' },
           }
         : undefined,
@@ -232,7 +240,12 @@ export function ChatChart({ config }: { config: ChartConfig }) {
     switch (chartType) {
       case 'bar':
         return (
-          <BarChart data={stableData} barGap={4} barCategoryGap="20%">
+          <BarChart
+            data={stableData}
+            barGap={4}
+            barCategoryGap="20%"
+            margin={CARTESIAN_CHART_MARGIN}
+          >
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="var(--border)"
@@ -244,12 +257,17 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               tick={AXIS_TICK_STYLE}
               axisLine={AXIS_LINE_STYLE}
               tickLine={false}
+              tickMargin={AXIS_TICK_MARGIN}
+              minTickGap={X_AXIS_MIN_TICK_GAP}
+              height={X_AXIS_HEIGHT}
               label={xLabelObj as any}
             />
             <YAxis
               tick={AXIS_TICK_STYLE}
               axisLine={false}
               tickLine={false}
+              tickMargin={AXIS_TICK_MARGIN}
+              width={Y_AXIS_WIDTH}
               label={yLabelObj as any}
             />
             <Tooltip content={CustomTooltip} cursor={false} />
@@ -274,7 +292,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
 
       case 'area':
         return (
-          <AreaChart data={stableData}>
+          <AreaChart data={stableData} margin={CARTESIAN_CHART_MARGIN}>
             <ChartGradients series={stableSeries} />
             <CartesianGrid
               strokeDasharray="3 3"
@@ -287,9 +305,19 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               tick={AXIS_TICK_STYLE}
               axisLine={AXIS_LINE_STYLE}
               tickLine={false}
+              tickMargin={AXIS_TICK_MARGIN}
+              minTickGap={X_AXIS_MIN_TICK_GAP}
+              height={X_AXIS_HEIGHT}
               label={xLabelObj as any}
             />
-            <YAxis tick={AXIS_TICK_STYLE} axisLine={false} tickLine={false} />
+            <YAxis
+              tick={AXIS_TICK_STYLE}
+              axisLine={false}
+              tickLine={false}
+              tickMargin={AXIS_TICK_MARGIN}
+              width={Y_AXIS_WIDTH}
+              label={yLabelObj as any}
+            />
             <Tooltip content={CustomTooltip} />
             {showLegend && (
               <Legend iconType="circle" iconSize={7} wrapperStyle={LEGEND_WRAPPER_STYLE} />
@@ -313,7 +341,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
 
       case 'line':
         return (
-          <LineChart data={stableData}>
+          <LineChart data={stableData} margin={CARTESIAN_CHART_MARGIN}>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="var(--border)"
@@ -325,9 +353,19 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               tick={AXIS_TICK_STYLE}
               axisLine={AXIS_LINE_STYLE}
               tickLine={false}
+              tickMargin={AXIS_TICK_MARGIN}
+              minTickGap={X_AXIS_MIN_TICK_GAP}
+              height={X_AXIS_HEIGHT}
               label={xLabelObj as any}
             />
-            <YAxis tick={AXIS_TICK_STYLE} axisLine={false} tickLine={false} />
+            <YAxis
+              tick={AXIS_TICK_STYLE}
+              axisLine={false}
+              tickLine={false}
+              tickMargin={AXIS_TICK_MARGIN}
+              width={Y_AXIS_WIDTH}
+              label={yLabelObj as any}
+            />
             <Tooltip content={CustomTooltip} />
             {showLegend && (
               <Legend iconType="circle" iconSize={7} wrapperStyle={LEGEND_WRAPPER_STYLE} />
@@ -386,7 +424,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
 
       case 'scatter':
         return (
-          <ScatterChart>
+          <ScatterChart margin={CARTESIAN_CHART_MARGIN}>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="var(--border)"
@@ -399,7 +437,11 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               tick={AXIS_TICK_STYLE}
               axisLine={AXIS_LINE_STYLE}
               tickLine={false}
+              tickMargin={AXIS_TICK_MARGIN}
+              minTickGap={X_AXIS_MIN_TICK_GAP}
+              height={X_AXIS_HEIGHT}
               name={xAxisLabel || stableXAxisKey}
+              label={xLabelObj as any}
             />
             <YAxis
               dataKey={stableSeries[0]?.dataKey}
@@ -407,7 +449,10 @@ export function ChatChart({ config }: { config: ChartConfig }) {
               tick={AXIS_TICK_STYLE}
               axisLine={false}
               tickLine={false}
-              name={stableSeries[0]?.label || stableSeries[0]?.dataKey}
+              tickMargin={AXIS_TICK_MARGIN}
+              width={Y_AXIS_WIDTH}
+              name={yAxisLabel || stableSeries[0]?.label || stableSeries[0]?.dataKey}
+              label={yLabelObj as any}
             />
             <Tooltip content={CustomTooltip} cursor={SCATTER_CURSOR} />
             <Scatter
@@ -474,7 +519,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
       </div>
 
       <div className="px-2 py-4 pb-2">
-        <div style={{ width: '100%', height: 240, minHeight: 240 }}>
+        <div style={{ width: '100%', height: 340, minHeight: 340 }}>
           <ResponsiveContainer width="100%" height="100%" debounce={50}>
             {renderChart() as any}
           </ResponsiveContainer>

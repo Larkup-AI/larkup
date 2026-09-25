@@ -6,6 +6,7 @@ import { HardDrive, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCacheBytes } from '@/lib/cache-size';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +24,11 @@ interface CacheResponse {
     available: boolean;
     exists: boolean;
     sizeBytes: number;
+    answerFeedback?: {
+      likedEntries: number;
+      dislikedEntries: number;
+      sizeBytes: number;
+    };
   };
   clearedBytes?: number;
   error?: string;
@@ -31,21 +37,15 @@ interface CacheResponse {
 async function fetchCache(url: string): Promise<CacheResponse> {
   const response = await fetch(url, { cache: 'no-store' });
   const payload = (await response.json()) as CacheResponse;
-  if (!response.ok) throw new Error(payload.error || 'Could not inspect the build cache.');
+  if (!response.ok) throw new Error(payload.error || 'Could not inspect the Larkup cache.');
   return payload;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / 1024 ** unit;
-  return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
 export function CacheManagementCard() {
   const { data, error, isLoading, isValidating, mutate } = useSWR('/api/system/cache', fetchCache, {
-    revalidateOnFocus: false,
+    revalidateOnMount: true,
+    revalidateOnFocus: true,
+    dedupingInterval: 0,
   });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -56,13 +56,13 @@ export function CacheManagementCard() {
     try {
       const response = await fetch('/api/system/cache', { method: 'DELETE' });
       const payload = (await response.json()) as CacheResponse;
-      if (!response.ok) throw new Error(payload.error || 'Could not clear the build cache.');
+      if (!response.ok) throw new Error(payload.error || 'Could not clear the Larkup cache.');
       await mutate(payload, { revalidate: false });
       setConfirmOpen(false);
-      toast.success(`Cleared ${formatBytes(payload.clearedBytes || 0)} of build cache.`);
+      toast.success(`Cleared ${formatCacheBytes(payload.clearedBytes || 0)} of Larkup cache.`);
     } catch (clearError) {
       toast.error(
-        clearError instanceof Error ? clearError.message : 'Could not clear build cache.',
+        clearError instanceof Error ? clearError.message : 'Could not clear the Larkup cache.',
       );
     } finally {
       setClearing(false);
@@ -91,23 +91,31 @@ export function CacheManagementCard() {
             <div>
               <p className="text-xs text-muted-foreground">Detected cache size</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
-                {isLoading ? '—' : formatBytes(cache?.sizeBytes || 0)}
+                {isLoading ? '—' : formatCacheBytes(cache?.sizeBytes || 0)}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {error
                   ? 'Cache size could not be read.'
                   : cache?.available === false
-                    ? 'No source workspace cache is present on this installation.'
+                    ? 'No Larkup cache is present on this installation.'
                     : cache?.exists
-                      ? 'Safe to clear. Future source builds will recreate only what they need.'
-                      : 'No build cache is currently stored.'}
+                      ? 'Safe to clear. Larkup recreates temporary data only when needed.'
+                      : 'No temporary cache data is currently stored.'}
               </p>
+              {!error && cache?.answerFeedback ? (
+                <p className="mt-1 text-xs text-muted-foreground" data-testid="answer-cache-counts">
+                  Across all projects: {cache.answerFeedback.likedEntries} liked answer
+                  {cache.answerFeedback.likedEntries === 1 ? '' : 's'} and{' '}
+                  {cache.answerFeedback.dislikedEntries} disliked answer
+                  {cache.answerFeedback.dislikedEntries === 1 ? '' : 's'} tracked.
+                </p>
+              ) : null}
             </div>
             <div className="flex shrink-0 gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                aria-label="Refresh build cache size"
+                aria-label="Refresh Larkup cache size"
                 disabled={isLoading || isValidating}
                 onClick={() => void mutate()}
               >
@@ -134,10 +142,12 @@ export function CacheManagementCard() {
             <AlertDialogMedia>
               <Trash2 className="size-5" />
             </AlertDialogMedia>
-            <AlertDialogTitle>Clear the build cache?</AlertDialogTitle>
+            <AlertDialogTitle>Clear the Larkup cache?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove {formatBytes(cache?.sizeBytes || 0)} of temporary Turborepo files. It
-              will not remove projects, indexed data, settings, API keys, or installed tools.
+              This will remove {formatCacheBytes(cache?.sizeBytes || 0)} of temporary build,
+              package, image-analysis, video-query, and answer-feedback data. It will not remove
+              projects, indexed sources, settings, API keys, user corrections, chat history, or
+              installed tools.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

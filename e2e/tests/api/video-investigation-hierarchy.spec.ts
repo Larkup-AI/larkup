@@ -92,6 +92,7 @@ test('plans every video question from a cached chapter, scene, event, and state 
   const first = await planVideoInvestigation(
     mediaAssetId,
     'Where was the blue box before it disappeared?',
+    { scope: 'temporal', goal: 'trace' },
   );
   expect(first?.states.map((state: { summary: string }) => state.summary)).toEqual(
     expect.arrayContaining(['shelf', 'not visible']),
@@ -103,6 +104,7 @@ test('plans every video question from a cached chapter, scene, event, and state 
   const second = await planVideoInvestigation(
     mediaAssetId,
     'Where was the blue box before it disappeared?',
+    { scope: 'temporal', goal: 'trace' },
   );
   expect(second?.chapters.length).toBeGreaterThan(0);
   expect(second?.scenes.length).toBeGreaterThan(0);

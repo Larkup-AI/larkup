@@ -50,3 +50,11 @@ export function filterMediaAssetsAvailableToAssistant<T extends Pick<MediaAsset,
 ): T[] {
   return assets.filter((asset) => isMediaAssetAvailableToAssistant(asset, groups));
 }
+
+/** Filters any group-owned sidecar data, including exact tabular datasets. */
+export function filterGroupOwnedDataAvailableToAssistant<T extends { groupId?: string }>(
+  values: readonly T[],
+  groups: readonly DataGroup[],
+): T[] {
+  return values.filter((value) => isGroupAvailableToAssistant(value.groupId, groups));
+}

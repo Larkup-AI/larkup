@@ -51,6 +51,66 @@ test.describe.serial('Data Page', () => {
     ).toBeVisible();
   });
 
+  test('uses one visible source switch and readiness pattern for every add type', async ({
+    page,
+  }) => {
+    await page.getByRole('button', { name: 'Files', exact: true }).click();
+    const fileSource = page.getByRole('group', { name: 'File source' });
+    const sharedControlClass = await fileSource.getAttribute('class');
+    const sharedOptionClass = await fileSource.getByRole('button').first().getAttribute('class');
+    await expect(fileSource.getByRole('button', { name: 'Upload' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    const addFile = page.getByRole('button', { name: 'Add file', exact: true });
+    await expect(addFile).toBeDisabled();
+    await expect(addFile).toHaveAttribute('data-ready', 'false');
+    await page
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: 'ready.txt',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('Ready to add'),
+      });
+    await expect(addFile).toBeEnabled();
+    await expect(addFile).toHaveAttribute('data-ready', 'true');
+    await page.getByRole('button', { name: 'Clear All' }).click();
+
+    await page.getByRole('button', { name: 'Media', exact: true }).click();
+    const mediaSource = page.getByRole('group', { name: 'Media source' });
+    expect(await mediaSource.getAttribute('class')).toBe(sharedControlClass);
+    expect(await mediaSource.getByRole('button').first().getAttribute('class')).toBe(
+      sharedOptionClass,
+    );
+    const addMedia = page.getByRole('button', { name: 'Add media', exact: true });
+    await expect(addMedia).toBeDisabled();
+    await page.locator('input[type="file"]').first().setInputFiles(FIXTURES.png);
+    await expect(addMedia).toBeEnabled();
+    await expect(addMedia).toHaveAttribute('data-ready', 'true');
+    await page.getByRole('button', { name: 'Clear All' }).click();
+
+    await page.getByRole('button', { name: 'Website', exact: true }).click();
+    const websiteSource = page.getByRole('group', { name: 'Website source' });
+    expect(await websiteSource.getAttribute('class')).toBe(sharedControlClass);
+    expect(await websiteSource.getByRole('button').first().getAttribute('class')).toBe(
+      sharedOptionClass,
+    );
+    const addWebsite = page.getByRole('button', { name: 'Add website', exact: true });
+    await expect(addWebsite).toBeDisabled();
+    await page.locator('input[placeholder*="URL" i]').first().fill('https://example.com/ready');
+    await expect(addWebsite).toBeEnabled();
+    await expect(addWebsite).toHaveAttribute('data-ready', 'true');
+
+    await page.getByRole('button', { name: 'Text', exact: true }).click();
+    const addText = page.getByRole('button', { name: 'Add text', exact: true });
+    await expect(addText).toBeDisabled();
+    await page.getByLabel('Content').fill('Ready to add');
+    await expect(addText).toBeEnabled();
+    await expect(addText).toHaveAttribute('data-ready', 'true');
+  });
+
   test('adds pasted text to the group selected on the add page', async ({ page }) => {
     const groups = [
       { id: 'default', name: 'Default', icon: '📚', createdAt: '2026-01-01' },
@@ -113,7 +173,57 @@ test.describe.serial('Data Page', () => {
       });
   });
 
-  test('stages a remote file from the Files URL importer', async ({ page }) => {
+  test('does not fall back to Default while a deep-linked group is loading', async ({ page }) => {
+    const groups = [
+      { id: 'default', name: 'Default', icon: '📚', createdAt: '2026-01-01' },
+      { id: 'research', name: 'Research', icon: '◆', createdAt: '2026-01-01' },
+    ];
+    let releaseGroups!: () => void;
+    const groupsReady = new Promise<void>((resolve) => {
+      releaseGroups = resolve;
+    });
+    let createRequest: Record<string, unknown> | undefined;
+
+    await page.route('**/api/documents', async (route) => {
+      if (route.request().method() === 'GET') {
+        await groupsReady;
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            documents: [],
+            groups,
+            stats: { docCount: 0, charCount: 0, bySource: {} },
+          }),
+        });
+        return;
+      }
+      if (route.request().method() === 'POST') {
+        createRequest = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({ document: { id: 'deep-linked', ...createRequest } }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.goto('/add?subtab=text&groupId=research');
+    await page.getByLabel('Content').fill('Keep the requested destination stable.');
+    await expect(page.getByRole('button', { name: 'Add text', exact: true })).toBeDisabled();
+    await expect(page.getByRole('combobox', { name: 'Data group' })).toContainText('Loading group');
+
+    releaseGroups();
+    await expect(page.getByRole('combobox', { name: 'Data group' })).toContainText('Research');
+    await expect(page.getByRole('button', { name: 'Add text', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Add text', exact: true }).click();
+
+    await expect.poll(() => createRequest?.groupId).toBe('research');
+  });
+
+  test('adds a remote file in one step with the same Add file action', async ({ page }) => {
+    let createRequest: Record<string, unknown> | undefined;
     await page.getByRole('button', { name: 'Files', exact: true }).click();
     await page.route('**/api/files/remote', async (route) => {
       await route.fulfill({
@@ -126,30 +236,42 @@ test.describe.serial('Data Page', () => {
         body: 'Alias = str\n',
       });
     });
+    await page.route('**/api/documents', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      createRequest = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ document: { id: 'remote-file', ...createRequest } }),
+      });
+    });
 
     await page.getByRole('button', { name: 'From URL', exact: true }).click();
+    const addFile = page.getByRole('button', { name: 'Add file', exact: true });
+    await expect(addFile).toBeDisabled();
     await page
       .getByRole('textbox', { name: 'Remote file URL' })
       .fill('https://example.com/aliases.py');
-    await page.getByRole('button', { name: 'Load remote file' }).click();
+    await expect(addFile).toBeEnabled();
+    await expect(addFile).toHaveAttribute('data-ready', 'true');
+    await addFile.click();
 
-    await expect(page.getByText('aliases.py', { exact: true })).toBeVisible();
-    await expect(page.getByText('Imported from example.com', { exact: true })).toBeVisible();
-    await expect(page.locator('ul').filter({ hasText: 'aliases.py' })).toHaveCSS(
-      'overflow-y',
-      'visible',
-    );
-    await page.getByRole('button', { name: 'Preview aliases.py' }).click();
-    await expect(page.getByRole('heading', { name: 'Preview: aliases.py' })).toBeVisible();
-    await expect(page.getByText('Alias = str', { exact: true })).toBeVisible();
-    await page.keyboard.press('Escape');
-
-    await page.getByRole('button', { name: 'From URL', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save 1 file', exact: true })).toBeVisible();
-    await page
-      .getByRole('textbox', { name: 'Remote file URL' })
-      .fill('https://example.com/next.toml');
-    await expect(page.getByRole('button', { name: 'Load remote file', exact: true })).toBeVisible();
+    await expect
+      .poll(() => createRequest)
+      .toMatchObject({
+        title: 'aliases.py',
+        content: 'Alias = str\n',
+        source: 'files',
+        url: 'https://example.com/aliases.py',
+        groupId: 'default',
+        metadata: {
+          originalUrl: 'https://example.com/aliases.py',
+        },
+      });
+    await expect(page.getByRole('button', { name: 'Add file', exact: true })).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: /Save \d+ files?|Load remote file/ }),
+    ).toHaveCount(0);
   });
 
   test('blocks all add actions until an embedding API key is configured', async ({ page }) => {
@@ -175,7 +297,7 @@ test.describe.serial('Data Page', () => {
       '/settings?section=models',
     );
 
-    for (const action of ['Add website', 'Add files', 'Add text', 'Add media']) {
+    for (const action of ['Add website', 'Add file', 'Add text', 'Add media']) {
       await expect(page.getByRole('button', { name: action })).toHaveCount(0);
     }
   });

@@ -64,6 +64,7 @@ function evidenceContext(overrides: {
   planInvestigation?: () => Promise<unknown>;
   reWatch?: (...args: any[]) => Promise<unknown>;
   scan?: (...args: any[]) => Promise<unknown>;
+  aggregate?: (...args: any[]) => Promise<unknown>;
 }) {
   return {
     origin: 'https://larkup.example.test',
@@ -79,6 +80,7 @@ function evidenceContext(overrides: {
       ...(overrides.planInvestigation ? { planInvestigation: overrides.planInvestigation } : {}),
       ...(overrides.reWatch ? { reWatch: overrides.reWatch } : {}),
       ...(overrides.scan ? { scan: overrides.scan } : {}),
+      ...(overrides.aggregate ? { aggregate: overrides.aggregate } : {}),
       search: async (
         _id: string,
         query: string,
@@ -203,6 +205,22 @@ describe('Video Intelligence chat extension', () => {
         },
         search,
         scan,
+        aggregate: async () => ({
+          resultHandle: 'aggregate-1',
+          participants: [],
+          timeline: [],
+          sourceItems: [],
+          visibleSubjects: [
+            {
+              identity: 'unidentified sponsor presenter',
+              identityBasis: 'source-described',
+              appearances: [{ startSecs: 840, endSecs: 900, precision: 'estimated' }],
+              observedDurationSecs: 60,
+              observationCount: 3,
+            },
+          ],
+          coverage: { inventoryComplete: true, activeEvidenceRecords: 2 },
+        }),
       }),
     );
 
@@ -218,6 +236,9 @@ describe('Video Intelligence chat extension', () => {
     expect(result.evidence).toHaveLength(1);
     expect(result.evidence[0].payload.text).toContain('Source respondent: Rami');
     expect(result.evidence[0].payload.text).not.toContain('How are you?');
+    expect(result.observedSubjects).toEqual([
+      expect.objectContaining({ identity: 'unidentified sponsor presenter' }),
+    ]);
     expect(result.inventory).toEqual({
       recordSet: 'source-questions',
       coverage: { complete: true },
@@ -484,6 +505,40 @@ describe('Video Intelligence chat extension', () => {
       success: false,
       error: 'Video analysis did not finish within the interactive response budget.',
     });
+  });
+
+  it('allows the inspection server to return just after its worker budget expires', async () => {
+    const fetcher = vi.fn(
+      (_url: URL, options: RequestInit) =>
+        new Promise<Response>((resolve, reject) => {
+          const timer = setTimeout(
+            () => resolve(Response.json({ evidence: [{ id: 'settled-at-deadline' }] })),
+            40,
+          );
+          options.signal?.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              reject(options.signal?.reason);
+            },
+            { once: true },
+          );
+        }),
+    ) as any;
+
+    await expect(
+      agentClient(fetcher).inspectVideoKnowledge(
+        {
+          mediaAssetId: 'media-1',
+          startSecs: 0,
+          endSecs: 10,
+          purpose: 'verify-visual',
+          queryId: 'deadline-response',
+          maxWaitMs: 10,
+        },
+        { origin: 'https://larkup.example.test' },
+      ),
+    ).resolves.toMatchObject({ success: true, evidence: [{ id: 'settled-at-deadline' }] });
   });
 
   it('answers from the index alone when it already establishes the claim', async () => {
@@ -2007,6 +2062,197 @@ describe('Video Intelligence chat extension', () => {
     });
   });
 
+  it('keeps only nearby visibility anchors on a focused follow-up', async () => {
+    const fetcher = vi.fn() as any;
+    const context = evidenceContext({
+      durationSecs: 1_000,
+      plan: {
+        kinds: ['visual-fact'],
+        route: 'search',
+        requiresInspectionWhenInsufficient: true,
+      },
+      search: () => [
+        directVerdict(
+          'local-answer',
+          840,
+          'Who appears at the requested moment?',
+          'An unidentified grey-haired presenter appears.',
+        ),
+      ],
+    });
+    context.mediaEvidence.aggregate = async () => ({
+      resultHandle: 'aggregate-1',
+      participants: [],
+      timeline: [],
+      sourceItems: [],
+      visibleSubjects: [
+        {
+          identity: 'unidentified grey-haired presenter',
+          identityBasis: 'source-described',
+          appearances: [{ startSecs: 840, endSecs: 900, precision: 'estimated' }],
+          observedDurationSecs: 60,
+          observationCount: 3,
+        },
+        {
+          identity: 'source-named interview guest',
+          identityBasis: 'source-named',
+          appearances: [{ startSecs: 0, endSecs: 700, precision: 'estimated' }],
+          observedDurationSecs: 700,
+          observationCount: 20,
+        },
+      ],
+      coverage: { inventoryComplete: true, activeEvidenceRecords: 2 },
+    });
+
+    const result: any = await agentClient(fetcher).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'Who appears at the requested moment?',
+        investigation: {
+          scope: 'focused',
+          goal: 'answer',
+          evidence: ['visual'],
+          timeRange: { startSecs: 840, endSecs: 900 },
+        },
+      },
+      context,
+    );
+
+    expect(result.observedSubjects).toEqual([
+      expect.objectContaining({ identity: 'unidentified grey-haired presenter' }),
+    ]);
+  });
+
+  it('does not let object detections or nearby speech establish a visible identity', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: false,
+      json: async () => ({ error: 'inspection unavailable in test' }),
+    })) as any;
+    const context = evidenceContext({
+      durationSecs: 1_000,
+      plan: {
+        kinds: ['visual-fact'],
+        route: 'search',
+        requiresInspectionWhenInsufficient: true,
+      },
+      search: () => [
+        hit('detector', 845, 'Detected objects: person (track 12), book (track 13)'),
+        hit('speech', 850, 'Our sponsor makes current events easier to compare.', {
+          modality: 'transcript',
+        }),
+      ],
+      aggregate: async () => ({
+        resultHandle: 'aggregate-1',
+        participants: [],
+        timeline: [],
+        sourceItems: [],
+        visibleSubjects: [
+          {
+            identity: 'unidentified sponsor presenter',
+            identityBasis: 'source-described',
+            appearances: [
+              { startSecs: 820, endSecs: 820, precision: 'estimated' },
+              { startSecs: 886, endSecs: 886, precision: 'estimated' },
+            ],
+            observedDurationSecs: 0,
+            observationCount: 2,
+          },
+        ],
+        coverage: { inventoryComplete: true, activeEvidenceRecords: 3 },
+      }),
+    });
+
+    const result: any = await agentClient(fetcher).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'Who is visibly on camera at the requested moment?',
+        investigation: {
+          scope: 'focused',
+          goal: 'answer',
+          evidence: ['visual'],
+          timeRange: { startSecs: 840, endSecs: 870 },
+        },
+      },
+      context,
+    );
+
+    expect(fetcher).toHaveBeenCalled();
+    expect(result.claimVerification).toMatchObject({
+      status: 'needs-corroboration',
+      directlyEstablished: false,
+    });
+    expect(result.observedSubjects).toEqual([
+      expect.objectContaining({ identity: 'unidentified sponsor presenter' }),
+    ]);
+  });
+
+  it('preserves a point timestamp as a bounded focused window', async () => {
+    const fetcher = vi.fn() as any;
+    const searchedRanges: Array<{ startSecs: number; endSecs: number }> = [];
+    const context = evidenceContext({
+      durationSecs: 1_000,
+      plan: {
+        kinds: ['visual-fact'],
+        route: 'search',
+        requiresInspectionWhenInsufficient: true,
+      },
+      search: (_query, options) => {
+        if (options?.timeRange) searchedRanges.push(options.timeRange as any);
+        return [
+          hit(
+            'presenter-account',
+            820,
+            'A grey-haired presenter in a checked shirt speaks to camera during a sponsor segment.',
+          ),
+        ];
+      },
+      aggregate: async () => ({
+        resultHandle: 'aggregate-1',
+        participants: [],
+        timeline: [],
+        sourceItems: [],
+        visibleSubjects: [
+          {
+            identity: 'grey-haired presenter',
+            identityBasis: 'source-described',
+            appearances: [{ startSecs: 820, endSecs: 820, precision: 'estimated' }],
+            observedDurationSecs: 0,
+            observationCount: 1,
+          },
+          {
+            identity: 'distant interview guest',
+            identityBasis: 'source-named',
+            appearances: [{ startSecs: 700, endSecs: 700, precision: 'estimated' }],
+            observedDurationSecs: 0,
+            observationCount: 1,
+          },
+        ],
+        coverage: { inventoryComplete: true, activeEvidenceRecords: 2 },
+      }),
+    });
+
+    const result: any = await agentClient(fetcher).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'Who is visible at the requested timestamp?',
+        investigation: {
+          scope: 'focused',
+          goal: 'answer',
+          evidence: ['visual'],
+          timeRange: { startSecs: 840, endSecs: 840 },
+        },
+      },
+      context,
+    );
+
+    expect(searchedRanges).toContainEqual({ startSecs: 810, endSecs: 870 });
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(result.claimVerification.status).toBe('directly-established');
+    expect(result.observedSubjects).toEqual([
+      expect.objectContaining({ identity: 'grey-haired presenter' }),
+    ]);
+  });
+
   it('reads an explicitly requested moment before whole-source ranking', async () => {
     const fetcher = vi.fn() as any;
     const rangedSearches: Array<{ query: string; options?: Record<string, unknown> }> = [];
@@ -2061,7 +2307,7 @@ describe('Video Intelligence chat extension', () => {
       expect.arrayContaining([
         expect.objectContaining({
           query: '',
-          options: expect.objectContaining({ timeRange: { startSecs: 840, endSecs: 900 } }),
+          options: expect.objectContaining({ timeRange: { startSecs: 810, endSecs: 930 } }),
         }),
       ]),
     );

@@ -25,6 +25,7 @@
     "./documents-store": "./src/documents-store.ts",
     "./groups-store": "./src/groups-store.ts",
     "./assistant-data-scope": "./src/assistant-data-scope.ts",
+    "./grounded-answer-cache": "./src/grounded-answer-cache.ts",
     "./jobs-store": "./src/jobs-store.ts",
     "./index-store": "./src/index-store.ts",
     "./mcp-store": "./src/mcp-store.ts",

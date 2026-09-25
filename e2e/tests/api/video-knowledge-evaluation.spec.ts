@@ -191,6 +191,17 @@ test.describe('Query planner — content-neutral directives', () => {
     expect(plan.requiresBroadCoverage).toBe(true);
     expect(plan.modalities).toEqual(['transcript', 'ocr', 'visual', 'computed']);
   });
+
+  test('uses the typed aggregate for a source-wide observed-subject inventory', () => {
+    const plan = planVideoQuestion('任意の表現', {
+      ...directive('source', 'enumerate', ['visual']),
+      recordSet: 'observed',
+    });
+
+    expect(plan.route).toBe('aggregate');
+    expect(plan.kinds).toContain('entity-inventory');
+    expect(plan.requiresIdentityContext).toBe(true);
+  });
 });
 
 /* ------------------------------------------------------------------ */

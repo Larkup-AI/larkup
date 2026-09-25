@@ -58,7 +58,15 @@ function NotionResourceIcon({ icon, isDatabase }: { icon: string | null; isDatab
   );
 }
 
-export function NotionPanel({ onAdded, onClose }: { onAdded: () => void; onClose?: () => void }) {
+export function NotionPanel({
+  onAdded,
+  onClose,
+  groupId,
+}: {
+  onAdded: () => void;
+  onClose?: () => void;
+  groupId: string;
+}) {
   const {
     data: statusData,
     error: swrError,
@@ -132,7 +140,7 @@ export function NotionPanel({ onAdded, onClose }: { onAdded: () => void; onClose
       const res = await fetch('/api/integrations/notion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageIds: Array.from(selected) }),
+        body: JSON.stringify({ pageIds: Array.from(selected), groupId }),
       });
       const data = await res.json();
 

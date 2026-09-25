@@ -225,6 +225,62 @@ describe('formatLocatedObservedSubjectAnswer', () => {
         'The recorded interval for this exact description: 13:50–14:18.',
     );
   });
+
+  it('keeps a point observation at the exact range boundary and includes its direct claim', () => {
+    expect(
+      formatLocatedObservedSubjectAnswer({
+        success: true,
+        claimVerification: { status: 'directly-established' },
+        investigation: {
+          directive: {
+            scope: 'temporal',
+            goal: 'trace',
+            recordSet: 'observed',
+            timeRange: { startSecs: 840, endSecs: 900 },
+          },
+        },
+        evidence: [
+          {
+            payload: {
+              text:
+                'A presenter delivers a sponsor segment.\n' +
+                'Visible subject: {"identity":"Presenter in plaid shirt","identityBasis":"unresolved","startMs":840000,"endMs":840000}\n' +
+                'Claim answer: At 14:00, an unnamed presenter in a plaid shirt delivers a sponsor segment.',
+            },
+          },
+          {
+            payload: {
+              text:
+                'A grey-haired presenter continues speaking.\n' +
+                'Visible subject: {"identity":"Presenter with grey hair","identityBasis":"source-described","startMs":886352,"endMs":886352}',
+            },
+          },
+        ],
+        observedSubjects: [
+          {
+            identity: 'Presenter in plaid shirt',
+            identityBasis: 'unresolved',
+            appearances: [{ startSecs: 840, endSecs: 840 }],
+          },
+          {
+            identity: 'Presenter with grey hair',
+            identityBasis: 'source-described',
+            appearances: [
+              { startSecs: 820.086, endSecs: 820.086 },
+              { startSecs: 886.352, endSecs: 886.352 },
+            ],
+          },
+        ],
+      }),
+    ).toBe(
+      'At 14:00, an unnamed presenter in a plaid shirt delivers a sponsor segment. ' +
+        'I saw Presenter in plaid shirt at 14:00–14:00. ' +
+        'This is an unresolved identification, so I cannot safely equate it with a separately named appearance. ' +
+        'The recorded interval for this exact description: 14:00. ' +
+        'The source also uses separate visible-subject labels: Presenter with grey hair (source-described) at 13:40, 14:46. ' +
+        'It does not establish that those labels are the same identity.',
+    );
+  });
 });
 
 describe('formatObservedAppearanceAnswer', () => {

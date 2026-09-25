@@ -266,7 +266,8 @@ export function formatLocatedObservedSubjectAnswer(value: unknown): string | und
     appearances: Appearance[];
   };
   type LocalSubject = Subject & { localAppearance: Appearance };
-  const localSubjects: LocalSubject[] = [];
+  type LocatedSubject = LocalSubject & { directClaim?: string };
+  const localSubjects: LocatedSubject[] = [];
   const visit = (candidate: unknown) => {
     if (typeof candidate === 'string') {
       try {
@@ -294,7 +295,7 @@ export function formatLocatedObservedSubjectAnswer(value: unknown): string | und
       directive.recordSet !== 'observed' ||
       !Number.isFinite(startSecs) ||
       !Number.isFinite(endSecs) ||
-      endSecs <= startSecs ||
+      endSecs < startSecs ||
       !Array.isArray(record.evidence) ||
       !Array.isArray(record.observedSubjects)
     ) {
@@ -360,8 +361,8 @@ export function formatLocatedObservedSubjectAnswer(value: unknown): string | und
           !Number.isFinite(localStartSecs) ||
           !Number.isFinite(localEndSecs) ||
           localEndSecs < localStartSecs ||
-          localStartSecs >= endSecs ||
-          localEndSecs <= startSecs
+          localStartSecs > endSecs ||
+          localEndSecs < startSecs
         ) {
           continue;
         }
@@ -375,6 +376,9 @@ export function formatLocatedObservedSubjectAnswer(value: unknown): string | und
             { startSecs: localStartSecs, endSecs: localEndSecs },
           ],
           localAppearance: { startSecs: localStartSecs, endSecs: localEndSecs },
+          ...(text.match(/\nClaim answer:\s*([^\n]+)/i)?.[1]?.trim()
+            ? { directClaim: text.match(/\nClaim answer:\s*([^\n]+)/i)![1]!.trim() }
+            : {}),
         });
       } catch {
         /* a malformed protocol record cannot produce a deterministic answer */
@@ -398,12 +402,33 @@ export function formatLocatedObservedSubjectAnswer(value: unknown): string | und
         : formatTime(appearance.startSecs),
     )
     .join(', ');
+  const separatelyDescribed = localSubjects.filter(
+    (candidate) =>
+      candidate.identity !== subject.identity || candidate.identityBasis !== subject.identityBasis,
+  );
+  const separateLabels = separatelyDescribed
+    .map((candidate) => {
+      const appearances = candidate.appearances
+        .map((appearance) =>
+          appearance.endSecs > appearance.startSecs
+            ? `${formatTime(appearance.startSecs)}–${formatTime(appearance.endSecs)}`
+            : formatTime(appearance.startSecs),
+        )
+        .join(', ');
+      return `${candidate.identity} (${candidate.identityBasis}) at ${appearances}`;
+    })
+    .join('; ');
+  const identityBasisArticle = /^[aeiou]/i.test(subject.identityBasis) ? 'an' : 'a';
   return (
+    (subject.directClaim ? `${subject.directClaim} ` : '') +
     `I saw ${subject.identity} at ${formatTime(subject.localAppearance.startSecs)}–${formatTime(
       subject.localAppearance.endSecs,
     )}. ` +
-    `This is a ${subject.identityBasis} identification, so I cannot safely equate it with a separately named appearance. ` +
-    `The recorded interval${uniqueAppearances.length === 1 ? '' : 's'} for this exact description: ${ranges}.`
+    `This is ${identityBasisArticle} ${subject.identityBasis} identification, so I cannot safely equate it with a separately named appearance. ` +
+    `The recorded interval${uniqueAppearances.length === 1 ? '' : 's'} for this exact description: ${ranges}.` +
+    (separateLabels
+      ? ` The source also uses separate visible-subject labels: ${separateLabels}. It does not establish that those labels are the same identity.`
+      : '')
   );
 }
 

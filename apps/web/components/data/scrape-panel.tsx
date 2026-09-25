@@ -35,11 +35,11 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import useSWR from 'swr';
 import { useRouter } from 'next/navigation';
 import type { RagConfig } from '@larkup/core/types';
 import type { DataPrimaryAction } from '@/components/data/data-primary-action';
+import { DataEntryModeSwitch } from '@/components/data/data-entry-mode-switch';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<{ config: RagConfig }>);
 
@@ -94,6 +94,8 @@ export function ScrapePanel({
   onActionChange?: (action: DataPrimaryAction | null) => void;
   groupId?: string;
 }) {
+  const groupIdRef = useRef(groupId ?? 'default');
+  groupIdRef.current = groupId ?? 'default';
   const router = useRouter();
   const {
     query,
@@ -664,7 +666,7 @@ export function ScrapePanel({
           keywords: query || urls[0],
           pageLimit: specificUrls || exactUrls ? 1 : pageLimit,
           targets: urls.map((url) => ({ url, scope: effectiveScope })),
-          groupId,
+          groupId: groupIdRef.current,
         }),
       });
       const data = await res.json();
@@ -790,28 +792,15 @@ export function ScrapePanel({
       <div className="space-y-3">
         {/* Mode toggle + input */}
         <div className="flex items-center gap-2">
-          <Tabs
+          <DataEntryModeSwitch
+            label="Website source"
             value={inputMode}
-            onValueChange={(v) => setInputMode(v as 'search' | 'url')}
-            className="shrink-0"
-          >
-            <TabsList className="inline-flex bg-white/70 h-9 items-center justify-center rounded-lg  border border-border p-0.5 text-muted-foreground">
-              <TabsTrigger
-                value="url"
-                className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
-              >
-                <Globe className="size-3.5 mr-1.5" />
-                Direct URL
-              </TabsTrigger>
-              <TabsTrigger
-                value="search"
-                className="inline-flex items-center h-9 justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all focus-visible:outline-none data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]: hover:text-foreground"
-              >
-                <Search className="size-3.5 mr-1.5" />
-                Search
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+            onValueChange={(value) => setInputMode(value as 'search' | 'url')}
+            options={[
+              { value: 'url', label: 'Direct URL', icon: Globe },
+              { value: 'search', label: 'Search', icon: Search },
+            ]}
+          />
 
           {/* Input field */}
           <div className="relative flex-1 flex items-center gap-2">

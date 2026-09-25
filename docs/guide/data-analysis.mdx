@@ -31,7 +31,7 @@ Once indexed, open **Chat** and ask anything about the data:
 > "Which sales rep had the highest net revenue in Q1?"
 > "Give me a monthly breakdown of gross sales"
 
-Larkup reads the relevant rows, computes the answer, and renders the chart or table inline.
+Larkup reads the relevant rows, computes the answer, and renders the chart or table inline. Cartesian charts show names for both axes and include units when the available data supplies them.
 
 <Frame caption="A bar chart generated in Chat from a sales dataset">
   <img src="/images/chat/chart-in-chat1.png" alt="Bar chart rendered inline in Chat" />
@@ -44,6 +44,14 @@ Larkup reads the relevant rows, computes the answer, and renders the chart or ta
   />
 </Frame>
 
-Each chart response includes a **Copy Data** button and a **CSV** export so you can take the output into another tool. Later questions build on the previous answer. You can drill down into a specific category, change the chart type, or ask for a written summary without uploading the data again.
+Each chart or table response includes **Copy** and **CSV** actions so you can take the visible result into another tool. You can also ask Chat to export the current answer as an Excel, CSV, or PDF file—for example, “Export this result as Excel.” Larkup creates a real download from the result already shown; it does not run a new, broader database query for a direct export follow-up.
+
+Later questions build on the previous answer. You can drill down into a specific category, change the chart type, export the exact result, or ask for a written summary without uploading the data again.
+
+## Feedback and exact repeats
+
+The **Like** and **Dislike** buttons are saved with the conversation and remain selected after you reload it. Liking a plain-document grounded answer also saves it in the project’s temporary answer cache, so the same exact question can reuse the answer without another search—even in a new chat—while the available sources and Assistant group settings are unchanged. Unrated consecutive exact repeats can also reuse their immediately preceding grounded result.
+
+Disliking removes the rejected answer from reuse and records negative feedback, so the next exact repeat performs a fresh search. Unliking removes that feedback record. Changing, moving, adding, deleting, selecting, or deselecting source data also changes the source scope and forces fresh retrieval. The saved thumb selection belongs to chat history, while Settings > **Larkup cache** globally reports the liked and disliked answer-feedback records across all projects. **Clear cache** removes both kinds of temporary feedback records without deleting chat history.
 
 For questions that relate worksheets or files, ask for the comparison explicitly—for example, “Join Orders to Returns by Order ID and show returned-order profit by region.” Larkup can stage the selected sheets together for code-based analysis while keeping the raw rows out of the conversation context.

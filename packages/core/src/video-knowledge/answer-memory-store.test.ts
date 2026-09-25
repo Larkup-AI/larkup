@@ -25,6 +25,7 @@ test('video answer memory is exact-question and revision scoped', async () => {
       saveVideoAnswerCorrection,
       saveVideoAnswerMemory,
       clearVideoAnswerMemory,
+      clearVideoKnowledgeRuntimeCaches,
     } = await import('./answer-memory-store');
     const { project } = await createProject('Answer memory');
     await runWithProject(project.id, async () => {
@@ -60,7 +61,20 @@ test('video answer memory is exact-question and revision scoped', async () => {
       assert.equal(miss?.unansweredCount, 2);
       assert.equal(miss?.answer, undefined);
 
-      assert.deepEqual(await clearVideoAnswerMemory('video-a'), { cleared: 2 });
+      assert.deepEqual(await clearVideoKnowledgeRuntimeCaches(), {
+        clearedArtifactEntries: 0,
+        clearedAnswerEntries: 1,
+      });
+      const correction = await getVideoAnswerMemory('video-a', 'revision-a', 'who won?');
+      assert.equal(correction?.userCorrection?.answer, 'The red team won.');
+      assert.equal(correction?.answer, undefined);
+      assert.deepEqual(correction?.evidenceIds, []);
+      assert.equal(
+        await getVideoAnswerMemory('video-a', 'revision-a', 'what happens next?'),
+        undefined,
+      );
+
+      assert.deepEqual(await clearVideoAnswerMemory('video-a'), { cleared: 1 });
       assert.equal(await getVideoAnswerMemory('video-a', 'revision-a', 'who won?'), undefined);
     });
   });

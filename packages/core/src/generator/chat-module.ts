@@ -309,7 +309,7 @@ async function buildAgentTools() {
   }
   if (isToolEnabled("generateVisualization")) {
     tools.generateVisualization = tool({
-      description: "Create an interactive chart from rows already returned by another tool. Call this tool instead of writing chart JSON or an ASCII chart. data must contain the exact rows to plot, and xAxisKey and every series dataKey must exactly match keys in those rows. Never use placeholder keys such as EMPTY, null, or undefined.",
+      description: "Create an interactive chart from rows already returned by another tool. Call this tool instead of writing chart JSON or an ASCII chart. data must contain the exact rows to plot, and xAxisKey and every series dataKey must exactly match keys in those rows. Never use placeholder keys such as EMPTY, null, or undefined. Supply clear human-readable xAxisLabel and yAxisLabel values, including units when known.",
       inputSchema: z.object({
         chartType: z.enum(["bar", "area", "line", "pie", "scatter", "radar"]),
         title: z.string(),

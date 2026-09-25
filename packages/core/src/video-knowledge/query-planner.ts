@@ -140,13 +140,24 @@ export function planVideoQuestion(
   ) {
     kinds.add('source-inventory');
   }
+  if (
+    investigation.scope === 'source' &&
+    investigation.goal === 'enumerate' &&
+    investigation.recordSet === 'observed'
+  ) {
+    // Observed subjects are already a typed, frame-grounded aggregate. Sending
+    // this request through the generic evidence scan buries that compact ledger
+    // among thousands of transcript/OCR records and lets a caller stop before
+    // the relevant sighting. Route the declared record set directly instead.
+    kinds.add('entity-inventory');
+  }
   if (investigation.scope === 'source') kinds.add('coverage');
 
   return {
     kinds: [...kinds],
     route:
       investigation.scope === 'source'
-        ? investigation.goal === 'enumerate'
+        ? investigation.goal === 'enumerate' && investigation.recordSet !== 'observed'
           ? 'scan'
           : 'aggregate'
         : investigation.scope === 'temporal'
@@ -159,7 +170,8 @@ export function planVideoQuestion(
       investigation.goal === 'trace',
     requiresInspectionWhenInsufficient: true,
     requiresBroadCoverage: investigation.scope === 'source',
-    requiresIdentityContext: false,
+    requiresIdentityContext:
+      investigation.scope === 'source' && investigation.recordSet === 'observed',
     investigation,
   };
 }

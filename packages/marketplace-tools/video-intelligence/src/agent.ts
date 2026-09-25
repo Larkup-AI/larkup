@@ -4,13 +4,15 @@ import type { VideoInvestigationDirective } from '@larkup/core/video-knowledge/q
 import type { VideoIntelligenceClient } from './client.js';
 
 const MAX_INSPECTION_CHUNK_SECS = 60;
+const POINT_QUERY_RADIUS_SECS = MAX_INSPECTION_CHUNK_SECS / 2;
+const FOCUSED_SUBJECT_CONTEXT_SECS = 30;
 const OUTCOME_RESOLUTION_WINDOW_SECS = 30;
 /** How much source a single targeted look covers on each side of a located moment. */
 const TARGET_PADDING_SECS = 8;
 /** Independent looks dispatched together before the next wave starts. */
 const MAX_PARALLEL_INSPECTIONS = 4;
 /** The whole evidence-query fallback shares one deadline, including re-watch. */
-const INTERACTIVE_INSPECTION_BUDGET_MS = 30_000;
+const INTERACTIVE_INSPECTION_BUDGET_MS = 40_000;
 /** Leave part of the shared deadline for a provider-backed inspection if needed. */
 const INTERACTIVE_REWATCH_BUDGET_MS = 12_000;
 
@@ -182,6 +184,14 @@ export function attachVideoIntelligenceAgentClient(
         exhaustive: input.exhaustive ?? plan.requiresBroadCoverage === true,
       };
       const durationSecs = asset.durationSecs;
+      // The compact aggregate is revision-cached and carries protocol-backed
+      // source questions and visual sightings that ranked snippets can split
+      // apart. Load it before either answer path so even a conservative source
+      // scan retains the visibility ledger when the conversational planner
+      // chooses a broader record set than `observed`.
+      const aggregate = mediaEvidence.aggregate
+        ? await mediaEvidence.aggregate(input.mediaAssetId)
+        : undefined;
       // Complete inventories are a deterministic database scan, never an
       // expanded Top-K query. The chat route follows the opaque cursor itself,
       // so a model cannot stop early or mistake its context window for source
@@ -232,11 +242,13 @@ export function attachVideoIntelligenceAgentClient(
             latencyMs: Date.now() - startedAt,
             timestamp: new Date().toISOString(),
           });
+          const observedSubjects = observedSubjectsForAnswer(aggregate, directive);
           return {
             success: true,
             mediaAssetId: input.mediaAssetId,
             fileName: asset.fileName,
             evidence,
+            ...(observedSubjects.length > 0 ? { observedSubjects } : {}),
             inventory: {
               recordSet: focusedInput.investigation.recordSet ?? 'all',
               coverage: {
@@ -286,12 +298,6 @@ export function attachVideoIntelligenceAgentClient(
           };
         }
       }
-      // The compact aggregate is revision-cached and carries protocol-backed
-      // source questions and visual sightings that ranked snippets can split
-      // apart. It is navigation material, not a substitute for source truth.
-      const aggregate = mediaEvidence.aggregate
-        ? await mediaEvidence.aggregate(input.mediaAssetId)
-        : undefined;
       // Start with the index alone. Planning and visual locating are useful
       // fallbacks, but waiting for both before checking an already-complete RAG
       // answer made simple questions feel like analysis jobs.
@@ -299,15 +305,16 @@ export function attachVideoIntelligenceAgentClient(
       // merely another ranking signal.  Read that bounded part of the index
       // first so a whole-recording overview cannot displace its evidence.
       const explicitRanges = directiveTimeRange(directive, durationSecs);
+      const explicitLookupRanges = directiveLookupRanges(directive, durationSecs);
       const [rankedHits, explicitlyScopedHits] = await Promise.all([
         retrieve(mediaEvidence, focusedInput, plan, durationSecs),
-        explicitRanges.length > 0
+        explicitLookupRanges.length > 0
           ? retrieveEvidenceInRanges(
               mediaEvidence,
               focusedInput,
               plan,
               durationSecs,
-              explicitRanges,
+              explicitLookupRanges,
             )
           : Promise.resolve([]),
       ]);
@@ -395,6 +402,10 @@ export function attachVideoIntelligenceAgentClient(
           );
           if (established.length > 0) {
             const supportingClip = established[0].range;
+            const observedSubjects = observedSubjectsForAnswer(
+              aggregate,
+              focusedInput.investigation,
+            );
             const indexedEvidence = evidenceHitsFor(
               hits,
               assessment,
@@ -447,9 +458,7 @@ export function attachVideoIntelligenceAgentClient(
                 coverage: investigation?.coverage,
                 directive: investigationDirectiveForOutput(focusedInput.investigation),
               },
-              ...(shouldIncludeObservedSubjects(aggregate, focusedInput.investigation, plan)
-                ? { observedSubjects: aggregate!.visibleSubjects }
-                : {}),
+              ...(observedSubjects.length > 0 ? { observedSubjects } : {}),
               ...(focusedInput.exhaustive
                 ? { continuation: exhaustiveContinuation(hits, assessment, focusedInput) }
                 : {}),
@@ -520,16 +529,7 @@ export function attachVideoIntelligenceAgentClient(
       const supportingClip = plan.kinds.includes('outcome')
         ? evidence.at(-1)?.timeRange
         : evidence[0]?.timeRange;
-      // A complete visibility ledger is useful for a source-wide or temporal
-      // question, but it is dangerous extra context for a single requested
-      // moment: a renderer can accidentally combine a remote appearance with
-      // that moment.  The selected evidence already carries any ledger entry
-      // whose explicit interval overlaps the focused request.
-      const includeObservedSubjects = shouldIncludeObservedSubjects(
-        aggregate,
-        focusedInput.investigation,
-        plan,
-      );
+      const observedSubjects = observedSubjectsForAnswer(aggregate, focusedInput.investigation);
       const responseTimeMs = Date.now() - startedAt;
       const answerPath = analyzedRanges.length > 0 ? 'rag+analysis' : 'rag';
       void trackUsageEvent({
@@ -579,7 +579,7 @@ export function attachVideoIntelligenceAgentClient(
           coverage: investigation?.coverage,
           directive: investigationDirectiveForOutput(focusedInput.investigation),
         },
-        ...(includeObservedSubjects ? { observedSubjects: aggregate!.visibleSubjects } : {}),
+        ...(observedSubjects.length > 0 ? { observedSubjects } : {}),
         ...(focusedInput.exhaustive
           ? { continuation: exhaustiveContinuation(hits, assessment, focusedInput) }
           : {}),
@@ -651,12 +651,13 @@ function explicitlyRequestedMomentEvidence(
 ) {
   const requestedRanges = directiveTimeRange(plan.investigation, durationSecs);
   if (requestedRanges.length === 0) return [];
-  const scoped = hits.filter((hit) =>
-    requestedRanges.some(
-      (range) =>
-        hit.evidence.timeRange.startSecs < range.endSecs &&
-        hit.evidence.timeRange.endSecs > range.startSecs,
-    ),
+  const scoped = hits.filter((hit) => evidenceOverlapsRanges(hit, requestedRanges));
+  const contextualRanges = directiveLookupRanges(plan.investigation, durationSecs);
+  const surrounding = hits.filter(
+    (hit) =>
+      evidenceOverlapsRanges(hit, contextualRanges) &&
+      hit.evidence.modality === 'visual' &&
+      isAccountOfMoment(hit),
   );
   return mergeHits(
     scoped.filter((hit) => hit.evidence.modality === 'visual' && isAccountOfMoment(hit)),
@@ -664,6 +665,7 @@ function explicitlyRequestedMomentEvidence(
       const text = evidenceText(hit.evidence.payload);
       return /^Reconciled visible subject:\s*[^\n]+\nIdentity basis:/im.test(text);
     }),
+    surrounding,
     scoped.filter(isAccountOfMoment),
   ).slice(0, 4);
 }
@@ -696,16 +698,27 @@ function investigationDirectiveForOutput(directive: VideoInvestigationDirective)
   };
 }
 
-function shouldIncludeObservedSubjects(
+function observedSubjectsForAnswer(
   aggregate: Awaited<ReturnType<NonNullable<MediaEvidence['aggregate']>>> | undefined,
   directive: VideoInvestigationDirective,
-  plan: VideoPlan,
-): boolean {
-  return Boolean(
-    aggregate?.visibleSubjects &&
-    (directive.recordSet === 'observed' ||
-      directive.scope !== 'focused' ||
-      plan.requiresBroadCoverage === true),
+) {
+  const subjects = aggregate?.visibleSubjects ?? [];
+  const requestedRanges = directiveTimeRange(directive, undefined);
+  if (directive.scope !== 'focused' || requestedRanges.length === 0) return subjects;
+
+  // A focused answer needs nearby identity anchors, not every person seen in
+  // a long recording. Visibility is sampled, so allow a small symmetric
+  // context around the requested interval; this joins neighbouring semantic
+  // scene descriptions without attaching a remote recurring participant to
+  // the local moment.
+  return subjects.filter((subject) =>
+    subject.appearances.some((appearance) =>
+      requestedRanges.some(
+        (range) =>
+          appearance.startSecs <= range.endSecs + FOCUSED_SUBJECT_CONTEXT_SECS &&
+          appearance.endSecs >= range.startSecs - FOCUSED_SUBJECT_CONTEXT_SECS,
+      ),
+    ),
   );
 }
 
@@ -1849,9 +1862,48 @@ function directiveTimeRange(
   if (!requested) return [];
   const limit =
     durationSecs && Number.isFinite(durationSecs) && durationSecs > 0 ? durationSecs : Infinity;
-  const startSecs = Math.max(0, Math.min(limit, requested.startSecs));
-  const endSecs = Math.max(startSecs, Math.min(limit, requested.endSecs));
+  const requestedStart = Math.max(0, Math.min(limit, requested.startSecs));
+  const requestedEnd = Math.max(requestedStart, Math.min(limit, requested.endSecs));
+  // Models commonly encode "at 14:00" as an equal start/end boundary. A
+  // zero-length range must not erase the user's timestamp and fall back to
+  // whole-source ranking. Treat a point as one bounded viewing window.
+  const startSecs =
+    requestedEnd === requestedStart
+      ? Math.max(0, requestedStart - POINT_QUERY_RADIUS_SECS)
+      : requestedStart;
+  const endSecs =
+    requestedEnd === requestedStart
+      ? Math.min(limit, requestedEnd + POINT_QUERY_RADIUS_SECS)
+      : requestedEnd;
   return endSecs > startSecs ? [{ startSecs, endSecs }] : [];
+}
+
+function directiveLookupRanges(
+  directive: VideoInvestigationDirective | undefined,
+  durationSecs: number | undefined,
+) {
+  const ranges = directiveTimeRange(directive, durationSecs);
+  const requested = directive?.timeRange;
+  if (!requested || requested.endSecs === requested.startSecs) return ranges;
+  const limit =
+    durationSecs && Number.isFinite(durationSecs) && durationSecs > 0 ? durationSecs : Infinity;
+  return ranges.map((range) => ({
+    startSecs: Math.max(0, range.startSecs - FOCUSED_SUBJECT_CONTEXT_SECS),
+    endSecs: Math.min(limit, range.endSecs + FOCUSED_SUBJECT_CONTEXT_SECS),
+  }));
+}
+
+function evidenceOverlapsRanges(hit: VideoKnowledgeSearchHit, ranges: TimeRange[]) {
+  const text = evidenceText(hit.evidence.payload);
+  const observedRanges = /^Reconciled visible subject:\s*[^\n]+\nIdentity basis:/im.test(text)
+    ? observedAppearanceRanges(text)
+    : [];
+  const evidenceRanges = observedRanges.length > 0 ? observedRanges : [hit.evidence.timeRange];
+  return evidenceRanges.some((candidate) =>
+    ranges.some(
+      (range) => candidate.startSecs < range.endSecs && candidate.endSecs > range.startSecs,
+    ),
+  );
 }
 
 /**
@@ -2186,6 +2238,14 @@ function selectAnswerEvidence(
     input.limit ?? (plan.requiresBothRanges || isCrossEvidenceClaim(plan) ? 12 : 8),
     12,
   );
+  const requestedRanges = directiveTimeRange(plan.investigation, durationSecs);
+  if (requestedRanges.length > 0 && !assessment.sufficient) {
+    const contextualRanges = directiveLookupRanges(plan.investigation, durationSecs);
+    const local = hits.filter(
+      (hit) => evidenceOverlapsRanges(hit, contextualRanges) && isAccountOfMoment(hit),
+    );
+    if (local.length > 0) return reconciledFirst(local).slice(0, limit);
+  }
   if (assessment.establishedByTrail) {
     // A trail can exist while `established` is empty: the trail settles the
     // claim, but only a question about unnamed subjects promotes it into
@@ -2476,6 +2536,9 @@ function answeringRule(
     return 'The returned evidence does not settle this. Say which part is established and which part the source did not show, rather than inferring the rest.';
   }
   if (assessment.needsBreadth) {
+    if (plan.kinds.includes('entity-inventory')) {
+      return 'These are the frame-grounded visible-subject observations retained across the source. Include every returned named and unnamed subject with its observed times. The list is complete for the active observation ledger, but sampled intervals do not prove that nobody appeared between observations; never turn an omitted or unsampled moment into an absence claim.';
+    }
     return plan.kinds.includes('state-change')
       ? 'These are timestamped source observations selected across the video. Give the account in their order, keep their timestamps for specific claims, and say where the source is silent rather than filling the gap.'
       : 'The evidence is distributed across the source. Synthesize the requested complete list or overview, deduplicate repeated items, preserve timestamps for specific claims, and state any explicit coverage limitation without exposing the evidence-gathering process.';
@@ -2561,10 +2624,16 @@ function createInspector(fetcher: typeof globalThis.fetch) {
       // The server has its own worker deadline, but a network socket or a
       // wedged control-plane request can otherwise outlive it indefinitely.
       // Keep a chat turn responsive even when that happens.
-      const timeoutMs = Math.max(
+      const serverBudgetMs = Math.max(
         1,
         Math.floor(input.maxWaitMs ?? INTERACTIVE_INSPECTION_BUDGET_MS),
       );
+      // The inspection route returns a bounded timeout result when its worker
+      // budget expires. Give that HTTP response a small transport grace period
+      // instead of aborting at the exact same millisecond and misreporting a
+      // result that the server is concurrently persisting.
+      const transportGraceMs = Math.min(5_000, Math.max(250, Math.floor(serverBudgetMs * 0.1)));
+      const timeoutMs = serverBudgetMs + transportGraceMs;
       try {
         const response = await fetcher(url, {
           method: 'POST',
@@ -2747,7 +2816,9 @@ function isAccountOfMoment(hit: VideoKnowledgeSearchHit) {
       ? (payload as { text?: unknown }).text
       : payload;
   // A typed subject/property/value locates a display; it does not describe it.
-  return typeof text === 'string' && text.trim().length > 0;
+  if (typeof text !== 'string') return false;
+  const normalized = text.trim();
+  return normalized.length > 0 && !/^Detected objects:/i.test(normalized);
 }
 
 function isIndexedDirectObservation(
@@ -2768,6 +2839,15 @@ function isIndexedDirectObservation(
     );
   if (!['transcript', 'ocr', 'visual'].includes(hit.evidence.modality) && !reconciledVisibility)
     return false;
+  // Speech at the requested timestamp can establish what is being discussed,
+  // but it cannot by itself identify who or what is visibly on screen.
+  if (
+    plan?.kinds.includes('visual-fact') &&
+    hit.evidence.modality !== 'visual' &&
+    !reconciledVisibility
+  ) {
+    return false;
+  }
   // Raw OCR/detection payloads locate a moment but do not recount what was
   // observed there. A broad recurring overlay must never become evidence that
   // a person, animal, event, or other subject was present at that timestamp.

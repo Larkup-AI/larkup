@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { formatErrorMessage } from '@/lib/shared/error-formatter';
 import { Plus, Loader2 } from 'lucide-react';
@@ -22,6 +22,8 @@ export function PastePanel({
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
+  const groupIdRef = useRef(groupId ?? 'default');
+  groupIdRef.current = groupId ?? 'default';
 
   async function submit() {
     if (!content.trim()) {
@@ -37,7 +39,7 @@ export function PastePanel({
           title: title.trim() || 'Pasted text',
           content: content,
           source: 'text',
-          groupId,
+          groupId: groupIdRef.current,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Failed');

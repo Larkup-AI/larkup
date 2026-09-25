@@ -4,8 +4,112 @@ import {
   compactTabularRowsForConversation,
   contextualizeKnowledgeFollowUpQuery,
   extractConversationEvidence,
+  findImmediateExactGroundedAnswer,
   isTabularFollowUp,
+  resolveParallelPreferenceQuestion,
 } from './conversation-memory';
+
+describe('exact grounded answer reuse', () => {
+  const firstTurn = [
+    { role: 'user', parts: [{ type: 'text', text: 'What is my favorite anime?' }] },
+    {
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-searchKnowledgeBase',
+          output: {
+            sourceScopeFingerprint: 'scope-1',
+            hits: [{ documentId: 'preferences', title: 'Preferences', text: 'Naruto.' }],
+          },
+        },
+        { role: 'assistant', type: 'text', text: 'Your favorite anime is Naruto.' },
+      ],
+    },
+  ];
+
+  it('reuses only the immediately repeated grounded question', () => {
+    expect(
+      findImmediateExactGroundedAnswer(
+        [
+          ...firstTurn,
+          { role: 'user', parts: [{ type: 'text', text: '  what is my favorite ANIME? ' }] },
+        ],
+        'what is my favorite ANIME?',
+      ),
+    ).toEqual({ answer: 'Your favorite anime is Naruto.', sourceScopeFingerprint: 'scope-1' });
+  });
+
+  it('does not reuse an answer for a changed question or a media result', () => {
+    expect(
+      findImmediateExactGroundedAnswer(
+        [
+          ...firstTurn,
+          { role: 'user', parts: [{ type: 'text', text: 'What is my favorite game?' }] },
+        ],
+        'What is my favorite game?',
+      ),
+    ).toBeUndefined();
+    const mediaTurn = structuredClone(firstTurn) as any[];
+    mediaTurn[1].parts[0].output.hits[0].metadata = { mediaAssetId: 'video-1' };
+    expect(
+      findImmediateExactGroundedAnswer(
+        [
+          ...mediaTurn,
+          { role: 'user', parts: [{ type: 'text', text: 'What is my favorite anime?' }] },
+        ],
+        'What is my favorite anime?',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('keeps liked answers reusable and refreshes a disliked exact repeat', () => {
+    const repeatedQuestion = {
+      role: 'user',
+      parts: [{ type: 'text', text: 'What is my favorite anime?' }],
+    };
+    const likedTurn = structuredClone(firstTurn) as any[];
+    likedTurn[1].metadata = { answerFeedback: 'liked' };
+    expect(
+      findImmediateExactGroundedAnswer(
+        [...likedTurn, repeatedQuestion],
+        'What is my favorite anime?',
+      ),
+    ).toEqual({ answer: 'Your favorite anime is Naruto.', sourceScopeFingerprint: 'scope-1' });
+
+    const dislikedTurn = structuredClone(firstTurn) as any[];
+    dislikedTurn[1].metadata = { answerFeedback: 'disliked' };
+    expect(
+      findImmediateExactGroundedAnswer(
+        [...dislikedTurn, repeatedQuestion],
+        'What is my favorite anime?',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('keeps consecutive cache-hit answers tied to the original grounded search', () => {
+    expect(
+      findImmediateExactGroundedAnswer(
+        [
+          ...firstTurn,
+          {
+            role: 'user',
+            parts: [{ type: 'text', text: 'What is my favorite anime?' }],
+          },
+          {
+            role: 'assistant',
+            metadata: { answerFeedback: 'liked' },
+            parts: [{ type: 'text', text: 'Your favorite anime is Naruto.' }],
+          },
+          {
+            role: 'user',
+            parts: [{ type: 'text', text: 'What is my favorite anime?' }],
+          },
+        ],
+        'What is my favorite anime?',
+      ),
+    ).toEqual({ answer: 'Your favorite anime is Naruto.', sourceScopeFingerprint: 'scope-1' });
+  });
+});
 
 describe('continuesRecentMediaTopic', () => {
   const video = { sources: [], images: [], mediaAssetIds: ['video-1'] };
@@ -89,6 +193,7 @@ describe('media conversation evidence', () => {
         parts: [
           {
             type: 'tool-searchKnowledgeBase',
+            input: { query: 'Who appears at the requested point?' },
             output: {
               hits: [],
               videoEvidence: {
@@ -102,6 +207,7 @@ describe('media conversation evidence', () => {
       },
     ]);
     expect(evidence.mediaAssetIds).toEqual(['video-1']);
+    expect(evidence.mediaQuestion).toBe('Who appears at the requested point?');
     expect(evidence.sources).toEqual([
       { title: 'Video evidence', text: 'The final display establishes the answer.' },
     ]);
@@ -117,12 +223,14 @@ describe('media conversation evidence', () => {
             type: 'dynamic-tool',
             toolName: 'queryVideoEvidence',
             state: 'output-available',
+            input: { mediaAssetId: 'video-2', query: 'Who appears near the middle?' },
             output: { success: true, mediaAssetId: 'video-2', evidence: [] },
           },
         ],
       },
     ]);
     expect(evidence.mediaAssetIds).toEqual(['video-2']);
+    expect(evidence.mediaQuestion).toBe('Who appears near the middle?');
     expect(continuesRecentMediaTopic('What did each person wear?', evidence)).toBe(true);
   });
 });
@@ -155,6 +263,24 @@ describe('generic source conversation evidence', () => {
     expect(
       contextualizeKnowledgeFollowUpQuery('What about another website?', event),
     ).toBeUndefined();
+  });
+});
+
+describe('parallel preference follow-ups', () => {
+  it('turns a new explicit subject into a fresh parallel question', () => {
+    expect(resolveParallelPreferenceQuestion('and fruits', 'what is my fav anime')).toBe(
+      'what is my fav fruits?',
+    );
+    expect(
+      resolveParallelPreferenceQuestion('also favorite color', 'what is my favorite anime'),
+    ).toBe('what is my favorite color?');
+  });
+
+  it('does not rewrite pronouns or unrelated prior question shapes', () => {
+    expect(
+      resolveParallelPreferenceQuestion('and it?', 'what is my favorite anime'),
+    ).toBeUndefined();
+    expect(resolveParallelPreferenceQuestion('and fruits', 'tell me about anime')).toBeUndefined();
   });
 });
 

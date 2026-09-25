@@ -59,9 +59,10 @@ export function isLikelyTabularQuestion(input: {
   const text = input.text.trim().toLocaleLowerCase();
   if (!text) return false;
   if (
-    /\b(?:spreadsheet|excel|csv|worksheet|sheet|dataset|row|column|filter|sort|group(?:ed|ing)?|aggregate|average|mean|median|total|sum|count|highest|lowest|largest|smallest|maximum|minimum|trend|distribution)\b/.test(
+    /\b(?:spreadsheet|excel|csv|worksheet|sheet|dataset|row|column|filter|sort|group(?:ed|ing)?|aggregate|average|median|total|sum|count|highest|lowest|largest|smallest|maximum|minimum|trend|distribution)\b/.test(
       text,
-    )
+    ) ||
+    /\b(?:arithmetic|geometric|weighted)\s+mean\b|\bmean\s+(?:of|for|by)\b/.test(text)
   ) {
     return true;
   }

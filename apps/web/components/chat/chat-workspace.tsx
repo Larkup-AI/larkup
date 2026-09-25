@@ -62,6 +62,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
+import {
+  answerFeedbackForMessage,
+  groundedAnswerFeedbackContext,
+  updateAnswerFeedback,
+  type AnswerFeedback,
+} from '@/lib/chat/message-feedback';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -453,6 +459,83 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   const historySaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
+  const feedbackSyncRevision = useRef<Record<string, number>>({});
+
+  const handleMessageFeedback = useCallback(
+    (messageId: string, feedback: AnswerFeedback | undefined) => {
+      const currentMessages = messagesRef.current;
+      const currentMessage = currentMessages.find((message) => message.id === messageId);
+      const previousFeedback = currentMessage
+        ? answerFeedbackForMessage(currentMessage)
+        : undefined;
+      const cacheContext = groundedAnswerFeedbackContext(currentMessages, messageId);
+      const nextMessages = updateAnswerFeedback(currentMessages, messageId, feedback);
+      messagesRef.current = nextMessages;
+      setMessages(nextMessages);
+
+      // Persist immediately instead of waiting for the normal history debounce;
+      // a reload directly after clicking a thumb must not lose the selection.
+      const activeId = currentChatId || crypto.randomUUID();
+      if (!currentChatId) {
+        setCurrentChatId(activeId);
+        if (window.location.pathname === '/chat') {
+          window.history.replaceState(null, '', `/chat/${activeId}`);
+        }
+      }
+      void set(`chat_messages_${activeId}`, nextMessages).catch((storageError) => {
+        console.error('Failed to save answer feedback', storageError);
+        toast.error('Could not save this feedback. Please try again.');
+      });
+
+      // Only plain-document grounded answers enter the reusable answer cache.
+      // Media, exports, and multi-tool results keep their specialized paths.
+      if (!cacheContext) {
+        if (feedback === 'liked') {
+          toast.success(
+            'Feedback saved. This answer type will use fresh tool results when repeated.',
+          );
+        }
+        return;
+      }
+      const revision = (feedbackSyncRevision.current[messageId] ?? 0) + 1;
+      feedbackSyncRevision.current[messageId] = revision;
+      void fetch('/api/chat/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({
+          projectId,
+          feedback,
+          ...cacheContext,
+        }),
+      })
+        .then(async (response) => {
+          const result = (await response.json().catch(() => null)) as {
+            cached?: boolean;
+            error?: string;
+          } | null;
+          if (!response.ok) {
+            throw new Error(result?.error || 'Could not update the answer cache.');
+          }
+          if (feedback === 'liked' && result?.cached) {
+            toast.success('Answer saved to Larkup cache');
+          }
+        })
+        .catch((feedbackError) => {
+          if (feedbackSyncRevision.current[messageId] !== revision) return;
+          const rolledBack = updateAnswerFeedback(messagesRef.current, messageId, previousFeedback);
+          messagesRef.current = rolledBack;
+          setMessages(rolledBack);
+          void set(`chat_messages_${activeId}`, rolledBack);
+          toast.error(
+            feedbackError instanceof Error
+              ? feedbackError.message
+              : 'Could not update the answer cache.',
+          );
+        });
+    },
+    [currentChatId, projectId, setMessages],
+  );
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -1230,6 +1313,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
                   autoOpenSupportingClip={shouldAutoOpenSupportingClip(messages, idx)}
                   regenerate={regenerate}
                   isBusy={isBusy}
+                  onFeedback={handleMessageFeedback}
                 />
               ))}
               {chatStatus === 'submitted' || isInitializingChat ? (

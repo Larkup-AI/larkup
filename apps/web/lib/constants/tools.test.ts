@@ -16,4 +16,11 @@ describe('chat tool progress behavior', () => {
       compactResult: false,
     });
   });
+
+  it('renders answer exports as downloadable files without a fake text link', () => {
+    expect(getChatToolBehavior('createDataExport')).toMatchObject({
+      resultView: 'file-export',
+      showProgressBar: false,
+    });
+  });
 });

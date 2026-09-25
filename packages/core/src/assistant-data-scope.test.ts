@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   filterDocumentsAvailableToAssistant,
+  filterGroupOwnedDataAvailableToAssistant,
   filterMediaAssetsAvailableToAssistant,
 } from './assistant-data-scope';
 import type { DataGroup, MediaAsset, SourceDocument } from './types';
@@ -102,5 +103,19 @@ test('assistant data scope never exposes an orphaned group through stale storage
   assert.deepEqual(
     filterMediaAssetsAvailableToAssistant([media('orphan-media', 'missing')], groups),
     [],
+  );
+});
+
+test('assistant data scope applies group availability to exact-data sidecars', () => {
+  const datasets = [
+    { id: 'legacy-default' },
+    { id: 'enabled', groupId: 'group-1' },
+    { id: 'disabled', groupId: 'group-2' },
+    { id: 'orphaned', groupId: 'missing' },
+  ];
+
+  assert.deepEqual(
+    filterGroupOwnedDataAvailableToAssistant(datasets, groups).map((dataset) => dataset.id),
+    ['legacy-default', 'enabled'],
   );
 });

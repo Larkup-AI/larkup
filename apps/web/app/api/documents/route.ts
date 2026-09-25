@@ -11,7 +11,7 @@ import { readConfig } from '@larkup/core/config-store';
 import { readRun, patchRun } from '@larkup/core/index-store';
 import { createAdapter } from '@larkup/vector-stores/factory';
 import type { DocumentSource } from '@larkup/core/types';
-import { readGroups, resolveGroupId } from '@larkup/core/groups-store';
+import { readGroups, resolveGroupId, UnknownDataGroupError } from '@larkup/core/groups-store';
 import { deleteVideoKnowledgeForMediaAsset } from '@larkup/core/video-knowledge/deletion-store';
 import {
   cancelVideoIntelligenceJob,
@@ -124,7 +124,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ document: doc }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to add document.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message },
+      { status: err instanceof UnknownDataGroupError ? 400 : 500 },
+    );
   }
 }
 
@@ -153,7 +156,15 @@ export async function PATCH(req: Request) {
   if (body.content !== undefined && !body.content.trim()) {
     return NextResponse.json({ error: 'Content is empty.' }, { status: 400 });
   }
-  const groupId = body.groupId === undefined ? undefined : await resolveGroupId(body.groupId);
+  let groupId: string | undefined;
+  try {
+    groupId = body.groupId === undefined ? undefined : await resolveGroupId(body.groupId);
+  } catch (error) {
+    if (error instanceof UnknownDataGroupError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
   const doc = await updateDocument(body.id, {
     title: body.title,
     content: body.content,
@@ -248,6 +259,13 @@ export async function DELETE(req: Request) {
       ...new Set([...toDeleteDocs.map((document) => document.id), ...cascadedMediaDocumentIds]),
     ];
     await deleteDocuments(deletedIds);
+    const tabularDatasetIds = toDeleteDocs
+      .map((document) => document.metadata?.tabularDatasetId)
+      .filter((datasetId): datasetId is string => typeof datasetId === 'string');
+    if (tabularDatasetIds.length > 0) {
+      const { deleteTabularDataset } = await import('@larkup/core/tabular-store');
+      await Promise.all(tabularDatasetIds.map((datasetId) => deleteTabularDataset(datasetId)));
+    }
   } else {
     // A corpus reset is a complete data reset, not just a documents.json
     // reset. Media assets keep their own durable evidence/cache records and

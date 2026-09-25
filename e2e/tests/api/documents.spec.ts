@@ -23,6 +23,17 @@ test.describe('Documents API (/api/documents)', () => {
 
     let documentId: string | undefined;
     try {
+      const staleGroupResponse = await request.post('/api/documents', {
+        data: {
+          title: 'Stale group must not fall back',
+          content: TEST_PASTE_TEXT,
+          source: 'paste',
+          groupId: 'deleted-group-id',
+        },
+      });
+      expect(staleGroupResponse.status()).toBe(400);
+      expect((await staleGroupResponse.json()).error).toContain('does not exist');
+
       const createResponse = await request.post('/api/documents', {
         data: {
           title: 'Grouped E2E document',
@@ -66,13 +77,25 @@ test.describe('Documents API (/api/documents)', () => {
     const targetGroup = (await targetGroupResponse.json()).group as { id: string };
 
     let documentId: string | undefined;
+    let datasetId: string | undefined;
     try {
+      const datasetResponse = await request.post('/api/tabular', {
+        data: {
+          fileName: 'movable.csv',
+          rows: [{ value: 42 }],
+          groupId: sourceGroup.id,
+        },
+      });
+      expect(datasetResponse.status()).toBe(200);
+      datasetId = (await datasetResponse.json()).id as string;
+
       const createResponse = await request.post('/api/documents', {
         data: {
           title: 'Movable E2E document',
           content: TEST_PASTE_TEXT,
           source: 'paste',
           groupId: sourceGroup.id,
+          metadata: { tabularDatasetId: datasetId },
         },
       });
       expect(createResponse.status()).toBe(201);
@@ -88,14 +111,22 @@ test.describe('Documents API (/api/documents)', () => {
       expect(move.documents).toEqual([
         expect.objectContaining({ id: documentId, groupId: targetGroup.id }),
       ]);
+      expect(move.tabularDatasets).toEqual([
+        expect.objectContaining({ id: datasetId, groupId: targetGroup.id }),
+      ]);
 
       const documents = await request.get('/api/documents');
       expect(documents.status()).toBe(200);
       expect((await documents.json()).documents).toContainEqual(
         expect.objectContaining({ id: documentId, groupId: targetGroup.id }),
       );
+      const datasets = await request.get('/api/tabular');
+      expect((await datasets.json()).datasets).toContainEqual(
+        expect.objectContaining({ id: datasetId, groupId: targetGroup.id }),
+      );
     } finally {
       if (documentId) await request.delete(`/api/documents?id=${documentId}`).catch(() => {});
+      if (datasetId) await request.delete(`/api/tabular?id=${datasetId}`).catch(() => {});
       await request.delete(`/api/groups?id=${sourceGroup.id}`).catch(() => {});
       await request.delete(`/api/groups?id=${targetGroup.id}`).catch(() => {});
     }
