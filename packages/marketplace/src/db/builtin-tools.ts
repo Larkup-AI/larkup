@@ -10,7 +10,7 @@ export const BUILTIN_TOOLS: Record<string, unknown>[] = [
     longDescription:
       'Turn videos into knowledge your AI can understand. It listens to what is said, reads what appears on screen, and helps you find the moments that matter.',
     category: 'media',
-    version: '0.3.2',
+    version: '0.3.3',
     pricing: 'free',
     emoji: '🎬',
     icon: 'Film',
@@ -595,7 +595,7 @@ export const BUILTIN_TOOLS: Record<string, unknown>[] = [
       'Supports PDF form fields (AcroForm), DOCX paragraphs/tables, PPTX slide text, and plain text editing. ' +
       'Uses pdf-lib (native) for PDF and the Docker sandbox for DOCX/PPTX via python-docx/python-pptx.',
     category: 'utility',
-    version: '0.2.27',
+    version: '0.2.28',
     pricing: 'free',
     emoji: '📝',
     icon: 'FileEdit',
