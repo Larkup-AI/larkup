@@ -1,5 +1,11 @@
 # @larkup/hub
 
+## 0.2.13
+
+### Patch Changes
+
+- @larkup/marketplace@0.3.3
+
 ## 0.2.12
 
 ### Patch Changes

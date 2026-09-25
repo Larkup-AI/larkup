@@ -1,5 +1,14 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.2
+
+### Patch Changes
+
+- 6b99a59: Route source-wide observed-subject questions through the typed visibility aggregate. Focused questions now preserve point timestamps as bounded windows, prioritize the exact local observation, use adjacent scene context, exclude remote subject appearances, and require real visual evidence instead of treating speech or raw object detections as visible identity proof. Bounded live inspections also allow the server a short response grace period so evidence completed at the deadline is returned instead of being reported as unavailable.
+- Updated dependencies [6b99a59]
+- Updated dependencies [6b99a59]
+  - @larkup/core@0.7.2
+
 ## 0.3.1
 
 ### Patch Changes
