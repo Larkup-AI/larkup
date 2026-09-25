@@ -26,7 +26,6 @@ interface CacheResponse {
     sizeBytes: number;
     answerFeedback?: {
       likedEntries: number;
-      dislikedEntries: number;
       sizeBytes: number;
     };
   };
@@ -105,9 +104,7 @@ export function CacheManagementCard() {
               {!error && cache?.answerFeedback ? (
                 <p className="mt-1 text-xs text-muted-foreground" data-testid="answer-cache-counts">
                   Across all projects: {cache.answerFeedback.likedEntries} liked answer
-                  {cache.answerFeedback.likedEntries === 1 ? '' : 's'} and{' '}
-                  {cache.answerFeedback.dislikedEntries} disliked answer
-                  {cache.answerFeedback.dislikedEntries === 1 ? '' : 's'} tracked.
+                  {cache.answerFeedback.likedEntries === 1 ? '' : 's'} cached.
                 </p>
               ) : null}
             </div>

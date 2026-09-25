@@ -127,7 +127,6 @@ describe('system cache maintenance', () => {
     expect(before.sizeBytes).toBeGreaterThan(15 * 1024);
     expect(before.answerFeedback).toEqual({
       likedEntries: 1,
-      dislikedEntries: 1,
       sizeBytes: expect.any(Number),
     });
 
@@ -136,7 +135,7 @@ describe('system cache maintenance', () => {
       available: true,
       exists: false,
       sizeBytes: 0,
-      answerFeedback: { likedEntries: 0, dislikedEntries: 0, sizeBytes: 0 },
+      answerFeedback: { likedEntries: 0, sizeBytes: 0 },
     });
     await expect(readFile(path.join(project, 'documents.json'), 'utf8')).resolves.toContain('keep');
   });
@@ -159,7 +158,7 @@ describe('system cache maintenance', () => {
       available: true,
       exists: false,
       sizeBytes: 0,
-      answerFeedback: { likedEntries: 0, dislikedEntries: 0, sizeBytes: 0 },
+      answerFeedback: { likedEntries: 0, sizeBytes: 0 },
     });
   });
 });

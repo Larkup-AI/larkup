@@ -5,7 +5,6 @@ import { readGroups } from '@larkup/core/groups-store';
 import { filterDocumentsAvailableToAssistant } from '@larkup/core/assistant-data-scope';
 import {
   deleteGroundedAnswerCacheEntry,
-  saveGroundedAnswerDislike,
   saveGroundedAnswerCacheEntry,
 } from '@larkup/core/grounded-answer-cache';
 import { runWithProject } from '@larkup/core/project-store';
@@ -40,6 +39,10 @@ export async function POST(request: Request) {
       if (feedback === 'liked' && (!answer || answer.length > 100_000)) {
         throw new Error('A valid answer is required to cache feedback.');
       }
+      if (feedback === 'disliked') {
+        const removed = await deleteGroundedAnswerCacheEntry(question);
+        return { cached: false, removed };
+      }
       const [documents, groups, config] = await Promise.all([
         readDocuments(),
         readGroups(),
@@ -51,13 +54,6 @@ export async function POST(request: Request) {
       );
       if (feedback === 'liked' && claimedFingerprint && claimedFingerprint !== currentFingerprint) {
         return { cached: false, stale: true };
-      }
-      if (feedback === 'disliked') {
-        const entry = await saveGroundedAnswerDislike({
-          question,
-          sourceScopeFingerprint: currentFingerprint,
-        });
-        return { cached: false, feedbackStored: true, entry };
       }
       const entry = await saveGroundedAnswerCacheEntry({
         question,
