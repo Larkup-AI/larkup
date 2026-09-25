@@ -1,5 +1,11 @@
 # @larkup/core
 
+## 0.7.3
+
+### Patch Changes
+
+- c4be854: Remove liked answers from reusable cache when they are disliked, keep negative feedback only in chat history, exclude legacy dislike records from reported cache size, and refresh cache status immediately after feedback changes.
+
 ## 0.7.2
 
 ### Patch Changes
