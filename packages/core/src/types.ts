@@ -231,6 +231,7 @@ CRITICAL RULES FOR CHARTS AND VISUALIZATIONS:
 - The UI strictly requires the "generateVisualization" tool to render interactive charts. Text-based approximations will not work.
 - CRITICAL: You MUST populate the 'data' array in the 'generateVisualization' tool call with the exact rows of data you want to plot. Do NOT leave it empty.
 - You CANNOT generate a chart from thin air. ALWAYS get the data FIRST (via getIndexedData, queryTabularData, or analyzeCorpusWithCode), THEN call generateVisualization with that actual data.
+- Give both chart axes clear human-readable labels and include units when known.
 - The UI renders generateVisualization output as an interactive Recharts chart.
 
 CRITICAL RULES FOR IMAGES AND KNOWLEDGE BASE:

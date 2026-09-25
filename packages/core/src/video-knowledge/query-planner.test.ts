@@ -68,6 +68,20 @@ test('planVideoQuestion: uses aggregate retrieval for a full-source synthesis', 
   assert.deepEqual(plan.modalities, ['transcript', 'ocr', 'visual', 'computed']);
 });
 
+test('planVideoQuestion: routes an observed-subject inventory to the typed aggregate', () => {
+  const plan = planVideoQuestion('任意の表現', {
+    ...directive('source', 'enumerate', ['visual']),
+    recordSet: 'observed',
+  });
+
+  assert.equal(plan.route, 'aggregate');
+  assert.equal(plan.requiresBroadCoverage, true);
+  assert.equal(plan.requiresIdentityContext, true);
+  assert.ok(plan.kinds.includes('entity-inventory'));
+  assert.ok(plan.kinds.includes('coverage'));
+  assert.ok(!plan.kinds.includes('source-inventory'));
+});
+
 test('planVideoQuestion: refuses a malformed directive instead of guessing from language', () => {
   assert.throws(
     () =>

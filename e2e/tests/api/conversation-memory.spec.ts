@@ -3,9 +3,43 @@ import {
   extractConversationEvidence,
   contextualizeKnowledgeFollowUpQuery,
   formatConversationEvidence,
+  findImmediateExactGroundedAnswer,
   isImagePreviewFollowUp,
   isTabularFollowUp,
+  resolveParallelPreferenceQuestion,
 } from '../../../apps/web/lib/chat/conversation-memory';
+
+test('finds an exact repeated answer only when a grounded source fingerprint exists', () => {
+  const messages = [
+    { role: 'user', parts: [{ type: 'text', text: 'what is my fav anime' }] },
+    {
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-searchKnowledgeBase',
+          output: {
+            sourceScopeFingerprint: 'current-scope',
+            hits: [{ documentId: 'preference-1', text: 'Favorite anime: Naruto.' }],
+          },
+        },
+        { type: 'text', text: 'Your favorite anime is Naruto.' },
+      ],
+    },
+    { role: 'user', parts: [{ type: 'text', text: 'what is my fav anime' }] },
+  ];
+
+  expect(findImmediateExactGroundedAnswer(messages, 'what is my fav anime')).toEqual({
+    answer: 'Your favorite anime is Naruto.',
+    sourceScopeFingerprint: 'current-scope',
+  });
+});
+
+test('turns a terse parallel preference into a new retrieval question', () => {
+  expect(resolveParallelPreferenceQuestion('and fruits', 'what is my fav anime')).toBe(
+    'what is my fav fruits?',
+  );
+  expect(resolveParallelPreferenceQuestion('and it', 'what is my fav anime')).toBeUndefined();
+});
 
 test('retains a compact prior PDF image reference for a preview follow-up', () => {
   const evidence = extractConversationEvidence([

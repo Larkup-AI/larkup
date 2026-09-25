@@ -118,6 +118,8 @@ test('removes placeholder chart names before the chat renderer sees a tool resul
 
   expect(chart.error).toBeUndefined();
   expect(chart.series.map((series) => series.label)).toEqual(['International', 'Domestic']);
+  expect(chart.xAxisLabel).toBe('Campus');
+  expect(chart.yAxisLabel).toBe('International / Domestic');
   expect(JSON.stringify(chart)).not.toContain('EMPTY');
 });
 

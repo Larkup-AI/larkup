@@ -1,4 +1,4 @@
-import { Search, Table, BarChart3, Code2, Files, FileEdit } from 'lucide-react';
+import { Search, Table, BarChart3, Code2, Files, FileEdit, FileDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export type Tool = {
@@ -22,6 +22,7 @@ export type ChatToolResultView =
   | 'sandbox'
   | 'corpus'
   | 'document-edit'
+  | 'file-export'
   | 'signature'
   | 'image-analysis'
   | 'media';
@@ -71,6 +72,12 @@ export const CHAT_TOOL_BEHAVIORS: Record<string, ChatToolBehavior> = {
     placement: 'visualization',
     pendingLabel: 'Preparing chart…',
     resultView: 'none',
+  },
+  createDataExport: {
+    placement: 'inline',
+    pendingLabel: 'Preparing file…',
+    resultView: 'file-export',
+    showProgressBar: false,
   },
   executeAnalysis: {
     placement: 'inline',
@@ -137,6 +144,12 @@ export const BUILT_IN_TOOLS: Tool[] = [
     name: 'Generate Charts',
     description: 'Create interactive charts from Assistant results.',
     icon: BarChart3,
+  },
+  {
+    id: 'createDataExport',
+    name: 'Export Answer',
+    description: 'Create a downloadable Excel, CSV, or PDF file from an Assistant result.',
+    icon: FileDown,
   },
   {
     id: 'executeAnalysis',

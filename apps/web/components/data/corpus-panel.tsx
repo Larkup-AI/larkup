@@ -92,12 +92,14 @@ export function CorpusPanel({
   onChanged,
   isIndexing,
   activeVideoRuntimeScope,
+  initialGroupId,
 }: {
   documents: SourceDocument[];
   groups?: DataGroup[];
   onChanged: () => void | Promise<unknown>;
   isIndexing?: boolean;
   activeVideoRuntimeScope: VideoRuntimeScope;
+  initialGroupId?: string;
 }) {
   const [active, setActive] = useState<SourceDocument | null>(null);
   const [deleteTask, setDeleteTask] = useState<
@@ -111,8 +113,14 @@ export function CorpusPanel({
 
   const [sourceFilter, setSourceFilter] = useState<DocumentSource | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'indexed' | 'unindexed'>('all');
-  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(
+    () => new Set(initialGroupId ? [initialGroupId] : []),
+  );
   const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    setSelectedGroupIds(new Set(initialGroupId ? [initialGroupId] : []));
+  }, [initialGroupId]);
 
   const groupedDocuments = useMemo(() => {
     const grouped = new Map<string, SourceDocument>();

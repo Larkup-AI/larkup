@@ -51,7 +51,7 @@ const panelIntegrations = integrations
     return integration;
   });
 
-export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
+export function IntegrationsPanel({ onAdded, groupId }: { onAdded: () => void; groupId: string }) {
   const [activeIntegration, setActiveIntegration] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
@@ -284,7 +284,11 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
             <DialogTitle>Integration Panel</DialogTitle>
           </DialogHeader>
           {activeIntegration === 'notion' && (
-            <NotionPanel onAdded={onAdded} onClose={() => setActiveIntegration(null)} />
+            <NotionPanel
+              onAdded={onAdded}
+              onClose={() => setActiveIntegration(null)}
+              groupId={groupId}
+            />
           )}
           {activeIntegration &&
             activeIntegration !== 'notion' &&
@@ -298,6 +302,7 @@ export function IntegrationsPanel({ onAdded }: { onAdded: () => void }) {
                   name={integration.name}
                   icon={integration.icon}
                   onAdded={onAdded}
+                  groupId={groupId}
                   onClose={() => {
                     setActiveIntegration(null);
                     mutateConnections();

@@ -28,12 +28,14 @@ export function IntegrationResourcesPanel({
   icon,
   onAdded,
   onClose,
+  groupId,
 }: {
   integration: string;
   name: string;
   icon: string;
   onAdded: () => void;
   onClose: () => void;
+  groupId: string;
 }) {
   const endpoint = `/api/integrations/${integration}`;
   const { data, isLoading, mutate } = useSWR<Status>(endpoint, (url: string) =>
@@ -106,7 +108,7 @@ export function IntegrationResourcesPanel({
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resourceIds: [...selected] }),
+        body: JSON.stringify({ resourceIds: [...selected], groupId }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error);

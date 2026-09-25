@@ -17,6 +17,7 @@ import {
   getProjectDataDir as getDataDir,
   requireProjectDataDir as requireDataDir,
 } from './project-store';
+import type { SourceDocument } from './types';
 
 export type ColumnType = 'string' | 'number' | 'date' | 'boolean' | 'mixed';
 
@@ -62,11 +63,44 @@ export interface TabularDataset {
   summary: DatasetSummary;
   /** Number of rows */
   rowCount: number;
+  /** The data group that owns this exact-data sidecar. Missing means Default. */
+  groupId?: string;
   createdAt: string;
 }
 
 /** Lightweight metadata without the actual rows (for listing). */
 export type TabularDatasetMeta = Omit<TabularDataset, 'rows'>;
+
+/**
+ * Resolves ownership for datasets created before groupId was stored directly.
+ * New uploads use the explicit ID link; the filename/row-count fallback is
+ * limited to an unambiguous legacy source match.
+ */
+export function resolveTabularDatasetGroups<T extends TabularDatasetMeta>(
+  datasets: readonly T[],
+  documents: readonly Pick<SourceDocument, 'title' | 'groupId' | 'metadata'>[],
+): T[] {
+  return datasets.map((dataset) => {
+    if (dataset.groupId) return dataset;
+    const explicitlyLinked = documents.find(
+      (document) => document.metadata?.tabularDatasetId === dataset.id,
+    );
+    if (explicitlyLinked) {
+      return { ...dataset, groupId: explicitlyLinked.groupId ?? 'default' };
+    }
+    const matchingGroups = new Set(
+      documents
+        .filter(
+          (document) =>
+            (document.metadata?.fileName === dataset.fileName ||
+              document.title === dataset.fileName) &&
+            Number(document.metadata?.rowCount) === dataset.rowCount,
+        )
+        .map((document) => document.groupId ?? 'default'),
+    );
+    return matchingGroups.size === 1 ? { ...dataset, groupId: [...matchingGroups][0] } : dataset;
+  });
+}
 
 const DATE_PATTERNS = [
   /^\d{4}-\d{2}-\d{2}$/,
@@ -258,6 +292,17 @@ function buildSummary(columns: ColumnMeta[], rowCount: number): DatasetSummary {
 }
 
 const FILE_NAME = 'tabular-datasets.json';
+let writeChain: Promise<unknown> = Promise.resolve();
+
+function serialize<T>(operation: () => Promise<T>): Promise<T> {
+  const run = writeChain.then(operation, operation);
+  writeChain = run.catch(() => undefined);
+  return run;
+}
+
+function isMissingFile(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
+}
 
 async function datasetsPath(create: boolean): Promise<string | null> {
   const dir = create ? await requireDataDir() : await getDataDir();
@@ -271,21 +316,33 @@ async function readAll(): Promise<TabularDataset[]> {
   try {
     const raw = await fs.readFile(file, 'utf8');
     return (JSON.parse(raw) as TabularDataset[]).map(repairLegacyDateMetadata);
-  } catch {
-    return [];
+  } catch (error) {
+    if (isMissingFile(error)) return [];
+    throw error;
   }
 }
 
 async function writeAll(datasets: TabularDataset[]): Promise<void> {
   const file = await datasetsPath(true);
   if (!file) return;
-  await fs.writeFile(file, JSON.stringify(datasets, null, 2), 'utf8');
+  const temporaryFile = path.join(
+    path.dirname(file),
+    `.${path.basename(file)}.${process.pid}.${randomUUID()}.tmp`,
+  );
+  try {
+    await fs.writeFile(temporaryFile, JSON.stringify(datasets, null, 2), 'utf8');
+    await fs.rename(temporaryFile, file);
+  } catch (error) {
+    await fs.unlink(temporaryFile).catch(() => {});
+    throw error;
+  }
 }
 
 /** Save a new tabular dataset. Returns the saved dataset with computed metadata. */
 export async function saveTabularDataset(
   fileName: string,
   rows: Record<string, any>[],
+  options: { groupId?: string } = {},
 ): Promise<TabularDataset> {
   if (rows.length === 0) {
     throw new Error('Cannot save an empty dataset');
@@ -302,12 +359,15 @@ export async function saveTabularDataset(
     rows,
     summary,
     rowCount: rows.length,
+    groupId: options.groupId,
     createdAt: new Date().toISOString(),
   };
 
-  const all = await readAll();
-  all.push(dataset);
-  await writeAll(all);
+  await serialize(async () => {
+    const all = await readAll();
+    all.push(dataset);
+    await writeAll(all);
+  });
 
   return dataset;
 }
@@ -326,13 +386,36 @@ export async function getTabularDataset(id: string): Promise<TabularDataset | nu
 
 /** Delete a dataset by ID. */
 export async function deleteTabularDataset(id: string): Promise<void> {
-  const all = await readAll();
-  await writeAll(all.filter((d) => d.id !== id));
+  await serialize(async () => {
+    const all = await readAll();
+    await writeAll(all.filter((d) => d.id !== id));
+  });
 }
 
 /** Removes raw tabular sidecar data when the whole knowledge base is cleared. */
 export async function clearTabularDatasets(): Promise<void> {
-  await writeAll([]);
+  await serialize(() => writeAll([]));
+}
+
+/** Moves exact-data sidecars with their visible source documents. */
+export function updateTabularDatasetsGroup(
+  ids: string[],
+  groupId: string,
+): Promise<TabularDatasetMeta[]> {
+  return serialize(async () => {
+    const idSet = new Set(ids);
+    if (idSet.size === 0) return [];
+    const datasets = await readAll();
+    const updated: TabularDatasetMeta[] = [];
+    for (const dataset of datasets) {
+      if (!idSet.has(dataset.id) || (dataset.groupId ?? 'default') === groupId) continue;
+      dataset.groupId = groupId;
+      const { rows: _rows, ...metadata } = dataset;
+      updated.push(metadata);
+    }
+    if (updated.length > 0) await writeAll(datasets);
+    return updated;
+  });
 }
 
 export type AggregationOp = 'sum' | 'avg' | 'count' | 'countDistinct' | 'min' | 'max' | 'median';

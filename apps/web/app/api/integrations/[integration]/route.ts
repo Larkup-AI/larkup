@@ -52,7 +52,10 @@ export async function POST(
       { status: 400 },
     );
 
-  const { resourceIds } = (await request.json()) as { resourceIds?: string[] };
+  const { resourceIds, groupId } = (await request.json()) as {
+    resourceIds?: string[];
+    groupId?: string;
+  };
   if (!resourceIds?.length)
     return NextResponse.json({ error: 'Select at least one resource' }, { status: 400 });
 
@@ -71,6 +74,7 @@ export async function POST(
               content: document.content,
               source: 'integrations',
               url: document.url,
+              groupId,
               metadata: {
                 integrationId: selected.integration.id,
                 resourceId: document.id,

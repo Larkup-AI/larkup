@@ -73,6 +73,7 @@ import {
   type ToolIndexingSurface,
 } from '@/components/data/tool-indexing-dialog';
 import { isLocallyActiveVideoJob } from '@/lib/media/video-intelligence-capacity';
+import { DataEntryModeSwitch } from '@/components/data/data-entry-mode-switch';
 import {
   selectedRemoteDuration,
   selectedRemoteUrls,
@@ -639,32 +640,15 @@ export function MediaPanel({
     <div className="space-y-5">
       {/* Keep the task choice small. File type is detected after selection. */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
-        <div className="flex items-center gap-1 border border-border/90 rounded-lg bg-muted/60 p-1">
-          {[
-            { id: 'upload' as const, label: 'Upload', icon: Upload },
-            { id: 'url' as const, label: 'From URL', icon: Link2 },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = entryTab === tab.id;
-
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setEntryTab(tab.id)}
-                className={cn(
-                  'relative flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium transition-all duration-200 rounded-md',
-                  isActive
-                    ? 'bg-background text-foreground ring-1 ring-border'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/80',
-                )}
-              >
-                <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.75} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        <DataEntryModeSwitch
+          label="Media source"
+          value={entryTab}
+          onValueChange={(value) => setEntryTab(value as MediaEntryTab)}
+          options={[
+            { value: 'upload', label: 'Upload', icon: Upload },
+            { value: 'url', label: 'From URL', icon: Link2 },
+          ]}
+        />
 
         {/* Storage usage (subtle) */}
         {storageBytes > 0 && (
@@ -994,6 +978,8 @@ function MediaContent({
   indexingSurface?: ToolIndexingSurface & { toolId: string };
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const groupIdRef = useRef(groupId);
+  groupIdRef.current = groupId;
   const urlInputRef = useRef<HTMLInputElement>(null);
   const recentUrlsRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -1365,7 +1351,7 @@ function MediaContent({
         body: JSON.stringify({
           urls,
           mediaType: remoteType,
-          groupId,
+          groupId: groupIdRef.current,
           toolInputs,
           ...(indexingInstructions ? { indexingInstructions } : {}),
         }),
@@ -1400,6 +1386,7 @@ function MediaContent({
     if (staged.length === 0) return;
     if (!ensureAudioConfiguration()) return;
     if (!ensureVideoIndexingCapacity(mediaType)) return;
+    const destinationGroupId = groupIdRef.current;
     setUploading(true);
 
     const BATCH_SIZE = 5;
@@ -1432,7 +1419,7 @@ function MediaContent({
             }),
           );
         }
-        formData.append('groupId', groupId);
+        formData.append('groupId', destinationGroupId);
 
         const res = await fetch(mediaApiUrl, {
           method: 'POST',

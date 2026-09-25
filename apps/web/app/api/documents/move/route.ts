@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
-import { updateDocumentsGroup } from '@larkup/core/documents-store';
+import { readDocuments, updateDocumentsGroup } from '@larkup/core/documents-store';
 import { readMediaAssets, updateMediaAssetsGroup } from '@larkup/core/media-store';
-import { resolveGroupId } from '@larkup/core/groups-store';
+import { resolveGroupId, UnknownDataGroupError } from '@larkup/core/groups-store';
+import {
+  listTabularDatasets,
+  resolveTabularDatasetGroups,
+  updateTabularDatasetsGroup,
+} from '@larkup/core/tabular-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,7 +35,15 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'groupId is required.' }, { status: 400 });
   }
 
-  const groupId = await resolveGroupId(body.groupId);
+  let groupId: string;
+  try {
+    groupId = await resolveGroupId(body.groupId);
+  } catch (error) {
+    if (error instanceof UnknownDataGroupError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
   // Media source state is split between the asset and its derived documents.
   // Always move both sides together, including for API callers that selected
   // only one side. Otherwise the unchanged side can remain retrievable via a
@@ -53,14 +66,41 @@ export async function PATCH(request: Request) {
   const allMediaAssetIds = [
     ...new Set([...mediaAssetIds, ...relatedMediaAssets.map((asset) => asset.id)]),
   ];
-  const [documents, mediaAssets] = await Promise.all([
+  const storedDocuments = await readDocuments();
+  const selectedStoredDocuments = storedDocuments.filter((document) =>
+    allDocumentIds.includes(document.id),
+  );
+  const resolvedDatasets = resolveTabularDatasetGroups(
+    await listTabularDatasets(),
+    storedDocuments,
+  );
+  const tabularDatasetIds = [
+    ...new Set(
+      selectedStoredDocuments.flatMap((document) => {
+        const explicitId = document.metadata?.tabularDatasetId;
+        if (typeof explicitId === 'string' && explicitId.length > 0) return [explicitId];
+        return resolvedDatasets
+          .filter(
+            (dataset) =>
+              (dataset.groupId ?? 'default') === (document.groupId ?? 'default') &&
+              (document.metadata?.fileName === dataset.fileName ||
+                document.title === dataset.fileName) &&
+              Number(document.metadata?.rowCount) === dataset.rowCount,
+          )
+          .map((dataset) => dataset.id);
+      }),
+    ),
+  ];
+  const [documents, mediaAssets, tabularDatasets] = await Promise.all([
     updateDocumentsGroup(allDocumentIds, groupId),
     updateMediaAssetsGroup(allMediaAssetIds, groupId),
+    updateTabularDatasetsGroup(tabularDatasetIds, groupId),
   ]);
   return NextResponse.json({
     groupId,
     movedCount: documents.length + mediaAssets.length,
     documents,
     mediaAssets,
+    tabularDatasets,
   });
 }

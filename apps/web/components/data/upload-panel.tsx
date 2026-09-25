@@ -43,6 +43,7 @@ import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DataEntryModeSwitch } from '@/components/data/data-entry-mode-switch';
 
 const ACCEPT = '.txt,.md,.markdown,.toml,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx';
 const CONTENT_PREVIEW_LIMIT = 100_000;
@@ -114,6 +115,8 @@ export function UploadPanel({
   const [staged, setStagedState] = useState<StagedFile[]>(initialStaged);
   const stagedRef = useRef(initialStaged);
   const savingRef = useRef(false);
+  const groupIdRef = useRef(groupId ?? 'default');
+  groupIdRef.current = groupId ?? 'default';
   const [indexAllImages, setIndexAllImages] = useState(false);
   const [imageIndexingCapability, setImageIndexingCapability] =
     useState<ImageIndexingCapability | null>(null);
@@ -183,7 +186,7 @@ export function UploadPanel({
   const [previewingFileId, setPreviewingFileId] = useState<string | null>(null);
   const editingFile = staged.find((f) => f.id === editingFileId);
   const previewingFile = staged.find((f) => f.id === previewingFileId);
-  const shouldLoadRemoteFile = entryTab === 'url' && remoteUrl.trim().length > 0;
+  const isRemoteEntry = entryTab === 'url';
 
   async function readFiles(files: FileList | File[], sourceUrl?: string) {
     const joinedActiveSave = savingRef.current;
@@ -351,6 +354,7 @@ export function UploadPanel({
       toast.message(`${next.length} file${next.length === 1 ? '' : 's'} added to the queue`);
       window.setTimeout(() => void ingest(), 0);
     }
+    return next;
   }
 
   async function loadRemoteFile() {
@@ -381,13 +385,14 @@ export function UploadPanel({
       const bytes = await response.arrayBuffer();
       if (!bytes.byteLength) throw new Error('This remote file is empty.');
 
-      await readFiles(
+      const loadedFiles = await readFiles(
         [new File([bytes], fileName, { type: response.headers.get('content-type') || '' })],
         sourceUrl,
       );
+      if (loadedFiles.length === 0) return;
       setRemoteUrl('');
       setEntryTab('upload');
-      toast.success(`Loaded ${fileName}. Review it below, then save it to your corpus.`);
+      await ingest(loadedFiles);
     } catch (error) {
       toast.error(formatErrorMessage(error));
     } finally {
@@ -395,14 +400,16 @@ export function UploadPanel({
     }
   }
 
-  async function ingest() {
-    if (savingRef.current || stagedRef.current.length === 0) return;
+  async function ingest(files?: StagedFile[]) {
+    if (savingRef.current || (files?.length ?? stagedRef.current.length) === 0) return;
     savingRef.current = true;
     setSaving(true);
     let ok = 0;
 
-    const filesToIngest = [...stagedRef.current];
+    const filesToIngest = files ? [...files] : [...stagedRef.current];
     const payloads: any[] = [];
+    const destinationGroupId = groupIdRef.current;
+    const tabularDatasetIds = new Map<string, string>();
 
     for (const f of filesToIngest) {
       if (f.format === 'structured' && f.rows && f.indexAsTabular) {
@@ -410,10 +417,15 @@ export function UploadPanel({
           const res = await fetch('/api/tabular', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileName: f.name, rows: f.rows }),
+            body: JSON.stringify({
+              fileName: f.name,
+              rows: f.rows,
+              groupId: destinationGroupId,
+            }),
           });
           if (res.ok) {
             const result = await res.json();
+            if (typeof result.id === 'string') tabularDatasetIds.set(f.id, result.id);
             toast.success(
               `Saved "${f.name}" as tabular dataset (${result.rowCount} rows, ${result.columns.length} columns)`,
             );
@@ -597,6 +609,7 @@ export function UploadPanel({
         const metadata: Record<string, unknown> = {
           fileName: f.name,
           rowCount: f.rows.length,
+          ...(tabularDatasetIds.get(f.id) ? { tabularDatasetId: tabularDatasetIds.get(f.id) } : {}),
           ...(f.sourceUrl ? { originalUrl: f.sourceUrl } : {}),
         };
         for (const item of f.globalMetadata ?? []) {
@@ -615,7 +628,7 @@ export function UploadPanel({
         const res = await fetch('/api/documents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...p, groupId }),
+          body: JSON.stringify({ ...p, groupId: destinationGroupId }),
         });
         if (res.ok) ok++;
       } catch {
@@ -654,27 +667,16 @@ export function UploadPanel({
       toast.error('No text or images could be extracted from the uploaded files.');
     }
 
-    if (remaining.length > 0) window.setTimeout(() => void ingest(), 0);
+    if (!files && remaining.length > 0) window.setTimeout(() => void ingest(), 0);
   }
 
   useEffect(() => {
+    const actionBusy = saving || loadingRemoteFile;
     onActionChange?.({
-      label: shouldLoadRemoteFile
-        ? 'Load remote file'
-        : saving
-          ? 'Uploading...'
-          : staged.length === 0
-            ? 'Add more files'
-            : `Save ${staged.length} file${staged.length === 1 ? '' : 's'}`,
-      onClick: shouldLoadRemoteFile
-        ? () => void loadRemoteFile()
-        : saving
-          ? () => undefined
-          : staged.length === 0
-            ? () => undefined
-            : ingest,
-      disabled: shouldLoadRemoteFile ? false : saving || staged.length === 0,
-      loading: shouldLoadRemoteFile ? loadingRemoteFile : false,
+      label: 'Add file',
+      onClick: isRemoteEntry ? () => void loadRemoteFile() : () => void ingest(),
+      disabled: actionBusy || (isRemoteEntry ? !remoteUrl.trim() : staged.length === 0),
+      loading: actionBusy,
     });
     return () => onActionChange?.(null);
   }, [entryTab, staged, saving, remoteUrl, loadingRemoteFile, groupId, onActionChange]);
@@ -685,32 +687,15 @@ export function UploadPanel({
 
   return (
     <div className="space-y-4 cursor-pointer">
-      <div className="flex w-fit items-center gap-1 rounded-lg border border-border/90 bg-muted/60 p-1">
-        {[
-          { id: 'upload' as const, label: 'Upload', icon: FileUp },
-          { id: 'url' as const, label: 'From URL', icon: Link2 },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const active = entryTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setEntryTab(tab.id)}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-all',
-                active
-                  ? 'bg-background text-foreground ring-1 ring-border'
-                  : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground',
-              )}
-            >
-              <Icon className="size-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <DataEntryModeSwitch
+        label="File source"
+        value={entryTab}
+        onValueChange={(value) => setEntryTab(value as 'upload' | 'url')}
+        options={[
+          { value: 'upload', label: 'Upload', icon: FileUp },
+          { value: 'url', label: 'From URL', icon: Link2 },
+        ]}
+      />
 
       {entryTab === 'upload' ? (
         <button
@@ -766,7 +751,7 @@ export function UploadPanel({
               ) : (
                 <Link2 className="size-4" />
               )}
-              Load remote file
+              Add file
             </Button>
           )}
         </div>
@@ -993,27 +978,17 @@ export function UploadPanel({
 
       {!onActionChange && (
         <Button
-          onClick={shouldLoadRemoteFile ? () => void loadRemoteFile() : ingest}
-          disabled={shouldLoadRemoteFile ? loadingRemoteFile : saving || staged.length === 0}
+          onClick={isRemoteEntry ? () => void loadRemoteFile() : () => void ingest()}
+          disabled={
+            loadingRemoteFile || saving || (isRemoteEntry ? !remoteUrl.trim() : staged.length === 0)
+          }
         >
-          {shouldLoadRemoteFile ? (
-            loadingRemoteFile ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Link2 className="size-4" />
-            )
-          ) : saving ? (
+          {loadingRemoteFile || saving ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
             <FileUp className="size-4" />
           )}
-          {shouldLoadRemoteFile
-            ? 'Load remote file'
-            : saving && progress
-              ? `Adding ${progress.current} of ${progress.total}`
-              : staged.length === 0
-                ? 'Add more files'
-                : `Save ${staged.length} file${staged.length === 1 ? '' : 's'}`}
+          Add file
         </Button>
       )}
 

@@ -116,7 +116,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { pageIds } = (await req.json()) as { pageIds: string[] };
+    const { pageIds, groupId } = (await req.json()) as { pageIds: string[]; groupId?: string };
     if (!pageIds?.length) {
       return NextResponse.json({ error: 'No pages selected.' }, { status: 400 });
     }
@@ -139,6 +139,7 @@ export async function POST(req: Request) {
             content,
             source: 'integrations',
             url: pageInfo.url,
+            groupId,
             metadata: {
               notionPageId: pageId,
               importedFrom: 'notion',

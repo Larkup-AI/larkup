@@ -13,8 +13,8 @@ test.describe('Settings Page', () => {
     await expect(page.getByText('Project settings and preferences.')).toBeVisible();
   });
 
-  test('build cache requires confirmation before it is cleared', async ({ page }) => {
-    let cacheSize = 5 * 1024 * 1024 * 1024;
+  test('Larkup cache requires confirmation before it is cleared', async ({ page }) => {
+    let cacheSize = 447;
     let deleteRequests = 0;
     await page.route('/api/system/cache', async (route) => {
       if (route.request().method() === 'DELETE') {
@@ -24,7 +24,12 @@ test.describe('Settings Page', () => {
         await route.fulfill({
           contentType: 'application/json',
           body: JSON.stringify({
-            cache: { available: true, exists: false, sizeBytes: 0 },
+            cache: {
+              available: true,
+              exists: false,
+              sizeBytes: 0,
+              answerFeedback: { likedEntries: 0, dislikedEntries: 0, sizeBytes: 0 },
+            },
             clearedBytes,
           }),
         });
@@ -33,17 +38,25 @@ test.describe('Settings Page', () => {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
-          cache: { available: true, exists: cacheSize > 0, sizeBytes: cacheSize },
+          cache: {
+            available: true,
+            exists: cacheSize > 0,
+            sizeBytes: cacheSize,
+            answerFeedback: { likedEntries: 2, dislikedEntries: 1, sizeBytes: 640 },
+          },
         }),
       });
     });
     await page.reload();
 
     const cacheCard = page.locator('[data-slot="card"]', { hasText: 'Larkup cache' });
-    await expect(cacheCard.getByText('5.0 GB')).toBeVisible();
+    await expect(cacheCard.getByText('0.4 KB')).toBeVisible();
+    await expect(cacheCard.getByTestId('answer-cache-counts')).toHaveText(
+      'Across all projects: 2 liked answers and 1 disliked answer tracked.',
+    );
     await cacheCard.getByRole('button', { name: 'Clear cache' }).click();
     await expect(page.getByRole('alertdialog')).toContainText(
-      'projects, indexed data, settings, API keys',
+      'projects, indexed sources, settings, API keys',
     );
     await page.getByRole('button', { name: 'Cancel' }).click();
     expect(deleteRequests).toBe(0);
@@ -51,6 +64,9 @@ test.describe('Settings Page', () => {
     await cacheCard.getByRole('button', { name: 'Clear cache' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Clear cache' }).click();
     await expect(cacheCard.getByText('0 B')).toBeVisible();
+    await expect(cacheCard.getByTestId('answer-cache-counts')).toHaveText(
+      'Across all projects: 0 liked answers and 0 disliked answers tracked.',
+    );
     expect(deleteRequests).toBe(1);
   });
 

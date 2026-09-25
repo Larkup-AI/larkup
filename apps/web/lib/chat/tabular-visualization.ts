@@ -7,6 +7,8 @@ export type TabularChartConfig = {
   xAxisKey: string;
   series: { dataKey: string; label: string }[];
   showLegend: boolean;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
 };
 
 export function requestsVisualization(text: string): boolean {

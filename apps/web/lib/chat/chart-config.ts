@@ -87,6 +87,30 @@ function cleanText(value: unknown) {
   return isUsableKey(value) ? value.trim() : undefined;
 }
 
+function sharedSeriesAxisLabel(series: SeriesConfig[]) {
+  const labels = series.map((item) => item.label ?? formatChartLabel(item.dataKey));
+  if (labels.length === 0) return undefined;
+  if (labels.length === 1) return labels[0];
+
+  const words = labels.map((label) => label.split(/\s+/).filter(Boolean));
+  const sharedSuffix: string[] = [];
+  for (let offset = 1; offset <= Math.min(...words.map((parts) => parts.length)); offset += 1) {
+    const candidate = words[0][words[0].length - offset];
+    if (
+      !words.every(
+        (parts) => parts[parts.length - offset]?.toLowerCase() === candidate.toLowerCase(),
+      )
+    ) {
+      break;
+    }
+    sharedSuffix.unshift(candidate);
+  }
+  if (sharedSuffix.length > 0) return sharedSuffix.join(' ');
+
+  const combined = labels.join(' / ');
+  return combined.length <= 40 ? combined : 'Value';
+}
+
 /**
  * Normalizes untrusted model chart payloads without inventing data. Invalid
  * placeholder fields are dropped and ambiguous keys are inferred from real
@@ -183,6 +207,9 @@ export function normalizeChartConfig(input: unknown): ChartConfig {
           : data.length === 0
             ? 'The supplied rows do not contain plottable values.'
             : undefined;
+  const xAxisLabel =
+    cleanText(source.xAxisLabel) ?? (xAxisKey ? formatChartLabel(xAxisKey) : undefined);
+  const yAxisLabel = cleanText(source.yAxisLabel) ?? sharedSeriesAxisLabel(selectedSeries);
 
   return {
     chartType,
@@ -197,8 +224,8 @@ export function normalizeChartConfig(input: unknown): ChartConfig {
     ...(typeof source.stacked === 'boolean' ? { stacked: source.stacked } : {}),
     showLegend:
       typeof source.showLegend === 'boolean' ? source.showLegend : selectedSeries.length > 1,
-    ...(cleanText(source.xAxisLabel) ? { xAxisLabel: cleanText(source.xAxisLabel) } : {}),
-    ...(cleanText(source.yAxisLabel) ? { yAxisLabel: cleanText(source.yAxisLabel) } : {}),
+    ...(xAxisLabel ? { xAxisLabel } : {}),
+    ...(yAxisLabel ? { yAxisLabel } : {}),
     ...(error ? { error } : {}),
   };
 }

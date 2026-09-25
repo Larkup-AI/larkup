@@ -8,6 +8,7 @@ import 'katex/dist/katex.min.css';
 import { MessageActions } from '@/components/chat/message-actions';
 import { ChatChart, type ChartConfig } from '@/components/chat/tools/chat-chart';
 import { ChatDataTable, type DataTableConfig } from '@/components/chat/tools/chat-data-table';
+import { ChatFileExport } from '@/components/chat/tools/chat-file-export';
 import {
   ChatSandboxResult,
   type SandboxResultConfig,
@@ -32,6 +33,7 @@ import {
   smoothPendingToolProgress,
   type LiveToolActivity,
 } from '@/lib/chat/live-tool-progress';
+import { answerFeedbackForMessage, type AnswerFeedback } from '@/lib/chat/message-feedback';
 
 export function MessageItem({
   message,
@@ -42,6 +44,7 @@ export function MessageItem({
   autoOpenSupportingClip = false,
   regenerate,
   isBusy,
+  onFeedback,
 }: {
   message: UIMessage;
   isLast?: boolean;
@@ -53,6 +56,7 @@ export function MessageItem({
   regenerate?: (options?: { messageId?: string }) => void;
   /** True while a request is in flight — hides "Regenerate" on a trailing user message that's still waiting on a reply. */
   isBusy?: boolean;
+  onFeedback?: (messageId: string, feedback: AnswerFeedback | undefined) => void;
 }) {
   const isUser = message.role === 'user';
   const [progressClock, setProgressClock] = useState(() => Date.now());
@@ -458,20 +462,16 @@ export function MessageItem({
     [allCleanTexts],
   );
 
-  // Feedback is presentation state only. Answers are always regenerated from
-  // fresh retrieval and are never saved as a shortcut for a later question.
-  const [liked, setLiked] = useState(false);
-  const [disliked, setDisliked] = useState(false);
+  const answerFeedback = answerFeedbackForMessage(message);
+  const liked = answerFeedback === 'liked';
+  const disliked = answerFeedback === 'disliked';
 
   const handleLike = () => {
-    setLiked((current) => !current);
-    setDisliked(false);
+    onFeedback?.(message.id, liked ? undefined : 'liked');
   };
 
   const handleDislike = () => {
-    const next = !disliked;
-    setDisliked(next);
-    if (next) setLiked(false);
+    onFeedback?.(message.id, disliked ? undefined : 'disliked');
   };
 
   const isShimmering =
@@ -645,8 +645,8 @@ export function MessageItem({
           text={answerText}
           liked={liked}
           disliked={disliked}
-          onLike={handleLike}
-          onDislike={handleDislike}
+          onLike={onFeedback ? handleLike : undefined}
+          onDislike={onFeedback ? handleDislike : undefined}
           onRegenerate={regenerate ? () => regenerate({ messageId: message.id }) : undefined}
         />
       )}
@@ -1061,6 +1061,11 @@ function renderToolPart(
             {visualization?.data?.length ? <ChatChart config={visualization} /> : null}
           </div>
         );
+      }
+
+      case 'file-export': {
+        if (!output?.success || !output?.fileBase64) return null;
+        return <ChatFileExport key={index} artifact={output} />;
       }
 
       case 'none': {

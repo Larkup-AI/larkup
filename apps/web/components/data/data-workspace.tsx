@@ -74,6 +74,11 @@ const SUB_TABS = [
 type TopTabId = 'add' | 'corpus';
 type SubTabId = (typeof SUB_TABS)[number]['id'];
 
+function normalizeGroupId(value: string | null): string {
+  const groupId = value?.split(',')[0]?.trim();
+  return !groupId || groupId === 'undefined' || groupId === 'null' ? 'default' : groupId;
+}
+
 const SUB_TAB_INTRO: Record<SubTabId, { title: string; description: string }> = {
   files: {
     title: 'Add Files',
@@ -99,7 +104,7 @@ const SUB_TAB_INTRO: Record<SubTabId, { title: string; description: string }> = 
 
 export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   const searchParams = useSearchParams();
-  const queryGroupId = searchParams.get('groupId') ?? 'default';
+  const queryGroupId = normalizeGroupId(searchParams.get('groupId'));
   const pathname = usePathname();
   const { activeProject } = useProject();
   const serverId = activeProject?.id;
@@ -117,9 +122,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
 
   const [activeTab, setActiveTabState] = useState<TopTabId>(getInitialTab());
   const [activeSubTab, setActiveSubTabState] = useState<SubTabId>(getInitialSubTab());
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(
-    queryGroupId && queryGroupId !== 'default' ? queryGroupId.split(',') : [],
-  );
+  const [selectedGroupId, setSelectedGroupId] = useState(queryGroupId);
 
   useEffect(() => {
     if (view) {
@@ -132,13 +135,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
     }
   }, [searchParams, activeTab, activeSubTab, view]);
 
-  useEffect(
-    () =>
-      setSelectedGroupIds(
-        queryGroupId && queryGroupId !== 'default' ? queryGroupId.split(',') : [],
-      ),
-    [queryGroupId],
-  );
+  useEffect(() => setSelectedGroupId(queryGroupId), [queryGroupId]);
 
   const setActiveSubTab = (subtab: SubTabId) => {
     // The outgoing panel owns the shared primary action. Clear it before changing
@@ -209,10 +206,15 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   );
   const activeVideoRuntimeScope = videoRuntimeScopeFromConfig(configQuery.data?.config);
 
-  const selectedGroups = groups.filter((group) => selectedGroupIds.includes(group.id));
-  // A source belongs to one group. Resolve the target from loaded data so a
-  // deleted/stale URL parameter can never be submitted as an orphaned group.
-  const targetGroupId = selectedGroups[0]?.id ?? 'default';
+  const selectedGroup = groups.find((group) => group.id === selectedGroupId);
+  // Keep the requested destination stable while groups are loading. Resolving
+  // through the temporarily empty SWR result used to turn a valid selection
+  // into Default during the first render and made fast submissions race.
+  const targetGroupId = selectedGroupId;
+  const groupSelectionReady =
+    docsQuery.data !== undefined &&
+    !docsQuery.error &&
+    (targetGroupId === 'default' || selectedGroup !== undefined);
 
   useEffect(() => {
     if (dataAddBlocked) setPrimaryAction(null);
@@ -328,11 +330,11 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   const activeSubTabIntro = SUB_TAB_INTRO[activeSubTab];
 
   const selectGroup = (groupId: string | null) => {
-    const next = !groupId || groupId === 'default' ? [] : [groupId];
-    setSelectedGroupIds(next);
+    const next = normalizeGroupId(groupId);
+    setSelectedGroupId(next);
 
     const params = new URLSearchParams(searchParams.toString());
-    if (next.length > 0) params.set('groupId', next.join(','));
+    if (next !== 'default') params.set('groupId', next);
     else params.delete('groupId');
     window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
   };
@@ -421,13 +423,13 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
                   className="h-9 min-w-42 max-w-56 bg-white text-xs"
                 >
                   <span className="flex flex-1 items-center gap-1.5 truncate text-left">
-                    {selectedGroups.length === 0
-                      ? 'Default group'
-                      : selectedGroups.length === 1
-                        ? `${selectedGroups[0].icon ? `${selectedGroups[0].icon} ` : ''}${
-                            selectedGroups[0].name
-                          }`
-                        : 'Default group'}
+                    {!groupSelectionReady && docsQuery.data === undefined
+                      ? 'Loading group…'
+                      : targetGroupId === 'default'
+                        ? 'Default group'
+                        : selectedGroup
+                          ? `${selectedGroup.icon ? `${selectedGroup.icon} ` : ''}${selectedGroup.name}`
+                          : 'Group unavailable'}
                   </span>
                 </SelectTrigger>
                 <SelectContent>
@@ -446,9 +448,20 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
               {primaryAction && (
                 <Button
                   size="default"
-                  className={'h-10'}
+                  data-ready={
+                    !dataAddBlocked &&
+                    groupSelectionReady &&
+                    !primaryAction.disabled &&
+                    !primaryAction.loading
+                  }
+                  className="h-10 min-w-28 transition-colors"
                   onClick={primaryAction.onClick}
-                  disabled={dataAddBlocked || primaryAction.disabled || primaryAction.loading}
+                  disabled={
+                    dataAddBlocked ||
+                    !groupSelectionReady ||
+                    primaryAction.disabled ||
+                    primaryAction.loading
+                  }
                 >
                   {primaryAction.loading ? (
                     <Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -607,7 +620,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
 
                   {activeSubTab === 'integrations' && (
                     <div className="animate-in fade-in duration-200">
-                      <IntegrationsPanel onAdded={handleDataAdded} />
+                      <IntegrationsPanel onAdded={handleDataAdded} groupId={targetGroupId} />
                     </div>
                   )}
                 </>
@@ -624,6 +637,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
               onChanged={refreshAll}
               isIndexing={indexRunning}
               activeVideoRuntimeScope={activeVideoRuntimeScope}
+              initialGroupId={searchParams.has('groupId') ? queryGroupId : undefined}
             />
           </div>
         )}

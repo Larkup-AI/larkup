@@ -14,7 +14,7 @@ import { createAdapter } from '@larkup/vector-stores/factory';
 import type { MediaType } from '@larkup/core/types';
 import { runWithProject } from '@larkup/core/project-store';
 import { deleteVideoKnowledgeForMediaAsset } from '@larkup/core/video-knowledge/deletion-store';
-import { resolveGroupId } from '@larkup/core/groups-store';
+import { resolveGroupId, UnknownDataGroupError } from '@larkup/core/groups-store';
 import {
   cancelVideoIntelligenceJob,
   purgeLocalVideoIntelligenceJobData,
@@ -157,7 +157,10 @@ async function saveMedia(req: Request) {
     return NextResponse.json({ assets, count: assets.length }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to upload media.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message },
+      { status: err instanceof UnknownDataGroupError ? 400 : 500 },
+    );
   }
 }
 

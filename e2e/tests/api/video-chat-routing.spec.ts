@@ -17,7 +17,7 @@ test('chat filters unavailable optional tools before invoking the AI SDK', async
   expect(route).toContain('normalizeIncomingMessages(body?.messages)');
   expect(route).toContain('.pipeThrough(');
   expect(route).toContain('recoverEmptyUIMessageStream(');
-  expect(route).toContain('if (imagePreviewFollowUp && previewImage && builtInTools.presentMedia)');
+  expect(route).toContain('if (imagePreviewFollowUp && builtInTools.presentMedia)');
   expect(tools).toContain("'inspectPdfPages'");
   expect(tools).toContain("'analyzePdfPages'");
   expect(messageInput).toContain("typeof message.content === 'string'");
@@ -65,15 +65,16 @@ test('chat exposes the evidence-first video tools instead of ordinary search alo
   expect(route).toContain('hasMediaAsset: recentMediaAssetIds.length > 0');
   expect(route).toContain('mediaAssetId');
   expect(route).toContain('if (mediaFlow.hasMediaAsset && evidenceQueryTools.length > 0)');
-  expect(route).toContain('typed investigation directive');
-  expect(route).toContain("the chat model understands the user's language");
+  expect(route).toContain('Return exactly one JSON object and no prose');
+  expect(route).toContain('Resolve the current request in its own language');
+  expect(route).toContain('resolvedQuestion');
   expect(route).not.toContain('input: { mediaAssetId, query: userText }');
   expect(tools).toContain('sourceWideVisualEvidenceRequested');
   expect(tools).toContain('Required language-model interpretation');
   expect(tools).not.toContain('groupOverviewEvidence');
   expect(tools).not.toContain('اثنان|اثنين');
-  expect(route).toContain('canReuseKnowledgeBaseEvidence(userText, evidenceMessages) &&');
-  expect(route).toContain('!continuesMediaTopic');
+  expect(route).toContain('findImmediateExactGroundedAnswer(evidenceMessages, userText)');
+  expect(route).toContain('continuesRecentMediaTopic(userText, reusableEvidence)');
   expect(route).toContain('Speak as someone who watched the material');
   expect(route).toContain('function findUnverifiedMediaEvidence(');
   expect(route).toContain('mediaClaimNeedsCorroboration(verification)');
@@ -154,8 +155,8 @@ test('runs bounded precision verification with visible, sanitized chat progress'
   expect(liveToolProgress).toContain(
     "const ceiling = activity.phase === 'waking-up' ? 28 : RUNNING_PROGRESS_CEILING",
   );
-  expect(videoAgent).toContain('INTERACTIVE_INSPECTION_BUDGET_MS = 45_000');
-  expect(videoAgent).toContain('INTERACTIVE_REWATCH_BUDGET_MS = 20_000');
+  expect(videoAgent).toContain('INTERACTIVE_INSPECTION_BUDGET_MS = 40_000');
+  expect(videoAgent).toContain('INTERACTIVE_REWATCH_BUDGET_MS = 12_000');
   expect(videoAgent).toContain('signal: AbortSignal.timeout(timeoutMs)');
   expect(videoAgent).toContain('deadline: responseDeadline');
   expect(videoAgent).toContain(

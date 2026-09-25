@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { normalizeTableData } from '@/lib/chat/table-presentation';
 
 export interface DataTableConfig {
   columns: string[];
@@ -101,7 +102,12 @@ function columnTypeIndicator(
 const PAGE_SIZES = [10, 25, 50, 100];
 
 export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
-  const { columns, rows, totalRows, aggregationResults } = config;
+  const normalized = useMemo(
+    () => normalizeTableData(config.columns, config.rows),
+    [config.columns, config.rows],
+  );
+  const { columns, rows } = normalized;
+  const { totalRows, aggregationResults } = config;
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(0);

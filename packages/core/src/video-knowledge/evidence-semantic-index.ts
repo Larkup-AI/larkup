@@ -251,6 +251,21 @@ const loaded = new Map<string, { units: SemanticEvidenceUnit[]; vectors: Float32
 const queryVectors = new Map<string, Float32Array>();
 const QUERY_VECTOR_CACHE_LIMIT = 64;
 
+/** Clears rebuildable semantic vectors from disk and this process. */
+export async function clearVideoSemanticIndexCache(): Promise<void> {
+  loaded.clear();
+  queryVectors.clear();
+  const run = writeChain.then(async () => {
+    const file = await cachePath(false);
+    if (!file) return;
+    await fs.unlink(file).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+    });
+  });
+  writeChain = run.catch(() => undefined);
+  await run;
+}
+
 async function embedQueryCached(query: string, abortSignal?: AbortSignal) {
   const config = await readConfig();
   const key = `${config.embeddingModelId}\u0000${query}`;

@@ -16,6 +16,13 @@ export const DEFAULT_GROUP: DataGroup = {
 
 const GROUP_ICONS = ['📚', '✦', '◈', '◆', '●', '▦', '✳'];
 
+export class UnknownDataGroupError extends Error {
+  constructor(groupId: string) {
+    super(`Data group "${groupId}" does not exist.`);
+    this.name = 'UnknownDataGroupError';
+  }
+}
+
 function generatedIcon(id: string): string {
   return GROUP_ICONS[
     [...id].reduce((total, char) => total + char.charCodeAt(0), 0) % GROUP_ICONS.length
@@ -30,9 +37,27 @@ function serialize<T>(operation: () => Promise<T>): Promise<T> {
   return run;
 }
 
+function isMissingFile(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
+}
+
 async function groupsFile(): Promise<string | null> {
   const dir = await getProjectDataDir();
   return dir ? path.join(dir, 'groups.json') : null;
+}
+
+async function writeGroupsFile(file: string, groups: DataGroup[]): Promise<void> {
+  const temporaryFile = path.join(
+    path.dirname(file),
+    `.${path.basename(file)}.${process.pid}.${randomUUID()}.tmp`,
+  );
+  try {
+    await fs.writeFile(temporaryFile, JSON.stringify(groups, null, 2), 'utf8');
+    await fs.rename(temporaryFile, file);
+  } catch (error) {
+    await fs.unlink(temporaryFile).catch(() => {});
+    throw error;
+  }
 }
 
 /** Reads all groups for the active Project. */
@@ -41,13 +66,16 @@ export async function readGroups(): Promise<DataGroup[]> {
   if (!file) return [];
   try {
     const raw = await fs.readFile(file, 'utf8');
-    const groups = JSON.parse(raw) as DataGroup[];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error(`Invalid group store at ${file}.`);
+    const groups = parsed as DataGroup[];
     if (groups.some((group) => group.id === DEFAULT_GROUP.id)) return groups;
     const next = [DEFAULT_GROUP, ...groups];
-    await fs.writeFile(file, JSON.stringify(next, null, 2), 'utf8');
+    await writeGroupsFile(file, next);
     return next;
-  } catch {
-    return [DEFAULT_GROUP];
+  } catch (error) {
+    if (isMissingFile(error)) return [DEFAULT_GROUP];
+    throw error;
   }
 }
 
@@ -61,13 +89,14 @@ export async function resolveGroupId(value: string | null | undefined): Promise<
   if (!groupId || groupId === 'undefined' || groupId === 'null') return DEFAULT_GROUP.id;
 
   const groups = await readGroups();
-  return groups.some((group) => group.id === groupId) ? groupId : DEFAULT_GROUP.id;
+  if (groups.some((group) => group.id === groupId)) return groupId;
+  throw new UnknownDataGroupError(groupId);
 }
 
 async function writeGroups(groups: DataGroup[]): Promise<DataGroup[]> {
   const file = await groupsFile();
   if (!file) throw new Error('An active Project is required.');
-  await fs.writeFile(file, JSON.stringify(groups, null, 2), 'utf8');
+  await writeGroupsFile(file, groups);
   return groups;
 }
 

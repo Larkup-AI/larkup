@@ -5,7 +5,7 @@ import { isFirecrawlConfigured } from '@larkup/scraper/firecrawl';
 import { readDocuments } from '@larkup/core/documents-store';
 import { readConfig } from '@larkup/core/config-store';
 import type { CrawlJob, CrawlScope, CrawlTarget } from '@larkup/core/types';
-import { resolveGroupId } from '@larkup/core/groups-store';
+import { resolveGroupId, UnknownDataGroupError } from '@larkup/core/groups-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -51,7 +51,15 @@ export async function POST(req: Request) {
 
   // Resolve the destination group first so the duplicate check is scoped to
   // that group only. A URL in a different group is not a duplicate.
-  const resolvedGroupId = await resolveGroupId(body.groupId);
+  let resolvedGroupId: string;
+  try {
+    resolvedGroupId = await resolveGroupId(body.groupId);
+  } catch (error) {
+    if (error instanceof UnknownDataGroupError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
 
   const docs = await readDocuments();
   const existingUrls = new Set(

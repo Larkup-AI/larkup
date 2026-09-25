@@ -393,6 +393,9 @@ importers:
       pdf-parse:
         specifier: 2.4.5
         version: 2.4.5
+      pdf-lib:
+        specifier: ^1.17.1
+        version: 1.17.1
       pdfjs-dist:
         specifier: ^6.1.200
         version: 6.3.289

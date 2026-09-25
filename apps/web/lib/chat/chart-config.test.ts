@@ -27,6 +27,42 @@ describe('normalizeChartConfig', () => {
       { University: 'North', International: 16, Domestic: 13 },
       { University: 'South', International: 49, Domestic: 26 },
     ]);
+    expect(chart.xAxisLabel).toBe('University');
+    expect(chart.yAxisLabel).toBe('International / Domestic');
+  });
+
+  it('derives clear axis names when the model omits them', () => {
+    const chart = normalizeChartConfig({
+      chartType: 'line',
+      title: 'Dropout comparison',
+      data: [
+        { Year: 2016, Bachelors: 0.3, Masters: 0.2 },
+        { Year: 2017, Bachelors: 0.28, Masters: 0.19 },
+      ],
+      xAxisKey: 'Year',
+      series: [
+        { dataKey: 'Bachelors', label: "Bachelor's Dropout Rate" },
+        { dataKey: 'Masters', label: "Master's Dropout Rate" },
+      ],
+    });
+
+    expect(chart.xAxisLabel).toBe('Year');
+    expect(chart.yAxisLabel).toBe('Dropout Rate');
+  });
+
+  it('preserves explicit axis names and units', () => {
+    const chart = normalizeChartConfig({
+      chartType: 'line',
+      title: 'Costs',
+      data: [{ Year: 2016, Cost: 20 }],
+      xAxisKey: 'Year',
+      series: [{ dataKey: 'Cost' }],
+      xAxisLabel: 'Fiscal year',
+      yAxisLabel: 'Cost (EUR billion)',
+    });
+
+    expect(chart.xAxisLabel).toBe('Fiscal year');
+    expect(chart.yAxisLabel).toBe('Cost (EUR billion)');
   });
 
   it('does not turn an invalid second series into a duplicate of a valid one', () => {

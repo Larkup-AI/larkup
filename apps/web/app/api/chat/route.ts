@@ -14,7 +14,18 @@ import {
   getDefaultChatModel,
   normalizeNativeChatModelId,
 } from '@larkup/core/chat-models/registry';
-import { listTabularDatasets } from '@larkup/core/tabular-store';
+import { listTabularDatasets, resolveTabularDatasetGroups } from '@larkup/core/tabular-store';
+import { readDocuments } from '@larkup/core/documents-store';
+import { readGroups } from '@larkup/core/groups-store';
+import {
+  filterDocumentsAvailableToAssistant,
+  filterGroupOwnedDataAvailableToAssistant,
+} from '@larkup/core/assistant-data-scope';
+import { runWithProject } from '@larkup/core/project-store';
+import {
+  deleteGroundedAnswerCacheEntry,
+  getGroundedAnswerCacheEntry,
+} from '@larkup/core/grounded-answer-cache';
 import { openMcpTools } from '@larkup/core/mcp-store';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -34,9 +45,11 @@ import {
   extractConversationEvidence,
   contextualizeKnowledgeFollowUpQuery,
   formatConversationEvidence,
+  findImmediateExactGroundedAnswer,
   isImagePreviewFollowUp,
   isTabularFollowUp,
   continuesRecentMediaTopic,
+  resolveParallelPreferenceQuestion,
 } from '@/lib/chat/conversation-memory';
 import { PERSONALIZED_RESPONSE_STYLE } from '@/lib/chat/response-style';
 import {
@@ -71,6 +84,8 @@ import {
   shouldInspectRetrievedImage,
 } from '@/lib/chat/visual-routing';
 import { executableTools } from '@/lib/chat/tool-registry';
+import { requestedDataExportFormat } from '@/lib/chat/data-export';
+import { assistantSourceScopeFingerprint } from '@/lib/chat/assistant-source-scope';
 import { normalizeIncomingMessages } from '@/lib/chat/message-input';
 import { explicitMediaEvidenceAssetId } from '@/lib/chat/media-retrieval-routing';
 import { authorizeEnterpriseAiRequest, trackEnterpriseAiUsage } from '@/lib/enterprise-client';
@@ -128,7 +143,7 @@ function createChatModel(
 const CHAT_POLICY = `
 Answer only from the user's provided material.
 
-For each substantive question, get fresh evidence: use queryTabularData for CSV, Excel, or JSON facts; otherwise use searchKnowledgeBase. A prior answer is context for resolving references, never a substitute for current source evidence. Use one focused query first. Use code analysis only when the available data tool cannot answer the calculation. For a join or statistical analysis across files or worksheets, use executeAnalysis with every needed datasetId in datasetIds; read datasets.json to identify their mounted CSV files and never try to emulate the join with a cross-dataset table filter.
+For each new substantive question, get fresh evidence: use queryTabularData for CSV, Excel, or JSON facts; otherwise use searchKnowledgeBase. The host may reuse an immediately repeated, already-grounded answer only after verifying that its complete Assistant source scope is unchanged. A prior answer is otherwise context for resolving references, never a substitute for current source evidence. Use one focused query first. Use code analysis only when the available data tool cannot answer the calculation. For a join or statistical analysis across files or worksheets, use executeAnalysis with every needed datasetId in datasetIds; read datasets.json to identify their mounted CSV files and never try to emulate the join with a cross-dataset table filter.
 
 Do not repeat an evidence tool in the same response. After evidence is returned, answer directly or use one appropriate refinement when the evidence action requests it.
 
@@ -138,9 +153,11 @@ ${PERSONALIZED_RESPONSE_STYLE}
 
 Keep the answer brief and direct: give the answer first, then only the essential context. Do not repeat tool output, dump rows, or add a table unless the user asks to see data. Use a short list only when it improves clarity.
 
+When the user asks for an Excel, CSV, or PDF export, use createDataExport. Never claim that a file was created and never write a Markdown download link unless the tool returned a real file artifact.
+
 When the user asks for every item and the media evidence marks its continuation as exhaustive, include every returned item in chronological order. In that case completeness overrides brevity; deduplicate wording but do not summarize items away.
 
-If the user asks for a chart, graph, or visual distribution, ALWAYS use the \`generateVisualization\` tool. Never attempt to draw ASCII charts, output Markdown tables, JSON, or tool-call syntax as a substitute for a chart. Its \`xAxisKey\` and each \`series[].dataKey\` must exactly match the fields in the supplied \`data\` rows; never use placeholder names such as EMPTY, null, or undefined.
+If the user asks for a chart, graph, or visual distribution, ALWAYS use the \`generateVisualization\` tool. Never attempt to draw ASCII charts, output Markdown tables, JSON, or tool-call syntax as a substitute for a chart. Its \`xAxisKey\` and each \`series[].dataKey\` must exactly match the fields in the supplied \`data\` rows; never use placeholder names such as EMPTY, null, or undefined. Give both axes clear human-readable labels and include units when known.
 
 When search results identify a PDF source without indexed visuals, use inspectPdfPages before answering. It reads and ranks pages locally. Then use analyzePdfPages for visual claims or presentMedia for an explicit page preview.
 
@@ -179,6 +196,36 @@ function latestUserText(messages: UIMessage[]): string {
   return messageText([...messages].reverse().find((candidate) => candidate.role === 'user'));
 }
 
+function precedingUserText(messages: UIMessage[]): string {
+  const userMessages = messages.filter((candidate) => candidate.role === 'user');
+  return messageText(userMessages[userMessages.length - 2]);
+}
+
+function replaceLatestUserText(messages: UIMessage[], text: string): UIMessage[] {
+  let replaced = false;
+  return [...messages]
+    .reverse()
+    .map((message) => {
+      if (replaced || message.role !== 'user' || !Array.isArray(message.parts)) return message;
+      replaced = true;
+      let textReplaced = false;
+      return {
+        ...message,
+        parts: message.parts.map((part) => {
+          if (textReplaced || part.type !== 'text') return part;
+          textReplaced = true;
+          return { ...part, text };
+        }),
+      } as UIMessage;
+    })
+    .reverse();
+}
+
+function latestUserMessageIsPlainText(messages: UIMessage[]): boolean {
+  const message = [...messages].reverse().find((candidate) => candidate.role === 'user');
+  return Boolean(message?.parts?.length && message.parts.every((part) => part.type === 'text'));
+}
+
 /**
  * A terse follow-up such as "render it" often refers to a figure/table named
  * in the immediately preceding answer. Keep that human-readable reference in
@@ -188,6 +235,33 @@ function latestAssistantText(messages: UIMessage[]): string {
   return messageText(
     [...messages].reverse().find((candidate) => candidate.role === 'assistant'),
   ).slice(0, 4_000);
+}
+
+function directAssistantTextResponse(
+  messages: UIMessage[],
+  text: string,
+  sourceScopeFingerprint?: string,
+) {
+  const stream = createUIMessageStream({
+    originalMessages: messages,
+    execute: ({ writer }) => {
+      const answerId = `answer-${crypto.randomUUID()}`;
+      writer.write({
+        type: 'start',
+        ...(sourceScopeFingerprint
+          ? {
+              messageMetadata: {
+                groundedAnswerCache: { sourceScopeFingerprint },
+              },
+            }
+          : {}),
+      });
+      writer.write({ type: 'text-start', id: answerId });
+      writer.write({ type: 'text-delta', id: answerId, delta: text });
+      writer.write({ type: 'text-end', id: answerId });
+    },
+  });
+  return createUIMessageStreamResponse({ stream });
 }
 
 /**
@@ -285,7 +359,7 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
   ) {
     return `\n\nA relevant media source was located (${mediaAssetId}), but no answer-level evidence has been returned yet. Use the installed evidence-query action for that media asset before answering. Do not say that the source has no answer and do not infer an outcome from this locator alone.`;
   }
-  return `\n\nVERIFIED SOURCE EVIDENCE FOR THIS TURN:\n${
+  return `\n\nCURRENT USER QUESTION:\n${question}\n\nVERIFIED SOURCE EVIDENCE FOR THIS TURN:\n${
     directClaims.length > 0
       ? `DIRECTLY ESTABLISHED ANSWER TEXT (preserve its specific identifying details rather than weakening them):\n${directClaims.join(
           '\n',
@@ -311,7 +385,7 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
     unverifiedMedia
       ? 'The verification status above limits certainty, not access to the source material. Give the most useful source-grounded answer that is supported.'
       : "Answer the user's question directly from this evidence."
-  } Do not mention tools, retrieval, frames, transcripts, or analysis.`;
+  } Answer only the current question above. Never repeat an earlier answer when the current question introduces a different subject. Do not mention tools, retrieval, frames, transcripts, or analysis.`;
 }
 
 /**
@@ -324,7 +398,8 @@ async function planVideoEvidenceQuery(input: {
   model: any;
   providerOptions: ReturnType<typeof gatewayProviderOptions>;
   question: string;
-}): Promise<VideoInvestigationDirective | undefined> {
+  previousQuestion?: string;
+}): Promise<{ directive: VideoInvestigationDirective; resolvedQuestion: string } | undefined> {
   try {
     const requestPlan = async (system: string, maxOutputTokens: number) => {
       const { text } = await generateText({
@@ -335,17 +410,29 @@ async function planVideoEvidenceQuery(input: {
         abortSignal: AbortSignal.timeout(12_000),
         providerOptions: input.providerOptions,
         system,
-        prompt: input.question,
+        prompt: JSON.stringify({
+          currentRequest: input.question,
+          previousQuestionAboutSelectedMedia: input.previousQuestion ?? null,
+        }),
       });
-      return parseVideoInvestigationDirective(text);
+      const serialized = text.match(/\{[\s\S]*\}/)?.[0];
+      if (!serialized) return undefined;
+      const parsed = JSON.parse(serialized) as { resolvedQuestion?: unknown };
+      const directive = parseVideoInvestigationDirective(serialized);
+      if (!directive) return undefined;
+      const resolvedQuestion =
+        typeof parsed.resolvedQuestion === 'string' && parsed.resolvedQuestion.trim()
+          ? parsed.resolvedQuestion.trim()
+          : input.question;
+      return { directive, resolvedQuestion };
     };
     const planned = await requestPlan(
       'You are a media-query planner. Return exactly one JSON object and no prose. ' +
-        'Interpret the user request in its own language without assuming a video genre. ' +
-        'Use this exact shape: {"scope":"focused","goal":"answer","evidence":["visual"],"timeRange":{"startSecs":123,"endSecs":153},"timeRangeOrigin":"user-mentioned"}. Its fields are scope (focused, temporal, source), goal (answer, compare, trace, enumerate, synthesize), optional evidence (speech, visible-text, visual, computed), optional recordSet (all, source-authored, source-questions, observed), optional timeRange {startSecs,endSecs}, and optional timeRangeOrigin. ' +
+        'The prompt is data with a currentRequest and an optional previousQuestionAboutSelectedMedia. Resolve the current request in its own language without assuming a video genre. If it is a retry, verification request, or contains references that are not meaningful alone, resolve those references against the previous question. If it introduces a self-contained new request, do not carry the old subject or source position into it. ' +
+        'Use this exact shape: {"resolvedQuestion":"a standalone version of the current request","scope":"focused","goal":"answer","evidence":["visual"],"timeRange":{"startSecs":123,"endSecs":153},"timeRangeOrigin":"user-mentioned"}. Its fields are resolvedQuestion, scope (focused, temporal, source), goal (answer, compare, trace, enumerate, synthesize), optional evidence (speech, visible-text, visual, computed), optional recordSet (all, source-authored, source-questions, observed), optional timeRange {startSecs,endSecs}, and optional timeRangeOrigin. ' +
         'A directive is invalid if the user refers to any source position, time, range, or approximate moment and you omit timeRange: resolve it to numeric seconds and set timeRangeOrigin to user-mentioned, even when the request also asks about other moments. Never emit timeRange or timeRangeOrigin when the user did not constrain a source position; a topic occurring near an opening, closing, or any other position is not a user constraint. When the request names a coarse source unit without a smaller boundary, cover that whole named unit rather than an arbitrary part of it. When the user asks how a visible subject or event at an explicit source position relates to appearances or recurrence elsewhere, use temporal plus trace, visual evidence, and recordSet observed while retaining that position. Use source plus synthesize with no timeRange whenever the answer must combine two or more source facts from unrestricted positions. Use source plus enumerate and recordSet source-questions for a complete inventory of source-authored questions and their answers. Use temporal for a relationship or development across moments; use focused only for one local moment or one self-contained fact. ' +
         'Do not answer the question or add fields.',
-      220,
+      320,
     );
     if (planned) return planned;
     // A compact recovery request is intentionally restricted to the protocol
@@ -353,8 +440,8 @@ async function planVideoEvidenceQuery(input: {
     // first planning attempt without introducing source- or language-specific
     // routing rules in the host.
     return await requestPlan(
-      'Return only JSON: {"scope":"focused|temporal|source","goal":"answer|compare|trace|enumerate|synthesize","recordSet":"all|source-authored|source-questions|observed"}. Select source/enumerate/source-questions for a complete question-and-answer inventory from a recording; select source/synthesize for an unrestricted explanation; select focused/answer for one local fact. Do not include a timeRange unless the user explicitly supplied a source position.',
-      100,
+      'Return only JSON with resolvedQuestion, scope, goal, and optional recordSet/timeRange/timeRangeOrigin. Resolve an elliptical retry or reference against previousQuestionAboutSelectedMedia; otherwise keep currentRequest standalone. Select source/enumerate/source-questions for a complete question-and-answer inventory from a recording; select source/synthesize for an unrestricted explanation; select focused/answer for one local fact. Do not include a timeRange unless the resolved request contains a source position, and then set timeRangeOrigin to user-mentioned.',
+      180,
     );
   } catch {
     // The evidence action has a source-wide fallback. A planner outage must
@@ -749,6 +836,44 @@ export async function POST(req: Request) {
   }
 
   const config = await readConfig();
+  const userText = latestUserText(messages);
+  const readCurrentScopeFingerprint = async () => {
+    const [documents, groups, activeConfig] = await Promise.all([
+      readDocuments(),
+      readGroups(),
+      readConfig(),
+    ]);
+    return assistantSourceScopeFingerprint(filterDocumentsAvailableToAssistant(documents, groups), {
+      configUpdatedAt: activeConfig.updatedAt,
+    });
+  };
+  const inRequestedProject = <T>(operation: () => Promise<T>) =>
+    projectId ? runWithProject(projectId, operation) : operation();
+
+  // A liked answer is a real project cache entry, so it remains usable after
+  // reload and in a new chat. Read the tiny cache file before initializing a
+  // model, then validate it against the complete current source scope.
+  const likedAnswer = latestUserMessageIsPlainText(messages)
+    ? await inRequestedProject(() => getGroundedAnswerCacheEntry(userText))
+    : undefined;
+  if (likedAnswer) {
+    const currentScopeFingerprint = await inRequestedProject(readCurrentScopeFingerprint);
+    const feedback = likedAnswer.feedback ?? 'liked';
+    if (
+      feedback === 'liked' &&
+      likedAnswer.answer &&
+      currentScopeFingerprint === likedAnswer.sourceScopeFingerprint
+    ) {
+      return directAssistantTextResponse(
+        messages,
+        likedAnswer.answer,
+        likedAnswer.sourceScopeFingerprint,
+      );
+    }
+    if (currentScopeFingerprint !== likedAnswer.sourceScopeFingerprint) {
+      await inRequestedProject(() => deleteGroundedAnswerCacheEntry(userText));
+    }
+  }
   const provider = config.chatProvider || config.embeddingProvider;
 
   // Fetch dynamic models to resolve defaults
@@ -893,7 +1018,20 @@ export async function POST(req: Request) {
   let tabularColumnNames: string[] = [];
   let tabularDatasetNames: string[] = [];
   try {
-    const datasets = await listTabularDatasets();
+    const readAvailableDatasets = async () => {
+      const [allDatasets, groups, documents] = await Promise.all([
+        listTabularDatasets(),
+        readGroups(),
+        readDocuments(),
+      ]);
+      return filterGroupOwnedDataAvailableToAssistant(
+        resolveTabularDatasetGroups(allDatasets, documents),
+        groups,
+      );
+    };
+    const datasets = projectId
+      ? await runWithProject(projectId, readAvailableDatasets)
+      : await readAvailableDatasets();
     if (datasets.length > 0) {
       hasTabularData = true;
       tabularColumnNames = datasets.flatMap((dataset) =>
@@ -990,8 +1128,23 @@ ${fieldLines}`;
       return `## ${skill.name}\n${skill.description}\n${source ?? ''}`;
     })
     .join('\n\n');
-  const userText = latestUserText(messagesToProcess);
   const recentAssistantText = latestAssistantText(messagesToProcess);
+  const parallelPreferenceQuestion = resolveParallelPreferenceQuestion(
+    userText,
+    precedingUserText(messagesToProcess),
+  );
+  const answerQuestion = parallelPreferenceQuestion ?? userText;
+  const exactRepeat = findImmediateExactGroundedAnswer(evidenceMessages, userText);
+  if (exactRepeat) {
+    const currentScopeFingerprint = await inRequestedProject(readCurrentScopeFingerprint);
+    if (currentScopeFingerprint === exactRepeat.sourceScopeFingerprint) {
+      return directAssistantTextResponse(
+        messages,
+        exactRepeat.answer,
+        exactRepeat.sourceScopeFingerprint,
+      );
+    }
+  }
   const precedingReferenceText =
     !hasNumberedDocumentReference(userText) && requestsImagePresentation(userText)
       ? precedingNumberedDocumentReference(messagesToProcess)
@@ -1000,7 +1153,17 @@ ${fieldLines}`;
   // This compact string is used by retrieval only, not appended to model
   // history. It preserves the immediate topic while keeping the model context
   // at the existing 20-message bound.
-  const contextualKnowledgeQuery = contextualizeKnowledgeFollowUpQuery(userText, reusableEvidence);
+  const contextualKnowledgeQuery =
+    parallelPreferenceQuestion ?? contextualizeKnowledgeFollowUpQuery(userText, reusableEvidence);
+  // A parallel subject switch is self-contained after rewriting. Exclude the
+  // previous assistant answer so small models cannot copy it over the current
+  // source evidence (for example, returning the anime answer for "and fruits").
+  const answerMessages = parallelPreferenceQuestion
+    ? replaceLatestUserText(
+        safeMessages.filter((message) => message.role === 'user').slice(-1),
+        parallelPreferenceQuestion,
+      )
+    : safeMessages;
   const tabularQuestion = isLikelyTabularQuestion({
     text: userText,
     columnNames: tabularColumnNames,
@@ -1014,6 +1177,15 @@ ${fieldLines}`;
     );
   const imagePreviewFollowUp = isImagePreviewFollowUp(userText, reusableEvidence);
   const tabularFollowUp = isTabularFollowUp(userText, reusableEvidence);
+  const dataExportFormat = requestedDataExportFormat(userText);
+  const directDataExport = Boolean(
+    dataExportFormat &&
+    (reusableEvidence.tabular ||
+      (/\b(?:answer|response|result|data|table|it|this|that|above|previous|same)\b/i.test(
+        userText,
+      ) &&
+        recentAssistantText.trim())),
+  );
   // A prior table is useful to resolve a follow-up, but never as answer
   // evidence: the source can be deleted or moved between chat turns.
   const canAnswerFromRecentTable = false;
@@ -1052,6 +1224,8 @@ ${fieldLines}`;
     contextualKnowledgeQuery,
     origin: new URL(req.url).origin,
     preferredMediaAssetId: continuesMediaTopic ? reusableEvidence.mediaAssetIds[0] : undefined,
+    recentExportTable: directDataExport ? reusableEvidence.tabular : undefined,
+    recentAnswerText: directDataExport ? recentAssistantText : undefined,
   });
   // Every installed marketplace/Enterprise tool the model may call this turn
   // — generic by construction (dynamicToolNames is whatever getChatTools
@@ -1070,6 +1244,7 @@ ${fieldLines}`;
     searchKnowledgeBase: allTools.searchKnowledgeBase,
     presentMedia: allTools.presentMedia,
     queryTabularData: allTools.queryTabularData,
+    createDataExport: allTools.createDataExport,
     generateVisualization: allTools.generateVisualization,
     ...(allTools.executeAnalysis ? { executeAnalysis: allTools.executeAnalysis } : {}),
     inspectPdfPages: allTools.inspectPdfPages,
@@ -1128,7 +1303,7 @@ ${fieldLines}`;
   }
 
   try {
-    await authorizeEnterpriseAiRequest(config);
+    if (!directDataExport) await authorizeEnterpriseAiRequest(config);
     const responseStream = createUIMessageStream({
       originalMessages: messages,
       execute: async ({ writer }) => {
@@ -1136,6 +1311,35 @@ ${fieldLines}`;
         let preloadedVideoEvidence = false;
         let preloadedEvidenceQueryAttempted = false;
         const preflightToolCallId = `knowledge-${crypto.randomUUID()}`;
+
+        if (directDataExport && dataExportFormat && builtInTools.createDataExport) {
+          const exportCallId = `export-${crypto.randomUUID()}`;
+          const exportInput = { format: dataExportFormat, title: 'Larkup answer' };
+          writer.write({ type: 'start' });
+          writer.write({
+            type: 'tool-input-available',
+            toolCallId: exportCallId,
+            toolName: 'createDataExport',
+            input: exportInput,
+          });
+          const exportOutput = await (builtInTools.createDataExport as any).execute(exportInput, {
+            toolCallId: exportCallId,
+          });
+          writer.write({
+            type: 'tool-output-available',
+            toolCallId: exportCallId,
+            output: exportOutput,
+          });
+          const answerId = `answer-${crypto.randomUUID()}`;
+          const exportText = exportOutput?.success
+            ? `Your ${dataExportFormat.toUpperCase()} file is ready to download.`
+            : exportOutput?.error || 'The export could not be created.';
+          writer.write({ type: 'text-start', id: answerId });
+          writer.write({ type: 'text-delta', id: answerId, delta: exportText });
+          writer.write({ type: 'text-end', id: answerId });
+          await mcp.close();
+          return;
+        }
 
         if (forceKnowledgeBaseSearch && builtInTools.searchKnowledgeBase) {
           // Open the message ourselves since a tool part is about to stream
@@ -1180,7 +1384,7 @@ ${fieldLines}`;
           if (pdfSource && builtInTools.inspectPdfPages) {
             const inspectionCallId = `pdf-pages-${crypto.randomUUID()}`;
             const pdfInspectionQuestion = [
-              userText,
+              answerQuestion,
               contextualKnowledgeQuery,
               recentAssistantText,
               precedingReferenceText,
@@ -1379,11 +1583,17 @@ ${fieldLines}`;
               model: plannerModel,
               providerOptions: gatewayProviderOptions(resolvedProvider, plannerModelId),
               question: userText,
+              ...(continuesMediaTopic && reusableEvidence.mediaQuestion
+                ? { previousQuestion: reusableEvidence.mediaQuestion }
+                : {}),
             };
-            const [plannedInvestigation, sourcePosition] = await Promise.all([
-              planVideoEvidenceQuery(plannerInput),
-              userSpecifiedSourcePosition(plannerInput),
-            ]);
+            const planned = await planVideoEvidenceQuery(plannerInput);
+            const resolvedMediaQuestion = planned?.resolvedQuestion ?? userText;
+            const plannedInvestigation = planned?.directive;
+            const sourcePosition = await userSpecifiedSourcePosition({
+              ...plannerInput,
+              question: resolvedMediaQuestion,
+            });
             const hasUserSpecifiedPosition = sourcePosition?.hasPosition;
             const connectsBeyondPosition = sourcePosition?.connectsBeyondPosition === true;
             // `trace` is already the planner's language-neutral declaration
@@ -1406,7 +1616,7 @@ ${fieldLines}`;
                   : plannedInvestigation;
             const evidenceInput = {
               mediaAssetId,
-              query: userText,
+              query: resolvedMediaQuestion,
               ...(investigation ? { investigation } : {}),
             };
             preloadedEvidenceQueryAttempted = true;
@@ -1536,9 +1746,9 @@ ${fieldLines}`;
           system: `${systemPrompt}${
             preloadedEvidence === undefined
               ? ''
-              : preloadedEvidenceContext(preloadedEvidence, userText)
+              : preloadedEvidenceContext(preloadedEvidence, answerQuestion)
           }`,
-          messages: await convertToModelMessages(safeMessages, { tools }),
+          messages: await convertToModelMessages(answerMessages, { tools }),
           // Leave enough room for structured tool inputs (especially charts) and
           // a complete grounded answer while keeping the response bounded.
           maxOutputTokens:
@@ -1699,7 +1909,7 @@ ${fieldLines}`;
                 messages: withFinalAnswerNudge(compactToolContextForModel(messages)),
               };
             }
-            if (imagePreviewFollowUp) {
+            if (imagePreviewFollowUp && builtInTools.presentMedia) {
               return stepNumber === 0
                 ? {
                     toolChoice: { type: 'tool', toolName: 'presentMedia' },
@@ -1749,6 +1959,13 @@ ${fieldLines}`;
               // previously sent simple "highest/lowest" questions to code.
               // Code analysis can receive multiple explicitly selected sheets
               // when a relationship cannot be answered by one bounded query.
+              if (dataExportFormat && stepNumber === 1 && builtInTools.createDataExport) {
+                return {
+                  toolChoice: { type: 'tool' as const, toolName: 'createDataExport' },
+                  activeTools: ['createDataExport'],
+                  messages: compactToolContextForModel(messages),
+                };
+              }
               const routing = tabularToolsForStep({
                 stepNumber,
                 toolNames: toolNames as string[],
@@ -1919,7 +2136,7 @@ ${fieldLines}`;
             })
             .pipeThrough(
               recoverEmptyUIMessageStream(
-                fallbackAnswerFromEvidence(preloadedEvidence, userText),
+                fallbackAnswerFromEvidence(preloadedEvidence, answerQuestion),
               )(),
             ),
         );
