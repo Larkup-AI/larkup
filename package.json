@@ -18,7 +18,7 @@
     "@changesets/cli": "^2.31.1",
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
-    "@turbo/gen": "^2.9.16",
+    "@turbo/gen": "^2.11.3",
     "husky": "^9.1.7",
     "lint-staged": "^17.1.0",
     "prettier": "^3.6.2",
