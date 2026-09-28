@@ -23,7 +23,7 @@ import {
 import useSWR, { mutate as globalMutate } from 'swr';
 import { MessageItem } from '@/components/chat/message-item';
 import { MessageQueue, type QueuedMessage } from '@/components/chat/message-queue';
-import { ChatSettingsModal } from '@/components/chat/chat-settings-modal';
+import { JobsTrackingButton } from '@/components/data/jobs-tracking-button';
 import { shouldAutoOpenSupportingClip } from '@/lib/chat-supporting-clip';
 import { useProject } from '@/components/projects/project-provider';
 import { cn } from '@/lib/utils';
@@ -1250,7 +1250,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
               />
               <TooltipContent>New Chat</TooltipContent>
             </Tooltip>
-            <ChatSettingsModal />
+            <JobsTrackingButton />
           </TooltipProvider>
         </div>
       </div>
