@@ -39,6 +39,14 @@ export type ReusableTabularEvidence = {
   totalRows: number;
 };
 
+/** Only reuse table evidence while its source is still present in the live data store. */
+export function tabularEvidenceDatasetIsAvailable(
+  evidence: ReusableTabularEvidence | undefined,
+  availableDatasetIds: ReadonlySet<string>,
+): boolean {
+  return Boolean(evidence?.datasetId && availableDatasetIds.has(evidence.datasetId));
+}
+
 export type ConversationEvidence = {
   sources: Array<{ title?: string; text?: string }>;
   images: ReusableImageEvidence[];

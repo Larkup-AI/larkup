@@ -1,5 +1,8 @@
 const MARKDOWN_LINK = /!?(?:\[([^\]]+)\])\([^)]*\)/g;
 
+/** Initial row count shared by the chat table and answer-scoped exports. */
+export const DEFAULT_CHAT_TABLE_PAGE_SIZE = 10;
+
 /** Convert model-authored Markdown labels into stable plain table headers. */
 export function plainTableLabel(value: unknown): string {
   return String(value ?? '')

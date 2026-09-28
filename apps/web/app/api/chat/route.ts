@@ -48,6 +48,7 @@ import {
   findImmediateExactGroundedAnswer,
   isImagePreviewFollowUp,
   isTabularFollowUp,
+  tabularEvidenceDatasetIsAvailable,
   continuesRecentMediaTopic,
   resolveParallelPreferenceQuestion,
 } from '@/lib/chat/conversation-memory';
@@ -66,7 +67,10 @@ import {
   mediaClaimNeedsCorroboration,
   withFinalAnswerNudge,
 } from '@/lib/chat/tool-context';
-import { requestsVisualization } from '@/lib/chat/tabular-visualization';
+import {
+  createTabularVisualization,
+  requestsVisualization,
+} from '@/lib/chat/tabular-visualization';
 import {
   isLikelyTabularQuestion,
   requiresTabularSandbox,
@@ -84,7 +88,7 @@ import {
   shouldInspectRetrievedImage,
 } from '@/lib/chat/visual-routing';
 import { executableTools } from '@/lib/chat/tool-registry';
-import { requestedDataExportFormat } from '@/lib/chat/data-export';
+import { answerScopedDataExportSource, requestedDataExportFormat } from '@/lib/chat/data-export';
 import { assistantSourceScopeFingerprint } from '@/lib/chat/assistant-source-scope';
 import { normalizeIncomingMessages } from '@/lib/chat/message-input';
 import { explicitMediaEvidenceAssetId } from '@/lib/chat/media-retrieval-routing';
@@ -1015,6 +1019,7 @@ export async function POST(req: Request) {
 
   let tabularContext = '';
   let hasTabularData = false;
+  let availableTabularDatasetIds = new Set<string>();
   let tabularColumnNames: string[] = [];
   let tabularDatasetNames: string[] = [];
   try {
@@ -1034,6 +1039,7 @@ export async function POST(req: Request) {
       : await readAvailableDatasets();
     if (datasets.length > 0) {
       hasTabularData = true;
+      availableTabularDatasetIds = new Set(datasets.map((dataset) => dataset.id));
       tabularColumnNames = datasets.flatMap((dataset) =>
         dataset.columns.map((column) => column.name),
       );
@@ -1186,10 +1192,27 @@ ${fieldLines}`;
       ) &&
         recentAssistantText.trim())),
   );
-  // A prior table is useful to resolve a follow-up, but never as answer
-  // evidence: the source can be deleted or moved between chat turns.
+  const directDataExportSource = directDataExport
+    ? answerScopedDataExportSource({
+        table: reusableEvidence.tabular,
+        answerText: recentAssistantText,
+      })
+    : undefined;
+  // A prior table is useful to resolve a follow-up, but never as fresh answer
+  // evidence. A direct chart may reuse its visible rows only while the source
+  // dataset still exists in the current project.
   const canAnswerFromRecentTable = false;
   const tabularFollowUpNeedsVisualization = tabularFollowUp && requestsVisualization(userText);
+  const reusableTabularDatasetStillExists = tabularEvidenceDatasetIsAvailable(
+    reusableEvidence.tabular,
+    availableTabularDatasetIds,
+  );
+  const directFollowUpVisualization =
+    tabularFollowUpNeedsVisualization &&
+    reusableEvidence.tabular &&
+    reusableTabularDatasetStillExists
+      ? createTabularVisualization(userText, reusableEvidence.tabular)
+      : undefined;
   const continuesMediaTopic =
     !imagePreviewFollowUp &&
     !tabularFollowUp &&
@@ -1224,8 +1247,9 @@ ${fieldLines}`;
     contextualKnowledgeQuery,
     origin: new URL(req.url).origin,
     preferredMediaAssetId: continuesMediaTopic ? reusableEvidence.mediaAssetIds[0] : undefined,
-    recentExportTable: directDataExport ? reusableEvidence.tabular : undefined,
-    recentAnswerText: directDataExport ? recentAssistantText : undefined,
+    recentExportTable: directDataExportSource,
+    recentVisualizationTable: directFollowUpVisualization ? reusableEvidence.tabular : undefined,
+    recentAnswerText: directDataExport && !directDataExportSource ? recentAssistantText : undefined,
   });
   // Every installed marketplace/Enterprise tool the model may call this turn
   // — generic by construction (dynamicToolNames is whatever getChatTools
@@ -1303,7 +1327,9 @@ ${fieldLines}`;
   }
 
   try {
-    if (!directDataExport) await authorizeEnterpriseAiRequest(config);
+    if (!directDataExport && !directFollowUpVisualization) {
+      await authorizeEnterpriseAiRequest(config);
+    }
     const responseStream = createUIMessageStream({
       originalMessages: messages,
       execute: async ({ writer }) => {
@@ -1336,6 +1362,40 @@ ${fieldLines}`;
             : exportOutput?.error || 'The export could not be created.';
           writer.write({ type: 'text-start', id: answerId });
           writer.write({ type: 'text-delta', id: answerId, delta: exportText });
+          writer.write({ type: 'text-end', id: answerId });
+          await mcp.close();
+          return;
+        }
+
+        // A direct chart follow-up is a presentation of the exact bounded rows
+        // already shown to the user. Build it on the host instead of asking the
+        // model to copy those rows into a second tool call; that second call was
+        // the source of both empty chart payloads and required-tool failures.
+        if (directFollowUpVisualization && builtInTools.generateVisualization) {
+          const chartCallId = `chart-${crypto.randomUUID()}`;
+          writer.write({ type: 'start' });
+          writer.write({
+            type: 'tool-input-available',
+            toolCallId: chartCallId,
+            toolName: 'generateVisualization',
+            input: directFollowUpVisualization,
+          });
+          const chartOutput = await (builtInTools.generateVisualization as any).execute(
+            directFollowUpVisualization,
+            { toolCallId: chartCallId },
+          );
+          writer.write({
+            type: 'tool-output-available',
+            toolCallId: chartCallId,
+            output: chartOutput,
+          });
+          const answerId = `answer-${crypto.randomUUID()}`;
+          writer.write({ type: 'text-start', id: answerId });
+          writer.write({
+            type: 'text-delta',
+            id: answerId,
+            delta: 'Here is the requested chart based on the data checked in the previous answer.',
+          });
           writer.write({ type: 'text-end', id: answerId });
           await mcp.close();
           return;
@@ -1702,6 +1762,29 @@ ${fieldLines}`;
                 apiKey,
                 config.customChatModels,
               );
+        // Some reasoning models return prose even when the provider request
+        // requires a specific tool. Use a small, proven Gateway tool caller
+        // only for the tabular evidence step, then return to the selected model
+        // for the grounded prose answer on the next step.
+        const tabularToolModelId = 'openai/gpt-4o-mini';
+        const tabularToolStepOverrides =
+          resolvedProvider === 'vercel_ai_gateway' &&
+          hasTabularData &&
+          (tabularQuestion || tabularFollowUp)
+            ? {
+                model: createChatModel(
+                  resolvedProvider,
+                  tabularToolModelId,
+                  apiKey,
+                  config.customChatModels,
+                ),
+                providerOptions: gatewayProviderOptions(resolvedProvider, tabularToolModelId),
+              }
+            : {};
+        const usageByModel = new Map<
+          string,
+          { modelId: string; promptTokens: number; completionTokens: number; totalTokens: number }
+        >();
         const result = streamText({
           model: evidenceWriterModel,
           // The Gateway owns model failover. Retrying the same quota-limited model
@@ -1848,7 +1931,8 @@ ${fieldLines}`;
               ) {
                 if (stepNumber === 0) {
                   return {
-                    toolChoice: { type: 'tool', toolName: 'queryTabularData' },
+                    ...tabularToolStepOverrides,
+                    toolChoice: { type: 'tool' as const, toolName: 'queryTabularData' as const },
                     activeTools: ['queryTabularData'],
                     messages: compactToolContextForModel(messages),
                   };
@@ -1883,20 +1967,6 @@ ${fieldLines}`;
                 }
                 return {
                   activeTools: ['analyzeImageDeeply'],
-                  messages: compactToolContextForModel(messages),
-                };
-              }
-              // The server already gathered the current evidence. A chart is a
-              // presentation action rather than another evidence lookup, so let
-              // the model turn these exact rows into the UI tool payload once.
-              if (
-                requestsVisualization(userText) &&
-                builtInTools.generateVisualization &&
-                !JSON.stringify(messages).includes('generateVisualization')
-              ) {
-                return {
-                  toolChoice: { type: 'tool', toolName: 'generateVisualization' },
-                  activeTools: ['generateVisualization'],
                   messages: compactToolContextForModel(messages),
                 };
               }
@@ -1941,7 +2011,8 @@ ${fieldLines}`;
               }
               return stepNumber === 0
                 ? {
-                    toolChoice: { type: 'tool', toolName: 'queryTabularData' },
+                    ...tabularToolStepOverrides,
+                    toolChoice: { type: 'tool' as const, toolName: 'queryTabularData' as const },
                     activeTools: ['queryTabularData'],
                     messages: compactToolContextForModel(messages),
                   }
@@ -1973,9 +2044,11 @@ ${fieldLines}`;
               });
               return {
                 ...routing,
+                ...(routing.toolChoice !== 'none' ? tabularToolStepOverrides : {}),
+                toolChoice: routing.toolChoice as any,
                 activeTools: routing.activeTools.filter(
                   (name) => !evidenceQueryTools.includes(name as any),
-                ),
+                ) as any,
                 messages:
                   routing.toolChoice === 'none'
                     ? withFinalAnswerNudge(compactToolContextForModel(messages))
@@ -2030,31 +2103,51 @@ ${fieldLines}`;
               messages: step?.toolChoice === 'none' ? withFinalAnswerNudge(compacted) : compacted,
             };
           },
-          onFinish: async ({ usage, response }) => {
+          onStepFinish: ({ usage, model: stepModel }) => {
+            const reportedModelId = stepModel.modelId || chatModelId;
+            const modelId =
+              [tabularToolModelId, evidenceWriterModelId, chatModelId].find(
+                (candidate) =>
+                  candidate === reportedModelId || candidate.endsWith(`/${reportedModelId}`),
+              ) ?? reportedModelId;
+            const promptTokens = usage.inputTokens ?? 0;
+            const completionTokens = usage.outputTokens ?? 0;
+            const totalTokens = usage.totalTokens ?? promptTokens + completionTokens;
+            const current = usageByModel.get(modelId);
+            usageByModel.set(modelId, {
+              modelId,
+              promptTokens: (current?.promptTokens ?? 0) + promptTokens,
+              completionTokens: (current?.completionTokens ?? 0) + completionTokens,
+              totalTokens: (current?.totalTokens ?? 0) + totalTokens,
+            });
+          },
+          onFinish: async () => {
             try {
               const { trackUsageEvent, estimateCost } =
                 await import('@larkup/core/analytics-store');
-              const u = usage as any;
-              void trackUsageEvent({
-                type: 'chat',
-                modelId: chatModelId,
-                provider: resolvedProvider,
-                promptTokens: u?.promptTokens ?? 0,
-                completionTokens: u?.completionTokens ?? 0,
-                totalTokens: u?.totalTokens ?? 0,
-                estimatedCost: estimateCost(
-                  chatModelId,
-                  u?.promptTokens ?? 0,
-                  u?.completionTokens ?? 0,
-                ),
-                timestamp: new Date().toISOString(),
-              });
-              trackEnterpriseAiUsage(config, {
-                modelId: chatModelId,
-                inputTokens: u?.promptTokens ?? 0,
-                outputTokens: u?.completionTokens ?? 0,
-                costUsd: estimateCost(chatModelId, u?.promptTokens ?? 0, u?.completionTokens ?? 0),
-              });
+              for (const usage of usageByModel.values()) {
+                const estimatedCost = estimateCost(
+                  usage.modelId,
+                  usage.promptTokens,
+                  usage.completionTokens,
+                );
+                void trackUsageEvent({
+                  type: 'chat',
+                  modelId: usage.modelId,
+                  provider: resolvedProvider,
+                  promptTokens: usage.promptTokens,
+                  completionTokens: usage.completionTokens,
+                  totalTokens: usage.totalTokens,
+                  estimatedCost,
+                  timestamp: new Date().toISOString(),
+                });
+                trackEnterpriseAiUsage(config, {
+                  modelId: usage.modelId,
+                  inputTokens: usage.promptTokens,
+                  outputTokens: usage.completionTokens,
+                  costUsd: estimatedCost,
+                });
+              }
             } finally {
               await mcp.close();
             }

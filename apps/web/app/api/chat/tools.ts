@@ -86,8 +86,8 @@ import {
   shouldKeepActiveMediaSource,
 } from '@/lib/chat/media-source-routing';
 import { createTabularVisualization } from '@/lib/chat/tabular-visualization';
-import { normalizeChartConfig } from '@/lib/chat/chart-config';
-import { createDataExport } from '@/lib/chat/data-export';
+import { normalizeChartConfigWithEvidence } from '@/lib/chat/chart-config';
+import { createDataExport, selectDataExportSource } from '@/lib/chat/data-export';
 import { assistantSourceScopeFingerprint } from '@/lib/chat/assistant-source-scope';
 import { inferTabularPlan } from '@/lib/chat/tabular-query-plan';
 import {
@@ -832,6 +832,11 @@ export async function getChatTools(context: {
     columns: string[];
     rows: Array<Record<string, unknown>>;
   };
+  /** Verified rows from the preceding visible table, for a direct chart follow-up. */
+  recentVisualizationTable?: {
+    columns: string[];
+    rows: Array<Record<string, unknown>>;
+  };
   /** Conversational answer fallback when no structured table preceded the export request. */
   recentAnswerText?: string;
 }) {
@@ -844,6 +849,7 @@ export async function getChatTools(context: {
     preferredMediaAssetId,
     contextualKnowledgeQuery,
     recentExportTable,
+    recentVisualizationTable,
     recentAnswerText,
   } = context;
   // Installed tools are shared, while their connection/runtime selection is
@@ -854,6 +860,8 @@ export async function getChatTools(context: {
     ? await runWithProject(projectId, () => readConfig())
     : config;
   const activeVideoRuntimeScope = videoRuntimeScopeFromConfig(activeProjectConfig);
+  let currentTurnExportTable:
+    { columns: string[]; rows: Array<Record<string, unknown>> } | undefined;
   const inActiveProject = <T>(operation: () => Promise<T>): Promise<T> =>
     projectId ? runWithProject(projectId, operation) : operation();
   // Read this scope at tool-execution time instead of capturing it when the
@@ -2578,6 +2586,9 @@ export async function getChatTools(context: {
             datasetId: resolvedDatasetId,
           });
           const result = await queryTabular(plan.request);
+          if (result.columns.length && result.rows.length) {
+            currentTurnExportTable = { columns: result.columns, rows: result.rows };
+          }
           const visualization = createTabularVisualization(requestText, result);
           if (visualization && plan.chartTitle) visualization.title = plan.chartTitle;
           return visualization ? { ...result, visualization } : result;
@@ -2609,20 +2620,19 @@ export async function getChatTools(context: {
           .optional()
           .describe('Columns from a result obtained in this same turn.'),
         rows: z
-          .array(z.record(z.string(), z.any()))
+          .array(z.looseObject({}))
           .max(500)
           .optional()
           .describe('Rows from a result obtained in this same turn.'),
       }),
       execute: async ({ format, title, fileName, columns, rows }) => {
         try {
-          const source = recentExportTable?.rows.length
-            ? recentExportTable
-            : columns?.length && rows?.length
-              ? { columns, rows }
-              : recentAnswerText?.trim()
-                ? { columns: ['Answer'], rows: [{ Answer: recentAnswerText.trim() }] }
-                : undefined;
+          const source = selectDataExportSource({
+            currentTurnTable: currentTurnExportTable,
+            explicitTable: columns?.length && rows?.length ? { columns, rows } : undefined,
+            recentTable: recentExportTable,
+            recentAnswerText,
+          });
           if (!source) throw new Error('There is no completed answer available to export yet.');
           return await createDataExport({
             format,
@@ -2642,7 +2652,7 @@ export async function getChatTools(context: {
 
     generateVisualization: tool({
       description:
-        'Generate an interactive chart visualization from evidence already returned by a tool. Call this tool instead of writing JSON, Markdown, or an ASCII chart in your answer. Copy the exact rows to data. xAxisKey and every series.dataKey must exactly match fields in those rows; never use placeholder names such as EMPTY, null, or undefined. Supply clear human-readable xAxisLabel and yAxisLabel values, including the unit when known. The UI renders the result automatically, so after calling it only summarize the finding in prose.',
+        'Generate an interactive chart visualization only from verified tabular rows already returned by a data tool in this turn or shown in the immediately preceding table. Copy those exact rows to data; charts without matching table evidence are rejected. xAxisKey and every series.dataKey must exactly match fields in those rows; never use placeholder names such as EMPTY, null, or undefined. Supply clear human-readable xAxisLabel and yAxisLabel values, including the unit when known. The UI renders the result automatically, so after calling it only summarize the finding in prose.',
       inputSchema: z.object({
         chartType: z
           .enum(['bar', 'area', 'line', 'pie', 'scatter', 'radar'])
@@ -2650,7 +2660,7 @@ export async function getChatTools(context: {
         title: z.string().describe('Chart title.'),
         subtitle: z.string().optional().describe('Chart subtitle for additional context.'),
         data: z
-          .array(z.record(z.string(), z.any()))
+          .array(z.looseObject({}))
           .describe(
             "Array of data points to plot. You MUST provide the data here. Example: [{'name': 'North', 'value': 3206}, {'name': 'East', 'value': 2492}]",
           ),
@@ -2687,10 +2697,13 @@ export async function getChatTools(context: {
           .describe('Human-readable Y-axis name, including its unit when relevant.'),
       }),
       execute: async (config) => {
-        // Treat model tool arguments as untrusted. The renderer repeats this
-        // normalization for historical messages, but normalizing here keeps
-        // follow-up model steps from receiving unusable series names as well.
-        return normalizeChartConfig(config);
+        // Chart arguments are model-authored. Require every plotted value to
+        // match authoritative table rows so unrelated image/text retrieval can
+        // never be turned into a plausible-looking invented chart.
+        return normalizeChartConfigWithEvidence(
+          config,
+          currentTurnExportTable?.rows ?? recentVisualizationTable?.rows,
+        );
       },
     }),
 

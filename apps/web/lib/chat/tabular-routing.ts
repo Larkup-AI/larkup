@@ -21,15 +21,11 @@ export function tabularToolsForStep(input: {
     };
   }
   if (input.stepNumber === 1) {
-    if (input.requiresSandbox && input.toolNames.includes('executeAnalysis')) {
-      return {
-        toolChoice: { type: 'tool' as const, toolName: 'executeAnalysis' },
-        activeTools: ['executeAnalysis'],
-      };
-    }
-    return {
-      activeTools: input.toolNames.filter((name) => name !== 'webSearch'),
-    };
+    // The first evidence tool has already returned authoritative rows (and,
+    // for chart requests, queryTabularData has attached a normalized chart).
+    // Re-exposing presentation and analysis tools here lets some models emit
+    // a second, empty chart call or repeat the analysis instead of answering.
+    return { toolChoice: 'none' as const, activeTools: [] };
   }
   return { toolChoice: 'none' as const, activeTools: [] };
 }

@@ -229,3 +229,62 @@ export function normalizeChartConfig(input: unknown): ChartConfig {
     ...(error ? { error } : {}),
   };
 }
+
+function chartValueMatchesEvidence(chartValue: unknown, evidenceValue: unknown) {
+  const chartNumber = numericValue(chartValue);
+  const evidenceNumber = numericValue(evidenceValue);
+  if (chartNumber !== undefined || evidenceNumber !== undefined) {
+    return (
+      chartNumber !== undefined &&
+      evidenceNumber !== undefined &&
+      Math.abs(chartNumber - evidenceNumber) <= Number.EPSILON * Math.max(1, Math.abs(chartNumber))
+    );
+  }
+  return (
+    String(chartValue ?? '')
+      .normalize('NFKC')
+      .trim()
+      .toLocaleLowerCase() ===
+    String(evidenceValue ?? '')
+      .normalize('NFKC')
+      .trim()
+      .toLocaleLowerCase()
+  );
+}
+
+/**
+ * Accept a chart only when every plotted row exists in authoritative tabular
+ * evidence from this turn (or the immediately preceding visible table).
+ */
+export function normalizeChartConfigWithEvidence(
+  input: unknown,
+  evidenceRows: Array<Record<string, unknown>> | undefined,
+): ChartConfig {
+  const chart = normalizeChartConfig(input);
+  if (chart.error) return chart;
+  if (!evidenceRows?.length) {
+    return {
+      ...chart,
+      data: [],
+      error: 'No verified tabular data was available for this chart.',
+    };
+  }
+
+  const plottedKeys = [chart.xAxisKey, ...chart.series.map((series) => series.dataKey)];
+  const allRowsVerified = chart.data.every((row) =>
+    evidenceRows.some((evidenceRow) =>
+      plottedKeys.every(
+        (key) =>
+          Object.prototype.hasOwnProperty.call(evidenceRow, key) &&
+          chartValueMatchesEvidence(row[key], evidenceRow[key]),
+      ),
+    ),
+  );
+  return allRowsVerified
+    ? chart
+    : {
+        ...chart,
+        data: [],
+        error: 'The requested chart contained values that were not present in the verified data.',
+      };
+}

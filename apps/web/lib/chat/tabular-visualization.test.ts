@@ -69,4 +69,21 @@ describe('createTabularVisualization', () => {
       ],
     });
   });
+
+  it('uses a varying year column for a year-to-year follow-up', () => {
+    expect(
+      createTabularVisualization('Graph this integration cost year to year.', {
+        columns: ['University', 'Year', 'Modeled integration cost'],
+        rows: [
+          { University: 'Freiburg', Year: 2023, 'Modeled integration cost': 5.59 },
+          { University: 'Freiburg', Year: 2024, 'Modeled integration cost': 7.47 },
+          { University: 'Freiburg', Year: 2025, 'Modeled integration cost': 6.63 },
+        ],
+      }),
+    ).toMatchObject({
+      chartType: 'line',
+      xAxisKey: 'Year',
+      series: [{ dataKey: 'Modeled integration cost' }],
+    });
+  });
 });
