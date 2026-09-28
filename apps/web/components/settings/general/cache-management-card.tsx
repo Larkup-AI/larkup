@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCacheBytes } from '@/lib/cache-size';
+import { clearRecentAddHistory } from '@/lib/browser-cache';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,16 +53,20 @@ export function CacheManagementCard() {
 
   async function clearCache() {
     setClearing(true);
+    clearRecentAddHistory(window.localStorage, window);
     try {
       const response = await fetch('/api/system/cache', { method: 'DELETE' });
       const payload = (await response.json()) as CacheResponse;
       if (!response.ok) throw new Error(payload.error || 'Could not clear the Larkup cache.');
       await mutate(payload, { revalidate: false });
       setConfirmOpen(false);
-      toast.success(`Cleared ${formatCacheBytes(payload.clearedBytes || 0)} of Larkup cache.`);
+      toast.success(
+        `Cleared ${formatCacheBytes(payload.clearedBytes || 0)} of Larkup cache and recent add-page history.`,
+      );
     } catch (clearError) {
       toast.error(
-        clearError instanceof Error ? clearError.message : 'Could not clear the Larkup cache.',
+        (clearError instanceof Error ? clearError.message : 'Could not clear the Larkup cache.') +
+          ' Recent Add-page history was still cleared.',
       );
     } finally {
       setClearing(false);
@@ -122,7 +127,7 @@ export function CacheManagementCard() {
               <Button
                 variant="destructive"
                 size="sm"
-                disabled={!cache?.exists || clearing}
+                disabled={clearing}
                 onClick={() => setConfirmOpen(true)}
               >
                 <Trash2 className="size-3.5" />
@@ -144,7 +149,9 @@ export function CacheManagementCard() {
               This will remove {formatCacheBytes(cache?.sizeBytes || 0)} of temporary build,
               package, image-analysis, video-query, and answer-feedback data. It will not remove
               projects, indexed sources, settings, API keys, user corrections, chat history, or
-              installed tools.
+              installed tools. Recent website searches and media URLs from the Add page will also be
+              cleared from this browser. To remove indexed sources, use Clear all data on the Data
+              page.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
