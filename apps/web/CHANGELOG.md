@@ -1,5 +1,21 @@
 # larkup
 
+## 0.4.6
+
+### Patch Changes
+
+- 0e15261: Keep PDF, CSV, and Excel follow-up exports scoped to the rows shown in the answer instead of expanding them to the full queried dataset.
+- 65a7184: Add a compact jobs tracking control to the chat header with live indexing, media, and website job progress.
+- 0e15261: Make tabular chart follow-ups deterministic, reject charts without verified table rows, tighten chart spacing, keep chart tool schemas Gateway-compatible, and immediately clear mounted Add-page URL history with the Settings cache action.
+- a9300d7: Make the built-in website crawler the default runtime through the Larkup API, remove Docker from end-user readiness, and keep optional managed crawler services isolated to explicit deployments.
+- 00ef12a: Make video imports work across direct and extractor-backed URLs, prefer native YouTube captions with speech/OCR fallback, preserve audio in downloaded media, normalize inflated playback timelines, and open chat citations at their evidence timestamps.
+- Updated dependencies [0e15261]
+- Updated dependencies [a9300d7]
+  - @larkup/core@0.7.4
+  - @larkup/scraper@0.1.50
+  - @larkup/marketplace@0.3.5
+  - @larkup/tool-doc-editor@0.2.29
+
 ## 0.4.5
 
 ### Patch Changes

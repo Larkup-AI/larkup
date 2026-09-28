@@ -1,5 +1,13 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.3
+
+### Patch Changes
+
+- 00ef12a: Make video imports work across direct and extractor-backed URLs, prefer native YouTube captions with speech/OCR fallback, preserve audio in downloaded media, normalize inflated playback timelines, and open chat citations at their evidence timestamps.
+- Updated dependencies [0e15261]
+  - @larkup/core@0.7.4
+
 ## 0.3.2
 
 ### Patch Changes

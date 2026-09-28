@@ -1,5 +1,13 @@
 # @larkup/scraper
 
+## 0.1.50
+
+### Patch Changes
+
+- a9300d7: Make the built-in website crawler the default runtime through the Larkup API, remove Docker from end-user readiness, and keep optional managed crawler services isolated to explicit deployments.
+- Updated dependencies [0e15261]
+  - @larkup/core@0.7.4
+
 ## 0.1.49
 
 ### Patch Changes
