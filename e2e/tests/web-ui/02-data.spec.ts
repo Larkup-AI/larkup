@@ -51,6 +51,32 @@ test.describe.serial('Data Page', () => {
     ).toBeVisible();
   });
 
+  test('uses the built-in crawler API without requiring Docker', async ({ page }) => {
+    let startAttempts = 0;
+    await page.route('**/api/firecrawl/local', async (route) => {
+      const isStart = route.request().method() === 'POST';
+      if (isStart) startAttempts += 1;
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          state: {
+            running: true,
+            mode: 'native',
+          },
+          starting: false,
+        }),
+      });
+    });
+
+    await page.reload();
+    const crawlerStatus = page.getByRole('button', { name: 'Website crawler status' });
+    await expect(crawlerStatus).toHaveAttribute('data-status', 'ready');
+    expect(startAttempts).toBeGreaterThanOrEqual(1);
+    await crawlerStatus.hover();
+    await expect(page.getByText('Website crawler is ready')).toBeVisible();
+    await expect(page.getByText(/Docker Desktop|Docker daemon/)).toHaveCount(0);
+  });
+
   test('uses one visible source switch and readiness pattern for every add type', async ({
     page,
   }) => {

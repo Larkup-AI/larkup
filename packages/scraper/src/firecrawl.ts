@@ -19,8 +19,9 @@ import { isBotProtectionPage } from './bot-protection';
  * in later without touching the API routes or UI.
  *
  * Endpoint resolution order:
- *  1. A running LOCAL self-hosted instance (launched from the UI), or
- *  2. The Firecrawl cloud via FIRECRAWL_API_KEY.
+ *  1. Larkup's built-in crawler, available through the app API without setup,
+ *  2. An explicitly connected Firecrawl sibling in a Docker deployment, or
+ *  3. Firecrawl Cloud when the user selects it and supplies an API key.
  */
 
 const CLOUD_BASE = 'https://api.firecrawl.dev/v1';
@@ -54,9 +55,9 @@ async function resolveEndpoint(): Promise<Endpoint> {
       }
       return { base: `${local.endpoint}/v1`, key: local.apiKey, mode: 'local' };
     }
-    // The built-in crawler has no process to launch. Fall back to it when an
-    // old/stopped Firecrawl state exists so curl, CLI, desktop, and container
-    // installs work without Docker or a setup click.
+    // The built-in crawler has no external process to launch. Use it whenever
+    // no explicitly connected service is active so every installation works
+    // without Docker, a browser binary, or a setup click.
     return { base: 'native://larkup-crawler', key: 'native', mode: 'native' };
   }
 

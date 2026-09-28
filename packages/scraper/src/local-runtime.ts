@@ -197,7 +197,20 @@ async function resolveDocker(): Promise<{
 export interface DockerAvailability {
   docker: boolean;
   compose: boolean;
+  daemon: boolean;
   message: string;
+}
+
+/** Some Docker Desktop CLI builds exit zero even when the daemon connection failed. */
+export function dockerInfoReportsReady(result: { stdout?: string; stderr?: string }): boolean {
+  const stdout = result.stdout?.trim() || '';
+  const diagnostic = `${stdout}\n${result.stderr || ''}`;
+  return (
+    stdout.length > 0 &&
+    !/cannot connect|connection refused|is the docker daemon running|error during connect/i.test(
+      diagnostic,
+    )
+  );
 }
 
 export async function checkDocker(): Promise<DockerAvailability> {
@@ -206,6 +219,7 @@ export async function checkDocker(): Promise<DockerAvailability> {
     return {
       docker: false,
       compose: false,
+      daemon: false,
       message:
         "Docker isn't available on this machine. Install Docker Desktop (or the Docker engine) and make sure it's running.",
     };
@@ -214,11 +228,24 @@ export async function checkDocker(): Promise<DockerAvailability> {
     return {
       docker: true,
       compose: false,
+      daemon: false,
       message:
         'Docker is installed but the Compose plugin was not found. Install `docker compose` to launch Firecrawl locally.',
     };
   }
-  return { docker: true, compose: true, message: 'Docker is ready.' };
+  try {
+    const info = await runCmd('docker info --format "{{.ServerVersion}}"', 10_000);
+    if (!dockerInfoReportsReady(info)) throw new Error('Docker daemon is not responding.');
+  } catch {
+    return {
+      docker: true,
+      compose: true,
+      daemon: false,
+      message:
+        'Docker is installed but is not running. Start Docker Desktop (or the Docker daemon); Larkup will relaunch the web browser automatically.',
+    };
+  }
+  return { docker: true, compose: true, daemon: true, message: 'Docker is ready.' };
 }
 
 /**
@@ -324,8 +351,8 @@ export async function startLocal(): Promise<LocalFirecrawlState> {
   // native crawler remains a zero-setup fallback, but it cannot execute the
   // JavaScript challenges used by sites such as Anubis.
   const avail = await checkDocker();
-  if (!avail.compose) {
-    return writeState(nativeState());
+  if (!avail.compose || !avail.daemon) {
+    return writeState({ ...nativeState(), lastError: avail.message });
   }
 
   const { compose } = await resolveDocker();

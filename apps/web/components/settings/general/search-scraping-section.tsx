@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { Loader2, Save, Eye, EyeOff } from 'lucide-react';
+import { Globe2, Loader2, Save, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -126,7 +126,9 @@ export function SearchIntegrationsSection() {
       if (!response.ok) throw new Error(json.error ?? 'Could not update web search.');
       setForm((current) => ({ ...current, ...json.config }));
       await mutate(json, { revalidate: false });
-      toast.success(enabled ? 'Web search is available to the Agent.' : 'Web search is disabled for the Agent.');
+      toast.success(
+        enabled ? 'Web search is available to the Agent.' : 'Web search is disabled for the Agent.',
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not update web search.');
     } finally {
@@ -272,7 +274,7 @@ export function SearchIntegrationsSection() {
                     <Image src="/icons/exa.png" alt="Exa" width={16} height={16} />
                   )}
                   {form.webSearchProvider === 'local' && (
-                    <Image src="/icons/firecrawl.png" alt="Local" width={16} height={16} />
+                    <Globe2 className="size-4" aria-hidden="true" />
                   )}
                   <SelectValue placeholder="Select provider" />
                 </div>
@@ -310,8 +312,8 @@ export function SearchIntegrationsSection() {
                 </SelectItem>
                 <SelectItem value="local">
                   <div className="flex items-center gap-2">
-                    <Image src="/icons/firecrawl.png" alt="Local Crawler" width={16} height={16} />
-                    <span>Local (Firecrawl)</span>
+                    <Globe2 className="size-4" aria-hidden="true" />
+                    <span>Built-in web search</span>
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -325,12 +327,12 @@ export function SearchIntegrationsSection() {
                   {form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
                     ? 'Serper API Key'
                     : form.webSearchProvider === 'brave'
-                    ? 'Brave API Key'
-                    : form.webSearchProvider === 'bing'
-                    ? 'SerpApi API Key'
-                    : form.webSearchProvider === 'exa'
-                    ? 'Exa API Key'
-                    : 'Tavily API Key'}
+                      ? 'Brave API Key'
+                      : form.webSearchProvider === 'bing'
+                        ? 'SerpApi API Key'
+                        : form.webSearchProvider === 'exa'
+                          ? 'Exa API Key'
+                          : 'Tavily API Key'}
                 </Label>
               </div>
               <div className="flex gap-2">
@@ -342,12 +344,12 @@ export function SearchIntegrationsSection() {
                       form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
                         ? form.serperApiKey || ''
                         : form.webSearchProvider === 'brave'
-                        ? form.braveApiKey || ''
-                        : form.webSearchProvider === 'bing'
-                        ? form.bingApiKey || ''
-                        : form.webSearchProvider === 'exa'
-                        ? form.exaApiKey || ''
-                        : form.tavilyApiKey || ''
+                          ? form.braveApiKey || ''
+                          : form.webSearchProvider === 'bing'
+                            ? form.bingApiKey || ''
+                            : form.webSearchProvider === 'exa'
+                              ? form.exaApiKey || ''
+                              : form.tavilyApiKey || ''
                     }
                     onChange={(e) => {
                       setVerifyStatus({ status: null });
@@ -370,12 +372,12 @@ export function SearchIntegrationsSection() {
                       form.webSearchProvider === 'serper' || form.webSearchProvider === 'google'
                         ? 'Your Serper API Key'
                         : form.webSearchProvider === 'brave'
-                        ? 'Your Brave API Key'
-                        : form.webSearchProvider === 'bing'
-                        ? 'Your SerpApi API Key'
-                        : form.webSearchProvider === 'exa'
-                        ? 'Your Exa API Key'
-                        : 'Your Tavily API Key'
+                          ? 'Your Brave API Key'
+                          : form.webSearchProvider === 'bing'
+                            ? 'Your SerpApi API Key'
+                            : form.webSearchProvider === 'exa'
+                              ? 'Your Exa API Key'
+                              : 'Your Tavily API Key'
                     }
                   />
                   <Button
@@ -429,7 +431,7 @@ export function SearchIntegrationsSection() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Web Scraper</CardTitle>
           <CardDescription className="text-xs">
-            Choose the web crawler used to search and import websites.
+            The built-in crawler works through the Larkup API without Docker or local services.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -444,24 +446,28 @@ export function SearchIntegrationsSection() {
             >
               <SelectTrigger className="w-full">
                 <div className="flex items-center gap-2">
-                  <Image src="/icons/firecrawl.png" alt="Web crawler" width={16} height={16} />
+                  {form.webCrawlerProvider === 'cloud' ? (
+                    <Image
+                      src="/icons/firecrawl.png"
+                      alt="Cloud web crawler"
+                      width={16}
+                      height={16}
+                    />
+                  ) : (
+                    <Globe2 className="size-4" aria-hidden="true" />
+                  )}
                   <span>
                     {form.webCrawlerProvider === 'cloud'
                       ? 'Cloud web crawler'
-                      : 'Local web crawler'}
+                      : 'Built-in crawler (no setup)'}
                   </span>
                 </div>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="local">
                   <div className="flex items-center gap-2">
-                    <Image
-                      src="/icons/firecrawl.png"
-                      alt="Local web crawler"
-                      width={16}
-                      height={16}
-                    />
-                    <span>Local web crawler</span>
+                    <Globe2 className="size-4" aria-hidden="true" />
+                    <span>Built-in crawler (no setup)</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="cloud">
