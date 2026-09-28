@@ -132,7 +132,7 @@ const AXIS_LINE_STYLE = {
   stroke: 'var(--border)',
 };
 
-const LEGEND_WRAPPER_STYLE = { fontSize: 11, paddingTop: 32 };
+const LEGEND_WRAPPER_STYLE = { fontSize: 11, paddingTop: 12 };
 const LEGEND_WRAPPER_STYLE_PIE = { fontSize: 11 };
 const PIE_LABEL_LINE = { stroke: 'var(--muted-foreground)', strokeWidth: 1 };
 const SCATTER_CURSOR = { strokeDasharray: '3 3' };
@@ -140,13 +140,13 @@ const POLAR_ANGLE_TICK = { fontSize: 11, fill: 'var(--muted-foreground)' };
 const POLAR_RADIUS_TICK = { fontSize: 10, fill: 'var(--muted-foreground)' };
 const ACTIVE_DOT = { r: 4, strokeWidth: 2, stroke: 'var(--card)' };
 const BAR_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
-const CARTESIAN_CHART_MARGIN = { top: 8, right: 16, bottom: 18, left: 36 };
-const X_AXIS_HEIGHT = 72;
-const Y_AXIS_WIDTH = 76;
-const AXIS_TICK_MARGIN = 10;
+const CARTESIAN_CHART_MARGIN = { top: 6, right: 12, bottom: 8, left: 12 };
+const X_AXIS_HEIGHT = 52;
+const Y_AXIS_WIDTH = 62;
+const AXIS_TICK_MARGIN = 8;
 const X_AXIS_MIN_TICK_GAP = 24;
-const X_AXIS_LABEL_OFFSET = -8;
-const Y_AXIS_LABEL_OFFSET = -20;
+const X_AXIS_LABEL_OFFSET = -4;
+const Y_AXIS_LABEL_OFFSET = -8;
 
 const renderPieLabel = ({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`;
 
@@ -498,7 +498,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
 
   if (normalizedConfig.error) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center border border-border/70 rounded-xl my-4 bg-transparent text-muted-foreground">
+      <div className="my-3 flex flex-col items-center justify-center rounded-lg border border-border/70 bg-transparent p-6 text-center text-muted-foreground">
         <p className="text-sm">This chart could not be prepared</p>
         <p className="text-xs opacity-70 mt-1">{normalizedConfig.error}</p>
       </div>
@@ -508,18 +508,19 @@ export function ChatChart({ config }: { config: ChartConfig }) {
   return (
     <div
       ref={chartRef}
-      className="overflow-hidden rounded-xl border border-border/70 bg-muted my-4 animate-in fade-in duration-300 [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_*:focus-visible]:ring-0"
+      data-testid="chat-chart"
+      className="my-3 overflow-hidden rounded-lg border border-border/70 bg-muted/25 animate-in fade-in duration-300 [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_*:focus-visible]:ring-0"
     >
       {/* Header */}
-      <div className="flex flex-row justify-between items-center gap-4 border-b border-border/30 px-4 py-3">
+      <div className="flex flex-row items-center justify-between gap-4 border-b border-border/30 px-3.5 py-2.5">
         <div className="flex flex-col justify-center min-w-0">
           <h3 className="text-sm font-semibold text-foreground truncate">{title}</h3>
           {subtitle && <p className="mt-0.5 text-xs text-muted-foreground truncate">{subtitle}</p>}
         </div>
       </div>
 
-      <div className="px-2 py-4 pb-2">
-        <div style={{ width: '100%', height: 340, minHeight: 340 }}>
+      <div className="px-1 pt-2.5 pb-0">
+        <div className="h-68 min-h-68 w-full sm:h-72 sm:min-h-72">
           <ResponsiveContainer width="100%" height="100%" debounce={50}>
             {renderChart() as any}
           </ResponsiveContainer>
@@ -527,7 +528,7 @@ export function ChatChart({ config }: { config: ChartConfig }) {
       </div>
 
       {/* Footer actions */}
-      <div className="flex flex-wrap items-center justify-start gap-2 border-t border-border/30 px-4 py-2.5">
+      <div className="flex flex-wrap items-center justify-start gap-1.5 border-t border-border/30 px-3 py-2">
         <Button
           variant="ghost"
           size="sm"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeChartConfig } from './chart-config';
+import { normalizeChartConfig, normalizeChartConfigWithEvidence } from './chart-config';
 
 describe('normalizeChartConfig', () => {
   it('drops placeholder fields and infers real axes and series from all rows', () => {
@@ -99,5 +99,46 @@ describe('normalizeChartConfig', () => {
     expect(chart.data).toEqual([]);
     expect(chart.series).toEqual([]);
     expect(chart.error).toBe('No usable category or X-axis field was provided.');
+  });
+});
+
+describe('normalizeChartConfigWithEvidence', () => {
+  const chart = {
+    chartType: 'bar',
+    title: 'Monthly sales',
+    data: [
+      { Month: 'January', Sales: 5000 },
+      { Month: 'February', Sales: 6000 },
+    ],
+    xAxisKey: 'Month',
+    series: [{ dataKey: 'Sales' }],
+  };
+
+  it('accepts rows copied from verified table evidence', () => {
+    expect(
+      normalizeChartConfigWithEvidence(chart, [
+        { Month: 'January', Sales: '$5,000' },
+        { Month: 'February', Sales: '$6,000' },
+      ]).error,
+    ).toBeUndefined();
+  });
+
+  it('rejects chart generation when no table evidence exists', () => {
+    expect(normalizeChartConfigWithEvidence(chart, undefined)).toMatchObject({
+      data: [],
+      error: 'No verified tabular data was available for this chart.',
+    });
+  });
+
+  it('rejects invented values that differ from the verified rows', () => {
+    expect(
+      normalizeChartConfigWithEvidence(chart, [
+        { Month: 'January', Sales: 5 },
+        { Month: 'February', Sales: 6 },
+      ]),
+    ).toMatchObject({
+      data: [],
+      error: 'The requested chart contained values that were not present in the verified data.',
+    });
   });
 });

@@ -1,6 +1,10 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import * as XLSX from 'xlsx';
-import { normalizeTableData, plainTableLabel } from './table-presentation';
+import {
+  DEFAULT_CHAT_TABLE_PAGE_SIZE,
+  normalizeTableData,
+  plainTableLabel,
+} from './table-presentation';
 
 export type DataExportFormat = 'xlsx' | 'csv' | 'pdf';
 
@@ -12,6 +16,34 @@ export type DataExportArtifact = {
   rowCount: number;
   format: DataExportFormat;
 };
+
+export type DataExportSource = {
+  columns: string[];
+  rows: Array<Record<string, unknown>>;
+};
+
+function usableDataExportSource(source: DataExportSource | undefined) {
+  return source?.columns.length && source.rows.length ? source : undefined;
+}
+
+/**
+ * Select the narrowest authoritative result available for an export. A query
+ * completed in the current turn must never be replaced by an older table.
+ */
+export function selectDataExportSource(input: {
+  currentTurnTable?: DataExportSource;
+  explicitTable?: DataExportSource;
+  recentTable?: DataExportSource;
+  recentAnswerText?: string;
+}): DataExportSource | undefined {
+  const table =
+    usableDataExportSource(input.explicitTable) ??
+    usableDataExportSource(input.currentTurnTable) ??
+    usableDataExportSource(input.recentTable);
+  if (table) return table;
+  const answer = input.recentAnswerText?.trim();
+  return answer ? { columns: ['Answer'], rows: [{ Answer: answer }] } : undefined;
+}
 
 const MIME_TYPES: Record<DataExportFormat, string> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -196,6 +228,109 @@ export async function createDataExport(input: {
     fileBase64: bytes.toString('base64'),
     rowCount: normalized.rows.length,
     format: input.format,
+  };
+}
+
+function markdownCells(line: string) {
+  const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  const cells: string[] = [];
+  let current = '';
+  let escaped = false;
+  for (const character of trimmed) {
+    if (escaped) {
+      current += character;
+      escaped = false;
+    } else if (character === '\\') {
+      escaped = true;
+    } else if (character === '|') {
+      cells.push(current.trim());
+      current = '';
+    } else {
+      current += character;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function markdownTableFromAnswer(answerText: string): DataExportSource | undefined {
+  const lines = answerText.split(/\r?\n/);
+  for (let index = 0; index < lines.length - 2; index++) {
+    if (!lines[index].includes('|') || !/^\s*\|?\s*:?-{3,}/.test(lines[index + 1])) continue;
+    const columns = markdownCells(lines[index]).map(plainTableLabel).filter(Boolean);
+    const separator = markdownCells(lines[index + 1]);
+    if (
+      columns.length === 0 ||
+      separator.length !== columns.length ||
+      separator.some((cell) => !/^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')))
+    ) {
+      continue;
+    }
+    const rows: Array<Record<string, unknown>> = [];
+    for (let rowIndex = index + 2; rowIndex < lines.length; rowIndex++) {
+      if (!lines[rowIndex].includes('|')) break;
+      const cells = markdownCells(lines[rowIndex]);
+      if (cells.length !== columns.length) break;
+      rows.push(Object.fromEntries(columns.map((column, cellIndex) => [column, cells[cellIndex]])));
+    }
+    if (rows.length) return { columns, rows };
+  }
+  return undefined;
+}
+
+function searchableText(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function rowsMentionedInAnswer(
+  source: DataExportSource,
+  answerText: string,
+): Array<Record<string, unknown>> {
+  const answer = ` ${searchableText(answerText)} `;
+  if (!answer.trim()) return [];
+  const frequencies = new Map<string, number>();
+  const searchableRows = source.rows.map((row) =>
+    source.columns
+      .map((column) => searchableText(row[column]))
+      .filter((value) => value.length >= 3),
+  );
+  for (const values of searchableRows) {
+    for (const value of new Set(values)) frequencies.set(value, (frequencies.get(value) ?? 0) + 1);
+  }
+  return source.rows.filter((_row, rowIndex) =>
+    searchableRows[rowIndex].some(
+      (value) => frequencies.get(value) === 1 && answer.includes(` ${value} `),
+    ),
+  );
+}
+
+/**
+ * Resolve what “export this answer” means without silently expanding it to
+ * every row read by the analysis tool. A rendered Markdown table is exact;
+ * otherwise answer-mentioned rows win, followed by the table's initial page.
+ */
+export function answerScopedDataExportSource(input: {
+  table?: DataExportSource;
+  answerText?: string;
+}): DataExportSource | undefined {
+  const answerText = input.answerText?.trim() ?? '';
+  const markdownTable = answerText ? markdownTableFromAnswer(answerText) : undefined;
+  if (markdownTable) return markdownTable;
+  if (!input.table?.columns.length || !input.table.rows.length) {
+    return answerText ? { columns: ['Answer'], rows: [{ Answer: answerText }] } : undefined;
+  }
+  const mentionedRows = answerText ? rowsMentionedInAnswer(input.table, answerText) : [];
+  return {
+    columns: input.table.columns,
+    rows:
+      mentionedRows.length > 0
+        ? mentionedRows
+        : input.table.rows.slice(0, DEFAULT_CHAT_TABLE_PAGE_SIZE),
   };
 }
 

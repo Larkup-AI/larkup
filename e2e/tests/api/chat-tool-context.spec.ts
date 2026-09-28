@@ -18,7 +18,13 @@ import {
   compactTabularRowsForConversation,
   extractConversationEvidence,
   isTabularFollowUp,
+  tabularEvidenceDatasetIsAvailable,
 } from '../../../apps/web/lib/chat/conversation-memory';
+import {
+  answerScopedDataExportSource,
+  selectDataExportSource,
+} from '../../../apps/web/lib/chat/data-export';
+import { normalizeChartConfigWithEvidence } from '../../../apps/web/lib/chat/chart-config';
 
 test('bounds retrieved source payloads before the next model step', () => {
   const compacted = compactToolContextForModel([
@@ -81,6 +87,29 @@ test('keeps large spreadsheet follow-up evidence compact and source-scoped', () 
   expect(isTabularFollowUp('Are the dropout rates administratively observed?', evidence)).toBe(
     true,
   );
+  expect(tabularEvidenceDatasetIsAvailable(evidence.tabular, new Set(['education-1']))).toBe(true);
+  expect(tabularEvidenceDatasetIsAvailable(evidence.tabular, new Set())).toBe(false);
+});
+
+test('keeps answer exports bounded to visible rows and fresh turn data', () => {
+  const fullResult = {
+    columns: ['Rank', 'Name'],
+    rows: Array.from({ length: 100 }, (_, index) => ({
+      Rank: index + 1,
+      Name: `Result ${index + 1}`,
+    })),
+  };
+  const answerResult = answerScopedDataExportSource({
+    table: fullResult,
+    answerText: 'Here are the requested results.',
+  });
+  expect(answerResult?.rows).toHaveLength(10);
+  expect(
+    selectDataExportSource({
+      currentTurnTable: { columns: ['Rank'], rows: [{ Rank: 1 }] },
+      recentTable: answerResult,
+    }),
+  ).toEqual({ columns: ['Rank'], rows: [{ Rank: 1 }] });
 });
 
 test('creates a chart from a queried grouped result without another model tool call', () => {
@@ -97,6 +126,24 @@ test('creates a chart from a queried grouped result without another model tool c
     chartType: 'bar',
     xAxisKey: 'Region',
     series: [{ dataKey: 'sum_Net Revenue' }],
+  });
+});
+
+test('rejects plausible chart rows when no verified table evidence exists', () => {
+  expect(
+    normalizeChartConfigWithEvidence(
+      {
+        chartType: 'bar',
+        title: 'Invented image values',
+        data: [{ Month: 'January', Sales: 5000 }],
+        xAxisKey: 'Month',
+        series: [{ dataKey: 'Sales' }],
+      },
+      undefined,
+    ),
+  ).toMatchObject({
+    data: [],
+    error: 'No verified tabular data was available for this chart.',
   });
 });
 
@@ -174,6 +221,12 @@ test('starts every spreadsheet question with the structured data tool', () => {
     toolChoice: { type: 'tool', toolName: 'queryTabularData' },
     activeTools: ['queryTabularData'],
   });
+  expect(
+    tabularToolsForStep({
+      stepNumber: 1,
+      toolNames: ['queryTabularData', 'generateVisualization'],
+    }),
+  ).toEqual({ toolChoice: 'none', activeTools: [] });
   expect(tabularToolsForStep({ stepNumber: 2, toolNames: ['queryTabularData'] })).toEqual({
     toolChoice: 'none',
     activeTools: [],

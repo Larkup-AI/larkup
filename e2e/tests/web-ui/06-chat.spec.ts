@@ -16,6 +16,28 @@ test.describe.serial('Chat Page', () => {
     ).toBeVisible();
   });
 
+  test('opens job tracking from a compact chat header button', async ({ page }) => {
+    const jobsButton = page.getByRole('button', { name: /Jobs tracking/i });
+    const historyButton = page.getByRole('button', { name: 'Chat history' });
+    await expect(jobsButton).toBeVisible();
+    await expect(historyButton).toBeVisible();
+
+    const [jobsBox, historyBox] = await Promise.all([
+      jobsButton.boundingBox(),
+      historyButton.boundingBox(),
+    ]);
+    expect(jobsBox?.width).toBe(historyBox?.width);
+    expect(jobsBox?.height).toBe(historyBox?.height);
+
+    await jobsButton.click();
+    await expect(page.getByRole('heading', { name: 'Jobs', exact: true })).toBeVisible();
+    await expect(
+      page
+        .getByText(/background jobs? active/i)
+        .or(page.getByText('Track indexing and website jobs')),
+    ).toBeVisible();
+  });
+
   test('send a message and receive a response', async ({ page }) => {
     test.setTimeout(120_000);
     const isSetupRequired = await page.getByText('Setup Required').isVisible();
@@ -258,6 +280,9 @@ test.describe.serial('Chat Page', () => {
     await expect(chart).toBeVisible();
     await expect(chart.getByText('Date month', { exact: true })).toBeVisible();
     await expect(chart.getByText('Net Revenue', { exact: true })).toBeVisible();
+    const chartCard = page.getByTestId('chat-chart');
+    await expect(chartCard).toBeVisible();
+    expect((await chartCard.boundingBox())?.height).toBeLessThan(400);
 
     const spacing = await chart.evaluate((element) => {
       const rect = (node: Element | null) => node?.getBoundingClientRect() ?? null;
@@ -301,8 +326,11 @@ test.describe.serial('Chat Page', () => {
     });
 
     expect(spacing.missing).toEqual([]);
-    expect(spacing.xTickToLabel).toBeGreaterThanOrEqual(24);
-    expect(spacing.xLabelToLegend).toBeGreaterThanOrEqual(8);
-    expect(spacing.yLabelToTicks).toBeGreaterThanOrEqual(24);
+    expect(spacing.xTickToLabel).toBeGreaterThanOrEqual(12);
+    expect(spacing.xTickToLabel).toBeLessThanOrEqual(28);
+    expect(spacing.xLabelToLegend).toBeGreaterThanOrEqual(6);
+    expect(spacing.xLabelToLegend).toBeLessThanOrEqual(20);
+    expect(spacing.yLabelToTicks).toBeGreaterThanOrEqual(8);
+    expect(spacing.yLabelToTicks).toBeLessThanOrEqual(34);
   });
 });

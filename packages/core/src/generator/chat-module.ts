@@ -314,7 +314,7 @@ async function buildAgentTools() {
         chartType: z.enum(["bar", "area", "line", "pie", "scatter", "radar"]),
         title: z.string(),
         subtitle: z.string().optional(),
-        data: z.array(z.record(z.string(), z.any())),
+        data: z.array(z.looseObject({})),
         xAxisKey: z.string(),
         series: z.array(z.object({ dataKey: z.string(), label: z.string().optional(), color: z.string().optional() })),
         colors: z.array(z.string()).optional(),

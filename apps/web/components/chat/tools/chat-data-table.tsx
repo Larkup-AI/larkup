@@ -29,7 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { normalizeTableData } from '@/lib/chat/table-presentation';
+import { DEFAULT_CHAT_TABLE_PAGE_SIZE, normalizeTableData } from '@/lib/chat/table-presentation';
 
 export interface DataTableConfig {
   columns: string[];
@@ -99,7 +99,7 @@ function columnTypeIndicator(
   return { icon: <Type className="size-3 text-blue-500" />, label: 'text' };
 }
 
-const PAGE_SIZES = [10, 25, 50, 100];
+const PAGE_SIZES = [DEFAULT_CHAT_TABLE_PAGE_SIZE, 25, 50, 100];
 
 export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
   const normalized = useMemo(
@@ -111,7 +111,7 @@ export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(DEFAULT_CHAT_TABLE_PAGE_SIZE);
   const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!compact);

@@ -71,4 +71,13 @@ describe('tabularToolsForStep', () => {
   it('does not require code for an ordinary grouped tabular question', () => {
     expect(requiresTabularSandbox('Show total sales by region.')).toBe(false);
   });
+
+  it('answers after the first table result instead of requesting a second chart tool', () => {
+    expect(
+      tabularToolsForStep({
+        stepNumber: 1,
+        toolNames: ['queryTabularData', 'generateVisualization', 'executeAnalysis'],
+      }),
+    ).toEqual({ toolChoice: 'none', activeTools: [] });
+  });
 });
