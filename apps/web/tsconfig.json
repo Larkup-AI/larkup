@@ -35,7 +35,8 @@
     "../../archive/simple-setup.tsx",
     "../../archive/tech-setup.tsx",
     "../../archive/firecrawl-notice.tsx",
-    "../../archive/configure-form.tsx"
+    "../../archive/configure-form.tsx",
+    "../../archive/chat-settings-modal.tsx"
   ],
   "exclude": ["node_modules", "archive"]
 }

@@ -26,6 +26,7 @@ import { useProject } from '@/components/projects/project-provider';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { fetchJobsWithSync } from '@/lib/jobs-client';
 import { videoRuntimeScopeFromConfig } from '@/lib/media/video-runtime-scope';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -38,29 +39,6 @@ interface DocsResponse {
     charCount: number;
     bySource: Record<string, number>;
   };
-}
-
-async function fetchJobsWithSync(url: string): Promise<{
-  jobs: CrawlJob[];
-  configured: boolean;
-}> {
-  const { jobs, configured } = (await fetcher(url)) as {
-    jobs: CrawlJob[];
-    configured: boolean;
-  };
-  const active = jobs.filter((j) => j.status === 'running' || j.status === 'queued');
-  if (active.length === 0) return { jobs, configured };
-
-  const advanced = await Promise.all(
-    active.map((j) =>
-      fetch(`/api/jobs/${j.id}`)
-        .then((r) => r.json())
-        .then((d) => d.job as CrawlJob)
-        .catch(() => j),
-    ),
-  );
-  const map = new Map(advanced.map((j) => [j.id, j]));
-  return { jobs: jobs.map((j) => map.get(j.id) ?? j), configured };
 }
 
 const SUB_TABS = [
