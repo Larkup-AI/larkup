@@ -2,6 +2,10 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import {
+  RECENT_ADD_HISTORY_CLEARED_EVENT,
+  SCRAPE_RECENT_QUERIES_STORAGE_KEY,
+} from '@/lib/browser-cache';
 import { formatErrorMessage } from '@/lib/shared/error-formatter';
 import {
   Globe,
@@ -170,7 +174,7 @@ export function ScrapePanel({
       setCrawlerStarting(false);
       setCrawlerState((current) => ({
         ...(current ?? { running: false }),
-        lastError: 'The browser crawler is still starting. Try again in a moment.',
+        lastError: 'The website crawler is still starting. Try again in a moment.',
       }));
       return false;
     })().finally(() => {
@@ -211,9 +215,8 @@ export function ScrapePanel({
     const started = await warmCrawler();
     if (!started) return false;
     if (started.state.running) return true;
-    // A first Chromium image pull can take a while. Keep warming it in the
-    // background, but never make an "Add website" click look frozen; the
-    // native crawler remains available as an immediate fallback.
+    // Keep a slow runtime startup in the background without making the Add
+    // website action look frozen. The built-in crawler normally starts at once.
     const ready = started.starting
       ? await Promise.race([
           pollCrawlerUntilReady(),
@@ -244,11 +247,29 @@ export function ScrapePanel({
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('scrape_recent_queries');
+      const saved = localStorage.getItem(SCRAPE_RECENT_QUERIES_STORAGE_KEY);
       if (saved) setCachedQueries(JSON.parse(saved));
     } catch {
       // ignore
     }
+  }, []);
+
+  useEffect(() => {
+    const clearRecentQueries = () => {
+      setCachedQueries([]);
+      setShowDropdown(false);
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === SCRAPE_RECENT_QUERIES_STORAGE_KEY || event.key === null) {
+        clearRecentQueries();
+      }
+    };
+    window.addEventListener(RECENT_ADD_HISTORY_CLEARED_EVENT, clearRecentQueries);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener(RECENT_ADD_HISTORY_CLEARED_EVENT, clearRecentQueries);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   function saveQuery(q: string) {
@@ -257,7 +278,7 @@ export function ScrapePanel({
     setCachedQueries((prev) => {
       const newCache = [trimmed, ...prev.filter((item) => item !== trimmed)].slice(0, 10);
       try {
-        localStorage.setItem('scrape_recent_queries', JSON.stringify(newCache));
+        localStorage.setItem(SCRAPE_RECENT_QUERIES_STORAGE_KEY, JSON.stringify(newCache));
       } catch {
         // ignore
       }
@@ -270,7 +291,7 @@ export function ScrapePanel({
     setCachedQueries((prev) => {
       const newCache = prev.filter((item) => item !== q);
       try {
-        localStorage.setItem('scrape_recent_queries', JSON.stringify(newCache));
+        localStorage.setItem(SCRAPE_RECENT_QUERIES_STORAGE_KEY, JSON.stringify(newCache));
       } catch {
         // ignore
       }
@@ -279,7 +300,7 @@ export function ScrapePanel({
   }
 
   useEffect(() => {
-    // Check Firecrawl
+    // Check the selected web-search provider.
     fetch('/api/search')
       .then((r) => r.json())
       .then((d) => setFirecrawlConfigured(d.configured ?? false))
@@ -291,7 +312,7 @@ export function ScrapePanel({
     void (async () => {
       try {
         const status = await readCrawlerStatus();
-        if (status.state.mode !== 'firecrawl' || !status.state.running) await warmCrawler();
+        if (!status.state.running) await warmCrawler();
       } catch {
         await warmCrawler();
       }
@@ -300,7 +321,7 @@ export function ScrapePanel({
 
   const selectedUrls = useMemo(() => Object.keys(selected).filter((u) => selected[u]), [selected]);
 
-  /** Search using Firecrawl (preferred — no Serper credits used for search). */
+  /** Search through the configured crawler endpoint. */
   async function searchFirecrawl(q: string, isMulti: boolean) {
     try {
       const res = await fetch('/api/search', {
@@ -899,9 +920,8 @@ export function ScrapePanel({
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" />
           <span>
-            <strong className="text-foreground">No search provider configured.</strong> Set up
-            Firecrawl (recommended) for search and scraping, or configure a Web Search provider in
-            Settings.
+            <strong className="text-foreground">No search provider configured.</strong> Set up Use
+            Larkup’s built-in crawler or configure a Web Search provider in Settings.
           </span>
         </div>
       )}

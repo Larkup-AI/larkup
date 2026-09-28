@@ -48,6 +48,14 @@ test.describe('Settings Page', () => {
       });
     });
     await page.reload();
+    await page.evaluate(() => {
+      localStorage.setItem('scrape_recent_queries', JSON.stringify(['https://example.com/page']));
+      localStorage.setItem('media_recent_urls', JSON.stringify(['https://example.com/video.mp4']));
+      localStorage.setItem('app-theme', 'theme-larkup');
+      window.addEventListener('larkup:recent-add-history-cleared', () => {
+        sessionStorage.setItem('recent-add-history-cleared', 'yes');
+      });
+    });
 
     const cacheCard = page.locator('[data-slot="card"]', { hasText: 'Larkup cache' });
     await expect(cacheCard.getByText('0.4 KB')).toBeVisible();
@@ -60,6 +68,9 @@ test.describe('Settings Page', () => {
     );
     await page.getByRole('button', { name: 'Cancel' }).click();
     expect(deleteRequests).toBe(0);
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('scrape_recent_queries')))
+      .not.toBeNull();
 
     await cacheCard.getByRole('button', { name: 'Clear cache' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Clear cache' }).click();
@@ -67,6 +78,14 @@ test.describe('Settings Page', () => {
     await expect(cacheCard.getByTestId('answer-cache-counts')).toHaveText(
       'Across all projects: 0 liked answers cached.',
     );
+    expect(
+      await page.evaluate(() => ({
+        scrape: localStorage.getItem('scrape_recent_queries'),
+        media: localStorage.getItem('media_recent_urls'),
+        theme: localStorage.getItem('app-theme'),
+        event: sessionStorage.getItem('recent-add-history-cleared'),
+      })),
+    ).toEqual({ scrape: null, media: null, theme: 'theme-larkup', event: 'yes' });
     expect(deleteRequests).toBe(1);
   });
 

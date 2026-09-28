@@ -4,6 +4,10 @@ import { useRef, useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import useSWR from 'swr';
 import { toast } from 'sonner';
+import {
+  MEDIA_RECENT_URLS_STORAGE_KEY,
+  RECENT_ADD_HISTORY_CLEARED_EVENT,
+} from '@/lib/browser-cache';
 import { formatErrorMessage } from '@/lib/shared/error-formatter';
 import {
   describeActiveMediaStep,
@@ -85,7 +89,6 @@ type MediaEntryTab = 'upload' | 'url';
 type MediaPipelineStage =
   'download' | 'prepare' | 'extract' | 'transcribe' | 'vision' | 'synthesize' | 'index';
 
-const RECENT_MEDIA_URLS_STORAGE_KEY = 'media_recent_urls';
 const MAX_RECENT_MEDIA_URLS = 10;
 
 interface MediaProcessingStep {
@@ -1045,7 +1048,7 @@ function MediaContent({
 
   useEffect(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem(RECENT_MEDIA_URLS_STORAGE_KEY) ?? '[]');
+      const stored = JSON.parse(localStorage.getItem(MEDIA_RECENT_URLS_STORAGE_KEY) ?? '[]');
       if (!Array.isArray(stored)) return;
       setRecentUrls(
         stored
@@ -1063,6 +1066,22 @@ function MediaContent({
     } catch {
       // A malformed browser cache should never prevent adding media.
     }
+  }, []);
+
+  useEffect(() => {
+    const clearRecentUrls = () => {
+      setRecentUrls([]);
+      setShowRecentUrls(false);
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === MEDIA_RECENT_URLS_STORAGE_KEY || event.key === null) clearRecentUrls();
+    };
+    window.addEventListener(RECENT_ADD_HISTORY_CLEARED_EVENT, clearRecentUrls);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener(RECENT_ADD_HISTORY_CLEARED_EVENT, clearRecentUrls);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -1099,7 +1118,7 @@ function MediaContent({
         }))
         .slice(0, MAX_RECENT_MEDIA_URLS);
       try {
-        localStorage.setItem(RECENT_MEDIA_URLS_STORAGE_KEY, JSON.stringify(next));
+        localStorage.setItem(MEDIA_RECENT_URLS_STORAGE_KEY, JSON.stringify(next));
       } catch {
         // Private-mode storage or a full quota should not block imports.
       }
@@ -1112,7 +1131,7 @@ function MediaContent({
     setRecentUrls((current) => {
       const next = current.filter((item) => item.url !== url);
       try {
-        localStorage.setItem(RECENT_MEDIA_URLS_STORAGE_KEY, JSON.stringify(next));
+        localStorage.setItem(MEDIA_RECENT_URLS_STORAGE_KEY, JSON.stringify(next));
       } catch {
         // Browser-local history is optional.
       }
