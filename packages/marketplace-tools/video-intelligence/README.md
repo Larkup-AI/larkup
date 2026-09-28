@@ -133,6 +133,22 @@ queue as Docker. To use a LAN URL, set the card's local URL to an address on
 the host and keep the generated key private. Configure optional AI/provider
 credentials with `larkup-video-intelligence config set …` before starting.
 
+## Supported sources and evidence fallback
+
+The Larkup Data page accepts local video uploads, direct public media URLs,
+YouTube links, and public pages supported by the built-in media extractor. For
+YouTube, Larkup prefers one native-language human caption track and then the
+original-language automatic caption track. When no usable source caption is
+available, the runtime transcribes the audio. Speech recognition is only one
+evidence source: frame OCR and visual analysis continue when a video is silent
+or transcription is unavailable, so written content can still be indexed.
+
+Downloaded adaptive video and audio streams are merged into one browser-safe
+asset. Larkup uses the video stream as the canonical timeline and normalizes a
+padded container before storage when it would otherwise report an inflated
+duration. Chat citations retain that same source timeline and open the local or
+provider player at the cited moment.
+
 ## Indexing contract
 
 1. Upload to `POST /v1/uploads`.
@@ -253,7 +269,7 @@ These are self-hosted worker/service variables. Managed Cloud receives the corre
 | `LARKUP_VIDEO_AGENT_PROVIDER`                        | `vercel_ai_gateway`          | Defaults from the AI Models chat provider and can be overridden per tool; supports Gateway, Google, OpenAI, DeepSeek, Mistral, Cohere, and Anthropic.                                                                                                                                                                                                                                                 |
 | `LARKUP_VIDEO_AGENT_API_KEY`                         | unset                        | User-owned agent provider credential.                                                                                                                                                                                                                                                                                                                                                                 |
 | `LARKUP_VIDEO_AGENT_MODEL`                           | `openai/gpt-5-mini`          | Tool-brain model that chooses modalities, sampling density, priority ranges, and extraction focus.                                                                                                                                                                                                                                                                                                    |
-| `LARKUP_VIDEO_CONTINUITY_WAVE_BATCHES`               | `4`                          | Parallel vision batches per chronological wave. Only source-grounded continuity candidates cross from one wave to the next.                                                                                                                                                                                                                                                                             |
+| `LARKUP_VIDEO_CONTINUITY_WAVE_BATCHES`               | `4`                          | Parallel vision batches per chronological wave. Only source-grounded continuity candidates cross from one wave to the next.                                                                                                                                                                                                                                                                           |
 | `LARKUP_VIDEO_GOOGLE_CONCURRENCY`                    | `4`                          | Maximum simultaneous native Gemini vision batches. Kept below Gateway concurrency to avoid direct-project burst limits.                                                                                                                                                                                                                                                                               |
 | `LARKUP_VIDEO_GOOGLE_MAX_IMAGES_PER_REQUEST`         | `8`                          | Bounds native Gemini request size so multi-clip structured responses remain within interactive provider timeouts.                                                                                                                                                                                                                                                                                     |
 | `LARKUP_VIDEO_GOOGLE_REQUESTS_PER_MINUTE`            | `12`                         | Sliding-window request limit for native Gemini vision calls, leaving quota headroom for the agent model.                                                                                                                                                                                                                                                                                              |

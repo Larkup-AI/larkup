@@ -157,6 +157,27 @@ class SemanticCoverageGateTests(unittest.TestCase):
         self.assertTrue(brief.interactive)
         self.assertTrue(brief.model_dump(by_alias=True)["interactive"])
 
+    def test_native_caption_context_survives_worker_validation(self) -> None:
+        brief = VideoIndexingBrief.model_validate(
+            {
+                "skipTranscription": True,
+                "transcriptContext": [
+                    {
+                        "startMs": 14_000,
+                        "endMs": 16_500,
+                        "text": "Native source caption",
+                        "words": [],
+                    }
+                ],
+            }
+        )
+
+        self.assertTrue(brief.skip_transcription)
+        self.assertEqual(
+            brief.model_dump(by_alias=True)["transcriptContext"][0]["startMs"],
+            14_000,
+        )
+
     def test_full_index_always_builds_configured_retrieval_vectors(self) -> None:
         plan = fallback_plan("balanced", 60, True)
         with patch.dict(

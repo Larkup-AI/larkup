@@ -18,7 +18,10 @@ export interface ImportedMedia {
   mediaType: RemoteMediaType;
   sourceTranscript?: {
     chunks: Array<{ text: string; startSecs: number; endSecs: number }>;
+    fullText: string;
+    durationSecs: number;
     language?: string;
+    origin: { kind: 'youtube-caption'; provider: 'youtube'; language?: string };
   };
 }
 
@@ -41,6 +44,12 @@ export const MEDIA_URL_INSPECTION_TIMEOUT_MS = 7_000;
 interface YouTubeInspectionData {
   title?: string;
   duration?: number;
+  language?: string;
+  ext?: string;
+  vcodec?: string;
+  acodec?: string;
+  subtitles?: Record<string, unknown>;
+  automatic_captions?: Record<string, unknown>;
   entries?: Array<{
     id?: string;
     url?: string;
@@ -105,6 +114,9 @@ export function inspectYouTubeMetadata(url: string, data: YouTubeInspectionData)
 
 export interface MediaProbe {
   durationSecs: number;
+  containerDurationSecs: number;
+  videoDurationSecs?: number;
+  audioDurationSecs?: number;
   hasAudio: boolean;
   hasCorruptionSignals: boolean;
 }
@@ -194,25 +206,56 @@ export async function probeMedia(mediaPath: string): Promise<MediaProbe> {
     '-v',
     'error',
     '-show_entries',
-    'format=duration:format_tags=probe_score:stream=codec_type',
+    'format=duration:format_tags=probe_score:stream=codec_type,duration',
     '-of',
     'json',
     mediaPath,
   ]);
   const data = JSON.parse(output) as {
     format?: { duration?: string; tags?: { probe_score?: string } };
-    streams?: Array<{ codec_type?: string }>;
+    streams?: Array<{ codec_type?: string; duration?: string }>;
   };
-  const durationSecs = Number(data.format?.duration ?? 0);
+  // A malformed or padded audio track can stretch the MP4 container duration
+  // far beyond its visible timeline. Video references, frame timestamps, and
+  // the player all need the actual video-stream duration as their canonical
+  // clock; audio-only files still use the audio stream or container fallback.
+  const videoDuration = streamDuration(data.streams, 'video');
+  const audioDuration = streamDuration(data.streams, 'audio');
+  const containerDurationSecs = Number(data.format?.duration ?? 0);
+  const durationSecs = videoDuration ?? audioDuration ?? containerDurationSecs;
   return {
     durationSecs: Number.isFinite(durationSecs) ? Math.max(0, durationSecs) : 0,
+    containerDurationSecs: Number.isFinite(containerDurationSecs)
+      ? Math.max(0, containerDurationSecs)
+      : 0,
+    videoDurationSecs: videoDuration,
+    audioDurationSecs: audioDuration,
     hasAudio: data.streams?.some((stream) => stream.codec_type === 'audio') ?? false,
     hasCorruptionSignals: !Number.isFinite(durationSecs) || durationSecs <= 0,
   };
 }
 
+function streamDuration(
+  streams: Array<{ codec_type?: string; duration?: string }> | undefined,
+  type: 'video' | 'audio',
+) {
+  return streams
+    ?.filter((stream) => stream.codec_type === type)
+    .map((stream) => positiveDuration(stream.duration))
+    .find((duration) => duration !== undefined);
+}
+
+/** Whether a browser-visible container clock is materially longer than its video. */
+export function hasInflatedPlaybackTimeline(probe: MediaProbe) {
+  const videoDuration = probe.videoDurationSecs;
+  if (!videoDuration || !probe.hasAudio) return false;
+  const longestReported = Math.max(probe.containerDurationSecs, probe.audioDurationSecs ?? 0);
+  return longestReported - videoDuration > Math.max(5, videoDuration * 0.03);
+}
+
 export async function inspectMediaUrl(url: string): Promise<UrlInspection> {
   const parsed = validHttpUrl(url);
+  await assertPublicHost(parsed.hostname);
   if (isYouTube(parsed)) {
     const output = await runYtDlp(['--dump-single-json', '--simulate', '--flat-playlist', url]);
     const inspection = inspectYouTubeMetadata(url, JSON.parse(output) as YouTubeInspectionData);
@@ -233,27 +276,65 @@ export async function inspectMediaUrl(url: string): Promise<UrlInspection> {
     return inspection;
   }
 
-  let response = await inspectPublicMediaUrl(url, { method: 'HEAD' });
-  if (response.status === 405 || response.status === 501) {
-    response = await inspectPublicMediaUrl(url, { headers: { Range: 'bytes=0-0' } });
+  let response: Response | undefined;
+  let directInspectionError: unknown;
+  try {
+    response = await inspectPublicMediaUrl(url, { method: 'HEAD' });
+    if (response.status === 405 || response.status === 501) {
+      response = await inspectPublicMediaUrl(url, { headers: { Range: 'bytes=0-0' } });
+    }
+  } catch (error) {
+    directInspectionError = error;
   }
-  if (!response.ok) throw new Error(`Unable to inspect media URL (${response.status}).`);
-  const headerMime = response.headers.get('content-type')?.split(';')[0];
-  const mimeType =
-    mediaTypeFromMime(headerMime) === 'unknown'
-      ? mimeFromExtension(path.extname(parsed.pathname).slice(1))
-      : headerMime;
-  const rangeTotal = response.headers.get('content-range')?.match(/\/(\d+)$/)?.[1];
-  await response.body?.cancel();
-  return {
-    originalUrl: url,
-    mimeType,
-    mediaType: mediaTypeFromMime(mimeType),
-    contentLength: Number(rangeTotal ?? response.headers.get('content-length')) || undefined,
-    durationSecs: Number(response.headers.get('content-duration')) || undefined,
-    entryCount: 1,
-    isYouTube: false,
-  };
+  if (response?.ok) {
+    const headerMime = response.headers.get('content-type')?.split(';')[0];
+    const mimeType =
+      mediaTypeFromMime(headerMime) === 'unknown'
+        ? mimeFromExtension(path.extname(parsed.pathname).slice(1))
+        : headerMime;
+    const rangeTotal = response.headers.get('content-range')?.match(/\/(\d+)$/)?.[1];
+    await response.body?.cancel();
+    if (mediaTypeFromMime(mimeType) !== 'unknown') {
+      return {
+        originalUrl: url,
+        mimeType,
+        mediaType: mediaTypeFromMime(mimeType),
+        contentLength: Number(rangeTotal ?? response.headers.get('content-length')) || undefined,
+        durationSecs: Number(response.headers.get('content-duration')) || undefined,
+        entryCount: 1,
+        isYouTube: false,
+      };
+    }
+  } else if (response) {
+    await response.body?.cancel();
+  }
+
+  // Provider pages return HTML rather than media bytes. Inspect those through
+  // the same extractor used for YouTube; direct files stay on the fast path.
+  try {
+    const output = await runYtDlp(['--dump-single-json', '--simulate', '--no-playlist', url]);
+    const data = JSON.parse(output) as YouTubeInspectionData;
+    const mediaType: RemoteMediaType =
+      data.vcodec === 'none' && data.acodec && data.acodec !== 'none' ? 'audio' : 'video';
+    return {
+      originalUrl: url,
+      title: data.title,
+      mimeType: mimeFromExtension(data.ext ?? ''),
+      mediaType,
+      durationSecs: positiveDuration(data.duration),
+      singleItemDurationSecs: positiveDuration(data.duration),
+      singleItemUrl: url,
+      entryCount: 1,
+      isYouTube: false,
+    };
+  } catch (error) {
+    if (response && !response.ok)
+      throw new Error(`Unable to inspect media URL (${response.status}).`);
+    if (directInspectionError instanceof Error) throw directInspectionError;
+    throw new Error(
+      `The URL is not a direct media file or a supported video provider (${error instanceof Error ? error.message : 'inspection failed'}).`,
+    );
+  }
 }
 
 async function inspectPublicMediaUrl(url: string, init: RequestInit): Promise<Response> {
@@ -284,57 +365,7 @@ export async function importMediaUrl(
   const parsed = validHttpUrl(url);
   await fs.mkdir(options.outputDir, { recursive: true });
   if (isYouTube(parsed)) {
-    const template = path.join(options.outputDir, '%(title).120B [%(id)s].%(ext)s');
-    const print =
-      '{"path":%(filepath)j,"title":%(title)j,"originalUrl":%(webpage_url)j,"ext":%(ext)j}';
-    const output = await runYtDlp(
-      [
-        '--no-playlist',
-        '--playlist-end',
-        String(options.playlistMax ?? 10),
-        '--socket-timeout',
-        '20',
-        '--retries',
-        '2',
-        '--newline',
-        '--format',
-        youtubeDownloadFormat(),
-        '--merge-output-format',
-        'mp4',
-        '-o',
-        template,
-        '--print',
-        `after_move:${print}`,
-        url,
-      ],
-      options.onProgress,
-    );
-    return await Promise.all(
-      output
-        .split('\n')
-        .filter(Boolean)
-        .map(async (line) => {
-          const item = JSON.parse(line) as {
-            path: string;
-            title: string;
-            originalUrl?: string;
-            ext: string;
-          };
-          // yt-dlp's after_move filepath can occasionally refer to an intermediate
-          // format file even though the final media was written under another name.
-          // Resolve it against the fresh output directory before handing it to storage.
-          const mediaPath = await resolveYtDlpMediaPath(item.path, options.outputDir);
-          const mimeType =
-            mimeFromExtension(path.extname(mediaPath).slice(1)) ?? mimeFromExtension(item.ext);
-          return {
-            path: mediaPath,
-            title: item.title,
-            originalUrl: item.originalUrl || url,
-            mimeType,
-            mediaType: mediaTypeFromMime(mimeType),
-          };
-        }),
-    );
+    return importExtractorMediaUrl(url, options, true);
   }
 
   const downloadStartedAt = Date.now();
@@ -351,11 +382,23 @@ export async function importMediaUrl(
   let response: Response;
   try {
     response = await fetchPublic(url);
+  } catch (directDownloadError) {
+    try {
+      return await importExtractorMediaUrl(url, options, false);
+    } catch {
+      throw directDownloadError;
+    }
   } finally {
     if (connectingHeartbeat) clearInterval(connectingHeartbeat);
   }
-  if (!response.ok || !response.body)
-    throw new Error(`Media download failed (${response.status}).`);
+  if (!response.ok || !response.body) {
+    await response.body?.cancel();
+    try {
+      return await importExtractorMediaUrl(url, options, false);
+    } catch {
+      throw new Error(`Media download failed (${response.status}).`);
+    }
+  }
   const maxBytes = options.maxBytes ?? 500 * 1024 * 1024;
   const declared = Number(response.headers.get('content-length'));
   if (declared > maxBytes) throw new Error(`Media exceeds download limit of ${maxBytes} bytes.`);
@@ -366,6 +409,10 @@ export async function importMediaUrl(
     mediaTypeFromMime(headerMime) === 'unknown'
       ? mimeFromExtension(path.extname(name).slice(1))
       : headerMime;
+  if (mediaTypeFromMime(mimeType) === 'unknown') {
+    await response.body.cancel();
+    return importExtractorMediaUrl(url, options, false);
+  }
   const outputPath = path.join(options.outputDir, `${randomUUID()}-${name}`);
   let bytes = 0;
   let lastProgressAt = 0;
@@ -415,6 +462,266 @@ export async function importMediaUrl(
       mediaType: mediaTypeFromMime(mimeType),
     },
   ];
+}
+
+async function importExtractorMediaUrl(
+  url: string,
+  options: {
+    outputDir: string;
+    playlistMax?: number;
+    onProgress?: (progress: MediaImportProgress) => void;
+  },
+  includeYouTubeCaptions: boolean,
+): Promise<ImportedMedia[]> {
+  const template = path.join(options.outputDir, '%(title).120B [%(id)s].%(ext)s');
+  const print =
+    '{"path":%(filepath)j,"title":%(title)j,"originalUrl":%(webpage_url)j,"ext":%(ext)j,"language":%(language)j,"requestedSubtitles":%(requested_subtitles)j}';
+  let subtitleArgs: string[] = [];
+  if (includeYouTubeCaptions) {
+    try {
+      const metadata = JSON.parse(
+        await runYtDlp(['--dump-single-json', '--simulate', '--no-playlist', url]),
+      ) as YouTubeInspectionData;
+      const language = selectYoutubeCaptionLanguage(metadata);
+      if (language) {
+        subtitleArgs = [
+          '--write-subs',
+          '--write-auto-subs',
+          '--sub-langs',
+          language,
+          '--sub-format',
+          'json3',
+        ];
+      }
+    } catch {
+      // The media download can still succeed and use speech-to-text + OCR.
+    }
+  }
+  const output = await runYtDlp(
+    [
+      '--no-playlist',
+      '--playlist-end',
+      String(options.playlistMax ?? 10),
+      '--socket-timeout',
+      '20',
+      '--retries',
+      '2',
+      '--newline',
+      '--format',
+      youtubeDownloadFormat(),
+      '--merge-output-format',
+      'mp4',
+      ...subtitleArgs,
+      '-o',
+      template,
+      '--print',
+      `after_move:${print}`,
+      url,
+    ],
+    options.onProgress,
+  );
+  return Promise.all(
+    output
+      .split('\n')
+      .filter(Boolean)
+      .map(async (line) => {
+        const item = JSON.parse(line) as {
+          path: string;
+          title: string;
+          originalUrl?: string;
+          ext: string;
+          language?: string;
+          requestedSubtitles?: Record<string, { filepath?: string }> | null;
+        };
+        const resolvedMediaPath = await resolveYtDlpMediaPath(item.path, options.outputDir);
+        const mediaPath = await normalizeExtractorPlaybackTimeline(resolvedMediaPath);
+        const mimeType =
+          mimeFromExtension(path.extname(mediaPath).slice(1)) ?? mimeFromExtension(item.ext);
+        const sourceTranscript = includeYouTubeCaptions
+          ? await readYoutubeSourceTranscript(
+              options.outputDir,
+              item.requestedSubtitles,
+              item.language,
+            )
+          : undefined;
+        return {
+          path: mediaPath,
+          title: item.title,
+          originalUrl: item.originalUrl || url,
+          mimeType,
+          mediaType: mediaTypeFromMime(mimeType),
+          ...(sourceTranscript ? { sourceTranscript } : {}),
+        };
+      }),
+  );
+}
+
+export function selectYoutubeCaptionLanguage(data: YouTubeInspectionData): string | undefined {
+  const preferred = data.language?.toLowerCase();
+  const manual = Object.keys(data.subtitles ?? {}).filter((language) => language !== 'live_chat');
+  const automatic = Object.keys(data.automatic_captions ?? {}).filter(
+    (language) => language !== 'live_chat',
+  );
+  const exactOrPrefix = (languages: string[]) =>
+    languages.find((language) => language.toLowerCase() === preferred) ??
+    languages.find((language) => language.toLowerCase().startsWith(`${preferred}-`));
+  // Human-authored captions are the most reliable source transcript. When
+  // none exist, prefer YouTube's original-language automatic track instead
+  // of downloading every translated caption variant.
+  return (
+    (preferred ? exactOrPrefix(manual) : undefined) ??
+    manual[0] ??
+    (preferred
+      ? exactOrPrefix(automatic.filter((language) => language.endsWith('-orig')))
+      : undefined) ??
+    automatic.find((language) => language.endsWith('-orig')) ??
+    (preferred ? exactOrPrefix(automatic) : undefined) ??
+    automatic[0]
+  );
+}
+
+/**
+ * Some provider manifests contain a padded audio track (or stale container
+ * duration) that makes browsers report nearly twice the visible runtime.
+ * Remux only those demonstrably inconsistent files, using the video stream as
+ * the canonical clock and retaining the first audio stream when present.
+ */
+async function normalizeExtractorPlaybackTimeline(mediaPath: string): Promise<string> {
+  let probe: MediaProbe;
+  try {
+    probe = await probeMedia(mediaPath);
+  } catch {
+    return mediaPath;
+  }
+  const videoDuration = probe.videoDurationSecs;
+  if (!videoDuration || !hasInflatedPlaybackTimeline(probe)) return mediaPath;
+
+  const extension = path.extname(mediaPath) || '.mp4';
+  const normalizedPath = `${mediaPath}.${randomUUID()}.normalized${extension}`;
+  const backupPath = `${mediaPath}.${randomUUID()}.original${extension}`;
+  const ffmpeg = process.env.LARKUP_FFMPEG_PATH?.trim() || 'ffmpeg';
+  try {
+    await runProcess(
+      ffmpeg,
+      [
+        '-nostdin',
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-i',
+        mediaPath,
+        '-map',
+        '0:v:0',
+        '-map',
+        '0:a:0?',
+        '-c',
+        'copy',
+        '-t',
+        String(videoDuration),
+        '-avoid_negative_ts',
+        'make_zero',
+        ...(extension.toLowerCase() === '.mp4' ? ['-movflags', '+faststart'] : []),
+        normalizedPath,
+      ],
+      undefined,
+      30 * 60_000,
+    );
+    // Renaming over an existing file is not portable to Windows. Move the
+    // original aside first and restore it if the final move cannot complete.
+    await fs.rename(mediaPath, backupPath);
+    try {
+      await fs.rename(normalizedPath, mediaPath);
+      await fs.rm(backupPath, { force: true });
+    } catch (error) {
+      await fs.rename(backupPath, mediaPath).catch(() => undefined);
+      throw error;
+    }
+  } catch (error) {
+    await fs.rm(normalizedPath, { force: true }).catch(() => undefined);
+    let playableFileExists = false;
+    try {
+      await fs.access(mediaPath);
+      playableFileExists = true;
+    } catch {
+      try {
+        await fs.rename(backupPath, mediaPath);
+        playableFileExists = true;
+      } catch {
+        // Preserve the backup for the caller's isolated import cleanup rather
+        // than deleting the only remaining copy after a filesystem failure.
+      }
+    }
+    if (playableFileExists) await fs.rm(backupPath, { force: true }).catch(() => undefined);
+    console.warn('[media] Could not normalize an inconsistent provider timeline:', error);
+  }
+  return mediaPath;
+}
+
+interface YoutubeJson3 {
+  events?: Array<{
+    tStartMs?: number;
+    dDurationMs?: number;
+    segs?: Array<{ utf8?: string }>;
+  }>;
+}
+
+export function parseYoutubeJson3Transcript(data: YoutubeJson3) {
+  return (data.events ?? [])
+    .map((event) => {
+      const text = (event.segs ?? [])
+        .map((segment) => segment.utf8 ?? '')
+        .join('')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const startSecs = Math.max(0, Number(event.tStartMs ?? 0) / 1_000);
+      const durationSecs = Math.max(0.001, Number(event.dDurationMs ?? 0) / 1_000);
+      return { text, startSecs, endSecs: startSecs + durationSecs };
+    })
+    .filter((chunk) => chunk.text);
+}
+
+async function readYoutubeSourceTranscript(
+  outputDir: string,
+  requestedSubtitles: Record<string, { filepath?: string }> | null | undefined,
+  preferredLanguage?: string,
+): Promise<ImportedMedia['sourceTranscript'] | undefined> {
+  const root = path.resolve(outputDir);
+  const requested = Object.entries(requestedSubtitles ?? {})
+    .map(([language, subtitle]) => ({ language, filepath: subtitle.filepath }))
+    .filter((item): item is { language: string; filepath: string } => Boolean(item.filepath))
+    .filter((item) => isPathWithinDirectory(path.resolve(item.filepath), root));
+  const scanned = (await fs.readdir(root))
+    .filter((name) => name.endsWith('.json3'))
+    .map((name) => ({
+      language: name.split('.').at(-2) || preferredLanguage || 'unknown',
+      filepath: path.join(root, name),
+    }));
+  const candidates = requested.length ? requested : scanned;
+  candidates.sort((left, right) => {
+    const preferred = preferredLanguage?.toLowerCase();
+    return (
+      Number(right.language.toLowerCase().startsWith(preferred ?? '')) -
+      Number(left.language.toLowerCase().startsWith(preferred ?? ''))
+    );
+  });
+  for (const candidate of candidates) {
+    try {
+      const chunks = parseYoutubeJson3Transcript(
+        JSON.parse(await fs.readFile(candidate.filepath, 'utf8')) as YoutubeJson3,
+      );
+      if (!chunks.length) continue;
+      return {
+        chunks,
+        fullText: chunks.map((chunk) => chunk.text).join(' '),
+        durationSecs: Math.max(...chunks.map((chunk) => chunk.endSecs)),
+        language: candidate.language,
+        origin: { kind: 'youtube-caption', provider: 'youtube', language: candidate.language },
+      };
+    } catch {
+      // A broken caption track must not block speech-to-text and frame OCR.
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -497,7 +804,11 @@ function scoreYtDlpMediaCandidate(
   return (
     (videoId && fileName.includes(`[${videoId}]`) ? 100 : 0) +
     (mimeType?.startsWith('video/') ? 20 : 0) +
-    (extension === expectedExtension ? 10 : 0)
+    (extension === expectedExtension ? 10 : 0) +
+    // yt-dlp names adaptive intermediate streams `.f137.mp4`, `.f140.m4a`,
+    // etc. Never prefer one over the final muxed file: selecting the video
+    // intermediate produces exactly the "volume control, no sound" symptom.
+    (/\.f\d+\.[^.]+$/i.test(fileName) ? -50 : 0)
   );
 }
 
@@ -520,7 +831,12 @@ async function runYtDlp(args: string[], onProgress?: (progress: MediaImportProgr
     if (preparationHeartbeat) clearInterval(preparationHeartbeat);
   }
   onProgress?.({ message: 'Connecting to the video source…', elapsedSeconds: 0 });
-  return runProcess(executable, ['--js-runtimes', 'nodejs:node', ...args], onProgress);
+  return runProcess(
+    executable,
+    ['--js-runtimes', 'nodejs:node', ...args],
+    onProgress,
+    args.includes('--simulate') ? 120_000 : 6 * 60 * 60_000,
+  );
 }
 
 function managedYtDlpPath() {
@@ -574,6 +890,7 @@ function runProcess(
   command: string,
   args: string[],
   onProgress?: (progress: MediaImportProgress) => void,
+  timeoutMs = 120_000,
 ) {
   return new Promise<string>((resolve, reject) => {
     const child = spawn(command, args, { shell: false });
@@ -582,7 +899,7 @@ function runProcess(
     let progressBuffer = '';
     const startedAt = Date.now();
     let latestProgress: MediaImportProgress | undefined;
-    const timeout = setTimeout(() => child.kill('SIGTERM'), 120_000);
+    const timeout = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
     const activityHeartbeat = onProgress
       ? setInterval(() => {
           const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1_000);

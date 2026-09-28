@@ -15,10 +15,20 @@ test.describe('Video Intelligence', () => {
     await expect(page.getByText('Recent URLs')).toBeVisible();
     await expect(page.getByText(recentUrl, { exact: true })).toBeVisible();
 
-    await page.getByText(recentUrl, { exact: true }).click();
-    await expect(input).toHaveValue(recentUrl);
+    await page.evaluate(() => {
+      localStorage.removeItem('media_recent_urls');
+      window.dispatchEvent(new Event('larkup:recent-add-history-cleared'));
+    });
+    await expect(page.getByText('Recent URLs')).not.toBeVisible();
 
-    await input.focus();
+    await page.reload();
+    await page.getByRole('button', { name: 'From URL' }).click();
+    const reloadedInput = page.getByLabel('Import media URL');
+    await reloadedInput.focus();
+    await page.getByText(recentUrl, { exact: true }).click();
+    await expect(reloadedInput).toHaveValue(recentUrl);
+
+    await reloadedInput.focus();
     await page.getByRole('button', { name: `Remove ${recentUrl} from recent URLs` }).click();
     await expect(page.getByText(recentUrl, { exact: true })).not.toBeVisible();
   });

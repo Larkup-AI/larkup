@@ -596,7 +596,7 @@ async function processMediaWithTool(
   serverId?: string,
 ): Promise<void> {
   if (asset.type === 'video' && (await isToolInstalled('video-intelligence'))) {
-    return processWithInstalledVideoIntelligence(asset, reportStage);
+    return processWithInstalledVideoIntelligence(asset, reportStage, sourceTranscript);
   }
   const tool = await loadTool<any>('video-audio');
   if (!tool) {
@@ -1351,6 +1351,11 @@ async function processMediaWithTool(
 async function processWithInstalledVideoIntelligence(
   asset: MediaAsset,
   reportStage: StageReporter,
+  sourceTranscript?: {
+    chunks: Array<{ text: string; startSecs: number; endSecs: number }>;
+    language?: string;
+    origin?: { kind?: string; provider?: string; language?: string };
+  },
 ): Promise<void> {
   await validateVideoIntelligenceConfiguration();
   // Capture this before the job begins. A later settings change must not
@@ -1390,10 +1395,38 @@ async function processWithInstalledVideoIntelligence(
     // stays local regardless -- duration probing and knowledge-run frame
     // artifacts above/below still need it.
     const sourceUrl = await storage.getReadUrl?.(asset.storageUri, 3_600);
+    const transcriptContext = sourceTranscript?.chunks
+      .slice(0, 2_000)
+      .map((chunk) => ({
+        startMs: Math.round(Math.max(0, chunk.startSecs) * 1_000),
+        endMs: Math.round(Math.max(chunk.startSecs, chunk.endSecs) * 1_000),
+        text: chunk.text,
+        words: [],
+      }))
+      .filter((chunk) => chunk.text.trim());
+    if (transcriptContext?.length) {
+      void trackUsageEvent({
+        type: 'media_processing',
+        mediaType: 'video',
+        mediaOperation: 'source_transcript',
+        mediaAssetId: asset.id,
+        durationSecs: assetForCloud.durationSecs,
+        timestamp: new Date().toISOString(),
+      });
+    }
     const { evidence, segments } = await runInstalledVideoIntelligence({
       asset: assetForCloud,
       mediaPath,
       sourceUrl,
+      ...(transcriptContext?.length
+        ? {
+            briefOverride: {
+              transcriptContext,
+              skipTranscription: true,
+              ...(sourceTranscript?.language ? { language: sourceTranscript.language } : {}),
+            },
+          }
+        : {}),
       reportStage,
       onJobSubmitted: async (jobId) => {
         const updated = await updateMediaAsset(asset.id, { activeVideoIntelligenceJobId: jobId });
