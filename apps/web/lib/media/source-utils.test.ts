@@ -4,9 +4,12 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ffprobeExecutable,
+  hasInflatedPlaybackTimeline,
   inspectYouTubeMetadata,
+  parseYoutubeJson3Transcript,
   parseYtDlpProgress,
   resolveYtDlpMediaPath,
+  selectYoutubeCaptionLanguage,
   youtubeDownloadFormat,
 } from './source-utils';
 
@@ -89,6 +92,65 @@ describe('youtubeDownloadFormat', () => {
   });
 });
 
+describe('hasInflatedPlaybackTimeline', () => {
+  it('detects a padded audio/container clock without flagging normal stream drift', () => {
+    expect(
+      hasInflatedPlaybackTimeline({
+        durationSecs: 3_600,
+        videoDurationSecs: 3_600,
+        audioDurationSecs: 7_200,
+        containerDurationSecs: 7_200,
+        hasAudio: true,
+        hasCorruptionSignals: false,
+      }),
+    ).toBe(true);
+    expect(
+      hasInflatedPlaybackTimeline({
+        durationSecs: 3_600,
+        videoDurationSecs: 3_600,
+        audioDurationSecs: 3_602,
+        containerDurationSecs: 3_602,
+        hasAudio: true,
+        hasCorruptionSignals: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('parseYoutubeJson3Transcript', () => {
+  it('turns native YouTube captions into timestamped evidence and ignores formatting events', () => {
+    expect(
+      parseYoutubeJson3Transcript({
+        events: [
+          { tStartMs: 14_000, dDurationMs: 2_500, segs: [{ utf8: 'The ' }, { utf8: 'answer' }] },
+          { tStartMs: 16_500, dDurationMs: 500 },
+        ],
+      }),
+    ).toEqual([{ text: 'The answer', startSecs: 14, endSecs: 16.5 }]);
+  });
+});
+
+describe('selectYoutubeCaptionLanguage', () => {
+  it('prefers a native manual caption over translated automatic tracks', () => {
+    expect(
+      selectYoutubeCaptionLanguage({
+        language: 'de',
+        subtitles: { de: [{}] },
+        automatic_captions: { en: [{}], 'de-orig': [{}] },
+      }),
+    ).toBe('de');
+  });
+
+  it('falls back to the original-language automatic caption', () => {
+    expect(
+      selectYoutubeCaptionLanguage({
+        language: 'ar',
+        automatic_captions: { en: [{}], 'ar-orig': [{}] },
+      }),
+    ).toBe('ar-orig');
+  });
+});
+
 describe('resolveYtDlpMediaPath', () => {
   it('uses the actual media output when yt-dlp reports a stale after-move filename', async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'larkup-source-utils-'));
@@ -110,6 +172,18 @@ describe('resolveYtDlpMediaPath', () => {
     await expect(
       resolveYtDlpMediaPath(path.join(os.tmpdir(), 'unrelated.mp4'), outputDir),
     ).rejects.toThrow('outside its import directory');
+  });
+
+  it('prefers the final mux over a silent adaptive video intermediate', async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'larkup-source-utils-'));
+    temporaryDirectories.push(outputDir);
+    const reportedPath = path.join(outputDir, 'Interview [video123].missing.mp4');
+    const silentIntermediate = path.join(outputDir, 'Interview [video123].f137.mp4');
+    const finalMux = path.join(outputDir, 'Interview [video123].webm');
+    await fs.writeFile(silentIntermediate, 'video only');
+    await fs.writeFile(finalMux, 'video and audio');
+
+    await expect(resolveYtDlpMediaPath(reportedPath, outputDir)).resolves.toBe(finalMux);
   });
 });
 

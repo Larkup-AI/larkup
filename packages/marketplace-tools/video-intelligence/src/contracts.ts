@@ -24,6 +24,8 @@ export interface VideoIndexingBrief {
   retainSourceHours: number;
   /** The app supplies transcript evidence itself, so the cloud GPU skips speech decoding. */
   skipTranscription?: boolean;
+  /** Timestamped source captions supplied by the host (for example YouTube captions). */
+  transcriptContext?: TranscriptEvidence[];
   /** A bounded verification must retain its direct visual evidence source. */
   requireSemanticVision?: boolean;
   /** Reads the requested range as one chronology instead of independent clips. */

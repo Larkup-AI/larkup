@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image as ImageIcon, Film, AudioLines, Maximize2, X } from 'lucide-react';
 
 /**
@@ -31,14 +31,14 @@ export function ChatMediaPreview({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [imageUnavailable, setImageUnavailable] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   // Media is rendered only from a server-validated presentMedia result. Do
   // not invent a URL from an identifier emitted in model text: it could point
   // to a missing or unrelated asset and creates the misleading dummy preview
   // shown in the previous chat experience.
   const assetUrl = mediaUrl;
-  if (!assetUrl) return null;
   const playbackUrl =
-    startSecs !== undefined
+    assetUrl && startSecs !== undefined
       ? `${assetUrl.split('#')[0]}#t=${startSecs}${endSecs !== undefined ? `,${endSecs}` : ''}`
       : assetUrl;
   const providerEmbedUrl = useMemo(
@@ -50,6 +50,21 @@ export function ChatMediaPreview({
     Number.isFinite(startSecs) &&
     Number.isFinite(endSecs) &&
     (endSecs as number) > (startSecs as number);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !Number.isFinite(startSecs)) return;
+    const seek = () => {
+      // Media fragments are not applied consistently after client-side
+      // navigation. Setting currentTime after metadata makes the cited moment
+      // deterministic for local uploads and downloaded provider videos.
+      video.currentTime = Math.max(0, startSecs as number);
+    };
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) seek();
+    else video.addEventListener('loadedmetadata', seek, { once: true });
+    return () => video.removeEventListener('loadedmetadata', seek);
+  }, [playbackUrl, startSecs]);
+
+  if (!assetUrl) return null;
 
   if (mediaType === 'image') {
     if (imageUnavailable) {
@@ -129,6 +144,7 @@ export function ChatMediaPreview({
           />
         ) : (
           <video
+            ref={videoRef}
             src={playbackUrl}
             controls
             playsInline
@@ -148,7 +164,7 @@ export function ChatMediaPreview({
         <MediaCitationFooter
           icon={<Film className="size-3 text-muted-foreground" />}
           fileName={fileName}
-          sourceUrl={sourceUrl}
+          sourceUrl={timestampedMediaUrl(sourceUrl, startSecs, endSecs)}
           timestamp={
             startSecs !== undefined
               ? `${formatTimestamp(startSecs)}${
@@ -188,7 +204,7 @@ export function ChatMediaPreview({
         {sourceUrl ? (
           <div className="flex justify-end border-t border-border px-3 py-1.5">
             <a
-              href={sourceUrl}
+              href={timestampedMediaUrl(sourceUrl, startSecs, endSecs)}
               target="_blank"
               rel="noreferrer"
               className="text-[11px] font-medium text-primary hover:text-primary/80"
@@ -209,7 +225,7 @@ export function ChatMediaPreview({
           <MediaCitationFooter
             icon={<Film className="size-3 text-muted-foreground" />}
             fileName={fileName}
-            sourceUrl={sourceUrl}
+            sourceUrl={timestampedMediaUrl(sourceUrl, startSecs)}
             timestamp={startSecs !== undefined ? formatTimestamp(startSecs) : undefined}
           />
         </div>
@@ -244,7 +260,7 @@ export function ChatMediaPreview({
           <MediaCitationFooter
             icon={<Film className="size-3 text-muted-foreground" />}
             fileName={fileName ? `${fileName} — Frame` : 'Video Frame'}
-            sourceUrl={sourceUrl}
+            sourceUrl={timestampedMediaUrl(sourceUrl, startSecs)}
             timestamp={startSecs !== undefined ? formatTimestamp(startSecs) : undefined}
           />
         </div>
@@ -328,6 +344,35 @@ export function getProviderEmbedUrl(
   }
 
   return undefined;
+}
+
+/** Build a provider-aware source link that opens at the cited evidence. */
+export function timestampedMediaUrl(
+  sourceUrl?: string,
+  startSecs?: number,
+  endSecs?: number,
+): string | undefined {
+  if (!sourceUrl || !Number.isFinite(startSecs)) return sourceUrl;
+  const start = Math.max(0, Math.floor(startSecs as number));
+  const end =
+    Number.isFinite(endSecs) && (endSecs as number) > start ? Math.floor(endSecs as number) : null;
+  try {
+    const url = new URL(sourceUrl, 'http://larkup.local');
+    const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    if (host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be') {
+      url.searchParams.set('t', `${start}s`);
+      return url.origin === 'http://larkup.local'
+        ? `${url.pathname}${url.search}${url.hash}`
+        : url.toString();
+    }
+    const fragment = `t=${start}${end !== null ? `,${end}` : ''}`;
+    url.hash = fragment;
+    return url.origin === 'http://larkup.local'
+      ? `${url.pathname}${url.search}${url.hash}`
+      : url.toString();
+  } catch {
+    return `${sourceUrl.split('#')[0]}#t=${start}${end !== null ? `,${end}` : ''}`;
+  }
 }
 
 function MediaCitationFooter({

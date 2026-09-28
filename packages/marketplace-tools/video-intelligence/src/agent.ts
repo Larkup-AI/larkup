@@ -2588,9 +2588,7 @@ function citationSurface(
     items: evidence.map((item) => ({
       label: evidenceLabel(item.modality),
       timestampSecs: item.timeRange.startSecs,
-      seekUrl: `${sourceUrl}${sourceUrl.includes('?') ? '&' : '?'}t=${Math.floor(
-        item.timeRange.startSecs,
-      )}`,
+      seekUrl: `${sourceUrl}#t=${Math.floor(item.timeRange.startSecs)}`,
     })),
   };
 }
