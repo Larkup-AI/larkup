@@ -7,6 +7,7 @@ import path from 'node:path';
 import { DEFAULT_CONFIG } from '../../../packages/core/src/types';
 import { writeConfig } from '../../../packages/core/src/config-store';
 import {
+  dockerInfoReportsReady,
   readLocalState,
   startNativeLocal,
   stopLocal,
@@ -34,7 +35,7 @@ test.afterEach(async () => {
   testDataDir = undefined;
 });
 
-test('the built-in crawler remains available as a Docker-free fallback', async () => {
+test('the built-in crawler remains available as the Docker-free primary runtime', async () => {
   const originalCwd = process.cwd();
   const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-native-crawler-'));
   try {
@@ -52,6 +53,32 @@ test('the built-in crawler remains available as a Docker-free fallback', async (
     process.chdir(originalCwd);
     await rm(workspace, { recursive: true, force: true });
   }
+});
+
+test('the crawler API starts its built-in runtime without returning Docker requirements', async ({
+  request,
+}) => {
+  const response = await request.post('/api/firecrawl/local', {
+    data: { action: 'start' },
+  });
+  expect(response.ok()).toBe(true);
+  const body = await response.json();
+  expect(body).toMatchObject({
+    state: { running: true, mode: 'native' },
+    starting: false,
+  });
+  expect(body).not.toHaveProperty('docker');
+  expect(JSON.stringify(body)).not.toMatch(/Docker Desktop|Docker daemon/);
+});
+
+test('a zero-exit Docker diagnostic is still unavailable when the daemon rejected it', () => {
+  expect(
+    dockerInfoReportsReady({
+      stdout: '',
+      stderr: 'Cannot connect to the Docker daemon. Is the docker daemon running?',
+    }),
+  ).toBe(false);
+  expect(dockerInfoReportsReady({ stdout: '28.4.0\n', stderr: '' })).toBe(true);
 });
 
 test('native crawler search returns public result URLs without Docker or an API key', async () => {

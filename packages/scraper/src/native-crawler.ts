@@ -5,7 +5,7 @@ import { ProxyAgent, type Dispatcher } from 'undici';
 import { readConfig } from '@larkup/core/config-store';
 
 /**
- * Small, dependency-free crawler used by the desktop, CLI, and curl install.
+ * Small, dependency-free crawler used by web, desktop, CLI, and curl installs.
  * It deliberately does not require Docker, a browser binary, or a cloud key.
  * JavaScript-only and bot-protected sites can still use Firecrawl Cloud.
  */

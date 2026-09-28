@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
 import {
-  checkDocker,
   refreshLocalStatus,
-  startLocalInBackground,
   startNativeLocal,
   stopLocal,
-  isLocalStartInProgress,
-  isInsideDocker,
   checkDockerSibling,
   connectDockerSibling,
 } from '@larkup/scraper/local-runtime';
@@ -15,44 +11,37 @@ import { getRuntimeEnv } from '@/lib/runtime/environment';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** GET → current local instance state + docker availability + runtime env. */
+async function ensureBuiltInCrawler() {
+  const state = await refreshLocalStatus();
+  return state.running && state.mode === 'native' && !state.lastError ? state : startNativeLocal();
+}
+
+/** GET → ensure and report the crawler runtime available through the app API. */
 export async function GET() {
   const runtimeEnv = getRuntimeEnv();
 
   if (runtimeEnv === 'docker') {
-    const [state, sibling] = await Promise.all([refreshLocalStatus(), checkDockerSibling()]);
+    const sibling = await checkDockerSibling();
+    const state = sibling.available ? await connectDockerSibling() : await ensureBuiltInCrawler();
     const { apiKey, ...safe } = state;
     return NextResponse.json({
-      state: {
-        ...safe,
-        hasKey: Boolean(apiKey),
-        // If the sibling is up, update running state
-        running: state.running || sibling.available,
-        endpoint: sibling.available ? sibling.endpoint : safe.endpoint,
-      },
-      docker: {
-        docker: true,
-        compose: sibling.available,
-        message: sibling.available
-          ? 'Crawler service is running.'
-          : 'Crawler service is not available for this Docker installation.',
-      },
+      state: { ...safe, hasKey: Boolean(apiKey) },
       runtimeEnv,
     });
   }
 
-  // Desktop or web — check Docker CLI availability
-  const [state, docker] = await Promise.all([refreshLocalStatus(), checkDocker()]);
+  // Web, desktop, npm and curl installations all use the crawler embedded in
+  // this process. A Docker daemon or a separately launched browser service is
+  // never required on the end user's computer.
+  const state = await ensureBuiltInCrawler();
   const { apiKey, ...safe } = state;
   return NextResponse.json({
     state: { ...safe, hasKey: Boolean(apiKey) },
-    docker,
     runtimeEnv,
-    starting: isLocalStartInProgress(),
   });
 }
 
-/** POST { action: "start" | "stop" } → control the local Firecrawl container. */
+/** POST { action: "start" | "stop" } → control the crawler exposed by this app API. */
 export async function POST(req: Request) {
   const runtimeEnv = getRuntimeEnv();
 
@@ -85,13 +74,10 @@ export async function POST(req: Request) {
     }
   }
 
-  // Starting Chromium can involve a first-time image pull. Respond right away
-  // and let the UI poll the explicit crawler status instead of leaving users
-  // stuck on an indefinite loading toast.
   if (action === 'start') {
-    const { state, starting } = await startLocalInBackground();
+    const state = await startNativeLocal();
     const { apiKey, ...safe } = state;
-    return NextResponse.json({ state: { ...safe, hasKey: Boolean(apiKey) }, starting });
+    return NextResponse.json({ state: { ...safe, hasKey: Boolean(apiKey) }, starting: false });
   }
 
   const state = await stopLocal();
