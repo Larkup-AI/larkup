@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@larkup/core": "workspace:*",
-    "undici": "^8.10.2"
+    "undici": "^8.11.2"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
