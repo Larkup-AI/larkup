@@ -7,7 +7,7 @@
   "description": "Help your AI understand your videos, so you can ask questions and get answers from the right moments.",
   "longDescription": "Turn videos into knowledge your AI can understand. It listens to what is said, reads what appears on screen, and helps you find the moments that matter.",
   "category": "media",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "pricing": "free",
   "emoji": "🎥",
   "icon": "Film",
@@ -654,7 +654,7 @@
   "downloads": 0,
   "repositoryUrl": "https://github.com/Larkup-AI/larkup",
   "license": "Apache-2.0",
-  "updatedAt": "2026-08-20",
+  "updatedAt": "2026-10-06",
   "trustLevel": "elevated",
   "permissions": {
     "httpAllow": [

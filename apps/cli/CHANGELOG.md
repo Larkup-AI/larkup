@@ -1,5 +1,12 @@
 # @larkup/cli
 
+## 0.3.12
+
+### Patch Changes
+
+- Updated dependencies [c49ca86]
+  - @larkup/marketplace@0.3.6
+
 ## 0.3.11
 
 ### Patch Changes

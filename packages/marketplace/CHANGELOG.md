@@ -1,5 +1,11 @@
 # @larkup/marketplace
 
+## 0.3.6
+
+### Patch Changes
+
+- c49ca86: Update vulnerable runtime dependencies and advertise the patched Video Intelligence release through the Marketplace catalog.
+
 ## 0.3.5
 
 ### Patch Changes
