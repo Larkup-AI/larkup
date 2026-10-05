@@ -1,10 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import * as XLSX from 'xlsx';
-import {
-  DEFAULT_CHAT_TABLE_PAGE_SIZE,
-  normalizeTableData,
-  plainTableLabel,
-} from './table-presentation';
+import { normalizeTableData, plainTableLabel } from './table-presentation';
 
 export type DataExportFormat = 'xlsx' | 'csv' | 'pdf';
 
@@ -37,8 +33,8 @@ export function selectDataExportSource(input: {
   recentAnswerText?: string;
 }): DataExportSource | undefined {
   const table =
-    usableDataExportSource(input.explicitTable) ??
     usableDataExportSource(input.currentTurnTable) ??
+    usableDataExportSource(input.explicitTable) ??
     usableDataExportSource(input.recentTable);
   if (table) return table;
   const answer = input.recentAnswerText?.trim();
@@ -83,6 +79,18 @@ function wrapPdfText(value: unknown, maxCharacters: number) {
   const lines: string[] = [];
   let line = '';
   for (const word of words) {
+    if (word.length > maxCharacters) {
+      if (line) {
+        lines.push(line);
+        line = '';
+      }
+      for (let offset = 0; offset < word.length; offset += maxCharacters) {
+        const chunk = word.slice(offset, offset + maxCharacters);
+        if (chunk.length === maxCharacters) lines.push(chunk);
+        else line = chunk;
+      }
+      continue;
+    }
     const candidate = line ? `${line} ${word}` : word;
     if (candidate.length <= maxCharacters) {
       line = candidate;
@@ -92,7 +100,7 @@ function wrapPdfText(value: unknown, maxCharacters: number) {
     line = word.slice(0, maxCharacters);
   }
   if (line) lines.push(line);
-  return lines.slice(0, 3);
+  return lines;
 }
 
 function pdfSafeText(value: string) {
@@ -151,33 +159,44 @@ async function buildPdf(title: string, columns: string[], rows: Array<Record<str
   drawHeader();
   for (const row of rows) {
     const cells = columns.map((column) => wrapPdfText(row[column], maxCharacters));
-    const rowHeight = Math.max(
-      lineHeight + 6,
-      ...cells.map((lines) => lines.length * lineHeight + 6),
-    );
-    if (y - rowHeight < margin) {
-      page = document.addPage(pageSize);
-      y = pageSize[1] - margin;
-      drawHeader();
-    }
-    page.drawLine({
-      start: { x: margin, y },
-      end: { x: pageSize[0] - margin, y },
-      thickness: 0.5,
-      color: rgb(0.83, 0.86, 0.9),
-    });
-    cells.forEach((lines, columnIndex) => {
-      lines.forEach((line, lineIndex) => {
-        page.drawText(pdfSafeText(line), {
-          x: margin + columnIndex * columnWidth + 5,
-          y: y - 12 - lineIndex * lineHeight,
-          size: 8,
-          font: regular,
-          color: rgb(0.18, 0.21, 0.26),
+    const totalLines = Math.max(1, ...cells.map((lines) => lines.length));
+    let lineOffset = 0;
+
+    while (lineOffset < totalLines) {
+      const availableLines = Math.max(0, Math.floor((y - margin - 6) / lineHeight));
+      if (availableLines === 0) {
+        page = document.addPage(pageSize);
+        y = pageSize[1] - margin;
+        drawHeader();
+        continue;
+      }
+      const linesOnPage = Math.min(totalLines - lineOffset, availableLines);
+      const rowHeight = Math.max(lineHeight + 6, linesOnPage * lineHeight + 6);
+      page.drawLine({
+        start: { x: margin, y },
+        end: { x: pageSize[0] - margin, y },
+        thickness: 0.5,
+        color: rgb(0.83, 0.86, 0.9),
+      });
+      cells.forEach((lines, columnIndex) => {
+        lines.slice(lineOffset, lineOffset + linesOnPage).forEach((line, lineIndex) => {
+          page.drawText(pdfSafeText(line), {
+            x: margin + columnIndex * columnWidth + 5,
+            y: y - 12 - lineIndex * lineHeight,
+            size: 8,
+            font: regular,
+            color: rgb(0.18, 0.21, 0.26),
+          });
         });
       });
-    });
-    y -= rowHeight;
+      y -= rowHeight;
+      lineOffset += linesOnPage;
+      if (lineOffset < totalLines) {
+        page = document.addPage(pageSize);
+        y = pageSize[1] - margin;
+        drawHeader();
+      }
+    }
   }
   return Buffer.from(await document.save());
 }
@@ -309,10 +328,67 @@ function rowsMentionedInAnswer(
   );
 }
 
+const answerMarkdownLink = /!?(?:\[([^\]]+)\])\([^)]*\)/g;
+
+function plainAnswerBlock(value: string) {
+  return value
+    .replace(answerMarkdownLink, '$1')
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*[-*+][ \t]+/gm, '- ')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/** Turn a rendered prose/list answer into complete, independently exportable rows. */
+function answerListSource(answerText: string): DataExportSource | undefined {
+  const horizontalRuleBlocks = answerText
+    .split(/\r?\n\s*(?:-{3,}|_{3,}|\*{3,})\s*\r?\n/g)
+    .map(plainAnswerBlock)
+    .filter(Boolean);
+  if (horizontalRuleBlocks.length > 1) {
+    return {
+      columns: ['Answer'],
+      rows: horizontalRuleBlocks.map((Answer) => ({ Answer })),
+    };
+  }
+
+  const lines = answerText.split(/\r?\n/);
+  const listItems = lines.flatMap((line, index) => {
+    const match = line.match(/^([ \t]*)(?:[-*+]\s+|\d+[.)]\s+)/);
+    return match ? [{ index, indent: match[1].replace(/\t/g, '  ').length }] : [];
+  });
+  const minimumIndent = Math.min(...listItems.map((item) => item.indent));
+  const listStarts = listItems
+    .filter((item) => item.indent === minimumIndent)
+    .map((item) => item.index);
+  if (listStarts.length > 1) {
+    const rows = listStarts.map((start, position) => {
+      const end = listStarts[position + 1] ?? lines.length;
+      return plainAnswerBlock(lines.slice(start, end).join('\n'));
+    });
+    return { columns: ['Answer'], rows: rows.filter(Boolean).map((Answer) => ({ Answer })) };
+  }
+
+  const paragraphBlocks = answerText
+    .split(/\r?\n\s*\r?\n/g)
+    .map(plainAnswerBlock)
+    .filter(Boolean);
+  if (paragraphBlocks.length > 1) {
+    return {
+      columns: ['Answer'],
+      rows: paragraphBlocks.map((Answer) => ({ Answer })),
+    };
+  }
+  return undefined;
+}
+
 /**
  * Resolve what “export this answer” means without silently expanding it to
- * every row read by the analysis tool. A rendered Markdown table is exact;
- * otherwise answer-mentioned rows win, followed by the table's initial page.
+ * unrelated source data. Rendered tables and lists are exact; otherwise
+ * answer-mentioned rows win, followed by the complete bounded query result.
  */
 export function answerScopedDataExportSource(input: {
   table?: DataExportSource;
@@ -321,17 +397,46 @@ export function answerScopedDataExportSource(input: {
   const answerText = input.answerText?.trim() ?? '';
   const markdownTable = answerText ? markdownTableFromAnswer(answerText) : undefined;
   if (markdownTable) return markdownTable;
+  const answerList = answerText ? answerListSource(answerText) : undefined;
+  if (answerList) return answerList;
   if (!input.table?.columns.length || !input.table.rows.length) {
     return answerText ? { columns: ['Answer'], rows: [{ Answer: answerText }] } : undefined;
   }
   const mentionedRows = answerText ? rowsMentionedInAnswer(input.table, answerText) : [];
   return {
     columns: input.table.columns,
-    rows:
-      mentionedRows.length > 0
-        ? mentionedRows
-        : input.table.rows.slice(0, DEFAULT_CHAT_TABLE_PAGE_SIZE),
+    rows: mentionedRows.length > 0 ? mentionedRows : input.table.rows,
   };
+}
+
+/**
+ * A request that changes selection or computation needs a fresh data step
+ * before export. Presentation-only follow-ups can safely reuse the last answer.
+ */
+export function dataExportNeedsFreshData(text: string): boolean {
+  if (!requestedDataExportFormat(text)) return false;
+  const normalized = text.normalize('NFKC').toLocaleLowerCase();
+  if (/\b(?:last|previous|above|this|that)\s+(?:answer|response)\s+only\b/.test(normalized)) {
+    return false;
+  }
+  return (
+    /\b(?:filter|where|match(?:es|ed|ing)?|find|search|select|sort|group|join|calculate|compute|compare|recalculate|redo)\b/.test(
+      normalized,
+    ) ||
+    /\b(?:first|last|top|bottom)\s+\d+\b/.test(normalized) ||
+    /\b\d+\s+(?:matches|rows|records|results|people|items)\b/.test(normalized) ||
+    /\b(?:only|except|excluding|including)\s+(?:rows|records|results|people|items|those)\b/.test(
+      normalized,
+    )
+  );
+}
+
+/** Whether a presentation-only export refers to rendered prose/list rather than table rows. */
+export function dataExportUsesAnswerText(text: string): boolean {
+  const normalized = text.normalize('NFKC').toLocaleLowerCase();
+  if (/\b(?:answer|response|list)\b/.test(normalized)) return true;
+  if (/\b(?:data|dataset|table|rows|records|results)\b/.test(normalized)) return false;
+  return true;
 }
 
 export function requestedDataExportFormat(text: string): DataExportFormat | undefined {

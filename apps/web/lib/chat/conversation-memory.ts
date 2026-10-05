@@ -245,6 +245,53 @@ function tabularEvidence(input: unknown, output: unknown): ReusableTabularEviden
   };
 }
 
+function completeTabularEvidence(
+  input: unknown,
+  output: unknown,
+): ReusableTabularEvidence | undefined {
+  const params = unwrapJson(input) as Record<string, unknown> | undefined;
+  const result = unwrapJson(output) as Record<string, unknown> | undefined;
+  if (!result || !Array.isArray(result.rows) || !Array.isArray(result.columns)) return undefined;
+
+  const columns = result.columns
+    .filter((column): column is string => typeof column === 'string')
+    .slice(0, 50);
+  const rows = result.rows.flatMap((value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    const row = value as Record<string, unknown>;
+    const projected = Object.fromEntries(
+      columns.filter((column) => column in row).map((column) => [column, row[column]]),
+    );
+    return Object.keys(projected).length > 0 ? [projected] : [];
+  });
+  if (columns.length === 0 || rows.length === 0) return undefined;
+
+  return {
+    datasetId: typeof params?.datasetId === 'string' ? params.datasetId : undefined,
+    columns,
+    rows: rows.slice(0, 500),
+    totalRows:
+      typeof result.totalRows === 'number' && Number.isFinite(result.totalRows)
+        ? result.totalRows
+        : rows.length,
+  };
+}
+
+/** Keep the complete bounded query result for an immediate export follow-up. */
+export function extractLatestTabularExportResult(
+  messages: readonly ChatMessage[],
+): ReusableTabularEvidence | undefined {
+  for (const message of [...messages].reverse()) {
+    if (message.role !== 'assistant') continue;
+    const result = toolParts(message)
+      .filter((part) => part.name === 'queryTabularData')
+      .map((part) => completeTabularEvidence(part.input, part.output))
+      .find(Boolean);
+    if (result) return result;
+  }
+  return undefined;
+}
+
 /** Keep only enough exact table evidence for a direct follow-up, never raw sheets. */
 export function compactTabularRowsForConversation(
   values: unknown[],

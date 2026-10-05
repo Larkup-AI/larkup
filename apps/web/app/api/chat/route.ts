@@ -43,6 +43,7 @@ import { retrievalToolsForStep } from '@/lib/chat/retrieval-routing';
 import { collectExhaustiveVideoEvidencePages } from '@/lib/chat/video-rag-routing';
 import {
   extractConversationEvidence,
+  extractLatestTabularExportResult,
   contextualizeKnowledgeFollowUpQuery,
   formatConversationEvidence,
   findImmediateExactGroundedAnswer,
@@ -88,9 +89,15 @@ import {
   shouldInspectRetrievedImage,
 } from '@/lib/chat/visual-routing';
 import { executableTools } from '@/lib/chat/tool-registry';
-import { answerScopedDataExportSource, requestedDataExportFormat } from '@/lib/chat/data-export';
+import {
+  answerScopedDataExportSource,
+  dataExportNeedsFreshData,
+  dataExportUsesAnswerText,
+  requestedDataExportFormat,
+} from '@/lib/chat/data-export';
 import { assistantSourceScopeFingerprint } from '@/lib/chat/assistant-source-scope';
 import { normalizeIncomingMessages } from '@/lib/chat/message-input';
+import { repairChatToolCall } from '@/lib/chat/tool-call-repair';
 import { explicitMediaEvidenceAssetId } from '@/lib/chat/media-retrieval-routing';
 import { authorizeEnterpriseAiRequest, trackEnterpriseAiUsage } from '@/lib/enterprise-client';
 
@@ -235,10 +242,10 @@ function latestUserMessageIsPlainText(messages: UIMessage[]): boolean {
  * in the immediately preceding answer. Keep that human-readable reference in
  * the local PDF query, without replaying prior tool payloads into the model.
  */
-function latestAssistantText(messages: UIMessage[]): string {
+function latestAssistantText(messages: UIMessage[], maxCharacters = 4_000): string {
   return messageText(
     [...messages].reverse().find((candidate) => candidate.role === 'assistant'),
-  ).slice(0, 4_000);
+  ).slice(0, maxCharacters);
 }
 
 function directAssistantTextResponse(
@@ -1135,6 +1142,7 @@ ${fieldLines}`;
     })
     .join('\n\n');
   const recentAssistantText = latestAssistantText(messagesToProcess);
+  const recentAssistantExportText = latestAssistantText(messagesToProcess, 50_000);
   const parallelPreferenceQuestion = resolveParallelPreferenceQuestion(
     userText,
     precedingUserText(messagesToProcess),
@@ -1156,6 +1164,7 @@ ${fieldLines}`;
       ? precedingNumberedDocumentReference(messagesToProcess)
       : undefined;
   const reusableEvidence = extractConversationEvidence(evidenceMessages);
+  const latestTabularExportResult = extractLatestTabularExportResult(evidenceMessages);
   // This compact string is used by retrieval only, not appended to model
   // history. It preserves the immediate topic while keeping the model context
   // at the existing 20-message bound.
@@ -1184,8 +1193,10 @@ ${fieldLines}`;
   const imagePreviewFollowUp = isImagePreviewFollowUp(userText, reusableEvidence);
   const tabularFollowUp = isTabularFollowUp(userText, reusableEvidence);
   const dataExportFormat = requestedDataExportFormat(userText);
+  const exportNeedsFreshData = dataExportNeedsFreshData(userText);
   const directDataExport = Boolean(
     dataExportFormat &&
+    !exportNeedsFreshData &&
     (reusableEvidence.tabular ||
       (/\b(?:answer|response|result|data|table|it|this|that|above|previous|same)\b/i.test(
         userText,
@@ -1194,8 +1205,8 @@ ${fieldLines}`;
   );
   const directDataExportSource = directDataExport
     ? answerScopedDataExportSource({
-        table: reusableEvidence.tabular,
-        answerText: recentAssistantText,
+        table: latestTabularExportResult ?? reusableEvidence.tabular,
+        answerText: dataExportUsesAnswerText(userText) ? recentAssistantExportText : undefined,
       })
     : undefined;
   // A prior table is useful to resolve a follow-up, but never as fresh answer
@@ -1787,6 +1798,7 @@ ${fieldLines}`;
         >();
         const result = streamText({
           model: evidenceWriterModel,
+          repairToolCall: repairChatToolCall,
           // The Gateway owns model failover. Retrying the same quota-limited model
           // only makes the user wait longer and consumes their request allowance.
           maxRetries: 0,
@@ -2002,6 +2014,13 @@ ${fieldLines}`;
             }
 
             if (tabularFollowUp) {
+              if (dataExportFormat && stepNumber === 1 && builtInTools.createDataExport) {
+                return {
+                  toolChoice: { type: 'tool' as const, toolName: 'createDataExport' },
+                  activeTools: ['createDataExport'],
+                  messages: compactToolContextForModel(messages),
+                };
+              }
               if (canAnswerFromRecentTable && !tabularFollowUpNeedsVisualization) {
                 return {
                   toolChoice: 'none' as const,

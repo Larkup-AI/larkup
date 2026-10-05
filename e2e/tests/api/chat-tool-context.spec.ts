@@ -22,9 +22,33 @@ import {
 } from '../../../apps/web/lib/chat/conversation-memory';
 import {
   answerScopedDataExportSource,
+  dataExportNeedsFreshData,
   selectDataExportSource,
 } from '../../../apps/web/lib/chat/data-export';
 import { normalizeChartConfigWithEvidence } from '../../../apps/web/lib/chat/chart-config';
+import { repairQueryTabularDataInput } from '../../../apps/web/lib/chat/tool-call-repair';
+
+test('repairs long table queries when projection arguments spill into filters', () => {
+  const guestIds = Array.from({ length: 40 }, (_, index) => `guest-${index + 1}`);
+  expect(
+    repairQueryTabularDataInput({
+      datasetId: 'guest-list',
+      filters: [
+        { column: 'guest_id', op: 'in', value: guestIds },
+        "limit':37,",
+        'columns:[',
+        'guest_id',
+        'name',
+        'Knowledge & Expertise',
+      ],
+    }),
+  ).toEqual({
+    datasetId: 'guest-list',
+    filters: [{ column: 'guest_id', op: 'in', value: guestIds }],
+    limit: 37,
+    columns: ['guest_id', 'name', 'Knowledge & Expertise'],
+  });
+});
 
 test('bounds retrieved source payloads before the next model step', () => {
   const compacted = compactToolContextForModel([
@@ -91,7 +115,7 @@ test('keeps large spreadsheet follow-up evidence compact and source-scoped', () 
   expect(tabularEvidenceDatasetIsAvailable(evidence.tabular, new Set())).toBe(false);
 });
 
-test('keeps answer exports bounded to visible rows and fresh turn data', () => {
+test('exports the complete prior result and makes new filtering requests run first', () => {
   const fullResult = {
     columns: ['Rank', 'Name'],
     rows: Array.from({ length: 100 }, (_, index) => ({
@@ -103,7 +127,9 @@ test('keeps answer exports bounded to visible rows and fresh turn data', () => {
     table: fullResult,
     answerText: 'Here are the requested results.',
   });
-  expect(answerResult?.rows).toHaveLength(10);
+  expect(answerResult?.rows).toHaveLength(100);
+  expect(dataExportNeedsFreshData('Create a PDF out of this list.')).toBe(false);
+  expect(dataExportNeedsFreshData('Create a PDF with the 25 matches for those people.')).toBe(true);
   expect(
     selectDataExportSource({
       currentTurnTable: { columns: ['Rank'], rows: [{ Rank: 1 }] },
