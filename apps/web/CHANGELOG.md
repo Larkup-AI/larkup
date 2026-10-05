@@ -1,5 +1,14 @@
 # larkup
 
+## 0.4.7
+
+### Patch Changes
+
+- f56d5e3: Recover malformed long table queries and preserve complete answer-scoped Excel and PDF exports.
+- 84cb791: Add group rename and safe deletion controls to the Data page.
+- 0df7e2f: Hide liked-answer cache counts from the cache settings card.
+- 4b7e652: Fix YouTube imports when optional downloader metadata is unavailable.
+
 ## 0.4.6
 
 ### Patch Changes
