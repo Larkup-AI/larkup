@@ -10,6 +10,7 @@ import {
   parseYtDlpProgress,
   resolveYtDlpMediaPath,
   selectYoutubeCaptionLanguage,
+  ytDlpImportPrintTemplate,
   youtubeDownloadFormat,
 } from './source-utils';
 
@@ -89,6 +90,15 @@ describe('youtubeDownloadFormat', () => {
     expect(preferred).toContain('+bestaudio[ext=m4a]');
     expect(combinedFallback).toContain('acodec!=none');
     expect(youtubeDownloadFormat().split('/').at(-1)).toContain('acodec!=none');
+  });
+});
+
+describe('ytDlpImportPrintTemplate', () => {
+  it('serializes one object so missing metadata never becomes a bare NA token', () => {
+    const template = ytDlpImportPrintTemplate();
+
+    expect(template).toBe('%(.{filepath,title,webpage_url,ext,language,requested_subtitles})j');
+    expect(template).not.toContain('"language":%(language)j');
   });
 });
 
