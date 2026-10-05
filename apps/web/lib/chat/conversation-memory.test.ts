@@ -4,6 +4,7 @@ import {
   compactTabularRowsForConversation,
   contextualizeKnowledgeFollowUpQuery,
   extractConversationEvidence,
+  extractLatestTabularExportResult,
   findImmediateExactGroundedAnswer,
   isTabularFollowUp,
   resolveParallelPreferenceQuestion,
@@ -358,6 +359,28 @@ describe('tabular conversation evidence', () => {
     expect(rows).toHaveLength(25);
     expect(JSON.stringify(rows).length).toBeLessThanOrEqual(12_000);
     expect(String(rows[0].Notes)).toHaveLength(360);
+  });
+
+  it('keeps the complete bounded tool result available for an export follow-up', () => {
+    const rows = Array.from({ length: 80 }, (_, index) => ({
+      guest_id: `guest-${index + 1}`,
+      name: `Guest ${index + 1}`,
+    }));
+    const messages = [
+      {
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-queryTabularData',
+            input: { datasetId: 'guests' },
+            output: { columns: ['guest_id', 'name'], rows, totalRows: 80 },
+          },
+        ],
+      },
+    ];
+
+    expect(extractConversationEvidence(messages).tabular?.rows).toHaveLength(25);
+    expect(extractLatestTabularExportResult(messages)?.rows).toHaveLength(80);
   });
 
   it('does not reuse an active table when the user explicitly changes datasets', () => {

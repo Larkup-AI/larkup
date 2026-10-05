@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
+import { PDFDocument } from 'pdf-lib';
 import {
   answerScopedDataExportSource,
   createDataExport,
+  dataExportNeedsFreshData,
+  dataExportUsesAnswerText,
   requestedDataExportFormat,
   selectDataExportSource,
 } from './data-export';
@@ -14,6 +17,26 @@ describe('chat data exports', () => {
     expect(requestedDataExportFormat('In excel table maybe?')).toBe('xlsx');
     expect(requestedDataExportFormat('In an Excel table, please.')).toBe('xlsx');
     expect(requestedDataExportFormat('What does the PDF say about renewal?')).toBeUndefined();
+  });
+
+  it('distinguishes direct exports from requests that require fresh filtering', () => {
+    expect(dataExportNeedsFreshData('Can you create a PDF out of this list?')).toBe(false);
+    expect(
+      dataExportNeedsFreshData('This answer is good. Create a PDF with this last answer only.'),
+    ).toBe(false);
+    expect(dataExportNeedsFreshData('Export only rows where Country is Germany to Excel.')).toBe(
+      true,
+    );
+    expect(
+      dataExportNeedsFreshData('Give me a PDF with the 25 matches for those first 25 people.'),
+    ).toBe(true);
+  });
+
+  it('distinguishes an answer/list export from an authoritative table export', () => {
+    expect(dataExportUsesAnswerText('Create a PDF out of this list.')).toBe(true);
+    expect(dataExportUsesAnswerText('Export the last answer only.')).toBe(true);
+    expect(dataExportUsesAnswerText('Export this filtered data to Excel.')).toBe(false);
+    expect(dataExportUsesAnswerText('Download the results as a PDF.')).toBe(false);
   });
 
   it('removes markdown from headers while preserving distinct columns', () => {
@@ -50,6 +73,18 @@ describe('chat data exports', () => {
       rows: [{ '**Name**': 'Ada Lovelace' }],
     });
     expect(Buffer.from(artifact.fileBase64, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('keeps a long answer cell across multiple PDF pages instead of truncating it', async () => {
+    const artifact = await createDataExport({
+      format: 'pdf',
+      title: 'Complete answer',
+      columns: ['Answer'],
+      rows: [{ Answer: Array.from({ length: 1_000 }, (_, index) => `detail-${index}`).join(' ') }],
+    });
+    const document = await PDFDocument.load(Buffer.from(artifact.fileBase64, 'base64'));
+    expect(document.getPageCount()).toBeGreaterThan(1);
+    expect(artifact.rowCount).toBe(1);
   });
 
   it('exports only rows explicitly included in the answer', () => {
@@ -98,7 +133,38 @@ describe('chat data exports', () => {
     });
   });
 
-  it('falls back to the same first 10 rows initially shown by the chat table', async () => {
+  it('exports every section of a rendered matching list as its own row', async () => {
+    const answer = Array.from({ length: 25 }, (_, index) =>
+      [
+        `**Person ${index + 1}**`,
+        `Needs: Topic ${index + 1}`,
+        '',
+        `- Match A${index + 1} - relevant expertise`,
+        `- Match B${index + 1} - complementary experience`,
+      ].join('\n'),
+    ).join('\n\n---\n\n');
+
+    const source = answerScopedDataExportSource({ answerText: answer });
+    expect(source?.rows).toHaveLength(25);
+    expect(source?.rows[0]).toEqual({
+      Answer:
+        'Person 1\nNeeds: Topic 1\n\n- Match A1 - relevant expertise\n- Match B1 - complementary experience',
+    });
+    expect(source?.rows[24].Answer).toContain('Person 25');
+
+    const spreadsheet = await createDataExport({
+      format: 'xlsx',
+      title: 'Matches',
+      ...source!,
+    });
+    const workbook = XLSX.read(Buffer.from(spreadsheet.fileBase64, 'base64'));
+    expect(XLSX.utils.sheet_to_json(workbook.Sheets.Answer!)).toHaveLength(25);
+
+    const pdf = await createDataExport({ format: 'pdf', title: 'Matches', ...source! });
+    expect(pdf.rowCount).toBe(25);
+  });
+
+  it('falls back to the complete bounded query result instead of an arbitrary first page', async () => {
     const source = answerScopedDataExportSource({
       table: {
         columns: ['University', 'Cost'],
@@ -109,22 +175,22 @@ describe('chat data exports', () => {
       },
       answerText: 'These are the strongest results from the analysis.',
     });
-    expect(source?.rows).toHaveLength(10);
+    expect(source?.rows).toHaveLength(100);
 
     const csv = await createDataExport({ format: 'csv', title: 'Answer', ...source! });
     const csvLines = Buffer.from(csv.fileBase64, 'base64')
       .toString('utf8')
       .replace(/^\uFEFF/, '')
       .split('\r\n');
-    expect(csv.rowCount).toBe(10);
-    expect(csvLines).toHaveLength(11);
+    expect(csv.rowCount).toBe(100);
+    expect(csvLines).toHaveLength(101);
 
     const pdf = await createDataExport({ format: 'pdf', title: 'Answer', ...source! });
-    expect(pdf.rowCount).toBe(10);
+    expect(pdf.rowCount).toBe(100);
     expect(Buffer.from(pdf.fileBase64, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
   });
 
-  it('prefers explicitly bounded rows, then current-turn data, over previous tables', () => {
+  it('prefers authoritative current-turn data over model-copied or previous rows', () => {
     expect(
       selectDataExportSource({
         currentTurnTable: {
@@ -134,7 +200,10 @@ describe('chat data exports', () => {
         explicitTable: { columns: ['Value'], rows: [{ Value: 'current 1' }] },
         recentTable: { columns: ['Value'], rows: [{ Value: 'previous' }] },
       }),
-    ).toEqual({ columns: ['Value'], rows: [{ Value: 'current 1' }] });
+    ).toEqual({
+      columns: ['Value'],
+      rows: [{ Value: 'current 1' }, { Value: 'current 2' }],
+    });
     expect(
       selectDataExportSource({
         currentTurnTable: { columns: ['Value'], rows: [{ Value: 'current' }] },

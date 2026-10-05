@@ -2543,7 +2543,9 @@ export async function getChatTools(context: {
             }),
           )
           .optional()
-          .describe('Filters to apply to the data.'),
+          .describe(
+            'Filters to apply to the data. This array must contain only filter objects; limit and columns are separate top-level arguments.',
+          ),
         groupBy: z.array(z.string()).optional().describe('Columns to group by for aggregations.'),
         aggregations: z
           .array(
@@ -2605,7 +2607,7 @@ export async function getChatTools(context: {
 
     createDataExport: tool({
       description:
-        'Create a real downloadable Excel, CSV, or PDF file from answer data already established in this conversation. Use this whenever the user asks to export, save, download, or convert an answer/result to one of these formats. Never write a Markdown download link. For a direct follow-up, omit columns and rows so the exact preceding result is reused. When exporting a result obtained earlier in this same turn, pass only those returned rows and columns.',
+        'Create a real downloadable Excel, CSV, or PDF file from answer data already established in this conversation. Use this whenever the user asks to export, save, download, or convert an answer/result to one of these formats. Never write a Markdown download link. Omit columns and rows whenever a data query ran in this turn or the request is a direct follow-up: the host reuses the complete authoritative result. Supply rows only when no structured data result exists.',
       inputSchema: z.object({
         format: z.enum(['xlsx', 'csv', 'pdf']).describe('The requested file format.'),
         title: z.string().max(100).optional().describe('A short human-readable file title.'),
