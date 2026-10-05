@@ -1,5 +1,11 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.4
+
+### Patch Changes
+
+- c49ca86: Update vulnerable runtime dependencies and advertise the patched Video Intelligence release through the Marketplace catalog.
+
 ## 0.3.3
 
 ### Patch Changes

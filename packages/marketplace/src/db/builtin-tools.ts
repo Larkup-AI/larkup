@@ -10,7 +10,7 @@ export const BUILTIN_TOOLS: Record<string, unknown>[] = [
     longDescription:
       'Turn videos into knowledge your AI can understand. It listens to what is said, reads what appears on screen, and helps you find the moments that matter.',
     category: 'media',
-    version: '0.3.3',
+    version: '0.3.4',
     pricing: 'free',
     emoji: '🎬',
     icon: 'Film',
@@ -191,7 +191,7 @@ export const BUILTIN_TOOLS: Record<string, unknown>[] = [
     downloads: 0,
     repositoryUrl: 'https://github.com/Larkup-AI/larkup',
     license: 'Apache-2.0',
-    updatedAt: '2026-08-20',
+    updatedAt: '2026-10-06',
     trustLevel: 'elevated',
     permissions: {
       fsRead: true,

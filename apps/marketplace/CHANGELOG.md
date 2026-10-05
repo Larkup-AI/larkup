@@ -1,5 +1,12 @@
 # @larkup/hub
 
+## 0.2.16
+
+### Patch Changes
+
+- Updated dependencies [c49ca86]
+  - @larkup/marketplace@0.3.6
+
 ## 0.2.15
 
 ### Patch Changes
