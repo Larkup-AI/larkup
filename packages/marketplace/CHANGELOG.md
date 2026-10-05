@@ -1,5 +1,11 @@
 # @larkup/marketplace
 
+## 0.3.7
+
+### Patch Changes
+
+- c455d4d: Apply the remaining dependency security patches discovered after refreshing all ecosystem lockfiles.
+
 ## 0.3.6
 
 ### Patch Changes

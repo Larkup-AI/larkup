@@ -1,5 +1,11 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.5
+
+### Patch Changes
+
+- c455d4d: Apply the remaining dependency security patches discovered after refreshing all ecosystem lockfiles.
+
 ## 0.3.4
 
 ### Patch Changes
