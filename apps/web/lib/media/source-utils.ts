@@ -474,8 +474,6 @@ async function importExtractorMediaUrl(
   includeYouTubeCaptions: boolean,
 ): Promise<ImportedMedia[]> {
   const template = path.join(options.outputDir, '%(title).120B [%(id)s].%(ext)s');
-  const print =
-    '{"path":%(filepath)j,"title":%(title)j,"originalUrl":%(webpage_url)j,"ext":%(ext)j,"language":%(language)j,"requestedSubtitles":%(requested_subtitles)j}';
   let subtitleArgs: string[] = [];
   if (includeYouTubeCaptions) {
     try {
@@ -515,7 +513,7 @@ async function importExtractorMediaUrl(
       '-o',
       template,
       '--print',
-      `after_move:${print}`,
+      `after_move:${ytDlpImportPrintTemplate()}`,
       url,
     ],
     options.onProgress,
@@ -526,34 +524,42 @@ async function importExtractorMediaUrl(
       .filter(Boolean)
       .map(async (line) => {
         const item = JSON.parse(line) as {
-          path: string;
+          filepath: string;
           title: string;
-          originalUrl?: string;
+          webpage_url?: string;
           ext: string;
           language?: string;
-          requestedSubtitles?: Record<string, { filepath?: string }> | null;
+          requested_subtitles?: Record<string, { filepath?: string }> | null;
         };
-        const resolvedMediaPath = await resolveYtDlpMediaPath(item.path, options.outputDir);
+        const resolvedMediaPath = await resolveYtDlpMediaPath(item.filepath, options.outputDir);
         const mediaPath = await normalizeExtractorPlaybackTimeline(resolvedMediaPath);
         const mimeType =
           mimeFromExtension(path.extname(mediaPath).slice(1)) ?? mimeFromExtension(item.ext);
         const sourceTranscript = includeYouTubeCaptions
           ? await readYoutubeSourceTranscript(
               options.outputDir,
-              item.requestedSubtitles,
+              item.requested_subtitles,
               item.language,
             )
           : undefined;
         return {
           path: mediaPath,
           title: item.title,
-          originalUrl: item.originalUrl || url,
+          originalUrl: item.webpage_url || url,
           mimeType,
           mediaType: mediaTypeFromMime(mimeType),
           ...(sourceTranscript ? { sourceTranscript } : {}),
         };
       }),
   );
+}
+
+/**
+ * Serialize the selected downloader fields as one object. Per-field templates
+ * use yt-dlp's bare `NA` placeholder for missing values, which is not JSON.
+ */
+export function ytDlpImportPrintTemplate() {
+  return '%(.{filepath,title,webpage_url,ext,language,requested_subtitles})j';
 }
 
 export function selectYoutubeCaptionLanguage(data: YouTubeInspectionData): string | undefined {
