@@ -106,12 +106,12 @@ export function CacheManagementCard() {
                       ? 'Safe to clear. Larkup recreates temporary data only when needed.'
                       : 'No temporary cache data is currently stored.'}
               </p>
-              {!error && cache?.answerFeedback ? (
+              {/* {!error && cache?.answerFeedback ? (
                 <p className="mt-1 text-xs text-muted-foreground" data-testid="answer-cache-counts">
                   Across all projects: {cache.answerFeedback.likedEntries} liked answer
                   {cache.answerFeedback.likedEntries === 1 ? '' : 's'} cached.
                 </p>
-              ) : null}
+              ) : null} */}
             </div>
             <div className="flex shrink-0 gap-2">
               <Button
