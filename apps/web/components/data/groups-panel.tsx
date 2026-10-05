@@ -2,7 +2,17 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { FolderPlus, Grid2X2, List, Plus, Dices } from 'lucide-react';
+import {
+  Dices,
+  FolderPlus,
+  Grid2X2,
+  List,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +27,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { DataGroup } from '@larkup/core/types';
 
 const fetcher = (url: string) => fetch(url).then((response) => response.json());
@@ -38,6 +65,11 @@ export function GroupsPanel({
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingGroup, setEditingGroup] = useState<GroupSummary | null>(null);
+  const [editName, setEditName] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingGroup, setDeletingGroup] = useState<GroupSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const groups = data?.groups ?? [];
 
   const filteredGroups = groups.filter((group) =>
@@ -71,6 +103,54 @@ export function GroupsPanel({
     });
     if (!response.ok) return toast.error('Could not update group availability.');
     await mutate();
+  }
+
+  function startRename(group: GroupSummary) {
+    setEditingGroup(group);
+    setEditName(group.name);
+  }
+
+  async function rename() {
+    if (!editingGroup || savingEdit) return;
+    const trimmed = editName.trim();
+    if (!trimmed) return toast.error('Enter a group name.');
+    setSavingEdit(true);
+    try {
+      const response = await fetch('/api/groups', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingGroup.id, name: trimmed }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        return toast.error(body.error || 'Could not rename group.');
+      }
+      setEditingGroup(null);
+      await mutate();
+      toast.success(`Renamed group to ${trimmed}.`);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function remove() {
+    if (!deletingGroup || deleting || deletingGroup.sourceCount > 0) return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/groups?id=${encodeURIComponent(deletingGroup.id)}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        return toast.error(body.error || 'Could not delete group.');
+      }
+      const deletedName = deletingGroup.name;
+      setDeletingGroup(null);
+      await mutate();
+      toast.success(`Deleted ${deletedName}.`);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   function generateRandomIcon() {
@@ -162,6 +242,8 @@ export function GroupsPanel({
               group={group}
               onAdd={onAddToGroup}
               onAvailability={setAvailability}
+              onDelete={setDeletingGroup}
+              onRename={startRename}
               onView={onView}
             />
           ))}
@@ -178,6 +260,9 @@ export function GroupsPanel({
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{group.name}</span>
               <span className="text-xs text-muted-foreground">{group.sourceCount} sources</span>
               <Availability group={group} onChange={setAvailability} />
+              {group.id !== 'default' && (
+                <GroupActions group={group} onDelete={setDeletingGroup} onRename={startRename} />
+              )}
               <Button
                 size="sm"
                 variant="ghost"
@@ -255,7 +340,104 @@ export function GroupsPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog
+        open={editingGroup !== null}
+        onOpenChange={(nextOpen) => !nextOpen && !savingEdit && setEditingGroup(null)}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename group</DialogTitle>
+            <DialogDescription>
+              Choose a clear name for this collection of sources.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rename-group-name">Name</Label>
+            <Input
+              id="rename-group-name"
+              autoFocus
+              value={editName}
+              onChange={(event) => setEditName(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && void rename()}
+              placeholder="Support docs"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingGroup(null)} disabled={savingEdit}>
+              Cancel
+            </Button>
+            <Button onClick={() => void rename()} disabled={savingEdit || !editName.trim()}>
+              {savingEdit && <Loader2 className="size-4 animate-spin" />}
+              Save name
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog
+        open={deletingGroup !== null}
+        onOpenChange={(nextOpen) => !nextOpen && !deleting && setDeletingGroup(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deletingGroup?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingGroup && deletingGroup.sourceCount > 0
+                ? `This group still contains ${deletingGroup.sourceCount} ${deletingGroup.sourceCount === 1 ? 'source' : 'sources'}. Move or delete them before deleting the group.`
+                : 'This removes the empty group permanently. Your other groups and sources are not affected.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deleting || (deletingGroup?.sourceCount ?? 0) > 0}
+              onClick={() => void remove()}
+            >
+              {deleting && <Loader2 className="size-4 animate-spin" />}
+              Delete group
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
+  );
+}
+
+function GroupActions({
+  group,
+  onDelete,
+  onRename,
+}: {
+  group: GroupSummary;
+  onDelete: (group: GroupSummary) => void;
+  onRename: (group: GroupSummary) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="size-7 shrink-0"
+            aria-label={`Group actions for ${group.name}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end" className="w-36">
+        <DropdownMenuItem onClick={() => onRename(group)}>
+          <Pencil className="size-4" /> Rename
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onClick={() => onDelete(group)}>
+          <Trash2 className="size-4" /> Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -292,11 +474,15 @@ function GroupCard({
   group,
   onAdd,
   onAvailability,
+  onDelete,
+  onRename,
   onView,
 }: {
   group: GroupSummary;
   onAdd: (id: string) => void;
   onAvailability: (group: GroupSummary, value: boolean) => void;
+  onDelete: (group: GroupSummary) => void;
+  onRename: (group: GroupSummary) => void;
   onView: (id: string) => void;
 }) {
   const image = group.icon?.startsWith('http');
@@ -317,8 +503,11 @@ function GroupCard({
           <p className="truncate text-sm font-medium">{group.name}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{group.sourceCount} sources</p>
         </div>
-        <div onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <Availability group={group} onChange={onAvailability} />
+          {group.id !== 'default' && (
+            <GroupActions group={group} onDelete={onDelete} onRename={onRename} />
+          )}
         </div>
       </div>
       <Button

@@ -51,6 +51,88 @@ test.describe.serial('Data Page', () => {
     ).toBeVisible();
   });
 
+  test('renames and deletes empty groups from the Groups view', async ({ page }) => {
+    const groups = [
+      {
+        id: 'default',
+        name: 'Default',
+        icon: '📚',
+        assistantEnabled: true,
+        sourceCount: 0,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'research',
+        name: 'Research',
+        icon: '◆',
+        assistantEnabled: true,
+        sourceCount: 0,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    let renameRequest: unknown;
+    let deletedGroupId: string | null = null;
+
+    await page.route('**/api/groups**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'PATCH') {
+        renameRequest = request.postDataJSON();
+        groups[1] = { ...groups[1], name: 'Product research' };
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ group: groups[1] }),
+        });
+        return;
+      }
+      if (request.method() === 'DELETE') {
+        deletedGroupId = new URL(request.url()).searchParams.get('id');
+        groups.splice(1, 1);
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true }),
+        });
+        return;
+      }
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ groups, ungroupedCount: 0 }),
+      });
+    });
+    await page.route('**/api/documents', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          documents: [],
+          groups,
+          stats: { docCount: 0, charCount: 0, bySource: {} },
+        }),
+      });
+    });
+
+    await page.goto('/data');
+    await page.getByRole('button', { name: 'Groups', exact: true }).click();
+    await page.getByRole('button', { name: 'Group actions for Research' }).click();
+    await page.getByRole('menuitem', { name: 'Rename' }).click();
+    const renameDialog = page.getByRole('dialog', { name: 'Rename group' });
+    await renameDialog.getByRole('textbox', { name: 'Name' }).fill('Product research');
+    await renameDialog.getByRole('button', { name: 'Save name' }).click();
+
+    await expect.poll(() => renameRequest).toEqual({ id: 'research', name: 'Product research' });
+    await expect(page.getByText('Product research', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Group actions for Product research' }).click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    const confirmation = page.getByRole('alertdialog');
+    await expect(confirmation).toContainText('Delete Product research?');
+    await confirmation.getByRole('button', { name: 'Delete group' }).click();
+
+    await expect.poll(() => deletedGroupId).toBe('research');
+    await expect(page.getByText('Product research', { exact: true })).toHaveCount(0);
+  });
+
   test('uses the built-in crawler API without requiring Docker', async ({ page }) => {
     let startAttempts = 0;
     await page.route('**/api/firecrawl/local', async (route) => {
