@@ -4,6 +4,11 @@
   "publishConfig": {
     "access": "public"
   },
+  "files": [
+    ".env.example",
+    "db",
+    "src"
+  ],
   "type": "module",
   "exports": {
     "./types": "./src/types.ts",
