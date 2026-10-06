@@ -1,5 +1,11 @@
 # larkup
 
+## 0.4.9
+
+### Patch Changes
+
+- 24b3173: fix: explicitly include .next standalone output in npm package payload by overriding default npmignore behaviors
+
 ## 0.4.8
 
 ### Patch Changes
