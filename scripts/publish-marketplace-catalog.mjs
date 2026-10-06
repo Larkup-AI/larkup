@@ -61,23 +61,31 @@ function readToolManifests() {
   });
 }
 
+async function readRemoteVersion(hubUrl, toolId) {
+  const url = new URL(`${hubUrl}/v1/tools/${encodeURIComponent(toolId)}`);
+  url.searchParams.set('catalogSync', Date.now().toString());
+  const response = await fetch(url, { cache: 'no-store' });
+  if (response.status === 404) return undefined;
+  if (!response.ok) {
+    throw new Error(`Could not read ${toolId} from Marketplace Hub (${response.status}).`);
+  }
+  const remote = await response.json();
+  const remoteVersion = remote.tool?.version;
+  if (typeof remoteVersion !== 'string') {
+    throw new Error(`Marketplace Hub returned no version for ${toolId}.`);
+  }
+  return remoteVersion;
+}
+
 const hubUrl = configValue('LARKUP_HUB_URL', 'https://hub.larkup.de').replace(/\/$/, '');
 const publishKey = configValue('HUB_PUBLISH_KEY');
 const pending = [];
 
 for (const manifest of readToolManifests()) {
-  const response = await fetch(`${hubUrl}/v1/tools/${encodeURIComponent(manifest.id)}`);
-  if (response.status === 404) {
+  const remoteVersion = await readRemoteVersion(hubUrl, manifest.id);
+  if (!remoteVersion) {
     pending.push(manifest);
     continue;
-  }
-  if (!response.ok) {
-    throw new Error(`Could not read ${manifest.id} from Marketplace Hub (${response.status}).`);
-  }
-  const remote = await response.json();
-  const remoteVersion = remote.tool?.version;
-  if (typeof remoteVersion !== 'string') {
-    throw new Error(`Marketplace Hub returned no version for ${manifest.id}.`);
   }
   if (compareVersions(manifest.version, remoteVersion) > 0) pending.push(manifest);
 }
@@ -113,6 +121,12 @@ for (const manifest of pending) {
   if (!response.ok) {
     throw new Error(
       `Could not publish ${manifest.id}@${manifest.version} to Marketplace Hub (${response.status}).`,
+    );
+  }
+  const remoteVersion = await readRemoteVersion(hubUrl, manifest.id);
+  if (remoteVersion !== manifest.version) {
+    throw new Error(
+      `Marketplace Hub reported ${manifest.id}@${remoteVersion ?? 'missing'} after publishing ${manifest.version}.`,
     );
   }
   console.log(`Published ${manifest.id}@${manifest.version} to Marketplace Hub.`);
