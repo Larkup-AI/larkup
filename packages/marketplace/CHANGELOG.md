@@ -1,5 +1,11 @@
 # @larkup/marketplace
 
+## 0.3.8
+
+### Patch Changes
+
+- c66e6a6: Restrict the published package contents so local environment files and build caches cannot be included in npm tarballs.
+
 ## 0.3.7
 
 ### Patch Changes
