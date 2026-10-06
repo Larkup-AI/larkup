@@ -1,5 +1,11 @@
 # larkup
 
+## 0.4.8
+
+### Patch Changes
+
+- 3bfa528: fix: use npm-registry xlsx instead of remote CDN tarball to prevent EALLOWREMOTE install failures
+
 ## 0.4.7
 
 ### Patch Changes
