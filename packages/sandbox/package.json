@@ -46,7 +46,7 @@
     "e2b": "^2.39.0",
     "@vercel/sandbox": "^3.0.0",
     "modal": "^0.11.0",
-    "@daytona/sdk": "^0.220.0",
+    "@daytona/sdk": "^0.223.0",
     "@browserbasehq/sdk": "^2.17.0",
     "playwright-core": "^1.62.1",
     "@fly/sprites": "^0.2.0",
