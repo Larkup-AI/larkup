@@ -73,6 +73,7 @@ import {
   requestsVisualization,
 } from '@/lib/chat/tabular-visualization';
 import {
+  hasCompletedTabularVisualizationStep,
   isLikelyTabularQuestion,
   requiresTabularSandbox,
   tabularToolsForStep,
@@ -1863,7 +1864,7 @@ ${fieldLines}`;
           // Most chats finish after their first answer. The upper bound leaves
           // room for retrieve → verify → inspect → re-verify when a tool result
           // reveals a video claim that needs source-level corroboration.
-          stopWhen: stepCountIs(5),
+          stopWhen: [stepCountIs(5), ({ steps }) => hasCompletedTabularVisualizationStep(steps)],
           toolChoice: 'auto',
           prepareStep: ({ stepNumber, messages }) => {
             if (preloadedEvidence !== undefined) {

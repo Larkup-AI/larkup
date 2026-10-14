@@ -30,6 +30,28 @@ export function tabularToolsForStep(input: {
   return { toolChoice: 'none' as const, activeTools: [] };
 }
 
+/** Stop once the host has attached a renderable chart to authoritative rows. */
+export function hasCompletedTabularVisualizationStep(
+  steps: Array<{
+    toolResults?: readonly unknown[];
+  }>,
+) {
+  const lastStep = steps.at(-1);
+  return Boolean(
+    lastStep?.toolResults?.some((result) => {
+      if (!result || typeof result !== 'object' || !('toolName' in result)) return false;
+      if ((result as { toolName?: unknown }).toolName !== 'queryTabularData') return false;
+      const output = (result as { output?: unknown }).output;
+      return Boolean(
+        output &&
+        typeof output === 'object' &&
+        'visualization' in output &&
+        (output as { visualization?: unknown }).visualization,
+      );
+    }),
+  );
+}
+
 /**
  * Identify requests whose answer requires an out-of-core calculation rather
  * than a single structured table query. This is phrased around analytical

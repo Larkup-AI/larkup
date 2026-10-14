@@ -1,6 +1,9 @@
 name: Build and Push Docker Image
 
 on:
+  push:
+    tags:
+      - 'larkup@*'
   release:
     types: [published]
   workflow_dispatch:
@@ -10,11 +13,42 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: docker-release-${{ github.event.release.tag_name || github.ref_name || inputs.version }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      - name: Resolve and validate image version
+        id: version
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          package_version=$(node -p "require('./apps/web/package.json').version")
+          requested_version="${REQUESTED_VERSION:-}"
+          release_tag="${RELEASE_TAG:-}"
+          ref_tag="${GITHUB_REF_NAME:-}"
+
+          if [[ -n "$requested_version" && "$requested_version" != "$package_version" ]]; then
+            echo "Requested Docker version $requested_version does not match larkup@$package_version." >&2
+            exit 1
+          fi
+          if [[ -n "$release_tag" && "$release_tag" != "$package_version" && "$release_tag" != "larkup@$package_version" ]]; then
+            echo "Release tag $release_tag does not match larkup@$package_version." >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$ref_tag" != "$package_version" && "$ref_tag" != "larkup@$package_version" ]]; then
+            echo "Git tag $ref_tag does not match larkup@$package_version." >&2
+            exit 1
+          fi
+
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -39,6 +73,6 @@ jobs:
             NEXT_PUBLIC_DOCKER_ENV=true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/larkup:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/larkup:${{ inputs.version || github.event.release.tag_name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/larkup:${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

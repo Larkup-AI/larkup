@@ -20,7 +20,13 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cd "$PROJECT_ROOT"
-pnpm -r --filter '{apps/web}...' --if-present build
+rm -rf apps/web/.next
+NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}" \
+  pnpm -r --filter '{apps/web}...' --if-present build
+if [[ ! -f apps/web/.next/standalone/apps/web/server.js ]]; then
+  echo 'Candidate build did not produce the standalone server.' >&2
+  exit 1
+fi
 mkdir -p "$TEST_ROOT/pack-cache"
 (cd apps/web && NPM_CONFIG_CACHE="$TEST_ROOT/pack-cache" npm pack --pack-destination "$TEST_ROOT" --ignore-scripts >/dev/null)
 
@@ -50,6 +56,13 @@ const path = require('node:path');
 const packageRoot = process.argv[2];
 const server = path.join(packageRoot, '.next', 'standalone', 'apps', 'web', 'server.js');
 const requireFromServer = createRequire(server);
+const packageJson = require(path.join(packageRoot, 'package.json'));
+const nextVersion = requireFromServer('next/package.json').version;
+if (nextVersion !== packageJson.dependencies.next) {
+  throw new Error(
+    `Installed Next ${nextVersion} does not match the build runtime ${packageJson.dependencies.next}.`,
+  );
+}
 const ffprobe = requireFromServer('@ffprobe-installer/ffprobe');
 if (!existsSync(ffprobe.path)) throw new Error(`Bundled ffprobe is missing: ${ffprobe.path}`);
 const result = spawnSync(ffprobe.path, ['-version'], {

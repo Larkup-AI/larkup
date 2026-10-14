@@ -413,7 +413,15 @@ def worker_model_configuration(value: Any) -> dict[str, dict[str, str]]:
         )
     allowed = {
         "audio": {"openai", "groq", "deepgram", "elevenlabs"},
-        "brain": {"vercel_ai_gateway", "google", "openai"},
+        "brain": {
+            "vercel_ai_gateway",
+            "google",
+            "openai",
+            "deepseek",
+            "mistral",
+            "cohere",
+            "anthropic",
+        },
         "vision": {"vercel_ai_gateway", "google", "openai"},
     }
     result: dict[str, dict[str, str]] = {}

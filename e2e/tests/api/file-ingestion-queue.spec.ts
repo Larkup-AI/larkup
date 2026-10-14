@@ -14,8 +14,11 @@ test('file uploads stay available and queue another indexing pass', async () => 
   );
   const indexRoute = await readFile(`${repoRoot}/apps/web/app/api/index/route.ts`, 'utf8');
 
-  expect(uploadPanel).toContain("? 'Add more files'");
-  expect(uploadPanel).toContain('onClick: saving ?');
+  expect(uploadPanel).toContain("label: 'Add file'");
+  expect(uploadPanel).toContain(
+    'onClick: isRemoteEntry ? () => void loadRemoteFile() : () => void ingest()',
+  );
+  expect(uploadPanel).toContain('const actionBusy = saving || loadingRemoteFile');
   expect(uploadPanel).toContain('joinedActiveSave');
   expect(uploadPanel).toContain('filesToIngest');
   expect(dataWorkspace).toContain('new files will join the queue');

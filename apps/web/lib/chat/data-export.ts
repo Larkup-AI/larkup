@@ -441,21 +441,27 @@ export function dataExportUsesAnswerText(text: string): boolean {
 
 export function requestedDataExportFormat(text: string): DataExportFormat | undefined {
   const normalized = text.trim().toLocaleLowerCase();
-  const format = /\b(?:excel|xlsx)\b/.test(normalized)
+  // Dataset names describe the source, not the requested output. Without
+  // masking them, "create a chart from sales.csv" is misrouted as a CSV export.
+  const outputRequest = normalized.replace(
+    /\b[\p{L}\p{N}_-]+\.(?:csv|xlsx|pdf)\b/gu,
+    'source-file',
+  );
+  const format = /\b(?:excel|xlsx)\b/.test(outputRequest)
     ? 'xlsx'
-    : /\bcsv\b/.test(normalized)
+    : /\bcsv\b/.test(outputRequest)
       ? 'csv'
-      : /\bpdf\b/.test(normalized)
+      : /\bpdf\b/.test(outputRequest)
         ? 'pdf'
         : undefined;
   if (!format) return undefined;
   const asksForFile =
     /\b(?:export|download|save|create|make|generate|prepare|provide|send|give|convert|format)\b/.test(
-      normalized,
+      outputRequest,
     ) ||
-    /\b(?:as|in|into|to)\s+(?:an?\s+)?(?:excel|xlsx|csv|pdf)\b/.test(normalized) ||
+    /\b(?:as|in|into|to)\s+(?:an?\s+)?(?:excel|xlsx|csv|pdf)\b/.test(outputRequest) ||
     /^(?:(?:in|as)\s+)?(?:an?\s+)?(?:excel|xlsx|csv|pdf)(?:\s+(?:file|format|table))?(?:\s+(?:maybe|please))?[?!.]*$/.test(
-      normalized,
+      outputRequest,
     );
   return asksForFile ? format : undefined;
 }
