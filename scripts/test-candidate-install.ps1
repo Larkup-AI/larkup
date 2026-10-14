@@ -11,14 +11,31 @@ try {
     Push-Location $ProjectRoot
     try {
         pnpm -r --filter '{apps/web}...' --if-present build
-        Push-Location (Join-Path $ProjectRoot 'apps/web')
         $env:NPM_CONFIG_CACHE = Join-Path $TestRoot 'pack-cache'
         New-Item -ItemType Directory -Path $env:NPM_CONFIG_CACHE -Force | Out-Null
+
+        # Pack direct workspace dependencies so candidate versions that have
+        # not reached npm yet can be installed as one release set.
+        $webManifest = Get-Content (Join-Path $ProjectRoot 'apps/web/package.json') -Raw | ConvertFrom-Json
+        $internalNames = @(
+            $webManifest.dependencies.PSObject.Properties |
+                Where-Object { $_.Name.StartsWith('@larkup/') } |
+                ForEach-Object { $_.Name }
+        )
+        $workspacePackages = @(pnpm list -r --depth -1 --json | ConvertFrom-Json)
+        foreach ($workspacePackage in $workspacePackages) {
+            if ($internalNames -contains $workspacePackage.name) {
+                Push-Location $workspacePackage.path
+                try { pnpm pack --pack-destination $TestRoot | Out-Null } finally { Pop-Location }
+            }
+        }
+
+        Push-Location (Join-Path $ProjectRoot 'apps/web')
         try { npm pack --pack-destination $TestRoot --ignore-scripts | Out-Null } finally { Pop-Location }
     } finally { Pop-Location }
 
-    $PackageTarball = Get-ChildItem -Path $TestRoot -Filter 'larkup-*.tgz' | Select-Object -First 1
-    if (-not $PackageTarball) { throw 'Candidate package tarball was not created.' }
+    $PackageTarballPath = Join-Path $TestRoot ("larkup-" + $webManifest.version + ".tgz")
+    if (-not (Test-Path $PackageTarballPath)) { throw 'Candidate package tarball was not created.' }
     $env:HOME = Join-Path $TestRoot 'home'
     $env:USERPROFILE = $env:HOME
     $env:APPDATA = Join-Path $TestRoot 'appdata'
@@ -26,7 +43,8 @@ try {
     $env:NPM_CONFIG_CACHE = Join-Path $TestRoot 'npm-cache'
     $env:NPM_CONFIG_PREFIX = Join-Path $TestRoot 'npm-prefix'
     New-Item -ItemType Directory -Path $env:HOME, $env:APPDATA, $env:LOCALAPPDATA, $env:NPM_CONFIG_CACHE, (Join-Path $env:NPM_CONFIG_PREFIX 'bin'), (Join-Path $env:NPM_CONFIG_PREFIX 'lib') -Force | Out-Null
-    npm install -g --prefix $env:NPM_CONFIG_PREFIX --no-audit --no-fund $PackageTarball.FullName | Out-Null
+    $candidateTarballs = @(Get-ChildItem -Path $TestRoot -Filter '*.tgz' | ForEach-Object { $_.FullName })
+    npm install -g --prefix $env:NPM_CONFIG_PREFIX --no-audit --no-fund @candidateTarballs | Out-Null
 
     $npmPrefix = @($env:NPM_CONFIG_PREFIX, (Join-Path $env:APPDATA 'npm')) |
         Where-Object { $_ -and (Test-Path (Join-Path $_ 'larkup.cmd')) } |
