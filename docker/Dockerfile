@@ -74,7 +74,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 # Install native bindings directly for the target platform. Keep these exact
 # versions aligned with the web package so Docker does not replace traced code
 # with an older runtime implementation.
-RUN npm install --no-save @lancedb/lancedb@0.39.0 @napi-rs/canvas@1.0.9 && \
+RUN npm install --no-save @lancedb/lancedb@0.40.0 @napi-rs/canvas@1.0.10 && \
     chown -R nextjs:nodejs node_modules/@lancedb node_modules/@napi-rs node_modules/apache-arrow node_modules/reflect-metadata && \
     mkdir -p /app/apps/web/.larkup /app/.tmp && \
     chown -R nextjs:nodejs /app/apps/web/.larkup /app/.tmp
