@@ -56,10 +56,9 @@ try {
     throw 'Installed Larkup server did not become healthy.'
 } finally {
     if ($ServerProcess -and -not $ServerProcess.HasExited) { Stop-Process -Id $ServerProcess.Id -Force }
-    if (Test-Path $TestRoot) {
+    if ($env:CI -ne 'true' -and (Test-Path $TestRoot)) {
         # The spawned server may leave browser-cache handles briefly open on
-        # GitHub's Windows runner. Cleanup must not turn a passed smoke test
-        # into a failure.
+        # Windows. Cleanup must not turn a passed smoke test into a failure.
         Remove-Item -Recurse -Force $TestRoot -ErrorAction SilentlyContinue
     }
 }
