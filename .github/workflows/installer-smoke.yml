@@ -21,6 +21,9 @@ on:
       - 'scripts/test-release-install.*'
       - 'scripts/test-candidate-install.*'
       - '.github/workflows/installer-smoke.yml'
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
   schedule:
     - cron: '20 5 * * *'
   workflow_dispatch:
