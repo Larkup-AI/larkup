@@ -38,7 +38,7 @@ command -v larkup
 larkup --version
 
 # The installed package must serve an HTTP response, not merely expose a shim.
-PORT=4568 larkup start >"$TEST_ROOT/larkup.log" 2>&1 &
+LARKUP_NO_OPEN=1 PORT=4568 larkup start >"$TEST_ROOT/larkup.log" 2>&1 &
 SERVER_PID=$!
 
 for _ in $(seq 1 60); do
