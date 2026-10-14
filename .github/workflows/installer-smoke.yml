@@ -53,10 +53,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Validate installer shell scripts
         run: scripts/test-install-scripts.sh
-      - name: Clean install and server health check
-        run: scripts/test-release-install.sh
       - name: Candidate package install, ffprobe, and server check
         run: scripts/test-candidate-install.sh
+      # A source push cannot change the package already on npm. Keep the public
+      # release monitor independent from candidate validation so installer fixes
+      # can become green before they are published.
+      - name: Published release clean install and server health check
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: scripts/test-release-install.sh
 
   windows:
     name: Windows x64 clean install
