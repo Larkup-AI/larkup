@@ -35,21 +35,37 @@ const ANALYSIS_PYTHON_MODULES = [
   'PIL',
 ];
 const ANALYSIS_PYTHON_PACKAGES = [
-  'pandas==2.2.3',
   // Python 3.9 ships with several supported desktop environments. Keep the
   // local pins compatible with it rather than requiring a user-managed upgrade.
-  'numpy==1.26.4',
-  'matplotlib==3.9.4',
+  // Newer Python releases need wheels from the current scientific stack; the
+  // environment markers let pip select one repeatable set without compiling.
+  "pandas==2.2.3; python_version < '3.13'",
+  "numpy==1.26.4; python_version < '3.13'",
+  "matplotlib==3.9.4; python_version < '3.13'",
+  "scipy==1.13.1; python_version < '3.13'",
+  "scikit-learn==1.6.1; python_version < '3.13'",
+  "Pillow==11.1.0; python_version < '3.13'",
+  "pandas==3.0.6; python_version >= '3.13'",
+  "numpy==2.5.4; python_version >= '3.13'",
+  "matplotlib==3.11.2; python_version >= '3.13'",
+  "scipy==1.18.1; python_version >= '3.13'",
+  "scikit-learn==1.9.1; python_version >= '3.13'",
+  "Pillow==12.3.0; python_version >= '3.13'",
   'openpyxl==3.1.5',
-  'scipy==1.13.1',
-  'scikit-learn==1.6.1',
   'seaborn==0.13.2',
   'xlrd==2.0.1',
   'pypdf==5.1.0',
   'python-docx==1.1.2',
   'python-pptx==1.0.2',
-  'Pillow==11.1.0',
 ];
+
+function installationFailureDetails(stderr: string): string {
+  const redacted = stderr
+    .replace(/https?:\/\/\S+/giu, '[package index]')
+    .trim()
+    .slice(-2_000);
+  return redacted ? `\n\nPython package installer output:\n${redacted}` : '';
+}
 
 function pythonEnvironment(virtualEnv?: string): NodeJS.ProcessEnv {
   const env = { ...process.env };
@@ -244,6 +260,7 @@ async function prepareManagedPythonRuntime(): Promise<Command> {
       'install',
       '--disable-pip-version-check',
       '--no-input',
+      '--only-binary=:all:',
       ...ANALYSIS_PYTHON_PACKAGES,
     ],
     undefined,
@@ -255,7 +272,7 @@ async function prepareManagedPythonRuntime(): Promise<Command> {
     !(await hasAnalysisDependencies(managedPython, runtimeDirectory))
   ) {
     throw new Error(
-      'Larkup could not prepare its local analysis environment. Check the internet connection and retry, or choose Docker or a remote sandbox provider.',
+      `Larkup could not prepare its local analysis environment. Check the internet connection and retry, or choose Docker or a remote sandbox provider.${installationFailureDetails(installed.stderr)}`,
     );
   }
   return managedPython;

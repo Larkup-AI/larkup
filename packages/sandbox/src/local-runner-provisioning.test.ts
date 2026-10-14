@@ -81,8 +81,11 @@ describe('managed local Python runtime', () => {
     );
     expect(pipCall?.args).toEqual(
       expect.arrayContaining([
-        'numpy==1.26.4',
-        'pandas==2.2.3',
+        '--only-binary=:all:',
+        "numpy==1.26.4; python_version < '3.13'",
+        "pandas==2.2.3; python_version < '3.13'",
+        "numpy==2.5.4; python_version >= '3.13'",
+        "pandas==3.0.6; python_version >= '3.13'",
         'openpyxl==3.1.5',
         'pypdf==5.1.0',
         'seaborn==0.13.2',
