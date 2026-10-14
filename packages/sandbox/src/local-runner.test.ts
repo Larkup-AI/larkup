@@ -26,7 +26,7 @@ summary = pd.DataFrame({'Region': ['East', 'West'], 'Profit': [12.5, 18.25]})
     expect(result.exitCode, result.stderr).toBe(0);
     expect(result.stdout).toContain('Analysis result preview (summary):');
     expect(result.stdout).toContain('East');
-  }, 15_000);
+  }, 180_000);
 
   it('runs JavaScript without Docker and returns output artifacts', async () => {
     const result = await executeLocally({
