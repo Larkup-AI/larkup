@@ -47,6 +47,7 @@ FROM base AS runner
 WORKDIR /app
 
 ARG YT_DLP_VERSION=2026.07.04
+ARG LARKUP_VERSION
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -70,6 +71,11 @@ RUN mkdir -p /app/apps/web/.next && chown nextjs:nodejs /app/apps/web/.next
 
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+
+# Fail the release build if the tag, embedded application, and traced Next.js
+# runtime ever drift apart. A mismatch here recreates the npm ENOENT class of
+# failure even when the container itself was tagged with the expected version.
+RUN node -e 'const { createRequire } = require("node:module"); const app = require("./apps/web/package.json"); const next = createRequire("/app/apps/web/server.js")("next/package.json").version; const expected = process.argv[1]; if (app.version !== expected || next !== app.dependencies.next) throw new Error(`Expected Larkup ${expected} with Next ${app.dependencies.next}, found Larkup ${app.version} with Next ${next}.`);' "$LARKUP_VERSION"
 
 # Install native bindings directly for the target platform. Keep these exact
 # versions aligned with the web package so Docker does not replace traced code

@@ -71,6 +71,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             NEXT_PUBLIC_DOCKER_ENV=true
+            LARKUP_VERSION=${{ steps.version.outputs.version }}
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/larkup:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/larkup:${{ steps.version.outputs.version }}
