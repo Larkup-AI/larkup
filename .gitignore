@@ -71,6 +71,7 @@ apps/api*.log
 
 notes.txt
 plan.md
+plan2.md
 test.py
 test.ts
 widget-demo
