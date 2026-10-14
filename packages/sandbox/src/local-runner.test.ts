@@ -14,19 +14,23 @@ describe('executeLocally', () => {
     expect(wrapper).toContain('Analysis result preview');
   });
 
-  it('emits a small final dataframe preview when analysis code has no stdout', async () => {
-    const result = await executeLocally({
-      language: 'python',
-      code: `
+  it(
+    'emits a small final dataframe preview when analysis code has no stdout',
+    async () => {
+      const result = await executeLocally({
+        language: 'python',
+        code: `
 import pandas as pd
 summary = pd.DataFrame({'Region': ['East', 'West'], 'Profit': [12.5, 18.25]})
 `,
-    });
+      });
 
-    expect(result.exitCode, result.stderr).toBe(0);
-    expect(result.stdout).toContain('Analysis result preview (summary):');
-    expect(result.stdout).toContain('East');
-  }, 180_000);
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toContain('Analysis result preview (summary):');
+      expect(result.stdout).toContain('East');
+    },
+    11 * 60_000,
+  );
 
   it('runs JavaScript without Docker and returns output artifacts', async () => {
     const result = await executeLocally({
