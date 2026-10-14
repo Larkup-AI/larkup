@@ -1,5 +1,17 @@
 # larkup
 
+## 0.4.12
+
+### Patch Changes
+
+- 969a7f3: Install a wheel-only, Python-version-compatible scientific analysis stack in the managed local sandbox so first-run chart and dataframe analysis works on current macOS, Windows, and Linux Python runtimes.
+
+  Include redacted package-installer diagnostics when environment preparation fails, making collaboration setup problems actionable without exposing configured package-index URLs.
+
+- Updated dependencies [969a7f3]
+  - @larkup/sandbox@0.1.8
+  - @larkup/tool-doc-editor@0.2.30
+
 ## 0.4.11
 
 ### Patch Changes

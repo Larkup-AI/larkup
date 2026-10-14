@@ -80,5 +80,10 @@ console.log(`Bundled ffprobe is executable: ${ffprobe.path}`);
     throw 'Candidate Larkup server did not become healthy.'
 } finally {
     if ($ServerProcess -and -not $ServerProcess.HasExited) { Stop-Process -Id $ServerProcess.Id -Force }
-    if (Test-Path $TestRoot) { Remove-Item -Recurse -Force $TestRoot -ErrorAction SilentlyContinue }
+    # GitHub-hosted runners are discarded after the job. Recursively deleting
+    # the packed app and its npm tree is very slow on Windows and can turn a
+    # successful smoke test into a job timeout.
+    if ($env:CI -ne 'true' -and (Test-Path $TestRoot)) {
+        Remove-Item -Recurse -Force $TestRoot -ErrorAction SilentlyContinue
+    }
 }
