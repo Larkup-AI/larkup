@@ -21,6 +21,10 @@ describe('published npm metadata', () => {
     const sandboxPackage = readJson('packages/sandbox/package.json');
     const launcher = readFileSync(path.join(repoRoot, 'apps/web/bin/larkup.js'), 'utf8');
     const dockerfile = readFileSync(path.join(repoRoot, 'docker/Dockerfile'), 'utf8');
+    const dockerWorkflow = readFileSync(
+      path.join(repoRoot, '.github/workflows/docker-build.yml'),
+      'utf8',
+    );
 
     expect(webPackage.dependencies['apache-arrow']).toBe('18.1.0');
     // The standalone output and its Next runtime must be the same patch
@@ -32,6 +36,9 @@ describe('published npm metadata', () => {
       `@lancedb/lancedb@${webPackage.dependencies['@lancedb/lancedb'].replace(/^\D+/, '')}`,
     );
     expect(dockerfile).toContain(`@napi-rs/canvas@${webPackage.dependencies['@napi-rs/canvas']}`);
+    expect(dockerfile).toContain('ARG LARKUP_VERSION');
+    expect(dockerfile).toContain('next !== app.dependencies.next');
+    expect(dockerWorkflow).toContain('LARKUP_VERSION=${{ steps.version.outputs.version }}');
     expect(dockerfile).not.toContain('fluent-ffmpeg');
     expect(cliPackage.dependencies['apache-arrow']).toBe('18.1.0');
     expect(vectorStoresPackage.dependencies['apache-arrow']).toBe('18.1.0');
@@ -47,6 +54,7 @@ describe('published npm metadata', () => {
     expect(launcher).toContain('`larkup@${latestVersion}`');
     expect(launcher).not.toContain("'@larkup/cli@latest'");
     expect(launcher).toContain('You already have the latest version.');
+    expect(launcher).toContain("process.env.LARKUP_NO_OPEN !== '1'");
     for (const dependency of [
       '@larkup/connections',
       '@larkup/core',
