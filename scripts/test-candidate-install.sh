@@ -14,7 +14,9 @@ cleanup() {
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
   fi
-  rm -rf "$TEST_ROOT"
+  # macOS can briefly retain files after terminating a spawned application.
+  # Cleanup must not turn an otherwise successful install health check red.
+  rm -rf "$TEST_ROOT" 2>/dev/null || true
   exit "$code"
 }
 trap cleanup EXIT INT TERM
@@ -73,7 +75,7 @@ if (result.status !== 0) throw new Error(result.stderr || 'Bundled ffprobe did n
 console.log(`Bundled ffprobe is executable: ${ffprobe.path}`);
 NODE
 
-PORT=4568 larkup start >"$TEST_ROOT/larkup.log" 2>&1 &
+LARKUP_NO_OPEN=1 PORT=4568 larkup start >"$TEST_ROOT/larkup.log" 2>&1 &
 SERVER_PID=$!
 for _ in $(seq 1 60); do
   if curl --fail --silent --show-error "http://127.0.0.1:4568/" >/dev/null; then

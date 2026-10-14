@@ -43,7 +43,9 @@ if (command === '--version' || command === '-v') {
   });
   child.once('exit', (code) => process.exit(code ?? 0));
 
-  void openWhenReady(url);
+  if (process.env.CI !== 'true' && process.env.LARKUP_NO_OPEN !== '1') {
+    void openWhenReady(url);
+  }
 } else if (command === 'update') {
   const currentVersion = pkg.version;
   const latestVersion = await getLatestPublishedVersion();

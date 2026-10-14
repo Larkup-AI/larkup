@@ -38,6 +38,7 @@ try {
     $stdoutPath = Join-Path $TestRoot 'larkup.stdout.log'
     $stderrPath = Join-Path $TestRoot 'larkup.stderr.log'
     $env:PORT = '4568'
+    $env:LARKUP_NO_OPEN = '1'
     $ServerProcess = Start-Process -FilePath 'larkup.cmd' -ArgumentList 'start' -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
         try {
