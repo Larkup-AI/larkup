@@ -320,13 +320,13 @@ importers:
         specifier: ^0.3.5
         version: link:../../packages/marketplace
       '@larkup/sandbox':
-        specifier: ^0.1.7
+        specifier: ^0.1.8
         version: link:../../packages/sandbox
       '@larkup/scraper':
         specifier: ^0.1.50
         version: link:../../packages/scraper
       '@larkup/tool-doc-editor':
-        specifier: ^0.2.29
+        specifier: ^0.2.30
         version: link:../../packages/marketplace-tools/doc-editor
       '@larkup/vector-stores':
         specifier: ^0.1.27
