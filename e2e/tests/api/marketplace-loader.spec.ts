@@ -55,11 +55,13 @@ test('bundled first-party tools are not marked installed until the user installs
 
 test('installs a pnpm workspace-linked tool locally without attempting a registry download', async () => {
   const originalCwd = process.cwd();
+  const originalFetch = globalThis.fetch;
   const workspace = await mkdtemp(path.join(tmpdir(), 'larkup-marketplace-workspace-'));
   const appDir = path.join(workspace, 'apps', 'web');
   const packageDir = path.join(workspace, 'packages', 'marketplace-tools', 'video-intelligence');
 
   try {
+    globalThis.fetch = async () => new Response(null, { status: 503 });
     await mkdir(path.join(appDir, 'node_modules', '@larkup'), { recursive: true });
     await mkdir(packageDir, { recursive: true });
     await writeFile(
@@ -92,6 +94,7 @@ test('installs a pnpm workspace-linked tool locally without attempting a registr
       ]),
     );
   } finally {
+    globalThis.fetch = originalFetch;
     process.chdir(originalCwd);
     invalidateRegistryCache();
     await rm(workspace, { recursive: true, force: true });
