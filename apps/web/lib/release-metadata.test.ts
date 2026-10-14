@@ -13,14 +13,26 @@ function readJson(relativePath: string) {
 describe('published npm metadata', () => {
   it('keeps global installer dependencies compatible and current', () => {
     const webPackage = readJson('apps/web/package.json');
+    const rootPackage = readJson('package.json');
     const cliPackage = readJson('apps/cli/package.json');
     const corePackage = readJson('packages/core/package.json');
     const marketplacePackage = readJson('packages/marketplace/package.json');
     const vectorStoresPackage = readJson('packages/vector-stores/package.json');
     const sandboxPackage = readJson('packages/sandbox/package.json');
     const launcher = readFileSync(path.join(repoRoot, 'apps/web/bin/larkup.js'), 'utf8');
+    const dockerfile = readFileSync(path.join(repoRoot, 'docker/Dockerfile'), 'utf8');
 
     expect(webPackage.dependencies['apache-arrow']).toBe('18.1.0');
+    // The standalone output and its Next runtime must be the same patch
+    // release. A range can install a newer runtime that expects build files
+    // which the packaged output does not contain.
+    expect(webPackage.dependencies.next).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(rootPackage.pnpm.overrides.next).toBe(webPackage.dependencies.next);
+    expect(dockerfile).toContain(
+      `@lancedb/lancedb@${webPackage.dependencies['@lancedb/lancedb'].replace(/^\D+/, '')}`,
+    );
+    expect(dockerfile).toContain(`@napi-rs/canvas@${webPackage.dependencies['@napi-rs/canvas']}`);
+    expect(dockerfile).not.toContain('fluent-ffmpeg');
     expect(cliPackage.dependencies['apache-arrow']).toBe('18.1.0');
     expect(vectorStoresPackage.dependencies['apache-arrow']).toBe('18.1.0');
     expect(webPackage.dependencies.tsx).toBeDefined();

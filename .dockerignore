@@ -20,13 +20,19 @@ docker/
 # Dependencies & Build output
 **/node_modules
 **/.next
+**/.aws-sam
 **/target
 .turbo
 .venv
+**/.venv
 .vercel
+**/__pycache__
+**/.pytest_cache
 **/.larkup
 **/gen
 **/lancedb
+**/test-results
+**/playwright-report
 
 # Misc
 *.md

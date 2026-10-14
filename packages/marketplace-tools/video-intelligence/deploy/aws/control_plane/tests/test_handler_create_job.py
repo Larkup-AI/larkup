@@ -112,6 +112,22 @@ class CreateJobTests(unittest.TestCase):
         self.assertNotIn("brain-secret", json.dumps(item, default=str))
         self.assertNotIn("audio-secret", json.dumps(item, default=str))
 
+    def test_accepts_every_agent_provider_supported_by_the_video_worker(self) -> None:
+        for provider in ("deepseek", "mistral", "cohere", "anthropic"):
+            with self.subTest(provider=provider):
+                models = {
+                    **self.models,
+                    "brain": {
+                        "provider": provider,
+                        "apiKey": f"{provider}-secret",
+                        "model": f"{provider}/test-model",
+                    },
+                }
+                self.assertEqual(
+                    self.handler.worker_model_configuration(models)["brain"],
+                    models["brain"],
+                )
+
     def test_interactive_job_uses_and_persists_the_bounded_queue(self) -> None:
         interactive_provider = _FakeProvider()
         self.handler.GPU_PROVIDER = "runpod"

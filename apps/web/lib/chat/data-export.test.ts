@@ -17,6 +17,9 @@ describe('chat data exports', () => {
     expect(requestedDataExportFormat('In excel table maybe?')).toBe('xlsx');
     expect(requestedDataExportFormat('In an Excel table, please.')).toBe('xlsx');
     expect(requestedDataExportFormat('What does the PDF say about renewal?')).toBeUndefined();
+    expect(
+      requestedDataExportFormat('Create a bar chart of totals from release-readiness.csv.'),
+    ).toBeUndefined();
   });
 
   it('distinguishes direct exports from requests that require fresh filtering', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hasCompletedTabularVisualizationStep,
   isLikelyTabularQuestion,
   requiresTabularSandbox,
   tabularToolsForStep,
@@ -79,5 +80,30 @@ describe('tabularToolsForStep', () => {
         toolNames: ['queryTabularData', 'generateVisualization', 'executeAnalysis'],
       }),
     ).toEqual({ toolChoice: 'none', activeTools: [] });
+  });
+});
+
+describe('hasCompletedTabularVisualizationStep', () => {
+  it('stops after the structured query returns a host-renderable chart', () => {
+    expect(
+      hasCompletedTabularVisualizationStep([
+        {
+          toolResults: [
+            {
+              toolName: 'queryTabularData',
+              output: {
+                rows: [{ region: 'North', total: 10 }],
+                visualization: { chartType: 'bar' },
+              },
+            },
+          ],
+        },
+      ]),
+    ).toBe(true);
+    expect(
+      hasCompletedTabularVisualizationStep([
+        { toolResults: [{ toolName: 'queryTabularData', output: { rows: [] } }] },
+      ]),
+    ).toBe(false);
   });
 });

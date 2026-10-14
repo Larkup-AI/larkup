@@ -1,4 +1,5 @@
 import { readConfig, writeConfig } from '@larkup/core/config-store';
+import { getActiveProject } from '@larkup/core/project-store';
 import { log } from '../ui/logger';
 
 type EnterpriseProfile = {
@@ -8,7 +9,11 @@ type EnterpriseProfile = {
   aiGateway: {
     enabled: boolean;
     allowedModels: string[];
-    limits: { monthlyBudgetUsd: number | null; dailyBudgetUsd: number | null; rateLimitPerMinute: number | null };
+    limits: {
+      monthlyBudgetUsd: number | null;
+      dailyBudgetUsd: number | null;
+      rateLimitPerMinute: number | null;
+    };
   };
   tools: Array<{
     toolId: string;
@@ -38,7 +43,9 @@ export async function updateEnterpriseCommand() {
   const config = await readConfig();
   const enterprise = config.enterprise;
   if (!enterprise) {
-    throw new Error('This Project is not enrolled with an Enterprise profile. Run `larkup install --ee` first.');
+    throw new Error(
+      'This Project is not enrolled with an Enterprise profile. Run `larkup install --ee` first.',
+    );
   }
 
   const response = await fetch(enterpriseEndpoint(enterprise.dashboardUrl, '/api/client/config'), {
@@ -68,10 +75,16 @@ export async function updateEnterpriseCommand() {
       continue;
     }
     const installResponse = await fetch(
-      enterpriseEndpoint(enterprise.dashboardUrl, `/api/client/tools/${encodeURIComponent(tool.toolId)}/install`),
+      enterpriseEndpoint(
+        enterprise.dashboardUrl,
+        `/api/client/tools/${encodeURIComponent(tool.toolId)}/install`,
+      ),
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${enterprise.clientKey}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${enterprise.clientKey}`,
+        },
         body: JSON.stringify({}),
       },
     );
@@ -88,14 +101,22 @@ export async function updateEnterpriseCommand() {
 
   await writeConfig({
     ...config,
-    enterprise: { ...enterprise, managedToolIds, configurationVersion: profile.configurationVersion },
+    enterprise: {
+      ...enterprise,
+      managedToolIds,
+      configurationVersion: profile.configurationVersion,
+    },
   });
 
-  log.success(`Enterprise configuration updated (v${localVersion} → v${profile.configurationVersion}).`);
+  log.success(
+    `Enterprise configuration updated (v${localVersion} → v${profile.configurationVersion}).`,
+  );
   if (added.length) log.info(`Newly installed: ${added.join(', ')}`);
   if (removed.length) log.info(`Removed (revoked): ${removed.join(', ')}`);
   if (needsCredential.length) {
-    log.warn(`Needs credentials — run \`larkup enterprise-tool install <id> --api-key <key>\`: ${needsCredential.join(', ')}`);
+    log.warn(
+      `Needs credentials — run \`larkup enterprise-tool install <id> --api-key <key>\`: ${needsCredential.join(', ')}`,
+    );
   }
   if (!added.length && !removed.length && !needsCredential.length) {
     log.dim('No tool changes. Limits and policy were refreshed.');
@@ -105,12 +126,18 @@ export async function updateEnterpriseCommand() {
 /** Cheap background check used to print the "run larkup update --ee" nudge on startup. Never throws. */
 export async function enterpriseUpdateAvailable(): Promise<boolean> {
   try {
+    // This runs concurrently with every command, including first-time setup.
+    // Do not let the background check create a default project during `init`.
+    if (!(await getActiveProject())) return false;
     const config = await readConfig();
     const enterprise = config.enterprise;
     if (!enterprise) return false;
-    const response = await fetch(enterpriseEndpoint(enterprise.dashboardUrl, '/api/client/config'), {
-      headers: { Authorization: `Bearer ${enterprise.clientKey}` },
-    });
+    const response = await fetch(
+      enterpriseEndpoint(enterprise.dashboardUrl, '/api/client/config'),
+      {
+        headers: { Authorization: `Bearer ${enterprise.clientKey}` },
+      },
+    );
     if (!response.ok) return false;
     const profile = (await response.json()) as EnterpriseProfile;
     return profile.configurationVersion !== (enterprise.configurationVersion ?? 0);

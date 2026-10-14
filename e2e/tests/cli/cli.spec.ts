@@ -15,7 +15,11 @@ function cli(args: string[], cwd = workspace): string {
     cwd,
     timeout: 60_000,
     encoding: 'utf8',
-    env: { ...process.env, NODE_ENV: 'test' },
+    env: {
+      ...process.env,
+      NODE_ENV: 'test',
+      LARKUP_DATA_DIR: path.join(workspace, '.larkup'),
+    },
   });
 }
 
