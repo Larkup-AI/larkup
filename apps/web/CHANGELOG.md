@@ -1,5 +1,11 @@
 # larkup
 
+## 0.4.13
+
+### Patch Changes
+
+- 0fcb97c: Prevent incomplete curl and global npm installations by giving the release build sufficient Node.js heap and refusing publication unless the packed artifact contains the standalone server and browser assets.
+
 ## 0.4.12
 
 ### Patch Changes
