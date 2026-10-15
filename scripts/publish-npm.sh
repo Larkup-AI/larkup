@@ -39,7 +39,15 @@ pnpm --filter @larkup/cli build
 # The npm package ships Next's standalone output. Rebuild it from scratch so a
 # previous release's traced bundle is never republished with a new outer version.
 rm -rf apps/web/.next
-pnpm --filter larkup build
+WEB_NODE_OPTIONS="${NODE_OPTIONS:-}"
+if [[ "$WEB_NODE_OPTIONS" != *"--max-old-space-size="* ]] &&
+  [[ "$WEB_NODE_OPTIONS" != *"--max_old_space_size="* ]]; then
+  WEB_NODE_OPTIONS="${WEB_NODE_OPTIONS:+${WEB_NODE_OPTIONS} }--max-old-space-size=8192"
+fi
+NODE_OPTIONS="$WEB_NODE_OPTIONS" pnpm --filter larkup build
+
+echo "Verifying the packed npm artifact..."
+node "$REPO_ROOT/scripts/verify-larkup-npm-package.mjs"
 
 echo "Publishing versioned workspace packages through Changesets..."
 pnpm changeset publish
