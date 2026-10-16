@@ -1,5 +1,7 @@
 'use client';
 
+import { SourceUploadDropzone } from '@larkup/workspace-ui';
+
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { formatErrorMessage } from '@/lib/shared/error-formatter';
@@ -698,8 +700,7 @@ export function UploadPanel({
       />
 
       {entryTab === 'upload' ? (
-        <button
-          type="button"
+        <SourceUploadDropzone
           onClick={() => inputRef.current?.click()}
           onDragOver={(e) => {
             e.preventDefault();
@@ -711,17 +712,9 @@ export function UploadPanel({
             setDragging(false);
             if (e.dataTransfer.files?.length) readFiles(e.dataTransfer.files);
           }}
-          className={cn(
-            'flex w-full flex-col cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-6 py-10 text-center transition-colors hover:bg-muted/70',
-            dragging && 'border-primary bg-accent',
-          )}
-        >
-          <FileUp className="size-6 text-muted-foreground" />
-          <span className="text-sm font-medium">Drop files here or click to browse</span>
-          <span className="text-xs text-muted-foreground">
-            Text, JSON, CSV, Excel, PDF, and Word files
-          </span>
-        </button>
+          dragging={dragging}
+          icon={<FileUp className="size-6 text-muted-foreground" />}
+        />
       ) : (
         <div className="space-y-1">
           <Input

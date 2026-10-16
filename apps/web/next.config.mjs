@@ -17,6 +17,7 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: [
+    '@larkup/workspace-ui',
     '@larkup/connections',
     '@larkup/core',
     '@larkup/vector-stores',

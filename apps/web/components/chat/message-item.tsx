@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChatUserBubble } from '@larkup/workspace-ui';
 import useSWR from 'swr';
 import type { UIMessage } from 'ai';
 import katex from 'katex';
@@ -383,11 +384,7 @@ export function MessageItem({
               })}
             </div>
           )}
-          {text && (
-            <div className="rounded-2xl rounded-br-md bg-muted border border-border/25 px-4 py-2 text-[15px] leading-relaxed text-foreground">
-              {text}
-            </div>
-          )}
+          {text && <ChatUserBubble>{text}</ChatUserBubble>}
           {text && (
             <MessageActions
               text={text}

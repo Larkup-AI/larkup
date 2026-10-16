@@ -331,6 +331,9 @@ importers:
       '@larkup/vector-stores':
         specifier: ^0.1.27
         version: link:../../packages/vector-stores
+      '@larkup/workspace-ui':
+        specifier: workspace:*
+        version: link:../../packages/workspace-ui
       '@napi-rs/canvas':
         specifier: 1.0.10
         version: 1.0.10
@@ -721,6 +724,37 @@ importers:
       chromadb:
         specifier: ^3.5.0
         version: 3.5.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
+  packages/workspace-ui:
+    dependencies:
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      tailwind-merge:
+        specifier: ^3.3.1
+        version: 3.7.0
+    devDependencies:
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.3.0(@types/react@19.3.0)
+      react:
+        specifier: ^19
+        version: 19.3.0
+      react-dom:
+        specifier: ^19
+        version: 19.3.0(react@19.3.0)
+      tsx:
+        specifier: ^4.19.3
+        version: 4.23.15
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

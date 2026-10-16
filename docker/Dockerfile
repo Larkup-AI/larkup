@@ -16,6 +16,7 @@ COPY apps/larkup-proxy/package.json ./apps/larkup-proxy/
 COPY apps/web/package.json ./apps/web/
 COPY packages/connections/package.json ./packages/connections/
 COPY packages/core/package.json ./packages/core/
+COPY packages/workspace-ui/package.json ./packages/workspace-ui/
 COPY packages/integrations/package.json ./packages/integrations/
 COPY packages/marketplace/package.json ./packages/marketplace/
 COPY packages/sandbox/package.json ./packages/sandbox/

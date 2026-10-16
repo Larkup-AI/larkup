@@ -226,17 +226,36 @@ curl -X POST "$VIDEO_ENDPOINT/v1/admin/devices/$USER_ID/entitlement" \
   -d '{"sourceMinutesPerMonth":60,"maxConcurrentJobs":1,"requestsPerMinute":60,"plan":"support-grant"}'
 ```
 
-For the common “add credits” workflow, use the support script. It calls the
-authenticated control plane, which updates the DynamoDB device entitlement and
-reconciles the current billing-period allowance atomically; it does not write
-to a Neon database. The minutes value is the new total monthly allowance, not
-an increment.
+Use the support script to inspect or change an installation by the generated
+user ID shown in Installed Tools. It calls the authenticated control plane and
+does not write to a Neon database. `set`, `add`, and `remove` change the monthly
+allowance; `reset` clears consumed minutes for the current billing period.
+Meter corrections are rejected while the user has an active job so reserved
+minutes cannot be lost.
 
 ```bash
 export LARKUP_VIDEO_INTELLIGENCE_CLOUD_ENDPOINT='https://video.example.com'
 export LARKUP_VIDEO_ADMIN_TOKEN='...'
-bash scripts/grant-cloud-credits.sh <user-id> 120 support-grant
+
+# Read the current allowance and consumption.
+bash scripts/manage-cloud-usage.sh status <user-id>
+
+# Clear current-period consumption, preserving the monthly allowance.
+bash scripts/manage-cloud-usage.sh reset <user-id>
+
+# Set, add, or remove monthly source-minute allowance.
+bash scripts/manage-cloud-usage.sh set <user-id> 120 support-grant
+bash scripts/manage-cloud-usage.sh add <user-id> 60 support-grant
+bash scripts/manage-cloud-usage.sh remove <user-id> 30 support-grant
+
+# Correct the consumed-minute meter when support needs an exact adjustment.
+bash scripts/manage-cloud-usage.sh usage-set <user-id> 15
+bash scripts/manage-cloud-usage.sh usage-add <user-id> 5
+bash scripts/manage-cloud-usage.sh usage-remove <user-id> 2.5
 ```
+
+`grant-cloud-credits.sh <user-id> <minutes> [plan]` remains as a compatibility
+alias for `manage-cloud-usage.sh set`.
 
 `$USER_ID` is the generated ID shown in Installed Tools and included in the Resend support request. Each local Larkup installation receives a separate key, while DynamoDB stores only hashes of keys and installation identifiers plus aggregate usage.
 
