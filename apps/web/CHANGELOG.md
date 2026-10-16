@@ -1,5 +1,11 @@
 # larkup
 
+## 0.4.14
+
+### Patch Changes
+
+- 48f2064: Retry one terminal managed-cloud video worker failure automatically without duplicating active, misconfigured, or quota-limited jobs. Recover URL imports that accidentally selected an audio-only adaptive stream by downloading a fresh video source, and prevent chat from substituting an unrelated enabled recording when a question explicitly names a media source outside the Assistant data scope.
+
 ## 0.4.13
 
 ### Patch Changes
@@ -532,6 +538,7 @@
   support the store doesn't have.
 
   Also fixes:
+
   - `server-section.tsx`: an interval ref typed via
     `ReturnType<typeof window.setInterval>` resolved to `NodeJS.Timeout` (from
     `@types/node`'s merged overload) instead of the `number` the DOM call
