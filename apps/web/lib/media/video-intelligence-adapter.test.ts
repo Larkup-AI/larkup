@@ -15,10 +15,40 @@ import {
   enforceManagedSemanticBrief,
   createAssetVideoIndexingBrief,
   inferLanguageHintFromTitle,
+  isRetryableManagedVideoWorkerFailure,
+  VideoWorkerTimeoutError,
   formatVideoKnowledgeSummary,
   resolveVideoIndexingHint,
   resolveVideoJobModelConfiguration,
 } from './video-intelligence-adapter';
+
+describe('managed worker recovery', () => {
+  it('retries only terminal Cloud worker failures that have released their reservation', () => {
+    expect(
+      isRetryableManagedVideoWorkerFailure(
+        new Error('Larkup Cloud could not complete this video. Please retry.'),
+      ),
+    ).toBe(true);
+    expect(
+      isRetryableManagedVideoWorkerFailure(
+        new Error('Larkup Cloud completed without a result. Please retry.'),
+      ),
+    ).toBe(true);
+  });
+
+  it('does not duplicate jobs for transport, quota, configuration, or timeout failures', () => {
+    expect(isRetryableManagedVideoWorkerFailure(new Error('fetch failed'))).toBe(false);
+    expect(
+      isRetryableManagedVideoWorkerFailure(new Error('quota or concurrency limit reached')),
+    ).toBe(false);
+    expect(
+      isRetryableManagedVideoWorkerFailure(new Error('A valid vision API key is required')),
+    ).toBe(false);
+    expect(isRetryableManagedVideoWorkerFailure(new VideoWorkerTimeoutError('running'))).toBe(
+      false,
+    );
+  });
+});
 
 describe('inferLanguageHintFromTitle', () => {
   it('uses a high-confidence non-Latin script without an AI request', () => {

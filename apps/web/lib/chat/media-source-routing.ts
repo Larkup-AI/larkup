@@ -27,6 +27,21 @@ export function clearlyTitleMatchedMediaAsset<T extends RoutableMediaAsset>(
 }
 
 /**
+ * Detect an explicitly named source that exists but is outside the Assistant
+ * source scope. A generic single-source fallback must not silently replace it
+ * with an unrelated enabled recording.
+ */
+export function clearlyUnavailableTitleMatchedMediaAsset<T extends RoutableMediaAsset>(
+  query: string,
+  availableAssets: readonly T[],
+  allAssets: readonly T[],
+): T | undefined {
+  const matched = clearlyTitleMatchedMediaAsset(query, allAssets);
+  if (!matched) return undefined;
+  return availableAssets.some((asset) => asset.id === matched.id) ? undefined : matched;
+}
+
+/**
  * A conversation carries a source selection as structured state. Once a
  * source is selected, do not reinterpret ordinary user prose in an attempt
  * to switch it: that is language- and genre-dependent, and can silently send

@@ -117,6 +117,7 @@ export interface MediaProbe {
   containerDurationSecs: number;
   videoDurationSecs?: number;
   audioDurationSecs?: number;
+  hasVideo: boolean;
   hasAudio: boolean;
   hasCorruptionSignals: boolean;
 }
@@ -230,6 +231,7 @@ export async function probeMedia(mediaPath: string): Promise<MediaProbe> {
       : 0,
     videoDurationSecs: videoDuration,
     audioDurationSecs: audioDuration,
+    hasVideo: data.streams?.some((stream) => stream.codec_type === 'video') ?? false,
     hasAudio: data.streams?.some((stream) => stream.codec_type === 'audio') ?? false,
     hasCorruptionSignals: !Number.isFinite(durationSecs) || durationSecs <= 0,
   };
@@ -812,9 +814,10 @@ function scoreYtDlpMediaCandidate(
     (mimeType?.startsWith('video/') ? 20 : 0) +
     (extension === expectedExtension ? 10 : 0) +
     // yt-dlp names adaptive intermediate streams `.f137.mp4`, `.f140.m4a`,
-    // etc. Never prefer one over the final muxed file: selecting the video
-    // intermediate produces exactly the "volume control, no sound" symptom.
-    (/\.f\d+\.[^.]+$/i.test(fileName) ? -50 : 0)
+    // etc. Keep a final mux ahead of its intermediates, but never penalize a
+    // real video stream so heavily that an audio-only `.m4a` wins when a stale
+    // after-move path forces recovery from the import directory.
+    (/\.f\d+\.[^.]+$/i.test(fileName) ? -15 : 0)
   );
 }
 

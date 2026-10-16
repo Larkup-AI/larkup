@@ -24,6 +24,20 @@ export class VideoWorkerTimeoutError extends Error {
   }
 }
 
+/**
+ * A terminal managed-worker failure has already released its concurrency and
+ * source-minute reservation, so a fresh worker can safely retry it. Keep this
+ * deliberately narrow: transport errors may leave the original job running,
+ * while configuration, quota, and evidence errors need user action instead.
+ */
+export function isRetryableManagedVideoWorkerFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    message.includes('Larkup Cloud could not complete this video') ||
+    message.includes('Larkup Cloud completed without a result')
+  );
+}
+
 interface VideoClient {
   health(): Promise<unknown>;
   getUsage(): Promise<{
