@@ -83,6 +83,7 @@ import {
 import {
   activeMediaFollowUpResult,
   clearlyTitleMatchedMediaAsset,
+  clearlyUnavailableTitleMatchedMediaAsset,
   shouldKeepActiveMediaSource,
 } from '@/lib/chat/media-source-routing';
 import { createTabularVisualization } from '@/lib/chat/tabular-visualization';
@@ -308,6 +309,25 @@ function uniqueCompletedMediaFallback(
       isMediaAssetAvailableInRuntime(asset, activeScope) &&
       (asset.type === 'video' || asset.type === 'audio'),
   );
+  const allCompletedAssets = mediaAssets.filter(
+    (asset) =>
+      asset.processingStatus === 'completed' &&
+      Boolean(asset.activeVideoKnowledgeRevisionId) &&
+      isMediaAssetAvailableInRuntime(asset, activeScope) &&
+      (asset.type === 'video' || asset.type === 'audio'),
+  );
+  const unavailableTitleMatch = clearlyUnavailableTitleMatchedMediaAsset(
+    query,
+    assets,
+    allCompletedAssets,
+  );
+  if (unavailableTitleMatch) {
+    return {
+      query,
+      hits: [],
+      error: `The named media source "${unavailableTitleMatch.fileName}" is not available to Assistant chat. Enable its data group under Data → Groups, then ask again.`,
+    };
+  }
   // A retrieval miss must not strand a single, unambiguous active media
   // source. With several sources the host deliberately stays neutral and
   // lets ordinary retrieval disambiguate rather than guessing the asset.

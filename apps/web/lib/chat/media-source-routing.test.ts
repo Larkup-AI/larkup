@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activeMediaFollowUpResult,
   clearlyTitleMatchedMediaAsset,
+  clearlyUnavailableTitleMatchedMediaAsset,
   shouldKeepActiveMediaSource,
   type RoutableMediaAsset,
 } from './media-source-routing';
@@ -64,6 +65,26 @@ describe('media source routing', () => {
         asset('a', 'The weekly episode A'),
         asset('b', 'The weekly episode B'),
       ]),
+    ).toBeUndefined();
+  });
+
+  it('does not replace an explicitly named unavailable source with an unrelated enabled one', () => {
+    const enabled = asset('enabled', 'Discussing the Frontier of Particle Physics');
+    const unavailable = asset('unavailable', 'Highlights Spain 1-0 Argentina Final');
+
+    expect(
+      clearlyUnavailableTitleMatchedMediaAsset(
+        'Who won in Highlights Spain 1-0 Argentina Final?',
+        [enabled],
+        [enabled, unavailable],
+      )?.id,
+    ).toBe('unavailable');
+    expect(
+      clearlyUnavailableTitleMatchedMediaAsset(
+        'What is discussed in Particle Physics?',
+        [enabled],
+        [enabled, unavailable],
+      ),
     ).toBeUndefined();
   });
 

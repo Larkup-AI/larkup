@@ -110,6 +110,7 @@ describe('hasInflatedPlaybackTimeline', () => {
         videoDurationSecs: 3_600,
         audioDurationSecs: 7_200,
         containerDurationSecs: 7_200,
+        hasVideo: true,
         hasAudio: true,
         hasCorruptionSignals: false,
       }),
@@ -120,6 +121,7 @@ describe('hasInflatedPlaybackTimeline', () => {
         videoDurationSecs: 3_600,
         audioDurationSecs: 3_602,
         containerDurationSecs: 3_602,
+        hasVideo: true,
         hasAudio: true,
         hasCorruptionSignals: false,
       }),
@@ -194,6 +196,18 @@ describe('resolveYtDlpMediaPath', () => {
     await fs.writeFile(finalMux, 'video and audio');
 
     await expect(resolveYtDlpMediaPath(reportedPath, outputDir)).resolves.toBe(finalMux);
+  });
+
+  it('never recovers a stale video path as an audio-only adaptive stream', async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'larkup-source-utils-'));
+    temporaryDirectories.push(outputDir);
+    const reportedPath = path.join(outputDir, 'Final [video123].missing.mp4');
+    const videoIntermediate = path.join(outputDir, 'Final [video123].f137.mp4');
+    const audioIntermediate = path.join(outputDir, 'Final [video123].f140.m4a');
+    await fs.writeFile(videoIntermediate, 'video bytes');
+    await fs.writeFile(audioIntermediate, 'audio bytes');
+
+    await expect(resolveYtDlpMediaPath(reportedPath, outputDir)).resolves.toBe(videoIntermediate);
   });
 });
 

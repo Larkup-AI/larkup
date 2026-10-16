@@ -57,6 +57,7 @@ import {
   evidenceToKnowledgeInputs,
   formatVideoKnowledgeSummary,
   getReconciledVideoIntelligenceUsage,
+  isRetryableManagedVideoWorkerFailure,
   resolveVideoIndexingHint,
   runInstalledVideoIntelligence,
   validateVideoIntelligenceConfiguration,
@@ -121,6 +122,46 @@ export async function POST(req: Request) {
   }
 }
 
+async function recoverUrlVideoWithoutVideoStream(asset: MediaAsset): Promise<MediaAsset> {
+  if (
+    asset.type !== 'video' ||
+    asset.processingStatus !== 'failed' ||
+    !asset.originalUrl ||
+    asset.storageUri.startsWith('pending://') ||
+    !asset.processingError?.includes('Larkup Cloud could not complete this video')
+  ) {
+    return asset;
+  }
+
+  const storage = createStorageProvider();
+  const { promises: fs } = await import('node:fs');
+  const path = await import('node:path');
+  const os = await import('node:os');
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'larkup-video-recovery-'));
+  try {
+    const resolved = await storage.resolvePath?.(asset.storageUri);
+    const mediaPath = resolved || path.join(tmpDir, 'source');
+    if (!resolved) await fs.writeFile(mediaPath, await storage.retrieve(asset.storageUri));
+    const probe = await probeMedia(mediaPath);
+    if (probe.hasVideo) return asset;
+
+    return (
+      (await updateMediaAsset(asset.id, {
+        storageUri: `pending://${asset.originalUrl}`,
+        mimeType: 'application/octet-stream',
+        fileSize: 0,
+        durationSecs: undefined,
+        activeVideoIntelligenceJobId: undefined,
+      })) ?? asset
+    );
+  } catch (error) {
+    console.warn(`[media] Could not validate failed URL video ${asset.id} before retry:`, error);
+    return asset;
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
 async function enqueueMediaProcessing(
   reqUrl: string,
   assetIds: string[],
@@ -157,15 +198,18 @@ async function enqueueMediaProcessing(
         );
       }
     }
+    const recoveredAssets = await Promise.all(
+      matchingAssets.map((asset) => recoverUrlVideoWithoutVideoStream(asset)),
+    );
     const configuredAssets = toolInputs
       ? await Promise.all(
-          matchingAssets.map((asset) =>
+          recoveredAssets.map((asset) =>
             updateMediaAsset(asset.id, {
               toolInputs: { ...(asset.toolInputs ?? {}), ...toolInputs },
             }),
           ),
         )
-      : matchingAssets;
+      : recoveredAssets;
     const claimedAssets = await Promise.all(
       configuredAssets
         .filter((asset): asset is MediaAsset => Boolean(asset))
@@ -321,7 +365,12 @@ async function enqueueMediaProcessing(
               const firstEntry = entries[0];
               const mimeType = firstEntry.mimeType || 'application/octet-stream';
               const downloadedProbe =
-                firstEntry.mediaType === 'video' ? await probeMedia(firstEntry.path) : undefined;
+                currentAsset.type === 'video' ? await probeMedia(firstEntry.path) : undefined;
+              if (currentAsset.type === 'video' && !downloadedProbe?.hasVideo) {
+                throw new Error(
+                  'The downloaded source contained audio but no video stream. Retry to download a fresh video copy, or upload the original video file.',
+                );
+              }
               const ext = path.extname(firstEntry.path).slice(1) || 'mp4';
               const key = `videos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
               const storedFirstEntry = await storeDownloadedFile(firstEntry.path, key, mimeType);
@@ -349,7 +398,12 @@ async function enqueueMediaProcessing(
                   const entry = entries[i];
                   const entryMime = entry.mimeType || 'application/octet-stream';
                   const entryProbe =
-                    entry.mediaType === 'video' ? await probeMedia(entry.path) : undefined;
+                    currentAsset.type === 'video' ? await probeMedia(entry.path) : undefined;
+                  if (currentAsset.type === 'video' && !entryProbe?.hasVideo) {
+                    throw new Error(
+                      'A downloaded playlist item contained audio but no video stream. Retry to download a fresh video copy.',
+                    );
+                  }
                   const entryExt = path.extname(entry.path).slice(1) || 'mp4';
                   const entryKey = `videos/${Date.now()}_${Math.random()
                     .toString(36)
@@ -1414,29 +1468,57 @@ async function processWithInstalledVideoIntelligence(
         timestamp: new Date().toISOString(),
       });
     }
-    const { evidence, segments } = await runInstalledVideoIntelligence({
-      asset: assetForCloud,
-      mediaPath,
-      sourceUrl,
-      ...(transcriptContext?.length
-        ? {
-            briefOverride: {
-              transcriptContext,
-              skipTranscription: true,
-              ...(sourceTranscript?.language ? { language: sourceTranscript.language } : {}),
-            },
-          }
-        : {}),
-      reportStage,
-      onJobSubmitted: async (jobId) => {
-        const updated = await updateMediaAsset(asset.id, { activeVideoIntelligenceJobId: jobId });
-        if (!updated) throw new Error('The video was removed before cloud indexing started.');
-      },
-      assertStillActive: async () => {
-        const current = (await readMediaAssets()).find((candidate) => candidate.id === asset.id);
-        if (!current) throw new Error('The video was removed before cloud indexing started.');
-      },
-    });
+    const runCloudJob = () =>
+      runInstalledVideoIntelligence({
+        asset: assetForCloud,
+        mediaPath,
+        sourceUrl,
+        ...(transcriptContext?.length
+          ? {
+              briefOverride: {
+                transcriptContext,
+                skipTranscription: true,
+                ...(sourceTranscript?.language ? { language: sourceTranscript.language } : {}),
+              },
+            }
+          : {}),
+        reportStage,
+        onJobSubmitted: async (jobId) => {
+          const updated = await updateMediaAsset(asset.id, {
+            activeVideoIntelligenceJobId: jobId,
+          });
+          if (!updated) throw new Error('The video was removed before cloud indexing started.');
+        },
+        assertStillActive: async () => {
+          const current = (await readMediaAssets()).find((candidate) => candidate.id === asset.id);
+          if (!current) throw new Error('The video was removed before cloud indexing started.');
+        },
+      });
+
+    let intelligenceResult: Awaited<ReturnType<typeof runCloudJob>>;
+    try {
+      intelligenceResult = await runCloudJob();
+    } catch (error) {
+      if (videoRuntimeScope !== 'cloud' || !isRetryableManagedVideoWorkerFailure(error)) {
+        throw error;
+      }
+      void trackUsageEvent({
+        type: 'media_processing',
+        mediaType: 'video',
+        mediaOperation: 'partial_failure',
+        mediaAssetId: asset.id,
+        durationSecs: assetForCloud.durationSecs,
+        runtime: 'remote',
+        timestamp: new Date().toISOString(),
+      });
+      await reportStage('extract', {
+        status: 'running',
+        percent: 1,
+        message: 'The Cloud worker ended early. Retrying once on a fresh worker...',
+      });
+      intelligenceResult = await runCloudJob();
+    }
+    const { evidence, segments } = intelligenceResult;
     if (!segments.length) {
       throw new Error(
         'Video Intelligence produced no searchable speech, visual, or semantic video evidence.',
