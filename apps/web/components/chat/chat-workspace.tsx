@@ -62,6 +62,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
+import { ChatComposerSurface, ChatEmptyState, ChatMessagesViewport } from '@larkup/workspace-ui';
 import {
   answerFeedbackForMessage,
   groundedAnswerFeedbackContext,
@@ -1256,123 +1257,96 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
       </div>
 
       {/* Messages area */}
-      <div
-        ref={scrollRef}
-        onScroll={handleMessageScroll}
-        className="min-h-0 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden"
-      >
-        <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
-          {!ready ? (
-            <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white border text-muted-foreground">
-                <MessageCircle className="size-7" />
-              </div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                Setup Required
-              </h1>
-              <p className="max-w-md text-sm leading-relaxed text-muted-foreground mb-2">
-                {status?.blockers?.join(' ') || 'Set an API key in Settings to start chatting.'}
-              </p>
-              <a
-                href={
-                  status?.blockers?.some((b) => b.includes('API Key') || b.includes('Settings'))
-                    ? '/settings?ai-models'
-                    : '/settings'
-                }
-                className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90    disabled:pointer-events-none disabled:opacity-50"
-              >
-                Go to Settings
-              </a>
+      <ChatMessagesViewport viewportRef={scrollRef} onScroll={handleMessageScroll}>
+        {!ready ? (
+          <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white border text-muted-foreground">
+              <MessageCircle className="size-7" />
             </div>
-          ) : isEmpty ? (
-            <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/90 border border-border/60 text-primary ">
-                {/* <MessageCircle className="size-7" /> */}
-                <img src={'/logo.png'} alt="Logo" className="size-9" />
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Setup Required</h1>
+            <p className="max-w-md text-sm leading-relaxed text-muted-foreground mb-2">
+              {status?.blockers?.join(' ') || 'Set an API key in Settings to start chatting.'}
+            </p>
+            <a
+              href={
+                status?.blockers?.some((b) => b.includes('API Key') || b.includes('Settings'))
+                  ? '/settings?ai-models'
+                  : '/settings'
+              }
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90    disabled:pointer-events-none disabled:opacity-50"
+            >
+              Go to Settings
+            </a>
+          </div>
+        ) : isEmpty ? (
+          <ChatEmptyState mark={<img src="/logo.png" alt="Logo" className="size-9" />} />
+        ) : (
+          <div className="flex flex-col gap-6">
+            {messages.map((m, idx) => (
+              <MessageItem
+                key={m.id}
+                message={m}
+                isLast={idx === messages.length - 1}
+                isStreaming={chatStatus === 'streaming'}
+                addToolResult={addToolResult}
+                serverId={projectId}
+                autoOpenSupportingClip={shouldAutoOpenSupportingClip(messages, idx)}
+                regenerate={regenerate}
+                isBusy={isBusy}
+                onFeedback={handleMessageFeedback}
+              />
+            ))}
+            {chatStatus === 'submitted' || isInitializingChat ? (
+              <div className="flex items-center gap-2">
+                <div className="size-7 bg-white border border-border rounded-full flex items-center justify-center p-1 animate-pulse">
+                  <img src="/logo.png" alt="logo" className="size-4 animate-spin" />
+                </div>
               </div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground text-balance">
-                Chat with your knowledge base
-              </h1>
-              <p className="max-w-md text-sm leading-relaxed text-muted-foreground text-pretty">
-                Ask questions and get AI-powered answers grounded in your indexed documents.
-              </p>
-              {/* {!status?.indexed && (
-                <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                  <TriangleAlert className="size-3.5 shrink-0" />
-                  No documents indexed yet. Add documents in the Docs page to get grounded answers
-                  with source citations.
-                </div>
-              )} */}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-6">
-              {messages.map((m, idx) => (
-                <MessageItem
-                  key={m.id}
-                  message={m}
-                  isLast={idx === messages.length - 1}
-                  isStreaming={chatStatus === 'streaming'}
-                  addToolResult={addToolResult}
-                  serverId={projectId}
-                  autoOpenSupportingClip={shouldAutoOpenSupportingClip(messages, idx)}
-                  regenerate={regenerate}
-                  isBusy={isBusy}
-                  onFeedback={handleMessageFeedback}
-                />
-              ))}
-              {chatStatus === 'submitted' || isInitializingChat ? (
-                <div className="flex items-center gap-2">
-                  <div className="size-7 bg-white border border-border rounded-full flex items-center justify-center p-1 animate-pulse">
-                    <img src="/logo.png" alt="logo" className="size-4 animate-spin" />
-                  </div>
-                </div>
-              ) : null}
-              {error
-                ? (() => {
-                    const raw =
-                      error.message || 'Something went wrong while generating a response.';
-                    // Sanitize: if the message contains URLs or is too long, clean it up
-                    let displayMessage = raw;
-                    if (
-                      raw.includes('rate-limited') ||
-                      raw.includes('rate_limit') ||
-                      raw.includes('429')
-                    ) {
-                      displayMessage =
-                        'Vercel AI Gateway could not serve this model because it is rate-limited. We tried compatible backups. Try again shortly, choose another model, or add AI Gateway credits / a provider key in Settings.';
-                    } else if (raw.includes('unavailable tool') || raw.includes('NoSuchTool')) {
-                      displayMessage =
-                        'The model tried an unavailable action. Please try your question again.';
-                    } else if (
-                      raw.length > 200 ||
-                      raw.includes('http://') ||
-                      raw.includes('https://')
-                    ) {
-                      displayMessage =
-                        'Something went wrong while generating a response. Please try again.';
-                    }
-                    return (
-                      <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
-                        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                        <div className="flex-1">
-                          <p className="text-sm text-foreground">{displayMessage}</p>
-                          <button
-                            type="button"
-                            onClick={() => regenerate()}
-                            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-secondary"
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                            Try again
-                          </button>
-                        </div>
+            ) : null}
+            {error
+              ? (() => {
+                  const raw = error.message || 'Something went wrong while generating a response.';
+                  // Sanitize: if the message contains URLs or is too long, clean it up
+                  let displayMessage = raw;
+                  if (
+                    raw.includes('rate-limited') ||
+                    raw.includes('rate_limit') ||
+                    raw.includes('429')
+                  ) {
+                    displayMessage =
+                      'Vercel AI Gateway could not serve this model because it is rate-limited. We tried compatible backups. Try again shortly, choose another model, or add AI Gateway credits / a provider key in Settings.';
+                  } else if (raw.includes('unavailable tool') || raw.includes('NoSuchTool')) {
+                    displayMessage =
+                      'The model tried an unavailable action. Please try your question again.';
+                  } else if (
+                    raw.length > 200 ||
+                    raw.includes('http://') ||
+                    raw.includes('https://')
+                  ) {
+                    displayMessage =
+                      'Something went wrong while generating a response. Please try again.';
+                  }
+                  return (
+                    <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                      <div className="flex-1">
+                        <p className="text-sm text-foreground">{displayMessage}</p>
+                        <button
+                          type="button"
+                          onClick={() => regenerate()}
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:bg-secondary"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Try again
+                        </button>
                       </div>
-                    );
-                  })()
-                : null}
-            </div>
-          )}
-        </div>
-      </div>
+                    </div>
+                  );
+                })()
+              : null}
+          </div>
+        )}
+      </ChatMessagesViewport>
 
       {/* Input area */}
       {ready && (
@@ -1387,7 +1361,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
             />
           )}
           <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl">
-            <div className="flex items-center gap-2 rounded-2xl border border-border bg-card p-2 transition focus-within:ring-0.5 focus-within:ring-ring/20">
+            <ChatComposerSurface>
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
@@ -1532,7 +1506,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
                   <ArrowUp className="h-4.5 w-4.5" />
                 )}
               </button>
-            </div>
+            </ChatComposerSurface>
           </form>
         </div>
       )}

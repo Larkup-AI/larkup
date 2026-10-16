@@ -42,6 +42,7 @@
     "@larkup/scraper": "^0.1.50",
     "@larkup/tool-doc-editor": "^0.2.30",
     "@larkup/vector-stores": "^0.1.27",
+    "@larkup/workspace-ui": "workspace:*",
     "@napi-rs/canvas": "1.0.10",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",

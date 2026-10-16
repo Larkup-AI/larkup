@@ -81,6 +81,10 @@ def handler(event: dict[str, Any], _: Any) -> dict[str, Any]:
             require_admin(headers(event).get("x-larkup-admin-token"))
             installation_id = path.removeprefix("/v1/admin/devices/").removesuffix("/entitlement").strip("/")
             return update_device_entitlement(installation_id, body(event))
+        if path.startswith("/v1/admin/devices/") and path.endswith("/usage") and method in {"GET", "POST"}:
+            require_admin(headers(event).get("x-larkup-admin-token"))
+            installation_id = path.removeprefix("/v1/admin/devices/").removesuffix("/usage").strip("/")
+            return admin_device_usage(installation_id, body(event) if method == "POST" else None)
         principal = authenticate(headers(event).get("authorization"))
         if method == "POST" and path == "/v1/uploads": return create_upload(principal, body(event))
         if method == "POST" and path == "/v1/jobs": return create_job(principal, body(event))
@@ -223,6 +227,122 @@ def update_device_entitlement(installation_id: str, payload: dict[str, Any]) -> 
     period, period_start, period_end = billing_period()
     reconcile_usage_limit(str(device["principalId"]), period, period_start, period_end, source_minutes)
     return response(200, {"principalId": device["principalId"], "entitlement": entitlement})
+
+
+def admin_device_usage(installation_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Inspect or correct the current-period meter for one installation."""
+    if len(installation_id) < 32 or len(installation_id) > 128:
+        raise ApiError(400, "invalid installation identifier")
+    device = table.get_item(
+        Key={"pk": f"DEVICE#{digest('device:' + installation_id)}", "sk": "DEVICE"},
+        ConsistentRead=True,
+    ).get("Item")
+    if not device:
+        raise ApiError(404, "device not found")
+    entitlement = json.loads(device["entitlementJson"])
+    principal_id = str(device["principalId"])
+    period, period_start, period_end = billing_period()
+
+    try:
+        reconcile_active_jobs(principal_id)
+    except Exception:
+        # Operators can still inspect or correct usage when a GPU provider is
+        # temporarily unavailable. The active-job guard below remains the
+        # authority for whether a mutation is safe.
+        pass
+
+    usage_key = {"pk": f"USAGE#{principal_id}#{period}", "sk": "USAGE"}
+    item = table.get_item(Key=usage_key, ConsistentRead=True).get("Item", {})
+    active_jobs = active_jobs_for_principal(principal_id)
+    active_count = len(active_jobs)
+    if int(item.get("activeJobs", 0)) != active_count:
+        reconcile_active_job_count(principal_id, active_count)
+        item = table.get_item(Key=usage_key, ConsistentRead=True).get("Item", {})
+
+    operation = str((payload or {}).get("operation") or "status").lower()
+    if operation != "status":
+        if operation not in {"reset", "set", "add", "remove"}:
+            raise ApiError(400, "operation must be status, reset, set, add, or remove")
+        if active_count:
+            raise ApiError(409, "usage cannot be changed while this device has active jobs")
+
+        current_used = Decimal(str(item.get("sourceMinutesUsed", 0)))
+        if operation == "reset":
+            updated_used = Decimal("0")
+        else:
+            try:
+                amount = Decimal(str((payload or {}).get("sourceMinutes")))
+            except Exception as error:
+                raise ApiError(400, "sourceMinutes must be a non-negative number") from error
+            if not amount.is_finite() or amount < 0 or amount > Decimal("1000000"):
+                raise ApiError(400, "sourceMinutes must be between 0 and 1000000")
+            if operation == "set":
+                updated_used = amount
+            elif operation == "add":
+                updated_used = current_used + amount
+            else:
+                updated_used = max(Decimal("0"), current_used - amount)
+            if updated_used > Decimal("1000000"):
+                raise ApiError(400, "resulting usage cannot exceed 1000000 source minutes")
+
+        source_limit = entitlement.get("sourceMinutesPerMonth")
+        available = (
+            Decimal("1000000000")
+            if source_limit is None
+            else max(Decimal("0"), Decimal(str(source_limit)) - updated_used)
+        )
+        old_used = Decimal(str(item.get("sourceMinutesUsed", 0)))
+        try:
+            table.update_item(
+                Key=usage_key,
+                UpdateExpression=(
+                    "SET periodStart = :start, periodEnd = :end, "
+                    "sourceMinutesLimit = :limit, sourceMinutesUsed = :used, "
+                    "availableSourceMinutes = :available, reservedSourceMinutes = :zero, "
+                    "activeJobs = :zero, updatedAt = :at"
+                ),
+                ConditionExpression=(
+                    "(attribute_not_exists(activeJobs) OR activeJobs = :zero) AND "
+                    "(attribute_not_exists(reservedSourceMinutes) OR reservedSourceMinutes = :zero) AND "
+                    "((attribute_not_exists(sourceMinutesUsed) AND :oldUsed = :zero) OR sourceMinutesUsed = :oldUsed)"
+                ),
+                ExpressionAttributeValues={
+                    ":start": period_start,
+                    ":end": period_end,
+                    ":limit": Decimal("-1") if source_limit is None else Decimal(str(source_limit)),
+                    ":used": updated_used,
+                    ":available": available,
+                    ":zero": Decimal("0"),
+                    ":oldUsed": old_used,
+                    ":at": now_iso(),
+                },
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                raise ApiError(409, "usage changed concurrently; inspect it and retry") from error
+            raise
+        item = table.get_item(Key=usage_key, ConsistentRead=True).get("Item", {})
+
+    return response(
+        200,
+        {
+            "principalId": principal_id,
+            "periodStart": period_start,
+            "periodEnd": period_end,
+            "sourceMinutesUsed": item.get("sourceMinutesUsed", 0),
+            "reservedSourceMinutes": item.get("reservedSourceMinutes", 0),
+            "availableSourceMinutes": item.get(
+                "availableSourceMinutes",
+                1_000_000_000
+                if entitlement.get("sourceMinutesPerMonth") is None
+                else max(0, float(entitlement.get("sourceMinutesPerMonth", 0))),
+            ),
+            "sourceMinutesLimit": entitlement.get("sourceMinutesPerMonth"),
+            "activeJobs": active_count,
+            "activeJobIds": [str(job["pk"])[4:] for job in active_jobs],
+            "entitlement": entitlement,
+        },
+    )
 
 
 def create_upload(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:

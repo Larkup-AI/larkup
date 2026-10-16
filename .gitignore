@@ -77,3 +77,4 @@ test.ts
 widget-demo
 .vercel
 copy.sh
+test-hpi-connection.sh

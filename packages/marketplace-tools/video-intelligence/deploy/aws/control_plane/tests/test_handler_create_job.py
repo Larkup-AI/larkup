@@ -410,6 +410,75 @@ class CreateJobTests(unittest.TestCase):
         principal = self.handler.authenticate(f"Bearer {second['apiKey']}")
         self.assertEqual(principal["entitlement"]["plan"], "support-grant")
 
+    def test_support_can_inspect_and_correct_device_usage(self) -> None:
+        self.handler.AUTO_PROVISIONING_ENABLED = True
+        installation_id = "c" * 32
+        provisioned = json.loads(
+            self.handler.provision_device_key({"installationId": installation_id})["body"]
+        )
+        principal = self.handler.authenticate(f"Bearer {provisioned['apiKey']}")
+        period, period_start, period_end = self.handler.billing_period()
+        self.handler.table.put_item(
+            Item={
+                "pk": f"USAGE#{principal['id']}#{period}",
+                "sk": "USAGE",
+                "periodStart": period_start,
+                "periodEnd": period_end,
+                "sourceMinutesLimit": 600,
+                "sourceMinutesUsed": 25,
+                "reservedSourceMinutes": 0,
+                "availableSourceMinutes": 575,
+                "activeJobs": 0,
+            }
+        )
+
+        status = json.loads(self.handler.admin_device_usage(installation_id)["body"])
+        self.assertEqual(status["sourceMinutesUsed"], 25)
+        self.assertEqual(status["availableSourceMinutes"], 575)
+
+        added = json.loads(
+            self.handler.admin_device_usage(
+                installation_id, {"operation": "add", "sourceMinutes": 5.5}
+            )["body"]
+        )
+        self.assertEqual(added["sourceMinutesUsed"], 30.5)
+        self.assertEqual(added["availableSourceMinutes"], 569.5)
+
+        removed = json.loads(
+            self.handler.admin_device_usage(
+                installation_id, {"operation": "remove", "sourceMinutes": 10.5}
+            )["body"]
+        )
+        self.assertEqual(removed["sourceMinutesUsed"], 20)
+
+        reset = json.loads(
+            self.handler.admin_device_usage(installation_id, {"operation": "reset"})["body"]
+        )
+        self.assertEqual(reset["sourceMinutesUsed"], 0)
+        self.assertEqual(reset["availableSourceMinutes"], 600)
+
+    def test_support_usage_correction_rejects_active_jobs(self) -> None:
+        self.handler.AUTO_PROVISIONING_ENABLED = True
+        installation_id = "d" * 32
+        provisioned = json.loads(
+            self.handler.provision_device_key({"installationId": installation_id})["body"]
+        )
+        principal = self.handler.authenticate(f"Bearer {provisioned['apiKey']}")
+        self.handler.table.put_item(
+            Item={
+                "pk": "JOB#job-active-admin",
+                "sk": "JOB",
+                "principalId": principal["id"],
+                "status": "running",
+                "createdAt": "now",
+                "updatedAt": "now",
+            }
+        )
+
+        with self.assertRaises(self.handler.ApiError) as ctx:
+            self.handler.admin_device_usage(installation_id, {"operation": "reset"})
+        self.assertEqual(ctx.exception.status, 409)
+
     def test_settle_deletes_the_source_object_when_retain_hours_is_zero(self) -> None:
         self.handler.s3.put_object(Bucket=os.environ["BUCKET_NAME"], Key="sources/principal-1/upl_2.mp4", Body=b"data")
         item = {

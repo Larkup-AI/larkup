@@ -1,5 +1,7 @@
 'use client';
 
+import { SettingsCardHeader } from '@larkup/workspace-ui';
+
 import { useState, useEffect, useMemo } from 'react';
 import useSWR from 'swr';
 import { Eye, EyeOff, Loader2, Save, Sparkles, MessageCircle, Plus, ScanEye } from 'lucide-react';
@@ -408,15 +410,11 @@ export function ModelsSection() {
 
       {/* Embedding Provider */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Sparkles className="size-3.5 text-primary" />
-            Embedding Model
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Transforms your documents into searchable representations.
-          </CardDescription>
-        </CardHeader>
+        <SettingsCardHeader
+          title="Embedding Model"
+          description="Transforms your documents into searchable representations."
+          icon={<Sparkles className="size-3.5 text-primary" />}
+        />
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Provider</Label>
@@ -594,16 +592,11 @@ export function ModelsSection() {
 
       {/* Vision-language model — shared by image and media tools. */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <ScanEye className="size-3.5 text-primary" />
-            Vision Model
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Used by video, image, OCR, and future tools that need to understand pixels. Only
-            providers with vision-capable models are shown.
-          </CardDescription>
-        </CardHeader>
+        <SettingsCardHeader
+          title="Vision Model"
+          description="Used by video, image, OCR, and future tools that need to understand pixels. Only providers with vision-capable models are shown."
+          icon={<ScanEye className="size-3.5 text-primary" />}
+        />
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Provider</Label>
@@ -762,16 +755,11 @@ export function ModelsSection() {
 
       {/* Chat (LLM) Provider */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <MessageCircle className="size-3.5 text-primary" />
-            Chat Model
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Powers the AI assistant that answers questions from your knowledge base. Leave blank to
-            use the same provider as embedding.
-          </CardDescription>
-        </CardHeader>
+        <SettingsCardHeader
+          title="Chat Model"
+          description="Powers the AI assistant that answers questions from your knowledge base. Leave blank to use the same provider as embedding."
+          icon={<MessageCircle className="size-3.5 text-primary" />}
+        />
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Provider</Label>

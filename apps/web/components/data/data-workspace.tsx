@@ -23,6 +23,7 @@ import {
 import { CorpusPanel } from '@/components/data/corpus-panel';
 import type { DataPrimaryAction } from '@/components/data/data-primary-action';
 import { useProject } from '@/components/projects/project-provider';
+import { WorkspaceLineTabs, WorkspacePageHeading } from '@larkup/workspace-ui';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -321,136 +322,115 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
     <div className="px-6 md:px-8">
       {view === 'add' && (
         <>
-          <div className="mb-2 flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                {activeSubTabIntro.title}
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">{activeSubTabIntro.description}</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {activeSubTab === 'website' && <WebCrawlerStatus />}
-              {hasJobsDrawerContent && (
-                <TooltipProvider delay={150}>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <button
-                          type="button"
-                          onClick={() => setShowJobsDrawer(!showJobsDrawer)}
-                          className={cn(
-                            'relative cursor-pointer flex size-9 items-center justify-center rounded-lg border transition-colors',
-                            hasActive
-                              ? 'border-green-600 bg-green-100/30 text-green-600 hover:bg-green-100/50'
-                              : 'border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-                            showJobsDrawer && 'bg-white hover:bg-white',
-                          )}
-                          aria-label="Toggle jobs panel"
-                        >
-                          <History className="size-4" />
-                          {hasActive && (
-                            <>
-                              <span className="absolute -top-1 -right-1 z-10 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white shadow-sm ring-1 ring-white">
-                                {activeJobCount}
-                              </span>
-                              <span className="absolute -top-1 -right-1 z-0 flex h-3.5 w-3.5 animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                            </>
-                          )}
-                        </button>
-                      }
-                    />
-                    <TooltipContent>
-                      <p>{hasActive ? 'Active jobs' : 'Job history'}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-          </div>
-          <div className="mb-4 pb-0 mt-9 flex items-center justify-between border-b border-border">
-            <div className="-mb-1.5  flex items-center gap-1">
-              {SUB_TABS.map((tab) => {
-                const isActive = activeSubTab === tab.id;
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveSubTab(tab.id)}
-                    className={cn(
-                      'relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors outline-none',
-                      isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    <Icon className="size-4" />
-                    {tab.label}
-                    {isActive && (
-                      <span
-                        aria-hidden="true"
-                        className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-primary motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-2 motion-safe:duration-200"
+          <WorkspacePageHeading
+            className="mb-2"
+            title={activeSubTabIntro.title}
+            description={activeSubTabIntro.description}
+            actions={
+              <>
+                {activeSubTab === 'website' && <WebCrawlerStatus />}
+                {hasJobsDrawerContent && (
+                  <TooltipProvider delay={150}>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            type="button"
+                            onClick={() => setShowJobsDrawer(!showJobsDrawer)}
+                            className={cn(
+                              'relative cursor-pointer flex size-9 items-center justify-center rounded-lg border transition-colors',
+                              hasActive
+                                ? 'border-green-600 bg-green-100/30 text-green-600 hover:bg-green-100/50'
+                                : 'border-border bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                              showJobsDrawer && 'bg-white hover:bg-white',
+                            )}
+                            aria-label="Toggle jobs panel"
+                          >
+                            <History className="size-4" />
+                            {hasActive && (
+                              <>
+                                <span className="absolute -top-1 -right-1 z-10 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white shadow-sm ring-1 ring-white">
+                                  {activeJobCount}
+                                </span>
+                                <span className="absolute -top-1 -right-1 z-0 flex h-3.5 w-3.5 animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                              </>
+                            )}
+                          </button>
+                        }
                       />
+                      <TooltipContent>
+                        <p>{hasActive ? 'Active jobs' : 'Job history'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </>
+            }
+          />
+          <WorkspaceLineTabs
+            className="mb-4 mt-9"
+            items={SUB_TABS}
+            activeId={activeSubTab}
+            onChange={setActiveSubTab}
+            trailing={
+              <div className="flex items-center gap-2">
+                <Select value={targetGroupId} onValueChange={selectGroup}>
+                  <SelectTrigger
+                    aria-label="Data group"
+                    className="h-9 min-w-42 max-w-56 bg-white text-xs"
+                  >
+                    <span className="flex flex-1 items-center gap-1.5 truncate text-left">
+                      {!groupSelectionReady && docsQuery.data === undefined
+                        ? 'Loading group…'
+                        : targetGroupId === 'default'
+                          ? 'Default group'
+                          : selectedGroup
+                            ? `${selectedGroup.icon ? `${selectedGroup.icon} ` : ''}${selectedGroup.name}`
+                            : 'Group unavailable'}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <div className="space-y-1 p-1">
+                      {groups.map((group) => (
+                        <SelectItem key={group.id} value={group.id} className="px-2 py-1.5 text-sm">
+                          <span className="truncate">
+                            {group.icon ? `${group.icon} ` : ''}
+                            {group.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </div>
+                  </SelectContent>
+                </Select>
+                {primaryAction && (
+                  <Button
+                    size="default"
+                    data-ready={
+                      !dataAddBlocked &&
+                      groupSelectionReady &&
+                      !primaryAction.disabled &&
+                      !primaryAction.loading
+                    }
+                    className="h-10 min-w-28 transition-colors"
+                    onClick={primaryAction.onClick}
+                    disabled={
+                      dataAddBlocked ||
+                      !groupSelectionReady ||
+                      primaryAction.disabled ||
+                      primaryAction.loading
+                    }
+                  >
+                    {primaryAction.loading ? (
+                      <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="mr-1.5 size-3.5" />
                     )}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-2 pb-1.5">
-              <Select value={targetGroupId} onValueChange={selectGroup}>
-                <SelectTrigger
-                  aria-label="Data group"
-                  className="h-9 min-w-42 max-w-56 bg-white text-xs"
-                >
-                  <span className="flex flex-1 items-center gap-1.5 truncate text-left">
-                    {!groupSelectionReady && docsQuery.data === undefined
-                      ? 'Loading group…'
-                      : targetGroupId === 'default'
-                        ? 'Default group'
-                        : selectedGroup
-                          ? `${selectedGroup.icon ? `${selectedGroup.icon} ` : ''}${selectedGroup.name}`
-                          : 'Group unavailable'}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="space-y-1 p-1">
-                    {groups.map((group) => (
-                      <SelectItem key={group.id} value={group.id} className="px-2 py-1.5 text-sm">
-                        <span className="truncate">
-                          {group.icon ? `${group.icon} ` : ''}
-                          {group.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </div>
-                </SelectContent>
-              </Select>
-              {primaryAction && (
-                <Button
-                  size="default"
-                  data-ready={
-                    !dataAddBlocked &&
-                    groupSelectionReady &&
-                    !primaryAction.disabled &&
-                    !primaryAction.loading
-                  }
-                  className="h-10 min-w-28 transition-colors"
-                  onClick={primaryAction.onClick}
-                  disabled={
-                    dataAddBlocked ||
-                    !groupSelectionReady ||
-                    primaryAction.disabled ||
-                    primaryAction.loading
-                  }
-                >
-                  {primaryAction.loading ? (
-                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                  ) : (
-                    <Plus className="mr-1.5 size-3.5" />
-                  )}
-                  {primaryAction.label}
-                </Button>
-              )}
-            </div>
-          </div>
+                    {primaryAction.label}
+                  </Button>
+                )}
+              </div>
+            }
+          />
         </>
       )}
 

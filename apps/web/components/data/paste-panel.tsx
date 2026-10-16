@@ -5,9 +5,7 @@ import { toast } from 'sonner';
 import { formatErrorMessage } from '@/lib/shared/error-formatter';
 import { Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { TextSourceFields } from '@larkup/workspace-ui';
 import type { DataPrimaryAction } from '@/components/data/data-primary-action';
 
 export function PastePanel({
@@ -66,29 +64,12 @@ export function PastePanel({
 
   return (
     <div className="space-y-4 w-full">
-      <div className="space-y-2">
-        <Label htmlFor="paste-title">Title</Label>
-        <Input
-          id="paste-title"
-          placeholder="Demo Title"
-          className="w-full h-10 bg-white"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="paste-content">Content</Label>
-        <Textarea
-          id="paste-content"
-          placeholder="Paste any text, markdown, or notes here…"
-          className="min-h-48 bg-white placeholder:text-muted-foreground/50 placeholder:text-xs font-mono text-xs leading-relaxed "
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-        />
-        <p className="text-xs text-muted-foreground tabular-nums">
-          {content.length.toLocaleString()} characters
-        </p>
-      </div>
+      <TextSourceFields
+        title={title}
+        content={content}
+        onTitleChange={setTitle}
+        onContentChange={setContent}
+      />
       {!onActionChange && (
         <Button onClick={submit} disabled={saving}>
           {saving ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
