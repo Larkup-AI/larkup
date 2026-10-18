@@ -105,9 +105,14 @@ def temporary_model_environment(payload: dict[str, Any]) -> Iterator[None]:
 
             audio = parsed["audio"]
             os.environ["LARKUP_VIDEO_TRANSCRIPTION_PROVIDER"] = audio["provider"]
-            # A managed worker must not silently spend Larkup GPU time on Whisper
-            # after the user's paid provider rejects a request.
-            os.environ["LARKUP_VIDEO_TRANSCRIPTION_FALLBACK"] = ""
+            # Keep transcription complete when a hosted recognizer cannot hear
+            # a source (notably singing, noisy recordings, or an unsupported
+            # language). This is the same canonical Modal worker, not a second
+            # control plane or provider pipeline; it runs only after the
+            # selected provider has failed or returned no usable speech.
+            os.environ["LARKUP_VIDEO_TRANSCRIPTION_FALLBACK"] = (
+                "whisper" if audio["provider"] != "whisper" else ""
+            )
             key_name, model_names = {
                 "deepgram": (
                     "DEEPGRAM_API_KEY",
