@@ -8,10 +8,12 @@ import threading
 import unittest
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from gpu_providers.remote_source import (
     _scaled_preparation_progress,
     extract_bounded_remote_clip,
+    materialize_provider_source,
     materialize_remote_source,
     rebase_transcript_context,
 )
@@ -98,6 +100,54 @@ def _probe_duration_secs(path: Path) -> float:
     shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg/ffprobe not installed"
 )
 class RemoteSourceTests(unittest.TestCase):
+    def test_youtube_provider_source_uses_ytdlp_and_reports_progress(self) -> None:
+        with tempfile.TemporaryDirectory() as out_dir:
+            destination = Path(out_dir) / "youtube.mp4"
+            process = MagicMock()
+            process.stdout.__iter__.return_value = iter(
+                ["[download]  12.5% of 10MiB\n", "[download] 100% of 10MiB\n"]
+            )
+            process.wait.return_value = 0
+            reports: list[tuple[int, str]] = []
+
+            def create_destination(*_args, **_kwargs):  # noqa: ANN002, ANN003
+                destination.write_bytes(b"video")
+                return process
+
+            with patch(
+                "gpu_providers.remote_source.subprocess.Popen",
+                side_effect=create_destination,
+            ) as popen:
+                materialize_provider_source(
+                    "https://www.youtube.com/watch?v=abc",
+                    destination,
+                    progress=lambda percent, message: reports.append((percent, message)),
+                )
+
+            command = popen.call_args.args[0]
+            self.assertEqual(command[0], "yt-dlp")
+            self.assertIn("--no-playlist", command)
+            self.assertEqual(command[-1], "https://www.youtube.com/watch?v=abc")
+            self.assertIn((12, "Downloading remote video (12%)"), reports)
+            self.assertEqual(reports[-1], (99, "Remote video is ready for secure transfer"))
+
+    @patch("gpu_providers.remote_source.materialize_remote_source")
+    def test_direct_media_provider_source_preserves_fast_stream_copy(self, materialize) -> None:
+        materialize_provider_source(
+            "https://storage.example.test/video.mp4",
+            Path("video.mp4"),
+            120,
+            prefer_stream_copy=True,
+        )
+
+        materialize.assert_called_once_with(
+            "https://storage.example.test/video.mp4",
+            Path("video.mp4"),
+            120,
+            None,
+            prefer_stream_copy=True,
+        )
+
     def test_codec_attempts_can_use_monotonic_preparation_slices(self) -> None:
         reports: list[tuple[int, str]] = []
         first = _scaled_preparation_progress(

@@ -3,7 +3,8 @@
   "version": "0.7.4",
   "scripts": {
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
   },
   "publishConfig": {
     "access": "public"
@@ -11,83 +12,376 @@
   "files": [
     "src",
     "!src/**/*.test.ts",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "dist-types"
   ],
   "type": "module",
   "exports": {
-    "./types": "./src/types.ts",
-    "./stages": "./src/stages.ts",
-    "./workspace": "./src/workspace.ts",
-    "./config-store": "./src/config-store.ts",
-    "./gpu-activity-store": "./src/gpu-activity-store.ts",
-    "./deployment-store": "./src/deployment-store.ts",
-    "./deployments-store": "./src/deployments-store.ts",
-    "./documents-store": "./src/documents-store.ts",
-    "./groups-store": "./src/groups-store.ts",
-    "./assistant-data-scope": "./src/assistant-data-scope.ts",
-    "./grounded-answer-cache": "./src/grounded-answer-cache.ts",
-    "./jobs-store": "./src/jobs-store.ts",
-    "./index-store": "./src/index-store.ts",
-    "./mcp-store": "./src/mcp-store.ts",
-    "./embeddings/registry": "./src/embeddings/registry.ts",
-    "./embeddings/providers": "./src/embeddings/providers.ts",
-    "./indexing/indexer": "./src/indexing/indexer.ts",
-    "./indexing/embedder": "./src/indexing/embedder.ts",
-    "./indexing/chunker": "./src/indexing/chunker.ts",
-    "./generator/generate-server": "./src/generator/generate-server.ts",
-    "./generator/chat-module": "./src/generator/chat-module.ts",
-    "./generator/generate-agent-server": "./src/generator/generate-agent-server.ts",
-    "./generator/server-runtime": "./src/generator/server-runtime.ts",
-    "./chat-models/registry": "./src/chat-models/registry.ts",
-    "./models-cache": "./src/models-cache.ts",
-    "./tabular-store": "./src/tabular-store.ts",
-    "./analytics-store": "./src/analytics-store.ts",
-    "./media-store": "./src/media-store.ts",
-    "./image-analysis-cache": "./src/image-analysis-cache.ts",
-    "./corpus-retriever": "./src/corpus-retriever.ts",
-    "./video-knowledge/types": "./src/video-knowledge/types.ts",
-    "./video-knowledge/answer-memory-store": "./src/video-knowledge/answer-memory-store.ts",
-    "./video-knowledge/revision-store": "./src/video-knowledge/revision-store.ts",
-    "./video-knowledge/job-store": "./src/video-knowledge/job-store.ts",
-    "./video-knowledge/evidence-store": "./src/video-knowledge/evidence-store.ts",
-    "./video-knowledge/artifact-cache-store": "./src/video-knowledge/artifact-cache-store.ts",
-    "./video-knowledge/manifest-store": "./src/video-knowledge/manifest-store.ts",
-    "./video-knowledge/knowledge-builder": "./src/video-knowledge/knowledge-builder.ts",
-    "./video-knowledge/retrieval": "./src/video-knowledge/retrieval.ts",
-    "./video-knowledge/verification": "./src/video-knowledge/verification.ts",
-    "./video-knowledge/video-embedding-index": "./src/video-knowledge/video-embedding-index.ts",
-    "./video-knowledge/evidence-semantic-index": "./src/video-knowledge/evidence-semantic-index.ts",
-    "./video-knowledge/focus-ranges": "./src/video-knowledge/focus-ranges.ts",
-    "./video-knowledge/information-gain": "./src/video-knowledge/information-gain.ts",
-    "./video-knowledge/query-planner": "./src/video-knowledge/query-planner.ts",
-    "./video-knowledge/query-engine": "./src/video-knowledge/query-engine.ts",
-    "./video-knowledge/investigation": "./src/video-knowledge/investigation.ts",
-    "./video-knowledge/inspection-policy": "./src/video-knowledge/inspection-policy.ts",
-    "./video-knowledge/inspection-chunking": "./src/video-knowledge/inspection-chunking.ts",
-    "./video-knowledge/confidence": "./src/video-knowledge/confidence.ts",
-    "./video-knowledge/refinement-store": "./src/video-knowledge/refinement-store.ts",
-    "./video-knowledge/range-expansion": "./src/video-knowledge/range-expansion.ts",
-    "./video-knowledge/inspection-store": "./src/video-knowledge/inspection-store.ts",
-    "./video-knowledge/conflict-store": "./src/video-knowledge/conflict-store.ts",
-    "./video-knowledge/evaluation": "./src/video-knowledge/evaluation.ts",
-    "./video-knowledge/deletion-store": "./src/video-knowledge/deletion-store.ts",
-    "./agent-store": "./src/agent-store.ts",
-    "./agent-runtime": "./src/agent-runtime.ts",
-    "./session-store": "./src/session-store.ts",
-    "./project-store": "./src/project-store.ts",
-    "./generator/generate-agent-runtime": "./src/generator/generate-agent-runtime.ts"
+    "./types": {
+      "types": "./dist-types/types.d.ts",
+      "import": "./src/types.ts",
+      "default": "./src/types.ts"
+    },
+    "./stages": {
+      "types": "./dist-types/stages.d.ts",
+      "import": "./src/stages.ts",
+      "default": "./src/stages.ts"
+    },
+    "./workspace": {
+      "types": "./dist-types/workspace.d.ts",
+      "import": "./src/workspace.ts",
+      "default": "./src/workspace.ts"
+    },
+    "./config-store": {
+      "types": "./dist-types/config-store.d.ts",
+      "import": "./src/config-store.ts",
+      "default": "./src/config-store.ts"
+    },
+    "./gpu-activity-store": {
+      "types": "./dist-types/gpu-activity-store.d.ts",
+      "import": "./src/gpu-activity-store.ts",
+      "default": "./src/gpu-activity-store.ts"
+    },
+    "./deployment-store": {
+      "types": "./dist-types/deployment-store.d.ts",
+      "import": "./src/deployment-store.ts",
+      "default": "./src/deployment-store.ts"
+    },
+    "./deployments-store": {
+      "types": "./dist-types/deployments-store.d.ts",
+      "import": "./src/deployments-store.ts",
+      "default": "./src/deployments-store.ts"
+    },
+    "./documents-store": {
+      "types": "./dist-types/documents-store.d.ts",
+      "import": "./src/documents-store.ts",
+      "default": "./src/documents-store.ts"
+    },
+    "./groups-store": {
+      "types": "./dist-types/groups-store.d.ts",
+      "import": "./src/groups-store.ts",
+      "default": "./src/groups-store.ts"
+    },
+    "./assistant-data-scope": {
+      "types": "./dist-types/assistant-data-scope.d.ts",
+      "import": "./src/assistant-data-scope.ts",
+      "default": "./src/assistant-data-scope.ts"
+    },
+    "./grounded-answer-cache": {
+      "types": "./dist-types/grounded-answer-cache.d.ts",
+      "import": "./src/grounded-answer-cache.ts",
+      "default": "./src/grounded-answer-cache.ts"
+    },
+    "./jobs-store": {
+      "types": "./dist-types/jobs-store.d.ts",
+      "import": "./src/jobs-store.ts",
+      "default": "./src/jobs-store.ts"
+    },
+    "./index-store": {
+      "types": "./dist-types/index-store.d.ts",
+      "import": "./src/index-store.ts",
+      "default": "./src/index-store.ts"
+    },
+    "./mcp-store": {
+      "types": "./dist-types/mcp-store.d.ts",
+      "import": "./src/mcp-store.ts",
+      "default": "./src/mcp-store.ts"
+    },
+    "./embeddings/registry": {
+      "types": "./dist-types/embeddings/registry.d.ts",
+      "import": "./src/embeddings/registry.ts",
+      "default": "./src/embeddings/registry.ts"
+    },
+    "./embeddings/providers": {
+      "types": "./dist-types/embeddings/providers.d.ts",
+      "import": "./src/embeddings/providers.ts",
+      "default": "./src/embeddings/providers.ts"
+    },
+    "./indexing/indexer": {
+      "types": "./dist-types/indexing/indexer.d.ts",
+      "import": "./src/indexing/indexer.ts",
+      "default": "./src/indexing/indexer.ts"
+    },
+    "./indexing/embedder": {
+      "types": "./dist-types/indexing/embedder.d.ts",
+      "import": "./src/indexing/embedder.ts",
+      "default": "./src/indexing/embedder.ts"
+    },
+    "./indexing/chunker": {
+      "types": "./dist-types/indexing/chunker.d.ts",
+      "import": "./src/indexing/chunker.ts",
+      "default": "./src/indexing/chunker.ts"
+    },
+    "./generator/generate-server": {
+      "types": "./dist-types/generator/generate-server.d.ts",
+      "import": "./src/generator/generate-server.ts",
+      "default": "./src/generator/generate-server.ts"
+    },
+    "./generator/chat-module": {
+      "types": "./dist-types/generator/chat-module.d.ts",
+      "import": "./src/generator/chat-module.ts",
+      "default": "./src/generator/chat-module.ts"
+    },
+    "./generator/generate-agent-server": {
+      "types": "./dist-types/generator/generate-agent-server.d.ts",
+      "import": "./src/generator/generate-agent-server.ts",
+      "default": "./src/generator/generate-agent-server.ts"
+    },
+    "./generator/server-runtime": {
+      "types": "./dist-types/generator/server-runtime.d.ts",
+      "import": "./src/generator/server-runtime.ts",
+      "default": "./src/generator/server-runtime.ts"
+    },
+    "./chat-models/registry": {
+      "types": "./dist-types/chat-models/registry.d.ts",
+      "import": "./src/chat-models/registry.ts",
+      "default": "./src/chat-models/registry.ts"
+    },
+    "./models-cache": {
+      "types": "./dist-types/models-cache.d.ts",
+      "import": "./src/models-cache.ts",
+      "default": "./src/models-cache.ts"
+    },
+    "./tabular-store": {
+      "types": "./dist-types/tabular-store.d.ts",
+      "import": "./src/tabular-store.ts",
+      "default": "./src/tabular-store.ts"
+    },
+    "./analytics-store": {
+      "types": "./dist-types/analytics-store.d.ts",
+      "import": "./src/analytics-store.ts",
+      "default": "./src/analytics-store.ts"
+    },
+    "./media-store": {
+      "types": "./dist-types/media-store.d.ts",
+      "import": "./src/media-store.ts",
+      "default": "./src/media-store.ts"
+    },
+    "./image-analysis-cache": {
+      "types": "./dist-types/image-analysis-cache.d.ts",
+      "import": "./src/image-analysis-cache.ts",
+      "default": "./src/image-analysis-cache.ts"
+    },
+    "./corpus-retriever": {
+      "types": "./dist-types/corpus-retriever.d.ts",
+      "import": "./src/corpus-retriever.ts",
+      "default": "./src/corpus-retriever.ts"
+    },
+    "./video-knowledge/types": {
+      "types": "./dist-types/video-knowledge/types.d.ts",
+      "import": "./src/video-knowledge/types.ts",
+      "default": "./src/video-knowledge/types.ts"
+    },
+    "./video-knowledge/answer-memory-store": {
+      "types": "./dist-types/video-knowledge/answer-memory-store.d.ts",
+      "import": "./src/video-knowledge/answer-memory-store.ts",
+      "default": "./src/video-knowledge/answer-memory-store.ts"
+    },
+    "./video-knowledge/revision-store": {
+      "types": "./dist-types/video-knowledge/revision-store.d.ts",
+      "import": "./src/video-knowledge/revision-store.ts",
+      "default": "./src/video-knowledge/revision-store.ts"
+    },
+    "./video-knowledge/job-store": {
+      "types": "./dist-types/video-knowledge/job-store.d.ts",
+      "import": "./src/video-knowledge/job-store.ts",
+      "default": "./src/video-knowledge/job-store.ts"
+    },
+    "./video-knowledge/evidence-store": {
+      "types": "./dist-types/video-knowledge/evidence-store.d.ts",
+      "import": "./src/video-knowledge/evidence-store.ts",
+      "default": "./src/video-knowledge/evidence-store.ts"
+    },
+    "./video-knowledge/artifact-cache-store": {
+      "types": "./dist-types/video-knowledge/artifact-cache-store.d.ts",
+      "import": "./src/video-knowledge/artifact-cache-store.ts",
+      "default": "./src/video-knowledge/artifact-cache-store.ts"
+    },
+    "./video-knowledge/manifest-store": {
+      "types": "./dist-types/video-knowledge/manifest-store.d.ts",
+      "import": "./src/video-knowledge/manifest-store.ts",
+      "default": "./src/video-knowledge/manifest-store.ts"
+    },
+    "./video-knowledge/knowledge-builder": {
+      "types": "./dist-types/video-knowledge/knowledge-builder.d.ts",
+      "import": "./src/video-knowledge/knowledge-builder.ts",
+      "default": "./src/video-knowledge/knowledge-builder.ts"
+    },
+    "./video-knowledge/retrieval": {
+      "types": "./dist-types/video-knowledge/retrieval.d.ts",
+      "import": "./src/video-knowledge/retrieval.ts",
+      "default": "./src/video-knowledge/retrieval.ts"
+    },
+    "./video-knowledge/verification": {
+      "types": "./dist-types/video-knowledge/verification.d.ts",
+      "import": "./src/video-knowledge/verification.ts",
+      "default": "./src/video-knowledge/verification.ts"
+    },
+    "./video-knowledge/video-embedding-index": {
+      "types": "./dist-types/video-knowledge/video-embedding-index.d.ts",
+      "import": "./src/video-knowledge/video-embedding-index.ts",
+      "default": "./src/video-knowledge/video-embedding-index.ts"
+    },
+    "./video-knowledge/evidence-semantic-index": {
+      "types": "./dist-types/video-knowledge/evidence-semantic-index.d.ts",
+      "import": "./src/video-knowledge/evidence-semantic-index.ts",
+      "default": "./src/video-knowledge/evidence-semantic-index.ts"
+    },
+    "./video-knowledge/focus-ranges": {
+      "types": "./dist-types/video-knowledge/focus-ranges.d.ts",
+      "import": "./src/video-knowledge/focus-ranges.ts",
+      "default": "./src/video-knowledge/focus-ranges.ts"
+    },
+    "./video-knowledge/information-gain": {
+      "types": "./dist-types/video-knowledge/information-gain.d.ts",
+      "import": "./src/video-knowledge/information-gain.ts",
+      "default": "./src/video-knowledge/information-gain.ts"
+    },
+    "./video-knowledge/query-planner": {
+      "types": "./dist-types/video-knowledge/query-planner.d.ts",
+      "import": "./src/video-knowledge/query-planner.ts",
+      "default": "./src/video-knowledge/query-planner.ts"
+    },
+    "./video-knowledge/query-engine": {
+      "types": "./dist-types/video-knowledge/query-engine.d.ts",
+      "import": "./src/video-knowledge/query-engine.ts",
+      "default": "./src/video-knowledge/query-engine.ts"
+    },
+    "./video-knowledge/investigation": {
+      "types": "./dist-types/video-knowledge/investigation.d.ts",
+      "import": "./src/video-knowledge/investigation.ts",
+      "default": "./src/video-knowledge/investigation.ts"
+    },
+    "./video-knowledge/inspection-policy": {
+      "types": "./dist-types/video-knowledge/inspection-policy.d.ts",
+      "import": "./src/video-knowledge/inspection-policy.ts",
+      "default": "./src/video-knowledge/inspection-policy.ts"
+    },
+    "./video-knowledge/inspection-chunking": {
+      "types": "./dist-types/video-knowledge/inspection-chunking.d.ts",
+      "import": "./src/video-knowledge/inspection-chunking.ts",
+      "default": "./src/video-knowledge/inspection-chunking.ts"
+    },
+    "./video-knowledge/confidence": {
+      "types": "./dist-types/video-knowledge/confidence.d.ts",
+      "import": "./src/video-knowledge/confidence.ts",
+      "default": "./src/video-knowledge/confidence.ts"
+    },
+    "./video-knowledge/refinement-store": {
+      "types": "./dist-types/video-knowledge/refinement-store.d.ts",
+      "import": "./src/video-knowledge/refinement-store.ts",
+      "default": "./src/video-knowledge/refinement-store.ts"
+    },
+    "./video-knowledge/range-expansion": {
+      "types": "./dist-types/video-knowledge/range-expansion.d.ts",
+      "import": "./src/video-knowledge/range-expansion.ts",
+      "default": "./src/video-knowledge/range-expansion.ts"
+    },
+    "./video-knowledge/inspection-store": {
+      "types": "./dist-types/video-knowledge/inspection-store.d.ts",
+      "import": "./src/video-knowledge/inspection-store.ts",
+      "default": "./src/video-knowledge/inspection-store.ts"
+    },
+    "./video-knowledge/conflict-store": {
+      "types": "./dist-types/video-knowledge/conflict-store.d.ts",
+      "import": "./src/video-knowledge/conflict-store.ts",
+      "default": "./src/video-knowledge/conflict-store.ts"
+    },
+    "./video-knowledge/evaluation": {
+      "types": "./dist-types/video-knowledge/evaluation.d.ts",
+      "import": "./src/video-knowledge/evaluation.ts",
+      "default": "./src/video-knowledge/evaluation.ts"
+    },
+    "./video-knowledge/deletion-store": {
+      "types": "./dist-types/video-knowledge/deletion-store.d.ts",
+      "import": "./src/video-knowledge/deletion-store.ts",
+      "default": "./src/video-knowledge/deletion-store.ts"
+    },
+    "./agent-store": {
+      "types": "./dist-types/agent-store.d.ts",
+      "import": "./src/agent-store.ts",
+      "default": "./src/agent-store.ts"
+    },
+    "./agent-runtime": {
+      "types": "./dist-types/agent-runtime.d.ts",
+      "import": "./src/agent-runtime.ts",
+      "default": "./src/agent-runtime.ts"
+    },
+    "./session-store": {
+      "types": "./dist-types/session-store.d.ts",
+      "import": "./src/session-store.ts",
+      "default": "./src/session-store.ts"
+    },
+    "./project-store": {
+      "types": "./dist-types/project-store.d.ts",
+      "import": "./src/project-store.ts",
+      "default": "./src/project-store.ts"
+    },
+    "./generator/generate-agent-runtime": {
+      "types": "./dist-types/generator/generate-agent-runtime.d.ts",
+      "import": "./src/generator/generate-agent-runtime.ts",
+      "default": "./src/generator/generate-agent-runtime.ts"
+    },
+    "./workspace-model-status": {
+      "types": "./dist-types/workspace-model-status.d.ts",
+      "import": "./src/workspace-model-status.ts",
+      "default": "./src/workspace-model-status.ts"
+    },
+    "./workspace-host": {
+      "types": "./dist-types/workspace-host.d.ts",
+      "import": "./src/workspace-host.ts",
+      "default": "./src/workspace-host.ts"
+    },
+    "./chart-config": {
+      "types": "./dist-types/workspace-common/chat/chart-config.d.ts",
+      "import": "./src/workspace-common/chat/chart-config.ts",
+      "default": "./src/workspace-common/chat/chart-config.ts"
+    },
+    "./message-feedback": {
+      "types": "./dist-types/workspace-common/chat/message-feedback.d.ts",
+      "import": "./src/workspace-common/chat/message-feedback.ts",
+      "default": "./src/workspace-common/chat/message-feedback.ts"
+    },
+    "./data-export": {
+      "types": "./dist-types/workspace-common/chat/data-export.d.ts",
+      "import": "./src/workspace-common/chat/data-export.ts",
+      "default": "./src/workspace-common/chat/data-export.ts"
+    },
+    "./table-presentation": {
+      "types": "./dist-types/workspace-common/chat/table-presentation.d.ts",
+      "import": "./src/workspace-common/chat/table-presentation.ts",
+      "default": "./src/workspace-common/chat/table-presentation.ts"
+    },
+    "./video-runtime-scope": {
+      "types": "./dist-types/workspace-common/media/video-runtime-scope.d.ts",
+      "import": "./src/workspace-common/media/video-runtime-scope.ts",
+      "default": "./src/workspace-common/media/video-runtime-scope.ts"
+    },
+    "./video-intelligence-capacity": {
+      "types": "./dist-types/workspace-common/media/video-intelligence-capacity.d.ts",
+      "import": "./src/workspace-common/media/video-intelligence-capacity.ts",
+      "default": "./src/workspace-common/media/video-intelligence-capacity.ts"
+    },
+    "./error-formatter": {
+      "types": "./dist-types/workspace-common/shared/error-formatter.d.ts",
+      "import": "./src/workspace-common/shared/error-formatter.ts",
+      "default": "./src/workspace-common/shared/error-formatter.ts"
+    }
   },
   "dependencies": {
-    "@ai-sdk/cohere": "^4.0.61",
-    "@ai-sdk/deepseek": "^3.0.65",
-    "@ai-sdk/gateway": "^4.0.114",
-    "@ai-sdk/google": "^4.0.96",
+    "@ai-sdk/cohere": "^4.0.58",
+    "@ai-sdk/deepseek": "^3.0.62",
+    "@ai-sdk/gateway": "^4.0.108",
+    "@ai-sdk/google": "^4.0.92",
     "@ai-sdk/mcp": "^2.0.26",
-    "@ai-sdk/mistral": "^4.0.64",
-    "@ai-sdk/openai": "^4.0.94",
-    "@ai-sdk/openai-compatible": "^3.0.69",
+    "@ai-sdk/mistral": "^4.0.61",
+    "@ai-sdk/openai": "^4.0.89",
+    "@ai-sdk/openai-compatible": "^3.0.66",
     "@larkup/vector-stores": "workspace:*",
-    "ai": "^7.0.141"
+    "ai": "^7.0.133",
+    "@larkup/runtime-kit": "workspace:*",
+    "pdf-lib": "^1.17.1",
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@types/node": "^26",

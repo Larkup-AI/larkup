@@ -3,6 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { InstalledTool } from './types';
 import { getInstalledTool, resolveWorkspaceToolPath } from './tool-installer';
+import { workspaceHost } from '@larkup/core/workspace-host';
 
 /**
  * Dynamic tool loader — loads an installed tool's module at runtime.
@@ -47,6 +48,8 @@ async function getScopedImport(revision: string) {
  * Load a tool's exported API. Returns `null` if the tool is not installed.
  */
 export async function loadTool<T = any>(toolId: string): Promise<T | null> {
+  const hosted = workspaceHost()?.tools?.find((tool) => tool.id === toolId);
+  if (hosted) return hosted.module as T;
   const installed = await getInstalledTool(toolId);
   if (!installed) return null;
   // Determine what to import
@@ -146,7 +149,7 @@ async function resolvePackageEntry(packageDir: string): Promise<string> {
   const rootExport =
     typeof manifest.exports === 'object' ? manifest.exports['.'] : manifest.exports;
   const entry =
-    (typeof rootExport === 'object' ? rootExport.import ?? rootExport.default : rootExport) ??
+    (typeof rootExport === 'object' ? (rootExport.import ?? rootExport.default) : rootExport) ??
     manifest.main ??
     'index.js';
 

@@ -16,6 +16,7 @@ COPY apps/larkup-proxy/package.json ./apps/larkup-proxy/
 COPY apps/web/package.json ./apps/web/
 COPY packages/connections/package.json ./packages/connections/
 COPY packages/core/package.json ./packages/core/
+COPY packages/runtime-kit/package.json ./packages/runtime-kit/
 COPY packages/workspace-ui/package.json ./packages/workspace-ui/
 COPY packages/integrations/package.json ./packages/integrations/
 COPY packages/marketplace/package.json ./packages/marketplace/
@@ -39,6 +40,7 @@ ARG NEXT_PUBLIC_DOCKER_ENV=true
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_DOCKER_ENV=${NEXT_PUBLIC_DOCKER_ENV}
 
+RUN pnpm --filter @larkup/workspace-ui build
 RUN pnpm --filter @larkup/sandbox build
 RUN pnpm --filter @larkup/integrations build
 RUN pnpm --filter @larkup/tool-doc-editor build
@@ -81,7 +83,7 @@ RUN node -e 'const { createRequire } = require("node:module"); const app = requi
 # Install native bindings directly for the target platform. Keep these exact
 # versions aligned with the web package so Docker does not replace traced code
 # with an older runtime implementation.
-RUN npm install --no-save @lancedb/lancedb@0.40.0 @napi-rs/canvas@1.0.10 && \
+RUN npm install --no-save @lancedb/lancedb@0.40.0 @napi-rs/canvas@1.0.11 && \
     chown -R nextjs:nodejs node_modules/@lancedb node_modules/@napi-rs node_modules/apache-arrow node_modules/reflect-metadata && \
     mkdir -p /app/apps/web/.larkup /app/.tmp && \
     chown -R nextjs:nodejs /app/apps/web/.larkup /app/.tmp

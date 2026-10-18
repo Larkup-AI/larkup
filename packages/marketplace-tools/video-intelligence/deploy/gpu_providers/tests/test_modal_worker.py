@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from gpu_providers.modal_worker_entrypoint import (
     GPU_IDLE_TIMEOUT_SECONDS,
     GPU_MAX_CONTAINERS,
     GPU_TYPE,
     _is_full_source_range,
+    materialize_remote_video,
     preparation_progress,
 )
 from app.model_configuration import temporary_model_environment
@@ -71,6 +73,45 @@ class ModalWorkerEnvironmentTests(unittest.TestCase):
                 os.environ["LARKUP_VIDEO_VISION_API_KEY"], "stale-shared-key"
             )
             self.assertEqual(os.environ["DEEPGRAM_API_KEY"], "managed-audio-key")
+
+    def test_remote_materialization_downloads_and_uploads_without_model_secrets(self) -> None:
+        updates = []
+
+        def materialize(_url, destination, _duration, progress) -> None:
+            destination.write_bytes(b"video")
+            progress(99, "Ready")
+
+        response = Mock()
+        response.raise_for_status.return_value = None
+        with patch(
+            "gpu_providers.modal_worker_entrypoint.materialize_provider_source",
+            side_effect=materialize,
+        ) as download, patch(
+            "gpu_providers.modal_worker_entrypoint.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                args=[], returncode=0, stdout='{"format":{"duration":"12.5"}}', stderr=""
+            ),
+        ), patch(
+            "gpu_providers.modal_worker_entrypoint.requests.put", return_value=response
+        ) as upload:
+            result = materialize_remote_video(
+                {
+                    "sourceDurationSecs": 12.5,
+                    "materializedSourceUploadUrl": "https://storage.example.test/upload",
+                    "materializedSourceUploadHeaders": {"Content-Type": "video/mp4"},
+                    "fileName": "song.mp4",
+                },
+                "https://www.youtube.com/watch?v=example",
+                lambda *args: updates.append(args),
+            )
+
+        self.assertEqual(result["actualSourceMinutes"], 0)
+        self.assertEqual(result["result"]["durationSecs"], 12.5)
+        self.assertEqual(result["result"]["sizeBytes"], 5)
+        self.assertEqual(result["result"]["fileName"], "song.mp4")
+        self.assertEqual(download.call_count, 1)
+        self.assertEqual(upload.call_args.kwargs["headers"], {"Content-Type": "video/mp4"})
+        self.assertEqual(updates[-1][0], "complete")
 
 
 if __name__ == "__main__":

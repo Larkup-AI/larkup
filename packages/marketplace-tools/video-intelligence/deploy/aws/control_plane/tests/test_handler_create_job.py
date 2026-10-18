@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import unittest
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
@@ -91,6 +92,89 @@ class CreateJobTests(unittest.TestCase):
         job_id = self.fake_provider.launch_calls[0]["jobId"]
         item = self.handler.table.get_item(Key={"pk": f"JOB#{job_id}", "sk": "JOB"})["Item"]
         self.assertNotIn("sourceKey", item)
+
+    def test_create_materialization_uses_the_existing_video_worker_without_model_keys(self) -> None:
+        with patch.object(self.handler, "get_provider", return_value=self.fake_provider):
+            result = self.handler.create_materialization(
+                self.principal,
+                {
+                    "sourceUrl": "https://www.youtube.com/watch?v=Engi4swCSDw",
+                    "fileName": "arabic-song.mp4",
+                    "durationSecs": 210,
+                },
+            )
+
+        self.assertEqual(result["statusCode"], 202)
+        launched = self.fake_provider.launch_calls[0]["env"]
+        self.assertEqual(launched["operation"], "materialize")
+        self.assertEqual(
+            launched["sourceUrl"],
+            "https://www.youtube.com/watch?v=Engi4swCSDw",
+        )
+        self.assertNotIn("modelConfiguration", launched)
+        self.assertTrue(launched["materializedSourceUploadUrl"].startswith("https://"))
+        job_id = self.fake_provider.launch_calls[0]["jobId"]
+        item = self.handler.table.get_item(
+            Key={"pk": f"JOB#{job_id}", "sk": "JOB"}
+        )["Item"]
+        self.assertEqual(item["operation"], "materialize")
+        self.assertEqual(
+            item["materializedSourceKey"],
+            f"materialized/{self.principal['id']}/{job_id}.mp4",
+        )
+
+    def test_create_materialization_rejects_non_youtube_and_lookalike_hosts(self) -> None:
+        for source_url in (
+            "https://example.com/video.mp4",
+            "https://youtube.com.evil.test/watch?v=abc",
+            "http://www.youtube.com/watch?v=abc",
+        ):
+            with self.subTest(source_url=source_url):
+                with self.assertRaises(self.handler.ApiError) as ctx:
+                    self.handler.create_materialization(
+                        self.principal,
+                        {"sourceUrl": source_url},
+                    )
+                self.assertEqual(ctx.exception.status, 400)
+
+    def test_failed_materialization_deletes_any_partial_temporary_source(self) -> None:
+        period, _, _ = self.handler.billing_period()
+        source_key = "materialized/principal-1/job-partial.mp4"
+        self.handler.s3.put_object(
+            Bucket=os.environ["BUCKET_NAME"], Key=source_key, Body=b"partial"
+        )
+        self.handler.table.put_item(
+            Item={
+                "pk": "JOB#job-partial",
+                "sk": "JOB",
+                "principalId": self.principal["id"],
+                "period": period,
+                "status": "running",
+                "operation": "materialize",
+                "materializedSourceKey": source_key,
+                "estimatedSourceMinutes": Decimal("0.01"),
+                "createdAt": "2026-01-01T00:00:00Z",
+                "updatedAt": "2026-01-01T00:00:00Z",
+                "progressJson": "{}",
+            }
+        )
+        self.handler.table.put_item(
+            Item={
+                "pk": f"USAGE#{self.principal['id']}#{period}",
+                "sk": "USAGE",
+                "reservedSourceMinutes": Decimal("0.01"),
+                "sourceMinutesUsed": Decimal("0"),
+                "availableSourceMinutes": Decimal("100"),
+                "activeJobs": 1,
+            }
+        )
+
+        self.handler.settle_failure("job-partial", "download failed")
+
+        with self.assertRaises(self.handler.s3.exceptions.NoSuchKey):
+            self.handler.s3.get_object(
+                Bucket=os.environ["BUCKET_NAME"], Key=source_key
+            )
 
     def test_create_job_forwards_user_models_only_to_the_worker(self) -> None:
         with patch.object(self.handler, "get_provider", return_value=self.fake_provider):

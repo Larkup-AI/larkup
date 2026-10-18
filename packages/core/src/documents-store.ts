@@ -1,3 +1,4 @@
+import { workspaceHost } from './workspace-host';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -27,6 +28,8 @@ async function docsPath(create: boolean): Promise<string | null> {
 }
 
 export async function readDocuments(): Promise<SourceDocument[]> {
+  const host = workspaceHost();
+  if (host) return host.readDocuments();
   const file = await docsPath(false);
   if (!file) return [];
   try {
@@ -43,6 +46,8 @@ export async function readDocuments(): Promise<SourceDocument[]> {
 }
 
 async function writeAll(docs: SourceDocument[]) {
+  const host = workspaceHost();
+  if (host) return host.writeDocuments(docs);
   const file = await docsPath(true);
   if (!file) return;
   const temporaryFile = path.join(

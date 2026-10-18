@@ -1,3 +1,4 @@
+import { workspaceHost } from './workspace-host';
 /**
  * File-backed tabular data store.
  *
@@ -311,6 +312,8 @@ async function datasetsPath(create: boolean): Promise<string | null> {
 }
 
 async function readAll(): Promise<TabularDataset[]> {
+  const host = workspaceHost();
+  if (host) return host.readTabularDatasets();
   const file = await datasetsPath(false);
   if (!file) return [];
   try {
@@ -323,6 +326,8 @@ async function readAll(): Promise<TabularDataset[]> {
 }
 
 async function writeAll(datasets: TabularDataset[]): Promise<void> {
+  const host = workspaceHost();
+  if (host) return host.writeTabularDatasets(datasets);
   const file = await datasetsPath(true);
   if (!file) return;
   const temporaryFile = path.join(

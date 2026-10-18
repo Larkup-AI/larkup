@@ -1,3 +1,4 @@
+import { workspaceHost } from './workspace-host';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -40,6 +41,8 @@ function isMissingFile(error: unknown): boolean {
 }
 
 export async function readMediaAssets(): Promise<MediaAsset[]> {
+  const host = workspaceHost();
+  if (host) return host.readMediaAssets();
   const file = await assetsPath(false);
   if (!file) return [];
   try {
@@ -58,6 +61,8 @@ export async function readMediaAssets(): Promise<MediaAsset[]> {
 }
 
 async function writeAll(assets: MediaAsset[]) {
+  const host = workspaceHost();
+  if (host) return host.writeMediaAssets(assets);
   const file = await assetsPath(true);
   if (!file) return;
   const temporaryFile = path.join(
@@ -246,6 +251,7 @@ export function updateMediaAsset(
       | 'processingRevision'
       | 'processingStartedAt'
       | 'processingHeartbeatAt'
+      | 'sourceLanguage'
       | 'caption'
       | 'thumbnailUri'
       | 'dimensions'

@@ -25,7 +25,7 @@ function normalizeToolDescriptor(descriptor: ToolDescriptor): ToolDescriptor {
  */
 export function compareToolVersions(left: string, right: string): number {
   const parse = (version: string) => {
-    const [core, suffix = ''] = version.split('-', 2);
+    const [core = '', suffix = ''] = version.split('-', 2);
     const parts = core.split('.').map((part) => Number.parseInt(part, 10) || 0);
     return { parts, stable: suffix.length === 0 };
   };

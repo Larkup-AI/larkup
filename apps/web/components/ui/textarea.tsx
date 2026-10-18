@@ -1,1 +1,1 @@
-export { Textarea } from '@larkup/workspace-ui';
+export * from '@larkup/workspace-app/components/ui/textarea';

@@ -2,6 +2,7 @@ import type {
   SubmitVideoJobRequest,
   VideoIntelligenceClientContract,
   VideoJob,
+  VideoMaterializationJob,
   VideoRuntimeMode,
   VideoServiceEntitlement,
   VideoServiceUsage,
@@ -136,6 +137,34 @@ export class VideoIntelligenceClient implements VideoIntelligenceClientContract 
 
   getUsage(): Promise<VideoServiceUsage> {
     return this.request('/v1/usage');
+  }
+
+  submitMaterialization(request: {
+    sourceUrl: string;
+    fileName?: string;
+    durationSecs?: number;
+  }): Promise<VideoMaterializationJob> {
+    return this.request('/v1/materializations', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  getMaterialization(jobId: string): Promise<VideoMaterializationJob> {
+    return this.request(`/v1/materializations/${encodeURIComponent(jobId)}`);
+  }
+
+  acknowledgeMaterialization(jobId: string): Promise<{ status: string }> {
+    return this.request(`/v1/materializations/${encodeURIComponent(jobId)}/ack`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
+  cancelMaterialization(jobId: string): Promise<VideoMaterializationJob> {
+    return this.request(`/v1/materializations/${encodeURIComponent(jobId)}`, {
+      method: 'DELETE',
+    });
   }
 
   redeemAccessCode(

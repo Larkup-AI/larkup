@@ -1,0 +1,582 @@
+{
+  "name": "@larkup/workspace-app",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Canonical Larkup chat, data and settings pages with host adapters",
+  "files": [
+    "src",
+    "README.md",
+    "dist-types",
+    "assets",
+    "scripts"
+  ],
+  "exports": {
+    "./storage": {
+      "types": "./dist-types/storage.d.ts",
+      "import": "./src/storage.ts",
+      "default": "./src/storage.ts"
+    },
+    "./host": {
+      "types": "./dist-types/host.d.ts",
+      "import": "./src/host.ts",
+      "default": "./src/host.ts"
+    },
+    "./components/ui/alert-dialog": {
+      "types": "./dist-types/components/ui/alert-dialog.d.ts",
+      "import": "./src/components/ui/alert-dialog.tsx",
+      "default": "./src/components/ui/alert-dialog.tsx"
+    },
+    "./components/ui/card": {
+      "types": "./dist-types/components/ui/card.d.ts",
+      "import": "./src/components/ui/card.tsx",
+      "default": "./src/components/ui/card.tsx"
+    },
+    "./components/ui/slider": {
+      "types": "./dist-types/components/ui/slider.d.ts",
+      "import": "./src/components/ui/slider.tsx",
+      "default": "./src/components/ui/slider.tsx"
+    },
+    "./components/ui/input-group": {
+      "types": "./dist-types/components/ui/input-group.d.ts",
+      "import": "./src/components/ui/input-group.tsx",
+      "default": "./src/components/ui/input-group.tsx"
+    },
+    "./components/ui/popover": {
+      "types": "./dist-types/components/ui/popover.d.ts",
+      "import": "./src/components/ui/popover.tsx",
+      "default": "./src/components/ui/popover.tsx"
+    },
+    "./components/ui/progress": {
+      "types": "./dist-types/components/ui/progress.d.ts",
+      "import": "./src/components/ui/progress.tsx",
+      "default": "./src/components/ui/progress.tsx"
+    },
+    "./components/ui/sheet": {
+      "types": "./dist-types/components/ui/sheet.d.ts",
+      "import": "./src/components/ui/sheet.tsx",
+      "default": "./src/components/ui/sheet.tsx"
+    },
+    "./components/ui/scroll-area": {
+      "types": "./dist-types/components/ui/scroll-area.d.ts",
+      "import": "./src/components/ui/scroll-area.tsx",
+      "default": "./src/components/ui/scroll-area.tsx"
+    },
+    "./components/ui/tooltip": {
+      "types": "./dist-types/components/ui/tooltip.d.ts",
+      "import": "./src/components/ui/tooltip.tsx",
+      "default": "./src/components/ui/tooltip.tsx"
+    },
+    "./components/ui/alert": {
+      "types": "./dist-types/components/ui/alert.d.ts",
+      "import": "./src/components/ui/alert.tsx",
+      "default": "./src/components/ui/alert.tsx"
+    },
+    "./components/ui/switch": {
+      "types": "./dist-types/components/ui/switch.d.ts",
+      "import": "./src/components/ui/switch.tsx",
+      "default": "./src/components/ui/switch.tsx"
+    },
+    "./components/ui/command": {
+      "types": "./dist-types/components/ui/command.d.ts",
+      "import": "./src/components/ui/command.tsx",
+      "default": "./src/components/ui/command.tsx"
+    },
+    "./components/ui/dialog": {
+      "types": "./dist-types/components/ui/dialog.d.ts",
+      "import": "./src/components/ui/dialog.tsx",
+      "default": "./src/components/ui/dialog.tsx"
+    },
+    "./components/ui/badge": {
+      "types": "./dist-types/components/ui/badge.d.ts",
+      "import": "./src/components/ui/badge.tsx",
+      "default": "./src/components/ui/badge.tsx"
+    },
+    "./components/ui/table": {
+      "types": "./dist-types/components/ui/table.d.ts",
+      "import": "./src/components/ui/table.tsx",
+      "default": "./src/components/ui/table.tsx"
+    },
+    "./components/ui/checkbox": {
+      "types": "./dist-types/components/ui/checkbox.d.ts",
+      "import": "./src/components/ui/checkbox.tsx",
+      "default": "./src/components/ui/checkbox.tsx"
+    },
+    "./components/ui/collapsible": {
+      "types": "./dist-types/components/ui/collapsible.d.ts",
+      "import": "./src/components/ui/collapsible.tsx",
+      "default": "./src/components/ui/collapsible.tsx"
+    },
+    "./components/ui/dropdown-menu": {
+      "types": "./dist-types/components/ui/dropdown-menu.d.ts",
+      "import": "./src/components/ui/dropdown-menu.tsx",
+      "default": "./src/components/ui/dropdown-menu.tsx"
+    },
+    "./components/ui/textarea": {
+      "types": "./dist-types/components/ui/textarea.d.ts",
+      "import": "./src/components/ui/textarea.tsx",
+      "default": "./src/components/ui/textarea.tsx"
+    },
+    "./components/ui/input": {
+      "types": "./dist-types/components/ui/input.d.ts",
+      "import": "./src/components/ui/input.tsx",
+      "default": "./src/components/ui/input.tsx"
+    },
+    "./components/settings/general/model-combobox": {
+      "types": "./dist-types/components/settings/general/model-combobox.d.ts",
+      "import": "./src/components/settings/general/model-combobox.tsx",
+      "default": "./src/components/settings/general/model-combobox.tsx"
+    },
+    "./components/settings/general/models-section": {
+      "types": "./dist-types/components/settings/general/models-section.d.ts",
+      "import": "./src/components/settings/general/models-section.tsx",
+      "default": "./src/components/settings/general/models-section.tsx"
+    },
+    "./components/chat/message-queue": {
+      "types": "./dist-types/components/chat/message-queue.d.ts",
+      "import": "./src/components/chat/message-queue.tsx",
+      "default": "./src/components/chat/message-queue.tsx"
+    },
+    "./components/chat/message-item": {
+      "types": "./dist-types/components/chat/message-item.d.ts",
+      "import": "./src/components/chat/message-item.tsx",
+      "default": "./src/components/chat/message-item.tsx"
+    },
+    "./components/chat/chat-workspace": {
+      "types": "./dist-types/components/chat/chat-workspace.d.ts",
+      "import": "./src/components/chat/chat-workspace.tsx",
+      "default": "./src/components/chat/chat-workspace.tsx"
+    },
+    "./components/chat/message-actions": {
+      "types": "./dist-types/components/chat/message-actions.d.ts",
+      "import": "./src/components/chat/message-actions.tsx",
+      "default": "./src/components/chat/message-actions.tsx"
+    },
+    "./components/chat/tools/chat-media-preview": {
+      "types": "./dist-types/components/chat/tools/chat-media-preview.d.ts",
+      "import": "./src/components/chat/tools/chat-media-preview.tsx",
+      "default": "./src/components/chat/tools/chat-media-preview.tsx"
+    },
+    "./components/chat/tools/chat-sandbox-result": {
+      "types": "./dist-types/components/chat/tools/chat-sandbox-result.d.ts",
+      "import": "./src/components/chat/tools/chat-sandbox-result.tsx",
+      "default": "./src/components/chat/tools/chat-sandbox-result.tsx"
+    },
+    "./components/chat/tools/chat-citations": {
+      "types": "./dist-types/components/chat/tools/chat-citations.d.ts",
+      "import": "./src/components/chat/tools/chat-citations.tsx",
+      "default": "./src/components/chat/tools/chat-citations.tsx"
+    },
+    "./components/chat/tools/chat-chart": {
+      "types": "./dist-types/components/chat/tools/chat-chart.d.ts",
+      "import": "./src/components/chat/tools/chat-chart.tsx",
+      "default": "./src/components/chat/tools/chat-chart.tsx"
+    },
+    "./components/chat/tools/chat-file-export": {
+      "types": "./dist-types/components/chat/tools/chat-file-export.d.ts",
+      "import": "./src/components/chat/tools/chat-file-export.tsx",
+      "default": "./src/components/chat/tools/chat-file-export.tsx"
+    },
+    "./components/chat/tools/corpus-data-result": {
+      "types": "./dist-types/components/chat/tools/corpus-data-result.d.ts",
+      "import": "./src/components/chat/tools/corpus-data-result.tsx",
+      "default": "./src/components/chat/tools/corpus-data-result.tsx"
+    },
+    "./components/chat/tools/visual-placement-modal": {
+      "types": "./dist-types/components/chat/tools/visual-placement-modal.d.ts",
+      "import": "./src/components/chat/tools/visual-placement-modal.tsx",
+      "default": "./src/components/chat/tools/visual-placement-modal.tsx"
+    },
+    "./components/chat/tools/knowledge-base-result": {
+      "types": "./dist-types/components/chat/tools/knowledge-base-result.d.ts",
+      "import": "./src/components/chat/tools/knowledge-base-result.tsx",
+      "default": "./src/components/chat/tools/knowledge-base-result.tsx"
+    },
+    "./components/chat/tools/chat-data-table": {
+      "types": "./dist-types/components/chat/tools/chat-data-table.d.ts",
+      "import": "./src/components/chat/tools/chat-data-table.tsx",
+      "default": "./src/components/chat/tools/chat-data-table.tsx"
+    },
+    "./components/chat/tools/chat-tabs": {
+      "types": "./dist-types/components/chat/tools/chat-tabs.d.ts",
+      "import": "./src/components/chat/tools/chat-tabs.tsx",
+      "default": "./src/components/chat/tools/chat-tabs.tsx"
+    },
+    "./components/chat/tools/chat-signature-request": {
+      "types": "./dist-types/components/chat/tools/chat-signature-request.d.ts",
+      "import": "./src/components/chat/tools/chat-signature-request.tsx",
+      "default": "./src/components/chat/tools/chat-signature-request.tsx"
+    },
+    "./components/chat/canvas/document-field": {
+      "types": "./dist-types/components/chat/canvas/document-field.d.ts",
+      "import": "./src/components/chat/canvas/document-field.tsx",
+      "default": "./src/components/chat/canvas/document-field.tsx"
+    },
+    "./components/chat/canvas/doc-editor-provider": {
+      "types": "./dist-types/components/chat/canvas/doc-editor-provider.d.ts",
+      "import": "./src/components/chat/canvas/doc-editor-provider.tsx",
+      "default": "./src/components/chat/canvas/doc-editor-provider.tsx"
+    },
+    "./components/chat/canvas/file-attachment-button": {
+      "types": "./dist-types/components/chat/canvas/file-attachment-button.d.ts",
+      "import": "./src/components/chat/canvas/file-attachment-button.tsx",
+      "default": "./src/components/chat/canvas/file-attachment-button.tsx"
+    },
+    "./components/chat/canvas/document-viewer": {
+      "types": "./dist-types/components/chat/canvas/document-viewer.d.ts",
+      "import": "./src/components/chat/canvas/document-viewer.tsx",
+      "default": "./src/components/chat/canvas/document-viewer.tsx"
+    },
+    "./components/chat/canvas/document-canvas": {
+      "types": "./dist-types/components/chat/canvas/document-canvas.d.ts",
+      "import": "./src/components/chat/canvas/document-canvas.tsx",
+      "default": "./src/components/chat/canvas/document-canvas.tsx"
+    },
+    "./components/configure/custom-model-modal": {
+      "types": "./dist-types/components/configure/custom-model-modal.d.ts",
+      "import": "./src/components/configure/custom-model-modal.tsx",
+      "default": "./src/components/configure/custom-model-modal.tsx"
+    },
+    "./components/projects/project-provider": {
+      "types": "./dist-types/components/projects/project-provider.d.ts",
+      "import": "./src/components/projects/project-provider.tsx",
+      "default": "./src/components/projects/project-provider.tsx"
+    },
+    "./components/projects/project-form-dialog": {
+      "types": "./dist-types/components/projects/project-form-dialog.d.ts",
+      "import": "./src/components/projects/project-form-dialog.tsx",
+      "default": "./src/components/projects/project-form-dialog.tsx"
+    },
+    "./components/alerts/generic-alert": {
+      "types": "./dist-types/components/alerts/generic-alert.d.ts",
+      "import": "./src/components/alerts/generic-alert.tsx",
+      "default": "./src/components/alerts/generic-alert.tsx"
+    },
+    "./components/data/integrations-panel": {
+      "types": "./dist-types/components/data/integrations-panel.d.ts",
+      "import": "./src/components/data/integrations-panel.tsx",
+      "default": "./src/components/data/integrations-panel.tsx"
+    },
+    "./components/data/project-data-page": {
+      "types": "./dist-types/components/data/project-data-page.d.ts",
+      "import": "./src/components/data/project-data-page.tsx",
+      "default": "./src/components/data/project-data-page.tsx"
+    },
+    "./components/data/tool-indexing-dialog": {
+      "types": "./dist-types/components/data/tool-indexing-dialog.d.ts",
+      "import": "./src/components/data/tool-indexing-dialog.tsx",
+      "default": "./src/components/data/tool-indexing-dialog.tsx"
+    },
+    "./components/data/jobs-panel": {
+      "types": "./dist-types/components/data/jobs-panel.d.ts",
+      "import": "./src/components/data/jobs-panel.tsx",
+      "default": "./src/components/data/jobs-panel.tsx"
+    },
+    "./components/data/media-indexing-jobs-panel": {
+      "types": "./dist-types/components/data/media-indexing-jobs-panel.d.ts",
+      "import": "./src/components/data/media-indexing-jobs-panel.tsx",
+      "default": "./src/components/data/media-indexing-jobs-panel.tsx"
+    },
+    "./components/data/media-panel": {
+      "types": "./dist-types/components/data/media-panel.d.ts",
+      "import": "./src/components/data/media-panel.tsx",
+      "default": "./src/components/data/media-panel.tsx"
+    },
+    "./components/data/jobs-tracking-button": {
+      "types": "./dist-types/components/data/jobs-tracking-button.d.ts",
+      "import": "./src/components/data/jobs-tracking-button.tsx",
+      "default": "./src/components/data/jobs-tracking-button.tsx"
+    },
+    "./components/data/tabular-preview": {
+      "types": "./dist-types/components/data/tabular-preview.d.ts",
+      "import": "./src/components/data/tabular-preview.tsx",
+      "default": "./src/components/data/tabular-preview.tsx"
+    },
+    "./components/data/web-crawler-status": {
+      "types": "./dist-types/components/data/web-crawler-status.d.ts",
+      "import": "./src/components/data/web-crawler-status.tsx",
+      "default": "./src/components/data/web-crawler-status.tsx"
+    },
+    "./components/data/data-primary-action": {
+      "types": "./dist-types/components/data/data-primary-action.d.ts",
+      "import": "./src/components/data/data-primary-action.ts",
+      "default": "./src/components/data/data-primary-action.ts"
+    },
+    "./components/data/notion-panel": {
+      "types": "./dist-types/components/data/notion-panel.d.ts",
+      "import": "./src/components/data/notion-panel.tsx",
+      "default": "./src/components/data/notion-panel.tsx"
+    },
+    "./components/data/live-media-progress": {
+      "types": "./dist-types/components/data/live-media-progress.d.ts",
+      "import": "./src/components/data/live-media-progress.tsx",
+      "default": "./src/components/data/live-media-progress.tsx"
+    },
+    "./components/data/groups-panel": {
+      "types": "./dist-types/components/data/groups-panel.d.ts",
+      "import": "./src/components/data/groups-panel.tsx",
+      "default": "./src/components/data/groups-panel.tsx"
+    },
+    "./components/data/data-workspace": {
+      "types": "./dist-types/components/data/data-workspace.d.ts",
+      "import": "./src/components/data/data-workspace.tsx",
+      "default": "./src/components/data/data-workspace.tsx"
+    },
+    "./components/data/scrape-panel": {
+      "types": "./dist-types/components/data/scrape-panel.d.ts",
+      "import": "./src/components/data/scrape-panel.tsx",
+      "default": "./src/components/data/scrape-panel.tsx"
+    },
+    "./components/data/data-entry-mode-switch": {
+      "types": "./dist-types/components/data/data-entry-mode-switch.d.ts",
+      "import": "./src/components/data/data-entry-mode-switch.tsx",
+      "default": "./src/components/data/data-entry-mode-switch.tsx"
+    },
+    "./components/data/corpus-panel": {
+      "types": "./dist-types/components/data/corpus-panel.d.ts",
+      "import": "./src/components/data/corpus-panel.tsx",
+      "default": "./src/components/data/corpus-panel.tsx"
+    },
+    "./components/data/upload-panel": {
+      "types": "./dist-types/components/data/upload-panel.d.ts",
+      "import": "./src/components/data/upload-panel.tsx",
+      "default": "./src/components/data/upload-panel.tsx"
+    },
+    "./components/data/integration-resources-panel": {
+      "types": "./dist-types/components/data/integration-resources-panel.d.ts",
+      "import": "./src/components/data/integration-resources-panel.tsx",
+      "default": "./src/components/data/integration-resources-panel.tsx"
+    },
+    "./components/data/paste-panel": {
+      "types": "./dist-types/components/data/paste-panel.d.ts",
+      "import": "./src/components/data/paste-panel.tsx",
+      "default": "./src/components/data/paste-panel.tsx"
+    },
+    "./hooks/use-live-media-progress": {
+      "types": "./dist-types/hooks/use-live-media-progress.d.ts",
+      "import": "./src/hooks/use-live-media-progress.ts",
+      "default": "./src/hooks/use-live-media-progress.ts"
+    },
+    "./hooks/use-notion-auth": {
+      "types": "./dist-types/hooks/use-notion-auth.d.ts",
+      "import": "./src/hooks/use-notion-auth.ts",
+      "default": "./src/hooks/use-notion-auth.ts"
+    },
+    "./hooks/use-copy-to-clipboard": {
+      "types": "./dist-types/hooks/use-copy-to-clipboard.d.ts",
+      "import": "./src/hooks/use-copy-to-clipboard.ts",
+      "default": "./src/hooks/use-copy-to-clipboard.ts"
+    },
+    "./hooks/use-integration-auth": {
+      "types": "./dist-types/hooks/use-integration-auth.d.ts",
+      "import": "./src/hooks/use-integration-auth.ts",
+      "default": "./src/hooks/use-integration-auth.ts"
+    },
+    "./lib/jobs-client": {
+      "types": "./dist-types/lib/jobs-client.d.ts",
+      "import": "./src/lib/jobs-client.ts",
+      "default": "./src/lib/jobs-client.ts"
+    },
+    "./lib/utils": {
+      "types": "./dist-types/lib/utils.d.ts",
+      "import": "./src/lib/utils.ts",
+      "default": "./src/lib/utils.ts"
+    },
+    "./lib/error-formatter": {
+      "types": "./dist-types/lib/error-formatter.d.ts",
+      "import": "./src/lib/error-formatter.ts",
+      "default": "./src/lib/error-formatter.ts"
+    },
+    "./lib/browser-cache": {
+      "types": "./dist-types/lib/browser-cache.d.ts",
+      "import": "./src/lib/browser-cache.ts",
+      "default": "./src/lib/browser-cache.ts"
+    },
+    "./lib/chat-supporting-clip": {
+      "types": "./dist-types/lib/chat-supporting-clip.d.ts",
+      "import": "./src/lib/chat-supporting-clip.ts",
+      "default": "./src/lib/chat-supporting-clip.ts"
+    },
+    "./lib/chat/message-feedback": {
+      "types": "./dist-types/lib/chat/message-feedback.d.ts",
+      "import": "./src/lib/chat/message-feedback.ts",
+      "default": "./src/lib/chat/message-feedback.ts"
+    },
+    "./lib/chat/chart-config": {
+      "types": "./dist-types/lib/chat/chart-config.d.ts",
+      "import": "./src/lib/chat/chart-config.ts",
+      "default": "./src/lib/chat/chart-config.ts"
+    },
+    "./lib/chat/data-export": {
+      "types": "./dist-types/lib/chat/data-export.d.ts",
+      "import": "./src/lib/chat/data-export.ts",
+      "default": "./src/lib/chat/data-export.ts"
+    },
+    "./lib/chat/live-tool-progress": {
+      "types": "./dist-types/lib/chat/live-tool-progress.d.ts",
+      "import": "./src/lib/chat/live-tool-progress.ts",
+      "default": "./src/lib/chat/live-tool-progress.ts"
+    },
+    "./lib/chat/tool-output": {
+      "types": "./dist-types/lib/chat/tool-output.d.ts",
+      "import": "./src/lib/chat/tool-output.ts",
+      "default": "./src/lib/chat/tool-output.ts"
+    },
+    "./lib/chat/table-presentation": {
+      "types": "./dist-types/lib/chat/table-presentation.d.ts",
+      "import": "./src/lib/chat/table-presentation.ts",
+      "default": "./src/lib/chat/table-presentation.ts"
+    },
+    "./lib/constants/tools": {
+      "types": "./dist-types/lib/constants/tools.d.ts",
+      "import": "./src/lib/constants/tools.ts",
+      "default": "./src/lib/constants/tools.ts"
+    },
+    "./lib/shared/error-formatter": {
+      "types": "./dist-types/lib/shared/error-formatter.d.ts",
+      "import": "./src/lib/shared/error-formatter.ts",
+      "default": "./src/lib/shared/error-formatter.ts"
+    },
+    "./lib/media/source-selection": {
+      "types": "./dist-types/lib/media/source-selection.d.ts",
+      "import": "./src/lib/media/source-selection.ts",
+      "default": "./src/lib/media/source-selection.ts"
+    },
+    "./lib/media/video-intelligence-capacity": {
+      "types": "./dist-types/lib/media/video-intelligence-capacity.d.ts",
+      "import": "./src/lib/media/video-intelligence-capacity.ts",
+      "default": "./src/lib/media/video-intelligence-capacity.ts"
+    },
+    "./lib/media/tool-indexing-estimate": {
+      "types": "./dist-types/lib/media/tool-indexing-estimate.d.ts",
+      "import": "./src/lib/media/tool-indexing-estimate.ts",
+      "default": "./src/lib/media/tool-indexing-estimate.ts"
+    },
+    "./lib/media/progress": {
+      "types": "./dist-types/lib/media/progress.d.ts",
+      "import": "./src/lib/media/progress.ts",
+      "default": "./src/lib/media/progress.ts"
+    },
+    "./lib/media/pdf": {
+      "types": "./dist-types/lib/media/pdf.d.ts",
+      "import": "./src/lib/media/pdf.ts",
+      "default": "./src/lib/media/pdf.ts"
+    },
+    "./lib/media/video-runtime-scope": {
+      "types": "./dist-types/lib/media/video-runtime-scope.d.ts",
+      "import": "./src/lib/media/video-runtime-scope.ts",
+      "default": "./src/lib/media/video-runtime-scope.ts"
+    },
+    "./store/chat-store": {
+      "types": "./dist-types/store/chat-store.d.ts",
+      "import": "./src/store/chat-store.ts",
+      "default": "./src/store/chat-store.ts"
+    },
+    "./store/scrape-store": {
+      "types": "./dist-types/store/scrape-store.d.ts",
+      "import": "./src/store/scrape-store.ts",
+      "default": "./src/store/scrape-store.ts"
+    },
+    "./source.css": "./src/source.css",
+    "./components/configure/store-fields": {
+      "types": "./dist-types/components/configure/store-fields.d.ts",
+      "import": "./src/components/configure/store-fields.tsx",
+      "default": "./src/components/configure/store-fields.tsx"
+    },
+    "./lib/constants/stores": {
+      "types": "./dist-types/lib/constants/stores.d.ts",
+      "import": "./src/lib/constants/stores.ts",
+      "default": "./src/lib/constants/stores.ts"
+    },
+    "./components/settings/general/storage-indexing-section": {
+      "types": "./dist-types/components/settings/general/storage-indexing-section.d.ts",
+      "import": "./src/components/settings/general/storage-indexing-section.tsx",
+      "default": "./src/components/settings/general/storage-indexing-section.tsx"
+    },
+    "./components/ui/tabs": {
+      "types": "./dist-types/components/ui/tabs.d.ts",
+      "import": "./src/components/ui/tabs.tsx",
+      "default": "./src/components/ui/tabs.tsx"
+    },
+    "./components/settings/general/mcp-connections-section": {
+      "types": "./dist-types/components/settings/general/mcp-connections-section.d.ts",
+      "import": "./src/components/settings/general/mcp-connections-section.tsx",
+      "default": "./src/components/settings/general/mcp-connections-section.tsx"
+    },
+    "./components/settings/general/sandbox-section": {
+      "types": "./dist-types/components/settings/general/sandbox-section.d.ts",
+      "import": "./src/components/settings/general/sandbox-section.tsx",
+      "default": "./src/components/settings/general/sandbox-section.tsx"
+    },
+    "./components/ui/line-tabs": {
+      "types": "./dist-types/components/ui/line-tabs.d.ts",
+      "import": "./src/components/ui/line-tabs.tsx",
+      "default": "./src/components/ui/line-tabs.tsx"
+    },
+    "./components/settings/general/agent-customization-section": {
+      "types": "./dist-types/components/settings/general/agent-customization-section.d.ts",
+      "import": "./src/components/settings/general/agent-customization-section.tsx",
+      "default": "./src/components/settings/general/agent-customization-section.tsx"
+    },
+    "./components/settings/general/search-scraping-section": {
+      "types": "./dist-types/components/settings/general/search-scraping-section.d.ts",
+      "import": "./src/components/settings/general/search-scraping-section.tsx",
+      "default": "./src/components/settings/general/search-scraping-section.tsx"
+    },
+    "./asset-server": {
+      "types": "./dist-types/asset-server.d.ts",
+      "import": "./src/asset-server.ts",
+      "default": "./src/asset-server.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "build": "node scripts/build-assets.mjs && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@ai-sdk/react": "4.0.136",
+    "@base-ui/react": "^1.5.0",
+    "@larkup/core": "^0.7.4",
+    "@larkup/integrations": "workspace:*",
+    "@larkup/tool-doc-editor": "workspace:*",
+    "@larkup/workspace-ui": "workspace:*",
+    "ai": "7.0.133",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "framer-motion": "^14.0.0",
+    "idb-keyval": "^6.3.0",
+    "katex": "^0.19.0",
+    "lucide-react": "^1.16.0",
+    "papaparse": "^5.5.3",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.1.200",
+    "recharts": "^3.9.2",
+    "sonner": "^2.0.7",
+    "swr": "^2.4.1",
+    "tailwind-merge": "^3.3.1",
+    "xlsx": "0.18.5",
+    "zustand": "^5.0.14",
+    "react": "^19",
+    "@larkup/vector-stores": "^0.1.27",
+    "@larkup/sandbox": "^0.1.8",
+    "next": "16.3.8"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "react-dom": ">=19",
+    "next": ">=16"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "tsx": "^4.23.5",
+    "@types/node": "^26",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/katex": "^0.16.8",
+    "@types/papaparse": "^5.5.2"
+  }
+}

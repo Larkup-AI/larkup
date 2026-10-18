@@ -109,3 +109,38 @@ test('document tables keep semantic markup and host-provided actions', () => {
   assert.match(html, /<tbody/);
   assert.match(html, /Inspect document/);
 });
+
+test('General settings preserve the Local structure with host-owned persistence', async () => {
+  const { GeneralSettingsView } = await import('../src/general-settings-view.js');
+  const html = renderToStaticMarkup(
+    <GeneralSettingsView
+      localName="Ada"
+      setLocalName={() => {}}
+      saving={null}
+      dirtyUsername={false}
+      handleSave={() => {}}
+      theme="default"
+      setTheme={() => {}}
+      layout="sidebar"
+      setLayout={() => {}}
+      isMounted={false}
+      dirtyAppearance={false}
+      handleSaveAppearance={() => {}}
+      cache={<div>Host cache controls</div>}
+    />,
+  );
+  assert.match(html, /Your Name/);
+  assert.match(html, /Project settings and preferences/);
+  assert.match(html, /value="Ada"/);
+  assert.match(html, /Host cache controls/);
+});
+
+test('provider assets work without requiring a host public directory', async () => {
+  const { getProviderMeta, ProviderIcon } = await import('../src/provider-icon.js');
+  const meta = getProviderMeta('openai');
+  assert.match(meta.iconSrc, /^data:image\/svg\+xml;base64,/);
+  const html = renderToStaticMarkup(
+    <ProviderIcon src={meta.iconSrc} alt={meta.label} pillBg={meta.pillBg} />,
+  );
+  assert.match(html, /alt="OpenAI"/);
+});

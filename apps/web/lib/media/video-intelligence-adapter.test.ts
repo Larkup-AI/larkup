@@ -308,12 +308,40 @@ describe('formatVideoKnowledgeSummary', () => {
       answeringGuide: { importantEntities: [], questionsToPrepareFor: [], instruction: '' },
     });
 
-    expect(result).toContain('[1:35–1:41] Event: A key action is shown.');
+    expect(result).toContain('[1:35–1:41] A key action is shown.');
     expect(result).toContain(
       '[1:30–1:50] The named speaker introduces the topic before the first action.',
     );
-    expect(result).toContain('[1:00:50–1:01:10] State: The displayed state changes.');
+    expect(result).toContain('[1:00:50–1:01:10] The displayed state changes.');
     expect(result).toContain('One identity remains unverified.');
+  });
+
+  it('does not wrap source-language notes in English labels', () => {
+    const result = formatVideoKnowledgeSummary({
+      durationMs: 60_000,
+      detectedLanguage: 'ar-SA',
+      video: { width: 1920, height: 1080, fps: 30 },
+      transcript: [],
+      visualObservations: [],
+      tracks: [],
+      knowledgeSummary: {
+        overview: 'أغنية عربية تؤديها مغنية على المسرح.',
+        participants: [
+          { name: 'المغنية', role: 'المؤدية', evidence: [{ startMs: 0, endMs: 5_000 }] },
+        ],
+        stateHistory: [],
+        keyEvents: [
+          { startMs: 5_000, endMs: 10_000, event: 'يبدأ المقطع الغنائي.', confidence: 'direct' },
+        ],
+        narrative: [],
+        context: [],
+        uncertainties: ['اسم الأغنية غير ظاهر بوضوح.'],
+      },
+      answeringGuide: { importantEntities: [], questionsToPrepareFor: [], instruction: '' },
+    });
+
+    expect(result).toContain('أغنية عربية');
+    expect(result).not.toMatch(/Overview|Participants|Event|Uncertainties/);
   });
 });
 

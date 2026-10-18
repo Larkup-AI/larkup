@@ -50,7 +50,7 @@ ARG YOLOX_MODEL_URL=https://github.com/Megvii-BaseDetection/YOLOX/releases/downl
 
 RUN apt-get update \
     && apt-get dist-upgrade -y \
-    && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg libgomp1 python3 python3-pip \
+    && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg fonts-liberation libasound2 libatk-bridge2.0-0 libgbm1 libgomp1 libgtk-3-0 libnss3 python3 python3-pip unzip xz-utils xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /service
@@ -58,7 +58,7 @@ WORKDIR /service
 FROM system AS runtime
 COPY runtime/requirements.txt ./requirements.txt
 RUN python3 -m pip install --no-cache-dir --upgrade pip \
-    && python3 -m pip install --no-cache-dir paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/ \
+    && python3 -m pip install --no-cache-dir paddlepaddle==3.0.0 \
     && python3 -m pip install --no-cache-dir -r requirements.txt
 
 RUN mkdir -p /models /data \
@@ -86,6 +86,22 @@ HEALTHCHECK --interval=15s --timeout=5s --retries=10 CMD curl -fsS http://127.0.
 CMD ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8787"]
 
 FROM runtime AS runpod
+
+ARG NODE_VERSION=22.23.0
+ARG CHROME_VERSION=155.0.8059.79
+
+RUN curl --fail --location --retry 4 "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" --output /tmp/node.tar.xz \
+    && mkdir -p /opt/node \
+    && tar -xJf /tmp/node.tar.xz --strip-components=1 -C /opt/node \
+    && curl --fail --location --retry 4 "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chrome-linux64.zip" --output /tmp/chrome.zip \
+    && unzip -q /tmp/chrome.zip -d /opt \
+    && mv /opt/chrome-linux64 /opt/chrome \
+    && rm -f /tmp/node.tar.xz /tmp/chrome.zip \
+    && python3 -m pip install --no-cache-dir 'yt-dlp[default]==2026.8.19' 'yt-dlp-getpot-wpc==1.1.2' \
+    && mv /usr/local/bin/yt-dlp /usr/local/bin/yt-dlp-python
+
+COPY --chmod=0755 deploy/gpu_providers/yt-dlp-wrapper.sh /usr/local/bin/yt-dlp
+COPY --chmod=0755 deploy/gpu_providers/chrome-wrapper.sh /usr/local/bin/larkup-chrome
 
 # The RunPod entrypoint is deliberately kept out of runtime/app (and out of
 # the published npm package) -- see deploy/gpu_providers/README.md. It still
