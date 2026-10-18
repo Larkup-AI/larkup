@@ -24,16 +24,19 @@ the same pipeline produced locally.
 
 from __future__ import annotations
 
+import json
+import subprocess
 import tempfile
 import time
 from pathlib import Path
 from typing import Any
 
 import modal
+import requests
 
 from .remote_source import (
     extract_bounded_remote_clip,
-    materialize_remote_source,
+    materialize_provider_source,
     rebase_transcript_context,
 )
 
@@ -49,7 +52,21 @@ WORKER_IMAGE = (
     modal.Image.from_registry(
         "nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04", add_python="3.12"
     )
-    .apt_install("ffmpeg", "libgomp1", "curl", "ca-certificates")
+    .apt_install(
+        "ffmpeg",
+        "libgomp1",
+        "curl",
+        "ca-certificates",
+        "fonts-liberation",
+        "libasound2",
+        "libatk-bridge2.0-0",
+        "libgbm1",
+        "libgtk-3-0",
+        "libnss3",
+        "unzip",
+        "xz-utils",
+        "xvfb",
+    )
     .run_commands(
         "python3 -m pip install --no-cache-dir --upgrade pip",
         "python3 -m pip install --no-cache-dir paddlepaddle==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/",
@@ -61,7 +78,25 @@ WORKER_IMAGE = (
         # Download lazy model assets while building the immutable image. A
         # live indexing/chat request must never spend minutes fetching them.
         "python3 -c \"from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-small')\"",
+        "curl --fail --location --retry 4 https://nodejs.org/dist/v22.23.0/node-v22.23.0-linux-x64.tar.xz --output /tmp/node.tar.xz",
+        "mkdir -p /opt/node && tar -xJf /tmp/node.tar.xz --strip-components=1 -C /opt/node",
+        "curl --fail --location --retry 4 https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.79/linux64/chrome-linux64.zip --output /tmp/chrome.zip",
+        "unzip -q /tmp/chrome.zip -d /opt && mv /opt/chrome-linux64 /opt/chrome",
+        "rm -f /tmp/node.tar.xz /tmp/chrome.zip",
+        "python3 -m pip install --no-cache-dir 'yt-dlp[default]==2026.8.19' 'yt-dlp-getpot-wpc==1.1.2'",
+        "mv /usr/local/bin/yt-dlp /usr/local/bin/yt-dlp-python",
     )
+    .add_local_file(
+        "deploy/gpu_providers/yt-dlp-wrapper.sh",
+        remote_path="/usr/local/bin/yt-dlp",
+        copy=True,
+    )
+    .add_local_file(
+        "deploy/gpu_providers/chrome-wrapper.sh",
+        remote_path="/usr/local/bin/larkup-chrome",
+        copy=True,
+    )
+    .run_commands("chmod 0755 /usr/local/bin/yt-dlp /usr/local/bin/larkup-chrome")
     .add_local_dir("runtime/app", remote_path="/service/app")
 )
 
@@ -110,6 +145,8 @@ def process_video_job(payload: dict[str, Any]) -> dict[str, Any]:
     source_url = str(payload.get("sourceUrl") or "")
     if not source_url.startswith("https://"):
         raise ValueError("sourceUrl must be an HTTPS signed URL")
+    if payload.get("operation") == "materialize":
+        return materialize_remote_video(payload, source_url, modal_progress_reporter())
     brief = VideoIndexingBrief.model_validate(payload.get("brief") or {})
     source_duration_secs = float(payload.get("sourceDurationSecs") or 0)
     progress = modal_progress_reporter()
@@ -124,6 +161,82 @@ def process_video_job(payload: dict[str, Any]) -> dict[str, Any]:
             normalized_important_ranges,
             progress,
         )
+
+
+def materialize_remote_video(
+    payload: dict[str, Any], source_url: str, progress: Any
+) -> dict[str, Any]:
+    upload_url = str(payload.get("materializedSourceUploadUrl") or "")
+    if not upload_url.startswith("https://"):
+        raise ValueError("materializedSourceUploadUrl must be an HTTPS signed URL")
+    upload_headers = {
+        str(key): str(value)
+        for key, value in (payload.get("materializedSourceUploadHeaders") or {}).items()
+    }
+    started = time.monotonic()
+
+    def report_preparation(percent: int, message: str) -> None:
+        bounded = max(0, min(99, int(percent)))
+        progress(
+            "prepare",
+            min(94, 1 + round(bounded * 0.93)),
+            message,
+            bounded,
+            {
+                "elapsedSeconds": round(max(0.0, time.monotonic() - started)),
+                "current": bounded,
+                "total": 100,
+                "unit": "source download",
+            },
+        )
+
+    with tempfile.TemporaryDirectory(prefix="larkup-modal-materialize-") as temporary:
+        source_path = Path(temporary) / "source.mp4"
+        materialize_provider_source(
+            source_url,
+            source_path,
+            float(payload.get("sourceDurationSecs") or 0) or None,
+            report_preparation,
+        )
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                str(source_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        duration_secs = max(
+            0.001,
+            float(json.loads(probe.stdout).get("format", {}).get("duration") or 0),
+        )
+        size_bytes = source_path.stat().st_size
+        progress("prepare", 96, "Transferring the video to secure platform storage", 100, {})
+        with source_path.open("rb") as source_file:
+            uploaded = requests.put(
+                upload_url,
+                headers=upload_headers,
+                data=source_file,
+                timeout=(30, 6 * 60 * 60),
+            )
+        uploaded.raise_for_status()
+        progress("complete", 99, "Remote video materialization completed", 100, {})
+        return {
+            "result": {
+                "fileName": str(payload.get("fileName") or "youtube-video.mp4"),
+                "mimeType": "video/mp4",
+                "sizeBytes": size_bytes,
+                "durationSecs": duration_secs,
+            },
+            "actualSourceMinutes": 0,
+        }
 
 
 def run_video_job(
@@ -175,7 +288,7 @@ def run_video_job(
                     end_secs,
                 )
         else:
-            materialize_remote_source(
+            materialize_provider_source(
                 source_url,
                 source_path,
                 source_duration_secs,

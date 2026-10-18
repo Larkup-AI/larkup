@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
+import { widgetScript } from '../../../packages/runtime-kit/src/index.js';
 import { DEFAULT_CONFIG } from '../../../packages/core/src/types';
 import { generateServer } from '../../../packages/core/src/generator/generate-server';
 import { resolveRuntimePluginVersion } from '../../../packages/core/src/generator/server-runtime';
@@ -26,7 +27,9 @@ test.describe('Generated Agent Server contract', () => {
       version: '1.2.3',
     };
 
-    expect(resolveRuntimePluginVersion(plugin)).toBe('file:/workspace/packages/marketplace-tools/example');
+    expect(resolveRuntimePluginVersion(plugin)).toBe(
+      'file:/workspace/packages/marketplace-tools/example',
+    );
     expect(resolveRuntimePluginVersion(plugin, true)).toBe('file:./marketplace-tools/example');
 
     const generated = generateServer({
@@ -42,7 +45,9 @@ test.describe('Generated Agent Server contract', () => {
     });
     const packageJson = generated.files.find((file) => file.path === 'package.json')?.contents;
 
-    expect(packageJson).toContain('"@example/marketplace-tool": "file:./marketplace-tools/example"');
+    expect(packageJson).toContain(
+      '"@example/marketplace-tool": "file:./marketplace-tools/example"',
+    );
     expect(packageJson).not.toContain('file:/workspace/packages/marketplace-tools/example');
   });
 
@@ -72,6 +77,9 @@ test.describe('Generated Agent Server contract', () => {
     expect(agent['chat.mjs']).toContain('getAgentSandboxStatus');
     expect(agent['chat.mjs']).toContain('CONFIGURED_BUILT_IN_TOOLS');
     expect(agent['chat.mjs']).toContain('Treat first- and second-person statements');
+    expect(agent['widget.mjs']).toBe(
+      `export const widgetScript = ${JSON.stringify(widgetScript(DEFAULT_CONFIG))};\n`,
+    );
     expect(agent['widget.mjs']).toContain('data.apiKey');
     expect(agent['widget.mjs']).toContain("host + '/chat'");
     expect(agent['models.mjs']).toContain('https://ai-gateway.vercel.sh/v1/models');

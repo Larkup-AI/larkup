@@ -2,126 +2,20 @@ import { NextResponse } from 'next/server';
 import { readConfig } from '@larkup/core/config-store';
 import { readRun } from '@larkup/core/index-store';
 import { runWithProject } from '@larkup/core/project-store';
-import { getModelsByType } from '@larkup/core/models-cache';
-import {
-  toChatDescriptor,
-  getChatModelsForProvider,
-  getDefaultChatModel,
-  getVisionModelsForProvider,
-} from '@larkup/core/chat-models/registry';
-import {
-  toEmbeddingDescriptor,
-  getEmbeddingModelsForProvider,
-  EMBEDDING_MODELS,
-} from '@larkup/core/embeddings/registry';
-
+import { workspaceModelStatus } from '@larkup/core/workspace-model-status';
 export const dynamic = 'force-dynamic';
-
-function withProject<T>(projectId: string | null, fn: () => Promise<T>) {
-  return projectId ? runWithProject(projectId, fn) : fn();
-}
-
 export async function GET(req: Request) {
-  const projectId = new URL(req.url).searchParams.get('projectId');
-  return withProject(projectId, async () => {
-    const config = await readConfig();
-    const run = await readRun();
-
-    const indexed = run?.status === 'completed' && (run.totalChunks ?? 0) > 0;
-    const hasApiKey = !!(config.chatApiKey || config.embeddingApiKey);
-
-    const blockers: string[] = [];
-    if (!hasApiKey) {
-      blockers.push("You Can't start chatting.You have to set AI Models API Key in Settings.");
-    }
-
-    const requestedProvider = new URL(req.url).searchParams.get('provider');
-    const provider = requestedProvider || config.chatProvider || config.embeddingProvider;
-
-    // Fetch dynamic models from gateway cache
-    const [languageModels, embeddingGatewayModels] = await Promise.all([
-      getModelsByType('language'),
-      getModelsByType('embedding'),
-    ]);
-
-    // Chat models.
-    const allChatModels = languageModels.map(toChatDescriptor);
-    const chatModels = getChatModelsForProvider(allChatModels, provider);
-
-    if (provider === 'custom' && config.customChatModels) {
-      chatModels.push(
-        ...config.customChatModels.map((m) => ({
-          id: `custom:${m.modelName}`,
-          name: m.modelName,
-          provider: 'custom',
-          tags: ['custom'],
-        })),
-      );
-    }
-
-    const defaultModel = getDefaultChatModel(allChatModels, provider);
-    const chatModelId =
-      config.chatModelId ||
-      (provider === 'custom' && config.customChatModels?.[0]
-        ? `custom:${config.customChatModels[0].modelName}`
-        : defaultModel?.id) ||
-      'openai/gpt-4o-mini';
-
-    // Embedding models.
-    const dynamicEmbeddingModels = embeddingGatewayModels.map(toEmbeddingDescriptor);
-
-    const embeddingIds = new Set(dynamicEmbeddingModels.map((m) => m.id));
-    const mergedEmbeddings = [
-      ...dynamicEmbeddingModels,
-      ...EMBEDDING_MODELS.filter((m) => !embeddingIds.has(m.id)),
-    ];
-
-    // Filter for the requested embedding provider
-    const embeddingProvider = config.embeddingProvider || provider;
-    const embeddingModels = getEmbeddingModelsForProvider(mergedEmbeddings, embeddingProvider);
-
-    return NextResponse.json({
-      ready: hasApiKey,
-      indexed,
-      blockers,
-      provider,
-      chatModelId,
-      availableModels: chatModels.map((m) => ({
-        id: m.id,
-        label: m.name,
-        provider: m.provider,
-        context_window: m.context_window,
-        tags: m.tags,
-      })),
-      // Keep this workspace-wide list separate from the chat provider list.
-      // `availableFrom` preserves the provider/model compatibility that was
-      // lost when native and Gateway catalogs were previously merged.
-      availableVisionModels: [
-        ...getVisionModelsForProvider(allChatModels, 'vercel_ai_gateway').map((m) => ({
-          id: m.id,
-          label: m.name,
-          provider: m.provider,
-          availableFrom: ['vercel_ai_gateway', ...(m.provider === 'google' ? [] : [m.provider])],
-          context_window: m.context_window,
-          tags: m.tags,
-        })),
-        ...getVisionModelsForProvider(allChatModels, 'google').map((m) => ({
-          id: m.id,
-          label: m.name,
-          provider: m.provider,
-          availableFrom: ['google'],
-          context_window: m.context_window,
-          tags: m.tags,
-        })),
-      ],
-      availableEmbeddingModels: mergedEmbeddings.map((m) => ({
-        id: m.id,
-        label: m.label,
-        provider: m.provider,
-        dimensions: m.dimensions,
-        maxInputTokens: m.maxInputTokens,
-        description: m.description,
-      })),
-    });
-  });
+  const params = new URL(req.url).searchParams;
+  const operation = async () => {
+    const [config, run] = await Promise.all([readConfig(), readRun()]);
+    return NextResponse.json(
+      await workspaceModelStatus(
+        config,
+        run?.status === 'completed' && (run.totalChunks ?? 0) > 0,
+        params.get('provider'),
+      ),
+    );
+  };
+  const projectId = params.get('projectId');
+  return projectId ? runWithProject(projectId, operation) : operation();
 }

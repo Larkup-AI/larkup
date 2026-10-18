@@ -1,3 +1,4 @@
+import { workspaceHost } from './workspace-host';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -32,11 +33,19 @@ export function normalizeGroundedAnswerQuestion(question: string) {
 }
 
 async function cachePath(create: boolean): Promise<string | null> {
+  if (workspaceHost()) return 'host:grounded-answers';
   const directory = create ? await requireProjectDataDir() : await getProjectDataDir();
   return directory ? path.join(directory, 'grounded-answer-cache.json') : null;
 }
 
 async function readState(): Promise<GroundedAnswerCacheState> {
+  const host = workspaceHost();
+  if (host)
+    return (
+      ((await host.readState('grounded-answers')) as GroundedAnswerCacheState | null) ?? {
+        entries: [],
+      }
+    );
   const file = await cachePath(false);
   if (!file) return { entries: [] };
   try {
@@ -52,6 +61,8 @@ async function readState(): Promise<GroundedAnswerCacheState> {
 }
 
 async function writeState(file: string, state: GroundedAnswerCacheState): Promise<void> {
+  const host = workspaceHost();
+  if (host) return host.writeState('grounded-answers', state);
   const temporaryFile = path.join(
     path.dirname(file),
     `.${path.basename(file)}.${process.pid}.${randomUUID()}.tmp`,
@@ -140,7 +151,7 @@ export function deleteGroundedAnswerCacheEntry(question: string) {
       (entry) => entry.feedback === 'liked' && entry.questionKey !== questionKey,
     );
     if (entries.length === state.entries.length) return false;
-    if (entries.length === 0) {
+    if (entries.length === 0 && !workspaceHost()) {
       await fs.unlink(file).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== 'ENOENT') throw error;
       });
@@ -153,6 +164,8 @@ export function deleteGroundedAnswerCacheEntry(question: string) {
 
 /** Clears all liked grounded answers for the active Project. */
 export async function clearGroundedAnswerCache(): Promise<void> {
+  const host = workspaceHost();
+  if (host) return host.writeState('grounded-answers', { entries: [] });
   const file = await cachePath(false);
   if (!file) return;
   await fs.unlink(file).catch((error: NodeJS.ErrnoException) => {

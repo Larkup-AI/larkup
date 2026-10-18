@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { getProjectDataDir, requireProjectDataDir } from '../project-store';
+import { workspaceHost } from '../workspace-host';
 import type { VideoKnowledgeStoreState } from './types';
 
 const EMPTY_STATE: VideoKnowledgeStoreState = {
@@ -69,6 +70,16 @@ let cached: { key: string; state: VideoKnowledgeStoreState } | null = null;
  * supported way to change it.
  */
 export async function readVideoKnowledgeState(): Promise<VideoKnowledgeStoreState> {
+  const host = workspaceHost();
+  if (host) {
+    const persisted = (await host.readState(
+      'video-knowledge',
+    )) as Partial<VideoKnowledgeStoreState> | null;
+    if (!persisted) return cloneEmpty();
+    if (persisted.schemaVersion !== 1)
+      throw new Error('Unsupported hosted video knowledge schema.');
+    return { ...cloneEmpty(), ...persisted };
+  }
   const file = await dataPath(false);
   if (!file) return cloneEmpty();
   let key: string;
@@ -91,6 +102,8 @@ export function invalidateVideoKnowledgeStateCache(): void {
 }
 
 async function writeState(state: VideoKnowledgeStoreState): Promise<void> {
+  const host = workspaceHost();
+  if (host) return host.writeState('video-knowledge', state);
   const file = await dataPath(true);
   if (!file) return;
   const temp = path.join(
@@ -114,6 +127,7 @@ const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  * same workspace file, so the in-memory promise chain alone is insufficient.
  */
 async function acquireStateLock(): Promise<() => Promise<void>> {
+  if (workspaceHost()) return async () => {};
   const file = await dataPath(true);
   if (!file) return async () => {};
   const lock = `${file}.lock`;
@@ -150,8 +164,13 @@ export function mutateVideoKnowledgeState<T>(
     try {
       // Never mutate the memoized read-only document: this transaction owns
       // a private copy, and the cache is dropped so readers pick the write up.
-      const file = await dataPath(false);
-      const state = file ? await readStateUncached(file) : cloneEmpty();
+      const host = workspaceHost();
+      const file = host ? null : await dataPath(false);
+      const state = host
+        ? structuredClone(await readVideoKnowledgeState())
+        : file
+          ? await readStateUncached(file)
+          : cloneEmpty();
       const result = await mutate(state);
       await writeState(state);
       invalidateVideoKnowledgeStateCache();

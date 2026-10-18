@@ -2073,14 +2073,16 @@ def _synthesis_prompt(
         "- keyEvents are moments something happened. Include one when the evidence shows it, and say what "
         "the evidence shows rather than what it implies. An event that would move a tracked value belongs "
         "here only when the ledger actually moves to that value and stays there.\n"
+        "- Write every generated natural-language summary value -- overview, participant roles, states, "
+        "events, narrative notes, context facts, and uncertainties -- in the dominant spoken language "
+        "identified by sourceLanguage (or the dominant language of transcriptEvidence when it is auto). "
+        "Preserve names and exact on-screen text as supplied rather than translating them.\n"
         "- narrative is the human notebook: a compact, continuous chronological account that combines "
         "the synchronized speech, named participants, visual layout, appearance, on-screen labels, states, "
         "and events. Each entry must make sense after the preceding entry, so preserve who is on which side "
         "or in which group and carry that identity forward only while the evidence supports it. Replace vague "
         "descriptions such as 'two people discuss something' with the supported names, relationships, and "
-        "purpose available anywhere in the supplied evidence. Do not invent a bridge across an edit. Write "
-        "narrative text in the dominant spoken language identified by sourceLanguage (or the dominant language "
-        "of transcriptEvidence when it is auto), while preserving names and exact on-screen text as supplied. "
+        "purpose available anywhere in the supplied evidence. Do not invent a bridge across an edit. "
         "Do not repeatedly say 'the video shows' or describe the act of analysis.\n"
         "- recurringOnScreenText lists short text that stayed legible across several frames. It marks "
         "where a display existed and when it changed. It never states what that text means: use it to "
@@ -2548,10 +2550,10 @@ def _fallback_knowledge_summary(
     elif len(key_events) == 1:
         overview = key_events[0]["event"]
     else:
-        overview = (
-            f"The sequence opens with {key_events[0]['event']} "
-            f"By the final indexed moment, {key_events[-1]['event']}"
-        )[:2_000]
+        # Keep deterministic fallback text in the same language as the
+        # semantic observations. English connective prose here was enough to
+        # make an otherwise-Arabic index appear translated.
+        overview = f"{key_events[0]['event']} … {key_events[-1]['event']}"[:2_000]
     return {
         "overview": overview,
         "participants": list(participants_by_name.values())[:50],

@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { InstalledTool } from './types';
+import { runWithWorkspaceHost, type WorkspaceHost } from '@larkup/core/workspace-host';
 
 const mocks = vi.hoisted(() => ({
   getInstalledTool: vi.fn(),
@@ -30,6 +31,30 @@ afterEach(async () => {
 });
 
 describe('loadTool', () => {
+  it('uses the module injected by a managed workspace host', async () => {
+    const module = { ready: true };
+    await expect(
+      runWithWorkspaceHost(
+        {
+          tools: [
+            {
+              id: 'hosted-fixture',
+              version: '1.0.0',
+              installedAt: new Date(0).toISOString(),
+              packageName: '@larkup/hosted-fixture',
+              resolvedPath: '@larkup/hosted-fixture',
+              source: 'local',
+              config: {},
+              module,
+            },
+          ],
+        } as unknown as WorkspaceHost,
+        () => loadTool<{ ready: boolean }>('hosted-fixture'),
+      ),
+    ).resolves.toBe(module);
+    expect(mocks.getInstalledTool).not.toHaveBeenCalled();
+  });
+
   it('loads an unlinked workspace package from its resolved directory', async () => {
     const packageDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'larkup-tool-loader-'));
     temporaryDirectories.push(packageDirectory);

@@ -1,3 +1,4 @@
+import { workspaceHost } from './workspace-host';
 /**
  * Workspace MCP connection store and AI SDK tool loader.
  *
@@ -81,6 +82,8 @@ function connectionFile(dir: string) {
 }
 
 async function readStoredConnections(): Promise<McpConnection[]> {
+  const host = workspaceHost();
+  if (host) return ((await host.readState('mcp-connections')) ?? []) as McpConnection[];
   const dir = await getDataDir();
   if (!dir) return [];
   try {
@@ -124,6 +127,11 @@ function isStoredConnection(value: unknown): value is McpConnection {
 }
 
 async function writeStoredConnections(connections: McpConnection[]) {
+  const host = workspaceHost();
+  if (host) {
+    await host.writeState('mcp-connections', connections);
+    return;
+  }
   const dir = await requireDataDir();
   await fs.writeFile(connectionFile(dir), JSON.stringify(connections, null, 2), 'utf8');
 }
@@ -239,7 +247,7 @@ export function mergeMcpConnection(
     update.proxyUrl === undefined ? current.proxyUrl : validateOptionalUrl(update.proxyUrl);
   const proxyAuthHeader =
     update.proxyAuthHeader === undefined
-      ? current.proxyAuthHeader ?? 'Authorization'
+      ? (current.proxyAuthHeader ?? 'Authorization')
       : validateHeaderName(update.proxyAuthHeader, 'Proxy auth header');
   const incomingProxyAuthToken =
     update.proxyAuthToken === undefined
@@ -258,10 +266,10 @@ export function mergeMcpConnection(
       update.name === undefined
         ? current.name
         : typeof update.name === 'string' && update.name.trim()
-        ? update.name.trim().slice(0, 120)
-        : (() => {
-            throw new Error('MCP name is required.');
-          })(),
+          ? update.name.trim().slice(0, 120)
+          : (() => {
+              throw new Error('MCP name is required.');
+            })(),
     url: update.url === undefined ? current.url : validateUrl(update.url),
     transport:
       update.transport === undefined ? current.transport : validateTransport(update.transport),

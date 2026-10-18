@@ -1,3 +1,4 @@
+import { workspaceHost } from './workspace-host';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_CONFIG, type RagConfig } from './types';
@@ -12,6 +13,8 @@ import { requireProjectDataDir } from './project-store';
  */
 
 export async function readConfig(): Promise<RagConfig> {
+  const host = workspaceHost();
+  if (host) return host.readConfig();
   const dir = await requireProjectDataDir();
   try {
     const raw = await fs.readFile(path.join(dir, 'config.json'), 'utf8');
@@ -61,6 +64,8 @@ export async function readConfig(): Promise<RagConfig> {
 }
 
 export async function writeConfig(config: RagConfig): Promise<RagConfig> {
+  const host = workspaceHost();
+  if (host) return host.writeConfig(config);
   const dir = await requireProjectDataDir();
   const next: RagConfig = { ...config, updatedAt: new Date().toISOString() };
   await fs.writeFile(path.join(dir, 'config.json'), JSON.stringify(next, null, 2), 'utf8');

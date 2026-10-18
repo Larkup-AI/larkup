@@ -237,14 +237,25 @@ function inventoryCoverage(evidence: EvidenceRevision[]) {
  */
 export async function scanVideoKnowledge(
   mediaAssetId: string,
-  input: { kind: VideoKnowledgeScanKind; cursor?: number; limit?: number },
+  input: {
+    kind: VideoKnowledgeScanKind;
+    cursor?: number;
+    limit?: number;
+    modalities?: Array<EvidenceRevision['modality']>;
+  },
 ): Promise<VideoKnowledgeScanPage | undefined> {
   const { manifest, evidence } = activeEvidence(await readVideoKnowledgeState(), mediaAssetId);
   if (!manifest) return undefined;
+  const requestedModalities = new Set(input.modalities ?? []);
+  const exactFilteredActiveIndex = input.kind === 'all-evidence' && requestedModalities.size > 0;
+  const scannedEvidence =
+    input.kind === 'all-evidence' && requestedModalities.size > 0
+      ? evidence.filter((item) => requestedModalities.has(item.modality))
+      : evidence;
   const records =
     input.kind === 'source-inventory'
       ? collapseSourceInventoryRecords(evidence.flatMap(sourceInventoryRecords))
-      : evidence.map((item) => ({
+      : scannedEvidence.map((item) => ({
           id: item.id,
           sourceEvidenceId: item.id,
           kind: 'evidence' as const,
@@ -273,12 +284,14 @@ export async function scanVideoKnowledge(
     coverage: {
       // Enumerating the active index is exact, but a complete-source answer
       // still needs the runtime's explicit proof that every source window was
-      // inventoried. Older/partial indexes remain useful evidence, never a
-      // silently complete recording.
-      complete: coverage.complete,
+      // inventoried. A modality-filtered scan has the narrower contract of
+      // enumerating every active record of that evidence type (for example
+      // every timestamped transcript segment), so it is exact even when the
+      // separate semantic source-inventory pass was partial.
+      complete: exactFilteredActiveIndex || coverage.complete,
       scannedRecords: page.length,
       totalRecords: records.length,
-      ...(coverage.reason ? { reason: coverage.reason } : {}),
+      ...(!exactFilteredActiveIndex && coverage.reason ? { reason: coverage.reason } : {}),
     },
   };
 }

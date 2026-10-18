@@ -1,3 +1,4 @@
+import { widgetScript } from '@larkup/runtime-kit';
 import type { RagConfig } from '../types';
 import { getVectorStore } from '@larkup/vector-stores/registry';
 import { getEmbeddingModel } from '../embeddings/registry';
@@ -1388,37 +1389,7 @@ for (const [i, hit] of data.hits.entries()) {
 }
 
 function widgetSource(config: RagConfig): string {
-  const settings = {
-    title: config.widget?.title || 'Ask us anything',
-    welcomeMessage: config.widget?.welcomeMessage || 'Hi! How can I help?',
-    placeholder: config.widget?.placeholder || 'Type a message…',
-    primaryColor: config.widget?.primaryColor || '#111827',
-    position: config.widget?.position || 'bottom-right',
-    darkMode: Boolean(config.widget?.darkMode),
-    logoUrl: config.widget?.logoUrl || '',
-  };
-  const browserSource = `(() => {
-  const defaults = ${JSON.stringify(settings)};
-  const script = document.currentScript || document.querySelector('script[data-larkup-widget]') || document.querySelector('script[src*="/widget.js"]');
-  const data = script?.dataset || {};
-  const host = String(data.host || new URL(script?.src || location.href, location.href).origin).replace(/\\/+$/, '');
-  const config = { ...defaults, title: data.title || defaults.title, welcomeMessage: data.welcomeMessage || defaults.welcomeMessage, placeholder: data.placeholder || defaults.placeholder, primaryColor: data.primaryColor || defaults.primaryColor, position: data.position || defaults.position, darkMode: data.theme ? data.theme === 'dark' : defaults.darkMode, logoUrl: data.logoUrl || defaults.logoUrl };
-  const mount = document.createElement('div'); mount.dataset.larkupWidget = ''; if (data.class) mount.className = data.class; document.body.appendChild(mount);
-  const root = mount.attachShadow({ mode: 'open' });
-  root.innerHTML = '<style>:host{all:initial}*{box-sizing:border-box}.w{--a:' + config.primaryColor + ';position:fixed;bottom:20px;z-index:2147483000;font:14px/1.45 ui-sans-serif,system-ui;color:#17191e}.right{right:20px}.left{left:20px}.p{width:min(390px,calc(100vw - 32px));height:min(620px,calc(100vh - 110px));display:none;flex-direction:column;overflow:hidden;background:#fff;border:1px solid #e1e3e8;border-radius:18px;box-shadow:0 20px 60px #11182738}.open .p{display:flex}.dark .p{background:#17191e;border-color:#343946;color:#f4f4f5;box-shadow:0 20px 60px #0009}.h{display:flex;gap:10px;align-items:center;padding:15px 16px;border-bottom:1px solid #e1e3e8}.dark .h{border-color:#343946}.d{width:9px;height:9px;border-radius:99px;background:var(--a)}strong{flex:1}.x,.b,.s{border:0;cursor:pointer}.x{background:transparent;color:inherit;font-size:20px}.m{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:16px}.a,.u,.empty{max-width:86%;padding:10px 12px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere}.a,.empty{align-self:flex-start;background:#f3f4f6}.dark .a,.dark .empty{background:#292d36}.u{align-self:flex-end;background:var(--a);color:#fff;border-bottom-right-radius:4px}.f{display:flex;gap:8px;padding:12px;border-top:1px solid #e1e3e8}.dark .f{border-color:#343946}textarea{flex:1;min-height:42px;resize:none;border:1px solid #d8dbe2;border-radius:12px;padding:10px;background:transparent;color:inherit;font:inherit}.s{width:42px;border-radius:12px;background:var(--a);color:#fff}.b{display:flex;align-items:center;justify-content:center;margin:12px 0 0 auto;width:56px;height:56px;border-radius:99px;background:var(--a);color:#fff;font-size:22px;box-shadow:0 10px 25px #11182740}.left .b{margin-left:0}.err{color:#dc2626}.dark .err{color:#fca5a5}.cb{background:#1e1e1e;color:#d4d4d4;border-radius:8px;overflow:hidden;margin:8px 0;font-family:monospace;font-size:13px;white-space:normal}.cb-h{display:flex;justify-content:space-between;background:#2d2d2d;padding:4px 8px;font-size:11px;color:#a0a0a0}.cb-h button{background:none;border:none;color:inherit;cursor:pointer;padding:0}.cb pre{margin:0;padding:8px;overflow-x:auto;white-space:pre}code{font-family:monospace;background:#0002;padding:2px 4px;border-radius:4px}a{color:var(--a)}@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}</style><div class="w ' + (config.position === 'bottom-left' ? 'left' : 'right') + (config.darkMode ? ' dark' : '') + '"><section class="p" role="dialog"><header class="h"><i class="d"></i><strong></strong><button class="x" aria-label="Close chat">×</button></header><main class="m"><div class="empty"></div></main><form class="f"><textarea rows="1"></textarea><button class="s" aria-label="Send">↑</button></form></section><button class="b" aria-label="Open chat"></button></div>';
-  const shell = root.querySelector('.w'), panel = root.querySelector('.p'), button = root.querySelector('.b'), close = root.querySelector('.x'), list = root.querySelector('.m'), empty = root.querySelector('.empty'), input = root.querySelector('textarea'), form = root.querySelector('form');
-  root.querySelector('strong').textContent = config.title; empty.textContent = config.welcomeMessage; input.placeholder = config.placeholder;
-  const iconNormal = config.logoUrl ? '<img src="' + config.logoUrl + '" style="width:28px;height:28px;border-radius:99px;object-fit:cover">' : '◌';
-  button.innerHTML = iconNormal;
-  const toggle = (open) => { shell.classList.toggle('open', open); button.innerHTML = open ? '×' : iconNormal; }; button.onclick = () => toggle(!shell.classList.contains('open')); close.onclick = () => toggle(false);
-  const add = (name, text) => { const el = document.createElement('div'); el.className = name; el.innerHTML = text; list.appendChild(el); list.scrollTop = list.scrollHeight; return el; };
-  const text = (line) => { try { if (line.startsWith('0:')) { const value = JSON.parse(line.slice(2)); return typeof value === 'string' ? value : ''; } if (!line.startsWith('data:')) return ''; const value = JSON.parse(line.slice(5)); return value?.type === 'text-delta' ? (value.delta || value.text || '') : ''; } catch { return ''; } };
-  const parseMD = (str) => { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\\\`\\\`\\\`(\\w*)\\n([\\s\\S]*?)\\\`\\\`\\\`/g, '<div class="cb"><div class="cb-h"><span>$1</span><button type="button" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.textContent);this.textContent=\\'Copied!\\';setTimeout(()=>this.textContent=\\'Copy\\',2000)">Copy</button></div><pre><code>$2</code></pre></div>').replace(/\\\`([^\`]+)\\\`/g, '<code>$1</code>').replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>').replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" target="_blank">$1</a>'); };
-  input.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } };
-  form.onsubmit = async (event) => { event.preventDefault(); const question = input.value.trim(); if (!question) return; empty.remove(); add('u', parseMD(question)); input.value = ''; const answer = add('a', '<span style="animation:pulse 1s infinite">Thinking...</span>'); try { const response = await fetch(host + '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(data.apiKey ? { Authorization: 'Bearer ' + data.apiKey } : {}) }, body: JSON.stringify({ messages: [{ role: 'user', content: question }] }) }); if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Could not reach the assistant.'); const reader = response.body?.getReader(), decoder = new TextDecoder(); if (!reader) return; let buffer = ''; let fullText = ''; while (true) { const chunk = await reader.read(); buffer += decoder.decode(chunk.value || new Uint8Array(), { stream: !chunk.done }); const lines = buffer.split(/\\r?\\n/); buffer = lines.pop() || ''; for (const line of lines) { const t = text(line); if (t) { fullText += t; answer.innerHTML = parseMD(fullText); list.scrollTop = list.scrollHeight; } } if (chunk.done) break; } const t = text(buffer); if (t) { fullText += t; answer.innerHTML = parseMD(fullText); list.scrollTop = list.scrollHeight; } } catch (error) { answer.classList.add('err'); answer.textContent = error instanceof Error ? error.message : 'Could not reach the assistant.'; } };
-  window.LarkupWidget = { destroy: () => mount.remove() };
-})();`;
-  return `export const widgetScript = ${JSON.stringify(browserSource)};\n`;
+  return `export const widgetScript = ${JSON.stringify(widgetScript(config))};\n`;
 }
 
 function dockerfile(): string {

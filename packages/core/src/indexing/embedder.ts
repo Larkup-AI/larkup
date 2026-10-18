@@ -27,7 +27,7 @@ export async function embedTexts(
   const totalTokens = texts.reduce((acc, t) => acc + Math.ceil(t.length / 4), 0);
   const { trackUsageEvent, estimateCost } = await import('../analytics-store');
 
-  void trackUsageEvent({
+  await trackUsageEvent({
     type: 'embedding',
     embeddingModelId: config.embeddingModelId,
     embeddingTokens: totalTokens, // calculated via heuristic

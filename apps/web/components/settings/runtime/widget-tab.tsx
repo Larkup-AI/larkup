@@ -1,5 +1,7 @@
 'use client';
 
+import { reactWidgetSnippet } from '@larkup/runtime-kit';
+
 import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { Code2, Copy, Eye, EyeOff, KeyRound, Loader2, Save, Send } from 'lucide-react';
@@ -11,11 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import {
-  DEFAULT_WIDGET_SETTINGS,
-  type EmbedTab,
-  type WidgetSettings,
-} from './widget-snippets';
+import { DEFAULT_WIDGET_SETTINGS, type EmbedTab, type WidgetSettings } from './widget-snippets';
 
 const fetcher = (url: string) => fetch(url).then((response) => response.json());
 
@@ -85,16 +83,7 @@ export function WidgetSection({ embedded = false }: { embedded?: boolean }) {
         .filter(Boolean)
         .join('\n');
 
-    const buildReact = (k: string) =>
-      `'use client';\n\nimport { useEffect } from 'react';\n\nexport function LarkupWidget() {\n  useEffect(() => {\n    const script = document.createElement('script');\n    script.async = true;\n    script.src = '${base}/widget.js';\n    script.dataset.apiKey = '${k}';\n    script.dataset.position = '${
-        widget.position
-      }';\n    script.dataset.theme = '${
-        widget.darkMode ? 'dark' : 'light'
-      }';\n    script.dataset.primaryColor = '${widget.primaryColor}';\n    ${
-        widget.logoUrl ? `script.dataset.logoUrl = '${widget.logoUrl}';\n    ` : ''
-      }${
-        widget.customCss ? `script.dataset.customCss = \`${widget.customCss}\`;\n    ` : ''
-      }document.body.appendChild(script);\n    return () => window.LarkupWidget?.destroy();\n  }, []);\n\n  return null;\n}`;
+    const buildReact = (apiKey: string) => reactWidgetSnippet({ baseUrl: base, apiKey, widget });
 
     return {
       javascript: `<script\n  async\n${buildAttrs(key)}\n></script>`,

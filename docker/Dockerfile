@@ -16,6 +16,7 @@ COPY apps/larkup-proxy/package.json ./apps/larkup-proxy/
 COPY apps/web/package.json ./apps/web/
 COPY packages/connections/package.json ./packages/connections/
 COPY packages/core/package.json ./packages/core/
+COPY packages/runtime-kit/package.json ./packages/runtime-kit/
 COPY packages/workspace-ui/package.json ./packages/workspace-ui/
 COPY packages/integrations/package.json ./packages/integrations/
 COPY packages/marketplace/package.json ./packages/marketplace/
@@ -39,6 +40,7 @@ ARG NEXT_PUBLIC_DOCKER_ENV=true
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_DOCKER_ENV=${NEXT_PUBLIC_DOCKER_ENV}
 
+RUN pnpm --filter @larkup/workspace-ui build
 RUN pnpm --filter @larkup/sandbox build
 RUN pnpm --filter @larkup/integrations build
 RUN pnpm --filter @larkup/tool-doc-editor build

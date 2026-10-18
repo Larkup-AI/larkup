@@ -17,6 +17,8 @@ deploy/gpu_providers
 !deploy/gpu_providers/cloud_worker_entrypoint.py
 !deploy/gpu_providers/remote_source.py
 !deploy/gpu_providers/progress.py
+!deploy/gpu_providers/yt-dlp-wrapper.sh
+!deploy/gpu_providers/chrome-wrapper.sh
 runtime/data
 runtime/models
 runtime/tests

@@ -10,6 +10,7 @@ from app.services.pipeline import (
     _link_chronological_notes,
     _reconciled_visible_subjects,
     _require_semantic_coverage,
+    _supplied_transcript_language,
 )
 from app.db.schemas import VideoIndexingBrief
 
@@ -177,6 +178,13 @@ class SemanticCoverageGateTests(unittest.TestCase):
             brief.model_dump(by_alias=True)["transcriptContext"][0]["startMs"],
             14_000,
         )
+
+    def test_supplied_transcript_keeps_its_detected_language_when_local_stt_is_skipped(self) -> None:
+        transcript = [{"startMs": 0, "endMs": 1_000, "text": "غناء عربي", "words": []}]
+
+        self.assertEqual(_supplied_transcript_language({"language": "ar-SA"}, transcript), "ar-SA")
+        self.assertIsNone(_supplied_transcript_language({"language": "auto"}, transcript))
+        self.assertIsNone(_supplied_transcript_language({"language": "ar-SA"}, []))
 
     def test_full_index_always_builds_configured_retrieval_vectors(self) -> None:
         plan = fallback_plan("balanced", 60, True)

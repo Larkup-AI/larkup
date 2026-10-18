@@ -3,6 +3,7 @@ import {
   activeMediaFollowUpResult,
   clearlyTitleMatchedMediaAsset,
   clearlyUnavailableTitleMatchedMediaAsset,
+  explicitlySelectedMediaAsset,
   shouldKeepActiveMediaSource,
   type RoutableMediaAsset,
 } from './media-source-routing';
@@ -64,6 +65,14 @@ describe('media source routing', () => {
       clearlyTitleMatchedMediaAsset('the weekly episode', [
         asset('a', 'The weekly episode A'),
         asset('b', 'The weekly episode B'),
+      ]),
+    ).toBeUndefined();
+  });
+
+  it('does not let a sole unrelated video pre-empt document retrieval', () => {
+    expect(
+      explicitlySelectedMediaAsset('what is the inventory database schema', [
+        asset('concert', 'MBC The Voice Kids final performance'),
       ]),
     ).toBeUndefined();
   });

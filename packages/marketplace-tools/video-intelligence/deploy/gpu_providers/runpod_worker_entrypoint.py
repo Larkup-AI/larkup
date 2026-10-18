@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
+import subprocess
 import tempfile
 import time
 from pathlib import Path
 from typing import Any
 
+import requests
 import runpod
 
 from .config import Settings
@@ -12,6 +15,7 @@ from .model_configuration import temporary_model_environment
 from .progress import create_progress_reporter
 from .remote_source import (
     extract_bounded_remote_clip,
+    materialize_provider_source,
     materialize_remote_source,
     rebase_transcript_context,
 )
@@ -32,6 +36,8 @@ def handler(event: dict[str, Any]) -> dict[str, Any]:
     source_url = str(payload.get("sourceUrl") or "")
     if not source_url.startswith("https://"):
         raise ValueError("sourceUrl must be an HTTPS signed URL")
+    if payload.get("operation") == "materialize":
+        return materialize_remote_video(event, payload, source_url)
     brief = VideoIndexingBrief.model_validate(payload.get("brief") or {})
     source_duration_secs = float(payload.get("sourceDurationSecs") or 0)
     # The control plane forwards the user's model bundle only in this job.
@@ -39,6 +45,85 @@ def handler(event: dict[str, Any]) -> dict[str, Any]:
     with temporary_model_environment(payload):
         settings = Settings.from_env()
         return run_video_job(event, payload, source_url, brief, source_duration_secs, settings)
+
+
+def materialize_remote_video(
+    event: dict[str, Any], payload: dict[str, Any], source_url: str
+) -> dict[str, Any]:
+    upload_url = str(payload.get("materializedSourceUploadUrl") or "")
+    if not upload_url.startswith("https://"):
+        raise ValueError("materializedSourceUploadUrl must be an HTTPS signed URL")
+    upload_headers = {
+        str(key): str(value)
+        for key, value in (payload.get("materializedSourceUploadHeaders") or {}).items()
+    }
+    report = progress_reporter(event)
+    started = time.monotonic()
+
+    def preparation_progress(percent: int, message: str) -> None:
+        bounded = max(0, min(99, int(percent)))
+        report(
+            "prepare",
+            min(94, 1 + round(bounded * 0.93)),
+            message,
+            bounded,
+            {
+                "elapsedSeconds": round(max(0.0, time.monotonic() - started)),
+                "current": bounded,
+                "total": 100,
+                "unit": "source download",
+            },
+        )
+
+    with tempfile.TemporaryDirectory(prefix="larkup-runpod-materialize-") as temporary:
+        source_path = Path(temporary) / "source.mp4"
+        materialize_provider_source(
+            source_url,
+            source_path,
+            float(payload.get("sourceDurationSecs") or 0) or None,
+            preparation_progress,
+        )
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                str(source_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        duration_secs = max(
+            0.001,
+            float(json.loads(probe.stdout).get("format", {}).get("duration") or 0),
+        )
+        size_bytes = source_path.stat().st_size
+        report("prepare", 96, "Transferring the video to secure platform storage", 100, {})
+        with source_path.open("rb") as source_file:
+            uploaded = requests.put(
+                upload_url,
+                headers=upload_headers,
+                data=source_file,
+                timeout=(30, 6 * 60 * 60),
+            )
+        uploaded.raise_for_status()
+        report("complete", 99, "Remote video materialization completed", 100, {})
+        return {
+            "result": {
+                "fileName": str(payload.get("fileName") or "youtube-video.mp4"),
+                "mimeType": "video/mp4",
+                "sizeBytes": size_bytes,
+                "durationSecs": duration_secs,
+            },
+            # This job only moves the source into the platform handoff. The
+            # subsequent visual indexing job owns the source-minute charge.
+            "actualSourceMinutes": 0,
+        }
 
 
 def run_video_job(
