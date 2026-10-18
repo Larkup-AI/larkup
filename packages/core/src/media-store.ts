@@ -246,6 +246,7 @@ export function updateMediaAsset(
       | 'processingRevision'
       | 'processingStartedAt'
       | 'processingHeartbeatAt'
+      | 'sourceLanguage'
       | 'caption'
       | 'thumbnailUri'
       | 'dimensions'

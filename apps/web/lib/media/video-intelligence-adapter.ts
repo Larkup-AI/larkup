@@ -1730,10 +1730,12 @@ export function formatVideoKnowledgeSummary(evidence: VideoEvidence): string | n
       ? `${hours}:${minutes.toString().padStart(2, '0')}:${remainder.toString().padStart(2, '0')}`
       : `${minutes}:${remainder.toString().padStart(2, '0')}`;
   };
-  const lines = [`Overview: ${summary.overview}`];
+  // The runtime already writes the audited account in the detected source
+  // language. Keep host scaffolding language-neutral instead of injecting
+  // English headings into otherwise Arabic (or any other-language) notes.
+  const lines = [summary.overview];
   if (summary.participants?.length) {
     lines.push(
-      'Participants:',
       ...summary.participants.map((item) => {
         const anchor = item.evidence[0];
         return `- ${anchor ? `[${time(anchor.startMs)}] ` : ''}${item.name}: ${item.role}`;
@@ -1745,26 +1747,20 @@ export function formatVideoKnowledgeSummary(evidence: VideoEvidence): string | n
       startMs: item.startMs,
       endMs: item.endMs,
       text: item.state,
-      kind: 'State',
     })),
     ...(summary.keyEvents ?? []).map((item) => ({
       startMs: item.startMs,
       endMs: item.endMs,
       text: item.event,
-      kind: 'Event',
     })),
   ].sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs);
   if (timeline.length) {
     lines.push(
-      'Clean timeline:',
-      ...timeline.map(
-        (item) => `- [${time(item.startMs)}–${time(item.endMs)}] ${item.kind}: ${item.text}`,
-      ),
+      ...timeline.map((item) => `- [${time(item.startMs)}–${time(item.endMs)}] ${item.text}`),
     );
   }
   if (summary.narrative?.length) {
     lines.push(
-      'Story notes:',
       ...summary.narrative.map(
         (item) => `- [${time(item.startMs)}–${time(item.endMs)}] ${item.text}`,
       ),
@@ -1772,7 +1768,6 @@ export function formatVideoKnowledgeSummary(evidence: VideoEvidence): string | n
   }
   if (summary.context?.length) {
     lines.push(
-      'Context:',
       ...summary.context.map((item) => {
         const anchor = item.evidence[0];
         return `- ${anchor ? `[${time(anchor.startMs)}] ` : ''}${item.fact}`;
@@ -1781,52 +1776,36 @@ export function formatVideoKnowledgeSummary(evidence: VideoEvidence): string | n
   }
   if (summary.sourceItems?.length) {
     lines.push(
-      'Source inventory:',
       ...summary.sourceItems.map(
         (item) =>
-          `- [${time(item.startMs)}–${time(item.endMs)}] ${item.kind}${
-            item.kind === 'question' && item.questionRole ? ` (${item.questionRole})` : ''
-          }: ${item.text}${
+          `- [${time(item.startMs)}–${time(item.endMs)}] ${item.text}${
             item.answer ? ` — ${item.answer}` : ''
-          }${item.respondent ? ` (respondent: ${item.respondent})` : ''}`,
+          }${item.respondent ? ` — ${item.respondent}` : ''}`,
       ),
     );
   }
   if (summary.sourceActivityStructures?.length) {
     lines.push(
-      'Source structures:',
       ...summary.sourceActivityStructures.map(
         (structure) =>
-          `- [${time(structure.startMs)}–${time(structure.endMs)}] ${structure.kind}: ${
-            structure.label || '—'
-          } (${structure.dimensions
+          `- [${time(structure.startMs)}–${time(structure.endMs)}] ${structure.label || '—'} (${structure.dimensions
             .map((dimension) => `${dimension.label} = ${dimension.values.join(', ')}`)
-            .join(' | ')})${
-            structure.promptCount === undefined ? '' : ` — ${structure.promptCount} prompt slots`
-          }`,
+            .join(' | ')})`,
       ),
     );
   }
   if (summary.sourceTaskInstances?.length) {
     lines.push(
-      'Continued source tasks:',
       ...summary.sourceTaskInstances.map(
         (task) =>
           `- [${time(task.startMs)}–${time(task.endMs)}] ${task.prompt}${
             task.answer ? ` — ${task.answer}` : ''
-          }${task.respondent ? ` (respondent: ${task.respondent})` : ''}`,
+          }${task.respondent ? ` — ${task.respondent}` : ''}`,
       ),
     );
   }
-  if (summary.sourceInventoryCoverage) {
-    lines.push(
-      `Source inventory coverage: ${summary.sourceInventoryCoverage.complete ? 'complete' : 'partial'}${
-        summary.sourceInventoryCoverage.reason ? ` (${summary.sourceInventoryCoverage.reason})` : ''
-      }`,
-    );
-  }
   if (summary.uncertainties?.length) {
-    lines.push('Uncertainties:', ...summary.uncertainties.map((item) => `- ${item}`));
+    lines.push(...summary.uncertainties.map((item) => `- ${item}`));
   }
   return lines.join('\n');
 }
