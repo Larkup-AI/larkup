@@ -416,7 +416,10 @@ class AgentPlannerTests(unittest.TestCase):
             ]
         )
 
-        self.assertIn("opens with", summary["overview"])
+        self.assertEqual(
+            summary["overview"],
+            "A presenter enters. … The presenter begins the first section.",
+        )
         self.assertEqual(summary["participants"][0]["name"], "Salma")
         self.assertEqual(summary["stateHistory"][0]["state"], "counter is 1")
         self.assertEqual(
@@ -836,6 +839,8 @@ class AgentPlannerTests(unittest.TestCase):
         )
 
         self.assertIn('"sourceLanguage":"ar"', prompt)
+        self.assertIn("every generated natural-language summary value", prompt)
+        self.assertIn("overview, participant roles, states", prompt)
         self.assertIn("continuous chronological account", prompt)
         self.assertIn("narrative:[{startMs,endMs,text", prompt)
 

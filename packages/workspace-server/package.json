@@ -1,0 +1,341 @@
+{
+  "name": "@larkup/workspace-server",
+  "version": "0.1.0",
+  "type": "module",
+  "files": [
+    "src",
+    "README.md",
+    "dist-types"
+  ],
+  "exports": {
+    "./app/api/chat/route": {
+      "types": "./dist-types/app/api/chat/route.d.ts",
+      "import": "./src/app/api/chat/route.ts",
+      "default": "./src/app/api/chat/route.ts"
+    },
+    "./app/api/chat/tools": {
+      "types": "./dist-types/app/api/chat/tools.d.ts",
+      "import": "./src/app/api/chat/tools.ts",
+      "default": "./src/app/api/chat/tools.ts"
+    },
+    "./app/api/search/bing/route": {
+      "types": "./dist-types/app/api/search/bing/route.d.ts",
+      "import": "./src/app/api/search/bing/route.ts",
+      "default": "./src/app/api/search/bing/route.ts"
+    },
+    "./app/api/search/brave/route": {
+      "types": "./dist-types/app/api/search/brave/route.d.ts",
+      "import": "./src/app/api/search/brave/route.ts",
+      "default": "./src/app/api/search/brave/route.ts"
+    },
+    "./app/api/search/exa/route": {
+      "types": "./dist-types/app/api/search/exa/route.d.ts",
+      "import": "./src/app/api/search/exa/route.ts",
+      "default": "./src/app/api/search/exa/route.ts"
+    },
+    "./app/api/search/google/route": {
+      "types": "./dist-types/app/api/search/google/route.d.ts",
+      "import": "./src/app/api/search/google/route.ts",
+      "default": "./src/app/api/search/google/route.ts"
+    },
+    "./app/api/search/route": {
+      "types": "./dist-types/app/api/search/route.d.ts",
+      "import": "./src/app/api/search/route.ts",
+      "default": "./src/app/api/search/route.ts"
+    },
+    "./app/api/search/tavily/route": {
+      "types": "./dist-types/app/api/search/tavily/route.d.ts",
+      "import": "./src/app/api/search/tavily/route.ts",
+      "default": "./src/app/api/search/tavily/route.ts"
+    },
+    "./lib/chat/assistant-source-scope": {
+      "types": "./dist-types/lib/chat/assistant-source-scope.d.ts",
+      "import": "./src/lib/chat/assistant-source-scope.ts",
+      "default": "./src/lib/chat/assistant-source-scope.ts"
+    },
+    "./lib/chat/conversation-memory": {
+      "types": "./dist-types/lib/chat/conversation-memory.d.ts",
+      "import": "./src/lib/chat/conversation-memory.ts",
+      "default": "./src/lib/chat/conversation-memory.ts"
+    },
+    "./lib/chat/gateway-fallbacks": {
+      "types": "./dist-types/lib/chat/gateway-fallbacks.d.ts",
+      "import": "./src/lib/chat/gateway-fallbacks.ts",
+      "default": "./src/lib/chat/gateway-fallbacks.ts"
+    },
+    "./lib/chat/media-retrieval-routing": {
+      "types": "./dist-types/lib/chat/media-retrieval-routing.d.ts",
+      "import": "./src/lib/chat/media-retrieval-routing.ts",
+      "default": "./src/lib/chat/media-retrieval-routing.ts"
+    },
+    "./lib/chat/media-source-routing": {
+      "types": "./dist-types/lib/chat/media-source-routing.d.ts",
+      "import": "./src/lib/chat/media-source-routing.ts",
+      "default": "./src/lib/chat/media-source-routing.ts"
+    },
+    "./lib/chat/message-input": {
+      "types": "./dist-types/lib/chat/message-input.d.ts",
+      "import": "./src/lib/chat/message-input.ts",
+      "default": "./src/lib/chat/message-input.ts"
+    },
+    "./lib/chat/model-provider": {
+      "types": "./dist-types/lib/chat/model-provider.d.ts",
+      "import": "./src/lib/chat/model-provider.ts",
+      "default": "./src/lib/chat/model-provider.ts"
+    },
+    "./lib/chat/response-style": {
+      "types": "./dist-types/lib/chat/response-style.d.ts",
+      "import": "./src/lib/chat/response-style.ts",
+      "default": "./src/lib/chat/response-style.ts"
+    },
+    "./lib/chat/retrieval-ranking": {
+      "types": "./dist-types/lib/chat/retrieval-ranking.d.ts",
+      "import": "./src/lib/chat/retrieval-ranking.ts",
+      "default": "./src/lib/chat/retrieval-ranking.ts"
+    },
+    "./lib/chat/retrieval-routing": {
+      "types": "./dist-types/lib/chat/retrieval-routing.d.ts",
+      "import": "./src/lib/chat/retrieval-routing.ts",
+      "default": "./src/lib/chat/retrieval-routing.ts"
+    },
+    "./lib/chat/tabular-dataset-routing": {
+      "types": "./dist-types/lib/chat/tabular-dataset-routing.d.ts",
+      "import": "./src/lib/chat/tabular-dataset-routing.ts",
+      "default": "./src/lib/chat/tabular-dataset-routing.ts"
+    },
+    "./lib/chat/tabular-query-plan": {
+      "types": "./dist-types/lib/chat/tabular-query-plan.d.ts",
+      "import": "./src/lib/chat/tabular-query-plan.ts",
+      "default": "./src/lib/chat/tabular-query-plan.ts"
+    },
+    "./lib/chat/tabular-routing": {
+      "types": "./dist-types/lib/chat/tabular-routing.d.ts",
+      "import": "./src/lib/chat/tabular-routing.ts",
+      "default": "./src/lib/chat/tabular-routing.ts"
+    },
+    "./lib/chat/tabular-sandbox-files": {
+      "types": "./dist-types/lib/chat/tabular-sandbox-files.d.ts",
+      "import": "./src/lib/chat/tabular-sandbox-files.ts",
+      "default": "./src/lib/chat/tabular-sandbox-files.ts"
+    },
+    "./lib/chat/tabular-visualization": {
+      "types": "./dist-types/lib/chat/tabular-visualization.d.ts",
+      "import": "./src/lib/chat/tabular-visualization.ts",
+      "default": "./src/lib/chat/tabular-visualization.ts"
+    },
+    "./lib/chat/tool-call-repair": {
+      "types": "./dist-types/lib/chat/tool-call-repair.d.ts",
+      "import": "./src/lib/chat/tool-call-repair.ts",
+      "default": "./src/lib/chat/tool-call-repair.ts"
+    },
+    "./lib/chat/tool-context": {
+      "types": "./dist-types/lib/chat/tool-context.d.ts",
+      "import": "./src/lib/chat/tool-context.ts",
+      "default": "./src/lib/chat/tool-context.ts"
+    },
+    "./lib/chat/tool-registry": {
+      "types": "./dist-types/lib/chat/tool-registry.d.ts",
+      "import": "./src/lib/chat/tool-registry.ts",
+      "default": "./src/lib/chat/tool-registry.ts"
+    },
+    "./lib/chat/video-rag-routing": {
+      "types": "./dist-types/lib/chat/video-rag-routing.d.ts",
+      "import": "./src/lib/chat/video-rag-routing.ts",
+      "default": "./src/lib/chat/video-rag-routing.ts"
+    },
+    "./lib/chat/visual-routing": {
+      "types": "./dist-types/lib/chat/visual-routing.d.ts",
+      "import": "./src/lib/chat/visual-routing.ts",
+      "default": "./src/lib/chat/visual-routing.ts"
+    },
+    "./lib/enterprise-client": {
+      "types": "./dist-types/lib/enterprise-client.d.ts",
+      "import": "./src/lib/enterprise-client.ts",
+      "default": "./src/lib/enterprise-client.ts"
+    },
+    "./lib/marketplace/tool-runtime-config": {
+      "types": "./dist-types/lib/marketplace/tool-runtime-config.d.ts",
+      "import": "./src/lib/marketplace/tool-runtime-config.ts",
+      "default": "./src/lib/marketplace/tool-runtime-config.ts"
+    },
+    "./lib/media/knowledge": {
+      "types": "./dist-types/lib/media/knowledge.d.ts",
+      "import": "./src/lib/media/knowledge.ts",
+      "default": "./src/lib/media/knowledge.ts"
+    },
+    "./lib/media/pdf-inspection": {
+      "types": "./dist-types/lib/media/pdf-inspection.d.ts",
+      "import": "./src/lib/media/pdf-inspection.ts",
+      "default": "./src/lib/media/pdf-inspection.ts"
+    },
+    "./lib/media/source-identity": {
+      "types": "./dist-types/lib/media/source-identity.d.ts",
+      "import": "./src/lib/media/source-identity.ts",
+      "default": "./src/lib/media/source-identity.ts"
+    },
+    "./lib/media/source-utils": {
+      "types": "./dist-types/lib/media/source-utils.d.ts",
+      "import": "./src/lib/media/source-utils.ts",
+      "default": "./src/lib/media/source-utils.ts"
+    },
+    "./lib/media/video/quick-look": {
+      "types": "./dist-types/lib/media/video/quick-look.d.ts",
+      "import": "./src/lib/media/video/quick-look.ts",
+      "default": "./src/lib/media/video/quick-look.ts"
+    },
+    "./lib/media/video-intelligence-adapter": {
+      "types": "./dist-types/lib/media/video-intelligence-adapter.d.ts",
+      "import": "./src/lib/media/video-intelligence-adapter.ts",
+      "default": "./src/lib/media/video-intelligence-adapter.ts"
+    },
+    "./lib/media/video-intelligence-connection": {
+      "types": "./dist-types/lib/media/video-intelligence-connection.d.ts",
+      "import": "./src/lib/media/video-intelligence-connection.ts",
+      "default": "./src/lib/media/video-intelligence-connection.ts"
+    },
+    "./runtime-host": {
+      "types": "./dist-types/runtime-host.d.ts",
+      "import": "./src/runtime-host.ts",
+      "default": "./src/runtime-host.ts"
+    },
+    "./app/api/tabular/route": {
+      "types": "./dist-types/app/api/tabular/route.d.ts",
+      "import": "./src/app/api/tabular/route.ts",
+      "default": "./src/app/api/tabular/route.ts"
+    },
+    "./app/api/parse-file/route": {
+      "types": "./dist-types/app/api/parse-file/route.d.ts",
+      "import": "./src/app/api/parse-file/route.ts",
+      "default": "./src/app/api/parse-file/route.ts"
+    },
+    "./app/api/chat/feedback/route": {
+      "types": "./dist-types/app/api/chat/feedback/route.d.ts",
+      "import": "./src/app/api/chat/feedback/route.ts",
+      "default": "./src/app/api/chat/feedback/route.ts"
+    },
+    "./app/api/config/verify/route": {
+      "types": "./dist-types/app/api/config/verify/route.d.ts",
+      "import": "./src/app/api/config/verify/route.ts",
+      "default": "./src/app/api/config/verify/route.ts"
+    },
+    "./app/api/config/test-embedding/route": {
+      "types": "./dist-types/app/api/config/test-embedding/route.d.ts",
+      "import": "./src/app/api/config/test-embedding/route.ts",
+      "default": "./src/app/api/config/test-embedding/route.ts"
+    },
+    "./app/api/proxy/verify/route": {
+      "types": "./dist-types/app/api/proxy/verify/route.d.ts",
+      "import": "./src/app/api/proxy/verify/route.ts",
+      "default": "./src/app/api/proxy/verify/route.ts"
+    },
+    "./lib/chat/image-description": {
+      "types": "./dist-types/lib/chat/image-description.d.ts",
+      "import": "./src/lib/chat/image-description.ts",
+      "default": "./src/lib/chat/image-description.ts"
+    },
+    "./app/api/describe-image/route": {
+      "types": "./dist-types/app/api/describe-image/route.d.ts",
+      "import": "./src/app/api/describe-image/route.ts",
+      "default": "./src/app/api/describe-image/route.ts"
+    },
+    "./app/api/doc-editor/parse/route": {
+      "types": "./dist-types/app/api/doc-editor/parse/route.d.ts",
+      "import": "./src/app/api/doc-editor/parse/route.ts",
+      "default": "./src/app/api/doc-editor/parse/route.ts"
+    },
+    "./app/api/doc-editor/edit/route": {
+      "types": "./dist-types/app/api/doc-editor/edit/route.d.ts",
+      "import": "./src/app/api/doc-editor/edit/route.ts",
+      "default": "./src/app/api/doc-editor/edit/route.ts"
+    },
+    "./app/api/doc-editor/export/route": {
+      "types": "./dist-types/app/api/doc-editor/export/route.d.ts",
+      "import": "./src/app/api/doc-editor/export/route.ts",
+      "default": "./src/app/api/doc-editor/export/route.ts"
+    },
+    "./app/api/doc-editor/restore/route": {
+      "types": "./dist-types/app/api/doc-editor/restore/route.d.ts",
+      "import": "./src/app/api/doc-editor/restore/route.ts",
+      "default": "./src/app/api/doc-editor/restore/route.ts"
+    },
+    "./app/api/document/sign/route": {
+      "types": "./dist-types/app/api/document/sign/route.d.ts",
+      "import": "./src/app/api/document/sign/route.ts",
+      "default": "./src/app/api/document/sign/route.ts"
+    },
+    "./lib/search/provider-verification": {
+      "types": "./dist-types/lib/search/provider-verification.d.ts",
+      "import": "./src/lib/search/provider-verification.ts",
+      "default": "./src/lib/search/provider-verification.ts"
+    },
+    "./app/api/search/verify/route": {
+      "types": "./dist-types/app/api/search/verify/route.d.ts",
+      "import": "./src/app/api/search/verify/route.ts",
+      "default": "./src/app/api/search/verify/route.ts"
+    },
+    "./app/api/mcp/route": {
+      "types": "./dist-types/app/api/mcp/route.d.ts",
+      "import": "./src/app/api/mcp/route.ts",
+      "default": "./src/app/api/mcp/route.ts"
+    },
+    "./app/api/mcp/[connectionId]/route": {
+      "types": "./dist-types/app/api/mcp/[connectionId]/route.d.ts",
+      "import": "./src/app/api/mcp/[connectionId]/route.ts",
+      "default": "./src/app/api/mcp/[connectionId]/route.ts"
+    },
+    "./app/api/mcp/[connectionId]/test/route": {
+      "types": "./dist-types/app/api/mcp/[connectionId]/test/route.d.ts",
+      "import": "./src/app/api/mcp/[connectionId]/test/route.ts",
+      "default": "./src/app/api/mcp/[connectionId]/test/route.ts"
+    },
+    "./lib/remote-files": {
+      "types": "./dist-types/lib/remote-files.d.ts",
+      "import": "./src/lib/remote-files.ts",
+      "default": "./src/lib/remote-files.ts"
+    },
+    "./app/api/files/remote/route": {
+      "types": "./dist-types/app/api/files/remote/route.d.ts",
+      "import": "./src/app/api/files/remote/route.ts",
+      "default": "./src/app/api/files/remote/route.ts"
+    },
+    "./app/api/pdf-page/route": {
+      "types": "./dist-types/app/api/pdf-page/route.d.ts",
+      "import": "./src/app/api/pdf-page/route.ts",
+      "default": "./src/app/api/pdf-page/route.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@ffprobe-installer/ffprobe": "2.1.2",
+    "@ai-sdk/anthropic": "^4.0.15",
+    "@ai-sdk/cohere": "4.0.58",
+    "@ai-sdk/deepseek": "3.0.62",
+    "@ai-sdk/gateway": "4.0.108",
+    "@ai-sdk/google": "4.0.92",
+    "@ai-sdk/mistral": "4.0.61",
+    "@ai-sdk/openai": "4.0.89",
+    "@ai-sdk/openai-compatible": "3.0.66",
+    "@larkup/core": "^0.7.4",
+    "@larkup/marketplace": "workspace:*",
+    "@larkup/sandbox": "workspace:*",
+    "@larkup/scraper": "workspace:*",
+    "@larkup/tool-doc-editor": "^0.2.30",
+    "@larkup/vector-stores": "workspace:*",
+    "ai": "7.0.133",
+    "pdf-parse": "2.4.5",
+    "zod": "^4.4.3",
+    "mammoth": "^1.12.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "tsx": "^4.23.5",
+    "@types/node": "^26"
+  }
+}

@@ -118,6 +118,24 @@ export interface VideoJob {
   error: string | null;
 }
 
+export interface VideoMaterializationSource {
+  url: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  durationSecs: number;
+}
+
+export interface VideoMaterializationJob {
+  id: string;
+  status: VideoJobStatus;
+  createdAt: string;
+  updatedAt: string;
+  progress: VideoJobProgress;
+  source: VideoMaterializationSource | null;
+  error: string | null;
+}
+
 export interface TranscriptEvidence {
   startMs: number;
   endMs: number;
@@ -366,6 +384,14 @@ export interface VideoIntelligenceClientContract {
   /** Deletes the temporary encrypted result after the caller has validated it. */
   acknowledgeJobResult(jobId: string): Promise<{ status: string }>;
   cancelJob(jobId: string): Promise<VideoJob>;
+  submitMaterialization(request: {
+    sourceUrl: string;
+    fileName?: string;
+    durationSecs?: number;
+  }): Promise<VideoMaterializationJob>;
+  getMaterialization(jobId: string): Promise<VideoMaterializationJob>;
+  acknowledgeMaterialization(jobId: string): Promise<{ status: string }>;
+  cancelMaterialization(jobId: string): Promise<VideoMaterializationJob>;
   /** Removes a local runtime's durable source/result cache for a deleted asset. */
   purgeJobData(jobId: string): Promise<void>;
   getUsage(): Promise<VideoServiceUsage>;

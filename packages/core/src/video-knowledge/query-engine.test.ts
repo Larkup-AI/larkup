@@ -69,7 +69,8 @@ test('scanVideoKnowledge: pages a complete source inventory chronologically with
             lineageId: item.lineageId,
             mediaAssetId,
             knowledgeRevisionId,
-            modality: 'transcript' as const,
+            modality: (item.id === 'coverage' ? 'computed' : 'transcript') as
+              'computed' | 'transcript',
             timeRange: {
               startSecs: item.startSecs,
               endSecs: item.startSecs + 4,
@@ -109,6 +110,18 @@ test('scanVideoKnowledge: pages a complete source inventory chronologically with
       assert.equal(fullIndex.coverage.complete, true);
       assert.equal(fullIndex.records.length, 3);
 
+      const speechOnly = await scanVideoKnowledge(mediaAssetId, {
+        kind: 'all-evidence',
+        modalities: ['transcript'],
+        limit: 10,
+      });
+      assert.ok(speechOnly);
+      assert.equal(speechOnly.coverage.complete, true);
+      assert.deepEqual(
+        speechOnly.records.map((item) => item.id),
+        ['first-question', 'second-question'],
+      );
+
       await mutateVideoKnowledgeState((state) => {
         const marker = state.evidence.findIndex((item) => item.id === 'coverage');
         if (marker >= 0) state.evidence.splice(marker, 1);
@@ -117,6 +130,13 @@ test('scanVideoKnowledge: pages a complete source inventory chronologically with
       assert.ok(missingMarker);
       assert.equal(missingMarker.coverage.complete, false);
       assert.match(missingMarker.coverage.reason ?? '', /no complete-source inventory marker/i);
+      const exactSpeechWithoutMarker = await scanVideoKnowledge(mediaAssetId, {
+        kind: 'all-evidence',
+        modalities: ['transcript'],
+      });
+      assert.ok(exactSpeechWithoutMarker);
+      assert.equal(exactSpeechWithoutMarker.coverage.complete, true);
+      assert.equal(exactSpeechWithoutMarker.coverage.reason, undefined);
     });
   });
 });

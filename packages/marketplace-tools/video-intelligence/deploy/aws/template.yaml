@@ -136,8 +136,8 @@ Resources:
       # S3StorageProvider) deliberately has NO expiration rule here: its
       # retention is governed only by the web app's own retainSourceHours
       # deletion, never a bucket-wide lifecycle policy, so a future
-      # watch_original call always finds its source. `sources/`/`results/`
-      # are this stack's own short-lived per-job processing scratch space.
+      # watch_original call always finds its source. `sources/`, `results/`,
+      # and `materialized/` are this stack's own short-lived processing space.
       LifecycleConfiguration:
         Rules:
           - Id: DeleteUnretainedSources
@@ -148,6 +148,12 @@ Resources:
               NoncurrentDays: 1
           - Id: DeleteEvidence
             Prefix: results/
+            Status: Enabled
+            ExpirationInDays: 1
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+          - Id: DeleteUnacknowledgedMaterializations
+            Prefix: materialized/
             Status: Enabled
             ExpirationInDays: 1
             NoncurrentVersionExpiration:

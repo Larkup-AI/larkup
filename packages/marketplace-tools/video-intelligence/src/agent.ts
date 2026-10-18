@@ -114,7 +114,7 @@ export const AGENT_TOOLS = [
     workflow: 'evidence-query',
     evidenceInput: 'media-asset',
     systemPromptFragment:
-      'Use this action for media questions. On every call, derive investigation from the user’s meaning in their own language: use focused for one local moment, temporal for a relationship or development across moments, and source when the answer must account for the recording as a whole. Set answer, compare, trace, enumerate, or synthesize according to the reasoning operation—not the video genre or a word list. If the user supplies a specific source time or range, put its resolved seconds in investigation.timeRange; otherwise omit it. For a source enumeration, set recordSet to source-authored for units authored in the recording, source-questions for only authored questions and their answers, observed for time-grounded observed facts, or all when both are needed. Choose source plus synthesize for the overall narrative. Focused questions use ranked evidence; source enumerations use a chronological database scan; source explanations use a durable navigation aggregate. Never turn a complete-source request into top-K retrieval. For an exhaustive result, follow continuation.nextCursor until hasMore=false; do not mistake one page for the complete answer. Never say you do not know or that the source lacks an answer before this action has attempted its available fallback. State a value, identity, count, or exact visible fact only when established. observedSubjects, when present, is the reconciled frame-grounded visibility ledger: use its ranges for visible-presence and timing claims, never speech, titles, or a source name. Its durations are observed intervals, not inferred continuous screen time. Answer as a viewer who remembers the material: lead with the answer itself, and when natural say "I saw" or "I heard" rather than describing a system. Do not say "the video shows", "the analysis indicates", or "according to retrieved evidence". Never mention retrieval, search, indexing, frames, tools, or analysis unless the user asks how the answer was found.',
+      'Use this action for media questions. On every call, derive investigation from the user’s meaning in their own language: use focused for one local moment, temporal for a relationship or development across moments, and source when the answer must account for the recording as a whole. Set answer, compare, trace, enumerate, or synthesize according to the reasoning operation—not the video genre or a word list. If the user supplies a specific source time or range, put its resolved seconds in investigation.timeRange; otherwise omit it. For a source enumeration, set recordSet to source-authored for units authored in the recording, source-questions for only authored questions and their answers, observed for time-grounded observed facts, or all when both are needed. For exact spoken or sung wording across the recording, use source plus enumerate, speech evidence, and recordSet all. Choose source plus synthesize for the overall narrative. Focused questions use ranked evidence; source enumerations use a chronological database scan; source explanations use a durable navigation aggregate. Never turn a complete-source request into top-K retrieval. For an exhaustive result, follow continuation.nextCursor until hasMore=false; do not mistake one page for the complete answer. Answer in the returned sourceLanguage by default, including notes, speech, and lyrics; translate only when the user explicitly asks. Never default to English. Never say you do not know or that the source lacks an answer before this action has attempted its available fallback. State a value, identity, count, or exact visible fact only when established. observedSubjects, when present, is the reconciled frame-grounded visibility ledger: use its ranges for visible-presence and timing claims, never speech, titles, or a source name. Its durations are observed intervals, not inferred continuous screen time. Answer as a viewer who remembers the material: lead with the answer itself, and when natural say "I saw" or "I heard" rather than describing a system. Do not say "the video shows", "the analysis indicates", or "according to retrieved evidence". Never mention retrieval, search, indexing, frames, tools, or analysis unless the user asks how the answer was found.',
   },
   {
     name: 'inspectVideoKnowledge',
@@ -163,6 +163,7 @@ export function attachVideoIntelligenceAgentClient(
       const asset = await mediaEvidence.getAsset(input.mediaAssetId);
       if (!asset || asset.processingStatus !== 'completed')
         return { success: false, error: 'A completed video asset is required.' };
+      const sourceLanguage = asset.sourceLanguage?.trim();
 
       const focusedQuery = focusQuestion(input.query, asset.fileName);
       const directive = validInvestigation(input.investigation)
@@ -204,6 +205,9 @@ export function attachVideoIntelligenceAgentClient(
           kind: sourceInventory ? 'source-inventory' : 'all-evidence',
           cursor: input.cursor,
           limit: input.limit,
+          ...(!sourceInventory && (plan.modalities?.length ?? 0) > 0
+            ? { modalities: plan.modalities }
+            : {}),
         });
         if (scanned) {
           // A source inventory can contain headings, slides, and literal list
@@ -243,14 +247,19 @@ export function attachVideoIntelligenceAgentClient(
             timestamp: new Date().toISOString(),
           });
           const observedSubjects = observedSubjectsForAnswer(aggregate, directive);
+          const recordSet =
+            !sourceInventory && plan.modalities?.length === 1 && plan.modalities[0] === 'transcript'
+              ? 'speech'
+              : (focusedInput.investigation.recordSet ?? 'all');
           return {
             success: true,
             mediaAssetId: input.mediaAssetId,
             fileName: asset.fileName,
+            ...(sourceLanguage ? { sourceLanguage } : {}),
             evidence,
             ...(observedSubjects.length > 0 ? { observedSubjects } : {}),
             inventory: {
-              recordSet: focusedInput.investigation.recordSet ?? 'all',
+              recordSet,
               coverage: {
                 complete,
                 ...(scanned.coverage.reason ? { reason: scanned.coverage.reason } : {}),
@@ -417,6 +426,7 @@ export function attachVideoIntelligenceAgentClient(
               success: true,
               mediaAssetId: input.mediaAssetId,
               fileName: asset.fileName,
+              ...(sourceLanguage ? { sourceLanguage } : {}),
               evidence: indexedEvidence,
               supportingClip,
               ui: citationSurface(
@@ -552,6 +562,7 @@ export function attachVideoIntelligenceAgentClient(
         success: true,
         mediaAssetId: input.mediaAssetId,
         fileName: asset.fileName,
+        ...(sourceLanguage ? { sourceLanguage } : {}),
         evidence,
         ...(supportingClip ? { supportingClip } : {}),
         ...(assessment.sufficient && supportingClip
@@ -673,6 +684,7 @@ function explicitlyRequestedMomentEvidence(
 type VideoPlan = {
   kinds: string[];
   route?: 'search' | 'temporal' | 'aggregate' | 'scan' | 'export';
+  modalities?: Array<'transcript' | 'ocr' | 'visual' | 'computed'>;
   requiresBothRanges?: boolean;
   requiresBroadCoverage?: boolean;
   requiresIdentityContext?: boolean;
@@ -693,6 +705,7 @@ function investigationDirectiveForOutput(directive: VideoInvestigationDirective)
   return {
     scope: directive.scope,
     goal: directive.goal,
+    ...(directive.evidence?.length ? { evidence: directive.evidence } : {}),
     ...(directive.recordSet ? { recordSet: directive.recordSet } : {}),
     ...(directive.timeRange ? { timeRange: directive.timeRange } : {}),
   };

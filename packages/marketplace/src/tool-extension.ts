@@ -32,6 +32,8 @@ export interface AgentToolExecutionContext {
           durationSecs?: number;
           fileName?: string;
           originalUrl?: string;
+          /** Detected language of the source recording, when the host persisted it. */
+          sourceLanguage?: string;
         }
       | undefined
     >;
@@ -170,7 +172,12 @@ export interface AgentToolExecutionContext {
      */
     scan?: (
       mediaAssetId: string,
-      input: { kind: 'source-inventory' | 'all-evidence'; cursor?: number; limit?: number },
+      input: {
+        kind: 'source-inventory' | 'all-evidence';
+        cursor?: number;
+        limit?: number;
+        modalities?: Array<'transcript' | 'ocr' | 'visual' | 'computed'>;
+      },
     ) => Promise<
       | {
           resultHandle: string;

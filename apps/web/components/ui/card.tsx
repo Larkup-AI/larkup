@@ -1,9 +1,1 @@
-export {
-  Card,
-  CardHeader,
-  CardFooter,
-  CardTitle,
-  CardAction,
-  CardDescription,
-  CardContent,
-} from '@larkup/workspace-ui';
+export * from '@larkup/workspace-app/components/ui/card';

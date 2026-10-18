@@ -1,11 +1,94 @@
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 from typing import Callable
+from urllib.parse import urlparse
 
 
 PreparationProgress = Callable[[int, str], None]
+
+
+def materialize_provider_source(
+    source_url: str,
+    destination: Path,
+    source_duration_secs: float | None = None,
+    progress: PreparationProgress | None = None,
+    prefer_stream_copy: bool = False,
+) -> None:
+    """Materialize a provider page or direct media URL into a playable MP4."""
+    hostname = (urlparse(source_url).hostname or "").lower().rstrip(".")
+    if (
+        hostname == "youtu.be"
+        or hostname == "youtube.com"
+        or hostname.endswith(".youtube.com")
+    ):
+        _download_youtube_source(source_url, destination, progress)
+        return
+    materialize_remote_source(
+        source_url,
+        destination,
+        source_duration_secs,
+        progress,
+        prefer_stream_copy=prefer_stream_copy,
+    )
+
+
+def _download_youtube_source(
+    source_url: str,
+    destination: Path,
+    progress: PreparationProgress | None,
+) -> None:
+    command = [
+        "yt-dlp",
+        "--no-playlist",
+        "--socket-timeout",
+        "20",
+        "--retries",
+        "3",
+        "--newline",
+        "--format",
+        (
+            "bestvideo*[height<=360][ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]/"
+            "best[height<=360][ext=mp4][vcodec!=none][acodec!=none]/"
+            "bestvideo*[height<=360]+bestaudio/"
+            "best[height<=360][vcodec!=none][acodec!=none]/"
+            "best[vcodec!=none][acodec!=none]"
+        ),
+        "--merge-output-format",
+        "mp4",
+        "-o",
+        str(destination),
+        source_url,
+    ]
+    if progress:
+        progress(1, "Connecting to the remote video source")
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    diagnostics: list[str] = []
+    assert process.stdout is not None
+    for raw_line in process.stdout:
+        line = raw_line.strip()
+        if line:
+            diagnostics.append(line)
+            diagnostics = diagnostics[-40:]
+        match = re.search(r"\[download\]\s+([0-9]+(?:\.[0-9]+)?)%", line)
+        if match and progress:
+            percent = max(1, min(99, round(float(match.group(1)))))
+            progress(percent, f"Downloading remote video ({percent}%)")
+    process.stdout.close()
+    return_code = process.wait()
+    if return_code != 0 or not destination.exists() or not destination.stat().st_size:
+        destination.unlink(missing_ok=True)
+        raise RuntimeError("could not download remote video: " + " | ".join(diagnostics)[-1200:])
+    if progress:
+        progress(99, "Remote video is ready for secure transfer")
 
 
 def rebase_transcript_context(

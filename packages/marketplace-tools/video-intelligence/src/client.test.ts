@@ -196,6 +196,95 @@ describe('VideoIntelligenceClient', () => {
     ]);
   });
 
+  it('submits, polls, acknowledges, and cancels remote materializations', async () => {
+    const requests: Array<{ url: string; method: string; body?: string }> = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = {
+        url: String(input),
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? init.body : undefined,
+      };
+      requests.push(request);
+      if (request.method === 'POST' && request.url.endsWith('/v1/materializations')) {
+        return Response.json(
+          {
+            id: 'job_materialize',
+            status: 'queued',
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+            progress: { stage: 'queued', percent: 0, message: 'Queued' },
+            source: null,
+            error: null,
+          },
+          { status: 202 },
+        );
+      }
+      if (request.method === 'GET') {
+        return Response.json({
+          id: 'job_materialize',
+          status: 'completed',
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:01:00Z',
+          progress: { stage: 'complete', percent: 100, message: 'Ready' },
+          source: {
+            url: 'https://signed.example.test/source.mp4',
+            fileName: 'source.mp4',
+            mimeType: 'video/mp4',
+            sizeBytes: 123,
+            durationSecs: 45,
+          },
+          error: null,
+        });
+      }
+      return Response.json({ status: 'acknowledged' });
+    }) as any;
+    const client = new VideoIntelligenceClient({
+      mode: 'managed-cloud',
+      endpoint: 'https://video.example.test',
+      apiKey: 'test-key',
+      fetch: fetcher,
+    });
+
+    await client.submitMaterialization({
+      sourceUrl: 'https://www.youtube.com/watch?v=abc',
+      fileName: 'lecture.mp4',
+      durationSecs: 10_800,
+    });
+    await expect(client.getMaterialization('job_materialize')).resolves.toMatchObject({
+      status: 'completed',
+      source: { sizeBytes: 123, durationSecs: 45 },
+    });
+    await client.acknowledgeMaterialization('job_materialize');
+    await client.cancelMaterialization('job_materialize');
+
+    expect(requests).toEqual([
+      {
+        url: 'https://video.example.test/v1/materializations',
+        method: 'POST',
+        body: JSON.stringify({
+          sourceUrl: 'https://www.youtube.com/watch?v=abc',
+          fileName: 'lecture.mp4',
+          durationSecs: 10_800,
+        }),
+      },
+      {
+        url: 'https://video.example.test/v1/materializations/job_materialize',
+        method: 'GET',
+        body: undefined,
+      },
+      {
+        url: 'https://video.example.test/v1/materializations/job_materialize/ack',
+        method: 'POST',
+        body: '{}',
+      },
+      {
+        url: 'https://video.example.test/v1/materializations/job_materialize',
+        method: 'DELETE',
+        body: undefined,
+      },
+    ]);
+  });
+
   it('migrates the legacy cloud credential shape away from the old local default', async () => {
     const fetcher = vi.fn(
       async () => new Response(JSON.stringify({ status: 'ok', version: '0.1.0', operators: {} })),

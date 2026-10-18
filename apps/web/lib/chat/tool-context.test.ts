@@ -12,6 +12,7 @@ import {
   formatLocatedObservedSubjectAnswer,
   formatObservedAppearanceAnswer,
   formatOutcomeMediaAnswer,
+  mediaEvidenceRequestsOnlySpeech,
   mediaClaimNeedsCorroboration,
   withFinalAnswerNudge,
 } from './tool-context';
@@ -476,6 +477,41 @@ describe('formatDirectObservationAnswer', () => {
       }),
     ).toBeUndefined();
   });
+
+  it('does not use a visual direct reading as the answer to a speech-only question', () => {
+    expect(
+      formatDirectObservationAnswer(
+        {
+          success: true,
+          claimVerification: { status: 'directly-established' },
+          investigation: { directive: { evidence: ['speech'] } },
+          directObservation: {
+            readings: [
+              {
+                found: 'A contestant is standing on the stage.',
+                confidence: 'high',
+                settlesQuestion: true,
+              },
+            ],
+          },
+        },
+        'What words were sung?',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('recognizes packaged speech-only evidence while leaving multimodal evidence available', () => {
+    expect(
+      mediaEvidenceRequestsOnlySpeech({
+        investigation: { directive: { evidence: ['speech'] } },
+      }),
+    ).toBe(true);
+    expect(
+      mediaEvidenceRequestsOnlySpeech({
+        investigation: { directive: { evidence: ['speech', 'visual'] } },
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('formatParticipantInventory', () => {
@@ -834,6 +870,39 @@ describe('compactToolContextForModel', () => {
     ]);
     const output = (message.content[0] as any).output;
     expect(output.rows).toHaveLength(50);
+  });
+
+  it('replaces chart rows with a concise synopsis for the final answer model', () => {
+    const [message] = compactToolContextForModel([
+      toolResultMessage('queryTabularData', {
+        columns: ['month', 'sum_Sales', 'sum_Profit'],
+        rows: [
+          { month: '2025-01', sum_Sales: 100, sum_Profit: 12 },
+          { month: '2025-02', sum_Sales: 180, sum_Profit: 35 },
+        ],
+        totalRows: 2,
+        visualization: {
+          chartType: 'line',
+          title: 'Monthly Sales and Profit trend',
+          data: [
+            { month: '2025-01', sum_Sales: 100, sum_Profit: 12 },
+            { month: '2025-02', sum_Sales: 180, sum_Profit: 35 },
+          ],
+          xAxisKey: 'month',
+          series: [
+            { dataKey: 'sum_Sales', label: 'Sales' },
+            { dataKey: 'sum_Profit', label: 'Profit' },
+          ],
+          showLegend: true,
+        },
+      }),
+    ]);
+    const output = (message.content[0] as any).output;
+
+    expect(output.rows).toBeUndefined();
+    expect(output.chartSynopsis).toBe(
+      'Here’s the requested chart: Monthly Sales and Profit trend. Sales peaks at 180 in Feb 2025; Profit peaks at 35 in Feb 2025.',
+    );
   });
 
   it('keeps bounded local PDF page evidence for the visual-analysis step', () => {

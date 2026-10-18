@@ -8,6 +8,10 @@
     "access": "public"
   },
   "type": "module",
+  "files": [
+    "src",
+    "CHANGELOG.md"
+  ],
   "exports": {
     "./adapter": "./src/adapters/base.ts",
     "./factory": "./src/factory.ts",
@@ -22,8 +26,10 @@
     "@pinecone-database/pinecone": "^9.0.0",
     "apache-arrow": "18.1.0"
   },
+  "optionalDependencies": {
+    "chromadb": "^3.5.0"
+  },
   "devDependencies": {
-    "chromadb": "^3.5.0",
     "typescript": "^7.0.2"
   }
 }

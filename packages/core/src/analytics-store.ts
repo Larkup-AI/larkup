@@ -1,3 +1,4 @@
+import { workspaceHost } from './workspace-host';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -115,6 +116,8 @@ export async function readUsageEvents(): Promise<UsageEvent[]> {
  * Asynchronously track a usage event. Fire-and-forget safe.
  */
 export function trackUsageEvent(event: Omit<UsageEvent, 'id'>): Promise<UsageEvent> {
+  const host = workspaceHost();
+  if (host) return host.trackUsage(event);
   return serialize(async () => {
     const events = await readUsageEvents();
     const fullEvent: UsageEvent = {
