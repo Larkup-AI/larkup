@@ -1410,6 +1410,8 @@ def _supplied_transcript_language(
     brief: dict[str, Any], transcript: list[dict[str, Any]]
 ) -> str | None:
     """Carry source/caption language through jobs that intentionally skip local STT."""
+    if not transcript:
+        return None
     language = str(brief.get("detectedLanguage") or brief.get("language") or "").strip()
     return language if language and language.casefold() != "auto" else None
 
