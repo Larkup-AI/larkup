@@ -6,19 +6,68 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./theme.css": "./src/theme.css"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./theme.css": "./src/theme.css",
+    "./button": {
+      "types": "./dist/button.d.ts",
+      "import": "./dist/button.js"
+    },
+    "./label": {
+      "types": "./dist/label.d.ts",
+      "import": "./dist/label.js"
+    },
+    "./select": {
+      "types": "./dist/select.d.ts",
+      "import": "./dist/select.js"
+    },
+    "./separator": {
+      "types": "./dist/separator.d.ts",
+      "import": "./dist/separator.js"
+    },
+    "./provider-icon": {
+      "types": "./dist/provider-icon.d.ts",
+      "import": "./dist/provider-icon.js"
+    },
+    "./theme-customizer-provider": {
+      "types": "./dist/theme-customizer-provider.d.ts",
+      "import": "./dist/theme-customizer-provider.js"
+    },
+    "./general-settings-view": {
+      "types": "./dist/general-settings-view.d.ts",
+      "import": "./dist/general-settings-view.js"
+    },
+    "./source.css": "./src/source.css",
+    "./themes.css": "./src/themes.css"
   },
-  "files": ["dist", "src/theme.css", "README.md"],
-  "dependencies": { "clsx": "^2.1.1", "tailwind-merge": "^3.3.1", "class-variance-authority": "^0.7.1" },
-  "publishConfig": { "access": "public" },
+  "files": [
+    "dist",
+    "src/theme.css",
+    "README.md",
+    "src/source.css",
+    "src/themes.css"
+  ],
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.3.1",
+    "class-variance-authority": "^0.7.1",
+    "@base-ui/react": "^1.5.0",
+    "lucide-react": "^1.11.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "type-check": "tsc --noEmit",
     "test": "node --import tsx --test tests/workspace-ui.test.tsx"
   },
-  "peerDependencies": { "react": ">=19" },
+  "peerDependencies": {
+    "react": ">=19"
+  },
   "devDependencies": {
     "@types/react": "^19",
     "react": "^19",

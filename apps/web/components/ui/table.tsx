@@ -1,10 +1,1 @@
-export {
-  Table,
-  TableHeader,
-  TableBody,
-  TableFooter,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableCaption,
-} from '@larkup/workspace-ui';
+export * from '@larkup/workspace-app/components/ui/table';

@@ -12,6 +12,7 @@ import type {
   ToolSource,
 } from './types';
 import { getToolById, invalidateRegistryCache } from './tool-registry';
+import { workspaceHost } from '@larkup/core/workspace-host';
 
 const installingTools = new Set<string>();
 const uninstallingTools = new Set<string>();
@@ -88,6 +89,8 @@ async function writeManifest(manifest: InstalledToolsManifest) {
 }
 
 export async function getInstalledTools(): Promise<InstalledTool[]> {
+  const hosted = workspaceHost()?.tools;
+  if (hosted) return hosted.map(({ module: _module, ...tool }) => tool);
   const manifest = await readManifest();
   return [...manifest.tools];
 }

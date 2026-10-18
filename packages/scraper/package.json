@@ -2,16 +2,29 @@
   "name": "@larkup/scraper",
   "version": "0.1.50",
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
   },
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
   "exports": {
-    "./firecrawl": "./src/firecrawl.ts",
-    "./job-runner": "./src/job-runner.ts",
-    "./local-runtime": "./src/local-runtime.ts"
+    "./firecrawl": {
+      "types": "./dist-types/firecrawl.d.ts",
+      "import": "./src/firecrawl.ts",
+      "default": "./src/firecrawl.ts"
+    },
+    "./job-runner": {
+      "types": "./dist-types/job-runner.d.ts",
+      "import": "./src/job-runner.ts",
+      "default": "./src/job-runner.ts"
+    },
+    "./local-runtime": {
+      "types": "./dist-types/local-runtime.d.ts",
+      "import": "./src/local-runtime.ts",
+      "default": "./src/local-runtime.ts"
+    }
   },
   "dependencies": {
     "@larkup/core": "workspace:*",
@@ -20,5 +33,10 @@
   "devDependencies": {
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
-  }
+  },
+  "files": [
+    "src",
+    "dist-types",
+    "README.md"
+  ]
 }

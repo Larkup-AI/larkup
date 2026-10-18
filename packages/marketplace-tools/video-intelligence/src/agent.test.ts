@@ -61,6 +61,7 @@ function evidenceContext(overrides: {
   ) => Promise<Hit[]> | Hit[];
   durationSecs?: number;
   fileName?: string;
+  sourceLanguage?: string;
   planInvestigation?: () => Promise<unknown>;
   reWatch?: (...args: any[]) => Promise<unknown>;
   scan?: (...args: any[]) => Promise<unknown>;
@@ -75,6 +76,7 @@ function evidenceContext(overrides: {
         processingStatus: 'completed',
         durationSecs: overrides.durationSecs ?? 120,
         fileName: overrides.fileName,
+        sourceLanguage: overrides.sourceLanguage,
       }),
       planQuestion: () => overrides.plan,
       ...(overrides.planInvestigation ? { planInvestigation: overrides.planInvestigation } : {}),
@@ -121,6 +123,7 @@ describe('Video Intelligence chat extension', () => {
       },
     });
     expect(queryTool?.systemPromptFragment).toContain('user’s meaning in their own language');
+    expect(queryTool?.systemPromptFragment).toContain('exact spoken or sung wording');
     expect(queryTool?.systemPromptFragment).toContain('when natural say "I saw" or "I heard"');
     expect(queryTool?.systemPromptFragment).toContain(
       'reconciled frame-grounded visibility ledger',
@@ -141,7 +144,7 @@ describe('Video Intelligence chat extension', () => {
     const planQuestion = vi.fn(() => plan);
     (context.mediaEvidence as any).planQuestion = planQuestion;
 
-    await agentClient(vi.fn() as any).queryVideoEvidence(
+    const result: any = await agentClient(vi.fn() as any).queryVideoEvidence(
       {
         mediaAssetId: 'media-1',
         query: '動画全体で何が起きた？',
@@ -151,6 +154,11 @@ describe('Video Intelligence chat extension', () => {
     );
 
     expect(planQuestion).toHaveBeenCalledWith('動画全体で何が起きた?', {
+      scope: 'source',
+      goal: 'synthesize',
+      evidence: ['speech', 'visual'],
+    });
+    expect(result.investigation.directive).toMatchObject({
       scope: 'source',
       goal: 'synthesize',
       evidence: ['speech', 'visual'],
@@ -314,6 +322,102 @@ describe('Video Intelligence chat extension', () => {
     expect(result.evidence[0].payload.text).toContain('Who starts?');
     expect(result.evidence[0].payload.text).not.toContain('Round one');
     expect(result.continuation.nextCursor).toBe(2);
+  });
+
+  it('scans only speech evidence for an exact whole-recording transcript', async () => {
+    const scan = vi.fn(async () => ({
+      resultHandle: 'video-scan:v1:revision:all-evidence',
+      records: [
+        {
+          id: 'speech-1',
+          sourceEvidenceId: 'speech-1',
+          kind: 'evidence',
+          text: 'المقطع الأول من الكلمات',
+          timeRange: { startSecs: 5, endSecs: 12, precision: 'segment' },
+          modality: 'transcript',
+          confidence: { score: 0.9 },
+        },
+      ],
+      continuation: { cursor: 0, hasMore: false, totalRecords: 1 },
+      coverage: { complete: true, scannedRecords: 1, totalRecords: 1 },
+    }));
+
+    const result: any = await agentClient(vi.fn() as any).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'اكتب كلمات الأغنية كاملة',
+        investigation: {
+          scope: 'source',
+          goal: 'enumerate',
+          evidence: ['speech'],
+          recordSet: 'all',
+        },
+      },
+      evidenceContext({
+        plan: {
+          kinds: ['coverage'],
+          route: 'scan',
+          modalities: ['transcript'],
+          requiresBroadCoverage: true,
+          requiresInspectionWhenInsufficient: false,
+        },
+        search: () => [],
+        scan,
+      }),
+    );
+
+    expect(scan).toHaveBeenCalledWith('media-1', {
+      kind: 'all-evidence',
+      cursor: undefined,
+      limit: undefined,
+      modalities: ['transcript'],
+    });
+    expect(result.rows).toEqual([
+      expect.objectContaining({ Content: 'المقطع الأول من الكلمات', 'Record type': 'evidence' }),
+    ]);
+    expect(result.inventory).toEqual({
+      recordSet: 'speech',
+      coverage: { complete: true },
+    });
+  });
+
+  it('keeps Arabic visual evidence and its timestamp when answering a visual question', async () => {
+    const result: any = await agentClient(vi.fn() as any).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'البنت لابسة إيه؟' },
+      evidenceContext({
+        sourceLanguage: 'ar',
+        plan: {
+          kinds: ['appearance'],
+          modalities: ['visual'],
+          requiresInspectionWhenInsufficient: false,
+        },
+        search: () => [
+          hit('appearance-1', 42, 'البنت ترتدي فستانًا أزرق.', {
+            modality: 'visual',
+            timeRange: { startSecs: 42, endSecs: 48, precision: 'segment' },
+          } as any),
+        ],
+      }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.sourceLanguage).toBe('ar');
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          modality: 'visual',
+          timeRange: expect.objectContaining({ startSecs: 42, endSecs: 48 }),
+          payload: 'البنت ترتدي فستانًا أزرق.',
+        }),
+      ]),
+    );
+  });
+
+  it('instructs chat to answer in the detected source language unless translation is explicit', () => {
+    expect(AGENT_TOOLS[0].systemPromptFragment).toContain(
+      'Answer in the returned sourceLanguage by default',
+    );
+    expect(AGENT_TOOLS[0].systemPromptFragment).toContain('Never default to English');
   });
 
   it('re-watches the source before dispatching a re-index, and answers from what it read', async () => {

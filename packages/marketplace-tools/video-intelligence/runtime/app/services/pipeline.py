@@ -1406,6 +1406,14 @@ def _link_chronological_notes(
     )
 
 
+def _supplied_transcript_language(
+    brief: dict[str, Any], transcript: list[dict[str, Any]]
+) -> str | None:
+    """Carry source/caption language through jobs that intentionally skip local STT."""
+    language = str(brief.get("detectedLanguage") or brief.get("language") or "").strip()
+    return language if language and language.casefold() != "auto" else None
+
+
 def _apply_video_embedding_policy(
     plan: ExtractionPlan,
     brief: dict[str, Any],
@@ -1506,7 +1514,7 @@ def _run_pipeline(
         for segment in (brief.get("transcriptContext") or [])
         if isinstance(segment, dict)
     ]
-    detected_language: str | None = None
+    detected_language: str | None = _supplied_transcript_language(brief, transcript)
     transcription_error: BaseException | None = None
     transcription_units = {"completed": 0, "total": 1}
     transcription_units_lock = threading.Lock()

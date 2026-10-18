@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { workspaceHost } from '@larkup/core/workspace-host';
 /**
  * Document editor — orchestrates parsing, editing, and export.
  *
@@ -29,24 +31,58 @@ import {
   generateExtractPDFTextScript,
 } from './sandbox-scripts.js';
 
-const sessions = new Map<string, EditorSession>();
+const localSessions = new Map<string, EditorSession>();
+const sessionScope = new AsyncLocalStorage<{
+  sessions: Map<string, EditorSession>;
+  flush: () => Promise<void>;
+}>();
+function sessions() {
+  return sessionScope.getStore()?.sessions ?? localSessions;
+}
+async function persistSessions() {
+  await sessionScope.getStore()?.flush();
+}
+/** Hydrate isolated sessions from the host's tenant-bound persistent repository. */
+export async function runWithDocumentSessions<T>(operation: () => T): Promise<Awaited<T>> {
+  const host = workspaceHost();
+  if (!host || sessionScope.getStore()) return await operation();
+  const stored = ((await host.readState('document-sessions')) ?? []) as EditorSession[];
+  const scoped = new Map(stored.map((session) => [session.id, session]));
+  let previous = JSON.stringify(stored);
+  let pending = Promise.resolve();
+  const flush = () => {
+    pending = pending.then(async () => {
+      const next = JSON.stringify([...scoped.values()]);
+      if (next !== previous) {
+        await host.writeState('document-sessions', JSON.parse(next));
+        previous = next;
+      }
+    });
+    return pending;
+  };
+  return await sessionScope.run({ sessions: scoped, flush }, async () => {
+    const result = await operation();
+    await flush();
+    return result;
+  });
+}
 
 export function getSession(sessionId: string): EditorSession | undefined {
-  return sessions.get(sessionId);
+  return sessions().get(sessionId);
 }
 
 export function getAllSessions(): EditorSession[] {
-  return Array.from(sessions.values()).sort(
+  return Array.from(sessions().values()).sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );
 }
 
 export function deleteSession(sessionId: string): boolean {
-  return sessions.delete(sessionId);
+  return sessions().delete(sessionId);
 }
 
 export function restoreSession(session: EditorSession): void {
-  sessions.set(session.id, session);
+  sessions().set(session.id, session);
 }
 
 export async function createSession(
@@ -112,16 +148,17 @@ export async function createSession(
     updatedAt: new Date().toISOString(),
   };
 
-  sessions.set(session.id, session);
+  sessions().set(session.id, session);
+  await persistSessions();
   return session;
 }
 
 export async function applyFieldEdits(sessionId: string, edits: FieldEdit[]): Promise<EditResult> {
-  const session = sessions.get(sessionId);
+  const session = sessions().get(sessionId);
   if (!session) {
     console.error(
       `[doc-editor] Session not found: ${sessionId}. Available sessions:`,
-      Array.from(sessions.keys()),
+      Array.from(sessions().keys()),
     );
     return {
       success: false,
@@ -279,6 +316,7 @@ export async function applyFieldEdits(sessionId: string, edits: FieldEdit[]): Pr
     session.parsed = newParsed;
     session.edits.push(...edits);
     session.updatedAt = new Date().toISOString();
+    await persistSessions();
 
     return {
       success: true,
@@ -302,7 +340,7 @@ export async function applyContentEdits(
   sessionId: string,
   edits: ContentEdit[],
 ): Promise<EditResult> {
-  const session = sessions.get(sessionId);
+  const session = sessions().get(sessionId);
   if (!session) {
     return {
       success: false,
@@ -390,6 +428,7 @@ export async function applyContentEdits(
     session.currentFileBase64 = newBase64;
     session.parsed = newParsed;
     session.updatedAt = new Date().toISOString();
+    await persistSessions();
 
     return {
       success: true,
@@ -411,7 +450,7 @@ export async function applyContentEdits(
 export function exportDocument(
   sessionId: string,
 ): { buffer: Buffer; fileName: string; mimeType: string } | null {
-  const session = sessions.get(sessionId);
+  const session = sessions().get(sessionId);
   if (!session) return null;
 
   return {
@@ -522,7 +561,7 @@ async function fillPDFNatively(
 }
 
 export async function applySignature(sessionId: string, data: SignatureData): Promise<EditResult> {
-  const session = sessions.get(sessionId);
+  const session = sessions().get(sessionId);
   if (!session) {
     return { success: false, error: 'Session not found' } as any;
   }
@@ -651,7 +690,8 @@ export async function applySignature(sessionId: string, data: SignatureData): Pr
       session.currentFileBase64 = newBase64;
       session.parsed = newParsed;
       session.updatedAt = new Date().toISOString();
-      sessions.set(sessionId, session);
+      await persistSessions();
+      sessions().set(sessionId, session);
 
       return {
         success: true,

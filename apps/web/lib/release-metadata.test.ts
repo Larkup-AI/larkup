@@ -68,7 +68,10 @@ describe('published npm metadata', () => {
       expect(webPackage.dependencies[dependency]).not.toContain('workspace:');
     }
     expect(webPackage.files).toEqual(['bin', '.next/standalone/apps/web']);
-    expect(corePackage.files).toEqual(['src', '!src/**/*.test.ts', 'CHANGELOG.md']);
+    expect(corePackage.files).toEqual(['src', '!src/**/*.test.ts', 'CHANGELOG.md', 'dist-types']);
+    expect(sandboxPackage.files).toEqual(['dist', 'Dockerfile', 'CHANGELOG.md']);
+    expect(vectorStoresPackage.files).toEqual(['src', 'CHANGELOG.md']);
+    expect(vectorStoresPackage.optionalDependencies.chromadb).toMatch(/^\^3\./);
   });
 
   it('scrubs local project state from every traced workspace before packing', () => {

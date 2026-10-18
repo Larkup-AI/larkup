@@ -1,0 +1,2 @@
+@source "./**/*.{ts,tsx}";
+@source "../dist/**/*.{js,jsx}";

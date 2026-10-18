@@ -1,3 +1,4 @@
+import { workspaceHost } from './workspace-host';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
@@ -157,6 +158,8 @@ export async function getProjectWorkspace(): Promise<ProjectWorkspace> {
 
 /** Resolves the request-scoped or active Project. */
 export async function getActiveProject(): Promise<ProjectMeta | null> {
+  const host = workspaceHost();
+  if (host) return host.project;
   const workspace = await getProjectWorkspace();
   const projectId = projectScope.getStore()?.projectId ?? workspace.activeProjectId;
   return workspace.projects.find((project) => project.id === projectId) ?? null;
@@ -164,6 +167,7 @@ export async function getActiveProject(): Promise<ProjectMeta | null> {
 
 /** Resolves the data directory for the active Project, without creating one. */
 export async function getProjectDataDir(): Promise<string | null> {
+  if (workspaceHost()) return null;
   const project = await getActiveProject();
   if (!project) return null;
   const dir = projectDir(project.id);
@@ -176,6 +180,7 @@ export async function getProjectDataDir(): Promise<string | null> {
  * one default Project so local APIs never write to an implicit global corpus.
  */
 export async function requireProjectDataDir(): Promise<string> {
+  if (workspaceHost()) throw new Error('This operation requires a workspace storage adapter.');
   const dir = await getProjectDataDir();
   if (dir) return dir;
   if (projectScope.getStore()?.projectId) {

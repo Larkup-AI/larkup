@@ -8,6 +8,7 @@ import math
 import os
 import secrets
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -87,6 +88,14 @@ def handler(event: dict[str, Any], _: Any) -> dict[str, Any]:
             return admin_device_usage(installation_id, body(event) if method == "POST" else None)
         principal = authenticate(headers(event).get("authorization"))
         if method == "POST" and path == "/v1/uploads": return create_upload(principal, body(event))
+        if method == "POST" and path == "/v1/materializations": return create_materialization(principal, body(event))
+        if path.startswith("/v1/materializations/"):
+            materialization_path = path.removeprefix("/v1/materializations/")
+            if method == "POST" and materialization_path.endswith("/ack"):
+                return acknowledge_materialization(principal, materialization_path.removesuffix("/ack").rstrip("/"))
+            materialization_id = materialization_path.rstrip("/")
+            if method == "GET": return get_materialization(principal, materialization_id)
+            if method == "DELETE": return cancel_job(principal, materialization_id)
         if method == "POST" and path == "/v1/jobs": return create_job(principal, body(event))
         if method == "GET" and path == "/v1/usage": return usage(principal)
         if method == "DELETE" and path == "/v1/jobs/active": return cancel_only_active_job(principal)
@@ -355,10 +364,43 @@ def create_upload(principal: dict[str, Any], payload: dict[str, Any]) -> dict[st
     return response(201, {"uploadId": upload_id, "uploadUrl": url, "uploadHeaders": {"Content-Type": content_type, "x-amz-server-side-encryption": "aws:kms"}})
 
 
-def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+def create_materialization(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    source_url = str(payload.get("sourceUrl") or "").strip()
+    try:
+        parsed = urllib.parse.urlparse(source_url)
+    except ValueError as error:
+        raise ApiError(400, "sourceUrl must be a public YouTube HTTPS URL") from error
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    if parsed.scheme != "https" or not (
+        hostname == "youtu.be" or hostname == "youtube.com" or hostname.endswith(".youtube.com")
+    ):
+        raise ApiError(400, "sourceUrl must be a public YouTube HTTPS URL")
+    try:
+        duration_seconds = float(payload.get("durationSecs") or 0)
+    except (TypeError, ValueError):
+        duration_seconds = 0
+    if not math.isfinite(duration_seconds) or duration_seconds < 0 or duration_seconds > 86_400:
+        raise ApiError(400, "durationSecs must be between 0 and 86400")
+    file_name = str(payload.get("fileName") or "youtube-video.mp4")[:255]
+    return create_job(
+        principal,
+        {
+            "source": {
+                "url": source_url,
+                "durationSecs": duration_seconds or 1,
+                "fileName": file_name,
+            },
+            "brief": {},
+        },
+        operation="materialize",
+    )
+
+
+def create_job(principal: dict[str, Any], payload: dict[str, Any], operation: str = "index") -> dict[str, Any]:
     if not PROCESSING_ENABLED: raise ApiError(503, "GPU processing is temporarily unavailable", {"Retry-After": "300"})
     source, brief = payload.get("source") or {}, payload.get("brief") or {}
-    model_configuration = worker_model_configuration(payload.get("modelConfiguration"))
+    materialize_only = operation == "materialize"
+    model_configuration = {} if materialize_only else worker_model_configuration(payload.get("modelConfiguration"))
     # A caller that already holds a durable canonical copy (the web app's own
     # S3StorageProvider) supplies source.url directly instead of re-uploading
     # through this control plane's short-lived sources/ prefix -- this is
@@ -413,9 +455,20 @@ def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, 
         timeline_duration_seconds = max(
             timeline_duration_seconds, furthest_requested_second + 1.0
         )
-    estimate, (period, period_start, period_end) = max(0.01, duration_seconds / 60), billing_period()
+    estimate, (period, period_start, period_end) = (0.01 if materialize_only else max(0.01, duration_seconds / 60)), billing_period()
     job_id, created_at = "job_" + secrets.token_hex(12), now_iso()
     source_url = external_source_url or s3.generate_presigned_url("get_object", Params={"Bucket": BUCKET, "Key": upload["sourceKey"]}, ExpiresIn=3600)
+    materialized_source_key = f"materialized/{principal['id']}/{job_id}.mp4" if materialize_only else ""
+    materialized_source_upload_url = s3.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": BUCKET,
+            "Key": materialized_source_key,
+            "ContentType": "video/mp4",
+            "ServerSideEncryption": "aws:kms",
+        },
+        ExpiresIn=21_600,
+    ) if materialize_only else ""
     webhook_url = str(payload.get("webhookUrl") or "")
     if webhook_url and not webhook_url.startswith("https://"): raise ApiError(400, "webhookUrl must be an HTTPS URL")
     provider_endpoint_id = (
@@ -423,7 +476,7 @@ def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, 
         if GPU_PROVIDER == "runpod" and brief.get("interactive") is True
         else ""
     )
-    job_item = {"pk": {"S": f"JOB#{job_id}"}, "sk": {"S": "JOB"}, "principalId": {"S": principal["id"]}, "status": {"S": "queued"}, **({"sourceKey": {"S": upload["sourceKey"]}} if upload else {}), **({"webhookUrl": {"S": webhook_url}} if webhook_url else {}), **({"providerEndpointId": {"S": provider_endpoint_id}} if provider_endpoint_id else {}), "briefJson": {"S": json.dumps(brief, separators=(",", ":"))}, "estimatedSourceMinutes": {"N": str(estimate)}, "period": {"S": period}, "createdAt": {"S": created_at}, "updatedAt": {"S": created_at}, "lastProgressAt": {"S": created_at}, "retainSourceHours": {"N": "0"}, "progressJson": {"S": json.dumps({"stage": "queued", "percent": 0, "message": "Waiting for Larkup Cloud processing capacity"})}}
+    job_item = {"pk": {"S": f"JOB#{job_id}"}, "sk": {"S": "JOB"}, "principalId": {"S": principal["id"]}, "status": {"S": "queued"}, **({"operation": {"S": operation}, "materializedSourceKey": {"S": materialized_source_key}} if materialize_only else {}), **({"sourceKey": {"S": upload["sourceKey"]}} if upload else {}), **({"webhookUrl": {"S": webhook_url}} if webhook_url else {}), **({"providerEndpointId": {"S": provider_endpoint_id}} if provider_endpoint_id else {}), "briefJson": {"S": json.dumps(brief, separators=(",", ":"))}, "estimatedSourceMinutes": {"N": str(estimate)}, "period": {"S": period}, "createdAt": {"S": created_at}, "updatedAt": {"S": created_at}, "lastProgressAt": {"S": created_at}, "retainSourceHours": {"N": "0"}, "progressJson": {"S": json.dumps({"stage": "queued", "percent": 0, "message": "Waiting for Larkup Cloud processing capacity"})}}
     source_limit = principal["entitlement"].get("sourceMinutesPerMonth")
     reconcile_usage_limit(principal["id"], period, period_start, period_end, source_limit)
     available, usage_key = Decimal(str(source_limit if source_limit is not None else 1_000_000_000)), f"USAGE#{principal['id']}#{period}"
@@ -496,7 +549,16 @@ def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, 
                 "sourceUrl": source_url,
                 "sourceDurationSecs": timeline_duration_seconds,
                 "brief": brief,
-                "modelConfiguration": model_configuration,
+                **({"modelConfiguration": model_configuration} if not materialize_only else {}),
+                **({
+                    "operation": "materialize",
+                    "materializedSourceUploadUrl": materialized_source_upload_url,
+                    "materializedSourceUploadHeaders": {
+                        "Content-Type": "video/mp4",
+                        "x-amz-server-side-encryption": "aws:kms",
+                    },
+                    "fileName": str(source.get("fileName") or "youtube-video.mp4")[:255],
+                } if materialize_only else {}),
             },
             gpu_type=os.getenv("LARKUP_VIDEO_GPU_TYPE", ""),
         )
@@ -504,7 +566,7 @@ def create_job(principal: dict[str, Any], payload: dict[str, Any]) -> dict[str, 
         table.update_item(Key={"pk": f"JOB#{job_id}", "sk": "JOB"}, UpdateExpression="SET providerName = :provider, instanceId = :instance", ExpressionAttributeValues={":provider": GPU_PROVIDER, ":instance": instance_id})
     except Exception as error:
         settle_failure(job_id, "Larkup Cloud could not start video indexing. Please retry."); raise ApiError(502, "Larkup Cloud could not start video indexing. Please retry.") from error
-    return get_job(principal, job_id, 202)
+    return get_materialization(principal, job_id, 202) if materialize_only else get_job(principal, job_id, 202)
 
 
 def provider_for(name: str, endpoint_id: str = ""):
@@ -576,6 +638,58 @@ def get_job(principal: dict[str, Any], job_id: str, status_code: int = 200) -> d
         sync_job(item); item = table.get_item(Key={"pk": f"JOB#{job_id}", "sk": "JOB"}, ConsistentRead=True)["Item"]
     result_url = s3.generate_presigned_url("get_object", Params={"Bucket": BUCKET, "Key": item["resultKey"]}, ExpiresIn=900) if item.get("resultKey") else None
     return response(status_code, {"id": job_id, "status": item["status"], "createdAt": item["createdAt"], "updatedAt": item["updatedAt"], "progress": json.loads(item["progressJson"]), "estimatedSourceMinutes": item["estimatedSourceMinutes"], "result": None, "resultUrl": result_url, "error": item.get("error")})
+
+
+def get_materialization(principal: dict[str, Any], job_id: str, status_code: int = 200) -> dict[str, Any]:
+    item = table.get_item(Key={"pk": f"JOB#{job_id}", "sk": "JOB"}, ConsistentRead=True).get("Item")
+    if not item or item.get("principalId") != principal["id"] or item.get("operation") != "materialize":
+        raise ApiError(404, "materialization not found")
+    if item["status"] in {"queued", "running"} and item.get("instanceId"):
+        sync_job(item)
+        item = table.get_item(Key={"pk": f"JOB#{job_id}", "sk": "JOB"}, ConsistentRead=True)["Item"]
+    source = None
+    if item.get("status") == "completed" and item.get("resultKey") and item.get("materializedSourceKey"):
+        result_body = s3.get_object(Bucket=BUCKET, Key=item["resultKey"])["Body"].read()
+        result = json.loads(result_body)
+        source = {
+            "url": s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": BUCKET, "Key": item["materializedSourceKey"]},
+                ExpiresIn=900,
+            ),
+            "fileName": str(result.get("fileName") or "youtube-video.mp4")[:255],
+            "mimeType": str(result.get("mimeType") or "video/mp4")[:120],
+            "sizeBytes": int(result.get("sizeBytes") or 0),
+            "durationSecs": float(result.get("durationSecs") or 0),
+        }
+    return response(status_code, {
+        "id": job_id,
+        "status": item["status"],
+        "createdAt": item["createdAt"],
+        "updatedAt": item["updatedAt"],
+        "progress": json.loads(item["progressJson"]),
+        "source": source,
+        "error": item.get("error"),
+    })
+
+
+def acknowledge_materialization(principal: dict[str, Any], job_id: str) -> dict[str, Any]:
+    item = table.get_item(Key={"pk": f"JOB#{job_id}", "sk": "JOB"}, ConsistentRead=True).get("Item")
+    if not item or item.get("principalId") != principal["id"] or item.get("operation") != "materialize":
+        raise ApiError(404, "materialization not found")
+    if item.get("status") != "completed":
+        raise ApiError(409, "materialization is not ready")
+    if item.get("materializedSourceKey"):
+        s3.delete_object(Bucket=BUCKET, Key=item["materializedSourceKey"])
+    acknowledged = acknowledge_result(principal, job_id)
+    try:
+        table.update_item(
+            Key={"pk": item["pk"], "sk": item["sk"]},
+            UpdateExpression="REMOVE materializedSourceKey",
+        )
+    except ClientError:
+        pass
+    return acknowledged
 
 
 def acknowledge_result(principal: dict[str, Any], job_id: str) -> dict[str, Any]:
@@ -664,7 +778,17 @@ def sync_job(item: dict[str, Any]) -> None:
         result["jobId"] = item["pk"][4:]
         result_key = f"results/{item['principalId']}/{item['pk'][4:]}.json"
         s3.put_object(Bucket=BUCKET, Key=result_key, Body=json.dumps(result, separators=(",", ":")).encode("utf-8"), ContentType="application/json", ServerSideEncryption="aws:kms")
-        settle(item, "completed", float(output.get("actualSourceMinutes") or item["estimatedSourceMinutes"]), result_key=result_key)
+        actual_source_minutes = output.get("actualSourceMinutes")
+        settle(
+            item,
+            "completed",
+            float(
+                item["estimatedSourceMinutes"]
+                if actual_source_minutes is None
+                else actual_source_minutes
+            ),
+            result_key=result_key,
+        )
     elif status.state == InstanceState.FAILED:
         print(
             json.dumps(
@@ -863,6 +987,11 @@ def settle(item: dict[str, Any], status: str, actual: float, result_key: str | N
     # its own to delete. The caller's own canonical store governs that
     # source's retention instead.
     if item.get("sourceKey") and int(item.get("retainSourceHours", 0)) == 0: s3.delete_object(Bucket=BUCKET, Key=item["sourceKey"])
+    # Materialization is only a short-lived bridge into the caller's durable
+    # platform store. A failed or cancelled transfer must never leave customer
+    # media behind in this control plane's bucket.
+    if status != "completed" and item.get("operation") == "materialize" and item.get("materializedSourceKey"):
+        s3.delete_object(Bucket=BUCKET, Key=item["materializedSourceKey"])
     deliver_webhook(item, status, error)
 
 

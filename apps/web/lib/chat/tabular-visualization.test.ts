@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createTabularVisualization } from './tabular-visualization';
+import {
+  createTabularVisualization,
+  formatTabularVisualizationAnswer,
+} from './tabular-visualization';
 
 describe('createTabularVisualization', () => {
   it('uses a line chart for a time trend', () => {
@@ -14,7 +17,7 @@ describe('createTabularVisualization', () => {
     ).toMatchObject({
       chartType: 'line',
       xAxisKey: 'Date_month',
-      series: [{ dataKey: 'sum_Revenue', label: 'sum Revenue' }],
+      series: [{ dataKey: 'sum_Revenue', label: 'Revenue' }],
     });
   });
 
@@ -85,5 +88,31 @@ describe('createTabularVisualization', () => {
       xAxisKey: 'Year',
       series: [{ dataKey: 'Modeled integration cost' }],
     });
+  });
+});
+
+describe('formatTabularVisualizationAnswer', () => {
+  it('summarizes chart peaks without dumping source rows', () => {
+    const answer = formatTabularVisualizationAnswer({
+      visualization: {
+        chartType: 'line',
+        title: 'Monthly Sales and Profit trends',
+        data: [
+          { month: '2025-01', sales: 100, profit: 15 },
+          { month: '2025-02', sales: 180, profit: 22 },
+        ],
+        xAxisKey: 'month',
+        series: [
+          { dataKey: 'sales', label: 'Sales' },
+          { dataKey: 'profit', label: 'Profit' },
+        ],
+        showLegend: true,
+      },
+    });
+
+    expect(answer).toBe(
+      'Here’s the requested chart: Monthly Sales and Profit trends. Sales peaks at 180 in Feb 2025; Profit peaks at 22 in Feb 2025.',
+    );
+    expect(answer).not.toContain('sales:');
   });
 });

@@ -1,0 +1,12 @@
+---
+title: Shared Cloud packages
+description: UI and runtime package boundaries between Local and Cloud
+---
+
+`@larkup/workspace-ui` owns General settings presentation, provider icons, form controls, workspace layout primitives, and themes. Local supplies its settings state and cache controls. Cloud supplies authenticated account persistence and encrypted provider-connection adapters. The browser package never imports filesystem stores or provider secrets.
+
+`@larkup/runtime-kit` owns the generated chat widget and React/JavaScript integration examples. Local generated agent servers and Cloud managed deployments serve the same widget script. Each runtime owns its authentication and allowed origins. Cloud widget keys are restricted to a single agent; deployment control-plane credentials never enter the browser.
+
+Develop Cloud with the repositories checked out side by side. Cloud's pnpm `link:` dependencies import these packages directly. The Cloud development command builds and watches the UI package, and production packaging packs current package output into a disposable release artifact. No shared package snapshots are checked into Cloud.
+
+This boundary does not yet migrate Local chat transport, corpus/groups, integration readers, or the full tool runtime into Cloud. Their filesystem APIs need explicit tenant-scoped storage adapters before those pages can become shared wrappers.

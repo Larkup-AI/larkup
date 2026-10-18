@@ -25,7 +25,8 @@
       "types": "./dist/runtime.d.ts",
       "import": "./dist/runtime.js",
       "default": "./dist/runtime.js"
-    }
+    },
+    "./manifest": "./tool.manifest.json"
   },
   "bin": {
     "larkup-video-intelligence": "./scripts/runtime.mjs"

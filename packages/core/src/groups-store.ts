@@ -1,3 +1,4 @@
+import { workspaceHost } from './workspace-host';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -62,6 +63,8 @@ async function writeGroupsFile(file: string, groups: DataGroup[]): Promise<void>
 
 /** Reads all groups for the active Project. */
 export async function readGroups(): Promise<DataGroup[]> {
+  const host = workspaceHost();
+  if (host) return host.readGroups();
   const file = await groupsFile();
   if (!file) return [];
   try {
@@ -94,6 +97,11 @@ export async function resolveGroupId(value: string | null | undefined): Promise<
 }
 
 async function writeGroups(groups: DataGroup[]): Promise<DataGroup[]> {
+  const host = workspaceHost();
+  if (host) {
+    await host.writeGroups(groups);
+    return groups;
+  }
   const file = await groupsFile();
   if (!file) throw new Error('An active Project is required.');
   await writeGroupsFile(file, groups);

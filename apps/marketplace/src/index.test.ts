@@ -1,6 +1,5 @@
 /** Use the local Marketplace database for contract tests. */
 import { config as loadEnv } from 'dotenv';
-import { connect } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,18 +22,12 @@ if (databaseUrl && !/localhost|127\.0\.0\.1/.test(databaseUrl)) {
  */
 async function marketplaceDbIsReachable(): Promise<boolean> {
   if (!databaseUrl) return false;
-  const { hostname, port } = new URL(databaseUrl);
-  return await new Promise((resolve) => {
-    const socket = connect({ host: hostname, port: Number(port || 5432) });
-    const settle = (reachable: boolean) => {
-      socket.destroy();
-      resolve(reachable);
-    };
-    socket.setTimeout(2_000);
-    socket.once('connect', () => settle(true));
-    socket.once('timeout', () => settle(false));
-    socket.once('error', () => settle(false));
-  });
+  try {
+    await getMarketplaceDb(databaseUrl).execute(sql`select 1`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const hasDb = await marketplaceDbIsReachable();
@@ -56,7 +49,7 @@ import {
   publishers,
   workspaceInstallations,
 } from '@larkup/marketplace/db/schema';
-import { inArray } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import app from './index.js';
 

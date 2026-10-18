@@ -6,6 +6,7 @@ import {
   ffprobeExecutable,
   hasInflatedPlaybackTimeline,
   inspectYouTubeMetadata,
+  inspectYouTubeWatchUrl,
   parseYoutubeJson3Transcript,
   parseYtDlpProgress,
   resolveYtDlpMediaPath,
@@ -56,6 +57,24 @@ describe('inspectYouTubeMetadata', () => {
 
     expect(inspection.singleItemDurationSecs).toBe(1_800);
     expect(inspection.singleItemUrl).toBe('https://www.youtube.com/watch?v=first-id');
+  });
+});
+
+describe('inspectYouTubeWatchUrl', () => {
+  it('stages a single public watch URL without inventing unavailable metadata', () => {
+    expect(inspectYouTubeWatchUrl('https://www.youtube.com/watch?v=Engi4swCSDw')).toEqual({
+      originalUrl: 'https://www.youtube.com/watch?v=Engi4swCSDw',
+      singleItemUrl: 'https://www.youtube.com/watch?v=Engi4swCSDw',
+      entryCount: 1,
+      mediaType: 'video',
+      isYouTube: true,
+    });
+  });
+
+  it('does not collapse a playlist-only URL into an unverified video', () => {
+    expect(
+      inspectYouTubeWatchUrl('https://www.youtube.com/playlist?list=playlist-id'),
+    ).toBeUndefined();
   });
 });
 
@@ -157,6 +176,16 @@ describe('selectYoutubeCaptionLanguage', () => {
     expect(
       selectYoutubeCaptionLanguage({
         language: 'ar',
+        automatic_captions: { en: [{}], 'ar-orig': [{}] },
+      }),
+    ).toBe('ar-orig');
+  });
+
+  it('keeps the source-language automatic caption ahead of a translated manual track', () => {
+    expect(
+      selectYoutubeCaptionLanguage({
+        language: 'ar',
+        subtitles: { en: [{}] },
         automatic_captions: { en: [{}], 'ar-orig': [{}] },
       }),
     ).toBe('ar-orig');

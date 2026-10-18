@@ -51,3 +51,5 @@ export type {
   EditorSession,
   EditResult,
 } from './types.js';
+
+export { runWithDocumentSessions } from './editor.js';
