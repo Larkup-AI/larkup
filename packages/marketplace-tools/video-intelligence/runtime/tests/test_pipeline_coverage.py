@@ -10,11 +10,20 @@ from app.services.pipeline import (
     _link_chronological_notes,
     _reconciled_visible_subjects,
     _require_semantic_coverage,
+    source_language_for_brief,
 )
 from app.db.schemas import VideoIndexingBrief
 
 
 class SemanticCoverageGateTests(unittest.TestCase):
+    def test_source_caption_language_survives_when_worker_skips_transcription(self) -> None:
+        self.assertEqual(source_language_for_brief({"language": "ar"}), "ar")
+        self.assertEqual(
+            source_language_for_brief({"language": "auto", "detectedLanguage": "ar-EG"}),
+            "ar-EG",
+        )
+        self.assertIsNone(source_language_for_brief({"language": "auto"}))
+
     def test_anonymous_presence_ledger_keeps_measurement_separate_from_identity(self) -> None:
         ledger = _anonymous_presence_ledger(
             [

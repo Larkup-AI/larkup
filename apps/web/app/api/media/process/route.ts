@@ -1116,6 +1116,7 @@ async function processMediaWithTool(
       // in the same final step. An earlier failure leaves old IDs untouched.
       const publishedAsset = await updateMediaAsset(asset.id, {
         processingStatus: 'completed',
+        sourceLanguage: transcript?.language ?? asset.sourceLanguage,
         caption: summary.slice(0, 600),
         durationSecs: preserveDurationSecs(asset, result.meta.durationSecs),
         dimensions: { width: result.meta.width, height: result.meta.height },
@@ -1299,6 +1300,7 @@ async function processMediaWithTool(
       }
       const publishedAsset = await updateMediaAsset(asset.id, {
         processingStatus: 'completed',
+        sourceLanguage: transcript.language ?? asset.sourceLanguage,
         caption: summary.slice(0, 600),
         durationSecs: preserveDurationSecs(asset, transcript.durationSecs),
         documentIds,
@@ -1561,6 +1563,7 @@ async function processWithInstalledVideoIntelligence(
     }
     const published = await updateMediaAsset(asset.id, {
       processingStatus: 'completed',
+      sourceLanguage: evidence.detectedLanguage ?? asset.sourceLanguage,
       processingProgress: 100,
       processingMessage: undefined,
       caption: summary.slice(0, 600),

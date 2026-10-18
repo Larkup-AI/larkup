@@ -32,6 +32,8 @@ export interface AgentToolExecutionContext {
           durationSecs?: number;
           fileName?: string;
           originalUrl?: string;
+          /** Detected/source-supplied language used for default chat answers. */
+          sourceLanguage?: string;
         }
       | undefined
     >;

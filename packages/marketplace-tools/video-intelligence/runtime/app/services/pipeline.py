@@ -51,6 +51,12 @@ from app.services.vision import SemanticVisionService
 ProgressDetails = dict[str, int | float | str]
 ProgressCallback = Callable[[str, int, str, int, ProgressDetails], None]
 
+
+def source_language_for_brief(brief: dict[str, Any]) -> str | None:
+    """Return authoritative host/caption language until live STT supersedes it."""
+    configured = str(brief.get("detectedLanguage") or brief.get("language") or "").strip()
+    return configured if configured and configured.lower() != "auto" else None
+
 COCO_LABELS = (
     "person bicycle car motorcycle airplane bus train truck boat traffic-light fire-hydrant "
     "stop-sign parking-meter bench bird cat dog horse sheep cow elephant bear zebra giraffe "
@@ -1506,7 +1512,12 @@ def _run_pipeline(
         for segment in (brief.get("transcriptContext") or [])
         if isinstance(segment, dict)
     ]
-    detected_language: str | None = None
+    # A host may supply a timestamped caption timeline from the source (for
+    # example an official YouTube caption track). In that case transcription
+    # is intentionally skipped, but the source language is still authoritative
+    # metadata for every downstream note and chat answer. A fresh transcription
+    # detection below supersedes this initial value when audio is decoded.
+    detected_language = source_language_for_brief(brief)
     transcription_error: BaseException | None = None
     transcription_units = {"completed": 0, "total": 1}
     transcription_units_lock = threading.Lock()
