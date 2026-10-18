@@ -46,7 +46,7 @@ class JobModelConfigurationTests(unittest.TestCase):
                 self.assertEqual(os.environ["LARKUP_VIDEO_AGENT_API_KEY"], "user-brain")
                 self.assertEqual(os.environ["LARKUP_VIDEO_VISION_API_KEY"], "user-vision")
                 self.assertEqual(os.environ["AI_GATEWAY_API_KEY"], "user-vision")
-                self.assertEqual(os.environ["LARKUP_VIDEO_TRANSCRIPTION_FALLBACK"], "")
+                self.assertEqual(os.environ["LARKUP_VIDEO_TRANSCRIPTION_FALLBACK"], "whisper")
                 self.assertEqual(os.environ["LARKUP_VIDEO_EMBEDDING_PROVIDER"], "disabled")
             self.assertEqual(os.environ["DEEPGRAM_API_KEY"], "operator-audio")
             self.assertEqual(os.environ["LARKUP_VIDEO_AGENT_API_KEY"], "operator-brain")
