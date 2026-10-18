@@ -1,5 +1,5 @@
 # Builds the candidate package for this native runner, installs its tarball into
-# an empty npm prefix, then verifies the bundled ffprobe binary and server.
+# an isolated npm project, then verifies the bundled ffprobe binary and server.
 $ErrorActionPreference = 'Stop'
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
@@ -41,17 +41,30 @@ try {
     $env:APPDATA = Join-Path $TestRoot 'appdata'
     $env:LOCALAPPDATA = Join-Path $TestRoot 'localappdata'
     $env:NPM_CONFIG_CACHE = Join-Path $TestRoot 'npm-cache'
-    $env:NPM_CONFIG_PREFIX = Join-Path $TestRoot 'npm-prefix'
-    New-Item -ItemType Directory -Path $env:HOME, $env:APPDATA, $env:LOCALAPPDATA, $env:NPM_CONFIG_CACHE, (Join-Path $env:NPM_CONFIG_PREFIX 'bin'), (Join-Path $env:NPM_CONFIG_PREFIX 'lib') -Force | Out-Null
+    New-Item -ItemType Directory -Path $env:HOME, $env:APPDATA, $env:LOCALAPPDATA, $env:NPM_CONFIG_CACHE -Force | Out-Null
     $candidateTarballs = @(Get-ChildItem -Path $TestRoot -Filter '*.tgz' | ForEach-Object { $_.FullName })
-    npm install -g --prefix $env:NPM_CONFIG_PREFIX --no-audit --no-fund @candidateTarballs | Out-Null
 
-    $npmPrefix = @($env:NPM_CONFIG_PREFIX, (Join-Path $env:APPDATA 'npm')) |
-        Where-Object { $_ -and (Test-Path (Join-Path $_ 'larkup.cmd')) } |
-        Select-Object -First 1
-    if (-not $npmPrefix) { throw 'The candidate install did not create larkup.cmd.' }
-    $env:Path = "$npmPrefix;$env:Path"
-    & larkup --version
+    # Candidate workspace packages may not be published yet. Installing their
+    # tarballs as CLI arguments still makes npm resolve nested dependencies
+    # through the registry, so create an isolated manifest with file overrides.
+    $dependencies = [ordered]@{}
+    $overrides = [ordered]@{}
+    foreach ($tarball in $candidateTarballs) {
+        $manifest = (& tar -xOf $tarball 'package/package.json' | ConvertFrom-Json)
+        $spec = "file:$tarball"
+        $dependencies[$manifest.name] = $spec
+        if ($manifest.name.StartsWith('@larkup/')) { $overrides[$manifest.name] = $spec }
+    }
+    @{ private = $true; dependencies = $dependencies; overrides = $overrides } |
+        ConvertTo-Json -Depth 4 |
+        Set-Content -Path (Join-Path $TestRoot 'package.json') -NoNewline
+    Push-Location $TestRoot
+    try { npm install --no-audit --no-fund | Out-Null } finally { Pop-Location }
+
+    $localBin = Join-Path $TestRoot 'node_modules/.bin'
+    if (-not (Test-Path (Join-Path $localBin 'larkup.cmd'))) { throw 'The candidate install did not create larkup.cmd.' }
+    $env:Path = "$localBin;$env:Path"
+    & (Join-Path $localBin 'larkup.cmd') --version
     if ($LASTEXITCODE -ne 0) { throw 'The candidate larkup command did not report a version.' }
 
     $probeScript = Join-Path $TestRoot 'verify-ffprobe.cjs'
@@ -69,10 +82,7 @@ const result = spawnSync(ffprobe.path, ['-version'], { encoding: 'utf8' });
 if (result.status !== 0) throw new Error(result.stderr || 'Bundled ffprobe did not start.');
 console.log(`Bundled ffprobe is executable: ${ffprobe.path}`);
 '@ | Set-Content -Path $probeScript -NoNewline
-    $installedPackage = @(
-        (Join-Path $env:NPM_CONFIG_PREFIX 'node_modules/larkup'),
-        (Join-Path $env:NPM_CONFIG_PREFIX 'lib/node_modules/larkup')
-    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    $installedPackage = Join-Path $TestRoot 'node_modules/larkup'
     if (-not $installedPackage) { throw 'The candidate Larkup package directory was not found.' }
     & node $probeScript $installedPackage
     if ($LASTEXITCODE -ne 0) { throw 'The candidate bundled ffprobe did not run.' }
@@ -81,7 +91,7 @@ console.log(`Bundled ffprobe is executable: ${ffprobe.path}`);
     $stderrPath = Join-Path $TestRoot 'larkup.stderr.log'
     $env:PORT = '4568'
     $env:LARKUP_NO_OPEN = '1'
-    $ServerProcess = Start-Process -FilePath 'larkup.cmd' -ArgumentList 'start' -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru
+    $ServerProcess = Start-Process -FilePath (Join-Path $localBin 'larkup.cmd') -ArgumentList 'start' -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
         try {
             $response = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:4568/' -TimeoutSec 2

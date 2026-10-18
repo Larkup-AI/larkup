@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Builds the candidate package for this native runner, installs its tarball into
-# an empty npm prefix, then verifies the bundled ffprobe binary and server.
+# an isolated npm project, then verifies the bundled ffprobe binary and server.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/larkup-candidate-install.XXXXXX")"
@@ -61,18 +61,37 @@ fi
 
 export HOME="$TEST_ROOT/home"
 export NPM_CONFIG_CACHE="$TEST_ROOT/npm-cache"
-export NPM_CONFIG_PREFIX="$TEST_ROOT/npm-prefix"
-mkdir -p "$HOME" "$NPM_CONFIG_CACHE" "$NPM_CONFIG_PREFIX/bin" "$NPM_CONFIG_PREFIX/lib"
+mkdir -p "$HOME" "$NPM_CONFIG_CACHE"
 CANDIDATE_TARBALLS=()
 while IFS= read -r -d '' tarball; do
   CANDIDATE_TARBALLS+=("$tarball")
 done < <(find "$TEST_ROOT" -maxdepth 1 -name '*.tgz' -print0)
-npm install -g --prefix "$NPM_CONFIG_PREFIX" --no-audit --no-fund "${CANDIDATE_TARBALLS[@]}" >/dev/null
-export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
+
+# Candidate workspace packages may not be published yet. Installing their
+# tarballs as CLI arguments still makes npm resolve nested dependencies through
+# the registry, so create an isolated manifest with file overrides instead.
+node - "$TEST_ROOT" "${CANDIDATE_TARBALLS[@]}" <<'NODE'
+const { execFileSync } = require('node:child_process');
+const { writeFileSync } = require('node:fs');
+const { join } = require('node:path');
+
+const [testRoot, ...tarballs] = process.argv.slice(2);
+const dependencies = {};
+const overrides = {};
+for (const tarball of tarballs) {
+  const manifest = JSON.parse(execFileSync('tar', ['-xOf', tarball, 'package/package.json'], { encoding: 'utf8' }));
+  const spec = `file:${tarball}`;
+  dependencies[manifest.name] = spec;
+  if (manifest.name.startsWith('@larkup/')) overrides[manifest.name] = spec;
+}
+writeFileSync(join(testRoot, 'package.json'), JSON.stringify({ private: true, dependencies, overrides }, null, 2));
+NODE
+(cd "$TEST_ROOT" && npm install --no-audit --no-fund >/dev/null)
+export PATH="$TEST_ROOT/node_modules/.bin:$PATH"
 command -v larkup
 larkup --version
 
-INSTALLED_PACKAGE="$NPM_CONFIG_PREFIX/lib/node_modules/larkup"
+INSTALLED_PACKAGE="$TEST_ROOT/node_modules/larkup"
 NODE_BIN="$(command -v node)"
 "$NODE_BIN" - "$INSTALLED_PACKAGE" <<'NODE'
 const { spawnSync } = require('node:child_process');
