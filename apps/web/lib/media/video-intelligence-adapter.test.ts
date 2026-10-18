@@ -308,12 +308,43 @@ describe('formatVideoKnowledgeSummary', () => {
       answeringGuide: { importantEntities: [], questionsToPrepareFor: [], instruction: '' },
     });
 
-    expect(result).toContain('[1:35–1:41] Event: A key action is shown.');
+    expect(result).toContain('[1:35–1:41] A key action is shown.');
     expect(result).toContain(
       '[1:30–1:50] The named speaker introduces the topic before the first action.',
     );
-    expect(result).toContain('[1:00:50–1:01:10] State: The displayed state changes.');
+    expect(result).toContain('[1:00:50–1:01:10] The displayed state changes.');
     expect(result).toContain('One identity remains unverified.');
+  });
+
+  it('does not inject English headings into Arabic source-language notes', () => {
+    const result = formatVideoKnowledgeSummary({
+      durationMs: 30_000,
+      video: { width: 1920, height: 1080, fps: 30 },
+      transcript: [],
+      visualObservations: [],
+      tracks: [],
+      knowledgeSummary: {
+        overview: 'تظهر المغنية على المسرح وتبدأ الأغنية.',
+        participants: [],
+        stateHistory: [],
+        keyEvents: [
+          {
+            startMs: 5_000,
+            endMs: 9_000,
+            event: 'تتحرك الكاميرا إلى لقطة قريبة.',
+            confidence: 'direct',
+          },
+        ],
+        narrative: [],
+        context: [],
+        uncertainties: [],
+      },
+      answeringGuide: { importantEntities: [], questionsToPrepareFor: [], instruction: '' },
+    });
+
+    expect(result).toContain('تظهر المغنية على المسرح وتبدأ الأغنية.');
+    expect(result).toContain('[0:05–0:09] تتحرك الكاميرا إلى لقطة قريبة.');
+    expect(result).not.toMatch(/Overview:|Event:|State:|Clean timeline:/);
   });
 });
 

@@ -361,6 +361,8 @@ export interface MediaAsset {
   /** Start time of the current processing attempt; reset on retry/re-index. */
   processingStartedAt?: string;
   processingHeartbeatAt?: string;
+  /** Detected or source-supplied language of spoken/video content. */
+  sourceLanguage?: string;
   caption?: string;
   documentIds: string[];
   pendingDocumentIds?: string[];
