@@ -532,7 +532,7 @@
     "access": "public"
   },
   "scripts": {
-    "type-check": "tsc --noEmit",
+    "type-check": "node scripts/build-assets.mjs && tsc --noEmit",
     "test": "node scripts/build-assets.mjs && node --import tsx --test tests/*.test.ts",
     "build": "node scripts/build-assets.mjs && tsc -p tsconfig.build.json"
   },
