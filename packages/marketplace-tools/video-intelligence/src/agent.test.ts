@@ -61,6 +61,7 @@ function evidenceContext(overrides: {
   ) => Promise<Hit[]> | Hit[];
   durationSecs?: number;
   fileName?: string;
+  sourceLanguage?: string;
   planInvestigation?: () => Promise<unknown>;
   reWatch?: (...args: any[]) => Promise<unknown>;
   scan?: (...args: any[]) => Promise<unknown>;
@@ -75,6 +76,7 @@ function evidenceContext(overrides: {
         processingStatus: 'completed',
         durationSecs: overrides.durationSecs ?? 120,
         fileName: overrides.fileName,
+        sourceLanguage: overrides.sourceLanguage,
       }),
       planQuestion: () => overrides.plan,
       ...(overrides.planInvestigation ? { planInvestigation: overrides.planInvestigation } : {}),
@@ -125,6 +127,21 @@ describe('Video Intelligence chat extension', () => {
     expect(queryTool?.systemPromptFragment).toContain(
       'reconciled frame-grounded visibility ledger',
     );
+  });
+
+  it('returns the detected source language and requires source-language answers by default', async () => {
+    const queryTool = AGENT_TOOLS.find((item) => item.name === 'queryVideoEvidence');
+    expect(queryTool?.systemPromptFragment).toContain('sourceLanguage');
+    const result = (await agentClient(vi.fn() as any).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'ما الذي تقوله المغنية؟' },
+      evidenceContext({
+        sourceLanguage: 'ar',
+        plan: { kinds: ['speech'], requiresInspectionWhenInsufficient: false },
+        search: () => [hit('arabic-speech', 10, 'أنا هنا معك.')],
+      }),
+    )) as any;
+
+    expect(result).toMatchObject({ success: true, sourceLanguage: 'ar' });
   });
 
   it('forwards the model-issued investigation directive without interpreting question language', async () => {
