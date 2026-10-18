@@ -1495,6 +1495,19 @@ class SemanticVisionService:
                 )
                 if part
             )
+        source_language = str(
+            brief.get("detectedLanguage") or brief.get("language") or ""
+        ).strip()
+        if source_language and source_language.casefold() != "auto":
+            goal = "\n".join(
+                part
+                for part in (
+                    goal,
+                    "Write every generated note and event in the source language "
+                    f"({source_language}); translate only when explicitly requested.",
+                )
+                if part
+            )
         requests_ = [
             ClipCaptionRequest(clip_id=clip_id, start_ms=start_ms, end_ms=end_ms, frames=frames)
             for clip_id, (start_ms, end_ms, frames) in clips.items()
