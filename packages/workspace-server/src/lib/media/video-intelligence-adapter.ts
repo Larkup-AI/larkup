@@ -30,12 +30,29 @@ export class VideoWorkerTimeoutError extends Error {
  * source-minute reservation, so a fresh worker can safely retry it. Keep this
  * deliberately narrow: transport errors may leave the original job running,
  * while configuration, quota, and evidence errors need user action instead.
+ *
+ * Safe to retry:
+ * - Larkup Cloud wrapper messages (previous-generation worker responses)
+ * - Model API overload / capacity errors from the upstream vision/LLM gateway
+ * - Stall-timeout: the job was explicitly cancelled before throwing, so no
+ *   duplicate run is left alive on the worker
+ * - Source ingestion failures where the worker dropped the job before ingesting
+ *   (status === 'failed' at the prepare stage, not a user-data error)
  */
 export function isRetryableManagedVideoWorkerFailure(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? '');
+  if (error instanceof VideoWorkerTimeoutError) return true;
   return (
+    // Legacy Larkup Cloud wrapper messages
     message.includes('Larkup Cloud could not complete this video') ||
-    message.includes('Larkup Cloud completed without a result')
+    message.includes('Larkup Cloud completed without a result') ||
+    // Modal GPU worker: upstream model capacity error
+    message.includes('model API is currently overloaded') ||
+    message.includes('may experience intermittent errors') ||
+    // Stall-timeout: job was cancelled before throwing — safe to resubmit
+    message.includes('stopped reporting progress for') ||
+    // Generic transient source ingestion drop (before any user data is processed)
+    message.includes('Video indexing ended with status failed')
   );
 }
 
