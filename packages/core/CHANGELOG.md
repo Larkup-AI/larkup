@@ -1,5 +1,20 @@
 # @larkup/core
 
+## 0.8.0
+
+### Minor Changes
+
+- d515b4c: Share the chat API, tool selection and data algorithms across hosts using request-scoped persistence adapters.
+
+### Patch Changes
+
+- d515b4c: Render exact whole-recording speech as a modality-filtered, cursor-paged table so long transcripts remain complete without entering the answer model context.
+- d515b4c: Share the workspace model status API algorithm across Local and Cloud hosts.
+- d515b4c: Extract the generated chat widget and React integration examples into a dependency-free shared runtime package for Local and Cloud.
+- Updated dependencies [0837ebc]
+- Updated dependencies [d515b4c]
+  - @larkup/runtime-kit@0.2.0
+
 ## 0.7.4
 
 ### Patch Changes

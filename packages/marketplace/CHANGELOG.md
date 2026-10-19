@@ -1,5 +1,16 @@
 # @larkup/marketplace
 
+## 0.3.9
+
+### Patch Changes
+
+- d515b4c: Render exact whole-recording speech as a modality-filtered, cursor-paged table so long transcripts remain complete without entering the answer model context.
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+  - @larkup/core@0.8.0
+
 ## 0.3.8
 
 ### Patch Changes
