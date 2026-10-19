@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Shared agent runtime browser assets and integration examples",
+  "main": "./src/index.js",
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
-      "import": "./src/index.js"
+      "import": "./src/index.js",
+      "default": "./src/index.js"
     }
   },
   "files": [
