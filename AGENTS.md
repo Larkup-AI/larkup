@@ -20,6 +20,15 @@ Always prefer the most specific agent instructions for the area you are modifyin
 - Add or update focused unit tests and run the package type-check. Package changes must also pass the cross-platform package CI matrix.
 - When workspace package names or build inputs change, update `pnpm-lock.yaml`, Docker's dependency stage, and all affected documentation in the same change.
 
+## Local / Cloud parity
+
+- This repository owns product behavior. Cloud (`../larkup-cloud`) consumes the canonical `@larkup/*` packages and adds managed-host adapters; do not copy implementations into Cloud.
+- Keep web chat, Cloud chat and public agent runs on `@larkup/workspace-server`'s shared route, prompt and tool registry. Preserve parity for RAG, CSV/chart analysis, sandbox execution, custom instructions, PDF images and video evidence when host capabilities are configured.
+- Fix shared behavior here first, add focused tests and changesets, then run `./scripts/sync-packages.sh --source ../larkup` from Cloud. Include mixed tabular plus video/document cases and tenant isolation; a chart request must not fall through to media retrieval.
+- Video Intelligence and its existing Modal-backed service remain canonical. Preserve source language and timestamps; use full-source artifacts/paging for complete speech, not unbounded transcript context. Do not create replacement GPU/transcription infrastructure for Cloud.
+- Read Cloud's `docs/shared-feature-parity.md` for the ownership map and release/acceptance checklist. Linked-source success does not prove npm release or production deployment; record the exact tested revision and distinguish mocked tests from live evidence.
+- Use functional names for new branches, files and commits, without agent-specific prefixes. Use `mktemp -d` for temporary worktrees and keep temporary operational scripts outside the repository.
+
 ## Skills Integration
 When working on specific feature sets, check the `.agents/` directory for relevant skills before executing the task.
 
