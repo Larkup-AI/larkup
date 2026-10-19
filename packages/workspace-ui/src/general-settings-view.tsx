@@ -9,16 +9,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import type { ThemeVariant, LayoutVariant } from './theme-customizer-provider.js';
 const THEMES: { id: ThemeVariant; name: string; color: string; description: string }[] = [
   {
-    id: 'theme-gaia',
-    name: 'Warm Ivory',
-    color: '#e6d343ff',
-    description: 'Warm ivory with dark accents',
-  },
-  {
     id: 'default',
     name: 'Minimalist Gray',
     color: '#636262ff',
     description: 'Clean & minimal gray palette',
+  },
+  {
+    id: 'theme-gaia',
+    name: 'Warm Ivory',
+    color: '#e6d343ff',
+    description: 'Warm ivory with dark accents',
   },
   {
     id: 'theme-linear',
