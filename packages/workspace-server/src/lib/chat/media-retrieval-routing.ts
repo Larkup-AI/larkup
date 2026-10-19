@@ -35,3 +35,13 @@ export function explicitMediaEvidenceAssetId(value: unknown): string | null {
   }
   return explicitMediaEvidenceAssetId(record.videoEvidence);
 }
+
+/** A deterministic gate before an answer model is allowed to compose prose. */
+export function hasRetrievedSourceEvidence(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as { hits?: unknown };
+  return (
+    (Array.isArray(record.hits) && record.hits.length > 0) ||
+    Boolean(explicitMediaEvidenceAssetId(value))
+  );
+}

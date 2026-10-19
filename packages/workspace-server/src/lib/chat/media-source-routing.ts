@@ -38,6 +38,15 @@ export function explicitlySelectedMediaAsset<T extends RoutableMediaAsset>(
   return clearlyTitleMatchedMediaAsset(query, assets);
 }
 
+/** Recover media after a miss only when the user named the source clearly.
+ * A sole video is not evidence for every unrelated question. */
+export function retrievalFallbackMediaAsset<T extends RoutableMediaAsset>(
+  query: string,
+  assets: readonly T[],
+): T | undefined {
+  return clearlyTitleMatchedMediaAsset(query, assets);
+}
+
 /**
  * Detect an explicitly named source that exists but is outside the Assistant
  * source scope. A generic single-source fallback must not silently replace it
