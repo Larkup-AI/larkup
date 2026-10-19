@@ -7,7 +7,7 @@ export type ThemeVariant = 'default' | 'theme-larkup' | 'theme-gaia' | 'theme-li
 export type LayoutVariant = 'sidebar' | 'topnav' | 'collapsed';
 
 /** The theme used for new workspaces that do not have a saved preference yet. */
-export const DEFAULT_THEME: ThemeVariant = 'theme-gaia';
+export const DEFAULT_THEME: ThemeVariant = 'default';
 
 interface ThemeCustomizerContextValue {
   theme: ThemeVariant;

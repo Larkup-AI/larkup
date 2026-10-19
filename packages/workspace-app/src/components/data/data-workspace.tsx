@@ -613,6 +613,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
               isIndexing={indexRunning}
               activeVideoRuntimeScope={activeVideoRuntimeScope}
               initialGroupId={searchParams.has('groupId') ? queryGroupId : undefined}
+              isLoading={docsQuery.isLoading || (docsQuery.data === undefined && !docsQuery.error)}
             />
           </div>
         )}
