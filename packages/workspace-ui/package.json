@@ -1,6 +1,6 @@
 {
   "name": "@larkup/workspace-ui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shared workspace presentation components for Larkup Local and Larkup Cloud",
   "type": "module",
   "main": "./dist/index.js",

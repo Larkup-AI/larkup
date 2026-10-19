@@ -1,5 +1,20 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.6
+
+### Patch Changes
+
+- f0acbcd: Report YouTube source-verification blocks with a safe actionable error instead of a generic indexing failure.
+- 037eff5: Add authenticated operator commands to inspect, reset, set, add, or remove managed-cloud video usage and allowances by installation ID.
+- d515b4c: Render exact whole-recording speech as a modality-filtered, cursor-paged table so long transcripts remain complete without entering the answer model context.
+- d515b4c: Preserve the detected language of host-supplied transcripts and generate all video knowledge notes in the source language.
+- d515b4c: Expose Cloud-safe document session persistence, declaration-ready scraper exports, and the canonical video tool manifest for shared workspace hosts.
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+  - @larkup/core@0.8.0
+
 ## 0.3.5
 
 ### Patch Changes

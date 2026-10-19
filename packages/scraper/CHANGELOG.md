@@ -1,5 +1,19 @@
 # @larkup/scraper
 
+## 0.2.0
+
+### Minor Changes
+
+- d515b4c: Expose Cloud-safe document session persistence, declaration-ready scraper exports, and the canonical video tool manifest for shared workspace hosts.
+
+### Patch Changes
+
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+  - @larkup/core@0.8.0
+
 ## 0.1.50
 
 ### Patch Changes

@@ -1,5 +1,39 @@
 # larkup
 
+## 0.4.15
+
+### Patch Changes
+
+- d515b4c: Share General settings presentation, provider logos, theme preferences and form controls with Cloud through explicit adapter props. Make form surfaces white in the light theme.
+- d515b4c: Share the workspace model status API algorithm across Local and Cloud hosts.
+- d515b4c: Extract the generated chat widget and React integration examples into a dependency-free shared runtime package for Local and Cloud.
+- d515b4c: Move canonical chat, data, integrations, media and model settings components into a reusable application package. Local and Cloud import the same implementations.
+- d515b4c: Share the chat API, tool selection and data algorithms across hosts using request-scoped persistence adapters.
+- 037eff5: Extract workspace presentation into a shared package consumed by Local and Cloud: chat surfaces, Add forms, Data tables, Settings navigation and form primitives, and light/dark design tokens. Keep runtime adapters and credentials in the host application.
+- Updated dependencies [ee0b5f6]
+- Updated dependencies [d515b4c]
+- Updated dependencies [3103955]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [0837ebc]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [d515b4c]
+- Updated dependencies [037eff5]
+- Updated dependencies [0837ebc]
+  - @larkup/workspace-app@0.2.0
+  - @larkup/workspace-server@0.2.0
+  - @larkup/core@0.8.0
+  - @larkup/marketplace@0.3.9
+  - @larkup/runtime-kit@0.2.0
+  - @larkup/tool-doc-editor@0.3.0
+  - @larkup/scraper@0.2.0
+  - @larkup/workspace-ui@0.2.0
+
 ## 0.4.14
 
 ### Patch Changes
