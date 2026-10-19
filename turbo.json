@@ -8,7 +8,11 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**"]
+      "outputs": [".next/**", "dist/**", "dist-types/**"]
+    },
+    "@larkup/workspace-app#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist-types/**", "src/asset-data.json"]
     },
     "@larkup/core#build": {
       "dependsOn": []
