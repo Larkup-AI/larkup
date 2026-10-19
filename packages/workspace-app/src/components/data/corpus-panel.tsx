@@ -842,7 +842,7 @@ function VideoKnowledgeInspector({
             {doc.charCount.toLocaleString()} total characters
           </DialogDescription>
         </DialogHeader>
-        {previewUrl && (mediaType === 'video' || mediaType === 'audio') && (
+        {/* {previewUrl && (mediaType === 'video' || mediaType === 'audio') && (
           <div className="overflow-hidden rounded-lg border border-border bg-black/95">
             {mediaType === 'video' ? (
               <video
@@ -856,8 +856,8 @@ function VideoKnowledgeInspector({
               <audio src={previewUrl} controls preload="metadata" className="w-full" />
             )}
           </div>
-        )}
-        <ScrollArea className={previewUrl ? 'max-h-[36vh]' : 'max-h-[70vh]'}>
+        )} */}
+        <ScrollArea className={previewUrl ? 'max-h-[70vh] h-full' : 'max-h-[70vh]'}>
           <div className="space-y-4 pr-4">
             {children.map((child, index) => {
               const startSecs = child.metadata?.startSecs;
