@@ -936,14 +936,6 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   const ready = status?.ready ?? false;
   const selectedModelData = status?.availableModels?.find((m) => m.id === selectedModel);
 
-  if (statusLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   return (
     <div
       className={cn(
@@ -1284,18 +1276,28 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
         {!ready ? (
           <div className="flex flex-col items-center justify-center gap-3 pt-[18vh] text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white border text-muted-foreground">
-              <MessageCircle className="size-7" />
+              {statusLoading ? (
+                <Loader2 className="size-6 animate-spin" />
+              ) : (
+                <MessageCircle className="size-7" />
+              )}
             </div>
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
-              {statusError ? 'Chat temporarily unavailable' : 'Setup Required'}
+              {statusLoading
+                ? 'Preparing your workspace'
+                : statusError
+                  ? 'Chat temporarily unavailable'
+                  : 'Setup Required'}
             </h1>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground mb-2">
-              {statusError
-                ? 'Chat services are temporarily unavailable. Larkup will retry automatically.'
-                : status?.blockers?.join(' ') ||
-                  'Connect a chat model in Settings to start chatting.'}
+              {statusLoading
+                ? 'Loading your chat configuration and available models…'
+                : statusError
+                  ? 'Chat services are temporarily unavailable. Larkup will retry automatically.'
+                  : status?.blockers?.join(' ') ||
+                    'Connect a chat model in Settings to start chatting.'}
             </p>
-            {!statusError && (
+            {!statusLoading && !statusError && (
               <a
                 href={
                   status?.blockers?.some((b) => b.includes('API Key') || b.includes('Settings'))
