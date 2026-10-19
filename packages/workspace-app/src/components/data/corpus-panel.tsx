@@ -87,6 +87,7 @@ export function CorpusPanel({
   isIndexing,
   activeVideoRuntimeScope,
   initialGroupId,
+  isLoading,
 }: {
   documents: SourceDocument[];
   groups?: DataGroup[];
@@ -94,6 +95,7 @@ export function CorpusPanel({
   isIndexing?: boolean;
   activeVideoRuntimeScope: VideoRuntimeScope;
   initialGroupId?: string;
+  isLoading?: boolean;
 }) {
   const [active, setActive] = useState<SourceDocument | null>(null);
   const [deleteTask, setDeleteTask] = useState<
@@ -291,6 +293,10 @@ export function CorpusPanel({
 
   function clearGroupFilter() {
     setSelectedGroupIds(new Set());
+  }
+
+  if (isLoading) {
+    return <CorpusSkeleton />;
   }
 
   if (documents.length === 0) {
@@ -1133,5 +1139,85 @@ function DocumentDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CorpusSkeleton() {
+  return (
+    <div className="space-y-4 animate-in fade-in duration-150">
+      {/* Filter bar skeleton */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between pb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {['All Sources', 'Website', 'Text', 'Files', 'Media', 'Integrations'].map((label, i) => (
+            <div
+              key={label}
+              className={cn(
+                'h-7 rounded-full px-3 text-xs font-medium flex items-center',
+                i === 0 ? 'bg-muted/80 text-transparent w-22' : 'bg-muted/40 text-transparent w-16',
+                'animate-pulse',
+              )}
+            >
+              &nbsp;
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-9 w-32 rounded-md bg-muted/50 animate-pulse border border-border/50" />
+          <div className="h-9 w-28 rounded-md bg-muted/50 animate-pulse border border-border/50" />
+          <div className="size-9 rounded-md bg-muted/50 animate-pulse border border-border/50" />
+        </div>
+      </div>
+
+      {/* Table skeleton */}
+      <div className="overflow-hidden rounded-lg border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead className="w-12">
+                <div className="size-4 rounded bg-muted/70 animate-pulse" />
+              </TableHead>
+              <TableHead>Title</TableHead>
+              <TableHead className="w-24">Status</TableHead>
+              <TableHead className="w-28">Source</TableHead>
+              <TableHead className="w-24 text-right">Chars</TableHead>
+              <TableHead className="w-20" />
+            </TableRow>
+          </TableHeader>
+          <TableBody className="bg-card">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <TableRow key={index} className="border-t border-border/60">
+                <TableCell className="w-12 py-3.5">
+                  <div className="size-4 rounded bg-muted/60 animate-pulse" />
+                </TableCell>
+                <TableCell className="py-3.5">
+                  <div className="space-y-1.5">
+                    <div
+                      className="h-4 rounded bg-muted/80 animate-pulse"
+                      style={{ width: `${Math.max(35, 75 - index * 10)}%` }}
+                    />
+                    <div className="h-3 w-40 rounded bg-muted/40 animate-pulse" />
+                  </div>
+                </TableCell>
+                <TableCell className="w-24 py-3.5">
+                  <div className="h-5 w-16 rounded-full bg-muted/60 animate-pulse" />
+                </TableCell>
+                <TableCell className="w-28 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <div className="size-4 rounded bg-muted/60 animate-pulse" />
+                    <div className="h-3 w-14 rounded bg-muted/60 animate-pulse" />
+                  </div>
+                </TableCell>
+                <TableCell className="w-24 py-3.5 text-right">
+                  <div className="h-3 w-12 ml-auto rounded bg-muted/60 animate-pulse" />
+                </TableCell>
+                <TableCell className="w-20 py-3.5 text-right">
+                  <div className="size-6 ml-auto rounded bg-muted/40 animate-pulse" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }

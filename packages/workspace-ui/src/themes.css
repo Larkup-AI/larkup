@@ -43,6 +43,7 @@
 }
 
 /* ── Larkup Dark ── */
+.dark .theme-larkup,
 .dark.theme-larkup,
 .theme-larkup .dark {
   --background: #1e1b16;
@@ -119,6 +120,7 @@
   --chart-5: #e8e6dd;
 }
 
+.dark .theme-gaia,
 .dark.theme-gaia,
 .theme-gaia .dark {
   --background: #0a0a0a;
@@ -195,6 +197,7 @@
   --chart-5: #e8e6dd;
 }
 
+.dark .theme-linear,
 .dark.theme-linear,
 .theme-linear .dark {
   --background: #000000;
