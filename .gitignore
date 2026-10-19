@@ -79,3 +79,4 @@ widget-demo
 copy.sh
 test-hpi-connection.sh
 dist-types/
+scratch/
