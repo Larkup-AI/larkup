@@ -1,5 +1,13 @@
 # @larkup/core
 
+## 0.8.1
+
+### Patch Changes
+
+- 67ff256: Export canonical OpenAPI document and Scalar reference HTML from runtime-kit for shared Agent and Knowledge server discovery.
+- Updated dependencies [67ff256]
+  - @larkup/runtime-kit@0.3.0
+
 ## 0.8.0
 
 ### Minor Changes

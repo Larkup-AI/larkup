@@ -1,5 +1,14 @@
 # @larkup/workspace-app
 
+## 0.2.1
+
+### Patch Changes
+
+- 77b85cf: Render the Chat workspace shell while its initial configuration is loading.
+- Updated dependencies [67ff256]
+  - @larkup/core@0.8.1
+  - @larkup/tool-doc-editor@0.3.1
+
 ## 0.2.0
 
 ### Minor Changes
