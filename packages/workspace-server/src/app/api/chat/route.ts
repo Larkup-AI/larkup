@@ -99,7 +99,10 @@ import {
 import { assistantSourceScopeFingerprint } from '../../../lib/chat/assistant-source-scope';
 import { normalizeIncomingMessages } from '../../../lib/chat/message-input';
 import { repairChatToolCall } from '../../../lib/chat/tool-call-repair';
-import { explicitMediaEvidenceAssetId } from '../../../lib/chat/media-retrieval-routing';
+import {
+  explicitMediaEvidenceAssetId,
+  hasRetrievedSourceEvidence,
+} from '../../../lib/chat/media-retrieval-routing';
 import {
   authorizeEnterpriseAiRequest,
   trackEnterpriseAiUsage,
@@ -1457,6 +1460,26 @@ ${fieldLines}`;
             toolCallId: preflightToolCallId,
             output: preloadedEvidence,
           });
+
+          // End no-evidence turns deterministically. A prose model may answer
+          // from general knowledge or mistake a sole media source for evidence
+          // even when the retrieval instruction says not to.
+          if (!hasRetrievedSourceEvidence(preloadedEvidence)) {
+            const retrievalError =
+              preloadedEvidence && typeof preloadedEvidence === 'object'
+                ? (preloadedEvidence as { error?: unknown }).error
+                : undefined;
+            const answer =
+              typeof retrievalError === 'string' && retrievalError.trim()
+                ? retrievalError
+                : "I couldn't find an answer to that in this project's data.";
+            const answerId = `answer-${crypto.randomUUID()}`;
+            writer.write({ type: 'text-start', id: answerId });
+            writer.write({ type: 'text-delta', id: answerId, delta: answer });
+            writer.write({ type: 'text-end', id: answerId });
+            await mcp.close();
+            return;
+          }
 
           // A PDF hit is a document-level locator, not necessarily the exact
           // page. Read its bounded local page evidence before asking the chat

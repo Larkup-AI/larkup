@@ -88,6 +88,7 @@ import {
   clearlyTitleMatchedMediaAsset,
   clearlyUnavailableTitleMatchedMediaAsset,
   explicitlySelectedMediaAsset,
+  retrievalFallbackMediaAsset,
   shouldKeepActiveMediaSource,
 } from '../../../lib/chat/media-source-routing';
 import { createTabularVisualization } from '../../../lib/chat/tabular-visualization';
@@ -348,24 +349,11 @@ function uniqueCompletedMediaFallback(
       error: `The named media source "${unavailableTitleMatch.fileName}" is not available to Assistant chat. Enable its data group under Data → Groups, then ask again.`,
     };
   }
-  // A retrieval miss must not strand a single, unambiguous active media
-  // source. With several sources the host deliberately stays neutral and
-  // lets ordinary retrieval disambiguate rather than guessing the asset.
-  if (assets.length === 1) {
-    return {
-      query,
-      hits: [],
-      videoEvidence: {
-        mediaAssetId: assets[0].id,
-        retrievalFallback: 'single-active-media-source',
-      },
-    };
-  }
   // A vector index can be temporarily unavailable while a completed video
   // remains perfectly usable through its evidence store. Recover an asset
-  // only when its user-visible title has a clear lexical lead; otherwise
-  // preserve the neutral no-result behavior for genuinely ambiguous media.
-  const titleMatch = clearlyTitleMatchedMediaAsset(query, assets);
+  // only when its user-visible title has a clear lexical lead. The mere fact
+  // that a project contains one video is not evidence for an unrelated query.
+  const titleMatch = retrievalFallbackMediaAsset(query, assets);
   if (!titleMatch) return { query, hits: [] };
   return {
     query,
