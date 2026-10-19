@@ -127,6 +127,7 @@ import {
 } from '../../../lib/enterprise-client';
 
 const sandboxAvailabilityCache = new Map<string, { expiresAt: number; ready: boolean }>();
+const hostedSandboxAvailabilityCaches = new WeakMap<object, typeof sandboxAvailabilityCache>();
 
 /** A compact, typed value captured from the source (for example a displayed
  * state, total, or counter). Unlike free-form OCR, it can be ranked and
@@ -175,6 +176,13 @@ function evidenceText(payload: unknown): string {
  * still use retrieval or tabular data when the local runtime is unavailable.
  */
 async function isSandboxReady(config: any): Promise<boolean> {
+  const host = workspaceHost();
+  let availabilityCache = sandboxAvailabilityCache;
+  if (host) {
+    // Managed hosts can resolve different credentials behind identical public config.
+    availabilityCache = hostedSandboxAvailabilityCaches.get(host) ?? new Map();
+    hostedSandboxAvailabilityCaches.set(host, availabilityCache);
+  }
   const { backend, credentials } = resolveSandboxConfig(config);
   const cacheKey =
     backend +
@@ -182,16 +190,16 @@ async function isSandboxReady(config: any): Promise<boolean> {
     createHash('sha256')
       .update(JSON.stringify(credentials ?? {}))
       .digest('hex');
-  const cached = sandboxAvailabilityCache.get(cacheKey);
+  const cached = availabilityCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.ready;
 
   try {
     const health = await workspaceSandbox({ backend, credentials }).healthCheck();
     const ready = health.status === 'ready';
-    sandboxAvailabilityCache.set(cacheKey, { ready, expiresAt: Date.now() + 30_000 });
+    availabilityCache.set(cacheKey, { ready, expiresAt: Date.now() + 30_000 });
     return ready;
   } catch {
-    sandboxAvailabilityCache.set(cacheKey, { ready: false, expiresAt: Date.now() + 30_000 });
+    availabilityCache.set(cacheKey, { ready: false, expiresAt: Date.now() + 30_000 });
     return false;
   }
 }
