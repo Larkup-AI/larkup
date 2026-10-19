@@ -1312,8 +1312,8 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
           <ChatEmptyState
             mark={
               <>
-                <img src="/logo/logo.png" alt="Logo" className="size-9 dark:hidden" />
-                <img src="/logo/light.png" alt="Logo" className="size-9 dark:block hidden" />
+                <img src="/logo.png" alt="Logo" className="size-9 dark:hidden" />
+                <img src="/logo-light.png" alt="Logo" className="size-9 dark:block hidden" />
               </>
             }
           />
