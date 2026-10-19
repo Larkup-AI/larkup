@@ -26,6 +26,7 @@ const nextConfig = {
     '@larkup/scraper',
     '@larkup/marketplace',
     '@larkup/sandbox',
+    '@larkup/integrations',
   ],
   serverExternalPackages: [
     '@lancedb/lancedb',
