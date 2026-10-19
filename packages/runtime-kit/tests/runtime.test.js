@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
-import { widgetScript, reactWidgetSnippet, agentSdkSnippet } from '../src/index.js';
+import {
+  widgetScript,
+  reactWidgetSnippet,
+  agentSdkSnippet,
+  serverOpenApiDocument,
+  scalarReferenceHtml,
+} from '../src/index.js';
 
 test('widget remains a standalone browser script with the Local chat contract', () => {
   const script = widgetScript({ widget: { title: 'Shared agent' } });
@@ -24,4 +30,21 @@ test('React snippet escapes settings as data and cleans up the script and widget
   assert.match(snippet, /LarkupWidget\?\.destroy/);
   assert.match(agentSdkSnippet('https://agent.test'), /LarkupAgentClient/);
   assert.match(agentSdkSnippet('https://agent.test'), /chatText/);
+});
+
+test('serverOpenApiDocument returns valid OpenAPI documents for agent and knowledge profiles', () => {
+  const agentDoc = serverOpenApiDocument('agent');
+  assert.equal(agentDoc.openapi, '3.1.0');
+  assert.equal(agentDoc.info.title, 'Larkup Agent Server');
+  assert.ok(agentDoc.paths['/agent/chat']);
+  assert.ok(agentDoc.paths['/query']);
+
+  const knowledgeDoc = serverOpenApiDocument('knowledge');
+  assert.equal(knowledgeDoc.info.title, 'Larkup Knowledge Server');
+  assert.equal(knowledgeDoc.paths['/agent/chat'], undefined);
+  assert.ok(knowledgeDoc.paths['/query']);
+
+  const scalarHtml = scalarReferenceHtml();
+  assert.match(scalarHtml, /@scalar\/api-reference/);
+  assert.match(scalarHtml, /\/openapi\.json/);
 });

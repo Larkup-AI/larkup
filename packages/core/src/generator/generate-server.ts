@@ -1,4 +1,4 @@
-import { widgetScript } from '@larkup/runtime-kit';
+import { serverOpenApiDocument, widgetScript } from '@larkup/runtime-kit';
 import type { RagConfig } from '../types';
 import { getVectorStore } from '@larkup/vector-stores/registry';
 import { getEmbeddingModel } from '../embeddings/registry';
@@ -593,6 +593,10 @@ const handler = async (req, res) => {
     return send(res, 200, { ok: true, service: ${JSON.stringify(
       config.projectName,
     )}, type: SERVER_PROFILE === "agent" ? "agent-server" : "knowledge-server", profile: SERVER_PROFILE })
+  }
+
+  if (req.method === "GET" && url.pathname === "/openapi.json") {
+    return send(res, 200, ${JSON.stringify(serverOpenApiDocument(isAgentServer ? 'agent' : 'knowledge'))})
   }
 
   if (req.method === "OPTIONS") {

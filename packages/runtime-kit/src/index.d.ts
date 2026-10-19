@@ -15,3 +15,5 @@ export function reactWidgetSnippet(input: {
   widget?: WidgetSettings;
 }): string;
 export function agentSdkSnippet(baseUrl: string): string;
+export function scalarReferenceHtml(): string;
+export function serverOpenApiDocument(profile?: 'agent' | 'knowledge'): Record<string, unknown>;
