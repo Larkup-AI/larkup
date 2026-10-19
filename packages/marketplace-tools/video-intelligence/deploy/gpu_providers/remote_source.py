@@ -10,6 +10,10 @@ from urllib.parse import urlparse
 PreparationProgress = Callable[[int, str], None]
 
 
+class YouTubeVerificationRequiredError(RuntimeError):
+    """YouTube rejected an automated public-source download before media processing."""
+
+
 def materialize_provider_source(
     source_url: str,
     destination: Path,
@@ -86,7 +90,14 @@ def _download_youtube_source(
     return_code = process.wait()
     if return_code != 0 or not destination.exists() or not destination.stat().st_size:
         destination.unlink(missing_ok=True)
-        raise RuntimeError("could not download remote video: " + " | ".join(diagnostics)[-1200:])
+        diagnostic = " | ".join(diagnostics)[-1200:]
+        if "Sign in to confirm you’re not a bot" in diagnostic:
+            # Keep the marker at the beginning: managed providers truncate
+            # exceptions before they return them to the control plane.
+            raise YouTubeVerificationRequiredError(
+                "YOUTUBE_VERIFICATION_REQUIRED: YouTube requires verification for this source."
+            )
+        raise RuntimeError("could not download remote video: " + diagnostic)
     if progress:
         progress(99, "Remote video is ready for secure transfer")
 

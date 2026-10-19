@@ -16,6 +16,7 @@ from gpu_providers.remote_source import (
     materialize_provider_source,
     materialize_remote_source,
     rebase_transcript_context,
+    YouTubeVerificationRequiredError,
 )
 
 
@@ -100,6 +101,25 @@ def _probe_duration_secs(path: Path) -> float:
     shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg/ffprobe not installed"
 )
 class RemoteSourceTests(unittest.TestCase):
+    def test_youtube_verification_failure_is_classified_before_provider_truncation(self) -> None:
+        with tempfile.TemporaryDirectory() as out_dir:
+            destination = Path(out_dir) / "youtube.mp4"
+            process = MagicMock()
+            process.stdout.__iter__.return_value = iter(
+                ["ERROR: [youtube] Sign in to confirm you’re not a bot\n"]
+            )
+            process.wait.return_value = 1
+
+            with patch(
+                "gpu_providers.remote_source.subprocess.Popen", return_value=process
+            ):
+                with self.assertRaisesRegex(
+                    YouTubeVerificationRequiredError, "^YOUTUBE_VERIFICATION_REQUIRED:"
+                ):
+                    materialize_provider_source(
+                        "https://www.youtube.com/watch?v=abc", destination
+                    )
+
     def test_youtube_provider_source_uses_ytdlp_and_reports_progress(self) -> None:
         with tempfile.TemporaryDirectory() as out_dir:
             destination = Path(out_dir) / "youtube.mp4"

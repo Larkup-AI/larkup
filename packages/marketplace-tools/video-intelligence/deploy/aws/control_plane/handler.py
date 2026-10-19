@@ -802,7 +802,7 @@ def sync_job(item: dict[str, Any]) -> None:
                 separators=(",", ":"),
             )
         )
-        settle(item, "failed", 0, error="Larkup Cloud could not complete this video. Please retry.")
+        settle(item, "failed", 0, error=public_gpu_failure_message(status.detail))
 
 
 def public_progress_message(message: str) -> str:
@@ -810,6 +810,16 @@ def public_progress_message(message: str) -> str:
     if message == "Preparing the visual search model for this video — this can take a little longer the first time":
         return "Creating the visual search index"
     return message
+
+
+def public_gpu_failure_message(detail: object) -> str:
+    """Expose only a safe, actionable source-verification failure to callers."""
+    if "YOUTUBE_VERIFICATION_REQUIRED" in str(detail or ""):
+        return (
+            "YouTube requires verification for this source. Upload an authorized copy of "
+            "the video or use a source YouTube permits this service to access, then retry."
+        )
+    return "Larkup Cloud could not complete this video. Please retry."
 
 
 def cancel_job(principal: dict[str, Any], job_id: str) -> dict[str, Any]:
