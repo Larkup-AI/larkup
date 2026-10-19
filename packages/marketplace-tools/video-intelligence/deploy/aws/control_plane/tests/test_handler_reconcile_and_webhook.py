@@ -291,6 +291,46 @@ class ReconcileAndWebhookTests(unittest.TestCase):
         saved = self.handler.table.get_item(Key={"pk": item["pk"], "sk": "JOB"})["Item"]
         self.assertEqual(saved["error"], "Larkup Cloud could not complete this video. Please retry.")
 
+    def test_failed_youtube_verification_job_returns_an_actionable_safe_error(self) -> None:
+        item = {
+            "pk": "JOB#job_youtube_verification",
+            "sk": "JOB",
+            "principalId": "p1",
+            "status": "running",
+            "instanceId": "instance-1",
+            "providerName": "modal",
+            "period": "2026-08",
+            "estimatedSourceMinutes": "1",
+            "retainSourceHours": 0,
+            "createdAt": "now",
+            "updatedAt": "now",
+            "progressJson": "{}",
+        }
+        self.handler.table.put_item(Item=item)
+        self._put_usage("p1", "2026-08")
+        handler = self.handler
+
+        class FailedProvider:
+            def get_status(self, instance_id: str):
+                return type(
+                    "FailedStatus",
+                    (),
+                    {
+                        "state": handler.InstanceState.FAILED,
+                        "detail": "RuntimeError: YOUTUBE_VERIFICATION_REQUIRED: provider output",
+                    },
+                )()
+
+        with patch.object(self.handler, "get_provider", return_value=FailedProvider()):
+            self.handler.sync_job(item)
+
+        saved = self.handler.table.get_item(Key={"pk": item["pk"], "sk": "JOB"})["Item"]
+        self.assertEqual(
+            saved["error"],
+            "YouTube requires verification for this source. Upload an authorized copy of "
+            "the video or use a source YouTube permits this service to access, then retry.",
+        )
+
     def test_finalizing_job_without_progress_is_failed_after_the_short_timeout(self) -> None:
         self.handler.FINALIZING_STALL_TIMEOUT_MINUTES = 12
         old_created_at = (datetime.now(timezone.utc) - timedelta(minutes=13)).isoformat()
