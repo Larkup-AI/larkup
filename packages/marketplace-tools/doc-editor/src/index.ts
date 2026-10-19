@@ -9,7 +9,7 @@
 export const TOOL_META = {
   id: 'doc-editor',
   name: 'Document Editor',
-  version: '0.3.0',
+  version: '0.3.1',
 } as const;
 
 export const TOOL_EXTENSION = {

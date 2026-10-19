@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.2
+
+### Patch Changes
+
+- e997fd8: Prevent unrelated single-media fallbacks and end no-evidence chat turns without allowing a model to answer from general knowledge.
+
 ## 0.2.1
 
 ### Patch Changes
