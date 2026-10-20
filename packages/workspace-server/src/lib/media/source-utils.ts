@@ -43,8 +43,9 @@ export interface UrlInspection {
 export async function readPublicUrl(
   url: string,
   maxBytes = 25 * 1024 * 1024,
+  init: RequestInit = {},
 ): Promise<{ bytes: Uint8Array; mimeType?: string; finalUrl: string }> {
-  const response = await fetchPublic(url);
+  const response = await fetchPublic(url, init);
   if (!response.ok || !response.body) {
     await response.body?.cancel();
     throw new Error(`Media download failed (${response.status}).`);
@@ -184,14 +185,21 @@ export function inspectYouTubeWatchUrl(url: string): UrlInspection | undefined {
 
 export function inspectYouTubeWatchPage(url: string, html: string): UrlInspection | undefined {
   const details = jsonObjectAfterMarker(html, '"videoDetails":');
-  if (!details) return undefined;
-  try {
-    return inspectYouTubePlayerMetadata(url, {
-      videoDetails: JSON.parse(details) as YouTubePlayerData['videoDetails'],
-    });
-  } catch {
-    return undefined;
+  if (details) {
+    try {
+      const inspection = inspectYouTubePlayerMetadata(url, {
+        videoDetails: JSON.parse(details) as YouTubePlayerData['videoDetails'],
+      });
+      if (inspection) return inspection;
+    } catch {
+      // Continue to the page's public schema.org duration metadata.
+    }
   }
+  const requestedId = youtubeVideoId(url);
+  const durationSecs = youtubePageDurationSecs(html);
+  return requestedId && durationSecs
+    ? youtubeInspection(url, requestedId, undefined, durationSecs)
+    : undefined;
 }
 
 export function inspectYouTubePlayerMetadata(
@@ -239,6 +247,19 @@ function playerStreamDurationSecs(data: YouTubePlayerData): number | undefined {
     .map((format) => positiveDuration(Number(format.approxDurationMs) / 1_000))
     .filter((duration): duration is number => duration !== undefined);
   return durations.length ? Math.round(Math.max(...durations)) : undefined;
+}
+
+function youtubePageDurationSecs(html: string): number | undefined {
+  const durationTag = html.match(
+    /<meta\b(?=[^>]*\bitemprop=["']duration["'])(?=[^>]*\bcontent=["']([^"']+)["'])[^>]*>/i,
+  );
+  const durationText = durationTag?.[1];
+  if (!durationText) return undefined;
+  const match = durationText.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/i);
+  if (!match) return undefined;
+  return positiveDuration(
+    Number(match[1] ?? 0) * 3_600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0),
+  );
 }
 
 function jsonObjectAfterMarker(source: string, marker: string): string | undefined {
@@ -459,7 +480,13 @@ export async function inspectMediaUrl(url: string): Promise<UrlInspection> {
       const playerInspection = await inspectYouTubePlayer(url).catch(() => undefined);
       if (playerInspection) return playerInspection;
       try {
-        const page = await readPublicUrl(url, 3 * 1024 * 1024);
+        const page = await readPublicUrl(url, 3 * 1024 * 1024, {
+          headers: {
+            // YouTube otherwise serves a reduced challenge page to serverless
+            // fetch clients, which excludes its public schema.org duration.
+            'user-agent': 'Mozilla/5.0 (compatible; Larkup/1.0; +https://larkup.de)',
+          },
+        });
         const inspection = inspectYouTubeWatchPage(url, new TextDecoder().decode(page.bytes));
         if (inspection) return inspection;
       } catch {

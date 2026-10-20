@@ -23,6 +23,24 @@ test('reads a selected YouTube duration from public watch-page metadata', () => 
   });
 });
 
+test('uses the YouTube schema.org duration when detailed page metadata is reduced', () => {
+  assert.deepEqual(
+    inspectYouTubeWatchPage(
+      url,
+      '<meta itemprop="duration" content="PT1M58S"><meta content="PT99H" itemprop="other">',
+    ),
+    {
+      originalUrl: url,
+      durationSecs: 118,
+      singleItemDurationSecs: 118,
+      singleItemUrl: url,
+      entryCount: 1,
+      mediaType: 'video',
+      isYouTube: true,
+    },
+  );
+});
+
 test('reads a selected YouTube duration from public player metadata', () => {
   assert.deepEqual(
     inspectYouTubePlayerMetadata(url, {
