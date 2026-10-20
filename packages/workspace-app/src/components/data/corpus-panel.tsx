@@ -88,6 +88,7 @@ export function CorpusPanel({
   activeVideoRuntimeScope,
   initialGroupId,
   isLoading,
+  error,
 }: {
   documents: SourceDocument[];
   groups?: DataGroup[];
@@ -96,6 +97,7 @@ export function CorpusPanel({
   activeVideoRuntimeScope: VideoRuntimeScope;
   initialGroupId?: string;
   isLoading?: boolean;
+  error?: string;
 }) {
   const [active, setActive] = useState<SourceDocument | null>(null);
   const [deleteTask, setDeleteTask] = useState<
@@ -326,6 +328,21 @@ export function CorpusPanel({
 
   if (isLoading) {
     return <CorpusSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card/50 px-6 py-14 text-center">
+        <div className="size-10 p-1.5 bg-destructive/10 border border-destructive/20 rounded-md flex items-center justify-center text-destructive">
+          <Info className="size-6" />
+        </div>
+        <p className="mt-3 text-lg font-medium text-foreground">Could not load corpus data</p>
+        <p className="mt-1 max-w-xl text-sm text-muted-foreground">{error}</p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => void onChanged()}>
+          Retry
+        </Button>
+      </div>
+    );
   }
 
   if (clearingAll || groupedDocuments.length === 0) {
