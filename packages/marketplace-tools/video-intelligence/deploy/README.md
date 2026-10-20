@@ -53,8 +53,19 @@ relative import):
 
 ```bash
 cd packages/marketplace-tools/video-intelligence
+modal secret create larkup-video-proxy \
+  SCRAPER_PROXY_SERVER="$SCRAPER_PROXY_SERVER" \
+  SCRAPER_PROXY_USERNAME="$SCRAPER_PROXY_USERNAME" \
+  SCRAPER_PROXY_PASSWORD="$SCRAPER_PROXY_PASSWORD" \
+  --force
 modal deploy -m deploy.gpu_providers.modal_worker_entrypoint
 ```
+
+The proxy secret is used only for provider-page materialization such as public
+YouTube sources. Keep the three values in the operator's ignored environment,
+use credential authentication because Modal egress is dynamic, and validate a
+metadata request plus a real media download before deploying. Never commit the
+proxy URL or credentials.
 
 Do not attach audio, brain, vision, or embedding provider secrets to the Modal
 function or RunPod template. Those credentials are user-owned and arrive only
