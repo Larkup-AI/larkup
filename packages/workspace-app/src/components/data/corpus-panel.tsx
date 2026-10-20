@@ -102,6 +102,8 @@ export function CorpusPanel({
     { type: 'single'; doc: SourceDocument } | { type: 'all' } | { type: 'selected' } | null
   >(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [clearingAll, setClearingAll] = useState(false);
   const [movingGroupId, setMovingGroupId] = useState<string | null>(null);
   const [inspectorDoc, setInspectorDoc] = useState<SourceDocument | null>(null);
 
@@ -143,9 +145,18 @@ export function CorpusPanel({
         others.push(doc);
       }
     }
-    return [...Array.from(grouped.values()), ...others].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+    return [...Array.from(grouped.values()), ...others]
+      .filter((document) => !deletedIds.has(document.id))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [deletedIds, documents]);
+
+  useEffect(() => {
+    setDeletedIds((current) => {
+      const documentIds = new Set(documents.map((document) => document.id));
+      const pending = new Set(Array.from(current).filter((id) => documentIds.has(id)));
+      return pending.size === current.size ? current : pending;
+    });
+    if (documents.length === 0) setClearingAll(false);
   }, [documents]);
 
   const filteredDocuments = groupedDocuments.filter(
@@ -182,6 +193,8 @@ export function CorpusPanel({
   }
 
   async function del(id: string, doc?: SourceDocument) {
+    setDeleteTask(null);
+    setDeletedIds((current) => new Set(current).add(id));
     try {
       if (doc?.metadata?.isGroup && doc?.metadata?.mediaAssetId) {
         await deleteRequest(workspaceUrl(`/api/media?id=${doc.metadata.mediaAssetId}`));
@@ -196,12 +209,20 @@ export function CorpusPanel({
       await onChanged();
       toast.success('Document deleted');
     } catch (error) {
+      setDeletedIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
       toast.error(formatErrorMessage(error) || 'Could not delete this document.');
     }
   }
   async function delSelected() {
     if (selectedIds.size === 0) return;
     const toDelete = groupedDocuments.filter((d) => selectedIds.has(d.id));
+    const deletionIds = new Set(toDelete.map((document) => document.id));
+    setDeleteTask(null);
+    setDeletedIds((current) => new Set([...current, ...deletionIds]));
     try {
       for (const doc of toDelete) {
         if (doc.metadata?.isGroup && doc.metadata?.mediaAssetId) {
@@ -214,16 +235,24 @@ export function CorpusPanel({
       await onChanged();
       toast.success(`Deleted ${toDelete.length} item(s)`);
     } catch (error) {
+      setDeletedIds((current) => {
+        const next = new Set(current);
+        for (const id of deletionIds) next.delete(id);
+        return next;
+      });
       toast.error(formatErrorMessage(error) || 'Could not delete the selected documents.');
     }
   }
   async function clearAll() {
+    setDeleteTask(null);
+    setClearingAll(true);
     try {
       await deleteRequest(workspaceUrl('/api/documents'));
       setSelectedIds(new Set());
       await onChanged();
       toast.success('Corpus and vector index cleared');
     } catch (error) {
+      setClearingAll(false);
       toast.error(formatErrorMessage(error) || 'Could not clear the corpus.');
     }
   }
@@ -299,7 +328,7 @@ export function CorpusPanel({
     return <CorpusSkeleton />;
   }
 
-  if (documents.length === 0) {
+  if (clearingAll || groupedDocuments.length === 0) {
     return (
       <div className="flex flex-col  items-center justify-center rounded-lg   px-6 py-14 text-center">
         <div className="size-10 p-1.5 bg-white/60 border border-border  rounded-md flex items-center justify-center">
@@ -1144,7 +1173,11 @@ function DocumentDialog({
 
 function CorpusSkeleton() {
   return (
-    <div className="space-y-4 animate-in fade-in duration-150">
+    <div
+      role="status"
+      aria-label="Loading corpus"
+      className="space-y-4 animate-in fade-in duration-150"
+    >
       {/* Filter bar skeleton */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between pb-3">
         <div className="flex flex-wrap items-center gap-2">

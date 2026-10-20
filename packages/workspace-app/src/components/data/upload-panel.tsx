@@ -83,6 +83,12 @@ interface ImageIndexingCapability {
   message?: string;
 }
 
+interface PreparingFile {
+  id: string;
+  name: string;
+  size: number;
+}
+
 const stagedFilesByScope = new Map<string, StagedFile[]>();
 const UPLOAD_QUEUE_KEY = 'larkup.upload-queue.v1';
 
@@ -179,6 +185,7 @@ export function UploadPanel({
   const [remoteUrl, setRemoteUrl] = useState('');
   const [loadingRemoteFile, setLoadingRemoteFile] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [preparingFiles, setPreparingFiles] = useState<PreparingFile[]>([]);
   const [progress, setProgress] = useState<{
     message?: string;
     current: number;
@@ -196,7 +203,17 @@ export function UploadPanel({
     const joinedActiveSave = savingRef.current;
     const next: StagedFile[] = [];
     const stage = (file: StagedFile) => next.push({ ...file, sourceUrl });
-    for (const file of Array.from(files)) {
+    const selectedFiles = Array.from(files).map((file) => ({
+      file,
+      pending: {
+        id: Math.random().toString(36).slice(2),
+        name: file.name,
+        size: file.size,
+      },
+    }));
+    setPreparingFiles((current) => [...current, ...selectedFiles.map(({ pending }) => pending)]);
+
+    for (const { file, pending } of selectedFiles) {
       const ext = file.name.split('.').pop()?.toLowerCase();
 
       // Prevent dragging media into the documents tab
@@ -205,10 +222,11 @@ export function UploadPanel({
         toast.error(
           `Unsupported file type: ${file.name}. Please upload media files in the Media tab.`,
         );
+        setPreparingFiles((current) => current.filter((item) => item.id !== pending.id));
         continue;
       }
 
-      const id = Math.random().toString(36).slice(2);
+      const id = pending.id;
       try {
         if (ext === 'csv') {
           const content = await file.text();
@@ -320,12 +338,18 @@ export function UploadPanel({
           });
 
           const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
+          const legacyImageOnlyPdf =
+            ext === 'pdf' &&
+            res.status === 422 &&
+            /(?:no readable text|does not contain selectable text)/i.test(String(data.error ?? ''));
+          if (!res.ok && !legacyImageOnlyPdf) {
             throw new Error(data.error || `Could not extract text from ${file.name}`);
           }
 
           const { text } = data;
-          const hasReadableText = data.hasReadableText ?? Boolean(text?.trim());
+          const hasReadableText = legacyImageOnlyPdf
+            ? false
+            : (data.hasReadableText ?? Boolean(text?.trim()));
           const imageOnlyPdf = ext === 'pdf' && !hasReadableText;
           if (!hasReadableText && !imageOnlyPdf) {
             throw new Error(
@@ -363,6 +387,8 @@ export function UploadPanel({
         }
       } catch (err) {
         toast.error(`Could not read ${file.name}. ${formatErrorMessage(err)}`);
+      } finally {
+        setPreparingFiles((current) => current.filter((item) => item.id !== pending.id));
       }
     }
     setStaged((prev) => [...prev, ...next]);
@@ -687,7 +713,7 @@ export function UploadPanel({
   }
 
   useEffect(() => {
-    const actionBusy = saving || loadingRemoteFile;
+    const actionBusy = saving || loadingRemoteFile || preparingFiles.length > 0;
     onActionChange?.({
       label: 'Add file',
       onClick: isRemoteEntry ? () => void loadRemoteFile() : () => void ingest(),
@@ -695,7 +721,16 @@ export function UploadPanel({
       loading: actionBusy,
     });
     return () => onActionChange?.(null);
-  }, [entryTab, staged, saving, remoteUrl, loadingRemoteFile, groupId, onActionChange]);
+  }, [
+    entryTab,
+    staged,
+    saving,
+    remoteUrl,
+    loadingRemoteFile,
+    preparingFiles.length,
+    groupId,
+    onActionChange,
+  ]);
 
   function updateEditingFile(patch: Partial<StagedFile>) {
     setStaged((prev) => prev.map((f) => (f.id === editingFileId ? { ...f, ...patch } : f)));
@@ -774,6 +809,30 @@ export function UploadPanel({
           e.target.value = '';
         }}
       />
+
+      {preparingFiles.length > 0 && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="space-y-2 rounded-md border border-border bg-card px-3 py-3"
+        >
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Loader2 className="size-4 animate-spin text-primary" />
+            Preparing {preparingFiles.length} file{preparingFiles.length === 1 ? '' : 's'}…
+          </div>
+          <ul className="space-y-1">
+            {preparingFiles.map((file) => (
+              <li
+                key={file.id}
+                className="flex items-center justify-between gap-3 text-xs text-muted-foreground"
+              >
+                <span className="truncate font-mono">{file.name}</span>
+                <span className="shrink-0 tabular-nums">{(file.size / 1024).toFixed(1)} KB</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {staged.length > 0 && (
         <div className="space-y-2 pb-5">
@@ -987,10 +1046,13 @@ export function UploadPanel({
         <Button
           onClick={isRemoteEntry ? () => void loadRemoteFile() : () => void ingest()}
           disabled={
-            loadingRemoteFile || saving || (isRemoteEntry ? !remoteUrl.trim() : staged.length === 0)
+            loadingRemoteFile ||
+            saving ||
+            preparingFiles.length > 0 ||
+            (isRemoteEntry ? !remoteUrl.trim() : staged.length === 0)
           }
         >
-          {loadingRemoteFile || saving ? (
+          {loadingRemoteFile || saving || preparingFiles.length > 0 ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
             <FileUp className="size-4" />
