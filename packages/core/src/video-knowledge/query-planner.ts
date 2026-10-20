@@ -27,7 +27,7 @@ export interface VideoInvestigationDirective {
   /** One local moment, a relationship across moments, or the active source as a whole. */
   scope: 'focused' | 'temporal' | 'source';
   /** The evidence operation needed to answer, independently of subject matter. */
-  goal: 'answer' | 'compare' | 'trace' | 'enumerate' | 'synthesize';
+  goal: 'answer' | 'compare' | 'trace' | 'resolve' | 'enumerate' | 'synthesize';
   /** Modalities the answer needs; omission keeps every available modality. */
   evidence?: Array<'speech' | 'visible-text' | 'visual' | 'computed'>;
   /** The evidence collection to enumerate when scope is the full source. */
@@ -62,6 +62,7 @@ const directiveGoals = new Set<VideoInvestigationDirective['goal']>([
   'answer',
   'compare',
   'trace',
+  'resolve',
   'enumerate',
   'synthesize',
 ]);
@@ -130,6 +131,7 @@ export function planVideoQuestion(
   if (investigation.goal === 'answer') kinds.add('visual-fact');
   if (investigation.goal === 'compare') kinds.add('comparison');
   if (investigation.goal === 'trace') kinds.add('state-change');
+  if (investigation.goal === 'resolve') kinds.add('outcome');
   if (investigation.goal === 'enumerate' || investigation.goal === 'synthesize') {
     kinds.add('coverage');
   }

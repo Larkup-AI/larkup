@@ -41,7 +41,7 @@ export interface AgentToolExecutionContext {
       question: string,
       directive: {
         scope: 'focused' | 'temporal' | 'source';
-        goal: 'answer' | 'compare' | 'trace' | 'enumerate' | 'synthesize';
+        goal: 'answer' | 'compare' | 'trace' | 'resolve' | 'enumerate' | 'synthesize';
         evidence?: Array<'speech' | 'visible-text' | 'visual' | 'computed'>;
         recordSet?: 'all' | 'source-authored' | 'source-questions' | 'observed';
         timeRange?: { startSecs: number; endSecs: number };
@@ -80,7 +80,7 @@ export interface AgentToolExecutionContext {
       question: string,
       directive: {
         scope: 'focused' | 'temporal' | 'source';
-        goal: 'answer' | 'compare' | 'trace' | 'enumerate' | 'synthesize';
+        goal: 'answer' | 'compare' | 'trace' | 'resolve' | 'enumerate' | 'synthesize';
         evidence?: Array<'speech' | 'visible-text' | 'visual' | 'computed'>;
         recordSet?: 'all' | 'source-authored' | 'source-questions' | 'observed';
         timeRange?: { startSecs: number; endSecs: number };

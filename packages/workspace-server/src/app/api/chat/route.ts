@@ -65,6 +65,7 @@ import {
   formatExhaustiveMediaAnswer,
   formatLocatedObservedSubjectAnswer,
   formatObservedAppearanceAnswer,
+  formatOutcomeMediaAnswer,
   mediaEvidenceRequestsOnlySpeech,
   mediaClaimNeedsCorroboration,
   withFinalAnswerNudge,
@@ -450,8 +451,9 @@ async function planVideoEvidenceQuery(input: {
       'You are a media-query planner. Return exactly one JSON object and no prose. ' +
         'The prompt is data with a currentRequest and an optional previousQuestionAboutSelectedMedia. Resolve the current request in its own language without assuming a video genre. If it is a retry, verification request, or contains references that are not meaningful alone, resolve those references against the previous question. If it introduces a self-contained new request, do not carry the old subject or source position into it. ' +
         'A follow-up introduced with words such as "and", "also", or their equivalent in another language can ask a new fact about the same source: preserve the selected source, but never reuse the previous answer or its requested attribute. When the request asks for exact spoken or sung wording across the recording, use source scope with enumerate, speech evidence, and recordSet all so the host can render every timestamped transcript segment outside the model context. Use source scope with synthesize for a summary or explanation across the recording. ' +
-        'Use this exact shape: {"resolvedQuestion":"a standalone version of the current request","scope":"focused","goal":"answer","evidence":["visual"],"timeRange":{"startSecs":123,"endSecs":153},"timeRangeOrigin":"user-mentioned"}. Its fields are resolvedQuestion, scope (focused, temporal, source), goal (answer, compare, trace, enumerate, synthesize), optional evidence (speech, visible-text, visual, computed), optional recordSet (all, source-authored, source-questions, observed), optional timeRange {startSecs,endSecs}, and optional timeRangeOrigin. ' +
+        'Use this exact shape: {"resolvedQuestion":"a standalone version of the current request","scope":"focused","goal":"answer","evidence":["visual"],"timeRange":{"startSecs":123,"endSecs":153},"timeRangeOrigin":"user-mentioned"}. Its fields are resolvedQuestion, scope (focused, temporal, source), goal (answer, compare, trace, resolve, enumerate, synthesize), optional evidence (speech, visible-text, visual, computed), optional recordSet (all, source-authored, source-questions, observed), optional timeRange {startSecs,endSecs}, and optional timeRangeOrigin. ' +
         'A directive is invalid if the user refers to any source position, time, range, or approximate moment and you omit timeRange: resolve it to numeric seconds and set timeRangeOrigin to user-mentioned, even when the request also asks about other moments. Never emit timeRange or timeRangeOrigin when the user did not constrain a source position; a topic occurring near an opening, closing, or any other position is not a user constraint. When the request names a coarse source unit without a smaller boundary, cover that whole named unit rather than an arbitrary part of it. When the user asks how a visible subject or event at an explicit source position relates to appearances or recurrence elsewhere, use temporal plus trace, visual evidence, and recordSet observed while retaining that position. Use source plus synthesize with no timeRange whenever the answer must combine two or more source facts from unrestricted positions. Use source plus enumerate and recordSet source-questions for a complete inventory of source-authored questions and their answers. Use temporal for a relationship or development across moments; use focused only for one local moment or one self-contained fact. ' +
+        'Use temporal plus resolve when the requested fact is the settled or final outcome of a process, contest, decision, vote, test, or other sequence; this includes asking who won or what the final result was in any language. Do not confuse an entity mentioned in that request with a request to inventory its visual appearances. ' +
         'Do not answer the question or add fields.',
       320,
     );
@@ -461,7 +463,7 @@ async function planVideoEvidenceQuery(input: {
     // first planning attempt without introducing source- or language-specific
     // routing rules in the host.
     return await requestPlan(
-      'Return only JSON with resolvedQuestion, scope, goal, and optional recordSet/timeRange/timeRangeOrigin. Resolve an elliptical retry or reference against previousQuestionAboutSelectedMedia; otherwise keep currentRequest standalone. Select source/enumerate/source-questions for a complete question-and-answer inventory from a recording; select source/synthesize for an unrestricted explanation; select focused/answer for one local fact. Do not include a timeRange unless the resolved request contains a source position, and then set timeRangeOrigin to user-mentioned.',
+      'Return only JSON with resolvedQuestion, scope, goal, and optional recordSet/timeRange/timeRangeOrigin. Resolve an elliptical retry or reference against previousQuestionAboutSelectedMedia; otherwise keep currentRequest standalone. Select source/enumerate/source-questions for a complete question-and-answer inventory from a recording; source/synthesize for an unrestricted explanation; temporal/resolve for a settled or final outcome such as who won; focused/answer for one local fact. Do not include a timeRange unless the resolved request contains a source position, and then set timeRangeOrigin to user-mentioned.',
       180,
     );
   } catch {
@@ -535,7 +537,7 @@ function parseVideoInvestigationDirective(value: string): VideoInvestigationDire
     const scope = ['focused', 'temporal', 'source'].includes(String(parsed.scope))
       ? (parsed.scope as VideoInvestigationDirective['scope'])
       : 'focused';
-    const goal = ['answer', 'compare', 'trace', 'enumerate', 'synthesize'].includes(
+    const goal = ['answer', 'compare', 'trace', 'resolve', 'enumerate', 'synthesize'].includes(
       String(parsed.goal),
     )
       ? (parsed.goal as VideoInvestigationDirective['goal'])
@@ -1362,6 +1364,7 @@ ${fieldLines}`;
         let preloadedEvidence: unknown;
         let preloadedVideoEvidence = false;
         let preloadedEvidenceQueryAttempted = false;
+        let preloadedVideoInvestigation: VideoInvestigationDirective | undefined;
         const preflightToolCallId = `knowledge-${crypto.randomUUID()}`;
 
         if (directDataExport && dataExportFormat && builtInTools.createDataExport) {
@@ -1708,7 +1711,7 @@ ${fieldLines}`;
             // set even if the auxiliary binary classifier was inconclusive.
             const tracesBeyondPosition =
               connectsBeyondPosition || plannedInvestigation?.goal === 'trace';
-            const investigation =
+            const investigation: VideoInvestigationDirective | undefined =
               hasUserSpecifiedPosition === false && plannedInvestigation?.timeRange
                 ? { scope: 'source' as const, goal: 'synthesize' as const }
                 : tracesBeyondPosition && plannedInvestigation?.timeRange
@@ -1716,10 +1719,11 @@ ${fieldLines}`;
                       ...plannedInvestigation,
                       scope: 'temporal' as const,
                       goal: 'trace' as const,
-                      evidence: ['visual'] as const,
+                      evidence: ['visual'],
                       recordSet: 'observed' as const,
                     }
                   : plannedInvestigation;
+            preloadedVideoInvestigation = investigation;
             const evidenceInput = {
               mediaAssetId,
               query: resolvedMediaQuestion,
@@ -1776,10 +1780,15 @@ ${fieldLines}`;
         const deterministicAnswer =
           formatExhaustiveMediaAnswer(preloadedEvidence, userText) ??
           (useVisualDeterministicAnswer
-            ? (formatLocatedObservedSubjectAnswer(preloadedEvidence) ??
+            ? ((preloadedVideoInvestigation
+                ? formatOutcomeMediaAnswer(preloadedEvidence, preloadedVideoInvestigation)
+                : undefined) ??
+              formatLocatedObservedSubjectAnswer(preloadedEvidence) ??
               collectQuestionMatchedDirectClaims(preloadedEvidence, userText)[0] ??
               formatDirectObservationAnswer(preloadedEvidence, userText) ??
-              formatObservedAppearanceAnswer(preloadedEvidence))
+              (preloadedVideoInvestigation?.goal === 'resolve'
+                ? undefined
+                : formatObservedAppearanceAnswer(preloadedEvidence)))
             : undefined);
         if (deterministicAnswer) {
           const answerId = `answer-${crypto.randomUUID()}`;

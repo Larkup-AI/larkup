@@ -52,6 +52,32 @@ test('planVideoQuestion: preserves a focused factual lookup as a search', () => 
   assert.ok(plan.kinds.includes('visual-fact'));
 });
 
+test('planVideoQuestion: maps a settled outcome without reading question wording', () => {
+  const questions = [
+    'Who won the match?',
+    'من فاز في المباراة؟',
+    '試合に勝ったのは誰ですか？',
+    '¿Quién ganó el partido?',
+  ];
+  const expected = planVideoQuestion(
+    questions[0],
+    directive('temporal', 'resolve', ['speech', 'visible-text', 'visual', 'computed']),
+  );
+
+  for (const question of questions.slice(1)) {
+    assert.deepEqual(
+      planVideoQuestion(
+        question,
+        directive('temporal', 'resolve', ['speech', 'visible-text', 'visual', 'computed']),
+      ),
+      expected,
+    );
+  }
+  assert.equal(expected.route, 'temporal');
+  assert.ok(expected.kinds.includes('outcome'));
+  assert.ok(!expected.kinds.includes('state-change'));
+});
+
 test('planVideoQuestion: carries a model-resolved time range without parsing the question language', () => {
   const plan = planVideoQuestion('فى الدقيقة الرابعة عشر، مين ظهر؟', {
     ...directive('focused', 'answer', ['visual']),

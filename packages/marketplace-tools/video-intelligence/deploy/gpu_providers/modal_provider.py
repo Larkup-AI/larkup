@@ -34,6 +34,7 @@ from .base import GPUInstanceProvider, GPUProviderError, InstanceState, Instance
 
 DEFAULT_APP_NAME = "larkup-video-intelligence"
 DEFAULT_FUNCTION_NAME = "process_video_job"
+DEFAULT_MATERIALIZATION_FUNCTION_NAME = "materialize_remote_video_job"
 PROGRESS_DICT_NAME = "larkup-video-intelligence-progress"
 _PROGRESS_STAGES = frozenset(
     {
@@ -58,6 +59,7 @@ class ModalProvider(GPUInstanceProvider):
     token_secret: str
     app_name: str = DEFAULT_APP_NAME
     function_name: str = DEFAULT_FUNCTION_NAME
+    materialization_function_name: str = DEFAULT_MATERIALIZATION_FUNCTION_NAME
 
     @classmethod
     def from_env(cls) -> "ModalProvider":
@@ -72,6 +74,10 @@ class ModalProvider(GPUInstanceProvider):
             token_secret=token_secret,
             app_name=os.getenv("LARKUP_VIDEO_MODAL_APP", DEFAULT_APP_NAME),
             function_name=os.getenv("LARKUP_VIDEO_MODAL_FUNCTION", DEFAULT_FUNCTION_NAME),
+            materialization_function_name=os.getenv(
+                "LARKUP_VIDEO_MODAL_MATERIALIZATION_FUNCTION",
+                DEFAULT_MATERIALIZATION_FUNCTION_NAME,
+            ),
         )
 
     def _sdk(self) -> Any:
@@ -94,7 +100,12 @@ class ModalProvider(GPUInstanceProvider):
         region: str | None = None,
     ) -> str:
         modal = self._sdk()
-        function = modal.Function.from_name(self.app_name, self.function_name)
+        function_name = (
+            self.materialization_function_name
+            if env.get("operation") == "materialize"
+            else self.function_name
+        )
+        function = modal.Function.from_name(self.app_name, function_name)
         call = function.spawn(dict(env))
         return str(call.object_id)
 

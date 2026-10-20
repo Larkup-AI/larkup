@@ -83,7 +83,7 @@ export const AGENT_TOOLS = [
             scope: { type: 'string', enum: ['focused', 'temporal', 'source'] },
             goal: {
               type: 'string',
-              enum: ['answer', 'compare', 'trace', 'enumerate', 'synthesize'],
+              enum: ['answer', 'compare', 'trace', 'resolve', 'enumerate', 'synthesize'],
             },
             evidence: {
               type: 'array',
@@ -3061,7 +3061,9 @@ function validInvestigation(value: unknown): value is VideoInvestigationDirectiv
   const timeRange = directive.timeRange;
   return (
     ['focused', 'temporal', 'source'].includes(String(directive.scope)) &&
-    ['answer', 'compare', 'trace', 'enumerate', 'synthesize'].includes(String(directive.goal)) &&
+    ['answer', 'compare', 'trace', 'resolve', 'enumerate', 'synthesize'].includes(
+      String(directive.goal),
+    ) &&
     (directive.recordSet === undefined ||
       ['all', 'source-authored', 'source-questions', 'observed'].includes(directive.recordSet)) &&
     (timeRange === undefined ||
