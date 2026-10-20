@@ -1,5 +1,13 @@
 # @larkup/marketplace
 
+## 0.3.11
+
+### Patch Changes
+
+- d961166: Route settled outcome questions to outcome evidence, prevent unrelated visible-subject recurrences from becoming the final answer, and dispatch remote video materialization through a separate CPU lane instead of the indexing GPU lane.
+- Updated dependencies [d961166]
+  - @larkup/core@0.8.2
+
 ## 0.3.10
 
 ### Patch Changes

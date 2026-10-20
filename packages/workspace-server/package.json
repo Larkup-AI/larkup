@@ -1,6 +1,6 @@
 {
   "name": "@larkup/workspace-server",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "type": "module",
   "files": [
     "src",
@@ -322,11 +322,11 @@
     "@ai-sdk/mistral": "4.0.61",
     "@ai-sdk/openai": "4.0.89",
     "@ai-sdk/openai-compatible": "3.0.66",
-    "@larkup/core": "^0.8.1",
+    "@larkup/core": "^0.8.2",
     "@larkup/marketplace": "workspace:*",
     "@larkup/sandbox": "workspace:*",
     "@larkup/scraper": "workspace:*",
-    "@larkup/tool-doc-editor": "^0.3.1",
+    "@larkup/tool-doc-editor": "^0.3.2",
     "@larkup/vector-stores": "workspace:*",
     "ai": "7.0.133",
     "pdf-parse": "2.4.5",

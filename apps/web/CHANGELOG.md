@@ -1,5 +1,17 @@
 # larkup
 
+## 0.4.23
+
+### Patch Changes
+
+- Updated dependencies [d961166]
+  - @larkup/core@0.8.2
+  - @larkup/marketplace@0.3.11
+  - @larkup/workspace-server@0.2.7
+  - @larkup/tool-doc-editor@0.3.2
+  - @larkup/scraper@0.2.2
+  - @larkup/workspace-app@0.2.3
+
 ## 0.4.22
 
 ### Patch Changes
