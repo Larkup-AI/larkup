@@ -104,6 +104,7 @@ app = modal.App(APP_NAME)
 
 @app.function(
     image=WORKER_IMAGE,
+    secrets=[modal.Secret.from_name("larkup-video-proxy")],
     # A single T4 keeps this batch-oriented workload on a modest GPU class.
     # It scales from zero, so idle GPU time is not billed.
     gpu=GPU_TYPE,

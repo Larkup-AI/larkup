@@ -32,6 +32,24 @@ if [ ! -S "/tmp/.X11-unix/X$display_number" ]; then
 fi
 export DISPLAY=":$display_number"
 
+proxy_server="${SCRAPER_PROXY_SERVER:-}"
+proxy_username="${SCRAPER_PROXY_USERNAME:-}"
+proxy_password="${SCRAPER_PROXY_PASSWORD:-}"
+if [ -n "$proxy_server$proxy_username$proxy_password" ]; then
+  if [ -z "$proxy_server" ] || [ -z "$proxy_username" ] || [ -z "$proxy_password" ]; then
+    echo "Incomplete managed video proxy configuration" >&2
+    exit 1
+  fi
+  case "$proxy_server" in
+    http://*|https://*) ;;
+    *) proxy_server="http://$proxy_server" ;;
+  esac
+  proxy_scheme="${proxy_server%%://*}"
+  proxy_address="${proxy_server#*://}"
+  proxy_address="${proxy_address%/}"
+  set -- --proxy "$proxy_scheme://$proxy_username:$proxy_password@$proxy_address" "$@"
+fi
+
 /usr/local/bin/yt-dlp-python \
   --js-runtimes node:/opt/node/bin/node \
   --extractor-args 'youtube:player_client=mweb,web_safari,web_embedded' \
