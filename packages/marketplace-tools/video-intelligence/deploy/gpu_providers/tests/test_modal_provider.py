@@ -39,6 +39,23 @@ class ModalProviderTests(unittest.TestCase):
         fake_modal.Function.from_name.assert_called_with(provider.app_name, provider.function_name)
         fake_function.spawn.assert_called_with({"sourceUrl": "https://x"})
 
+    def test_launch_routes_materialization_away_from_the_gpu_function(self) -> None:
+        provider = ModalProvider(token_id="id", token_secret="s")
+        fake_call = MagicMock(object_id="call-1")
+        fake_function = MagicMock()
+        fake_function.spawn.return_value = fake_call
+        fake_modal = MagicMock()
+        fake_modal.Function.from_name.return_value = fake_function
+        payload = {"operation": "materialize", "sourceUrl": "https://youtube.example.test"}
+
+        with patch.object(provider, "_sdk", return_value=fake_modal):
+            provider.launch(job_id="job_x", image="", env=payload, gpu_type="")
+
+        fake_modal.Function.from_name.assert_called_with(
+            provider.app_name, provider.materialization_function_name
+        )
+        fake_function.spawn.assert_called_with(payload)
+
     def test_get_status_running_while_result_not_ready(self) -> None:
         provider = ModalProvider(token_id="id", token_secret="s")
         fake_call = MagicMock()

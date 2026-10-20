@@ -42,9 +42,11 @@ from .remote_source import (
 
 APP_NAME = "larkup-video-intelligence"
 FUNCTION_NAME = "process_video_job"
+MATERIALIZATION_FUNCTION_NAME = "materialize_remote_video_job"
 PROGRESS_DICT_NAME = "larkup-video-intelligence-progress"
 GPU_TYPE = "T4"
 GPU_MAX_CONTAINERS = 1
+MATERIALIZATION_MAX_CONTAINERS = 4
 GPU_IDLE_TIMEOUT_SECONDS = 15 * 60
 YOLOX_MODEL_URL = "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_s.onnx"
 
@@ -162,6 +164,25 @@ def process_video_job(payload: dict[str, Any]) -> dict[str, Any]:
             normalized_important_ranges,
             progress,
         )
+
+
+@app.function(
+    image=WORKER_IMAGE,
+    secrets=[modal.Secret.from_name("larkup-video-proxy")],
+    # Remote acquisition uses yt-dlp/ffmpeg and object storage, not inference.
+    # Keeping it off the single GPU lane removes GPU cold-start and indexing
+    # contention while preserving the same canonical downloader and proxy.
+    max_containers=MATERIALIZATION_MAX_CONTAINERS,
+    timeout=60 * 60,
+    scaledown_window=GPU_IDLE_TIMEOUT_SECONDS,
+)
+def materialize_remote_video_job(payload: dict[str, Any]) -> dict[str, Any]:
+    source_url = str(payload.get("sourceUrl") or "")
+    if not source_url.startswith("https://"):
+        raise ValueError("sourceUrl must be an HTTPS URL")
+    if payload.get("operation") != "materialize":
+        raise ValueError("materialize_remote_video_job only accepts materialize operations")
+    return materialize_remote_video(payload, source_url, modal_progress_reporter())
 
 
 def materialize_remote_video(

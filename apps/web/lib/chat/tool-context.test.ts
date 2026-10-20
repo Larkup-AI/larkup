@@ -370,7 +370,7 @@ describe('formatOutcomeMediaAnswer', () => {
           },
         },
       },
-      { scope: 'temporal', goal: 'trace' },
+      { scope: 'temporal', goal: 'resolve' },
     );
 
     expect(answer).toBe('Beta won, 1400–1200 over Alpha.');

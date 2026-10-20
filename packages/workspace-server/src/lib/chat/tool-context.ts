@@ -544,7 +544,7 @@ export function formatOutcomeMediaAnswer(
   value: unknown,
   investigation: VideoInvestigationDirective,
 ): string | undefined {
-  if (investigation.goal !== 'trace') return undefined;
+  if (investigation.goal !== 'trace' && investigation.goal !== 'resolve') return undefined;
   type Reading = { at: number; text: string };
   const readings: Reading[] = [];
   const visit = (candidate: unknown) => {

@@ -1328,7 +1328,7 @@ export async function getChatTools(context: {
         investigation: z
           .object({
             scope: z.enum(['focused', 'temporal', 'source']),
-            goal: z.enum(['answer', 'compare', 'trace', 'enumerate', 'synthesize']),
+            goal: z.enum(['answer', 'compare', 'trace', 'resolve', 'enumerate', 'synthesize']),
             evidence: z
               .array(z.enum(['speech', 'visible-text', 'visual', 'computed']))
               .max(4)
@@ -2306,7 +2306,7 @@ export async function getChatTools(context: {
         question: z.string().describe('The full user question, including any temporal conditions.'),
         investigation: z.object({
           scope: z.enum(['focused', 'temporal', 'source']),
-          goal: z.enum(['answer', 'compare', 'trace', 'enumerate', 'synthesize']),
+          goal: z.enum(['answer', 'compare', 'trace', 'resolve', 'enumerate', 'synthesize']),
           evidence: z
             .array(z.enum(['speech', 'visible-text', 'visual', 'computed']))
             .max(4)

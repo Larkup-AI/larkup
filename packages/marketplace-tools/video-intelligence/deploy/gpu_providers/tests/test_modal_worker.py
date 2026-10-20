@@ -9,6 +9,7 @@ from gpu_providers.modal_worker_entrypoint import (
     GPU_IDLE_TIMEOUT_SECONDS,
     GPU_MAX_CONTAINERS,
     GPU_TYPE,
+    MATERIALIZATION_MAX_CONTAINERS,
     _is_full_source_range,
     materialize_remote_video,
     preparation_progress,
@@ -21,6 +22,9 @@ class ModalWorkerEnvironmentTests(unittest.TestCase):
         self.assertEqual(GPU_TYPE, "T4")
         self.assertEqual(GPU_MAX_CONTAINERS, 1)
         self.assertEqual(GPU_IDLE_TIMEOUT_SECONDS, 15 * 60)
+
+    def test_remote_materialization_has_a_separate_concurrent_cpu_lane(self) -> None:
+        self.assertEqual(MATERIALIZATION_MAX_CONTAINERS, 4)
 
     def test_whole_source_range_is_not_treated_as_bounded_clip(self) -> None:
         self.assertTrue(_is_full_source_range([(0.0, 3600.0)], 3600.0))
