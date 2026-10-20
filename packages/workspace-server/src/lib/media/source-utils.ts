@@ -170,6 +170,56 @@ export function inspectYouTubeWatchUrl(url: string): UrlInspection | undefined {
   };
 }
 
+export function inspectYouTubeWatchPage(url: string, html: string): UrlInspection | undefined {
+  const requestedId = youtubeVideoId(url);
+  if (!requestedId) return undefined;
+  const details = jsonObjectAfterMarker(html, '"videoDetails":');
+  if (!details) return undefined;
+  try {
+    const data = JSON.parse(details) as {
+      videoId?: string;
+      title?: string;
+      lengthSeconds?: string | number;
+    };
+    const durationSecs = positiveDuration(data.lengthSeconds);
+    if (data.videoId !== requestedId || !durationSecs) return undefined;
+    return {
+      originalUrl: url,
+      title: data.title,
+      durationSecs,
+      singleItemDurationSecs: durationSecs,
+      singleItemUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(requestedId)}`,
+      entryCount: 1,
+      mediaType: 'video',
+      isYouTube: true,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function jsonObjectAfterMarker(source: string, marker: string): string | undefined {
+  const markerIndex = source.indexOf(marker);
+  const start = markerIndex < 0 ? -1 : source.indexOf('{', markerIndex + marker.length);
+  if (start < 0) return undefined;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < source.length; index++) {
+    const character = source[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') inString = true;
+    else if (character === '{') depth += 1;
+    else if (character === '}' && --depth === 0) return source.slice(start, index + 1);
+  }
+  return undefined;
+}
+
 export interface MediaProbe {
   durationSecs: number;
   containerDurationSecs: number;
@@ -321,6 +371,13 @@ export async function inspectMediaUrl(url: string): Promise<UrlInspection> {
     try {
       output = await runYtDlp(['--dump-single-json', '--simulate', '--flat-playlist', url]);
     } catch (error) {
+      try {
+        const page = await readPublicUrl(url, 3 * 1024 * 1024);
+        const inspection = inspectYouTubeWatchPage(url, new TextDecoder().decode(page.bytes));
+        if (inspection) return inspection;
+      } catch {
+        // A public watch URL can still be staged for durable inspection below.
+      }
       const fallback = inspectYouTubeWatchUrl(url);
       if (fallback) return fallback;
       throw error;
