@@ -77,7 +77,7 @@ def materialize_remote_video(
 
     with tempfile.TemporaryDirectory(prefix="larkup-runpod-materialize-") as temporary:
         source_path = Path(temporary) / "source.mp4"
-        materialize_provider_source(
+        extracted_title = materialize_provider_source(
             source_url,
             source_path,
             float(payload.get("sourceDurationSecs") or 0) or None,
@@ -115,7 +115,8 @@ def materialize_remote_video(
         report("complete", 99, "Remote video materialization completed", 100, {})
         return {
             "result": {
-                "fileName": str(payload.get("fileName") or "youtube-video.mp4"),
+                "fileName": extracted_title
+                or str(payload.get("fileName") or "youtube-video.mp4"),
                 "mimeType": "video/mp4",
                 "sizeBytes": size_bytes,
                 "durationSecs": duration_secs,

@@ -77,9 +77,10 @@ class ModalWorkerEnvironmentTests(unittest.TestCase):
     def test_remote_materialization_downloads_and_uploads_without_model_secrets(self) -> None:
         updates = []
 
-        def materialize(_url, destination, _duration, progress) -> None:
+        def materialize(_url, destination, _duration, progress) -> str:
             destination.write_bytes(b"video")
             progress(99, "Ready")
+            return "The real YouTube title"
 
         response = Mock()
         response.raise_for_status.return_value = None
@@ -108,7 +109,7 @@ class ModalWorkerEnvironmentTests(unittest.TestCase):
         self.assertEqual(result["actualSourceMinutes"], 0)
         self.assertEqual(result["result"]["durationSecs"], 12.5)
         self.assertEqual(result["result"]["sizeBytes"], 5)
-        self.assertEqual(result["result"]["fileName"], "song.mp4")
+        self.assertEqual(result["result"]["fileName"], "The real YouTube title")
         self.assertEqual(download.call_count, 1)
         self.assertEqual(upload.call_args.kwargs["headers"], {"Content-Type": "video/mp4"})
         self.assertEqual(updates[-1][0], "complete")
