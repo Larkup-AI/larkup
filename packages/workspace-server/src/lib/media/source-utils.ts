@@ -104,6 +104,10 @@ interface YouTubePlayerData {
     title?: string;
     lengthSeconds?: string | number;
   };
+  streamingData?: {
+    formats?: Array<{ approxDurationMs?: string | number }>;
+    adaptiveFormats?: Array<{ approxDurationMs?: string | number }>;
+  };
 }
 
 function positiveDuration(value: unknown): number | undefined {
@@ -195,11 +199,29 @@ export function inspectYouTubePlayerMetadata(
   data: YouTubePlayerData,
 ): UrlInspection | undefined {
   const requestedId = youtubeVideoId(url);
-  const durationSecs = positiveDuration(data.videoDetails?.lengthSeconds);
-  if (!requestedId || data.videoDetails?.videoId !== requestedId || !durationSecs) return undefined;
+  const details = data.videoDetails;
+  const declaredDurationSecs = positiveDuration(details?.lengthSeconds);
+  if (requestedId && declaredDurationSecs && details?.videoId === requestedId) {
+    return youtubeInspection(url, requestedId, details.title, declaredDurationSecs);
+  }
+  // Some serverless requests receive a reduced but still valid player payload:
+  // `videoDetails` is omitted while the signed selected-stream metadata remains.
+  // It is tied to the requested ID in this player request, so use a rounded
+  // positive stream duration only when the response does not claim another ID.
+  const streamDurationSecs = playerStreamDurationSecs(data);
+  if (!requestedId || data.videoDetails?.videoId || !streamDurationSecs) return undefined;
+  return youtubeInspection(url, requestedId, data.videoDetails?.title, streamDurationSecs);
+}
+
+function youtubeInspection(
+  url: string,
+  requestedId: string,
+  title: string | undefined,
+  durationSecs: number,
+): UrlInspection {
   return {
     originalUrl: url,
-    title: data.videoDetails.title,
+    ...(title ? { title } : {}),
     durationSecs,
     singleItemDurationSecs: durationSecs,
     singleItemUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(requestedId)}`,
@@ -207,6 +229,16 @@ export function inspectYouTubePlayerMetadata(
     mediaType: 'video',
     isYouTube: true,
   };
+}
+
+function playerStreamDurationSecs(data: YouTubePlayerData): number | undefined {
+  const durations = [
+    ...(data.streamingData?.formats ?? []),
+    ...(data.streamingData?.adaptiveFormats ?? []),
+  ]
+    .map((format) => positiveDuration(Number(format.approxDurationMs) / 1_000))
+    .filter((duration): duration is number => duration !== undefined);
+  return durations.length ? Math.round(Math.max(...durations)) : undefined;
 }
 
 function jsonObjectAfterMarker(source: string, marker: string): string | undefined {

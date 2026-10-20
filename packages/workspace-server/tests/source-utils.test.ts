@@ -45,6 +45,26 @@ test('reads a selected YouTube duration from public player metadata', () => {
   );
 });
 
+test('uses signed stream durations when a reduced player response omits video details', () => {
+  assert.deepEqual(
+    inspectYouTubePlayerMetadata(url, {
+      streamingData: {
+        formats: [{ approxDurationMs: '117075' }],
+        adaptiveFormats: [{ approxDurationMs: '116783' }],
+      },
+    }),
+    {
+      originalUrl: url,
+      durationSecs: 117,
+      singleItemDurationSecs: 117,
+      singleItemUrl: url,
+      entryCount: 1,
+      mediaType: 'video',
+      isYouTube: true,
+    },
+  );
+});
+
 test('does not accept watch-page metadata for another video or without a duration', () => {
   assert.equal(
     inspectYouTubeWatchPage(
