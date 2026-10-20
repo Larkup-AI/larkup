@@ -575,6 +575,16 @@ export function formatOutcomeMediaAnswer(
   };
   visit(value);
 
+  const settledWinner = readings
+    .sort((left, right) => left.at - right.at)
+    .flatMap((reading) => {
+      const match = reading.text.match(
+        /^Reconciled event:\s*(?:.*?\b(?:conclusion|final)\b.*?)\bwith\s+(.+?)\s+as\s+(?:the\s+)?winner\s*$/iu,
+      );
+      return match?.[1]?.trim() ? [{ ...reading, winner: match[1].trim() }] : [];
+    })
+    .at(-1);
+
   const cleanLabel = (label: string) =>
     label
       .replace(/^.*?(?:(?:final\s+)?(?:result|score)|النتيجة(?:\s+النهائية)?)\s*:\s*/iu, '')
@@ -607,6 +617,22 @@ export function formatOutcomeMediaAnswer(
           : [];
       });
     });
+  const sideScorePattern =
+    /^\s*(.+?\p{L})\s+(\d+(?:[.,]\d+)?)\s*[|｜]\s*(.+?\p{L})\s+(\d+(?:[.,]\d+)?)\s*$/u;
+  const sideScoreCandidates = readings
+    .sort((left, right) => left.at - right.at)
+    .flatMap((reading) => {
+      const match = cleanLabel(reading.text).match(sideScorePattern);
+      if (!match) return [];
+      const left = { label: cleanLabel(match[1]), value: Number(match[2].replace(',', '.')) };
+      const right = { label: cleanLabel(match[3]), value: Number(match[4].replace(',', '.')) };
+      return left.label &&
+        right.label &&
+        Number.isFinite(left.value) &&
+        Number.isFinite(right.value)
+        ? [{ ...reading, pairs: [left, right] }]
+        : [];
+    });
   const pairPattern =
     /([^=,;،؛\n]{2,100}?)(?:\s*=\s*|\s*:\s*|\s+)(-?\d+(?:[.,]\d+)?)(?=$|[,;،؛])/gu;
   const candidates = readings
@@ -622,7 +648,14 @@ export function formatOutcomeMediaAnswer(
       };
     })
     .filter((reading) => reading.pairs.length === 2);
-  const settled = scorelineCandidates.at(-1) ?? candidates.at(-1);
+  const settled = scorelineCandidates.at(-1) ?? sideScoreCandidates.at(-1) ?? candidates.at(-1);
+  if (settledWinner) {
+    if (!settled) return `${settledWinner.winner} won.`;
+    const values = settled.pairs.map((pair) => pair.value).sort((left, right) => right - left);
+    if (values[0] !== values[1]) {
+      return `${settledWinner.winner} won, ${values[0]}–${values[1]}.`;
+    }
+  }
   if (!settled) return undefined;
   const [left, right] = settled.pairs;
   if (left.value === right.value) {

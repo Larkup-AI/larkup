@@ -410,6 +410,28 @@ describe('formatOutcomeMediaAnswer', () => {
       ),
     ).toBe('الزمالك المصري won, 2–1 over الهلال السعودي.');
   });
+
+  it('uses a settled indexed winner with a pipe-delimited final state', () => {
+    expect(
+      formatOutcomeMediaAnswer(
+        {
+          success: true,
+          claimVerification: { status: 'directly-established' },
+          temporalContext: {
+            readings: [
+              { atSecs: 0, text: 'Reconciled state: ESP 0 | ARG 0' },
+              { atSecs: 66.733, text: 'Reconciled state: ESP 1 | ARG 0' },
+              {
+                atSecs: 100.1,
+                text: 'Reconciled event: match conclusion with Spain as the winner',
+              },
+            ],
+          },
+        },
+        { scope: 'temporal', goal: 'resolve' },
+      ),
+    ).toBe('Spain won, 1–0.');
+  });
 });
 
 describe('formatDirectObservationAnswer', () => {
