@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.9
+
+### Patch Changes
+
+- 94ebf3f: Render verified indexed video outcomes directly when the evidence includes a settled winner and a pipe-delimited final state.
+
 ## 0.2.8
 
 ### Patch Changes
