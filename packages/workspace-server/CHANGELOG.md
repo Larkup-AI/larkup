@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.3
+
+### Patch Changes
+
+- bbaf8d4: Recover YouTube titles and durations from public watch-page metadata when the primary extractor is temporarily challenged, so remote videos can reserve quota and reach indexing.
+
 ## 0.2.2
 
 ### Patch Changes
