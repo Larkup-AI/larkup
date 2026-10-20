@@ -41,6 +41,7 @@ import { getChatTools } from './tools';
 import { gatewayProviderOptions } from '../../../lib/chat/gateway-fallbacks';
 import { retrievalToolsForStep } from '../../../lib/chat/retrieval-routing';
 import { collectExhaustiveVideoEvidencePages } from '../../../lib/chat/video-rag-routing';
+import { reconcileVideoInvestigation } from '../../../lib/chat/video-query-planning';
 import {
   extractConversationEvidence,
   extractLatestTabularExportResult,
@@ -488,6 +489,7 @@ async function userSpecifiedSourcePosition(input: {
   | {
       hasPosition: boolean;
       connectsBeyondPosition: boolean;
+      asksForSettledOutcome: boolean;
     }
   | undefined
 > {
@@ -500,7 +502,7 @@ async function userSpecifiedSourcePosition(input: {
       abortSignal: AbortSignal.timeout(8_000),
       providerOptions: input.providerOptions,
       system:
-        'Return exactly one JSON object and no prose: {"kind":"input-location"|"answer-timestamp"|"none","locator":string|null,"connectsBeyondPosition":boolean}. Use input-location only when the user explicitly constrains where in the provided source to look; locator must be the exact corresponding substring from the user request. Use answer-timestamp when the user asks for timestamps in the answer but does not specify where to look; locator is null. Use none when neither is present. Set connectsBeyondPosition true only when the request explicitly relates the thing at its named source position to another point or portion of the source, such as recurrence, reappearance, a later/earlier occurrence, change, or comparison; otherwise false. Example: "Explain a subject and include timestamps" => {"kind":"answer-timestamp","locator":null,"connectsBeyondPosition":false}. Example: "What happens at 14:00?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":false}. Example: "Who is at 14:00 and where else do they appear?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":true}. Example: "Give the full story from beginning to conclusion" => {"kind":"none","locator":null,"connectsBeyondPosition":false} unless the user asks specifically about the beginning or conclusion. Interpret every language without assuming a source genre.',
+        'Return exactly one JSON object and no prose: {"kind":"input-location"|"answer-timestamp"|"none","locator":string|null,"connectsBeyondPosition":boolean,"asksForSettledOutcome":boolean}. Use input-location only when the user explicitly constrains where in the provided source to look; locator must be the exact corresponding substring from the user request. Use answer-timestamp when the user asks for timestamps in the answer but does not specify where to look; locator is null. Use none when neither is present. Set connectsBeyondPosition true only when the request explicitly relates the thing at its named source position to another point or portion of the source, such as recurrence, reappearance, a later/earlier occurrence, change, or comparison; otherwise false. Set asksForSettledOutcome true only when the request asks for the final or settled result of a process, contest, decision, vote, test, or other sequence, including who won in any language; it overrides a broad summary classification. A status at a named intermediate position is not a settled outcome. Example: "Explain a subject and include timestamps" => {"kind":"answer-timestamp","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":false}. Example: "Who won the match?" => {"kind":"none","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":true}. Example: "What happens at 14:00?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":false,"asksForSettledOutcome":false}. Example: "Who is at 14:00 and where else do they appear?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":true,"asksForSettledOutcome":false}. Example: "Give the full story from beginning to conclusion" => {"kind":"none","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":false} unless the user asks specifically about the beginning or conclusion. Interpret every language without assuming a source genre.',
       prompt: input.question,
     });
     const serialized = text.match(/\{[\s\S]*\}/)?.[0];
@@ -509,10 +511,12 @@ async function userSpecifiedSourcePosition(input: {
       kind?: unknown;
       locator?: unknown;
       connectsBeyondPosition?: unknown;
+      asksForSettledOutcome?: unknown;
     };
     const connectsBeyondPosition = parsed.connectsBeyondPosition === true;
+    const asksForSettledOutcome = parsed.asksForSettledOutcome === true;
     if (parsed.kind === 'answer-timestamp' || parsed.kind === 'none') {
-      return { hasPosition: false, connectsBeyondPosition };
+      return { hasPosition: false, connectsBeyondPosition, asksForSettledOutcome };
     }
     if (parsed.kind !== 'input-location' || typeof parsed.locator !== 'string') return undefined;
     // The quote need only occur in the user text. Its semantic role was
@@ -520,6 +524,7 @@ async function userSpecifiedSourcePosition(input: {
     return {
       hasPosition: input.question.normalize('NFKC').includes(parsed.locator.normalize('NFKC')),
       connectsBeyondPosition,
+      asksForSettledOutcome,
     };
   } catch {
     return undefined;
@@ -1703,26 +1708,7 @@ ${fieldLines}`;
               ...plannerInput,
               question: resolvedMediaQuestion,
             });
-            const hasUserSpecifiedPosition = sourcePosition?.hasPosition;
-            const connectsBeyondPosition = sourcePosition?.connectsBeyondPosition === true;
-            // `trace` is already the planner's language-neutral declaration
-            // that the answer connects moments. Preserve its supplied source
-            // boundary and give the evidence capability its visibility record
-            // set even if the auxiliary binary classifier was inconclusive.
-            const tracesBeyondPosition =
-              connectsBeyondPosition || plannedInvestigation?.goal === 'trace';
-            const investigation: VideoInvestigationDirective | undefined =
-              hasUserSpecifiedPosition === false && plannedInvestigation?.timeRange
-                ? { scope: 'source' as const, goal: 'synthesize' as const }
-                : tracesBeyondPosition && plannedInvestigation?.timeRange
-                  ? {
-                      ...plannedInvestigation,
-                      scope: 'temporal' as const,
-                      goal: 'trace' as const,
-                      evidence: ['visual'],
-                      recordSet: 'observed' as const,
-                    }
-                  : plannedInvestigation;
+            const investigation = reconcileVideoInvestigation(plannedInvestigation, sourcePosition);
             preloadedVideoInvestigation = investigation;
             const evidenceInput = {
               mediaAssetId,
