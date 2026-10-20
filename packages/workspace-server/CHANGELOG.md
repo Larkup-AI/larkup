@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.8
+
+### Patch Changes
+
+- c2e9a11: Keep final-outcome video questions on the outcome evidence path even when the broad planner classifies them as source synthesis.
+
 ## 0.2.7
 
 ### Patch Changes
