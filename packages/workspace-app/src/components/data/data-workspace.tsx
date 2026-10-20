@@ -190,9 +190,13 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   const completedJobs = jobs.filter((job) => job.status === 'completed');
   const [jobsFilterTab, setJobsFilterTab] = useState<'running' | 'all'>('running');
 
-  const docsQuery = useSWR<DocsResponse>(workspaceUrl('/api/documents'), fetcher, {
-    refreshInterval: hasActive ? 5000 : 0,
-  });
+  const docsQuery = useSWR<DocsResponse>(
+    serverId ? workspaceUrl('/api/documents') : null,
+    fetcher,
+    {
+      refreshInterval: hasActive ? 5000 : 0,
+    },
+  );
   const { mutate: mutateDocuments } = docsQuery;
   const documents = docsQuery.data?.documents ?? [];
   const groups = docsQuery.data?.groups ?? [];
@@ -211,6 +215,9 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
     docsQuery.data !== undefined &&
     !docsQuery.error &&
     (targetGroupId === 'default' || selectedGroup !== undefined);
+  const isCorpusLoading = Boolean(
+    !serverId || docsQuery.isLoading || (docsQuery.data === undefined && !docsQuery.error),
+  );
 
   useEffect(() => {
     if (dataAddBlocked) setPrimaryAction(null);
@@ -613,7 +620,14 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
               isIndexing={indexRunning}
               activeVideoRuntimeScope={activeVideoRuntimeScope}
               initialGroupId={searchParams.has('groupId') ? queryGroupId : undefined}
-              isLoading={docsQuery.isLoading || (docsQuery.data === undefined && !docsQuery.error)}
+              isLoading={isCorpusLoading}
+              error={
+                docsQuery.error
+                  ? docsQuery.error instanceof Error
+                    ? docsQuery.error.message
+                    : String(docsQuery.error)
+                  : undefined
+              }
             />
           </div>
         )}

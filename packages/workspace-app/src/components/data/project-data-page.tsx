@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Database, FolderOpen } from 'lucide-react';
 import { WorkspaceLineTabs, WorkspacePageHeading } from '@larkup/workspace-ui';
 import type { DataGroup } from '@larkup/core/types';
+import { useProject } from '../projects/project-provider';
 import { DataWorkspace } from './data-workspace';
 import { GroupsPanel } from './groups-panel';
 
@@ -15,8 +16,13 @@ const fetcher = (url: string) => fetch(url).then((response) => response.json());
 /** Simple, tab-first source management for the active Project. */
 export function ProjectDataPage() {
   const router = useRouter();
+  const { activeProject } = useProject();
+  const serverId = activeProject?.id;
   const [activeView, setActiveView] = useState<'all' | 'groups'>('all');
-  const { data } = useSWR<{ groups: DataGroup[] }>(workspaceUrl('/api/groups'), fetcher);
+  const { data } = useSWR<{ groups: DataGroup[] }>(
+    serverId ? workspaceUrl('/api/groups') : null,
+    fetcher,
+  );
   const groups = data?.groups ?? [];
 
   return (
