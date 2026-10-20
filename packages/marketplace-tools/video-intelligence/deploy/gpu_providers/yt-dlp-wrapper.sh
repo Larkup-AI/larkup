@@ -47,11 +47,19 @@ if [ -n "$proxy_server$proxy_username$proxy_password" ]; then
   proxy_scheme="${proxy_server%%://*}"
   proxy_address="${proxy_server#*://}"
   proxy_address="${proxy_address%/}"
+  # The browser-backed WPC provider does not inherit yt-dlp's authenticated
+  # proxy and can wait indefinitely for its in-page client. The residential
+  # proxy already gives yt-dlp a usable non-datacenter route, so disable
+  # external plugins for this invocation and rely on the built-in JS solver.
+  export YTDLP_NO_PLUGINS=1
   set -- --proxy "$proxy_scheme://$proxy_username:$proxy_password@$proxy_address" "$@"
+else
+  set -- \
+    --extractor-args 'youtubepot-wpc:browser_path=/usr/local/bin/larkup-chrome' \
+    "$@"
 fi
 
 /usr/local/bin/yt-dlp-python \
   --js-runtimes node:/opt/node/bin/node \
   --extractor-args 'youtube:player_client=mweb,web_safari,web_embedded' \
-  --extractor-args 'youtubepot-wpc:browser_path=/usr/local/bin/larkup-chrome' \
   "$@"
