@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.5
+
+### Patch Changes
+
+- fd882c2: Recover YouTube durations from signed player stream metadata when reduced serverless player responses omit video details.
+
 ## 0.2.4
 
 ### Patch Changes
