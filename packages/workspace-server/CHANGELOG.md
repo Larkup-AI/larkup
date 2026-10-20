@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.6
+
+### Patch Changes
+
+- 63c15ad: Read YouTube's public schema.org duration metadata with a browser-compatible request when serverless extraction is challenged.
+
 ## 0.2.5
 
 ### Patch Changes
