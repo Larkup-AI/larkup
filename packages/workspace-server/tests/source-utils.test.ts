@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { inspectYouTubeWatchPage, inspectYouTubeWatchUrl } from '../src/lib/media/source-utils';
+import {
+  inspectYouTubePlayerMetadata,
+  inspectYouTubeWatchPage,
+  inspectYouTubeWatchUrl,
+} from '../src/lib/media/source-utils';
 
 const url = 'https://www.youtube.com/watch?v=6HaHNYjnghE';
 
@@ -17,6 +21,28 @@ test('reads a selected YouTube duration from public watch-page metadata', () => 
     mediaType: 'video',
     isYouTube: true,
   });
+});
+
+test('reads a selected YouTube duration from public player metadata', () => {
+  assert.deepEqual(
+    inspectYouTubePlayerMetadata(url, {
+      videoDetails: {
+        videoId: '6HaHNYjnghE',
+        title: 'Highlights | Spain vs Argentina',
+        lengthSeconds: '117',
+      },
+    }),
+    {
+      originalUrl: url,
+      title: 'Highlights | Spain vs Argentina',
+      durationSecs: 117,
+      singleItemDurationSecs: 117,
+      singleItemUrl: url,
+      entryCount: 1,
+      mediaType: 'video',
+      isYouTube: true,
+    },
+  );
 });
 
 test('does not accept watch-page metadata for another video or without a duration', () => {

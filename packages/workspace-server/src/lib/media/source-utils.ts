@@ -98,6 +98,14 @@ interface YouTubeInspectionData {
   }>;
 }
 
+interface YouTubePlayerData {
+  videoDetails?: {
+    videoId?: string;
+    title?: string;
+    lengthSeconds?: string | number;
+  };
+}
+
 function positiveDuration(value: unknown): number | undefined {
   const duration = Number(value);
   return Number.isFinite(duration) && duration > 0 ? duration : undefined;
@@ -171,31 +179,34 @@ export function inspectYouTubeWatchUrl(url: string): UrlInspection | undefined {
 }
 
 export function inspectYouTubeWatchPage(url: string, html: string): UrlInspection | undefined {
-  const requestedId = youtubeVideoId(url);
-  if (!requestedId) return undefined;
   const details = jsonObjectAfterMarker(html, '"videoDetails":');
   if (!details) return undefined;
   try {
-    const data = JSON.parse(details) as {
-      videoId?: string;
-      title?: string;
-      lengthSeconds?: string | number;
-    };
-    const durationSecs = positiveDuration(data.lengthSeconds);
-    if (data.videoId !== requestedId || !durationSecs) return undefined;
-    return {
-      originalUrl: url,
-      title: data.title,
-      durationSecs,
-      singleItemDurationSecs: durationSecs,
-      singleItemUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(requestedId)}`,
-      entryCount: 1,
-      mediaType: 'video',
-      isYouTube: true,
-    };
+    return inspectYouTubePlayerMetadata(url, {
+      videoDetails: JSON.parse(details) as YouTubePlayerData['videoDetails'],
+    });
   } catch {
     return undefined;
   }
+}
+
+export function inspectYouTubePlayerMetadata(
+  url: string,
+  data: YouTubePlayerData,
+): UrlInspection | undefined {
+  const requestedId = youtubeVideoId(url);
+  const durationSecs = positiveDuration(data.videoDetails?.lengthSeconds);
+  if (!requestedId || data.videoDetails?.videoId !== requestedId || !durationSecs) return undefined;
+  return {
+    originalUrl: url,
+    title: data.videoDetails.title,
+    durationSecs,
+    singleItemDurationSecs: durationSecs,
+    singleItemUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(requestedId)}`,
+    entryCount: 1,
+    mediaType: 'video',
+    isYouTube: true,
+  };
 }
 
 function jsonObjectAfterMarker(source: string, marker: string): string | undefined {
@@ -363,6 +374,48 @@ export function hasInflatedPlaybackTimeline(probe: MediaProbe) {
   return longestReported - videoDuration > Math.max(5, videoDuration * 0.03);
 }
 
+async function inspectYouTubePlayer(url: string): Promise<UrlInspection | undefined> {
+  const videoId = youtubeVideoId(url);
+  if (!videoId) return undefined;
+  const response = await fetchPublic(
+    'https://www.youtube.com/youtubei/v1/player?prettyPrint=false',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'user-agent': 'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip',
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: 'ANDROID',
+            clientVersion: '20.10.38',
+            androidSdkVersion: 30,
+            hl: 'en',
+            gl: 'US',
+          },
+        },
+        videoId,
+        contentCheckOk: true,
+        racyCheckOk: true,
+      }),
+      signal: AbortSignal.timeout(MEDIA_URL_INSPECTION_TIMEOUT_MS),
+    },
+  );
+  if (!response.ok) {
+    await response.body?.cancel();
+    return undefined;
+  }
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > 3 * 1024 * 1024) {
+    await response.body?.cancel();
+    return undefined;
+  }
+  const body = await response.text();
+  if (body.length > 3 * 1024 * 1024) return undefined;
+  return inspectYouTubePlayerMetadata(url, JSON.parse(body) as YouTubePlayerData);
+}
+
 export async function inspectMediaUrl(url: string): Promise<UrlInspection> {
   const parsed = validHttpUrl(url);
   await assertPublicHost(parsed.hostname);
@@ -371,6 +424,8 @@ export async function inspectMediaUrl(url: string): Promise<UrlInspection> {
     try {
       output = await runYtDlp(['--dump-single-json', '--simulate', '--flat-playlist', url]);
     } catch (error) {
+      const playerInspection = await inspectYouTubePlayer(url).catch(() => undefined);
+      if (playerInspection) return playerInspection;
       try {
         const page = await readPublicUrl(url, 3 * 1024 * 1024);
         const inspection = inspectYouTubeWatchPage(url, new TextDecoder().decode(page.bytes));
