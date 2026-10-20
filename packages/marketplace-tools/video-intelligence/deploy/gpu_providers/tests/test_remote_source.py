@@ -125,7 +125,11 @@ class RemoteSourceTests(unittest.TestCase):
             destination = Path(out_dir) / "youtube.mp4"
             process = MagicMock()
             process.stdout.__iter__.return_value = iter(
-                ["[download]  12.5% of 10MiB\n", "[download] 100% of 10MiB\n"]
+                [
+                    "[download]  12.5% of 10MiB\n",
+                    "[download] 100% of 10MiB\n",
+                    'LARKUP_MEDIA_METADATA:{"title":"A useful video title"}\n',
+                ]
             )
             process.wait.return_value = 0
             reports: list[tuple[int, str]] = []
@@ -138,7 +142,7 @@ class RemoteSourceTests(unittest.TestCase):
                 "gpu_providers.remote_source.subprocess.Popen",
                 side_effect=create_destination,
             ) as popen:
-                materialize_provider_source(
+                title = materialize_provider_source(
                     "https://www.youtube.com/watch?v=abc",
                     destination,
                     progress=lambda percent, message: reports.append((percent, message)),
@@ -147,7 +151,9 @@ class RemoteSourceTests(unittest.TestCase):
             command = popen.call_args.args[0]
             self.assertEqual(command[0], "yt-dlp")
             self.assertIn("--no-playlist", command)
+            self.assertIn("--print", command)
             self.assertEqual(command[-1], "https://www.youtube.com/watch?v=abc")
+            self.assertEqual(title, "A useful video title")
             self.assertIn((12, "Downloading remote video (12%)"), reports)
             self.assertEqual(reports[-1], (99, "Remote video is ready for secure transfer"))
 

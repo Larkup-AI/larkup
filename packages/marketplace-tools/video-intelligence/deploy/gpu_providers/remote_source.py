@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -8,6 +9,7 @@ from urllib.parse import urlparse
 
 
 PreparationProgress = Callable[[int, str], None]
+YTDLP_METADATA_PREFIX = "LARKUP_MEDIA_METADATA:"
 
 
 class YouTubeVerificationRequiredError(RuntimeError):
@@ -20,7 +22,7 @@ def materialize_provider_source(
     source_duration_secs: float | None = None,
     progress: PreparationProgress | None = None,
     prefer_stream_copy: bool = False,
-) -> None:
+) -> str | None:
     """Materialize a provider page or direct media URL into a playable MP4."""
     hostname = (urlparse(source_url).hostname or "").lower().rstrip(".")
     if (
@@ -28,8 +30,7 @@ def materialize_provider_source(
         or hostname == "youtube.com"
         or hostname.endswith(".youtube.com")
     ):
-        _download_youtube_source(source_url, destination, progress)
-        return
+        return _download_youtube_source(source_url, destination, progress)
     materialize_remote_source(
         source_url,
         destination,
@@ -37,13 +38,14 @@ def materialize_provider_source(
         progress,
         prefer_stream_copy=prefer_stream_copy,
     )
+    return None
 
 
 def _download_youtube_source(
     source_url: str,
     destination: Path,
     progress: PreparationProgress | None,
-) -> None:
+) -> str | None:
     command = [
         "yt-dlp",
         "--no-playlist",
@@ -62,6 +64,8 @@ def _download_youtube_source(
         ),
         "--merge-output-format",
         "mp4",
+        "--print",
+        f"after_move:{YTDLP_METADATA_PREFIX}%(.{{title}})j",
         "-o",
         str(destination),
         source_url,
@@ -76,12 +80,21 @@ def _download_youtube_source(
         bufsize=1,
     )
     diagnostics: list[str] = []
+    extracted_title: str | None = None
     assert process.stdout is not None
     for raw_line in process.stdout:
         line = raw_line.strip()
         if line:
             diagnostics.append(line)
             diagnostics = diagnostics[-40:]
+        if line.startswith(YTDLP_METADATA_PREFIX):
+            try:
+                metadata = json.loads(line[len(YTDLP_METADATA_PREFIX) :])
+                title = str(metadata.get("title") or "").replace("\x00", "").strip()
+                if title:
+                    extracted_title = title[:255]
+            except (json.JSONDecodeError, AttributeError):
+                pass
         match = re.search(r"\[download\]\s+([0-9]+(?:\.[0-9]+)?)%", line)
         if match and progress:
             percent = max(1, min(99, round(float(match.group(1)))))
@@ -100,6 +113,7 @@ def _download_youtube_source(
         raise RuntimeError("could not download remote video: " + diagnostic)
     if progress:
         progress(99, "Remote video is ready for secure transfer")
+    return extracted_title
 
 
 def rebase_transcript_context(
