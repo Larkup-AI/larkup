@@ -219,6 +219,140 @@ test.describe.serial('Data Page', () => {
     await expect(addText).toHaveAttribute('data-ready', 'true');
   });
 
+  test('shows file preparation immediately and stages image-only PDFs', async ({ page }) => {
+    let releaseParse!: () => void;
+    const parseReady = new Promise<void>((resolve) => {
+      releaseParse = resolve;
+    });
+    await page.route('**/api/config', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ capabilities: { imageIndexing: { available: true } } }),
+      }),
+    );
+    await page.route('**/api/parse-file', async (route) => {
+      await parseReady;
+      await route.fulfill({
+        status: 422,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'No readable text was found in this file.' }),
+      });
+    });
+
+    await page.getByRole('button', { name: 'Files', exact: true }).click();
+    await page
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: 'scanned-report.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('%PDF-1.4 image-only test'),
+      });
+
+    await expect(page.getByRole('status').filter({ hasText: 'Preparing 1 file' })).toBeVisible();
+    await expect(page.getByText('scanned-report.pdf', { exact: true })).toBeVisible();
+    releaseParse();
+
+    await expect(page.getByText('1 file staged', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Toggle image indexing' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.getByText(/Could not read scanned-report\.pdf/)).toHaveCount(0);
+  });
+
+  test('keeps the corpus loading state until the first document response', async ({ page }) => {
+    let releaseDocuments!: () => void;
+    const documentsReady = new Promise<void>((resolve) => {
+      releaseDocuments = resolve;
+    });
+    await page.route('**/api/documents', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await documentsReady;
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          documents: [
+            {
+              id: '00000000-0000-4000-8000-000000000001',
+              title: 'Loaded source',
+              content: 'Ready',
+              charCount: 5,
+              source: 'text',
+              status: 'indexed',
+              groupId: 'default',
+              metadata: {},
+              createdAt: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+          groups: [],
+          stats: { docCount: 1, charCount: 5, bySource: { text: 1 } },
+        }),
+      });
+    });
+
+    await page.goto('/data');
+    await expect(page.getByRole('status', { name: 'Loading corpus' })).toBeVisible();
+    await expect(page.getByText('Your corpus is empty', { exact: true })).toHaveCount(0);
+    releaseDocuments();
+    await expect(page.getByText('Loaded source', { exact: true })).toBeVisible();
+  });
+
+  test('removes a confirmed document immediately while deletion finishes', async ({ page }) => {
+    let deleted = false;
+    let releaseDelete!: () => void;
+    const deleteReady = new Promise<void>((resolve) => {
+      releaseDelete = resolve;
+    });
+    const document = {
+      id: '00000000-0000-4000-8000-000000000002',
+      title: 'Delete without delay',
+      content: 'Temporary',
+      charCount: 9,
+      source: 'text',
+      status: 'indexed',
+      groupId: 'default',
+      metadata: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+    };
+    await page.route('**/api/documents**', async (route) => {
+      if (route.request().method() === 'DELETE') {
+        await deleteReady;
+        deleted = true;
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true }),
+        });
+        return;
+      }
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            documents: deleted ? [] : [document],
+            groups: [],
+            stats: {
+              docCount: deleted ? 0 : 1,
+              charCount: deleted ? 0 : document.charCount,
+              bySource: deleted ? {} : { text: 1 },
+            },
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.goto('/data');
+    await expect(page.getByText(document.title, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Delete document' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+
+    await expect(page.getByText(document.title, { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Your corpus is empty', { exact: true })).toBeVisible();
+    releaseDelete();
+  });
+
   test('adds pasted text to the group selected on the add page', async ({ page }) => {
     const groups = [
       { id: 'default', name: 'Default', icon: '📚', createdAt: '2026-01-01' },
