@@ -1,5 +1,11 @@
 # @larkup/workspace-app
 
+## 0.2.2
+
+### Patch Changes
+
+- f46e865: Keep corpus loading and deletion states consistent, show immediate file preparation progress, and stage image-only PDFs for vision indexing.
+
 ## 0.2.1
 
 ### Patch Changes
