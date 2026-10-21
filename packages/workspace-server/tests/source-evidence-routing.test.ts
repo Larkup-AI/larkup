@@ -70,6 +70,31 @@ test('a direct image request reuses the prior PDF page without another search', 
   assert.deepEqual(imagePreviewInput(evidence), { documentId: 'pdf-1', pageNumber: 2 });
 });
 
+test('a direct image request reuses a page selected by PDF inspection', () => {
+  const evidence = extractConversationEvidence([
+    {
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-searchKnowledgeBase',
+          input: { query: 'What does the schema include?' },
+          output: {
+            hits: [{ documentId: 'pdf-1', title: 'Schema.pdf', text: 'Database schema details' }],
+          },
+        },
+        {
+          type: 'tool-inspectPdfPages',
+          input: { documentId: 'pdf-1', question: 'What does the schema include?' },
+          output: { success: true, pages: [{ pageNumber: 2 }] },
+        },
+      ],
+    },
+  ]);
+
+  assert.equal(isImagePreviewFollowUp('I need the image', evidence), true);
+  assert.deepEqual(imagePreviewInput(evidence), { documentId: 'pdf-1', pageNumber: 2 });
+});
+
 test('an extracted image remains reusable when no PDF page is available', () => {
   const evidence = {
     sources: [],
