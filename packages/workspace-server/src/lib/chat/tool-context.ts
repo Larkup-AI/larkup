@@ -441,7 +441,18 @@ export function formatLocatedObservedSubjectAnswer(value: unknown): string | und
  * asking a prose model to reinterpret explicit discrete moments as one
  * continuous appearance or as an absence claim.
  */
-export function formatObservedAppearanceAnswer(value: unknown): string | undefined {
+export function formatObservedAppearanceAnswer(
+  value: unknown,
+  investigation?: { goal?: unknown; recordSet?: unknown },
+): string | undefined {
+  // A visibility ledger answers recurrence/presence questions. It is context,
+  // not a substitute for another requested visual fact such as clothing,
+  // colour, action, count, or identity. The typed planner directive is the
+  // language-neutral boundary: only an explicit observed trace may render the
+  // ledger as the final answer.
+  if (investigation?.goal !== 'trace' || investigation.recordSet !== 'observed') {
+    return undefined;
+  }
   type Appearance = { startSecs: number; endSecs: number };
   type Subject = { identity: string; basis: string; appearances: Appearance[] };
   const subjects = new Map<string, Subject>();

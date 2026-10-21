@@ -10,6 +10,7 @@ import {
   retrievalFallbackMediaAsset,
   type RoutableMediaAsset,
 } from '../src/lib/chat/media-source-routing.ts';
+import { formatObservedAppearanceAnswer } from '../src/lib/chat/tool-context.ts';
 
 const asset: RoutableMediaAsset = {
   id: 'video-1',
@@ -103,4 +104,37 @@ test('an extracted image remains reusable when no PDF page is available', () => 
   };
   assert.equal(isImagePreviewFollowUp('show it', evidence), true);
   assert.deepEqual(imagePreviewInput(evidence), { imageUrl: '/indexed-image.png' });
+});
+
+const recurringSubjectEvidence = {
+  success: true,
+  claimVerification: { status: 'directly-established', directlyEstablished: true },
+  evidence: [
+    {
+      payload:
+        'Reconciled visible subject: unidentified Spain player\n' +
+        'Identity basis: source-described\n' +
+        'Observed appearances: 19.987-19.987s; 50.017-50.017s',
+    },
+  ],
+};
+
+test('a visibility ledger cannot replace the answer to another visual question', () => {
+  assert.equal(
+    formatObservedAppearanceAnswer(recurringSubjectEvidence, {
+      goal: 'compare',
+      recordSet: 'all',
+    }),
+    undefined,
+  );
+});
+
+test('a visibility trace can render recurring observed moments directly', () => {
+  assert.match(
+    formatObservedAppearanceAnswer(recurringSubjectEvidence, {
+      goal: 'trace',
+      recordSet: 'observed',
+    }) ?? '',
+    /separate observed moments/,
+  );
 });

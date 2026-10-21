@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image as ImageIcon, Film, AudioLines, Maximize2, X } from 'lucide-react';
 import { workspaceUrl } from '../../../host';
 
@@ -32,6 +32,7 @@ export function ChatMediaPreview({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [imageUnavailable, setImageUnavailable] = useState(false);
+  const [videoUnavailable, setVideoUnavailable] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   // Media is rendered only from a server-validated presentMedia result. Do
   // not invent a URL from an identifier emitted in model text: it could point
@@ -42,10 +43,6 @@ export function ChatMediaPreview({
     assetUrl && startSecs !== undefined
       ? `${assetUrl.split('#')[0]}#t=${startSecs}${endSecs !== undefined ? `,${endSecs}` : ''}`
       : assetUrl;
-  const providerEmbedUrl = useMemo(
-    () => (mediaType === 'video' ? getProviderEmbedUrl(sourceUrl, startSecs, endSecs) : undefined),
-    [mediaType, sourceUrl, startSecs, endSecs],
-  );
   const hasClipEnd =
     mediaType === 'video' &&
     Number.isFinite(startSecs) &&
@@ -133,35 +130,53 @@ export function ChatMediaPreview({
   }
 
   if (mediaType === 'video') {
+    if (videoUnavailable) {
+      return (
+        <div className="my-2 w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-card">
+          <div className="flex aspect-video items-center justify-center bg-muted/30 px-6 text-center">
+            <div>
+              <Film className="mx-auto mb-2 size-6 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">Preview unavailable</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Open the original source to watch this cited moment.
+              </p>
+            </div>
+          </div>
+          <MediaCitationFooter
+            icon={<Film className="size-3 text-muted-foreground" />}
+            fileName={fileName}
+            sourceUrl={timestampedMediaUrl(sourceUrl, startSecs, endSecs)}
+            timestamp={
+              startSecs !== undefined
+                ? `${formatTimestamp(startSecs)}${
+                    endSecs !== undefined ? ` – ${formatTimestamp(endSecs)}` : ''
+                  }`
+                : undefined
+            }
+          />
+        </div>
+      );
+    }
     return (
       <div className="my-2 w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-card">
-        {providerEmbedUrl ? (
-          <iframe
-            src={providerEmbedUrl}
-            title={fileName ? `Watch ${fileName}` : 'Video preview'}
-            className="aspect-video w-full bg-black"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
-        ) : (
-          <video
-            ref={videoRef}
-            src={playbackUrl}
-            controls
-            playsInline
-            preload="metadata"
-            className="max-h-90 w-full bg-black object-contain"
-            onTimeUpdate={(event) => {
-              // Media-fragment end times are not enforced consistently by
-              // browsers. Stop local playback at the cited evidence boundary
-              // so a supporting clip never continues into unrelated footage.
-              if (hasClipEnd && event.currentTarget.currentTime >= (endSecs as number)) {
-                event.currentTarget.pause();
-                event.currentTarget.currentTime = endSecs as number;
-              }
-            }}
-          />
-        )}
+        <video
+          ref={videoRef}
+          src={playbackUrl}
+          controls
+          playsInline
+          preload="metadata"
+          className="max-h-90 w-full bg-black object-contain"
+          onError={() => setVideoUnavailable(true)}
+          onTimeUpdate={(event) => {
+            // Media-fragment end times are not enforced consistently by
+            // browsers. Stop local playback at the cited evidence boundary
+            // so a supporting clip never continues into unrelated footage.
+            if (hasClipEnd && event.currentTarget.currentTime >= (endSecs as number)) {
+              event.currentTarget.pause();
+              event.currentTarget.currentTime = endSecs as number;
+            }
+          }}
+        />
         <MediaCitationFooter
           icon={<Film className="size-3 text-muted-foreground" />}
           fileName={fileName}
