@@ -1,5 +1,11 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.9
+
+### Patch Changes
+
+- Keep visibility ledgers from answering unrelated visual questions, route missing visual attributes to bounded re-watch, preserve complete long-source inventories, and fall back from blocked provider embeds to local playback or a clean source link.
+
 ## 0.3.8
 
 ### Patch Changes

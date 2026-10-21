@@ -1,6 +1,6 @@
 {
   "name": "@larkup/tool-video-intelligence",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "type": "module",
   "description": "Installable local and cloud video intelligence with evidence-first indexing.",
   "main": "./dist/index.js",
