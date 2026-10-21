@@ -26,7 +26,7 @@ export type ExactGroundedAnswer = {
 };
 
 export type ReusableImageEvidence = {
-  imageUrl: string;
+  imageUrl?: string;
   documentId?: string;
   pageNumber?: number;
   index?: number;
@@ -355,6 +355,28 @@ export function extractConversationEvidence(
       return { sources: [], images: [], mediaAssetIds: [], tabular: table };
     }
 
+    const inspectedPdfPages = parts
+      .filter((part) => part.name === 'inspectPdfPages')
+      .flatMap((part) => {
+        const input = unwrapJson(part.input) as { documentId?: unknown } | undefined;
+        const output = unwrapJson(part.output) as
+          | { success?: unknown; pages?: Array<{ pageNumber?: unknown; imageUrl?: unknown }> }
+          | undefined;
+        if (typeof input?.documentId !== 'string' || output?.success !== true) return [];
+        return (output.pages ?? []).flatMap((page) => {
+          if (typeof page.pageNumber !== 'number' || !Number.isInteger(page.pageNumber)) return [];
+          return [
+            {
+              documentId: input.documentId as string,
+              pageNumber: page.pageNumber,
+              ...(typeof page.imageUrl === 'string' && page.imageUrl
+                ? { imageUrl: page.imageUrl }
+                : {}),
+            } satisfies ReusableImageEvidence,
+          ];
+        });
+      });
+
     const result = parts
       .filter((part) => part.name === 'searchKnowledgeBase')
       .map(
@@ -375,6 +397,9 @@ export function extractConversationEvidence(
     const hits = Array.isArray(result?.hits) ? result.hits : [];
 
     const images = new Map<string, ReusableImageEvidence>();
+    for (const image of inspectedPdfPages) {
+      images.set(`${image.documentId}:${image.pageNumber}`, image);
+    }
     for (const hit of hits.slice(0, 4) as any[]) {
       if (!hit || typeof hit !== 'object') continue;
       const title = typeof hit.title === 'string' ? hit.title : undefined;
@@ -382,7 +407,7 @@ export function extractConversationEvidence(
         ...imageEvidence(hit.images, title, hit.documentId),
         ...imageEvidence(hit.metadata?.images, title, hit.documentId),
       ]) {
-        images.set(image.imageUrl, image);
+        images.set(image.imageUrl ?? `${image.documentId}:${image.pageNumber}`, image);
       }
     }
     const sources = hits.slice(0, 2).flatMap((hit: any) => {
@@ -520,7 +545,7 @@ export function imagePreviewInput(
   if (image.documentId && image.pageNumber) {
     return { documentId: image.documentId, pageNumber: image.pageNumber };
   }
-  return { imageUrl: image.imageUrl };
+  return image.imageUrl ? { imageUrl: image.imageUrl } : undefined;
 }
 
 /**
