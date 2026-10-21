@@ -35,9 +35,15 @@ function formatSeriesLabel(value: string) {
 }
 
 export function requestsVisualization(text: string): boolean {
-  return /\b(chart|graph|plot|visuali[sz]e|distribution|breakdown|trends?|compare|show\s+me)\b/i.test(
-    text,
-  );
+  const explicitChart =
+    /\b(?:charts?|graphs?|plots?|visuali[sz](?:e|ation)|diagram|histogram|scatter\s*plot|trends?)\b/iu.test(
+      text,
+    );
+  const visualPresentation =
+    /\b(?:show|display|draw|render|create|make)\b.{0,40}\b(?:distribution|breakdown|trend|comparison)\b/iu.test(
+      text,
+    );
+  return explicitChart || visualPresentation;
 }
 
 function normalizedTerms(value: string) {

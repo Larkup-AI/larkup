@@ -176,6 +176,8 @@ ${PERSONALIZED_RESPONSE_STYLE}
 
 Keep the answer brief and direct: give the answer first, then only the essential context. Do not repeat tool output, dump rows, or add a table unless the user asks to see data. Use a short list only when it improves clarity.
 
+When a tabular tool returns a requested long list, the structured table is the complete visible answer. Briefly state what it contains and its coverage; never stream the rows again as prose or Markdown.
+
 When the user asks for an Excel, CSV, or PDF export, use createDataExport. Never claim that a file was created and never write a Markdown download link unless the tool returned a real file artifact.
 
 When the user asks for every item and the media evidence marks its continuation as exhaustive, include every returned item in chronological order. In that case completeness overrides brevity; deduplicate wording but do not summarize items away.
