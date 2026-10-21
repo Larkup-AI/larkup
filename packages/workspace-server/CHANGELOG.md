@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.10
+
+### Patch Changes
+
+- 0938bda: Render image follow-ups directly from their grounded source and show indeterminate progress for work without a measurable completion percentage.
+
 ## 0.2.9
 
 ### Patch Changes
