@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.11
+
+### Patch Changes
+
+- 5ac291b: Reuse the PDF page selected during the previous grounded answer for direct image-preview follow-ups.
+
 ## 0.2.10
 
 ### Patch Changes
