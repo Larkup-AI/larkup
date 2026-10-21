@@ -13,6 +13,40 @@ test('settled outcomes override an incorrect broad synthesis plan', () => {
   );
 });
 
+test('explicit complete-source timelines override a temporal top-k plan', () => {
+  assert.deepEqual(
+    reconcileVideoInvestigation(
+      {
+        scope: 'temporal',
+        goal: 'enumerate',
+        evidence: ['visual', 'speech'],
+        recordSet: 'all',
+      },
+      {
+        hasPosition: false,
+        asksForSettledOutcome: false,
+        asksForExhaustiveCoverage: true,
+      },
+    ),
+    {
+      scope: 'source',
+      goal: 'enumerate',
+      evidence: ['visual', 'speech'],
+      recordSet: 'all',
+    },
+  );
+});
+
+test('a broad narrative request remains synthesis rather than a record dump', () => {
+  assert.deepEqual(
+    reconcileVideoInvestigation(
+      { scope: 'source', goal: 'synthesize', evidence: ['speech', 'visual'] },
+      { hasPosition: false, asksForExhaustiveCoverage: false },
+    ),
+    { scope: 'source', goal: 'synthesize', evidence: ['speech', 'visual'] },
+  );
+});
+
 test('a status at a specified position remains bounded rather than becoming a final outcome', () => {
   assert.deepEqual(
     reconcileVideoInvestigation(
