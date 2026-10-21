@@ -1,6 +1,6 @@
 {
   "name": "@larkup/workspace-app",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "type": "module",
   "description": "Canonical Larkup chat, data and settings pages with host adapters",
   "files": [

@@ -1,5 +1,13 @@
 # @larkup/workspace-app
 
+## 0.2.8
+
+### Patch Changes
+
+- Route repeated analysis across many records through one sandbox execution and preserve the requested item count in a structured result artifact.
+
+  Render complete analysis tables with pagination, search, and CSV download, and render long narrative results in a searchable paged reader with TXT download.
+
 ## 0.2.7
 
 ### Patch Changes
