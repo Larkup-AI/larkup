@@ -53,6 +53,11 @@
       "import": "./src/lib/chat/assistant-source-scope.ts",
       "default": "./src/lib/chat/assistant-source-scope.ts"
     },
+    "./lib/chat/analysis-presentation": {
+      "types": "./dist-types/lib/chat/analysis-presentation.d.ts",
+      "import": "./src/lib/chat/analysis-presentation.ts",
+      "default": "./src/lib/chat/analysis-presentation.ts"
+    },
     "./lib/chat/conversation-memory": {
       "types": "./dist-types/lib/chat/conversation-memory.d.ts",
       "import": "./src/lib/chat/conversation-memory.ts",

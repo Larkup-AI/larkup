@@ -33,6 +33,7 @@ export interface DataTableConfig {
   totalRows: number;
   truncated?: boolean;
   aggregationResults?: Record<string, number>;
+  fileName?: string;
 }
 
 export interface ChatDataTableProps {
@@ -50,7 +51,7 @@ function formatCell(value: any): string {
   return String(value);
 }
 
-function downloadCSV(columns: string[], rows: Record<string, any>[]) {
+function downloadCSV(columns: string[], rows: Record<string, any>[], fileName = 'data') {
   const csv = [
     columns.join(','),
     ...rows.map((row) =>
@@ -67,7 +68,12 @@ function downloadCSV(columns: string[], rows: Record<string, any>[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'data.csv';
+  const stem = fileName
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^\p{L}\p{N}._-]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100);
+  a.download = `${stem || 'data'}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -168,7 +174,10 @@ export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
     setTimeout(() => setCopied(false), 2000);
   }, [columns, rows]);
 
-  const handleDownload = useCallback(() => downloadCSV(columns, rows), [columns, rows]);
+  const handleDownload = useCallback(
+    () => downloadCSV(columns, rows, config.fileName),
+    [columns, rows, config.fileName],
+  );
 
   if (columns.length === 0 || rows.length === 0) {
     return <div className="py-4 text-center text-sm text-muted-foreground">No data returned</div>;
@@ -358,6 +367,7 @@ export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Previous table page"
             className="h-7 w-7 focus:ring-0 focus-visible:ring-0"
             disabled={page === 0}
             onClick={() => setPage((p) => p - 1)}
@@ -367,6 +377,7 @@ export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Next table page"
             className="h-7 w-7 focus:ring-0 focus-visible:ring-0"
             disabled={page >= totalPages - 1}
             onClick={() => setPage((p) => p + 1)}
