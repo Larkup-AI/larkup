@@ -40,6 +40,14 @@ export type ReusableTabularEvidence = {
   totalRows: number;
 };
 
+export type AnalysisArtifactSummary = {
+  kind: 'table' | 'document';
+  title: string;
+  totalItems: number;
+  requestedItems?: number;
+  complete: boolean;
+};
+
 /** Only reuse table evidence while its source is still present in the live data store. */
 export function tabularEvidenceDatasetIsAvailable(
   evidence: ReusableTabularEvidence | undefined,
@@ -283,6 +291,44 @@ function completeTabularEvidence(
   };
 }
 
+function analysisPresentation(output: unknown): Record<string, unknown> | undefined {
+  const result = unwrapJson(output) as Record<string, unknown> | undefined;
+  const presentation = result?.presentation;
+  return presentation && typeof presentation === 'object' && !Array.isArray(presentation)
+    ? (presentation as Record<string, unknown>)
+    : undefined;
+}
+
+/** Read only completion metadata; the full paged artifact remains in the UI message. */
+export function extractLatestAnalysisArtifact(
+  messages: readonly ChatMessage[],
+): AnalysisArtifactSummary | undefined {
+  for (const message of [...messages].reverse()) {
+    if (message.role !== 'assistant') continue;
+    for (const part of toolParts(message).reverse()) {
+      if (part.name !== 'executeAnalysis' && part.name !== 'analyzeCorpusWithCode') continue;
+      const presentation = analysisPresentation(part.output);
+      if (
+        (presentation?.kind !== 'table' && presentation?.kind !== 'document') ||
+        typeof presentation.title !== 'string' ||
+        typeof presentation.totalItems !== 'number' ||
+        typeof presentation.complete !== 'boolean'
+      )
+        continue;
+      return {
+        kind: presentation.kind,
+        title: presentation.title,
+        totalItems: presentation.totalItems,
+        ...(typeof presentation.requestedItems === 'number'
+          ? { requestedItems: presentation.requestedItems }
+          : {}),
+        complete: presentation.complete,
+      };
+    }
+  }
+  return undefined;
+}
+
 /** Keep the complete bounded query result for an immediate export follow-up. */
 export function extractLatestTabularExportResult(
   messages: readonly ChatMessage[],
@@ -290,8 +336,18 @@ export function extractLatestTabularExportResult(
   for (const message of [...messages].reverse()) {
     if (message.role !== 'assistant') continue;
     const result = toolParts(message)
-      .filter((part) => part.name === 'queryTabularData')
-      .map((part) => completeTabularEvidence(part.input, part.output))
+      .filter(
+        (part) =>
+          part.name === 'queryTabularData' ||
+          part.name === 'executeAnalysis' ||
+          part.name === 'analyzeCorpusWithCode',
+      )
+      .map((part) =>
+        completeTabularEvidence(
+          part.input,
+          part.name === 'queryTabularData' ? part.output : analysisPresentation(part.output),
+        ),
+      )
       .find(Boolean);
     if (result) return result;
   }
@@ -348,8 +404,18 @@ export function extractConversationEvidence(
     if (message.role !== 'assistant') continue;
     const parts = toolParts(message);
     const table = parts
-      .filter((part) => part.name === 'queryTabularData')
-      .map((part) => tabularEvidence(part.input, part.output))
+      .filter(
+        (part) =>
+          part.name === 'queryTabularData' ||
+          part.name === 'executeAnalysis' ||
+          part.name === 'analyzeCorpusWithCode',
+      )
+      .map((part) =>
+        tabularEvidence(
+          part.input,
+          part.name === 'queryTabularData' ? part.output : analysisPresentation(part.output),
+        ),
+      )
       .find(Boolean);
     if (table) {
       return { sources: [], images: [], mediaAssetIds: [], tabular: table };

@@ -1192,11 +1192,28 @@ function compactValue(value: unknown, toolName?: string): unknown {
           totalRows: result.totalRows,
           aggregationResults: result.aggregationResults,
         };
-  } else if (toolName === 'executeAnalysis') {
+  } else if (toolName === 'executeAnalysis' || toolName === 'analyzeCorpusWithCode') {
+    const presentation =
+      result.presentation && typeof result.presentation === 'object'
+        ? (result.presentation as Record<string, any>)
+        : undefined;
     compact = {
       stdout: typeof result.stdout === 'string' ? result.stdout.slice(0, 4_000) : result.stdout,
       stderr: typeof result.stderr === 'string' ? result.stderr.slice(0, 1_000) : result.stderr,
       exitCode: result.exitCode,
+      ...(presentation
+        ? {
+            presentation: {
+              kind: presentation.kind,
+              title: presentation.title,
+              summary: presentation.summary,
+              totalItems: presentation.totalItems,
+              requestedItems: presentation.requestedItems,
+              complete: presentation.complete,
+              ...(Array.isArray(presentation.columns) ? { columns: presentation.columns } : {}),
+            },
+          }
+        : {}),
     };
   } else if (
     (toolName === 'inspectPdfPages' || toolName === 'analyzePdfPages') &&

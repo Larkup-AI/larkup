@@ -59,9 +59,37 @@ export function hasCompletedTabularVisualizationStep(
  * column names.
  */
 export function requiresTabularSandbox(text: string): boolean {
-  return /\b(?:join|correlat(?:e|ion)|regression|cluster(?:ing)?|forecast(?:ing)?|statistical|sandbox|python|matplotlib|seaborn|scikit(?:-learn)?|custom\s+(?:analysis|chart|visuali[sz]ation)|across\s+(?:sheets?|tables?|datasets?|files?)|between\s+(?:sheets?|tables?|datasets?|files?))\b/i.test(
-    text,
+  return (
+    /\b(?:join|correlat(?:e|ion)|regression|cluster(?:ing)?|forecast(?:ing)?|statistical|sandbox|python|matplotlib|seaborn|scikit(?:-learn)?|custom\s+(?:analysis|chart|visuali[sz]ation)|across\s+(?:sheets?|tables?|datasets?|files?)|between\s+(?:sheets?|tables?|datasets?|files?))\b/i.test(
+      text,
+    ) || requestsLongAnalysisArtifact(text)
   );
+}
+
+/**
+ * Long per-record transformations cannot be completed safely as streamed prose:
+ * the model will eventually hit its output ceiling and a later "continue" loses
+ * global constraints. Route these through one sandbox run and a paged artifact.
+ */
+export function requestsLongAnalysisArtifact(text: string): boolean {
+  const hasManyTargets =
+    /\bfor\s+(?:the\s+)?(?:first|last|top)\s+\d+\b|\bfor\s+(?:each|every|all)\b|\b(?:each|every|all)\s+(?:of\s+)?(?:the\s+)?(?:people|participants?|rows?|records?|entries|documents?|items?|responses?)\b/i.test(
+      text,
+    );
+  const transformsEachTarget =
+    /\b(?:match(?:es|ed|ing)?|recommend(?:ation|ations|ed|ing)?|explain(?:ed|ing|s)?|summari[sz](?:e|ed|es|ing|ation)|profile(?:d|s|ing)?|assess(?:ed|ment|ments|ing)?|evaluat(?:e|ed|es|ing|ion)|classif(?:y|ied|ies|ication)|score(?:d|s|ing)?|rewrite|generate\s+(?:a\s+)?(?:description|report|answer))\b/i.test(
+      text,
+    );
+  return hasManyTargets && transformsEachTarget;
+}
+
+/** Preserve explicit batch sizes for sandbox artifacts (larger than chat prose limits). */
+export function requestedLongAnalysisItemCount(text: string): number | undefined {
+  const match = text.match(
+    /\b(?:first|last|top)\s+(\d{1,5})\b|\bfor\s+(\d{1,5})\s+(?:people|participants?|rows?|records?|entries|documents?|items?|responses?)\b/i,
+  );
+  const value = Number(match?.[1] ?? match?.[2]);
+  return Number.isInteger(value) && value > 0 ? Math.min(value, 5_000) : undefined;
 }
 
 /**

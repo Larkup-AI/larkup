@@ -44,6 +44,7 @@ import { collectExhaustiveVideoEvidencePages } from '../../../lib/chat/video-rag
 import { reconcileVideoInvestigation } from '../../../lib/chat/video-query-planning';
 import {
   extractConversationEvidence,
+  extractLatestAnalysisArtifact,
   extractLatestTabularExportResult,
   contextualizeKnowledgeFollowUpQuery,
   formatConversationEvidence,
@@ -78,6 +79,7 @@ import {
 } from '../../../lib/chat/tabular-visualization';
 import {
   isLikelyTabularQuestion,
+  requestsLongAnalysisArtifact,
   requiresTabularSandbox,
   tabularToolsForStep,
 } from '../../../lib/chat/tabular-routing';
@@ -177,6 +179,8 @@ ${PERSONALIZED_RESPONSE_STYLE}
 Keep the answer brief and direct: give the answer first, then only the essential context. Do not repeat tool output, dump rows, or add a table unless the user asks to see data. Use a short list only when it improves clarity.
 
 When a tabular tool returns a requested long list, the structured table is the complete visible answer. Briefly state what it contains and its coverage; never stream the rows again as prose or Markdown.
+
+When the user asks for a transformation repeated across many records (for example matches, recommendations, explanations, profiles, or summaries for the first 25 or for every item), use the sandbox analysis tool. It must prepare the whole requested result in one run with larkup_table or larkup_document. Treat that paged artifact as the answer: state its coverage briefly and never repeat its entries in chat prose. Do not ask the user to say "continue" for an artifact result.
 
 When the user asks for an Excel, CSV, or PDF export, use createDataExport. Never claim that a file was created and never write a Markdown download link unless the tool returned a real file artifact.
 
@@ -1199,6 +1203,19 @@ ${fieldLines}`;
       ? precedingNumberedDocumentReference(messagesToProcess)
       : undefined;
   const reusableEvidence = extractConversationEvidence(evidenceMessages);
+  const latestAnalysisArtifact = extractLatestAnalysisArtifact(evidenceMessages);
+  if (
+    latestAnalysisArtifact?.complete &&
+    /^(?:continue|go\s+on|keep\s+going|show\s+the\s+rest|more|تابع|أكمل|اكمل)[.!\s]*$/iu.test(
+      userText.trim(),
+    )
+  ) {
+    const count = latestAnalysisArtifact.requestedItems ?? latestAnalysisArtifact.totalItems;
+    return directAssistantTextResponse(
+      messages,
+      `The complete ${count.toLocaleString()}-item result is already prepared in “${latestAnalysisArtifact.title}”. Use its page controls, search, or download button to inspect the rest without restarting the analysis.`,
+    );
+  }
   const latestTabularExportResult = extractLatestTabularExportResult(evidenceMessages);
   // This compact string is used by retrieval only, not appended to model
   // history. It preserves the immediate topic while keeping the model context
@@ -1219,8 +1236,11 @@ ${fieldLines}`;
     columnNames: tabularColumnNames,
     datasetNames: tabularDatasetNames,
   });
+  const requestsLongArtifact = requestsLongAnalysisArtifact(userText);
+  const requiresCorpusSandboxAnalysis = !tabularQuestion && requestsLongArtifact;
   const requiresSandboxAnalysis =
-    hasTabularData && tabularQuestion && requiresTabularSandbox(userText);
+    (hasTabularData && tabularQuestion && requiresTabularSandbox(userText)) ||
+    requiresCorpusSandboxAnalysis;
   const isExplicitVideoCorrection =
     /^(?:no|nah),\s+|\b(?:that(?:'s| is) (?:wrong|incorrect)|correction\s*:|actually\s*,|instead\s*,|should be|not .{0,80}\bbut|i meant)\b/i.test(
       userText,
@@ -1320,6 +1340,9 @@ ${fieldLines}`;
     createDataExport: allTools.createDataExport,
     generateVisualization: allTools.generateVisualization,
     ...(allTools.executeAnalysis ? { executeAnalysis: allTools.executeAnalysis } : {}),
+    ...(allTools.analyzeCorpusWithCode
+      ? { analyzeCorpusWithCode: allTools.analyzeCorpusWithCode }
+      : {}),
     inspectPdfPages: allTools.inspectPdfPages,
     analyzePdfPages: allTools.analyzePdfPages,
     analyzeImageDeeply: allTools.analyzeImageDeeply,
@@ -1342,6 +1365,7 @@ ${fieldLines}`;
     userText.trim() &&
     !isGreeting &&
     !docSessionId &&
+    !(requiresCorpusSandboxAnalysis && builtInTools.analyzeCorpusWithCode) &&
     (!hasTabularData || !tabularQuestion) &&
     builtInTools.searchKnowledgeBase,
   );
@@ -2106,6 +2130,20 @@ ${fieldLines}`;
                 activeTools: [],
                 messages: withFinalAnswerNudge(compactToolContextForModel(messages)),
               };
+            }
+
+            if (requiresCorpusSandboxAnalysis && builtInTools.analyzeCorpusWithCode) {
+              return stepNumber === 0
+                ? {
+                    toolChoice: { type: 'tool' as const, toolName: 'analyzeCorpusWithCode' },
+                    activeTools: ['analyzeCorpusWithCode'],
+                    messages: compactToolContextForModel(messages),
+                  }
+                : {
+                    toolChoice: 'none' as const,
+                    activeTools: [],
+                    messages: withFinalAnswerNudge(compactToolContextForModel(messages)),
+                  };
             }
 
             if (tabularFollowUp) {

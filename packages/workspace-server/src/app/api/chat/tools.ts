@@ -96,6 +96,7 @@ import { normalizeChartConfigWithEvidence } from '@larkup/core/chart-config';
 import { createDataExport, selectDataExportSource } from '@larkup/core/data-export';
 import { assistantSourceScopeFingerprint } from '../../../lib/chat/assistant-source-scope';
 import { inferTabularPlan } from '../../../lib/chat/tabular-query-plan';
+import { requestedLongAnalysisItemCount } from '../../../lib/chat/tabular-routing';
 import {
   resolveTabularDatasetForQuestion,
   selectTabularDatasetForQuestion,
@@ -104,6 +105,10 @@ import {
   createTabularSandboxFiles,
   remapLegacyMultiDatasetReads,
 } from '../../../lib/chat/tabular-sandbox-files';
+import {
+  extractAnalysisPresentation,
+  withAnalysisPresentationHelpers,
+} from '../../../lib/chat/analysis-presentation';
 import { leadingMediaAssetId } from '../../../lib/chat/media-retrieval-routing';
 import { findIndexedImageSource } from '../../../lib/chat/visual-routing';
 import { indexedVideoEvidenceIsSufficient } from '../../../lib/chat/video-rag-routing';
@@ -2759,12 +2764,12 @@ export async function getChatTools(context: {
 
     executeAnalysis: tool({
       description:
-        'Execute Python code in a secure sandbox for deep data analysis. Use this for complex statistical computations (correlations, regressions, clustering), data transformations, or when creating custom matplotlib visualizations. The code has access to pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Always print results to stdout and use plt.show() for charts. The sandbox already configures headless plotting and its cache directories: do not set MPLBACKEND, MPLCONFIGDIR, or XDG_CACHE_HOME in analysis code.',
+        'Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.',
       inputSchema: z.object({
         code: z
           .string()
           .describe(
-            'Python code to execute. Has pandas (2.0+), numpy, matplotlib, scipy, sklearn, seaborn available. ALWAYS use "ME" instead of "M" for resample frequency. Print results and use plt.show() for charts. Plot configuration is already prepared by the sandbox; do not set MPLBACKEND, MPLCONFIGDIR, or XDG_CACHE_HOME.',
+            'Python code to execute. For a list/table longer than a short chat answer, finish with larkup_table(...). For long prose, finish with larkup_document(...). These helpers are preloaded; never redefine them. requested_items must equal the user-requested top/first/all count so completeness is verified. Has pandas (2.0+), numpy, matplotlib, scipy, sklearn, seaborn. ALWAYS use "ME" instead of "M" for resample frequency. Use plt.show() for charts. Plot configuration is already prepared; do not set MPLBACKEND, MPLCONFIGDIR, or XDG_CACHE_HOME.',
           ),
         datasetId: z
           .string()
@@ -2850,6 +2855,10 @@ export async function getChatTools(context: {
           ) {
             finalCode = `import os\n${finalCode}`;
           }
+          finalCode = withAnalysisPresentationHelpers(
+            finalCode,
+            requestedLongAnalysisItemCount(requestText ?? ''),
+          );
 
           let result = await sandboxManager.execute({
             code: finalCode,
@@ -2880,10 +2889,12 @@ export async function getChatTools(context: {
             });
           }
 
+          const extracted = extractAnalysisPresentation(result.stdout);
           return {
-            stdout: result.stdout.slice(0, 5000),
+            stdout: extracted.stdout.slice(0, 5000),
             stderr: result.stderr.slice(0, 2000),
             exitCode: result.exitCode,
+            ...(extracted.presentation ? { presentation: extracted.presentation } : {}),
             artifacts: result.artifacts.map((a) => ({
               name: a.name,
               mimeType: a.mimeType,
@@ -3052,12 +3063,12 @@ export async function getChatTools(context: {
 
     analyzeCorpusWithCode: tool({
       description:
-        'Run Python code in a sandbox with the FULL indexed corpus available as a file. Use this for complex analysis of documents: parsing fields from content, computing progress percentages, grouping by patterns, detecting duplicates, generating charts from corpus data, or any question that requires programmatic processing of hundreds/thousands of documents. The corpus is available as "corpus.csv" (or "corpus.jsonl" if format is jsonl). CSV columns: id, title, source, url, charCount, status, createdAt, content, plus any metadata_* columns.',
+        'Run Python code in a sandbox with the FULL indexed corpus available as a file. Use this for complete long inventories or transformations across documents, parsing fields, grouping, detecting duplicates, and corpus-scale analysis. For many result records call larkup_table(...) exactly once; for long narrative sections call larkup_document(...) exactly once. Produce the complete requested item count in one execution instead of streaming a long answer. The corpus is available as "corpus.csv" (or "corpus.jsonl"). CSV columns: id, title, source, url, charCount, status, createdAt, content, plus metadata_* columns.',
       inputSchema: z.object({
         code: z
           .string()
           .describe(
-            'Python code to execute. The corpus file is in the working directory. Use pandas to load it: df = pd.read_csv("corpus.csv") or for JSONL: df = pd.read_json("corpus.jsonl", lines=True). Has pandas (2.0+), numpy, matplotlib, scipy, sklearn, seaborn available. ALWAYS use "ME" instead of "M" for resample frequency. Print results and use plt.show() for charts.',
+            'Python code to execute. The corpus file is in the working directory. Use pandas to load it. For long structured results finish with larkup_table(...); for long prose finish with larkup_document(...). These helpers are preloaded. Set requested_items to the requested count. Has pandas, numpy, matplotlib, scipy, sklearn, seaborn. ALWAYS use "ME" instead of "M" for resample frequency.',
           ),
         format: z
           .enum(['csv', 'jsonl'])
@@ -3092,7 +3103,10 @@ export async function getChatTools(context: {
           const fileName = format === 'jsonl' ? 'corpus.jsonl' : 'corpus.csv';
           const files = [{ name: fileName, content: corpusData }];
 
-          let finalCode = code;
+          let finalCode = withAnalysisPresentationHelpers(
+            code,
+            requestedLongAnalysisItemCount(requestText ?? ''),
+          );
           let result = await sandboxManager.execute({
             code: finalCode,
             language: 'python',
@@ -3116,10 +3130,12 @@ export async function getChatTools(context: {
             });
           }
 
+          const extracted = extractAnalysisPresentation(result.stdout);
           return {
-            stdout: result.stdout.slice(0, 5000),
+            stdout: extracted.stdout.slice(0, 5000),
             stderr: result.stderr.slice(0, 2000),
             exitCode: result.exitCode,
+            ...(extracted.presentation ? { presentation: extracted.presentation } : {}),
             artifacts: result.artifacts.map((a) => ({
               name: a.name,
               mimeType: a.mimeType,
@@ -3389,6 +3405,7 @@ export async function getChatTools(context: {
         'createDataExport',
         'generateVisualization',
         'executeAnalysis',
+        'analyzeCorpusWithCode',
         // PDF/image hits can require one visual pass after retrieval. This is
         // available only to a follow-up tool step, never auto-run on chat.
         'inspectPdfPages',

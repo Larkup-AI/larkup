@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { ChevronDown, Play, Clock, Image as ImageIcon, Table2 } from 'lucide-react';
 import { ChatDataTable, type DataTableConfig } from './chat-data-table';
+import { ChatAnalysisResult, type AnalysisPresentation } from './chat-analysis-result';
 import { Card, CardContent } from '../../ui/card';
 
 interface SandboxArtifact {
@@ -17,6 +18,7 @@ export interface SandboxResultConfig {
   exitCode: number;
   artifacts: SandboxArtifact[];
   executionTimeMs: number;
+  presentation?: AnalysisPresentation;
 }
 
 function tryParseStdoutAsTable(stdout: string): DataTableConfig | null {
@@ -24,7 +26,7 @@ function tryParseStdoutAsTable(stdout: string): DataTableConfig | null {
 }
 
 export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
-  const { stdout, stderr, exitCode, artifacts, executionTimeMs } = config;
+  const { stdout, stderr, exitCode, artifacts, executionTimeMs, presentation } = config;
 
   const images = useMemo(
     () => artifacts.filter((a) => a.mimeType.startsWith('image/')),
@@ -80,6 +82,8 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
       )}
 
       {/* Structured stdout (rendered as table) */}
+      {isSuccess && presentation && <ChatAnalysisResult presentation={presentation} />}
+
       {stdoutTable && (
         <CardContent className="p-3 pt-3">
           <div className="flex items-center gap-1.5 mb-2 text-xs text-muted-foreground">
@@ -91,7 +95,7 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
       )}
 
       {/* Plain stdout (only if not parsed as table) */}
-      {stdout && !stdoutTable && (
+      {stdout && !stdoutTable && !presentation && (
         <div className="border-b border-border/40 px-4 py-3">
           <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-foreground [&::-webkit-scrollbar]:hidden">
             {stdout}

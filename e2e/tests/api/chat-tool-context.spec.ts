@@ -15,14 +15,106 @@ import {
 } from '../../../apps/web/lib/chat/visual-routing';
 import {
   isLikelyTabularQuestion,
+  requestsLongAnalysisArtifact,
+  requestedLongAnalysisItemCount,
+  requiresTabularSandbox,
   tabularToolsForStep,
 } from '../../../apps/web/lib/chat/tabular-routing';
+import { extractAnalysisPresentation } from '../../../apps/web/lib/chat/analysis-presentation';
 import {
   compactTabularRowsForConversation,
   extractConversationEvidence,
+  extractLatestAnalysisArtifact,
   isTabularFollowUp,
   tabularEvidenceDatasetIsAvailable,
 } from '../../../apps/web/lib/chat/conversation-memory';
+
+test('routes repeated semantic work to one sandbox artifact', () => {
+  const request =
+    'For the first 25 people from the list, make 3 matches with the whole list and explain every match.';
+  expect(requestsLongAnalysisArtifact(request)).toBe(true);
+  expect(requiresTabularSandbox(request)).toBe(true);
+  expect(requestedLongAnalysisItemCount(request)).toBe(25);
+  expect(requestedLongAnalysisItemCount('Prepare profiles for the first 1000 records')).toBe(1000);
+  expect(requestsLongAnalysisArtifact('List the top 300 participants')).toBe(false);
+  expect(
+    tabularToolsForStep({
+      stepNumber: 0,
+      toolNames: ['queryTabularData', 'executeAnalysis'],
+      requiresSandbox: true,
+    }),
+  ).toEqual({
+    toolChoice: { type: 'tool', toolName: 'executeAnalysis' },
+    activeTools: ['executeAnalysis'],
+  });
+});
+
+test('extracts a complete long result without keeping it in stdout', () => {
+  const rows = Array.from({ length: 25 }, (_, index) => ({
+    Participant: `Participant ${index + 1}`,
+    Matches: `Match ${index + 1}A; Match ${index + 1}B; Match ${index + 1}C`,
+  }));
+  const payload = {
+    kind: 'table',
+    title: 'Participant matches',
+    columns: ['Participant', 'Matches'],
+    rows,
+    totalItems: 25,
+    requestedItems: 25,
+    complete: true,
+  };
+  const extracted = extractAnalysisPresentation(
+    `finished\n__LARKUP_PRESENTATION__:${JSON.stringify(payload)}\n`,
+  );
+  expect(extracted.stdout).toBe('finished');
+  expect(extracted.presentation).toMatchObject({
+    kind: 'table',
+    totalItems: 25,
+    requestedItems: 25,
+    complete: true,
+  });
+  expect(extracted.presentation?.kind === 'table' && extracted.presentation.rows).toHaveLength(25);
+
+  const incomplete = extractAnalysisPresentation(
+    `__LARKUP_PRESENTATION__:${JSON.stringify({ ...payload, rows: rows.slice(0, 12) })}`,
+  );
+  expect(incomplete.presentation?.complete).toBe(false);
+});
+
+test('remembers completed analysis artifacts without replaying the full result', () => {
+  const messages = [
+    {
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-executeAnalysis',
+          output: {
+            presentation: {
+              kind: 'table',
+              title: 'Participant matches',
+              columns: ['Participant', 'Match'],
+              rows: Array.from({ length: 25 }, (_, index) => ({
+                Participant: `Participant ${index + 1}`,
+                Match: `Match ${index + 1}`,
+              })),
+              totalItems: 25,
+              requestedItems: 25,
+              complete: true,
+            },
+          },
+        },
+      ],
+    },
+  ];
+  expect(extractLatestAnalysisArtifact(messages)).toEqual({
+    kind: 'table',
+    title: 'Participant matches',
+    totalItems: 25,
+    requestedItems: 25,
+    complete: true,
+  });
+  expect(extractConversationEvidence(messages).tabular?.rows).toHaveLength(25);
+});
 import {
   answerScopedDataExportSource,
   dataExportNeedsFreshData,

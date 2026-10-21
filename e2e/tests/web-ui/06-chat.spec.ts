@@ -282,6 +282,117 @@ test.describe.serial('Chat Page', () => {
     await expect(page.getByText('Participant 11', { exact: true })).not.toBeVisible();
   });
 
+  test('sandbox artifacts render complete tables and paged long text', async ({ page }) => {
+    const chatId = `analysis-artifacts-${Date.now()}`;
+    await page.evaluate(
+      async ({ chatId }) => {
+        const messages = [
+          {
+            id: 'artifact-question',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Prepare matches for 25 participants' }],
+          },
+          {
+            id: 'artifact-answer',
+            role: 'assistant',
+            parts: [
+              {
+                type: 'tool-executeAnalysis',
+                state: 'output-available',
+                input: {},
+                output: {
+                  stdout: '',
+                  stderr: '',
+                  exitCode: 0,
+                  executionTimeMs: 120,
+                  artifacts: [],
+                  presentation: {
+                    kind: 'table',
+                    title: 'Participant matches',
+                    summary: 'Three constrained matches for every requested participant.',
+                    columns: ['Participant', 'Match 1', 'Reason'],
+                    rows: Array.from({ length: 25 }, (_, index) => ({
+                      Participant: `Participant ${index + 1}`,
+                      'Match 1': `Candidate ${index + 1}`,
+                      Reason: `Reason for participant ${index + 1}`,
+                    })),
+                    totalItems: 25,
+                    requestedItems: 25,
+                    complete: true,
+                    fileName: 'participant-matches.csv',
+                  },
+                },
+              },
+              {
+                type: 'tool-analyzeCorpusWithCode',
+                state: 'output-available',
+                input: {},
+                output: {
+                  stdout: '',
+                  stderr: '',
+                  exitCode: 0,
+                  executionTimeMs: 90,
+                  artifacts: [],
+                  presentation: {
+                    kind: 'document',
+                    title: 'Prepared report',
+                    summary: 'A paged narrative result.',
+                    pages: [
+                      { title: 'Opening', content: 'First prepared section.' },
+                      { title: 'Findings', content: 'Second prepared section.' },
+                      { title: 'Conclusion', content: 'Third prepared section.' },
+                    ],
+                    totalItems: 3,
+                    requestedItems: 3,
+                    complete: true,
+                    fileName: 'prepared-report.txt',
+                  },
+                },
+              },
+              { type: 'text', text: 'Both complete results are ready below.' },
+            ],
+          },
+        ];
+        await new Promise<void>((resolve, reject) => {
+          const request = indexedDB.open('keyval-store', 1);
+          request.onupgradeneeded = () => {
+            if (!request.result.objectStoreNames.contains('keyval')) {
+              request.result.createObjectStore('keyval');
+            }
+          };
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            const transaction = request.result.transaction('keyval', 'readwrite');
+            transaction.objectStore('keyval').put(messages, `chat_messages_${chatId}`);
+            transaction.oncomplete = () => {
+              request.result.close();
+              resolve();
+            };
+            transaction.onerror = () => reject(transaction.error);
+          };
+        });
+      },
+      { chatId },
+    );
+
+    await page.goto(`/chat/${chatId}`);
+    await expect(page.getByText('Participant matches', { exact: true })).toBeVisible();
+    await expect(page.getByText('25 of 25 prepared', { exact: true })).toBeVisible();
+    await expect(page.getByText('Participant 1', { exact: true })).toBeVisible();
+    await expect(page.getByText('Participant 11', { exact: true })).not.toBeVisible();
+    await page.getByRole('button', { name: 'Next table page' }).click();
+    await expect(page.getByText('Participant 11', { exact: true })).toBeVisible();
+
+    const csvDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'CSV' }).click();
+    expect((await csvDownload).suggestedFilename()).toBe('participant-matches.csv');
+
+    await expect(page.getByText('First prepared section.')).toBeVisible();
+    await page.getByRole('button', { name: 'Next prepared page' }).click();
+    await expect(page.getByText('Second prepared section.')).toBeVisible();
+    await expect(page.getByText('Page 2 of 3')).toBeVisible();
+  });
+
   test('generated charts show names for both axes', async ({ page }) => {
     const chatId = `axis-labels-${Date.now()}`;
     await page.evaluate(
