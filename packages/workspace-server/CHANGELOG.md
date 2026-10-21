@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.12
+
+### Patch Changes
+
+- 7031e04: Package the native PDF canvas renderer explicitly so source-page previews work in serverless deployments.
+
 ## 0.2.11
 
 ### Patch Changes
