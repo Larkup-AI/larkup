@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.14
+
+### Patch Changes
+
+- Route explicit complete, every-event, start-to-finish video timeline requests through the exhaustive source scan and pagination path instead of bounded top-K evidence retrieval.
+
 ## 0.2.13
 
 ### Patch Changes
