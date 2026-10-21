@@ -48,6 +48,7 @@ import {
   contextualizeKnowledgeFollowUpQuery,
   formatConversationEvidence,
   findImmediateExactGroundedAnswer,
+  imagePreviewInput,
   isImagePreviewFollowUp,
   isTabularFollowUp,
   tabularEvidenceDatasetIsAvailable,
@@ -1213,6 +1214,9 @@ ${fieldLines}`;
       userText,
     );
   const imagePreviewFollowUp = isImagePreviewFollowUp(userText, reusableEvidence);
+  const directImagePreviewInput = imagePreviewFollowUp
+    ? imagePreviewInput(reusableEvidence)
+    : undefined;
   const tabularFollowUp = isTabularFollowUp(userText, reusableEvidence);
   const dataExportFormat = requestedDataExportFormat(userText);
   const exportNeedsFreshData = dataExportNeedsFreshData(userText);
@@ -1333,6 +1337,53 @@ ${fieldLines}`;
   if (isGreeting && builtInTools.searchKnowledgeBase) {
     // Completely remove the search tool for simple greetings to guarantee no retrieval overhead
     delete (builtInTools as any).searchKnowledgeBase;
+  }
+
+  // A direct "show it" follow-up already has a source-scoped image reference.
+  // Render it on the host instead of repeating retrieval and a model round trip.
+  // PDF pages are rendered fresh from the original source, not a stale derivative.
+  if (directImagePreviewInput && builtInTools.presentMedia) {
+    const previewCallId = `preview-${crypto.randomUUID()}`;
+    const stream = createUIMessageStream({
+      originalMessages: messages,
+      execute: async ({ writer }) => {
+        writer.write({ type: 'start' });
+        writer.write({
+          type: 'tool-input-available',
+          toolCallId: previewCallId,
+          toolName: 'presentMedia',
+          input: directImagePreviewInput,
+        });
+        let previewOutput: any;
+        try {
+          previewOutput = await (builtInTools.presentMedia as any).execute(
+            directImagePreviewInput,
+            { toolCallId: previewCallId },
+          );
+        } catch (error) {
+          previewOutput = {
+            success: false,
+            error: error instanceof Error ? error.message : 'The source image could not be opened.',
+          };
+        }
+        writer.write({
+          type: 'tool-output-available',
+          toolCallId: previewCallId,
+          output: previewOutput,
+        });
+        const answerId = `answer-${crypto.randomUUID()}`;
+        writer.write({ type: 'text-start', id: answerId });
+        writer.write({
+          type: 'text-delta',
+          id: answerId,
+          delta: previewOutput?.success
+            ? 'Here is the requested source image.'
+            : previewOutput?.error || 'The source image could not be opened.',
+        });
+        writer.write({ type: 'text-end', id: answerId });
+      },
+    });
+    return createUIMessageStreamResponse({ stream });
   }
 
   // Remote MCP connections are opt-in per workspace and their tool names are

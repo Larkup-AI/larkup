@@ -519,6 +519,7 @@ export function MessageItem({
     return {
       toolCallId,
       percent: smoothPendingToolProgress(pendingToolStartedAt.current[toolCallId], progressClock),
+      indeterminate: true,
       label: behavior.pendingLabel || 'Working…',
       message: behavior.pendingLabel || 'Working…',
     };
@@ -902,6 +903,7 @@ function renderToolPart(
   toolProgress?: {
     toolCallId: string;
     percent: number;
+    indeterminate?: boolean;
     label: string;
     message?: string;
   } | null,
@@ -929,7 +931,9 @@ function renderToolPart(
     // Past the point where the remaining work has a measurable size, a
     // percentage is a claim we cannot back. Drop it and shuttle the bar
     // instead, so the wait still reads as active rather than stalled.
-    const indeterminate = liveProgress ? isIndeterminateProgress(liveProgress.percent) : false;
+    const indeterminate = liveProgress
+      ? liveProgress.indeterminate === true || isIndeterminateProgress(liveProgress.percent)
+      : false;
 
     return (
       <div key={index} className="flex min-w-0 flex-col gap-1.5 py-3">

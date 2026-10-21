@@ -27,6 +27,7 @@ export type ExactGroundedAnswer = {
 
 export type ReusableImageEvidence = {
   imageUrl: string;
+  documentId?: string;
   pageNumber?: number;
   index?: number;
   title?: string;
@@ -208,13 +209,18 @@ export function findImmediateExactGroundedAnswer(
   return undefined;
 }
 
-function imageEvidence(value: unknown, title?: string): ReusableImageEvidence[] {
+function imageEvidence(
+  value: unknown,
+  title?: string,
+  documentId?: string,
+): ReusableImageEvidence[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((image: any) => {
     if (!image || typeof image.imageUrl !== 'string' || !image.imageUrl) return [];
     return [
       {
         imageUrl: image.imageUrl,
+        documentId,
         pageNumber: typeof image.pageNumber === 'number' ? image.pageNumber : undefined,
         index: typeof image.index === 'number' ? image.index : undefined,
         title,
@@ -373,8 +379,8 @@ export function extractConversationEvidence(
       if (!hit || typeof hit !== 'object') continue;
       const title = typeof hit.title === 'string' ? hit.title : undefined;
       for (const image of [
-        ...imageEvidence(hit.images, title),
-        ...imageEvidence(hit.metadata?.images, title),
+        ...imageEvidence(hit.images, title, hit.documentId),
+        ...imageEvidence(hit.metadata?.images, title, hit.documentId),
       ]) {
         images.set(image.imageUrl, image);
       }
@@ -500,9 +506,21 @@ export function isTabularFollowUp(text: string, evidence: ConversationEvidence):
 
 export function isImagePreviewFollowUp(text: string, evidence: ConversationEvidence): boolean {
   if (evidence.images.length === 0) return false;
-  return /\b(?:show|preview|display|open|view|render)\b[\s\S]{0,40}\b(?:image|picture|diagram|page|figure|it)\b|\b(?:image|picture|diagram|figure)\s+preview\b/i.test(
+  return /\b(?:show|preview|display|open|view|render|need|give|provide|want)\b[\s\S]{0,40}\b(?:image|picture|diagram|page|figure|visual|it)\b|\b(?:image|picture|diagram|figure|visual)\s+(?:preview|view)\b/i.test(
     text,
   );
+}
+
+/** Reuse the exact prior source, preferring a fresh PDF-page render over a stale derivative. */
+export function imagePreviewInput(
+  evidence: ConversationEvidence,
+): { documentId: string; pageNumber: number } | { imageUrl: string } | undefined {
+  const image = evidence.images[0];
+  if (!image) return undefined;
+  if (image.documentId && image.pageNumber) {
+    return { documentId: image.documentId, pageNumber: image.pageNumber };
+  }
+  return { imageUrl: image.imageUrl };
 }
 
 /**
