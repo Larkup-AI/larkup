@@ -216,6 +216,72 @@ test.describe.serial('Chat Page', () => {
     ).toHaveAttribute('aria-pressed', 'true');
   });
 
+  test('long tabular answers stay compact and disclose returned coverage', async ({ page }) => {
+    const chatId = `long-table-${Date.now()}`;
+    await page.evaluate(
+      async ({ chatId }) => {
+        const messages = [
+          {
+            id: 'table-question',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Show me the top 300 participants' }],
+          },
+          {
+            id: 'table-answer',
+            role: 'assistant',
+            parts: [
+              {
+                type: 'tool-queryTabularData',
+                state: 'output-available',
+                input: {},
+                output: {
+                  columns: ['Rank', 'Participant', 'Score'],
+                  rows: Array.from({ length: 300 }, (_, index) => ({
+                    Rank: index + 1,
+                    Participant: `Participant ${index + 1}`,
+                    Score: 1_000 - index,
+                  })),
+                  totalRows: 1_000,
+                  truncated: true,
+                },
+              },
+              { type: 'text', text: 'The requested ranked results are in the table.' },
+            ],
+          },
+        ];
+        await new Promise<void>((resolve, reject) => {
+          const request = indexedDB.open('keyval-store', 1);
+          request.onupgradeneeded = () => {
+            if (!request.result.objectStoreNames.contains('keyval')) {
+              request.result.createObjectStore('keyval');
+            }
+          };
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            const transaction = request.result.transaction('keyval', 'readwrite');
+            transaction.objectStore('keyval').put(messages, `chat_messages_${chatId}`);
+            transaction.oncomplete = () => {
+              request.result.close();
+              resolve();
+            };
+            transaction.onerror = () => reject(transaction.error);
+          };
+        });
+      },
+      { chatId },
+    );
+
+    await page.goto(`/chat/${chatId}`);
+    const tableSummary = page.getByRole('button', {
+      name: /Data checked 300 of 1,000 rows/,
+    });
+    await expect(tableSummary).toBeVisible();
+    await tableSummary.click();
+    await expect(page.getByText('300 shown of 1,000 matching rows')).toBeVisible();
+    await expect(page.getByText('Participant 1', { exact: true })).toBeVisible();
+    await expect(page.getByText('Participant 11', { exact: true })).not.toBeVisible();
+  });
+
   test('generated charts show names for both axes', async ({ page }) => {
     const chatId = `axis-labels-${Date.now()}`;
     await page.evaluate(

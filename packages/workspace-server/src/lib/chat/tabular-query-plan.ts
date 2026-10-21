@@ -1,4 +1,8 @@
-import type { TabularDataset, TabularQueryRequest } from '@larkup/core/tabular-store';
+import {
+  MAX_TABULAR_RESULT_LIMIT,
+  type TabularDataset,
+  type TabularQueryRequest,
+} from '@larkup/core/tabular-store';
 
 export type InferredTabularPlan = {
   request: TabularQueryRequest;
@@ -78,6 +82,17 @@ function requestedSortOrder(text: string) {
   return undefined;
 }
 
+/** Preserve an explicit long-list size instead of relying on a model default. */
+export function requestedTabularResultLimit(text: string): number | undefined {
+  const match = text.match(
+    /\b(?:top|first|last|show|list|return|give(?:\s+me)?|display)\s+(?:the\s+)?(\d{1,4})\b/iu,
+  );
+  if (!match) return undefined;
+  const requested = Number(match[1]);
+  if (!Number.isSafeInteger(requested) || requested < 1) return undefined;
+  return Math.min(requested, MAX_TABULAR_RESULT_LIMIT);
+}
+
 function normalizeAggregations(
   dataset: TabularDataset,
   request: TabularQueryRequest,
@@ -133,6 +148,7 @@ export function inferTabularPlan(
   const measureColumns =
     requestedMeasures.length > 0 ? requestedMeasures : numeric.length === 1 ? [numeric[0]] : [];
   const year = text.match(/\b(20\d{2})\b/)?.[1];
+  const explicitLimit = requestedTabularResultLimit(text);
 
   if (
     dateColumn &&
@@ -184,12 +200,15 @@ export function inferTabularPlan(
         ...(sortOrder
           ? { sortBy: `${aggregations[0].op}_${aggregations[0].column}`, sortOrder }
           : {}),
-        limit: Math.min(request.limit ?? 120, 120),
+        limit: explicitLimit ?? Math.min(request.limit ?? 120, 120),
       },
     };
   }
 
   return {
-    request: normalizeDistinctCountIntent(text, normalizeAggregations(dataset, request)),
+    request: {
+      ...normalizeDistinctCountIntent(text, normalizeAggregations(dataset, request)),
+      ...(explicitLimit ? { limit: explicitLimit } : {}),
+    },
   };
 }

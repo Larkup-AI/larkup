@@ -1049,6 +1049,7 @@ function renderToolPart(
           columns: output.columns ?? [],
           rows: output.rows ?? [],
           totalRows: output.totalRows ?? 0,
+          truncated: output.truncated,
           aggregationResults: output.aggregationResults,
         };
         if (tableConfig.rows.length === 0 && !tableConfig.aggregationResults) return null;

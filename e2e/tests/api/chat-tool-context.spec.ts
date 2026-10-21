@@ -4,7 +4,10 @@ import {
   createTabularVisualization,
   requestsVisualization,
 } from '../../../apps/web/lib/chat/tabular-visualization';
-import { inferTabularPlan } from '../../../apps/web/lib/chat/tabular-query-plan';
+import {
+  inferTabularPlan,
+  requestedTabularResultLimit,
+} from '../../../apps/web/lib/chat/tabular-query-plan';
 import { normalizeChartConfig } from '../../../apps/web/lib/chat/chart-config';
 import {
   findRetrievedPdfSource,
@@ -155,6 +158,38 @@ test('creates a chart from a queried grouped result without another model tool c
   });
 });
 
+test('requires explicit visual intent before adding a chart to tabular results', () => {
+  expect(requestsVisualization('compare the top participants and explain the best matches')).toBe(
+    false,
+  );
+  expect(requestsVisualization('show me the top 300 participants')).toBe(false);
+  expect(requestsVisualization('show me a comparison chart for the top participants')).toBe(true);
+  expect(
+    createTabularVisualization('show me the top participants', {
+      columns: ['Name', 'Score'],
+      rows: [{ Name: 'Ada', Score: 98 }],
+    }),
+  ).toBeUndefined();
+});
+
+test('does not attach an empty chart when requested rows have no plottable measure', () => {
+  expect(
+    createTabularVisualization('Create a chart of participants by expertise', {
+      columns: ['Participant', 'Expertise'],
+      rows: [
+        { Participant: 'Ada', Expertise: 'Fundraising' },
+        { Participant: 'Grace', Expertise: 'Operations' },
+      ],
+    }),
+  ).toBeUndefined();
+});
+
+test('preserves explicit long-list sizes for the structured table', () => {
+  expect(requestedTabularResultLimit('Tell me the top 300 participants')).toBe(300);
+  expect(requestedTabularResultLimit('List 900 participants')).toBe(500);
+  expect(requestedTabularResultLimit('Who are the top participants?')).toBeUndefined();
+});
+
 test('rejects plausible chart rows when no verified table evidence exists', () => {
   expect(
     normalizeChartConfigWithEvidence(
@@ -235,6 +270,18 @@ test('plans the CSV demo questions as bounded table queries', () => {
   expect(distribution.request).toMatchObject({
     groupBy: ['Region'],
     aggregations: [{ column: 'Net Revenue', op: 'sum' }],
+  });
+
+  const longList = inferTabularPlan('List the top 300 participants', dataset as any, {
+    datasetId: dataset.id,
+    sortBy: 'Net Revenue',
+    sortOrder: 'desc',
+    limit: 10,
+  });
+  expect(longList.request).toMatchObject({
+    sortBy: 'Net Revenue',
+    sortOrder: 'desc',
+    limit: 300,
   });
 });
 

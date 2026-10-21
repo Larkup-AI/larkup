@@ -31,6 +31,7 @@ export interface DataTableConfig {
   columns: string[];
   rows: Record<string, any>[];
   totalRows: number;
+  truncated?: boolean;
   aggregationResults?: Record<string, number>;
 }
 
@@ -104,6 +105,7 @@ export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
   );
   const { columns, rows } = normalized;
   const { totalRows, aggregationResults } = config;
+  const isPartialResult = config.truncated === true || totalRows > rows.length;
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(0);
@@ -173,7 +175,7 @@ export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
   }
 
   if (compact && !isExpanded) {
-    const count = totalRows || rows.length;
+    const count = rows.length;
     return (
       <button
         type="button"
@@ -183,7 +185,9 @@ export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
         <Table2 className="size-3.5" />
         <span>Data checked</span>
         <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] tabular-nums text-foreground">
-          {count.toLocaleString()} {count === 1 ? 'row' : 'rows'}
+          {count.toLocaleString()}
+          {isPartialResult ? ` of ${totalRows.toLocaleString()}` : ''}{' '}
+          {totalRows === 1 ? 'row' : 'rows'}
         </span>
       </button>
     );
@@ -318,8 +322,11 @@ export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
       <div className="flex items-center justify-between border-t border-border/30 px-3 py-2">
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground">
-            {filteredRows.length !== rows.length ? `${filteredRows.length} matched of ` : ''}
-            {totalRows.toLocaleString()} rows
+            {filteredRows.length !== rows.length
+              ? `${filteredRows.length.toLocaleString()} matched in ${rows.length.toLocaleString()} returned rows`
+              : isPartialResult
+                ? `${rows.length.toLocaleString()} shown of ${totalRows.toLocaleString()} matching rows`
+                : `${rows.length.toLocaleString()} rows`}
           </span>
           <div className="h-3 w-px bg-border/40" />
           <div className="flex items-center gap-1.5">
