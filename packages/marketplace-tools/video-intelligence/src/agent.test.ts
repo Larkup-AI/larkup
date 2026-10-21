@@ -2053,6 +2053,7 @@ describe('Video Intelligence chat extension', () => {
         plan: {
           kinds: ['visual-fact'],
           requiresInspectionWhenInsufficient: true,
+          investigation: { scope: 'temporal', goal: 'trace', recordSet: 'observed' },
         },
         search: () => [ledger],
       }),
@@ -2062,6 +2063,56 @@ describe('Video Intelligence chat extension', () => {
     expect(result.investigation.answerPath).toBe('rag');
     expect(result.claimVerification.status).toBe('directly-established');
     expect(result.evidence).toEqual([expect.objectContaining({ id: 'visible-brian' })]);
+  });
+
+  it('does not answer an attribute question from a semantically matched visibility ledger', async () => {
+    const reWatch = vi.fn(async () => [
+      {
+        range: { startSecs: 12, endSecs: 58 },
+        found:
+          'Spain wear red shirts and blue shorts; Argentina wear white shirts and black shorts.',
+        settlesQuestion: true,
+        confidence: 'high' as const,
+        read: [],
+      },
+    ]);
+    const ledger = {
+      ...hit(
+        'visible-spain',
+        20,
+        'Reconciled visible subject: unidentified Spain player\n' +
+          'Identity basis: unresolved\n' +
+          'Observed appearances: 19.987-19.987s; 50.017-50.017s\n' +
+          'Observed visible duration: 0s',
+        {
+          modality: 'computed',
+          source: { kind: 'provider', provider: 'video-intelligence-index' },
+        },
+      ),
+      components: { semantic: 0.94, lexical: 0.4 },
+    };
+
+    const result = (await agentClient(vi.fn() as any).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'What were Spain and Argentina players wearing? (colors of clothes)',
+        investigation: { scope: 'focused', goal: 'compare', evidence: ['visual'] },
+      },
+      evidenceContext({
+        plan: {
+          kinds: ['comparison'],
+          requiresBothRanges: true,
+          requiresInspectionWhenInsufficient: true,
+          investigation: { scope: 'focused', goal: 'compare', evidence: ['visual'] },
+        },
+        search: () => [ledger],
+        reWatch,
+      }),
+    )) as any;
+
+    expect(reWatch).toHaveBeenCalledTimes(1);
+    expect(result.investigation.answerPath).toBe('rag+rewatch');
+    expect(result.directObservation.readings[0].found).toContain('Spain wear red shirts');
   });
 
   it('does not treat a source-wide visibility ledger as proof for an unobserved requested moment', async () => {
@@ -2110,6 +2161,13 @@ describe('Video Intelligence chat extension', () => {
         kinds: ['visual-fact'],
         route: 'temporal',
         requiresInspectionWhenInsufficient: true,
+        investigation: {
+          scope: 'temporal',
+          goal: 'trace',
+          recordSet: 'observed',
+          evidence: ['visual'],
+          timeRange: { startSecs: 840, endSecs: 870 },
+        },
       },
       search: () => [],
     });
@@ -2174,6 +2232,12 @@ describe('Video Intelligence chat extension', () => {
         kinds: ['visual-fact'],
         route: 'search',
         requiresInspectionWhenInsufficient: true,
+        investigation: {
+          scope: 'focused',
+          goal: 'answer',
+          evidence: ['visual'],
+          timeRange: { startSecs: 840, endSecs: 840 },
+        },
       },
       search: () => [
         directVerdict(
@@ -2299,6 +2363,12 @@ describe('Video Intelligence chat extension', () => {
         kinds: ['visual-fact'],
         route: 'search',
         requiresInspectionWhenInsufficient: true,
+        investigation: {
+          scope: 'focused',
+          goal: 'answer',
+          evidence: ['visual'],
+          timeRange: { startSecs: 840, endSecs: 840 },
+        },
       },
       search: (_query, options) => {
         if (options?.timeRange) searchedRanges.push(options.timeRange as any);

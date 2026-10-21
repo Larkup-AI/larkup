@@ -287,22 +287,25 @@ describe('formatLocatedObservedSubjectAnswer', () => {
 describe('formatObservedAppearanceAnswer', () => {
   it('preserves every repeated protocol-backed appearance without inferring continuity', () => {
     expect(
-      formatObservedAppearanceAnswer({
-        videoEvidence: {
-          success: true,
-          claimVerification: { status: 'directly-established' },
-          evidence: [
-            {
-              payload: {
-                text:
-                  'Reconciled visible subject: grey-haired person in a purple checkered shirt\n' +
-                  'Identity basis: source-described\n' +
-                  'Observed appearances: 55.022-55.022s; 895.022-895.022s',
+      formatObservedAppearanceAnswer(
+        {
+          videoEvidence: {
+            success: true,
+            claimVerification: { status: 'directly-established' },
+            evidence: [
+              {
+                payload: {
+                  text:
+                    'Reconciled visible subject: grey-haired person in a purple checkered shirt\n' +
+                    'Identity basis: source-described\n' +
+                    'Observed appearances: 55.022-55.022s; 895.022-895.022s',
+                },
               },
-            },
-          ],
+            ],
+          },
         },
-      }),
+        { goal: 'trace', recordSet: 'observed' },
+      ),
     ).toBe(
       'I saw grey-haired person in a purple checkered shirt at 00:55.022 and 14:55.022. These are separate observed moments, not continuous visibility.',
     );
