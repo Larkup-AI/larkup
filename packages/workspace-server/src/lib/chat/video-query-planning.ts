@@ -4,6 +4,7 @@ export interface VideoQuestionSignals {
   hasPosition?: boolean;
   connectsBeyondPosition?: boolean;
   asksForSettledOutcome?: boolean;
+  asksForExhaustiveCoverage?: boolean;
 }
 
 /**
@@ -18,6 +19,14 @@ export function reconcileVideoInvestigation(
 ): VideoInvestigationDirective | undefined {
   if (signals?.asksForSettledOutcome) {
     return { scope: 'temporal', goal: 'resolve' };
+  }
+  if (signals?.hasPosition === false && signals.asksForExhaustiveCoverage) {
+    return {
+      scope: 'source',
+      goal: 'enumerate',
+      ...(planned?.evidence?.length ? { evidence: planned.evidence } : {}),
+      recordSet: 'all',
+    };
   }
   if (signals?.hasPosition === false && planned?.timeRange) {
     return { scope: 'source', goal: 'synthesize' };

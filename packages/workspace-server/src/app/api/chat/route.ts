@@ -492,6 +492,7 @@ async function userSpecifiedSourcePosition(input: {
       hasPosition: boolean;
       connectsBeyondPosition: boolean;
       asksForSettledOutcome: boolean;
+      asksForExhaustiveCoverage: boolean;
     }
   | undefined
 > {
@@ -504,7 +505,7 @@ async function userSpecifiedSourcePosition(input: {
       abortSignal: AbortSignal.timeout(8_000),
       providerOptions: input.providerOptions,
       system:
-        'Return exactly one JSON object and no prose: {"kind":"input-location"|"answer-timestamp"|"none","locator":string|null,"connectsBeyondPosition":boolean,"asksForSettledOutcome":boolean}. Use input-location only when the user explicitly constrains where in the provided source to look; locator must be the exact corresponding substring from the user request. Use answer-timestamp when the user asks for timestamps in the answer but does not specify where to look; locator is null. Use none when neither is present. Set connectsBeyondPosition true only when the request explicitly relates the thing at its named source position to another point or portion of the source, such as recurrence, reappearance, a later/earlier occurrence, change, or comparison; otherwise false. Set asksForSettledOutcome true only when the request asks for the final or settled result of a process, contest, decision, vote, test, or other sequence, including who won in any language; it overrides a broad summary classification. A status at a named intermediate position is not a settled outcome. Example: "Explain a subject and include timestamps" => {"kind":"answer-timestamp","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":false}. Example: "Who won the match?" => {"kind":"none","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":true}. Example: "What happens at 14:00?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":false,"asksForSettledOutcome":false}. Example: "Who is at 14:00 and where else do they appear?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":true,"asksForSettledOutcome":false}. Example: "Give the full story from beginning to conclusion" => {"kind":"none","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":false} unless the user asks specifically about the beginning or conclusion. Interpret every language without assuming a source genre.',
+        'Return exactly one JSON object and no prose: {"kind":"input-location"|"answer-timestamp"|"none","locator":string|null,"connectsBeyondPosition":boolean,"asksForSettledOutcome":boolean,"asksForExhaustiveCoverage":boolean}. Use input-location only when the user explicitly constrains where in the provided source to look; locator must be the exact corresponding substring from the user request. Use answer-timestamp when the user asks for timestamps in the answer but does not specify where to look; locator is null. Use none when neither is present. Set connectsBeyondPosition true only when the request explicitly relates the thing at its named source position to another point or portion of the source, such as recurrence, reappearance, a later/earlier occurrence, change, or comparison; otherwise false. Set asksForSettledOutcome true only when the request asks for the final or settled result of a process, contest, decision, vote, test, or other sequence, including who won in any language; it overrides a broad summary classification. Set asksForExhaustiveCoverage true only when the user explicitly asks to enumerate all or every relevant record across the complete recording, such as a complete start-to-finish timeline, every spoken statement, or every visual and spoken event. A full story, overview, or summary is source-wide synthesis, not exhaustive enumeration. A status at a named intermediate position is not a settled outcome. Example: "Explain a subject and include timestamps" => {"kind":"answer-timestamp","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":false,"asksForExhaustiveCoverage":false}. Example: "Who won the match?" => {"kind":"none","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":true,"asksForExhaustiveCoverage":false}. Example: "What happens at 14:00?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":false,"asksForSettledOutcome":false,"asksForExhaustiveCoverage":false}. Example: "Who is at 14:00 and where else do they appear?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":true,"asksForSettledOutcome":false,"asksForExhaustiveCoverage":false}. Example: "Give a complete timeline of every visual and spoken event from start to finish" => {"kind":"none","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":false,"asksForExhaustiveCoverage":true}. Example: "Give the full story from beginning to conclusion" => {"kind":"none","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":false,"asksForExhaustiveCoverage":false} unless the user asks specifically about the beginning or conclusion. Interpret every language without assuming a source genre.',
       prompt: input.question,
     });
     const serialized = text.match(/\{[\s\S]*\}/)?.[0];
@@ -514,11 +515,18 @@ async function userSpecifiedSourcePosition(input: {
       locator?: unknown;
       connectsBeyondPosition?: unknown;
       asksForSettledOutcome?: unknown;
+      asksForExhaustiveCoverage?: unknown;
     };
     const connectsBeyondPosition = parsed.connectsBeyondPosition === true;
     const asksForSettledOutcome = parsed.asksForSettledOutcome === true;
+    const asksForExhaustiveCoverage = parsed.asksForExhaustiveCoverage === true;
     if (parsed.kind === 'answer-timestamp' || parsed.kind === 'none') {
-      return { hasPosition: false, connectsBeyondPosition, asksForSettledOutcome };
+      return {
+        hasPosition: false,
+        connectsBeyondPosition,
+        asksForSettledOutcome,
+        asksForExhaustiveCoverage,
+      };
     }
     if (parsed.kind !== 'input-location' || typeof parsed.locator !== 'string') return undefined;
     // The quote need only occur in the user text. Its semantic role was
@@ -527,6 +535,7 @@ async function userSpecifiedSourcePosition(input: {
       hasPosition: input.question.normalize('NFKC').includes(parsed.locator.normalize('NFKC')),
       connectsBeyondPosition,
       asksForSettledOutcome,
+      asksForExhaustiveCoverage,
     };
   } catch {
     return undefined;
