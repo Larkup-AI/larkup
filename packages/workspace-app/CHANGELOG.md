@@ -1,5 +1,11 @@
 # @larkup/workspace-app
 
+## 0.2.5
+
+### Patch Changes
+
+- 3804f1f: Preserve compact PDF page selections across chat turns so image follow-ups can render the inspected source directly.
+
 ## 0.2.4
 
 ### Patch Changes
