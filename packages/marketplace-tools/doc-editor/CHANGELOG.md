@@ -1,5 +1,12 @@
 # @larkup/tool-doc-editor
 
+## 0.3.4
+
+### Patch Changes
+
+- Updated dependencies [fabed14]
+  - @larkup/sandbox@0.1.10
+
 ## 0.3.3
 
 ### Patch Changes
