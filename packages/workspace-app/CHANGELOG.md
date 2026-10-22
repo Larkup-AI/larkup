@@ -1,5 +1,11 @@
 # @larkup/workspace-app
 
+## 0.2.11
+
+### Patch Changes
+
+- 6de990d: Remove the card shell around analysis results so table and text presentations render without a global background, border, shadow, or excess spacing.
+
 ## 0.2.10
 
 ### Patch Changes
