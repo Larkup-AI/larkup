@@ -92,6 +92,11 @@ export function requestedLongAnalysisItemCount(text: string): number | undefined
   return Number.isInteger(value) && value > 0 ? Math.min(value, 5_000) : undefined;
 }
 
+/** Use a consistent capable code planner for deep artifacts across selectable chat models. */
+export function tabularToolPlannerModel(requiresSandbox: boolean) {
+  return requiresSandbox ? 'openai/gpt-4.1-mini' : 'openai/gpt-4o-mini';
+}
+
 /**
  * A workspace can contain spreadsheets alongside PDFs, media, and notes.
  * Only force the table path when the wording actually asks for tabular facts;

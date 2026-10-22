@@ -3,6 +3,7 @@ import {
   hasCompletedTabularVisualizationStep,
   isLikelyTabularQuestion,
   requiresTabularSandbox,
+  tabularToolPlannerModel,
   tabularToolsForStep,
 } from './tabular-routing';
 
@@ -49,6 +50,10 @@ describe('isLikelyTabularQuestion', () => {
 });
 
 describe('tabularToolsForStep', () => {
+  it('uses one capable artifact planner independent of the selected small chat model', () => {
+    expect(tabularToolPlannerModel(true)).toBe('openai/gpt-4.1-mini');
+    expect(tabularToolPlannerModel(false)).toBe('openai/gpt-4o-mini');
+  });
   it('requires the exact table query before an answer is generated', () => {
     expect(tabularToolsForStep({ stepNumber: 0, toolNames: ['queryTabularData'] })).toEqual({
       toolChoice: { type: 'tool', toolName: 'queryTabularData' },

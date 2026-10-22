@@ -177,6 +177,8 @@ export function extractAnalysisPresentation(stdout: string): {
 export const ANALYSIS_PRESENTATION_PYTHON = String.raw`
 import json as _larkup_json
 
+_LARKUP_PRESENTATION_EMITTED = False
+
 def _larkup_json_default(value):
     item = getattr(value, "item", None)
     if callable(item):
@@ -187,31 +189,65 @@ def _larkup_json_default(value):
     return str(value)
 
 def larkup_table(title, rows, columns=None, summary=None, requested_items=None, file_name=None):
+    global _LARKUP_PRESENTATION_EMITTED
     if hasattr(rows, "to_dict"):
         rows = rows.to_dict(orient="records")
     rows = list(rows)
     if columns is None:
         columns = list(rows[0].keys()) if rows else []
-    requested_items = requested_items if requested_items is not None else _LARKUP_REQUESTED_ITEMS
+    requested_items = requested_items if isinstance(requested_items, int) and not isinstance(requested_items, bool) and requested_items > 0 else _LARKUP_REQUESTED_ITEMS
     payload = {
         "kind": "table", "title": title, "summary": summary,
         "columns": list(columns), "rows": rows, "totalItems": len(rows),
         "requestedItems": requested_items, "complete": True, "fileName": file_name,
     }
     print("${PRESENTATION_MARKER}" + _larkup_json.dumps(payload, ensure_ascii=False, default=_larkup_json_default))
+    _LARKUP_PRESENTATION_EMITTED = True
 
 def larkup_document(title, pages, summary=None, requested_items=None, file_name=None):
+    global _LARKUP_PRESENTATION_EMITTED
     pages = list(pages)
-    requested_items = requested_items if requested_items is not None else _LARKUP_REQUESTED_ITEMS
+    requested_items = requested_items if isinstance(requested_items, int) and not isinstance(requested_items, bool) and requested_items > 0 else _LARKUP_REQUESTED_ITEMS
     payload = {
         "kind": "document", "title": title, "summary": summary,
         "pages": pages, "totalItems": len(pages), "requestedItems": requested_items,
         "complete": True, "fileName": file_name,
     }
     print("${PRESENTATION_MARKER}" + _larkup_json.dumps(payload, ensure_ascii=False, default=_larkup_json_default))
+    _LARKUP_PRESENTATION_EMITTED = True
+
+def _larkup_auto_present():
+    if _LARKUP_PRESENTATION_EMITTED or _LARKUP_REQUESTED_ITEMS is None:
+        return
+    scope = globals()
+    value = None
+    for name in ("rows", "results", "final_results", "output_rows", "recommendations", "matches_summary", "matches", "output", "result"):
+        candidate = scope.get(name)
+        if candidate is not None and not isinstance(candidate, (str, bytes, dict)):
+            try:
+                if len(candidate) > 0:
+                    value = candidate
+                    break
+            except Exception:
+                pass
+    if value is None:
+        return
+    if hasattr(value, "to_dict"):
+        value = value.to_dict(orient="records")
+    else:
+        value = list(value)
+    if not value:
+        return
+    if all(isinstance(item, str) for item in value):
+        larkup_document("Prepared analysis", value, requested_items=_LARKUP_REQUESTED_ITEMS)
+        return
+    columns = scope.get("columns")
+    if not isinstance(columns, (list, tuple)) or not all(isinstance(item, str) for item in columns):
+        columns = list(value[0].keys()) if isinstance(value[0], dict) else []
+    larkup_table("Prepared analysis", value, columns=list(columns), requested_items=_LARKUP_REQUESTED_ITEMS)
 `;
 
 export function withAnalysisPresentationHelpers(code: string, requestedItems?: number): string {
   const requested = requestedItems === undefined ? 'None' : String(requestedItems);
-  return `${ANALYSIS_PRESENTATION_PYTHON}\n_LARKUP_REQUESTED_ITEMS = ${requested}\n${code}`;
+  return `${ANALYSIS_PRESENTATION_PYTHON}\n_LARKUP_REQUESTED_ITEMS = ${requested}\n${code}\n_larkup_auto_present()`;
 }

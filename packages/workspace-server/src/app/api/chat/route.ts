@@ -82,6 +82,7 @@ import {
   isLikelyTabularQuestion,
   requestsLongAnalysisArtifact,
   requiresTabularSandbox,
+  tabularToolPlannerModel,
   tabularToolsForStep,
 } from '../../../lib/chat/tabular-routing';
 import {
@@ -1902,7 +1903,7 @@ ${fieldLines}`;
         // requires a specific tool. Use a small, proven Gateway tool caller
         // only for the tabular evidence step, then return to the selected model
         // for the grounded prose answer on the next step.
-        const tabularToolModelId = 'openai/gpt-4o-mini';
+        const tabularToolModelId = tabularToolPlannerModel(requiresSandboxAnalysis);
         const tabularToolStepOverrides =
           resolvedProvider === 'vercel_ai_gateway' &&
           hasTabularData &&
