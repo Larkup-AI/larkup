@@ -71,4 +71,24 @@ describe('analysis presentation runtime', () => {
       complete: true,
     });
   });
+
+  it('normalizes module-qualified presentation helper calls from small models', () => {
+    for (const authoredCode of [
+      `import larkup_table\nrows = [{"participant": "Person 1"}]\nlarkup_table.larkup_table("Matches", rows, requested_items=1)`,
+      `import larkup\nrows = [{"participant": "Person 1"}]\nlarkup.larkup_table("Matches", rows, requested_items=1)`,
+    ]) {
+      const stdout = execFileSync(
+        'python3',
+        ['-c', withAnalysisPresentationHelpers(authoredCode, 1)],
+        {
+          encoding: 'utf8',
+        },
+      );
+      expect(extractAnalysisPresentation(stdout).presentation).toMatchObject({
+        kind: 'table',
+        totalItems: 1,
+        complete: true,
+      });
+    }
+  });
 });

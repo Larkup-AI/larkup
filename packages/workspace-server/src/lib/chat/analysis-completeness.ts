@@ -6,7 +6,7 @@ export interface AnalysisCompletenessResult {
   error?: string;
 }
 
-function requestedMatchesPerTarget(text: string) {
+export function requestedMatchesPerTarget(text: string) {
   const match = text.match(
     /\b(?:make|find|give|suggest|recommend|provide|create)?\s*(\d{1,2})\s+(?:best\s+)?matches?\b/i,
   );
@@ -14,7 +14,7 @@ function requestedMatchesPerTarget(text: string) {
   return Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
-function requestedSuggestionCap(text: string) {
+export function requestedSuggestionCap(text: string) {
   const match = text.match(
     /(?:not\s+more\s+than|no\s+more\s+than|at\s+most|maximum(?:\s+of)?|max(?:imum)?)[^\d]{0,20}(\d{1,3})\s+times?/i,
   );
