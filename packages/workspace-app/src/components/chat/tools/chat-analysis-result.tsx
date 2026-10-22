@@ -199,8 +199,8 @@ function DocumentReader({ presentation }: { presentation: AnalysisDocumentPresen
 export function ChatAnalysisResult({ presentation }: { presentation: AnalysisPresentation }) {
   const Icon = presentation.kind === 'table' ? Table2 : BookOpen;
   return (
-    <section className="my-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div className="mb-2.5 flex items-start justify-between gap-3 px-0.5">
+    <section className="my-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="mb-1.5 flex items-start justify-between gap-3 px-0.5">
         <div className="flex min-w-0 items-start gap-2.5">
           <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
             <Icon className="size-3.5" />
