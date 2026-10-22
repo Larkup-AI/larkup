@@ -78,11 +78,7 @@ export function selectTabularDatasetForQuestion(
  * An exact filename is stronger evidence than an opaque model-authored ID;
  * when the same upload exists more than once, prefer the newest copy.
  */
-export function selectTabularDatasetForAnalysis(
-  text: string | undefined,
-  code: string,
-  datasets: TabularDatasetMeta[],
-) {
+export function selectTabularDatasetReferencedByCode(code: string, datasets: TabularDatasetMeta[]) {
   const normalizedCode = code.toLocaleLowerCase();
   const referenced = datasets.filter((dataset) =>
     normalizedCode.includes(dataset.fileName.toLocaleLowerCase()),
@@ -94,7 +90,18 @@ export function selectTabularDatasetForAnalysis(
     return [...referenced].sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0]
       ?.id;
   }
-  return selectTabularDatasetForQuestion(text, datasets);
+  return undefined;
+}
+
+export function selectTabularDatasetForAnalysis(
+  text: string | undefined,
+  code: string,
+  datasets: TabularDatasetMeta[],
+) {
+  return (
+    selectTabularDatasetReferencedByCode(code, datasets) ??
+    selectTabularDatasetForQuestion(text, datasets)
+  );
 }
 
 /**

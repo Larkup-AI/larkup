@@ -3,6 +3,7 @@ import type { TabularDatasetMeta } from '@larkup/core/tabular-store';
 import {
   resolveTabularDatasetForQuestion,
   selectTabularDatasetForAnalysis,
+  selectTabularDatasetReferencedByCode,
   selectTabularDatasetForQuestion,
 } from './tabular-dataset-routing';
 
@@ -100,5 +101,11 @@ describe('resolveTabularDatasetForQuestion', () => {
         [datasets[0], { ...datasets[0], id: 'new-sales', createdAt: '2026-02-01T00:00:00.000Z' }],
       ),
     ).toBe('new-sales');
+  });
+
+  it('does not repair an opaque dataset ID without an exact code filename', () => {
+    expect(
+      selectTabularDatasetReferencedByCode("print('tenant analysis')", [datasets[0]]),
+    ).toBeUndefined();
   });
 });
