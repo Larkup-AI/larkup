@@ -80,8 +80,10 @@ import {
 } from '../../../lib/chat/tabular-visualization';
 import {
   isLikelyTabularQuestion,
+  latestAnalysisAttemptFailed,
   requestsLongAnalysisArtifact,
   requiresTabularSandbox,
+  supportsStableTabularPlanner,
   tabularToolPlannerModel,
   tabularToolsForStep,
 } from '../../../lib/chat/tabular-routing';
@@ -1905,7 +1907,7 @@ ${fieldLines}`;
         // for the grounded prose answer on the next step.
         const tabularToolModelId = tabularToolPlannerModel(requiresSandboxAnalysis);
         const tabularToolStepOverrides =
-          resolvedProvider === 'vercel_ai_gateway' &&
+          supportsStableTabularPlanner(resolvedProvider) &&
           hasTabularData &&
           (tabularQuestion || tabularFollowUp)
             ? {
@@ -2193,6 +2195,19 @@ ${fieldLines}`;
                 return {
                   toolChoice: { type: 'tool' as const, toolName: 'createDataExport' },
                   activeTools: ['createDataExport'],
+                  messages: compactToolContextForModel(messages),
+                };
+              }
+              const retryFailedAnalysis =
+                requiresTabularSandbox(userText) &&
+                stepNumber > 0 &&
+                stepNumber <= 2 &&
+                latestAnalysisAttemptFailed(messages as unknown[]);
+              if (retryFailedAnalysis) {
+                return {
+                  ...tabularToolStepOverrides,
+                  toolChoice: { type: 'tool' as const, toolName: 'executeAnalysis' as const },
+                  activeTools: ['executeAnalysis'] as any,
                   messages: compactToolContextForModel(messages),
                 };
               }

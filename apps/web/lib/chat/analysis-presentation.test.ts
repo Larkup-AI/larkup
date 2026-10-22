@@ -57,4 +57,18 @@ describe('analysis presentation runtime', () => {
       complete: true,
     });
   });
+
+  it('removes imports for the presentation helpers that are already injected', () => {
+    const code = withAnalysisPresentationHelpers(
+      `import larkup_table\nrows = [{"participant": "Person 1"}]\nlarkup_table("Matches", rows, requested_items=1)`,
+      1,
+    );
+    const stdout = execFileSync('python3', ['-c', code], { encoding: 'utf8' });
+
+    expect(extractAnalysisPresentation(stdout).presentation).toMatchObject({
+      kind: 'table',
+      totalItems: 1,
+      complete: true,
+    });
+  });
 });

@@ -252,5 +252,11 @@ def _larkup_auto_present():
 
 export function withAnalysisPresentationHelpers(code: string, requestedItems?: number): string {
   const requested = requestedItems === undefined ? 'None' : String(requestedItems);
-  return `${ANALYSIS_PRESENTATION_PYTHON}\n_LARKUP_REQUESTED_ITEMS = ${requested}\n${code}\n_larkup_auto_present()`;
+  const sanitizedCode = code
+    .replace(/^\s*import\s+larkup_(?:table|document)(?:\s+as\s+\w+)?\s*(?:#.*)?$/gm, '')
+    .replace(
+      /^\s*from\s+larkup_(?:table|document)\s+import\s+larkup_(?:table|document)\s*(?:#.*)?$/gm,
+      '',
+    );
+  return `${ANALYSIS_PRESENTATION_PYTHON}\n_LARKUP_REQUESTED_ITEMS = ${requested}\n${sanitizedCode}\n_larkup_auto_present()`;
 }
