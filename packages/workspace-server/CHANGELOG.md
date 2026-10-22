@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.20
+
+### Patch Changes
+
+- Make single-dataset sandbox analysis resilient to missing or hallucinated dataset IDs and model-authored CSV filenames.
+
 ## 0.2.19
 
 ### Patch Changes
