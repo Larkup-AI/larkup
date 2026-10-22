@@ -1,5 +1,14 @@
 # @larkup/workspace-server
 
+## 0.2.19
+
+### Patch Changes
+
+- fabed14: Preserve remote Python tracebacks and make long analysis artifacts complete across small selectable chat models.
+- Updated dependencies [fabed14]
+  - @larkup/sandbox@0.1.10
+  - @larkup/tool-doc-editor@0.3.4
+
 ## 0.2.18
 
 ### Patch Changes

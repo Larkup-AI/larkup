@@ -1,5 +1,11 @@
 # @larkup/sandbox
 
+## 0.1.10
+
+### Patch Changes
+
+- fabed14: Preserve remote Python tracebacks and make long analysis artifacts complete across small selectable chat models.
+
 ## 0.1.9
 
 ### Patch Changes

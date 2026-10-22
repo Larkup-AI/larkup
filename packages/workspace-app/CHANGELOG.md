@@ -1,5 +1,13 @@
 # @larkup/workspace-app
 
+## 0.2.10
+
+### Patch Changes
+
+- Updated dependencies [fabed14]
+  - @larkup/sandbox@0.1.10
+  - @larkup/tool-doc-editor@0.3.4
+
 ## 0.2.9
 
 ### Patch Changes
