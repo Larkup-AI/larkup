@@ -110,7 +110,12 @@ export function latestAnalysisAttemptFailed(messages: unknown[]) {
       const part = message.content[partIndex] as
         { type?: unknown; toolName?: unknown; output?: unknown } | undefined;
       if (part?.type !== 'tool-result' || part.toolName !== 'executeAnalysis') continue;
-      const output = part.output as { exitCode?: unknown } | undefined;
+      const wrappedOutput = part.output as { value?: unknown } | undefined;
+      const output = (
+        wrappedOutput && typeof wrappedOutput === 'object' && 'value' in wrappedOutput
+          ? wrappedOutput.value
+          : wrappedOutput
+      ) as { exitCode?: unknown } | undefined;
       return typeof output?.exitCode === 'number' && output.exitCode !== 0;
     }
   }

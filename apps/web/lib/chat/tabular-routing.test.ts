@@ -102,7 +102,10 @@ describe('latestAnalysisAttemptFailed', () => {
             {
               type: 'tool-result',
               toolName: 'executeAnalysis',
-              output: { exitCode: 1, stderr: 'Completeness validation failed' },
+              output: {
+                type: 'json',
+                value: { exitCode: 1, stderr: 'Completeness validation failed' },
+              },
             },
           ],
         },
