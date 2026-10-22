@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.25
+
+### Patch Changes
+
+- 46d8f0b: Detect failed analysis results inside the AI SDK JSON output wrapper so bounded code repair runs after validation failures.
+
 ## 0.2.24
 
 ### Patch Changes
