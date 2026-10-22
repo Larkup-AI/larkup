@@ -36,4 +36,25 @@ describe('analysis presentation runtime', () => {
       expect.objectContaining({ requestedItems: 25, totalItems: 25, complete: true }),
     );
   });
+
+  it('normalizes positional rows from values.tolist into table records', () => {
+    const code = withAnalysisPresentationHelpers(
+      `rows = [["Person 1", "Match 1", "Reason 1"], ["Person 2", "Match 2", "Reason 2"]]\ncolumns = ["Participant", "Match", "Reason"]\nlarkup_table("Matches", rows, columns, requested_items=2)`,
+      2,
+    );
+    const stdout = execFileSync('python3', ['-c', code], { encoding: 'utf8' });
+    const result = extractAnalysisPresentation(stdout);
+
+    expect(result.presentation).toMatchObject({
+      kind: 'table',
+      columns: ['Participant', 'Match', 'Reason'],
+      rows: [
+        { Participant: 'Person 1', Match: 'Match 1', Reason: 'Reason 1' },
+        { Participant: 'Person 2', Match: 'Match 2', Reason: 'Reason 2' },
+      ],
+      totalItems: 2,
+      requestedItems: 2,
+      complete: true,
+    });
+  });
 });
