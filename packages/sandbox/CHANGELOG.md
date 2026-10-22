@@ -1,5 +1,11 @@
 # @larkup/sandbox
 
+## 0.1.9
+
+### Patch Changes
+
+- Run E2B analysis in its data-science template and share animated chat progress styles with managed hosts.
+
 ## 0.1.8
 
 ### Patch Changes

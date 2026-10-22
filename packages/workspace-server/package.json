@@ -1,6 +1,6 @@
 {
   "name": "@larkup/workspace-server",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "type": "module",
   "files": [
     "src",
@@ -331,7 +331,7 @@
     "@larkup/marketplace": "workspace:*",
     "@larkup/sandbox": "workspace:*",
     "@larkup/scraper": "workspace:*",
-    "@larkup/tool-doc-editor": "^0.3.2",
+    "@larkup/tool-doc-editor": "^0.3.3",
     "@larkup/vector-stores": "workspace:*",
     "@napi-rs/canvas": "1.0.11",
     "ai": "7.0.133",
