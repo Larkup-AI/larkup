@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.26
+
+### Patch Changes
+
+- Guarantee complete constrained participant-matching artifacts with a deterministic CSV fallback when generated analysis crashes or fails its requested count and reuse limits.
+
 ## 0.2.25
 
 ### Patch Changes
