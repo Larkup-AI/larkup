@@ -76,3 +76,12 @@ export function remapLegacyMultiDatasetReads(code: string, datasetCount: number)
   let datasetIndex = 0;
   return code.replace(legacyRead, () => `pd.read_csv('dataset-${++datasetIndex}.csv')`);
 }
+
+/** Repoint only the first model-authored input read to the staged source. */
+export function remapSingleDatasetRead(code: string): string {
+  const firstCsvRead = /\b(?:pd|pandas)\s*\.\s*read_csv\(\s*(?:(["'])[^"']*\1|[A-Za-z_]\w*)/;
+  return code.replace(firstCsvRead, (match) => {
+    const open = match.slice(0, match.indexOf('(') + 1);
+    return `${open}'data.csv'`;
+  });
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { TabularDatasetMeta } from '@larkup/core/tabular-store';
 import {
   resolveTabularDatasetForQuestion,
+  selectTabularDatasetForAnalysis,
   selectTabularDatasetForQuestion,
 } from './tabular-dataset-routing';
 
@@ -79,5 +80,25 @@ describe('resolveTabularDatasetForQuestion', () => {
     expect(
       selectTabularDatasetForQuestion('Run a statistical analysis.', datasets),
     ).toBeUndefined();
+  });
+
+  it('uses the exact filename in generated code when the model omits the dataset ID', () => {
+    expect(
+      selectTabularDatasetForAnalysis(
+        'Analyze the participant list.',
+        "data = pd.read_csv('Sample - Superstore.xlsx — Orders')",
+        datasets,
+      ),
+    ).toBe('superstore-orders');
+  });
+
+  it('prefers the newest duplicate upload named in generated code', () => {
+    expect(
+      selectTabularDatasetForAnalysis(
+        'Analyze the participant list.',
+        "data = pd.read_csv('sample_sales_data.xlsx')",
+        [datasets[0], { ...datasets[0], id: 'new-sales', createdAt: '2026-02-01T00:00:00.000Z' }],
+      ),
+    ).toBe('new-sales');
   });
 });

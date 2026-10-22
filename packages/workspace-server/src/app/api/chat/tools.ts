@@ -99,11 +99,13 @@ import { inferTabularPlan } from '../../../lib/chat/tabular-query-plan';
 import { requestedLongAnalysisItemCount } from '../../../lib/chat/tabular-routing';
 import {
   resolveTabularDatasetForQuestion,
+  selectTabularDatasetForAnalysis,
   selectTabularDatasetForQuestion,
 } from '../../../lib/chat/tabular-dataset-routing';
 import {
   createTabularSandboxFiles,
   remapLegacyMultiDatasetReads,
+  remapSingleDatasetRead,
 } from '../../../lib/chat/tabular-sandbox-files';
 import {
   extractAnalysisPresentation,
@@ -2806,17 +2808,29 @@ export async function getChatTools(context: {
           // single-sheet contract. Ambiguous workbooks still require the
           // model to make an explicit selection.
           if (requestedDatasetIds.length === 0) {
-            const automaticDatasetId = selectTabularDatasetForQuestion(
+            const automaticDatasetId = selectTabularDatasetForAnalysis(
               requestText,
+              code,
               availableDatasets,
             );
             if (automaticDatasetId) requestedDatasetIds.push(automaticDatasetId);
           }
           if (requestedDatasetIds.length > 0) {
             const availableDatasetIds = new Set(availableDatasets.map((dataset) => dataset.id));
-            const unavailableDatasetId = requestedDatasetIds.find(
+            let unavailableDatasetId = requestedDatasetIds.find(
               (requestedId) => !availableDatasetIds.has(requestedId),
             );
+            if (unavailableDatasetId && requestedDatasetIds.length === 1) {
+              const inferredDatasetId = selectTabularDatasetForAnalysis(
+                requestText,
+                code,
+                availableDatasets,
+              );
+              if (inferredDatasetId) {
+                requestedDatasetIds.splice(0, 1, inferredDatasetId);
+                unavailableDatasetId = undefined;
+              }
+            }
             if (unavailableDatasetId) {
               throw new Error(`Tabular dataset is not available: ${unavailableDatasetId}`);
             }
@@ -2859,6 +2873,9 @@ export async function getChatTools(context: {
             finalCode,
             requestedLongAnalysisItemCount(requestText ?? ''),
           );
+          if (requestedDatasetIds.length === 1) {
+            finalCode = remapSingleDatasetRead(finalCode);
+          }
 
           let result = await sandboxManager.execute({
             code: finalCode,
