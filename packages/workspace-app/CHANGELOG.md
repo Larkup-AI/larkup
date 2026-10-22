@@ -1,5 +1,14 @@
 # @larkup/workspace-app
 
+## 0.2.9
+
+### Patch Changes
+
+- Run E2B analysis in its data-science template and share animated chat progress styles with managed hosts.
+- Updated dependencies
+  - @larkup/sandbox@0.1.9
+  - @larkup/tool-doc-editor@0.3.3
+
 ## 0.2.8
 
 ### Patch Changes
