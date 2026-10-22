@@ -22,6 +22,7 @@ import {
   filterGroupOwnedDataAvailableToAssistant,
 } from '@larkup/core/assistant-data-scope';
 import { runWithProject } from '@larkup/core/project-store';
+import { runWithWorkspaceHost, workspaceHost } from '@larkup/core/workspace-host';
 import {
   deleteGroundedAnswerCacheEntry,
   getGroundedAnswerCacheEntry,
@@ -886,6 +887,11 @@ export async function POST(req: Request) {
   }
 
   const config = await readConfig();
+  // AI SDK invokes stream lifecycle callbacks after the request's original
+  // async context has finished. Retain the managed host so that final usage
+  // events are attributed to the tenant instead of falling back to local
+  // analytics storage.
+  const requestWorkspaceHost = workspaceHost();
   const userText = latestUserText(messages);
   const readCurrentScopeFingerprint = async () => {
     const [documents, groups, activeConfig] = await Promise.all([
@@ -2274,34 +2280,41 @@ ${fieldLines}`;
             });
           },
           onFinish: async () => {
-            try {
-              const { trackUsageEvent, estimateCost } =
-                await import('@larkup/core/analytics-store');
-              for (const usage of usageByModel.values()) {
-                const estimatedCost = estimateCost(
-                  usage.modelId,
-                  usage.promptTokens,
-                  usage.completionTokens,
-                );
-                await trackUsageEvent({
-                  type: 'chat',
-                  modelId: usage.modelId,
-                  provider: resolvedProvider,
-                  promptTokens: usage.promptTokens,
-                  completionTokens: usage.completionTokens,
-                  totalTokens: usage.totalTokens,
-                  estimatedCost,
-                  timestamp: new Date().toISOString(),
-                });
-                trackEnterpriseAiUsage(config, {
-                  modelId: usage.modelId,
-                  inputTokens: usage.promptTokens,
-                  outputTokens: usage.completionTokens,
-                  costUsd: estimatedCost,
-                });
+            const finish = async () => {
+              try {
+                const { trackUsageEvent, estimateCost } =
+                  await import('@larkup/core/analytics-store');
+                for (const usage of usageByModel.values()) {
+                  const estimatedCost = estimateCost(
+                    usage.modelId,
+                    usage.promptTokens,
+                    usage.completionTokens,
+                  );
+                  await trackUsageEvent({
+                    type: 'chat',
+                    modelId: usage.modelId,
+                    provider: resolvedProvider,
+                    promptTokens: usage.promptTokens,
+                    completionTokens: usage.completionTokens,
+                    totalTokens: usage.totalTokens,
+                    estimatedCost,
+                    timestamp: new Date().toISOString(),
+                  });
+                  trackEnterpriseAiUsage(config, {
+                    modelId: usage.modelId,
+                    inputTokens: usage.promptTokens,
+                    outputTokens: usage.completionTokens,
+                    costUsd: estimatedCost,
+                  });
+                }
+              } finally {
+                await mcp.close();
               }
-            } finally {
-              await mcp.close();
+            };
+            if (requestWorkspaceHost) {
+              await runWithWorkspaceHost(requestWorkspaceHost, finish);
+            } else {
+              await finish();
             }
           },
           tools,
