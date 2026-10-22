@@ -58,6 +58,11 @@
       "import": "./src/lib/chat/analysis-presentation.ts",
       "default": "./src/lib/chat/analysis-presentation.ts"
     },
+    "./lib/chat/analysis-completeness": {
+      "types": "./dist-types/lib/chat/analysis-completeness.d.ts",
+      "import": "./src/lib/chat/analysis-completeness.ts",
+      "default": "./src/lib/chat/analysis-completeness.ts"
+    },
     "./lib/chat/conversation-memory": {
       "types": "./dist-types/lib/chat/conversation-memory.d.ts",
       "import": "./src/lib/chat/conversation-memory.ts",

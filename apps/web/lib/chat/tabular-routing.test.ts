@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   hasCompletedTabularVisualizationStep,
   isLikelyTabularQuestion,
+  latestAnalysisAttemptFailed,
   requiresTabularSandbox,
+  supportsStableTabularPlanner,
   tabularToolPlannerModel,
   tabularToolsForStep,
 } from './tabular-routing';
@@ -53,6 +55,9 @@ describe('tabularToolsForStep', () => {
   it('uses one capable artifact planner independent of the selected small chat model', () => {
     expect(tabularToolPlannerModel(true)).toBe('openai/gpt-4.1-mini');
     expect(tabularToolPlannerModel(false)).toBe('openai/gpt-4o-mini');
+    expect(supportsStableTabularPlanner('openai')).toBe(true);
+    expect(supportsStableTabularPlanner('vercel_ai_gateway')).toBe(true);
+    expect(supportsStableTabularPlanner('anthropic')).toBe(false);
   });
   it('requires the exact table query before an answer is generated', () => {
     expect(tabularToolsForStep({ stepNumber: 0, toolNames: ['queryTabularData'] })).toEqual({
@@ -85,6 +90,34 @@ describe('tabularToolsForStep', () => {
         toolNames: ['queryTabularData', 'generateVisualization', 'executeAnalysis'],
       }),
     ).toEqual({ toolChoice: 'none', activeTools: [] });
+  });
+});
+
+describe('latestAnalysisAttemptFailed', () => {
+  it('recognizes a failed sandbox result so the route can repair it', () => {
+    expect(
+      latestAnalysisAttemptFailed([
+        {
+          content: [
+            {
+              type: 'tool-result',
+              toolName: 'executeAnalysis',
+              output: { exitCode: 1, stderr: 'Completeness validation failed' },
+            },
+          ],
+        },
+      ]),
+    ).toBe(true);
+  });
+
+  it('does not retry a successful latest analysis', () => {
+    expect(
+      latestAnalysisAttemptFailed([
+        {
+          content: [{ type: 'tool-result', toolName: 'executeAnalysis', output: { exitCode: 0 } }],
+        },
+      ]),
+    ).toBe(false);
   });
 });
 

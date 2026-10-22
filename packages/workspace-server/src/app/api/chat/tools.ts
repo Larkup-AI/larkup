@@ -113,6 +113,7 @@ import {
   extractAnalysisPresentation,
   withAnalysisPresentationHelpers,
 } from '../../../lib/chat/analysis-presentation';
+import { validateAnalysisCompleteness } from '../../../lib/chat/analysis-completeness';
 import { leadingMediaAssetId } from '../../../lib/chat/media-retrieval-routing';
 import { findIndexedImageSource } from '../../../lib/chat/visual-routing';
 import { indexedVideoEvidenceIsSufficient } from '../../../lib/chat/video-rag-routing';
@@ -2768,7 +2769,7 @@ export async function getChatTools(context: {
 
     executeAnalysis: tool({
       description:
-        'Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.',
+        'Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. Hard counts are acceptance criteria: when the user asks for K matches for N targets, emit exactly N×K long-form rows or N rows with K populated match fields. Never skip a target with empty data or zero semantic overlap; fill it from the best remaining eligible candidates, while honoring global reuse limits, and assert all counts before presentation. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.',
       inputSchema: z.object({
         code: z
           .string()
@@ -2908,11 +2909,20 @@ export async function getChatTools(context: {
           }
 
           const extracted = extractAnalysisPresentation(result.stdout);
+          const completeness =
+            result.exitCode === 0
+              ? validateAnalysisCompleteness(requestText ?? '', extracted.presentation)
+              : { valid: true };
+          const completenessError = completeness.valid ? undefined : completeness.error;
+          const exitCode = result.exitCode === 0 && completenessError ? 1 : result.exitCode;
+          const stderr = [result.stderr.trim(), completenessError].filter(Boolean).join('\n\n');
           return {
             stdout: extracted.stdout.slice(0, 5000),
-            stderr: result.stderr.slice(0, 2000),
-            exitCode: result.exitCode,
-            ...(extracted.presentation ? { presentation: extracted.presentation } : {}),
+            stderr: stderr.slice(0, 2000),
+            exitCode,
+            ...(extracted.presentation && !completenessError
+              ? { presentation: extracted.presentation }
+              : {}),
             artifacts: result.artifacts.map((a) => ({
               name: a.name,
               mimeType: a.mimeType,

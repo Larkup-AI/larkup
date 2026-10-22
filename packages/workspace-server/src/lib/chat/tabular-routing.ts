@@ -97,6 +97,26 @@ export function tabularToolPlannerModel(requiresSandbox: boolean) {
   return requiresSandbox ? 'openai/gpt-4.1-mini' : 'openai/gpt-4o-mini';
 }
 
+export function supportsStableTabularPlanner(provider: string) {
+  return provider === 'vercel_ai_gateway' || provider === 'openai';
+}
+
+/** Allow a bounded repair attempt when sandbox execution or validation failed. */
+export function latestAnalysisAttemptFailed(messages: unknown[]) {
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+    const message = messages[messageIndex] as { content?: unknown } | undefined;
+    if (!Array.isArray(message?.content)) continue;
+    for (let partIndex = message.content.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = message.content[partIndex] as
+        { type?: unknown; toolName?: unknown; output?: unknown } | undefined;
+      if (part?.type !== 'tool-result' || part.toolName !== 'executeAnalysis') continue;
+      const output = part.output as { exitCode?: unknown } | undefined;
+      return typeof output?.exitCode === 'number' && output.exitCode !== 0;
+    }
+  }
+  return false;
+}
+
 /**
  * A workspace can contain spreadsheets alongside PDFs, media, and notes.
  * Only force the table path when the wording actually asks for tabular facts;
