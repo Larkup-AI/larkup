@@ -195,10 +195,13 @@ def larkup_table(title, rows, columns=None, summary=None, requested_items=None, 
     rows = list(rows)
     if columns is None:
         columns = list(rows[0].keys()) if rows else []
+    columns = list(columns)
+    if rows and not isinstance(rows[0], dict) and isinstance(rows[0], (list, tuple)):
+        rows = [dict(zip(columns, row)) for row in rows]
     requested_items = requested_items if isinstance(requested_items, int) and not isinstance(requested_items, bool) and requested_items > 0 else _LARKUP_REQUESTED_ITEMS
     payload = {
         "kind": "table", "title": title, "summary": summary,
-        "columns": list(columns), "rows": rows, "totalItems": len(rows),
+        "columns": columns, "rows": rows, "totalItems": len(rows),
         "requestedItems": requested_items, "complete": True, "fileName": file_name,
     }
     print("${PRESENTATION_MARKER}" + _larkup_json.dumps(payload, ensure_ascii=False, default=_larkup_json_default))
