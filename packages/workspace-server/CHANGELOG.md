@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.22
+
+### Patch Changes
+
+- Render long analysis tables when generated Python supplies positional rows with explicit columns.
+
 ## 0.2.21
 
 ### Patch Changes
