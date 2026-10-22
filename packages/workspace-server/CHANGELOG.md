@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.17
+
+### Patch Changes
+
+- Preserve the managed workspace context when a streamed chat completes so usage is attributed to the correct tenant.
+
 ## 0.2.16
 
 ### Patch Changes
