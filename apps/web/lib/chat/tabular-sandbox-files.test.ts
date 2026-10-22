@@ -3,6 +3,7 @@ import type { TabularDataset } from '@larkup/core/tabular-store';
 import {
   createTabularSandboxFiles,
   remapLegacyMultiDatasetReads,
+  remapSingleDatasetColumnReferences,
   remapSingleDatasetRead,
   tabularDatasetToCsv,
 } from './tabular-sandbox-files';
@@ -36,6 +37,16 @@ describe('tabular sandbox files', () => {
     expect(createTabularSandboxFiles([source])).toEqual({
       files: [{ name: 'data.csv', content: 'Name,Amount\n"Desk, ""Large""",42' }],
     });
+  });
+
+  it('quotes form-export headers that contain commas and quotes', () => {
+    const source = dataset('survey', 'survey.csv', [{ Name: 'Ada', Amount: 42 }]);
+    source.columns[0].name = 'Question 1: Skills, "What can you offer?"';
+    source.rows = [{ 'Question 1: Skills, "What can you offer?"': 'Fundraising', Amount: 42 }];
+
+    expect(tabularDatasetToCsv(source)).toBe(
+      '"Question 1: Skills, ""What can you offer?""",Amount\nFundraising,42',
+    );
   });
 
   it('creates a manifest and distinct files for a cross-dataset analysis', () => {
@@ -113,5 +124,35 @@ describe('remapSingleDatasetRead', () => {
         "source = pd.read_csv(filename)\nresult = pd.read_csv('generated.csv')",
       ),
     ).toBe("source = pd.read_csv('data.csv')\nresult = pd.read_csv('generated.csv')");
+  });
+});
+
+describe('remapSingleDatasetColumnReferences', () => {
+  it('maps an unambiguous long suffix to the exact exported form column', () => {
+    const source = dataset('participants', 'participants.csv', []);
+    source.columns.push({
+      name: 'Pre-Matching (optional) Question 1: Knowledge & Expertise "Where can you help others with your experience?"',
+      type: 'string',
+      nullCount: 0,
+      uniqueCount: 0,
+    });
+    const authored =
+      'Question 1: Knowledge & Expertise "Where can you help others with your experience?"';
+    const code = `expertise = data[${JSON.stringify(authored)}]`;
+
+    expect(remapSingleDatasetColumnReferences(code, source)).toBe(
+      `expertise = data[${JSON.stringify(source.columns[2].name)}]`,
+    );
+  });
+
+  it('does not guess when a suffix identifies multiple columns', () => {
+    const source = dataset('survey', 'survey.csv', []);
+    source.columns.push(
+      { name: 'Registration: Current Needs', type: 'string', nullCount: 0, uniqueCount: 0 },
+      { name: 'Follow-up: Current Needs', type: 'string', nullCount: 0, uniqueCount: 0 },
+    );
+    const code = `needs = data['Current Needs and priorities']`;
+
+    expect(remapSingleDatasetColumnReferences(code, source)).toBe(code);
   });
 });

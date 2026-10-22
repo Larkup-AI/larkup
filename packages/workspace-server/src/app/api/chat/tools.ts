@@ -106,6 +106,7 @@ import {
 import {
   createTabularSandboxFiles,
   remapLegacyMultiDatasetReads,
+  remapSingleDatasetColumnReferences,
   remapSingleDatasetRead,
 } from '../../../lib/chat/tabular-sandbox-files';
 import {
@@ -2816,6 +2817,7 @@ export async function getChatTools(context: {
             );
             if (automaticDatasetId) requestedDatasetIds.push(automaticDatasetId);
           }
+          let mountedDatasets: NonNullable<Awaited<ReturnType<typeof getTabularDataset>>>[] = [];
           if (requestedDatasetIds.length > 0) {
             const availableDatasetIds = new Set(availableDatasets.map((dataset) => dataset.id));
             let unavailableDatasetId = requestedDatasetIds.find(
@@ -2841,10 +2843,8 @@ export async function getChatTools(context: {
             if (missingDatasetId) {
               throw new Error(`Tabular dataset is not available: ${missingDatasetId}`);
             }
-            files.push(
-              ...createTabularSandboxFiles(datasets as NonNullable<(typeof datasets)[number]>[])
-                .files,
-            );
+            mountedDatasets = datasets as typeof mountedDatasets;
+            files.push(...createTabularSandboxFiles(mountedDatasets).files);
           }
 
           if (pdfDocumentId) {
@@ -2875,6 +2875,7 @@ export async function getChatTools(context: {
           );
           if (requestedDatasetIds.length === 1) {
             finalCode = remapSingleDatasetRead(finalCode);
+            finalCode = remapSingleDatasetColumnReferences(finalCode, mountedDatasets[0]);
           }
 
           let result = await sandboxManager.execute({

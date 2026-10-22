@@ -23,7 +23,7 @@ function csvCell(value: unknown) {
 export function tabularDatasetToCsv(dataset: TabularDataset) {
   const columns = dataset.columns.map((column) => column.name);
   return [
-    columns.join(','),
+    columns.map(csvCell).join(','),
     ...dataset.rows.map((row) => columns.map((column) => csvCell(row[column])).join(',')),
   ].join('\n');
 }
@@ -83,5 +83,39 @@ export function remapSingleDatasetRead(code: string): string {
   return code.replace(firstCsvRead, (match) => {
     const open = match.slice(0, match.indexOf('(') + 1);
     return `${open}'data.csv'`;
+  });
+}
+
+function decodeSimplePythonString(value: string) {
+  return value.replace(/\\([\\'\"])/g, '$1');
+}
+
+function normalizedColumnName(value: string) {
+  return value.toLocaleLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Repair a model-authored column reference only when its long label is an
+ * unambiguous suffix of one real column. Form exports commonly prepend form
+ * descriptions to otherwise exact question labels, which small models omit.
+ */
+export function remapSingleDatasetColumnReferences(code: string, dataset: TabularDataset) {
+  const columns = dataset.columns.map((column) => column.name);
+  const exactColumns = new Set(columns.map(normalizedColumnName));
+  const stringLiteral = /(['"])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+  return code.replace(stringLiteral, (literal, _quote: string, encoded: string) => {
+    const authored = decodeSimplePythonString(encoded);
+    const normalizedAuthored = normalizedColumnName(authored);
+    if (normalizedAuthored.length < 20 || exactColumns.has(normalizedAuthored)) return literal;
+
+    const candidates = columns.filter((column) => {
+      const normalizedColumn = normalizedColumnName(column);
+      return (
+        normalizedColumn.endsWith(normalizedAuthored) ||
+        normalizedAuthored.endsWith(normalizedColumn)
+      );
+    });
+    return candidates.length === 1 ? JSON.stringify(candidates[0]) : literal;
   });
 }
