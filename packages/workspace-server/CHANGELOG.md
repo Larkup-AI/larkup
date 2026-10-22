@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.21
+
+### Patch Changes
+
+- Restrict invalid analysis dataset ID repair to exact filenames present in generated code.
+
 ## 0.2.20
 
 ### Patch Changes
