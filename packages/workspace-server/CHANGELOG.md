@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.24
+
+### Patch Changes
+
+- 3f88319: Validate hard multi-match counts, retry failed sandbox analysis with bounded code repair, use a stable OpenAI analysis planner, and ignore invalid imports of injected presentation helpers.
+
 ## 0.2.23
 
 ### Patch Changes
