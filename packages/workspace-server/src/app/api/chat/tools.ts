@@ -100,6 +100,7 @@ import { requestedLongAnalysisItemCount } from '../../../lib/chat/tabular-routin
 import {
   resolveTabularDatasetForQuestion,
   selectTabularDatasetForAnalysis,
+  selectTabularDatasetReferencedByCode,
   selectTabularDatasetForQuestion,
 } from '../../../lib/chat/tabular-dataset-routing';
 import {
@@ -2821,8 +2822,7 @@ export async function getChatTools(context: {
               (requestedId) => !availableDatasetIds.has(requestedId),
             );
             if (unavailableDatasetId && requestedDatasetIds.length === 1) {
-              const inferredDatasetId = selectTabularDatasetForAnalysis(
-                requestText,
+              const inferredDatasetId = selectTabularDatasetReferencedByCode(
                 code,
                 availableDatasets,
               );
