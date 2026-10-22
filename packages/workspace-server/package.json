@@ -63,6 +63,11 @@
       "import": "./src/lib/chat/analysis-completeness.ts",
       "default": "./src/lib/chat/analysis-completeness.ts"
     },
+    "./lib/chat/matching-analysis-fallback": {
+      "types": "./dist-types/lib/chat/matching-analysis-fallback.d.ts",
+      "import": "./src/lib/chat/matching-analysis-fallback.ts",
+      "default": "./src/lib/chat/matching-analysis-fallback.ts"
+    },
     "./lib/chat/conversation-memory": {
       "types": "./dist-types/lib/chat/conversation-memory.d.ts",
       "import": "./src/lib/chat/conversation-memory.ts",

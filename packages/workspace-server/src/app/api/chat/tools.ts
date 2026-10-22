@@ -114,6 +114,7 @@ import {
   withAnalysisPresentationHelpers,
 } from '../../../lib/chat/analysis-presentation';
 import { validateAnalysisCompleteness } from '../../../lib/chat/analysis-completeness';
+import { buildMatchingAnalysisFallback } from '../../../lib/chat/matching-analysis-fallback';
 import { leadingMediaAssetId } from '../../../lib/chat/media-retrieval-routing';
 import { findIndexedImageSource } from '../../../lib/chat/visual-routing';
 import { indexedVideoEvidenceIsSufficient } from '../../../lib/chat/video-rag-routing';
@@ -2908,11 +2909,31 @@ export async function getChatTools(context: {
             });
           }
 
-          const extracted = extractAnalysisPresentation(result.stdout);
-          const completeness =
+          let extracted = extractAnalysisPresentation(result.stdout);
+          let completeness =
             result.exitCode === 0
               ? validateAnalysisCompleteness(requestText ?? '', extracted.presentation)
               : { valid: true };
+          const matchingFallback =
+            mountedDatasets.length === 1
+              ? buildMatchingAnalysisFallback(requestText ?? '', mountedDatasets[0])
+              : undefined;
+          if ((result.exitCode !== 0 || !completeness.valid) && matchingFallback) {
+            result = await sandboxManager.execute({
+              code: withAnalysisPresentationHelpers(
+                matchingFallback,
+                requestedLongAnalysisItemCount(requestText ?? ''),
+              ),
+              language: 'python',
+              files,
+              timeout: 30_000,
+            });
+            extracted = extractAnalysisPresentation(result.stdout);
+            completeness =
+              result.exitCode === 0
+                ? validateAnalysisCompleteness(requestText ?? '', extracted.presentation)
+                : { valid: true };
+          }
           const completenessError = completeness.valid ? undefined : completeness.error;
           const exitCode = result.exitCode === 0 && completenessError ? 1 : result.exitCode;
           const stderr = [result.stderr.trim(), completenessError].filter(Boolean).join('\n\n');
