@@ -45,6 +45,13 @@ interface E2bModule {
   };
 }
 
+/**
+ * The base E2B template intentionally contains only a minimal Python runtime.
+ * Larkup's analysis tools promise common data-science packages, so unmanaged
+ * E2B executions must start from E2B's public Code Interpreter template.
+ */
+export const DEFAULT_E2B_ANALYSIS_TEMPLATE = 'code-interpreter-v1';
+
 async function loadSdk(): Promise<E2bModule> {
   return (await import('e2b')) as unknown as E2bModule;
 }
@@ -87,7 +94,7 @@ async function execute(
     const options = { apiKey, timeoutMs: timeoutMs + 60_000, allowInternetAccess: false };
     const snapshotId = credentials.snapshotId?.trim();
     sandbox = await withTimeout(
-      snapshotId ? Sandbox.create(snapshotId, options) : Sandbox.create(options),
+      Sandbox.create(snapshotId || DEFAULT_E2B_ANALYSIS_TEMPLATE, options),
       timeoutMs + 30_000,
       'E2B sandbox create',
     );

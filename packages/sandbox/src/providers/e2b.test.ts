@@ -12,7 +12,7 @@ vi.mock('e2b', () => ({
   },
 }));
 
-const { e2bAdapter } = await import('./e2b.js');
+const { DEFAULT_E2B_ANALYSIS_TEMPLATE, e2bAdapter } = await import('./e2b.js');
 
 beforeEach(() => {
   listMock.mockReset();
@@ -37,15 +37,23 @@ describe('e2bAdapter.verifyCredentials', () => {
   });
 
   it('propagates the SDK error on an invalid key', async () => {
-    listMock.mockReturnValue({ nextItems: vi.fn().mockRejectedValue(new Error('401 unauthorized')) });
-    await expect(e2bAdapter.verifyCredentials({ apiKey: 'bad' })).rejects.toThrow('401 unauthorized');
+    listMock.mockReturnValue({
+      nextItems: vi.fn().mockRejectedValue(new Error('401 unauthorized')),
+    });
+    await expect(e2bAdapter.verifyCredentials({ apiKey: 'bad' })).rejects.toThrow(
+      '401 unauthorized',
+    );
   });
 });
 
 describe('e2bAdapter.healthCheck', () => {
   it('reports missing-credentials without touching the SDK', async () => {
     const result = await e2bAdapter.healthCheck({});
-    expect(result).toEqual({ status: 'missing-credentials', backend: 'e2b', error: 'E2B API key is required.' });
+    expect(result).toEqual({
+      status: 'missing-credentials',
+      backend: 'e2b',
+      error: 'E2B API key is required.',
+    });
     expect(listMock).not.toHaveBeenCalled();
   });
 
@@ -66,9 +74,15 @@ describe('e2bAdapter.execute', () => {
 
   it('creates a sandbox, runs the script, and always kills it afterward', async () => {
     runMock.mockResolvedValue({ stdout: 'hi\n', stderr: '', exitCode: 0 });
-    const result = await e2bAdapter.execute({ code: 'print("hi")', language: 'python' }, { apiKey: 'key' });
+    const result = await e2bAdapter.execute(
+      { code: 'print("hi")', language: 'python' },
+      { apiKey: 'key' },
+    );
 
-    expect(createMock).toHaveBeenCalled();
+    expect(createMock).toHaveBeenCalledWith(
+      DEFAULT_E2B_ANALYSIS_TEMPLATE,
+      expect.objectContaining({ allowInternetAccess: false }),
+    );
     expect(runMock).toHaveBeenCalledTimes(1);
     expect(result.stdout).toBe('hi\n');
     expect(result.exitCode).toBe(0);
