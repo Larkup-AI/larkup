@@ -111,4 +111,28 @@ describe('e2bAdapter.execute', () => {
     expect(result.stderr).toContain('command failed');
     expect(killMock).toHaveBeenCalledTimes(1);
   });
+
+  it('preserves the Python traceback from a non-zero E2B command', async () => {
+    runMock.mockRejectedValue(
+      Object.assign(new Error('exit status 1'), {
+        stdout: 'before failure\n',
+        stderr: 'Traceback: invalid generated code\n',
+        exitCode: 1,
+      }),
+    );
+
+    const result = await e2bAdapter.execute(
+      { code: 'raise RuntimeError()', language: 'python' },
+      { apiKey: 'key' },
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        stdout: 'before failure\n',
+        stderr: 'Traceback: invalid generated code\n',
+        exitCode: 1,
+      }),
+    );
+    expect(killMock).toHaveBeenCalledTimes(1);
+  });
 });

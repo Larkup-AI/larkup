@@ -100,12 +100,31 @@ async function execute(
     );
     const activeSandbox = sandbox;
     return await runScriptedExecution(async (script) => {
-      const result = await activeSandbox.commands.run(script, { timeoutMs });
-      return {
-        stdout: result.stdout ?? '',
-        stderr: result.stderr ?? '',
-        exitCode: result.exitCode ?? 0,
-      };
+      try {
+        const result = await activeSandbox.commands.run(script, { timeoutMs });
+        return {
+          stdout: result.stdout ?? '',
+          stderr: result.stderr ?? '',
+          exitCode: result.exitCode ?? 0,
+        };
+      } catch (err) {
+        // E2B throws CommandExitError for an ordinary non-zero process. Keep
+        // its real Python traceback so the analysis tool can diagnose and
+        // repair generated code instead of returning only "exit status 1".
+        const failed = err as { stdout?: unknown; stderr?: unknown; exitCode?: unknown };
+        if (
+          typeof failed.stdout === 'string' &&
+          typeof failed.stderr === 'string' &&
+          typeof failed.exitCode === 'number'
+        ) {
+          return {
+            stdout: failed.stdout,
+            stderr: failed.stderr,
+            exitCode: failed.exitCode,
+          };
+        }
+        throw err;
+      }
     }, request);
   } catch (err) {
     return failedResult(err instanceof Error ? err.message : 'E2B execution failed.', startTime);
