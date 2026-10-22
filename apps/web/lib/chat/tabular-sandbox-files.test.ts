@@ -3,6 +3,7 @@ import type { TabularDataset } from '@larkup/core/tabular-store';
 import {
   createTabularSandboxFiles,
   remapLegacyMultiDatasetReads,
+  remapSingleDatasetRead,
   tabularDatasetToCsv,
 } from './tabular-sandbox-files';
 
@@ -96,5 +97,21 @@ describe('tabular sandbox files', () => {
         '\n',
       ),
     );
+  });
+});
+
+describe('remapSingleDatasetRead', () => {
+  it('repoints a literal upload filename to the staged data.csv', () => {
+    expect(remapSingleDatasetRead("data = pd.read_csv('participants.csv')")).toBe(
+      "data = pd.read_csv('data.csv')",
+    );
+  });
+
+  it('repoints a filename variable and leaves later generated-file reads alone', () => {
+    expect(
+      remapSingleDatasetRead(
+        "source = pd.read_csv(filename)\nresult = pd.read_csv('generated.csv')",
+      ),
+    ).toBe("source = pd.read_csv('data.csv')\nresult = pd.read_csv('generated.csv')");
   });
 });

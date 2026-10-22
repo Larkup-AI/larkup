@@ -72,6 +72,32 @@ export function selectTabularDatasetForQuestion(
 }
 
 /**
+ * Resolve the single source a generated analysis program intends to read.
+ * Small tool-calling models occasionally omit or hallucinate the optional
+ * dataset ID while still copying the exact visible filename into their code.
+ * An exact filename is stronger evidence than an opaque model-authored ID;
+ * when the same upload exists more than once, prefer the newest copy.
+ */
+export function selectTabularDatasetForAnalysis(
+  text: string | undefined,
+  code: string,
+  datasets: TabularDatasetMeta[],
+) {
+  const normalizedCode = code.toLocaleLowerCase();
+  const referenced = datasets.filter((dataset) =>
+    normalizedCode.includes(dataset.fileName.toLocaleLowerCase()),
+  );
+  const referencedNames = new Set(
+    referenced.map((dataset) => dataset.fileName.toLocaleLowerCase()),
+  );
+  if (referenced.length > 0 && referencedNames.size === 1) {
+    return [...referenced].sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0]
+      ?.id;
+  }
+  return selectTabularDatasetForQuestion(text, datasets);
+}
+
+/**
  * Correct a model-selected sheet only when the question's schema makes a
  * different dataset objectively better. This keeps workbook selection
  * generic while avoiding a filename such as "sales.xlsx" winning over a
