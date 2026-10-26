@@ -137,14 +137,14 @@ _matching_labels_all = _matching_labels(_matching_people, _matching_settings["id
 _matching_usage = [0] * len(_matching_people)
 _matching_rows = []
 _matching_targets = min(_matching_settings["targetCount"], len(_matching_people))
-
+_matching_preferences = []
 for _target_index in range(_matching_targets):
     _target = _matching_people[_target_index]
     _need_text = _matching_text(_target.get(_matching_settings["needs"]))
     _need_tokens = _matching_tokens(_need_text)
     _candidates = []
     for _candidate_index, _candidate in enumerate(_matching_people):
-        if _candidate_index == _target_index or _matching_usage[_candidate_index] >= _matching_settings["suggestionCap"]:
+        if _candidate_index == _target_index:
             continue
         _offer_text = _matching_text(_candidate.get(_matching_settings["offers"]))
         _offer_tokens = _matching_tokens(_offer_text)
@@ -153,13 +153,57 @@ for _target_index in range(_matching_targets):
         _jaccard = len(_shared) / len(_union) if _union else 0.0
         _sequence = difflib.SequenceMatcher(None, _need_text.casefold(), _offer_text.casefold()).ratio()
         _score = len(_shared) * 10.0 + _jaccard * 3.0 + _sequence
-        _candidates.append((-_score, _matching_usage[_candidate_index], _matching_labels_all[_candidate_index].casefold(), _candidate_index, _shared))
+        _candidates.append((-_score, _matching_labels_all[_candidate_index].casefold(), _candidate_index, _shared))
     _candidates.sort()
-    _selected = _candidates[:_matching_settings["matchesPerTarget"]]
-    if len(_selected) != _matching_settings["matchesPerTarget"]:
-        raise RuntimeError("Not enough eligible candidates to satisfy every requested match and reuse limit")
-    for _rank, (_, _, _, _candidate_index, _shared) in enumerate(_selected, start=1):
+    _matching_preferences.append(_candidates)
+
+_matching_required = _matching_targets * _matching_settings["matchesPerTarget"]
+_matching_capacity = len(_matching_people) * _matching_settings["suggestionCap"]
+if _matching_capacity < _matching_required:
+    raise RuntimeError("The requested candidate reuse limit is mathematically impossible for this dataset")
+
+# A sequential greedy allocator can consume all non-self capacity needed by a
+# later participant even though a complete assignment exists. Build one
+# injective bipartite matching per rank instead. Every round assigns every
+# target once, uses a candidate at most once, and excludes pairs selected in
+# earlier rounds. Therefore K rounds guarantee K unique non-self matches per
+# target and candidate reuse no greater than K.
+_matching_used_pairs = set()
+_matching_selected = [[] for _ in range(_matching_targets)]
+
+def _matching_assign(_target_index, _seen_candidates, _round_assignments, _round_selected):
+    for _, _, _candidate_index, _shared in _matching_preferences[_target_index]:
+        if (_target_index, _candidate_index) in _matching_used_pairs or _candidate_index in _seen_candidates:
+            continue
+        _seen_candidates.add(_candidate_index)
+        _displaced_target = _round_assignments.get(_candidate_index)
+        if _displaced_target is None or _matching_assign(
+            _displaced_target,
+            _seen_candidates,
+            _round_assignments,
+            _round_selected,
+        ):
+            _round_assignments[_candidate_index] = _target_index
+            _round_selected[_target_index] = (_candidate_index, _shared)
+            return True
+    return False
+
+for _matching_round in range(_matching_settings["matchesPerTarget"]):
+    _round_assignments = {}
+    _round_selected = {}
+    for _target_index in range(_matching_targets):
+        if not _matching_assign(_target_index, set(), _round_assignments, _round_selected):
+            raise RuntimeError("Could not construct a complete balanced matching assignment")
+    if len(_round_selected) != _matching_targets:
+        raise RuntimeError("Balanced matching assignment is incomplete")
+    for _target_index in range(_matching_targets):
+        _candidate_index, _shared = _round_selected[_target_index]
+        _matching_used_pairs.add((_target_index, _candidate_index))
+        _matching_selected[_target_index].append((_candidate_index, _shared))
         _matching_usage[_candidate_index] += 1
+
+for _target_index, _selected in enumerate(_matching_selected):
+    for _rank, (_candidate_index, _shared) in enumerate(_selected, start=1):
         _target_label = _matching_labels_all[_target_index]
         _candidate_label = _matching_labels_all[_candidate_index]
         _selected_candidate = _matching_people[_candidate_index]
