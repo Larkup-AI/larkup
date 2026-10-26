@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.28
+
+### Patch Changes
+
+- fe5062d: Replace greedy long-list matching recovery with balanced bipartite rounds so valid constrained assignments cannot fail after exhausting candidates for a later participant.
+
 ## 0.2.27
 
 ### Patch Changes
