@@ -1007,13 +1007,14 @@ export function recoverEmptyUIMessageStream(fallbackText: string) {
 
   return () => {
     let hasText = false;
+    let hasCompleteAnalysisArtifact = false;
     let recoveryEmitted = false;
 
     const emitRecovery = (
       controller: TransformStreamDefaultController<any>,
       recoveryText = fallback,
     ) => {
-      if (hasText || recoveryEmitted) return;
+      if (hasText || hasCompleteAnalysisArtifact || recoveryEmitted) return;
       const id = `answer-${crypto.randomUUID()}`;
       controller.enqueue({ type: 'text-start', id });
       controller.enqueue({ type: 'text-delta', id, delta: recoveryText });
@@ -1026,6 +1027,13 @@ export function recoverEmptyUIMessageStream(fallbackText: string) {
       transform(chunk, controller) {
         if (!chunk || typeof chunk !== 'object') return;
         if (chunk.type === 'text-delta' && String(chunk.delta ?? '').trim()) hasText = true;
+        if (
+          chunk.type === 'tool-output-available' &&
+          chunk.output?.exitCode === 0 &&
+          chunk.output?.presentation?.complete === true
+        ) {
+          hasCompleteAnalysisArtifact = true;
+        }
         if (chunk.type === 'error') {
           emitRecovery(controller, String(chunk.errorText ?? '').trim() || fallback);
           // A recovered error is ordinary assistant text. Do not also leave the

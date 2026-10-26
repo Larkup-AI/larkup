@@ -79,6 +79,7 @@ import {
   requestsVisualization,
 } from '../../../lib/chat/tabular-visualization';
 import {
+  hasCompletedLongAnalysisStep,
   isLikelyTabularQuestion,
   latestAnalysisAttemptFailed,
   requestsLongAnalysisArtifact,
@@ -1991,7 +1992,11 @@ ${fieldLines}`;
           // Most chats finish after their first answer. The upper bound leaves
           // room for retrieve → verify → inspect → re-verify when a tool result
           // reveals a video claim that needs source-level corroboration.
-          stopWhen: stepCountIs(5),
+          stopWhen: [
+            stepCountIs(5),
+            ({ steps }) =>
+              requestsLongAnalysisArtifact(userText) && hasCompletedLongAnalysisStep(steps),
+          ],
           toolChoice: 'auto',
           prepareStep: ({ stepNumber, messages }) => {
             if (preloadedEvidence !== undefined) {

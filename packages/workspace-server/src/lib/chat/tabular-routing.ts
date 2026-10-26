@@ -52,6 +52,32 @@ export function hasCompletedTabularVisualizationStep(
   );
 }
 
+/** Stop after a validated long artifact; the rendered tool result is the answer. */
+export function hasCompletedLongAnalysisStep(
+  steps: Array<{
+    toolResults?: readonly unknown[];
+  }>,
+) {
+  const lastStep = steps.at(-1);
+  return Boolean(
+    lastStep?.toolResults?.some((result) => {
+      if (!result || typeof result !== 'object' || !('toolName' in result)) return false;
+      if ((result as { toolName?: unknown }).toolName !== 'executeAnalysis') return false;
+      const rawOutput = (result as { output?: unknown }).output;
+      const output =
+        rawOutput && typeof rawOutput === 'object' && 'value' in rawOutput
+          ? (rawOutput as { value?: unknown }).value
+          : rawOutput;
+      if (!output || typeof output !== 'object') return false;
+      const analysis = output as {
+        exitCode?: unknown;
+        presentation?: { complete?: unknown };
+      };
+      return analysis.exitCode === 0 && analysis.presentation?.complete === true;
+    }),
+  );
+}
+
 /**
  * Identify requests whose answer requires an out-of-core calculation rather
  * than a single structured table query. This is phrased around analytical
@@ -84,12 +110,25 @@ export function requestsLongAnalysisArtifact(text: string): boolean {
 }
 
 /** Preserve explicit batch sizes for sandbox artifacts (larger than chat prose limits). */
-export function requestedLongAnalysisItemCount(text: string): number | undefined {
+export function requestedLongAnalysisItemCount(
+  text: string,
+  availableItems?: number,
+): number | undefined {
   const match = text.match(
-    /\b(?:first|last|top)\s+(\d{1,5})\b|\bfor\s+(\d{1,5})\s+(?:people|participants?|rows?|records?|entries|documents?|items?|responses?)\b/i,
+    /\b(?:first|last|top)\s+(\d{1,5})\b|\bfor\s+(\d{1,5})\s+(?:people|participants?|rows?|records?|entries|documents?|items?|responses?)\b|\b(?:listing|contains?|has|with)\s+(\d{1,5})\s+(?:people|participants?|rows?|records?|entries|documents?|items?|responses?)\b/i,
   );
-  const value = Number(match?.[1] ?? match?.[2]);
-  return Number.isInteger(value) && value > 0 ? Math.min(value, 5_000) : undefined;
+  const value = Number(match?.[1] ?? match?.[2] ?? match?.[3]);
+  if (Number.isInteger(value) && value > 0) return Math.min(value, 5_000);
+  if (
+    Number.isInteger(availableItems) &&
+    availableItems! > 0 &&
+    /\b(?:for\s+(?:each|every|all)|(?:each|every|all)\s+(?:of\s+)?(?:the\s+)?(?:people|participants?|rows?|records?|entries|documents?|items?|responses?))\b/i.test(
+      text,
+    )
+  ) {
+    return Math.min(availableItems!, 5_000);
+  }
+  return undefined;
 }
 
 /** Use a consistent capable code planner for deep artifacts across selectable chat models. */
@@ -135,7 +174,7 @@ export function isLikelyTabularQuestion(input: {
   const text = input.text.trim().toLocaleLowerCase();
   if (!text) return false;
   if (
-    /\b(?:spreadsheet|excel|csv|worksheet|sheet|dataset|row|column|filter|sort|group(?:ed|ing)?|aggregate|average|median|total|sum|count|highest|lowest|largest|smallest|maximum|minimum|trend|distribution)\b/.test(
+    /\b(?:spreadsheet|excel|csv|worksheet|sheet|dataset|data document|row|column|filter|sort|group(?:ed|ing)?|aggregate|average|median|total|sum|count|highest|lowest|largest|smallest|maximum|minimum|trend|distribution)\b/.test(
       text,
     ) ||
     /\b(?:arithmetic|geometric|weighted)\s+mean\b|\bmean\s+(?:of|for|by)\b/.test(text)

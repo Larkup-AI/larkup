@@ -104,7 +104,17 @@ export function remapSingleDatasetColumnReferences(code: string, dataset: Tabula
   const exactColumns = new Set(columns.map(normalizedColumnName));
   const stringLiteral = /(['"])((?:\\.|(?!\1)[^\\])*)\1/g;
 
-  return code.replace(stringLiteral, (literal, _quote: string, encoded: string) => {
+  // A form-export header can contain the same apostrophe or quote a model used
+  // to delimit it, leaving otherwise reasonable code syntactically invalid.
+  // Replace only exact, known schema labels before parsing ordinary literals.
+  let repairedCode = code;
+  for (const column of columns) {
+    const safeLiteral = JSON.stringify(column);
+    repairedCode = repairedCode.split(`'${column}'`).join(safeLiteral);
+    repairedCode = repairedCode.split(`"${column}"`).join(safeLiteral);
+  }
+
+  return repairedCode.replace(stringLiteral, (literal, _quote: string, encoded: string) => {
     const authored = decodeSimplePythonString(encoded);
     const normalizedAuthored = normalizedColumnName(authored);
     if (normalizedAuthored.length < 20 || exactColumns.has(normalizedAuthored)) return literal;

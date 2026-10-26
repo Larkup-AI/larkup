@@ -68,6 +68,14 @@ function Coverage({ presentation }: { presentation: AnalysisPresentation }) {
   const requested = presentation.requestedItems;
   const prepared =
     presentation.kind === 'table' ? presentation.rows.length : presentation.pages.length;
+  const label =
+    requested === undefined
+      ? `${prepared.toLocaleString()} prepared`
+      : prepared === requested
+        ? `${prepared.toLocaleString()} of ${requested.toLocaleString()} prepared`
+        : presentation.complete
+          ? `${requested.toLocaleString()} of ${requested.toLocaleString()} prepared · ${prepared.toLocaleString()} rows`
+          : `${Math.min(prepared, requested).toLocaleString()} of ${requested.toLocaleString()} prepared · ${prepared.toLocaleString()} rows`;
   return (
     <span
       className={cn(
@@ -78,8 +86,7 @@ function Coverage({ presentation }: { presentation: AnalysisPresentation }) {
       )}
     >
       {presentation.complete && <CheckCircle2 className="size-3" />}
-      {prepared.toLocaleString()}
-      {requested !== undefined ? ` of ${requested.toLocaleString()}` : ''} prepared
+      {label}
     </span>
   );
 }
@@ -223,7 +230,7 @@ export function ChatAnalysisResult({ presentation }: { presentation: AnalysisPre
             columns: presentation.columns,
             rows: presentation.rows,
             totalRows: presentation.totalItems,
-            truncated: !presentation.complete,
+            truncated: presentation.totalItems > presentation.rows.length,
             fileName: presentation.fileName || presentation.title,
           }}
         />

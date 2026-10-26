@@ -393,6 +393,104 @@ test.describe.serial('Chat Page', () => {
     await expect(page.getByText('Page 2 of 3')).toBeVisible();
   });
 
+  test('analysis failures, empty output, and long-form coverage remain visible', async ({
+    page,
+  }) => {
+    const chatId = `analysis-edge-states-${Date.now()}`;
+    await page.evaluate(
+      async ({ chatId }) => {
+        const messages = [
+          {
+            id: 'edge-question',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Prepare three matches for all 25 participants' }],
+          },
+          {
+            id: 'edge-answer',
+            role: 'assistant',
+            parts: [
+              {
+                type: 'tool-executeAnalysis',
+                state: 'output-error',
+                input: {},
+                errorText: 'provider detail that must not be exposed',
+              },
+              {
+                type: 'tool-executeAnalysis',
+                state: 'output-available',
+                input: {},
+                output: {
+                  stdout: '',
+                  stderr: '',
+                  exitCode: 0,
+                  executionTimeMs: 40,
+                  artifacts: [],
+                },
+              },
+              {
+                type: 'tool-executeAnalysis',
+                state: 'output-available',
+                input: {},
+                output: {
+                  stdout: '',
+                  stderr: '',
+                  exitCode: 0,
+                  executionTimeMs: 80,
+                  artifacts: [],
+                  presentation: {
+                    kind: 'table',
+                    title: 'Long-form matches',
+                    columns: ['Participant', 'Match', 'Email', 'Reason'],
+                    rows: Array.from({ length: 75 }, (_, index) => ({
+                      Participant: `Participant ${Math.floor(index / 3) + 1}`,
+                      Match: `Candidate ${index + 1}`,
+                      Email: `candidate${index + 1}@example.test`,
+                      Reason: `A complete explanation for match ${index + 1}.`,
+                    })),
+                    totalItems: 75,
+                    requestedItems: 25,
+                    complete: true,
+                  },
+                },
+              },
+            ],
+          },
+        ];
+        await new Promise<void>((resolve, reject) => {
+          const request = indexedDB.open('keyval-store', 1);
+          request.onupgradeneeded = () => {
+            if (!request.result.objectStoreNames.contains('keyval')) {
+              request.result.createObjectStore('keyval');
+            }
+          };
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            const transaction = request.result.transaction('keyval', 'readwrite');
+            transaction.objectStore('keyval').put(messages, `chat_messages_${chatId}`);
+            transaction.oncomplete = () => {
+              request.result.close();
+              resolve();
+            };
+            transaction.onerror = () => reject(transaction.error);
+          };
+        });
+      },
+      { chatId },
+    );
+
+    await page.goto(`/chat/${chatId}`);
+    await expect(page.getByText('Analysis encountered an issue', { exact: true })).toBeVisible();
+    await expect(page.getByText('provider detail that must not be exposed')).not.toBeVisible();
+    await expect(
+      page.getByText('Analysis completed without a usable result', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText('Long-form matches', { exact: true })).toBeVisible();
+    await expect(page.getByText('25 of 25 prepared · 75 rows', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('A complete explanation for match 1.', { exact: true }),
+    ).toBeVisible();
+  });
+
   test('generated charts show names for both axes', async ({ page }) => {
     const chatId = `axis-labels-${Date.now()}`;
     await page.evaluate(

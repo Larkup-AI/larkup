@@ -546,7 +546,10 @@ export function MessageItem({
       {webSearchParts.length > 0 && <WebSearchSummary parts={webSearchParts} />}
 
       {nonVizToolParts
-        .filter((p: any) => getToolInfo(p).isCompleted)
+        .filter((p: any) => {
+          const info = getToolInfo(p);
+          return info.isCompleted || info.isFailed;
+        })
         .map((part: any, i: number) => {
           const partIndex = toolParts.indexOf(part);
           return renderToolPart(
@@ -856,6 +859,8 @@ function getToolInfo(part: any): {
   toolName: string;
   isExecuting: boolean;
   isCompleted: boolean;
+  isFailed: boolean;
+  errorText?: string;
   output: any;
   input: any;
 } {
@@ -868,6 +873,8 @@ function getToolInfo(part: any): {
       isCompleted:
         (state === 'result' || state === 'output' || state === 'output-available') &&
         ti.result !== undefined,
+      isFailed: state === 'output-error' || state === 'error',
+      errorText: typeof ti.errorText === 'string' ? ti.errorText : undefined,
       output: decodeToolOutput(ti.result) ?? ti.result,
       input: ti.args,
     };
@@ -881,6 +888,8 @@ function getToolInfo(part: any): {
       isExecuting: state === 'input-streaming' || state === 'input-available',
       isCompleted:
         (state === 'output' || state === 'output-available') && part.output !== undefined,
+      isFailed: state === 'output-error' || state === 'error',
+      errorText: typeof part.errorText === 'string' ? part.errorText : undefined,
       output: decodeToolOutput(part.output) ?? part.output,
       input: part.input,
     };
@@ -890,6 +899,7 @@ function getToolInfo(part: any): {
     toolName: '',
     isExecuting: false,
     isCompleted: false,
+    isFailed: false,
     output: undefined,
     input: undefined,
   };
@@ -909,7 +919,7 @@ function renderToolPart(
   } | null,
   autoOpenSupportingClip = false,
 ): React.ReactNode | null {
-  const { toolName, isExecuting, isCompleted, output, input } = getToolInfo(part);
+  const { toolName, isExecuting, isCompleted, isFailed, output, input } = getToolInfo(part);
   const behavior = getChatToolBehavior(toolName);
   const callId = part.toolInvocation?.toolCallId || part.toolCallId || part.id || '';
 
@@ -968,6 +978,32 @@ function renderToolPart(
             ) : null}
           </div>
         ) : null}
+      </div>
+    );
+  }
+
+  if (isFailed) {
+    if (behavior.resultView === 'sandbox') {
+      return (
+        <ChatSandboxResult
+          key={index}
+          config={{
+            stdout: '',
+            stderr: '',
+            exitCode: 1,
+            artifacts: [],
+            executionTimeMs: 0,
+          }}
+        />
+      );
+    }
+    return (
+      <div
+        key={index}
+        role="alert"
+        className="rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+      >
+        This action could not be completed. Please retry.
       </div>
     );
   }

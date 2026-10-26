@@ -95,6 +95,24 @@ describe('recoverEmptyUIMessageStream', () => {
       expect.objectContaining({ delta: 'The actual answer.' }),
     ]);
   });
+
+  it('treats a complete analysis artifact as the visible answer', async () => {
+    const chunks = await transformedChunks([
+      { type: 'start-step' },
+      {
+        type: 'tool-output-available',
+        toolCallId: 'analysis-1',
+        output: {
+          exitCode: 0,
+          presentation: { kind: 'table', complete: true },
+        },
+      },
+      { type: 'finish-step' },
+      { type: 'finish' },
+    ]);
+
+    expect(chunks.some((chunk) => chunk.type === 'text-delta')).toBe(false);
+  });
 });
 
 describe('collectAnswerLevelMediaStatements', () => {

@@ -35,8 +35,11 @@ function bestColumn(
     .sort((a, b) => b.score - a.score || a.index - b.index)[0]?.column;
 }
 
-export function matchingAnalysisSpec(requestText: string): MatchingAnalysisSpec | undefined {
-  const targetCount = requestedLongAnalysisItemCount(requestText);
+export function matchingAnalysisSpec(
+  requestText: string,
+  availableItems?: number,
+): MatchingAnalysisSpec | undefined {
+  const targetCount = requestedLongAnalysisItemCount(requestText, availableItems);
   const matchesPerTarget = requestedMatchesPerTarget(requestText);
   if (!targetCount || !matchesPerTarget || matchesPerTarget > 20) return undefined;
   const suggestionCap = requestedSuggestionCap(requestText) ?? targetCount * matchesPerTarget;
@@ -51,7 +54,7 @@ export function buildMatchingAnalysisFallback(
   requestText: string,
   dataset: Pick<TabularDataset, 'columns' | 'rowCount'>,
 ): string | undefined {
-  const spec = matchingAnalysisSpec(requestText);
+  const spec = matchingAnalysisSpec(requestText, dataset.rowCount);
   if (!spec || dataset.rowCount <= spec.matchesPerTarget) return undefined;
 
   const columns = dataset.columns.map((column) => column.name);
@@ -77,15 +80,31 @@ export function buildMatchingAnalysisFallback(
       { pattern: /\bhelp others?\b/, score: 90 },
       { pattern: /\bcan offer\b/, score: 80 },
       { pattern: /\bwhat .* offer\b/, score: 70 },
+      { pattern: /\bbringing to (?:the )?table\b/, score: 70 },
+      { pattern: /\banything else .* add\b/, score: 45 },
+      { pattern: /\blooking for\b/, score: 30 },
       { pattern: /\bexpertise\b/, score: 40 },
       { pattern: /\bskills?\b/, score: 25 },
       { pattern: /\boffer(?:s|ed|ing)?\b/, score: 20 },
     ],
     new Set(needs ? [needs] : []),
   );
-  if (!identity || !needs || !offers) return undefined;
+  const resolvedOffers =
+    offers ||
+    bestColumn(columns, [
+      { pattern: /\bbringing to (?:the )?table\b/, score: 70 },
+      { pattern: /\banything else .* add\b/, score: 45 },
+      { pattern: /\blooking for\b/, score: 30 },
+      { pattern: /\boffer(?:s|ed|ing)?\b/, score: 20 },
+    ]);
+  if (!identity || !needs || !resolvedOffers) return undefined;
 
-  const settings = JSON.stringify({ ...spec, identity, needs, offers });
+  const email = bestColumn(columns, [
+    { pattern: /^e ?mail(?: address)?$/, score: 100 },
+    { pattern: /\be ?mail(?: address)?\b/, score: 60 },
+  ]);
+
+  const settings = JSON.stringify({ ...spec, identity, needs, offers: resolvedOffers, email });
   return String.raw`
 import csv
 import difflib
@@ -143,11 +162,13 @@ for _target_index in range(_matching_targets):
         _matching_usage[_candidate_index] += 1
         _target_label = _matching_labels_all[_target_index]
         _candidate_label = _matching_labels_all[_candidate_index]
+        _selected_candidate = _matching_people[_candidate_index]
+        _candidate_email = _matching_text(_selected_candidate.get(_matching_settings.get("email"))) if _matching_settings.get("email") else ""
         if _shared:
             _reason = _candidate_label + " matches " + _target_label + " through relevant expertise in " + ", ".join(_shared[:3]) + "."
         else:
             _reason = _candidate_label + " is the best remaining eligible profile for " + _target_label + " after comparing the stated needs and offered expertise while respecting the reuse limit."
-        _matching_rows.append({"Participant": _target_label, "Match": _candidate_label, "Rank": _rank, "Reason": _reason})
+        _matching_rows.append({"Participant": _target_label, "Match": _candidate_label, "Email": _candidate_email, "Rank": _rank, "Reason": _reason})
 
 if len(_matching_rows) != _matching_targets * _matching_settings["matchesPerTarget"]:
     raise RuntimeError("Matching result is incomplete")
@@ -157,7 +178,7 @@ if max(_matching_usage, default=0) > _matching_settings["suggestionCap"]:
 larkup_table(
     "Participant matches",
     _matching_rows,
-    ["Participant", "Match", "Rank", "Reason"],
+    ["Participant", "Match", "Email", "Rank", "Reason"],
     summary=str(_matching_targets) + " participants with " + str(_matching_settings["matchesPerTarget"]) + " matches each",
     requested_items=_matching_targets,
     file_name="participant-matches.csv",

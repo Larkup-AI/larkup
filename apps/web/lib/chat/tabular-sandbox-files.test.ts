@@ -155,4 +155,15 @@ describe('remapSingleDatasetColumnReferences', () => {
 
     expect(remapSingleDatasetColumnReferences(code, source)).toBe(code);
   });
+
+  it('repairs exact schema references whose apostrophes break generated Python quoting', () => {
+    const source = dataset('survey', 'survey.csv', []);
+    const column =
+      'Question 3: "Anything else you\'d like to add? Share what you\'re bringing to the table."';
+    source.columns.push({ name: column, type: 'string', nullCount: 0, uniqueCount: 0 });
+
+    expect(remapSingleDatasetColumnReferences(`offers = data['${column}']`, source)).toBe(
+      `offers = data[${JSON.stringify(column)}]`,
+    );
+  });
 });
