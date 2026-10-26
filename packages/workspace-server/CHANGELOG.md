@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.30
+
+### Patch Changes
+
+- Publish the long-analysis fix with resolved npm dependency versions so clean external installs do not retain workspace protocol references.
+
 ## 0.2.29
 
 ### Patch Changes
