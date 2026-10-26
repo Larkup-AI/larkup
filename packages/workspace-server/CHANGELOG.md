@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.27
+
+### Patch Changes
+
+- 55a6c45: Make long tabular analysis reliably produce complete rendered artifacts, repair quoted survey headers, validate matching constraints and candidate emails, stop before duplicating results as prose, and surface empty or failed tool states in Chat.
+
 ## 0.2.26
 
 ### Patch Changes
