@@ -93,4 +93,49 @@ describe('buildMatchingAnalysisFallback', () => {
       valid: true,
     });
   });
+
+  it('rebalances globally when greedy semantic choices would exhaust the final target', () => {
+    const adversarialRequest =
+      'For the first 8 people from the list, make 3 matches. Every person can be suggested not more than 3 times.';
+    const columns = ['Name', 'Current Needs', 'What can you offer?'];
+    const needs = ['t3 t6', 't0 t1 t2', 't5', 't1 t2 t5 t6', 't7', 't6', 't2 t3 t6 t7', ''];
+    const offers = [
+      't4 t7',
+      't7',
+      't6 t7',
+      't0 t2 t3 t7',
+      't2 t3 t6 t7',
+      't4 t7',
+      't0 t5 t7',
+      't5 t7',
+    ];
+    const code = buildMatchingAnalysisFallback(adversarialRequest, {
+      columns: columns.map((name) => ({ name })) as never,
+      rowCount: 8,
+    });
+    expect(code).toBeTruthy();
+
+    const directory = mkdtempSync(join(tmpdir(), 'larkup-matching-adversarial-'));
+    const csv = [
+      columns.map((column) => JSON.stringify(column)).join(','),
+      ...needs.map((need, index) =>
+        [
+          JSON.stringify(`Person ${index + 1}`),
+          JSON.stringify(need),
+          JSON.stringify(offers[index]),
+        ].join(','),
+      ),
+    ].join('\n');
+    writeFileSync(join(directory, 'data.csv'), csv);
+    const stdout = execFileSync('python3', ['-c', withAnalysisPresentationHelpers(code!, 8)], {
+      cwd: directory,
+      encoding: 'utf8',
+    });
+    const presentation = extractAnalysisPresentation(stdout).presentation;
+
+    expect(presentation).toMatchObject({ kind: 'table', totalItems: 24, requestedItems: 8 });
+    expect(validateAnalysisCompleteness(adversarialRequest, presentation, 8)).toEqual({
+      valid: true,
+    });
+  });
 });
