@@ -58,7 +58,7 @@ function downloadCSV(columns: string[], rows: Record<string, any>[], fileName = 
       columns
         .map((c) => {
           const v = String(row[c] ?? '');
-          return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
+          return /[,"\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
         })
         .join(','),
     ),
@@ -315,7 +315,12 @@ export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
                 {columns.map((col) => (
                   <TableCell
                     key={col}
-                    className="max-w-55 truncate px-3 py-2 text-xs tabular-nums"
+                    className={cn(
+                      'px-3 py-2 text-xs tabular-nums',
+                      /reason|explanation|summary|description/i.test(col)
+                        ? 'min-w-72 max-w-xl whitespace-pre-wrap align-top leading-relaxed'
+                        : 'max-w-55 truncate',
+                    )}
                     title={String(row[col] ?? '')}
                   >
                     {formatCell(row[col])}

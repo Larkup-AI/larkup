@@ -26,7 +26,12 @@ function tryParseStdoutAsTable(stdout: string): DataTableConfig | null {
 }
 
 export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
-  const { stdout, stderr, exitCode, artifacts, executionTimeMs, presentation } = config;
+  const stdout = typeof config?.stdout === 'string' ? config.stdout : '';
+  const stderr = typeof config?.stderr === 'string' ? config.stderr : '';
+  const exitCode = typeof config?.exitCode === 'number' ? config.exitCode : 1;
+  const artifacts = Array.isArray(config?.artifacts) ? config.artifacts : [];
+  const executionTimeMs = typeof config?.executionTimeMs === 'number' ? config.executionTimeMs : 0;
+  const presentation = config?.presentation;
 
   const images = useMemo(
     () => artifacts.filter((a) => a.mimeType.startsWith('image/')),
@@ -37,6 +42,8 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
   const stdoutTable = useMemo(() => tryParseStdoutAsTable(stdout), [stdout]);
 
   const isSuccess = exitCode === 0;
+  const isEmptySuccess =
+    isSuccess && !stdout.trim() && artifacts.length === 0 && presentation === undefined;
   const isRuntimeUnavailable =
     /docker\.sock|docker (?:isn't|is not) running|code execution is unavailable|needs python 3/i.test(
       stderr,
@@ -100,6 +107,17 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
           <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-foreground [&::-webkit-scrollbar]:hidden">
             {stdout}
           </pre>
+        </div>
+      )}
+
+      {isEmptySuccess && (
+        <div className="border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+          <div className="text-sm font-medium text-amber-800 dark:text-amber-300">
+            Analysis completed without a usable result
+          </div>
+          <div className="mt-1 text-xs text-amber-700/80 dark:text-amber-300/80">
+            No table, document, chart, or diagnostic output was returned. Please retry the request.
+          </div>
         </div>
       )}
 

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hasCompletedLongAnalysisStep,
   hasCompletedTabularVisualizationStep,
   isLikelyTabularQuestion,
   latestAnalysisAttemptFailed,
+  requestedLongAnalysisItemCount,
   requiresTabularSandbox,
   supportsStableTabularPlanner,
   tabularToolPlannerModel,
@@ -58,6 +60,15 @@ describe('tabularToolsForStep', () => {
     expect(supportsStableTabularPlanner('openai')).toBe(true);
     expect(supportsStableTabularPlanner('vercel_ai_gateway')).toBe(true);
     expect(supportsStableTabularPlanner('anthropic')).toBe(false);
+  });
+
+  it('resolves every target from the prompt or the selected dataset size', () => {
+    expect(
+      requestedLongAnalysisItemCount(
+        'You have a data document listing 102 participants. For each person, make 3 matches.',
+      ),
+    ).toBe(102);
+    expect(requestedLongAnalysisItemCount('For every participant, make 3 matches.', 102)).toBe(102);
   });
   it('requires the exact table query before an answer is generated', () => {
     expect(tabularToolsForStep({ stepNumber: 0, toolNames: ['queryTabularData'] })).toEqual({
@@ -144,6 +155,38 @@ describe('hasCompletedTabularVisualizationStep', () => {
     expect(
       hasCompletedTabularVisualizationStep([
         { toolResults: [{ toolName: 'queryTabularData', output: { rows: [] } }] },
+      ]),
+    ).toBe(false);
+  });
+});
+
+describe('hasCompletedLongAnalysisStep', () => {
+  it('stops only after a successful complete analysis artifact', () => {
+    expect(
+      hasCompletedLongAnalysisStep([
+        {
+          toolResults: [
+            {
+              toolName: 'executeAnalysis',
+              output: {
+                exitCode: 0,
+                presentation: { kind: 'table', complete: true },
+              },
+            },
+          ],
+        },
+      ]),
+    ).toBe(true);
+    expect(
+      hasCompletedLongAnalysisStep([
+        {
+          toolResults: [
+            {
+              toolName: 'executeAnalysis',
+              output: { exitCode: 1 },
+            },
+          ],
+        },
       ]),
     ).toBe(false);
   });

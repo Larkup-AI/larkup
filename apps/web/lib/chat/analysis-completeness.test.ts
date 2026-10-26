@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { validateAnalysisCompleteness } from '@larkup/workspace-server/lib/chat/analysis-completeness';
+import {
+  requestedSuggestionCap,
+  validateAnalysisCompleteness,
+} from '@larkup/workspace-server/lib/chat/analysis-completeness';
 
 const request =
   'For the first 25 people, make 3 matches. Every person can be suggested not more than 3 times.';
@@ -17,6 +20,16 @@ function table(rows: Array<Record<string, string>>) {
 }
 
 describe('validateAnalysisCompleteness', () => {
+  it('derives all-target completeness and the incoming-match cap from natural wording', () => {
+    const naturalRequest =
+      'For each person, make 3 matches. Each person should be matched with no more than 6 people in total: 3 times they might be a good match for someone, and 3 times they should be matched with someone.';
+    expect(requestedSuggestionCap(naturalRequest)).toBe(3);
+    expect(validateAnalysisCompleteness(naturalRequest, undefined, 102)).toEqual({
+      valid: false,
+      error:
+        'Completeness validation failed: expected 102 targets with 3 matches each, but no result table was produced.',
+    });
+  });
   it('accepts exactly three matches for every requested participant', () => {
     const rows = Array.from({ length: 25 }, (_, participant) =>
       Array.from({ length: 3 }, (_, match) => ({
@@ -78,5 +91,26 @@ describe('validateAnalysisCompleteness', () => {
         complete: true,
       }),
     ).toEqual({ valid: true });
+  });
+
+  it('rejects duplicate, self, and under-documented matches', () => {
+    const strictRequest =
+      'For the first 2 people, make 2 matches. For every match, write an explanation and mention their email.';
+    const result = validateAnalysisCompleteness(strictRequest, {
+      kind: 'table',
+      title: 'Matches',
+      columns: ['Participant', 'Match', 'Email', 'Reason'],
+      rows: [
+        { Participant: 'Ada', Match: 'Ada', Email: 'ada@example.test', Reason: 'Self' },
+        { Participant: 'Ada', Match: 'Ada', Email: 'ada@example.test', Reason: 'Duplicate' },
+        { Participant: 'Lin', Match: 'Sam', Email: '', Reason: '' },
+        { Participant: 'Lin', Match: 'Jo', Email: 'jo@example.test', Reason: 'Relevant' },
+      ],
+      totalItems: 4,
+      requestedItems: 2,
+      complete: true,
+    });
+
+    expect(result.valid).toBe(false);
   });
 });

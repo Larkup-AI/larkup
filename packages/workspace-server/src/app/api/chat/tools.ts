@@ -2871,10 +2871,11 @@ export async function getChatTools(context: {
           ) {
             finalCode = `import os\n${finalCode}`;
           }
-          finalCode = withAnalysisPresentationHelpers(
-            finalCode,
-            requestedLongAnalysisItemCount(requestText ?? ''),
+          const analysisTargetCount = requestedLongAnalysisItemCount(
+            requestText ?? '',
+            mountedDatasets.length === 1 ? mountedDatasets[0].rowCount : undefined,
           );
+          finalCode = withAnalysisPresentationHelpers(finalCode, analysisTargetCount);
           if (requestedDatasetIds.length === 1) {
             finalCode = remapSingleDatasetRead(finalCode);
             finalCode = remapSingleDatasetColumnReferences(finalCode, mountedDatasets[0]);
@@ -2912,7 +2913,11 @@ export async function getChatTools(context: {
           let extracted = extractAnalysisPresentation(result.stdout);
           let completeness =
             result.exitCode === 0
-              ? validateAnalysisCompleteness(requestText ?? '', extracted.presentation)
+              ? validateAnalysisCompleteness(
+                  requestText ?? '',
+                  extracted.presentation,
+                  mountedDatasets.length === 1 ? mountedDatasets[0].rowCount : undefined,
+                )
               : { valid: true };
           const matchingFallback =
             mountedDatasets.length === 1
@@ -2920,10 +2925,7 @@ export async function getChatTools(context: {
               : undefined;
           if ((result.exitCode !== 0 || !completeness.valid) && matchingFallback) {
             result = await sandboxManager.execute({
-              code: withAnalysisPresentationHelpers(
-                matchingFallback,
-                requestedLongAnalysisItemCount(requestText ?? ''),
-              ),
+              code: withAnalysisPresentationHelpers(matchingFallback, analysisTargetCount),
               language: 'python',
               files,
               timeout: 30_000,
@@ -2931,7 +2933,11 @@ export async function getChatTools(context: {
             extracted = extractAnalysisPresentation(result.stdout);
             completeness =
               result.exitCode === 0
-                ? validateAnalysisCompleteness(requestText ?? '', extracted.presentation)
+                ? validateAnalysisCompleteness(
+                    requestText ?? '',
+                    extracted.presentation,
+                    mountedDatasets.length === 1 ? mountedDatasets[0].rowCount : undefined,
+                  )
                 : { valid: true };
           }
           const completenessError = completeness.valid ? undefined : completeness.error;
