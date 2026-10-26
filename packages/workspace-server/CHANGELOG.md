@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.29
+
+### Patch Changes
+
+- Republish the balanced long-analysis matching fix after npm reserved the prior server version in an unusable staged state.
+
 ## 0.2.28
 
 ### Patch Changes
