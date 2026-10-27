@@ -4,8 +4,7 @@
     Larkup — Windows/PowerShell Installer
 .DESCRIPTION
     Installs Larkup CLI globally via npm on Windows.
-    Usage: iwr -useb https://www.larkup.de/install.ps1 | iex
-           powershell -c "& ([scriptblock]::Create((irm https://www.larkup.de/install.ps1))) -Version 1.2.0 -DryRun"
+    Usage: powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-Expression (Invoke-RestMethod 'https://www.larkup.de/install.ps1')"
 #>
 param(
     [string]$Version = "latest",
@@ -22,6 +21,7 @@ $PackageName = "larkup"
 $BinName     = "larkup"
 $MinNodeMajor = 22
 $NodeSetupMajor = 22
+$InstallCommand = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-Expression (Invoke-RestMethod ''https://www.larkup.de/install.ps1'')"'
 
 # Track exit code so we don't kill the host when piped via iex
 $script:ResultCode = 0
@@ -52,7 +52,7 @@ function Show-Help {
     Write-Host "Larkup — Windows Installer" -ForegroundColor White
     Write-Host ""
     Write-Host "Usage:"
-    Write-Host "  iwr -useb https://www.larkup.de/install.ps1 | iex"
+    Write-Host "  $InstallCommand"
     Write-Host ""
     Write-Host "Options:"
     Write-Host "  -Version <ver>   Install a specific version (default: latest)"
@@ -62,7 +62,7 @@ function Show-Help {
     Write-Host "  -Help            Show this help message"
     Write-Host ""
     Write-Host "Examples:"
-    Write-Host '  iwr -useb https://www.larkup.de/install.ps1 | iex'
+    Write-Host "  $InstallCommand"
     Write-Host '  .\install.ps1 -Version 1.2.0 -NoPrompt'
     Write-Host '  .\install.ps1 -DryRun'
     Write-Host ""
