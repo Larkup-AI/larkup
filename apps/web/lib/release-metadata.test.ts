@@ -58,10 +58,15 @@ describe('published npm metadata', () => {
     expect(launcher).toContain("process.platform === 'win32' ? 'npm.cmd' : 'npm'");
     expect(launcher.match(/spawn\(\s*npmExecutable,/g)).toHaveLength(2);
     expect(launcher).not.toMatch(/spawn\(['"]npm['"],/);
-    expect(launcher).toContain("new SandboxManager({ backend: 'local' }).setup()");
-    expect(launcher.indexOf('await prepareLocalAnalysisRuntime()')).toBeLessThan(
+    expect(launcher).toContain("new URL('/api/sandbox?action=setup', url)");
+    expect(launcher).toContain("health.backend !== 'local'");
+    expect(launcher).toContain(
+      'Larkup is ready to open; analysis tools will activate when setup finishes.',
+    );
+    expect(launcher.indexOf('void prepareLocalAnalysisRuntime(url)')).toBeGreaterThan(
       launcher.indexOf('const child = spawn(process.execPath'),
     );
+    expect(launcher).not.toContain('await prepareLocalAnalysisRuntime()');
     for (const dependency of [
       '@larkup/connections',
       '@larkup/core',
