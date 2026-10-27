@@ -80,11 +80,12 @@ Prefer the command line? Install the Larkup CLI in one command:
   </Tab>
   <Tab title="Windows" icon="windows">
     ```powershell
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-Expression (Invoke-RestMethod 'https://www.larkup.de/install.ps1')"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-RestMethod 'https://www.larkup.de/install.ps1'))) -NoPrompt"
     ```
 
     This command works from Command Prompt, Windows PowerShell, and Windows Terminal. It explicitly
-    starts Windows PowerShell, so it does not depend on shell-only aliases such as `iwr`.
+    starts Windows PowerShell and accepts the dependency installation automatically, so it does not
+    depend on shell-only aliases such as `iwr` or an interactive prompt.
 
     Then start Larkup in your terminal:
 

@@ -180,8 +180,9 @@ for target in "${windows_command_targets[@]}"; do
   if grep -Fq 'iwr -useb' "$filepath"; then
     fail "${target}: still recommends the PowerShell-only iwr alias"
   elif grep -Fq 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command' "$filepath" && \
-       grep -Fq 'Invoke-RestMethod' "$filepath"; then
-    pass "${target}: documents the cross-shell Windows command"
+       grep -Fq 'Invoke-RestMethod' "$filepath" && \
+       grep -Fq -- '-NoPrompt' "$filepath"; then
+    pass "${target}: documents the non-interactive cross-shell Windows command"
   else
     fail "${target}: missing the cross-shell Windows command"
   fi
