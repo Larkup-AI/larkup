@@ -55,6 +55,9 @@ describe('published npm metadata', () => {
     expect(launcher).not.toContain("'@larkup/cli@latest'");
     expect(launcher).toContain('You already have the latest version.');
     expect(launcher).toContain("process.env.LARKUP_NO_OPEN !== '1'");
+    expect(launcher).toContain("process.platform === 'win32' ? 'npm.cmd' : 'npm'");
+    expect(launcher.match(/spawn\(\s*npmExecutable,/g)).toHaveLength(2);
+    expect(launcher).not.toMatch(/spawn\(['"]npm['"],/);
     expect(launcher).toContain("new SandboxManager({ backend: 'local' }).setup()");
     expect(launcher.indexOf('await prepareLocalAnalysisRuntime()')).toBeLessThan(
       launcher.indexOf('const child = spawn(process.execPath'),

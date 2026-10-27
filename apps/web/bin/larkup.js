@@ -19,6 +19,9 @@ process.env.LARKUP_DATA_DIR = larkupDataDir;
 
 const args = process.argv.slice(2);
 const command = args[0];
+// Windows exposes npm through npm.cmd. Spawning the extensionless Unix name
+// fails with ENOENT even though npm works when entered directly in cmd.exe.
+const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 if (command === '--version' || command === '-v') {
   console.log(pkg.version);
@@ -81,7 +84,7 @@ if (command === '--version' || command === '-v') {
   console.log('');
   await migrateLegacyRuntimeState();
   const child = spawn(
-    'npm',
+    npmExecutable,
     [
       'install',
       '-g',
@@ -506,7 +509,9 @@ async function removeLocalPathEntries(localRoot) {
 
 function uninstallGlobalPackage() {
   return new Promise((resolve, reject) => {
-    const child = spawn('npm', ['uninstall', '-g', 'larkup', '@larkup/cli'], { stdio: 'inherit' });
+    const child = spawn(npmExecutable, ['uninstall', '-g', 'larkup', '@larkup/cli'], {
+      stdio: 'inherit',
+    });
     child.once('error', reject);
     child.once('exit', (code) => {
       if (code === 0) {
