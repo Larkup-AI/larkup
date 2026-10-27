@@ -1,6 +1,7 @@
 # Larkup Workspace Agents Rules
 
 Unless user explicitly asks, do not inspect or modify the `archive` or `dummy` folders.
+Unless the user explicitly requests desktop or Tauri work, do not inspect, modify, build, or test `apps/desktop`. Desktop/Tauri CI failures are out of scope and must not block validation or release of the web app, CLI, installers, shared packages, or Cloud. Do not change desktop dependencies merely to make an unrelated task's overall CI run green.
 Always prefer the most specific agent instructions for the area you are modifying. Detailed skills and project guidelines are located in `.agents/skills/` (e.g., UI development, analytics, database guidelines).
 
 ## Monorepo Rules
