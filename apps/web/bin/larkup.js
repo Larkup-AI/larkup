@@ -31,6 +31,7 @@ if (command === '--version' || command === '-v') {
     process.exit(1);
   }
   await migrateLegacyRuntimeState();
+  await prepareLocalAnalysisRuntime();
   const child = spawn(process.execPath, [standaloneServer], {
     cwd: packageDir,
     stdio: 'inherit',
@@ -191,6 +192,29 @@ async function migrateLegacyRuntimeState() {
     if (error?.code !== 'ENOENT' && error?.code !== 'EEXIST') {
       console.warn('Could not migrate existing local Larkup data:', error.message);
     }
+  }
+}
+
+/**
+ * Prepare the managed Python environment before the browser can submit an
+ * analysis request. A fresh Windows install may need several minutes to fetch
+ * pandas, numpy, and the other pinned wheels; doing that inside the streamed
+ * chat request can outlive the model step even though installation succeeds.
+ *
+ * This launcher is used only by the local npm application. Managed Cloud hosts
+ * start their configured remote sandbox adapters through the server runtime
+ * and never enter this path.
+ */
+async function prepareLocalAnalysisRuntime() {
+  console.log(`\x1b[38;2;223;156;32mPreparing local analysis runtime…\x1b[0m`);
+  try {
+    const { SandboxManager } = await import('@larkup/sandbox');
+    await new SandboxManager({ backend: 'local' }).setup();
+    console.log(`\x1b[32mLocal analysis runtime ready.\x1b[0m`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Local analysis runtime is unavailable: ${message}`);
+    console.warn('Larkup will still start, but code-analysis tools will remain unavailable.');
   }
 }
 

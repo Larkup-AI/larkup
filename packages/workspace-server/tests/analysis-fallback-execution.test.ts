@@ -32,6 +32,18 @@ test('failed model matching code is replaced by a complete balanced artifact', a
     'What can you offer?': offers[index],
   }));
   const datasetId = crypto.randomUUID();
+  const longDatasetId = crypto.randomUUID();
+  const longNeedsColumn =
+    'Question 2: Current Needs: "What would you benefit from most right now?"';
+  const longOffersColumn =
+    "Question 3: \"Anything else you'd like to add? Share what you're bringing to the table or what you're looking for.\"";
+  const longColumns = ['Name', 'Email', longNeedsColumn, longOffersColumn];
+  const longRows = Array.from({ length: 102 }, (_, index) => ({
+    Name: `Participant ${index + 1}`,
+    Email: `participant${index + 1}@example.com`,
+    [longNeedsColumn]: `Introductions to group ${index % 6} and support with topic ${index % 11}`,
+    [longOffersColumn]: `Expertise in group ${(index + 1) % 6} and topic ${(index + 3) % 11}`,
+  }));
   const now = new Date().toISOString();
   const config = { ...DEFAULT_CONFIG, defaultSandboxProvider: 'local' as const };
   const host: WorkspaceHost = {
@@ -65,6 +77,26 @@ test('failed model matching code is replaced by a complete balanced artifact', a
           dateColumns: 0,
         },
         rowCount: rows.length,
+        createdAt: now,
+      },
+      {
+        id: longDatasetId,
+        fileName: 'participants-102.xlsx',
+        columns: longColumns.map((name) => ({
+          name,
+          type: 'string' as const,
+          nullCount: 0,
+          uniqueCount: longRows.length,
+        })),
+        rows: longRows,
+        summary: {
+          totalRows: longRows.length,
+          totalColumns: longColumns.length,
+          numericColumns: 0,
+          categoricalColumns: longColumns.length,
+          dateColumns: 0,
+        },
+        rowCount: longRows.length,
         createdAt: now,
       },
     ],
@@ -145,6 +177,58 @@ test('failed model matching code is replaced by a complete balanced artifact', a
         assert.equal(output.presentation?.totalItems, 24);
         assert.equal(output.presentation?.requestedItems, 8);
         assert.equal(output.presentation?.complete, true);
+
+        const longRequestText = `You have a data document listing 102 participants. For each person from the list, make 3 matches with other people from the list based on people's needs and offers - Question 2: Current Needs: "What would you benefit from most right now?" Question 3: "Anything else you'd like to add? Share what you're bringing to the table or what you're looking for." Each person should be matched with no more than 6 people in total: 3 times they might be a good match for someone, and 3 times they should be matched with someone. For every match, write a one-sentence explanation of why this is the best choice and mention their email. Other information is not important.`;
+        const longTools = await getChatTools({ config, requestText: longRequestText });
+        const longAnalysis = longTools.tools.executeAnalysis as {
+          execute?: (input: unknown, options: unknown) => Promise<unknown>;
+        };
+        assert.ok(longAnalysis.execute);
+        const longOutput = (await longAnalysis.execute(
+          {
+            code: 'raise RuntimeError("model-authored matching failed")',
+            datasetId: longDatasetId,
+          },
+          {},
+        )) as {
+          exitCode: number;
+          presentation?: {
+            kind?: string;
+            columns?: string[];
+            rows?: Array<Record<string, unknown>>;
+            totalItems?: number;
+            requestedItems?: number;
+            complete?: boolean;
+          };
+        };
+        assert.equal(executions, 6);
+        assert.equal(longOutput.exitCode, 0);
+        assert.equal(longOutput.presentation?.kind, 'table');
+        assert.equal(longOutput.presentation?.rows?.length, 306);
+        assert.equal(longOutput.presentation?.totalItems, 306);
+        assert.equal(longOutput.presentation?.requestedItems, 102);
+        assert.equal(longOutput.presentation?.complete, true);
+        assert.deepEqual(longOutput.presentation?.columns, [
+          'Participant',
+          'Match',
+          'Email',
+          'Rank',
+          'Reason',
+        ]);
+        const longResultRows = longOutput.presentation?.rows ?? [];
+        const targetCounts = new Map<string, number>();
+        const suggestionCounts = new Map<string, number>();
+        for (const row of longResultRows) {
+          const target = String(row.Participant ?? '');
+          const suggestion = String(row.Match ?? '');
+          targetCounts.set(target, (targetCounts.get(target) ?? 0) + 1);
+          suggestionCounts.set(suggestion, (suggestionCounts.get(suggestion) ?? 0) + 1);
+          assert.match(String(row.Email ?? ''), /^participant\d+@example\.com$/);
+          assert.match(String(row.Reason ?? ''), /\.$/);
+        }
+        assert.equal(targetCounts.size, 102);
+        assert.ok([...targetCounts.values()].every((count) => count === 3));
+        assert.ok([...suggestionCounts.values()].every((count) => count <= 3));
       },
     ),
   );
