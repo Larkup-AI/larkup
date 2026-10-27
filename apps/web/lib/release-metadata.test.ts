@@ -66,7 +66,7 @@ describe('published npm metadata', () => {
     expect(unixInstaller.match(/--allow-remote=all/g)).toHaveLength(2);
     expect(localInstaller).toContain('--allow-remote=all');
     expect(windowsInstaller).toContain('npm install -g --allow-remote=all $spec');
-    expect(npmPublisher).toContain('pnpm --config.node-linker=hoisted changeset publish');
+    expect(npmPublisher).toContain('npm_config_node_linker=hoisted pnpm changeset publish');
     expect(launcher).toContain("'--loglevel=error'");
     expect(launcher).toContain('https://registry.npmjs.org/larkup/latest');
     expect(launcher).toContain('`larkup@${latestVersion}`');
