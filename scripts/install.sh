@@ -521,7 +521,7 @@ install_larkup() {
   local exit_code=0
   if [[ "$VERBOSE" == "1" ]]; then
     log_info "Streaming npm output because --verbose was supplied..."
-    if npm install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps "$spec" 2>&1 | tee "$install_log"; then
+    if npm install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps --allow-remote=all "$spec" 2>&1 | tee "$install_log"; then
       exit_code=0
     else
       local pipeline_status=("${PIPESTATUS[@]}")
@@ -529,7 +529,7 @@ install_larkup() {
     fi
   else
     # Run npm install in background for a compact progress indicator.
-    npm install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps "$spec" >"$install_log" 2>&1 &
+    npm install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps --allow-remote=all "$spec" >"$install_log" 2>&1 &
     local npm_pid=$!
     local chars="/-\\|"
     local start_time=$SECONDS

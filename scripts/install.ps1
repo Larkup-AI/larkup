@@ -387,7 +387,7 @@ function Install-Larkup {
     $env:NPM_CONFIG_AUDIT    = "false"
 
     try {
-        $npmOutput = & npm install -g $spec 2>&1
+        $npmOutput = & npm install -g --allow-remote=all $spec 2>&1
         $npmExit = $LASTEXITCODE
 
         # Write output to log regardless

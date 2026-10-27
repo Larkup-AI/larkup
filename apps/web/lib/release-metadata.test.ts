@@ -20,6 +20,9 @@ describe('published npm metadata', () => {
     const vectorStoresPackage = readJson('packages/vector-stores/package.json');
     const sandboxPackage = readJson('packages/sandbox/package.json');
     const launcher = readFileSync(path.join(repoRoot, 'apps/web/bin/larkup.js'), 'utf8');
+    const unixInstaller = readFileSync(path.join(repoRoot, 'scripts/install.sh'), 'utf8');
+    const localInstaller = readFileSync(path.join(repoRoot, 'scripts/install-local.sh'), 'utf8');
+    const windowsInstaller = readFileSync(path.join(repoRoot, 'scripts/install.ps1'), 'utf8');
     const dockerfile = readFileSync(path.join(repoRoot, 'docker/Dockerfile'), 'utf8');
     const dockerWorkflow = readFileSync(
       path.join(repoRoot, '.github/workflows/docker-build.yml'),
@@ -27,6 +30,10 @@ describe('published npm metadata', () => {
     );
 
     expect(webPackage.dependencies['apache-arrow']).toBe('18.1.0');
+    expect(webPackage.bundledDependencies).toContain('xlsx');
+    expect(webPackage.dependencies.xlsx).toBe(
+      'https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz',
+    );
     // The standalone output and its Next runtime must be the same patch
     // release. A range can install a newer runtime that expects build files
     // which the packaged output does not contain.
@@ -49,6 +56,10 @@ describe('published npm metadata', () => {
     expect(sandboxPackage.optionalDependencies['@daytona/sdk']).toBeDefined();
     expect(sandboxPackage.optionalDependencies['@daytonaio/sdk']).toBeUndefined();
     expect(launcher).toContain("'--legacy-peer-deps'");
+    expect(launcher).toContain("'--allow-remote=all'");
+    expect(unixInstaller.match(/--allow-remote=all/g)).toHaveLength(2);
+    expect(localInstaller).toContain('--allow-remote=all');
+    expect(windowsInstaller).toContain('npm install -g --allow-remote=all $spec');
     expect(launcher).toContain("'--loglevel=error'");
     expect(launcher).toContain('https://registry.npmjs.org/larkup/latest');
     expect(launcher).toContain('`larkup@${latestVersion}`');

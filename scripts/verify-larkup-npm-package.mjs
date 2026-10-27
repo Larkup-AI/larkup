@@ -12,6 +12,7 @@ const requiredFiles = [
   '.next/standalone/apps/web/server.js',
   '.next/standalone/apps/web/package.json',
   '.next/standalone/apps/web/.next/BUILD_ID',
+  'node_modules/xlsx/package.json',
 ];
 
 for (const relativePath of requiredFiles) {
