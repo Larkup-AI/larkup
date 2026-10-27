@@ -1,5 +1,11 @@
 # larkup
 
+## 0.4.52
+
+### Patch Changes
+
+- 2fb5127: Support npm 12 installations by explicitly permitting Larkup's pinned SheetJS tarball and bundling the exact Excel runtime in the published package.
+
 ## 0.4.51
 
 ### Patch Changes
