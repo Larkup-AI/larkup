@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.31
+
+### Patch Changes
+
+- b0b8c6c: Pin the Anthropic AI SDK to the provider contract used by the rest of the chat stack so clean installs build consistently across platforms.
+
 ## 0.2.30
 
 ### Patch Changes
