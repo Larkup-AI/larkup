@@ -305,7 +305,10 @@ install_node() {
       local node_version version_index tmp_tar tmp_extract node_dir
       version_index="$(new_tmp_file)"
       fetch_to_file "https://nodejs.org/dist/latest-v${NODEJS_SETUP_MAJOR}.x/" "$version_index"
-      node_version="$(grep -m1 -oE 'node-v[0-9]+\.[0-9]+\.[0-9]+' "$version_index" | sed 's/node-//' || true)"
+      # A directory-index anchor contains the release name in both its href
+      # and label. BSD grep (the macOS default) prints both -o matches even
+      # with -m1, which would put a newline in the download URL.
+      node_version="$(sed -nE 's/.*node-(v[0-9]+\.[0-9]+\.[0-9]+).*/\1/p' "$version_index" | head -n 1 || true)"
       [[ -n "$node_version" ]] || { log_error "Could not resolve the latest Node.js v${NODEJS_SETUP_MAJOR} release."; exit 1; }
 
       tmp_tar="$(new_tmp_file)"

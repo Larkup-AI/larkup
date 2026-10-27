@@ -144,6 +144,28 @@ for script in "scripts/install.sh" "scripts/install-local.sh" "scripts/install.p
   fi
 done
 
+# ── Official Node.js artifact URL construction ───────────────
+section "Node.js Artifact URLs"
+
+# nodejs.org directory anchors repeat the version in href and label. The
+# macOS parser must still return one clean value, not a newline-separated pair.
+node_index_fixture='<a href="node-v22.23.4-darwin-arm64.tar.gz">node-v22.23.4-darwin-arm64.tar.gz</a>'
+resolved_node_version=$(printf '%s\n' "$node_index_fixture" \
+  | sed -nE 's/.*node-(v[0-9]+\.[0-9]+\.[0-9]+).*/\1/p' \
+  | head -n 1)
+if [[ "$resolved_node_version" == "v22.23.4" && "$resolved_node_version" != *$'\n'* ]]; then
+  pass "install.sh: macOS Node version resolves to one URL-safe value"
+else
+  fail "install.sh: macOS Node version resolution is malformed"
+fi
+
+if grep -Fq 'node-$($release.version)-${arch}.msi' "${PROJECT_ROOT}/scripts/install.ps1" && \
+   ! grep -Fq 'node-$($release.version)-win-${arch}.msi' "${PROJECT_ROOT}/scripts/install.ps1"; then
+  pass "install.ps1: Windows MSI uses the official Node.js filename"
+else
+  fail "install.ps1: Windows MSI URL contains an invalid filename"
+fi
+
 # ── Package name consistency ──────────────────────────────────
 section "Package Name Consistency"
 

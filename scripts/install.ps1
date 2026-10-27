@@ -273,7 +273,9 @@ function Install-NodeRuntime {
             Write-Err "No Node.js v${NodeSetupMajor} MSI is available for Windows $arch."
             Stop-Installer
         }
-        $msiUrl = "https://nodejs.org/dist/$($release.version)/node-$($release.version)-win-${arch}.msi"
+        # The index advertises the asset as win-x64-msi, but the actual file
+        # name is node-vX.Y.Z-x64.msi (without a "win-" segment).
+        $msiUrl = "https://nodejs.org/dist/$($release.version)/node-$($release.version)-${arch}.msi"
         $msiPath = Join-Path $env:TEMP "larkup-node-installer.msi"
 
         try {
