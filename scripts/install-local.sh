@@ -310,6 +310,7 @@ install_cli() {
   if "${LARKUP_NPM_BIN}" install -g \
       --prefix "${LARKUP_LIB}" \
       --no-fund --no-audit \
+      --allow-remote=all \
       "$spec" >"$install_log" 2>&1; then
     log_success "CLI installed"
     return 0

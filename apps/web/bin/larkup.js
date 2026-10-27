@@ -96,6 +96,7 @@ if (command === '--version' || command === '-v') {
       '--no-audit',
       '--ignore-scripts',
       '--legacy-peer-deps',
+      '--allow-remote=all',
       '--loglevel=error',
       `larkup@${latestVersion}`,
     ],
