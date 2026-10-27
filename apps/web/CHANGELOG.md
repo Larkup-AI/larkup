@@ -1,5 +1,11 @@
 # larkup
 
+## 0.4.51
+
+### Patch Changes
+
+- 8d974b8: Start the local app immediately while its embedded analysis runtime prepares in the background, with visible progress and no effect on configured remote sandbox backends.
+
 ## 0.4.50
 
 ### Patch Changes
