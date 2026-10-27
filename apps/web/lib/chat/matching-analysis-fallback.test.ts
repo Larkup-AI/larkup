@@ -50,7 +50,7 @@ describe('buildMatchingAnalysisFallback', () => {
 
   it('handles every survey row, combined offer wording, email output, and balanced reuse', () => {
     const naturalRequest =
-      'You have a data document listing 102 participants. For each person from the list, make 3 matches. Each person should be matched with no more than 6 people in total: 3 times they might be a good match for someone, and 3 times they should be matched with someone. For every match, write an explanation and mention their email.';
+      'You have a data document listing 102 participants. For each person from the list, make 3 matches with other people from the list based on people\'s needs and offers - Question 2: Current Needs: "What would you benefit from most right now?" Question 3: "Anything else you\'d like to add? Share what you\'re bringing to the table or what you\'re looking for.". Each person should be matched with no more than 6 people in total: 3 times they might be a good match for someone, and 3 times they should be matched with someone. For every match, write a one-sentence explanation of why this is the best choice and mention their email. Other information is not important.';
     const columns = [
       'Name',
       'Email Address',
@@ -82,12 +82,27 @@ describe('buildMatchingAnalysisFallback', () => {
     });
     const presentation = extractAnalysisPresentation(stdout).presentation;
 
-    expect(presentation).toMatchObject({ kind: 'table', totalItems: 306, requestedItems: 102 });
+    expect(presentation).toMatchObject({
+      kind: 'table',
+      totalItems: 306,
+      requestedItems: 102,
+      complete: true,
+      fileName: 'participant-matches.csv',
+    });
     expect(presentation?.kind === 'table' && presentation.columns).toContain('Email');
     if (presentation?.kind === 'table') {
+      const outgoing = new Map<string, number>();
+      const incoming = new Map<string, number>();
       for (const row of presentation.rows) {
         expect(row.Email).toBe(`${String(row.Match).replace('Person ', 'person')}@example.test`);
+        expect(String(row.Reason)).toMatch(/^[^.]+\.$/);
+        outgoing.set(String(row.Participant), (outgoing.get(String(row.Participant)) ?? 0) + 1);
+        incoming.set(String(row.Match), (incoming.get(String(row.Match)) ?? 0) + 1);
       }
+      expect(outgoing.size).toBe(102);
+      expect([...outgoing.values()]).toEqual(Array.from({ length: 102 }, () => 3));
+      expect(incoming.size).toBe(102);
+      expect(Math.max(...incoming.values())).toBe(3);
     }
     expect(validateAnalysisCompleteness(naturalRequest, presentation, 102)).toEqual({
       valid: true,
