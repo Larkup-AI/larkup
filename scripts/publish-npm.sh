@@ -50,6 +50,9 @@ echo "Verifying the packed npm artifact..."
 node "$REPO_ROOT/scripts/verify-larkup-npm-package.mjs"
 
 echo "Publishing versioned workspace packages through Changesets..."
-pnpm changeset publish
+# pnpm's isolated linker refuses packages with bundledDependencies even though
+# npm can pack them correctly. Limit the hoisted linker to publication so the
+# larkup package can embed its pinned XLSX runtime without changing installs.
+pnpm --config.node-linker=hoisted changeset publish
 
 echo "npm publishing completed."
