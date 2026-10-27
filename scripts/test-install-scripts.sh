@@ -166,6 +166,27 @@ else
   fail "install.ps1: Windows MSI URL contains an invalid filename"
 fi
 
+# ── Cross-shell Windows command ──────────────────────────────
+section "Windows Install Command"
+
+windows_command_targets=(
+  "scripts/install.sh"
+  "scripts/install-local.sh"
+  "scripts/install.ps1"
+  "docs/guide/installation.mdx"
+)
+for target in "${windows_command_targets[@]}"; do
+  filepath="${PROJECT_ROOT}/${target}"
+  if grep -Fq 'iwr -useb' "$filepath"; then
+    fail "${target}: still recommends the PowerShell-only iwr alias"
+  elif grep -Fq 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command' "$filepath" && \
+       grep -Fq 'Invoke-RestMethod' "$filepath"; then
+    pass "${target}: documents the cross-shell Windows command"
+  else
+    fail "${target}: missing the cross-shell Windows command"
+  fi
+done
+
 # ── Package name consistency ──────────────────────────────────
 section "Package Name Consistency"
 
