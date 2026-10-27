@@ -1,5 +1,11 @@
 # larkup
 
+## 0.4.50
+
+### Patch Changes
+
+- 6f26810: Use the Windows npm command shim for self-update and global removal so installed Larkup commands no longer fail with `spawn npm ENOENT`.
+
 ## 0.4.49
 
 ### Patch Changes
