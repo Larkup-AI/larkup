@@ -329,7 +329,7 @@
   },
   "dependencies": {
     "@ffprobe-installer/ffprobe": "2.1.2",
-    "@ai-sdk/anthropic": "^4.0.15",
+    "@ai-sdk/anthropic": "4.0.85",
     "@ai-sdk/cohere": "4.0.66",
     "@ai-sdk/deepseek": "3.0.70",
     "@ai-sdk/gateway": "4.0.121",

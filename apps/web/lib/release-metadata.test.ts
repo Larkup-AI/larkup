@@ -13,6 +13,7 @@ function readJson(relativePath: string) {
 describe('published npm metadata', () => {
   it('keeps global installer dependencies compatible and current', () => {
     const webPackage = readJson('apps/web/package.json');
+    const workspaceServerPackage = readJson('packages/workspace-server/package.json');
     const rootPackage = readJson('package.json');
     const cliPackage = readJson('apps/cli/package.json');
     const corePackage = readJson('packages/core/package.json');
@@ -30,6 +31,10 @@ describe('published npm metadata', () => {
     );
 
     expect(webPackage.dependencies['apache-arrow']).toBe('18.1.0');
+    expect(webPackage.dependencies['@ai-sdk/anthropic']).toBe('4.0.85');
+    expect(workspaceServerPackage.dependencies['@ai-sdk/anthropic']).toBe(
+      webPackage.dependencies['@ai-sdk/anthropic'],
+    );
     expect(webPackage.bundledDependencies).toContain('xlsx');
     expect(webPackage.dependencies.xlsx).toBe(
       'https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz',
