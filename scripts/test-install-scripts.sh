@@ -216,6 +216,7 @@ for target in "${windows_command_targets[@]}"; do
     fail "${target}: still uses the stale landing-site installer copy"
   elif grep -Fq 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command' "$filepath" && \
        grep -Fq 'Invoke-RestMethod' "$filepath" && \
+       grep -Fq '.TrimStart([char]0xFEFF)' "$filepath" && \
        grep -Fq 'https://raw.githubusercontent.com/Larkup-AI/larkup/main/scripts/install.ps1' "$filepath" && \
        grep -Fq -- '-NoPrompt' "$filepath"; then
     pass "${target}: uses the canonical non-interactive Windows installer command"

@@ -80,7 +80,7 @@ Prefer the command line? Install the Larkup CLI in one command:
   </Tab>
   <Tab title="Windows" icon="windows">
     ```powershell
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/Larkup-AI/larkup/main/scripts/install.ps1'))) -NoPrompt"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/Larkup-AI/larkup/main/scripts/install.ps1').TrimStart([char]0xFEFF))) -NoPrompt"
     ```
 
     This command works from Command Prompt, Windows PowerShell, and Windows Terminal. It explicitly
