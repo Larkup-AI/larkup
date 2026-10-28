@@ -197,10 +197,13 @@ for target in "${windows_command_targets[@]}"; do
   filepath="${PROJECT_ROOT}/${target}"
   if grep -Fq 'iwr -useb' "$filepath"; then
     fail "${target}: still recommends the PowerShell-only iwr alias"
+  elif grep -Fq 'https://www.larkup.de/install.ps1' "$filepath"; then
+    fail "${target}: still uses the stale landing-site installer copy"
   elif grep -Fq 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command' "$filepath" && \
        grep -Fq 'Invoke-RestMethod' "$filepath" && \
+       grep -Fq 'https://raw.githubusercontent.com/Larkup-AI/larkup/main/scripts/install.ps1' "$filepath" && \
        grep -Fq -- '-NoPrompt' "$filepath"; then
-    pass "${target}: documents the non-interactive cross-shell Windows command"
+    pass "${target}: uses the canonical non-interactive Windows installer command"
   else
     fail "${target}: missing the cross-shell Windows command"
   fi

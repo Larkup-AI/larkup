@@ -4,7 +4,7 @@
     Larkup — Windows/PowerShell Installer
 .DESCRIPTION
     Installs Larkup CLI globally via npm on Windows.
-    Usage: powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-RestMethod 'https://www.larkup.de/install.ps1'))) -NoPrompt"
+    Usage: powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/Larkup-AI/larkup/main/scripts/install.ps1'))) -NoPrompt"
 #>
 param(
     [string]$Version = "latest",
@@ -21,7 +21,7 @@ $PackageName = "larkup"
 $BinName     = "larkup"
 $MinNodeMajor = 22
 $NodeSetupMajor = 22
-$InstallCommand = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-RestMethod ''https://www.larkup.de/install.ps1''))) -NoPrompt"'
+$InstallCommand = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-RestMethod ''https://raw.githubusercontent.com/Larkup-AI/larkup/main/scripts/install.ps1''))) -NoPrompt"'
 
 # Track exit code so we don't kill the host when piped via iex
 $script:ResultCode = 0
