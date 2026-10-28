@@ -95,7 +95,8 @@ jobs:
             }
             exit 1
           }
-          ./scripts/install.ps1 -DryRun -NoPrompt
+          $installer = [ScriptBlock]::Create($installerSource)
+          & $installer -DryRun -NoPrompt
       - uses: pnpm/action-setup@v6
         with:
           version: 10.11.0
