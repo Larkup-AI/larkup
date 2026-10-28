@@ -372,8 +372,17 @@ function Install-Larkup {
     Write-Step "Installing $spec..."
 
     if ($DryRun) {
-        Write-Dry "Would run: npm install -g $spec"
+        Write-Dry "Would run: npm.cmd install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps --allow-remote=all $spec"
         return
+    }
+
+    # Invoke the Windows command shim explicitly. Calling bare `npm` can pick
+    # npm.ps1 instead, which is affected by the machine's execution policy.
+    $npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue
+    if (-not $npmCommand) {
+        Write-Err "npm.cmd was not found after installing Node.js."
+        Write-Err "Restart the terminal and retry, or reinstall Node.js v${NodeSetupMajor}.x."
+        Stop-Installer
     }
 
     $logFile = Join-Path $env:TEMP "larkup-install-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
@@ -387,8 +396,17 @@ function Install-Larkup {
     $env:NPM_CONFIG_AUDIT    = "false"
 
     try {
-        $npmOutput = & npm install -g --allow-remote=all $spec 2>&1
-        $npmExit = $LASTEXITCODE
+        # Windows PowerShell 5.1 wraps native stderr as NativeCommandError when
+        # ErrorActionPreference is Stop. npm writes normal diagnostics to
+        # stderr, so capture its complete output before deciding by exit code.
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            $npmOutput = & $npmCommand.Source install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps --allow-remote=all $spec 2>&1
+            $npmExit = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
 
         # Write output to log regardless
         if ($npmOutput) { $npmOutput | Out-File -FilePath $logFile -Encoding utf8 }

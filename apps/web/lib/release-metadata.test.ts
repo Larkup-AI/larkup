@@ -65,7 +65,12 @@ describe('published npm metadata', () => {
     expect(launcher).toContain("'--allow-remote=all'");
     expect(unixInstaller.match(/--allow-remote=all/g)).toHaveLength(2);
     expect(localInstaller).toContain('--allow-remote=all');
-    expect(windowsInstaller).toContain('npm install -g --allow-remote=all $spec');
+    expect(windowsInstaller).toContain('$npmCommand = Get-Command npm.cmd');
+    expect(windowsInstaller).toContain(
+      '& $npmCommand.Source install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps --allow-remote=all $spec',
+    );
+    expect(windowsInstaller).toContain('$ErrorActionPreference = "Continue"');
+    expect(windowsInstaller).toContain('$ErrorActionPreference = $previousErrorActionPreference');
     expect(npmPublisher).toContain('npm_config_node_linker=hoisted pnpm changeset publish');
     expect(launcher).toContain("'--loglevel=error'");
     expect(launcher).toContain('https://registry.npmjs.org/larkup/latest');

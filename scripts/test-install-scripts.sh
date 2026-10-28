@@ -166,6 +166,24 @@ else
   fail "install.ps1: Windows MSI URL contains an invalid filename"
 fi
 
+# PowerShell must use the .cmd shim and the same non-interactive dependency
+# flags as the Unix installer. It must also capture npm stderr before checking
+# the exit code; otherwise Windows PowerShell 5.1 can stop at NativeCommandError.
+windows_npm_flags='install -g --no-fund --no-audit --ignore-scripts --legacy-peer-deps --allow-remote=all $spec'
+if grep -Fq '$npmCommand = Get-Command npm.cmd' "${PROJECT_ROOT}/scripts/install.ps1" && \
+   grep -Fq "& \$npmCommand.Source $windows_npm_flags" "${PROJECT_ROOT}/scripts/install.ps1"; then
+  pass "install.ps1: uses the explicit npm.cmd shim with safe install flags"
+else
+  fail "install.ps1: npm command is missing the Windows shim or safe install flags"
+fi
+
+if grep -Fq '$ErrorActionPreference = "Continue"' "${PROJECT_ROOT}/scripts/install.ps1" && \
+   grep -Fq '$ErrorActionPreference = $previousErrorActionPreference' "${PROJECT_ROOT}/scripts/install.ps1"; then
+  pass "install.ps1: captures native npm stderr without terminating early"
+else
+  fail "install.ps1: does not safely capture native npm stderr"
+fi
+
 # ── Cross-shell Windows command ──────────────────────────────
 section "Windows Install Command"
 
