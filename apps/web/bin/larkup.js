@@ -19,9 +19,22 @@ process.env.LARKUP_DATA_DIR = larkupDataDir;
 
 const args = process.argv.slice(2);
 const command = args[0];
-// Windows exposes npm through npm.cmd. Spawning the extensionless Unix name
-// fails with ENOENT even though npm works when entered directly in cmd.exe.
-const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+// Windows command shims such as npm.cmd cannot be spawned directly reliably
+// (Node 24 can return EINVAL). Route fixed, validated npm arguments through
+// cmd.exe there, while Unix platforms continue to execute npm directly.
+function spawnNpm(npmArgs, options) {
+  if (process.platform !== 'win32') return spawn('npm', npmArgs, options);
+
+  if (!npmArgs.every((arg) => /^[A-Za-z0-9@/._=+:-]+$/.test(arg))) {
+    throw new Error('Refusing to pass an unsafe argument to npm on Windows.');
+  }
+
+  return spawn(
+    process.env.ComSpec || 'cmd.exe',
+    ['/d', '/s', '/c', ['npm.cmd', ...npmArgs].join(' ')],
+    options,
+  );
+}
 
 if (command === '--version' || command === '-v') {
   console.log(pkg.version);
@@ -87,8 +100,7 @@ if (command === '--version' || command === '-v') {
   console.log('\x1b[1m╰──────────────────────────────────────────────╯\x1b[0m');
   console.log('');
   await migrateLegacyRuntimeState();
-  const child = spawn(
-    npmExecutable,
+  const child = spawnNpm(
     [
       'install',
       '-g',
@@ -550,7 +562,7 @@ async function removeLocalPathEntries(localRoot) {
 
 function uninstallGlobalPackage() {
   return new Promise((resolve, reject) => {
-    const child = spawn(npmExecutable, ['uninstall', '-g', 'larkup', '@larkup/cli'], {
+    const child = spawnNpm(['uninstall', '-g', 'larkup', '@larkup/cli'], {
       stdio: 'inherit',
     });
     child.once('error', reject);

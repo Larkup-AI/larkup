@@ -78,9 +78,11 @@ describe('published npm metadata', () => {
     expect(launcher).not.toContain("'@larkup/cli@latest'");
     expect(launcher).toContain('You already have the latest version.');
     expect(launcher).toContain("process.env.LARKUP_NO_OPEN !== '1'");
-    expect(launcher).toContain("process.platform === 'win32' ? 'npm.cmd' : 'npm'");
-    expect(launcher.match(/spawn\(\s*npmExecutable,/g)).toHaveLength(2);
-    expect(launcher).not.toMatch(/spawn\(['"]npm['"],/);
+    expect(launcher).toContain("process.env.ComSpec || 'cmd.exe'");
+    expect(launcher).toContain("['/d', '/s', '/c', ['npm.cmd', ...npmArgs].join(' ')]");
+    expect(launcher.match(/const child = spawnNpm\(/g)).toHaveLength(2);
+    expect(launcher).not.toContain('const npmExecutable');
+    expect(launcher.match(/spawn\(['"]npm['"],/g)).toHaveLength(1);
     expect(launcher).toContain("new URL('/api/sandbox?action=setup', url)");
     expect(launcher).toContain("health.backend !== 'local'");
     expect(launcher).toContain(
