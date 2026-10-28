@@ -147,10 +147,10 @@ done
 # ── Official Node.js artifact URL construction ───────────────
 section "Node.js Artifact URLs"
 
-if [[ "$(od -An -tx1 -N3 "${PROJECT_ROOT}/scripts/install.ps1" | tr -d '[:space:]')" == "efbbbf" ]]; then
-  pass "install.ps1: has a UTF-8 BOM for Windows PowerShell 5.1"
+if [[ "$(od -An -tx1 -N3 "${PROJECT_ROOT}/scripts/install.ps1" | tr -d '[:space:]')" != "efbbbf" ]]; then
+  pass "install.ps1: remote script starts directly with #Requires"
 else
-  fail "install.ps1: missing the UTF-8 BOM required by Windows PowerShell 5.1"
+  fail "install.ps1: UTF-8 BOM breaks the remote ScriptBlock parameter block"
 fi
 
 # nodejs.org directory anchors repeat the version in href and label. The
