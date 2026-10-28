@@ -79,7 +79,17 @@ function Save-RemoteFile {
         try {
             # PowerShell 5.1 can promote native stderr to a terminating error.
             $ErrorActionPreference = "Continue"
-            & $curlCommand.Source --fail --location --silent --show-error --retry 3 --connect-timeout 30 --output $Destination $Url
+            $curlArguments = @(
+                "--fail",
+                "--location",
+                "--silent",
+                "--show-error",
+                "--retry", "3",
+                "--connect-timeout", "30",
+                "--output", $Destination,
+                $Url
+            )
+            & $curlCommand.Source @curlArguments
             $curlExitCode = $LASTEXITCODE
         } finally {
             $ErrorActionPreference = $previousErrorActionPreference
