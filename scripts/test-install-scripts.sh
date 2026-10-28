@@ -166,6 +166,15 @@ else
   fail "install.ps1: Windows MSI URL contains an invalid filename"
 fi
 
+if grep -Fq 'Get-Command curl.exe' "${PROJECT_ROOT}/scripts/install.ps1" && \
+   grep -Fq 'Get-Command Start-BitsTransfer' "${PROJECT_ROOT}/scripts/install.ps1" && \
+   grep -Fq 'Invoke-WebRequest -Uri $Url -OutFile $Destination' "${PROJECT_ROOT}/scripts/install.ps1" && \
+   grep -Fq 'Save-RemoteFile -Url $msiUrl -Destination $msiPath' "${PROJECT_ROOT}/scripts/install.ps1"; then
+  pass "install.ps1: Windows MSI download has curl, BITS, and PowerShell fallbacks"
+else
+  fail "install.ps1: Windows MSI download is missing resilient fallbacks"
+fi
+
 # PowerShell must use the .cmd shim and the same non-interactive dependency
 # flags as the Unix installer. It must also capture npm stderr before checking
 # the exit code; otherwise Windows PowerShell 5.1 can stop at NativeCommandError.

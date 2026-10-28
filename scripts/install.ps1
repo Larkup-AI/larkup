@@ -46,6 +46,83 @@ function Write-Err    { param([string]$Msg) Write-Host " ✗  " -ForegroundColor
 function Write-Dry    { param([string]$Msg) Write-Host "[dry-run] " -ForegroundColor Yellow -NoNewline; Write-Host $Msg }
 function Write-Detail { param([string]$Msg) if ($VerboseOutput) { Write-Host "[debug] $Msg" -ForegroundColor DarkGray } }
 
+# Windows PowerShell 5.1's Invoke-WebRequest can fail against otherwise valid
+# downloads on some older/proxied Windows installations. Prefer the native
+# Windows curl binary, then BITS, while keeping Invoke-WebRequest as a fallback.
+function Test-DownloadedFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    if (-not (Test-Path $Path -PathType Leaf)) { return $false }
+    try {
+        return (Get-Item $Path).Length -gt 0
+    } catch {
+        return $false
+    }
+}
+
+function Save-RemoteFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Url,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+
+    if ($Url -notmatch '^https://') {
+        Write-Err "Refusing to download an installer over an insecure connection."
+        Stop-Installer
+    }
+
+    $curlCommand = Get-Command curl.exe -ErrorAction SilentlyContinue
+    if ($curlCommand) {
+        Write-Detail "Downloading with curl.exe"
+        $previousErrorActionPreference = $ErrorActionPreference
+        $curlExitCode = 1
+        try {
+            # PowerShell 5.1 can promote native stderr to a terminating error.
+            $ErrorActionPreference = "Continue"
+            & $curlCommand.Source --fail --location --silent --show-error --retry 3 --connect-timeout 30 --output $Destination $Url
+            $curlExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+
+        if ($curlExitCode -eq 0 -and (Test-DownloadedFile -Path $Destination)) {
+            return
+        }
+        Remove-Item $Destination -Force -ErrorAction SilentlyContinue
+        Write-Warn "curl.exe could not download the installer; trying Windows BITS..."
+    }
+
+    $bitsCommand = Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue
+    if ($bitsCommand) {
+        Write-Detail "Downloading with Windows BITS"
+        try {
+            Start-BitsTransfer -Source $Url -Destination $Destination -ErrorAction Stop
+            if (Test-DownloadedFile -Path $Destination) { return }
+        } catch {
+            Write-Detail "BITS download failed: $($_.Exception.Message)"
+        }
+        Remove-Item $Destination -Force -ErrorAction SilentlyContinue
+        Write-Warn "Windows BITS could not download the installer; trying PowerShell..."
+    }
+
+    Write-Detail "Downloading with Invoke-WebRequest"
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing -Headers @{ "User-Agent" = "Larkup-Installer/1.0" }
+    } catch {
+        Remove-Item $Destination -Force -ErrorAction SilentlyContinue
+        Write-Err "Could not download the Node.js installer."
+        Write-Err "URL: $Url"
+        Write-Detail $_.Exception.Message
+        Stop-Installer
+    }
+
+    if (-not (Test-DownloadedFile -Path $Destination)) {
+        Remove-Item $Destination -Force -ErrorAction SilentlyContinue
+        Write-Err "The downloaded Node.js installer is empty."
+        Stop-Installer
+    }
+}
+
 # ── Help ──────────────────────────────────────────────────────
 function Show-Help {
     Write-Host ""
@@ -280,7 +357,7 @@ function Install-NodeRuntime {
 
         try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            Invoke-WebRequest -Uri $msiUrl -OutFile $msiPath -UseBasicParsing
+            Save-RemoteFile -Url $msiUrl -Destination $msiPath
             Write-Step "Running installer (may require elevation)..."
             Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`" /qn" -Wait -Verb RunAs
         } finally {
