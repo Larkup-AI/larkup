@@ -83,15 +83,16 @@ describe('published npm metadata', () => {
     expect(launcher.match(/const child = spawnNpm\(/g)).toHaveLength(2);
     expect(launcher).not.toContain('const npmExecutable');
     expect(launcher.match(/spawn\(['"]npm['"],/g)).toHaveLength(1);
-    expect(launcher).toContain("new URL('/api/sandbox?action=setup', url)");
-    expect(launcher).toContain("health.backend !== 'local'");
-    expect(launcher).toContain(
-      'Larkup is ready to open; analysis tools will activate when setup finishes.',
-    );
-    expect(launcher.indexOf('void prepareLocalAnalysisRuntime(url)')).toBeGreaterThan(
+    expect(launcher).toContain("command === 'prepare'");
+    expect(launcher).toContain("new SandboxManager({ backend: 'local' }).setup()");
+    expect(launcher.indexOf('await prepareLocalAnalysisRuntime()')).toBeLessThan(
       launcher.indexOf('const child = spawn(process.execPath'),
     );
-    expect(launcher).not.toContain('await prepareLocalAnalysisRuntime()');
+    expect(launcher).not.toContain('void prepareLocalAnalysisRuntime');
+    expect(unixInstaller).toContain('prepare_local_analysis_runtime');
+    expect(unixInstaller).toContain('"$BIN_NAME" prepare');
+    expect(windowsInstaller).toContain('Prepare-LocalAnalysisRuntime');
+    expect(windowsInstaller).toContain('& $larkupCommand.Source prepare');
     for (const dependency of [
       '@larkup/connections',
       '@larkup/core',

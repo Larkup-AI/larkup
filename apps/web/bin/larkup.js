@@ -47,6 +47,7 @@ if (command === '--version' || command === '-v') {
     process.exit(1);
   }
   await migrateLegacyRuntimeState();
+  await prepareLocalAnalysisRuntime();
   const child = spawn(process.execPath, [standaloneServer], {
     cwd: packageDir,
     stdio: 'inherit',
@@ -59,14 +60,13 @@ if (command === '--version' || command === '-v') {
   });
   child.once('exit', (code) => process.exit(code ?? 0));
 
-  // Start the browser-facing application immediately. The local analysis
-  // environment is warmed through the running server so an analysis request
-  // can share that same in-process setup instead of starting a second install.
-  void prepareLocalAnalysisRuntime(url);
-
   if (process.env.CI !== 'true' && process.env.LARKUP_NO_OPEN !== '1') {
     void openWhenReady(url);
   }
+} else if (command === 'prepare') {
+  await migrateLegacyRuntimeState();
+  const ready = await prepareLocalAnalysisRuntime();
+  process.exit(ready ? 0 : 1);
 } else if (command === 'update') {
   const currentVersion = pkg.version;
   const latestVersion = await getLatestPublishedVersion();
@@ -138,7 +138,9 @@ if (command === '--version' || command === '-v') {
 } else if (command === 'enterprise-tool' && args[1] === 'install') {
   await installEnterpriseTool(args.slice(2));
 } else {
-  console.error('Usage: larkup <dev|start|update|remove|enterprise-enroll|enterprise-tool>');
+  console.error(
+    'Usage: larkup <dev|start|prepare|update|remove|enterprise-enroll|enterprise-tool>',
+  );
   process.exit(1);
 }
 
@@ -216,62 +218,37 @@ async function migrateLegacyRuntimeState() {
 }
 
 /**
- * Warm the managed Python environment after the application starts. A fresh
- * Windows install may need several minutes to fetch pandas, numpy, and the
- * other pinned wheels, but that work must not block the UI from opening.
+ * Prepare the managed Python environment before the browser can submit an
+ * analysis request. Installers call the same command so the longer first-time
+ * download is completed as part of installation. The startup check remains as
+ * a fallback for upgrades and interrupted installs, and is fast once cached.
  *
- * Going through the existing sandbox API keeps setup in the server process.
- * If chat analysis starts while warmup is running, both calls share the same
- * cached setup promise. Managed Cloud and configured remote backends are
- * detected by the health response and never enter the local setup path.
+ * This launcher is used only by the local npm application. Managed Cloud hosts
+ * use their configured remote sandbox adapters and never enter this path.
  */
-async function prepareLocalAnalysisRuntime(url) {
+async function prepareLocalAnalysisRuntime() {
+  console.log(`\x1b[38;2;223;156;32mPreparing local analysis runtime…\x1b[0m`);
+  const startedAt = Date.now();
+  const progress = setInterval(() => {
+    const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1_000);
+    const elapsed =
+      elapsedSeconds < 60 ? `${elapsedSeconds}s` : `${Math.floor(elapsedSeconds / 60)} min`;
+    console.log(`Still preparing local analysis runtime (${elapsed})…`);
+  }, 30_000);
+
   try {
-    const health = await waitForSandboxApi(url);
-    if (!health || health.backend !== 'local') return;
-
-    console.log(`\x1b[38;2;223;156;32mPreparing local analysis runtime in the background…\x1b[0m`);
-    console.log('Larkup is ready to open; analysis tools will activate when setup finishes.');
-
-    const startedAt = Date.now();
-    const progress = setInterval(() => {
-      const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1_000);
-      const elapsed =
-        elapsedSeconds < 60 ? `${elapsedSeconds}s` : `${Math.floor(elapsedSeconds / 60)} min`;
-      console.log(`Still preparing local analysis runtime (${elapsed})…`);
-    }, 30_000);
-
-    try {
-      const response = await fetch(new URL('/api/sandbox?action=setup', url), {
-        method: 'POST',
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.error || `setup request failed with HTTP ${response.status}`);
-      }
-    } finally {
-      clearInterval(progress);
-    }
-
+    const { SandboxManager } = await import('@larkup/sandbox');
+    await new SandboxManager({ backend: 'local' }).setup();
     console.log(`\x1b[32mLocal analysis runtime ready.\x1b[0m`);
+    return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`Local analysis runtime is unavailable: ${message}`);
     console.warn('Larkup will still start, but code-analysis tools will remain unavailable.');
+    return false;
+  } finally {
+    clearInterval(progress);
   }
-}
-
-async function waitForSandboxApi(url) {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    try {
-      const response = await fetch(new URL('/api/sandbox', url));
-      if (response.ok) return await response.json();
-    } catch {
-      // The standalone server is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  return undefined;
 }
 
 async function activeProjectConfig() {
