@@ -568,6 +568,38 @@ function Confirm-Installation {
     }
 }
 
+# Prepare the managed local Python environment while installation is still in
+# progress, so the first analysis request cannot race a background download.
+function Prepare-LocalAnalysisRuntime {
+    if ($DryRun) {
+        Write-Dry "Would run: $BinName prepare"
+        return
+    }
+
+    Sync-SessionPath
+    $larkupCommand = Get-Command "$BinName.cmd" -ErrorAction SilentlyContinue
+    if (-not $larkupCommand) {
+        $larkupCommand = Get-Command $BinName -ErrorAction SilentlyContinue
+    }
+    if (-not $larkupCommand) {
+        Write-Warn "Skipping local analysis setup because '$BinName' is not available in this session."
+        return
+    }
+
+    Write-Step "Preparing local analysis runtime (first install may take several minutes)..."
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        & $larkupCommand.Source prepare
+        $prepareExit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($prepareExit -ne 0) {
+        Write-Warn "Local analysis setup did not finish. 'larkup dev' will retry before opening."
+    }
+}
+
 # ── Banner ────────────────────────────────────────────────────
 function Show-Banner {
     Write-Host ""
@@ -606,6 +638,7 @@ function Main {
     Assert-NodeInstalled
     Install-Larkup
     Confirm-Installation
+    Prepare-LocalAnalysisRuntime
     Show-NextSteps
 
     Write-Ok "Done! 🚀"

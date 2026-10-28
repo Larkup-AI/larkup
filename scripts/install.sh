@@ -614,6 +614,25 @@ verify_install() {
   fi
 }
 
+# Prepare the managed local Python environment while installation is still in
+# progress, so the first analysis request cannot race a background download.
+prepare_local_analysis_runtime() {
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log_dry "Would run: ${BIN_NAME} prepare"
+    return 0
+  fi
+
+  if ! command -v "$BIN_NAME" &>/dev/null; then
+    log_warn "Skipping local analysis setup because '${BIN_NAME}' is not available in this session."
+    return 0
+  fi
+
+  log_info "Preparing local analysis runtime (first install may take several minutes)..."
+  if ! "$BIN_NAME" prepare; then
+    log_warn "Local analysis setup did not finish. 'larkup dev' will retry before opening."
+  fi
+}
+
 # ── Banner ────────────────────────────────────────────────────
 show_banner() {
   echo -e "${OCHRE}"
@@ -655,6 +674,7 @@ main() {
   check_node
   install_larkup
   verify_install
+  prepare_local_analysis_runtime
   show_next_steps
   log_success "Done! 🚀"
 
