@@ -84,6 +84,20 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: Install candidate build dependencies
         run: pnpm install --frozen-lockfile
+      - name: Validate and dry-run Windows installer
+        shell: powershell
+        run: |
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path './scripts/install.ps1'),
+            [ref]$null,
+            [ref]$parseErrors
+          ) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+          ./scripts/install.ps1 -DryRun -NoPrompt
       - name: Candidate package install, ffprobe, and server check
         shell: pwsh
         run: ./scripts/test-candidate-install.ps1
