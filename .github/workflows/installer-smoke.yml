@@ -88,13 +88,20 @@ jobs:
         shell: powershell
         run: |
           $parseErrors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path './scripts/install.ps1'),
+          $installerPath = (Resolve-Path './scripts/install.ps1').Path
+          $installerSource = [System.IO.File]::ReadAllText(
+            $installerPath,
+            [System.Text.Encoding]::UTF8
+          )
+          [System.Management.Automation.Language.Parser]::ParseInput(
+            $installerSource,
             [ref]$null,
             [ref]$parseErrors
           ) | Out-Null
           if ($parseErrors.Count -gt 0) {
-            $parseErrors | Format-List | Out-String | Write-Error
+            $parseErrors | ForEach-Object {
+              Write-Error "Line $($_.Extent.StartLineNumber), column $($_.Extent.StartColumnNumber): $($_.Message)"
+            }
             exit 1
           }
           ./scripts/install.ps1 -DryRun -NoPrompt
