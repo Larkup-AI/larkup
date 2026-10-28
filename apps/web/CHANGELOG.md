@@ -1,5 +1,11 @@
 # larkup
 
+## 0.4.55
+
+### Patch Changes
+
+- 8d74f09: Prepare the Local analysis runtime during installation and verify it before opening the app, preventing first-run analysis requests from timing out while dependencies are still downloading.
+
 ## 0.4.54
 
 ### Patch Changes
