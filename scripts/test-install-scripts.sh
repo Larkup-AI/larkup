@@ -147,6 +147,12 @@ done
 # ── Official Node.js artifact URL construction ───────────────
 section "Node.js Artifact URLs"
 
+if [[ "$(od -An -tx1 -N3 "${PROJECT_ROOT}/scripts/install.ps1" | tr -d '[:space:]')" == "efbbbf" ]]; then
+  pass "install.ps1: has a UTF-8 BOM for Windows PowerShell 5.1"
+else
+  fail "install.ps1: missing the UTF-8 BOM required by Windows PowerShell 5.1"
+fi
+
 # nodejs.org directory anchors repeat the version in href and label. The
 # macOS parser must still return one clean value, not a newline-separated pair.
 node_index_fixture='<a href="node-v22.23.4-darwin-arm64.tar.gz">node-v22.23.4-darwin-arm64.tar.gz</a>'
