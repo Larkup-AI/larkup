@@ -190,7 +190,7 @@ identify_system() {
       fi ;;
     MINGW*|MSYS*|CYGWIN*)
       log_error "Windows detected. Use the PowerShell installer instead:"
-      log_error "  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/Larkup-AI/larkup/main/scripts/install.ps1'))) -NoPrompt\""
+      log_error "  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/Larkup-AI/larkup/main/scripts/install.ps1').TrimStart([char]0xFEFF))) -NoPrompt\""
       exit 1 ;;
     *) log_error "Unsupported OS: ${uname_s}"; exit 1 ;;
   esac
