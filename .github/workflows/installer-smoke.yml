@@ -75,15 +75,6 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10.11.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-      - name: Install candidate build dependencies
-        run: pnpm install --frozen-lockfile
       - name: Validate and dry-run Windows installer
         shell: powershell
         run: |
@@ -105,6 +96,15 @@ jobs:
             exit 1
           }
           ./scripts/install.ps1 -DryRun -NoPrompt
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Install candidate build dependencies
+        run: pnpm install --frozen-lockfile
       - name: Candidate package install, ffprobe, and server check
         shell: pwsh
         run: ./scripts/test-candidate-install.ps1
