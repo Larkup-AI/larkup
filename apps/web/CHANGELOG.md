@@ -1,5 +1,11 @@
 # larkup
 
+## 0.4.54
+
+### Patch Changes
+
+- 789f6d0: Launch npm through `cmd.exe` on Windows so `larkup update` and `larkup remove` work reliably with Node.js 24 instead of failing with `spawn EINVAL`.
+
 ## 0.4.53
 
 ### Patch Changes
