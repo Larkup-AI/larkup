@@ -46,10 +46,7 @@ export function matchingAnalysisSpec(
   return { targetCount, matchesPerTarget, suggestionCap };
 }
 
-/**
- * Build a deterministic stdlib-only repair for constrained participant matching.
- * This runs only after model-authored analysis failed completeness validation.
- */
+/** Build a deterministic stdlib-only engine for constrained participant matching. */
 export function buildMatchingAnalysisFallback(
   requestText: string,
   dataset: Pick<TabularDataset, 'columns' | 'rowCount'>,
@@ -58,14 +55,26 @@ export function buildMatchingAnalysisFallback(
   if (!spec || dataset.rowCount <= spec.matchesPerTarget) return undefined;
 
   const columns = dataset.columns.map((column) => column.name);
-  const identity = bestColumn(columns, [
-    { pattern: /^name$/, score: 100 },
-    { pattern: /\bfull name\b/, score: 90 },
-    { pattern: /\bfirst name\b/, score: 80 },
-    { pattern: /\bparticipant name\b/, score: 80 },
-    { pattern: /\bguest id\b/, score: 50 },
-    { pattern: /\bname\b/, score: 20 },
+  const email = bestColumn(columns, [
+    { pattern: /^e ?mail(?: address)?$/, score: 100 },
+    { pattern: /\be ?mail(?: address)?\b/, score: 60 },
   ]);
+  const identity =
+    bestColumn(columns, [
+      { pattern: /^name$/, score: 100 },
+      { pattern: /\bfull name\b/, score: 90 },
+      { pattern: /\bfirst name\b/, score: 80 },
+      { pattern: /\bparticipant name\b/, score: 80 },
+      { pattern: /\bguest id\b/, score: 50 },
+      { pattern: /\bname\b/, score: 20 },
+    ]) ||
+    bestColumn(columns, [
+      { pattern: /\bparticipant\b/, score: 60 },
+      { pattern: /\bprofile\b/, score: 50 },
+      { pattern: /\bidentifier\b|\bid\b/, score: 30 },
+    ]) ||
+    email ||
+    columns[0];
   const needs = bestColumn(columns, [
     { pattern: /\bcurrent needs?\b/, score: 100 },
     { pattern: /\bbenefit from (?:the )?most\b/, score: 90 },
@@ -97,14 +106,29 @@ export function buildMatchingAnalysisFallback(
       { pattern: /\blooking for\b/, score: 30 },
       { pattern: /\boffer(?:s|ed|ing)?\b/, score: 20 },
     ]);
-  if (!identity || !needs || !resolvedOffers) return undefined;
+  if (!identity) return undefined;
 
-  const email = bestColumn(columns, [
-    { pattern: /^e ?mail(?: address)?$/, score: 100 },
-    { pattern: /\be ?mail(?: address)?\b/, score: 60 },
-  ]);
+  const metadataPattern =
+    /\b(?:created|updated|timestamp|date|status|approval|consent|ticket|referrer|linkedin|phone|address|company|organisation|organization|industry)\b/;
+  const descriptiveColumns = columns.filter(
+    (column) =>
+      column !== identity && column !== email && !metadataPattern.test(normalized(column)),
+  );
+  const fallbackSignals =
+    descriptiveColumns.length > 0
+      ? descriptiveColumns
+      : columns.filter((column) => column !== identity && column !== email);
+  const needColumns = needs ? [needs] : fallbackSignals;
+  const offerColumns = resolvedOffers ? [resolvedOffers] : fallbackSignals;
+  if (needColumns.length === 0 || offerColumns.length === 0) return undefined;
 
-  const settings = JSON.stringify({ ...spec, identity, needs, offers: resolvedOffers, email });
+  const settings = JSON.stringify({
+    ...spec,
+    identity,
+    needs: needColumns,
+    offers: offerColumns,
+    email,
+  });
   return String.raw`
 import csv
 import difflib
@@ -121,6 +145,9 @@ _matching_stopwords = {
 
 def _matching_text(value):
     return " ".join(str(value or "").split())
+
+def _matching_fields(person, columns):
+    return " ".join(_matching_text(person.get(column)) for column in columns if _matching_text(person.get(column)))
 
 def _matching_tokens(value):
     return {
@@ -140,13 +167,13 @@ _matching_targets = min(_matching_settings["targetCount"], len(_matching_people)
 _matching_preferences = []
 for _target_index in range(_matching_targets):
     _target = _matching_people[_target_index]
-    _need_text = _matching_text(_target.get(_matching_settings["needs"]))
+    _need_text = _matching_fields(_target, _matching_settings["needs"])
     _need_tokens = _matching_tokens(_need_text)
     _candidates = []
     for _candidate_index, _candidate in enumerate(_matching_people):
         if _candidate_index == _target_index:
             continue
-        _offer_text = _matching_text(_candidate.get(_matching_settings["offers"]))
+        _offer_text = _matching_fields(_candidate, _matching_settings["offers"])
         _offer_tokens = _matching_tokens(_offer_text)
         _shared = sorted(_need_tokens.intersection(_offer_tokens))
         _union = _need_tokens.union(_offer_tokens)
@@ -162,48 +189,93 @@ _matching_capacity = len(_matching_people) * _matching_settings["suggestionCap"]
 if _matching_capacity < _matching_required:
     raise RuntimeError("The requested candidate reuse limit is mathematically impossible for this dataset")
 
-# A sequential greedy allocator can consume all non-self capacity needed by a
-# later participant even though a complete assignment exists. Build one
-# injective bipartite matching per rank instead. Every round assigns every
-# target once, uses a candidate at most once, and excludes pairs selected in
-# earlier rounds. Therefore K rounds guarantee K unique non-self matches per
-# target and candidate reuse no greater than K.
-_matching_used_pairs = set()
+# Solve the full capacity-constrained assignment as one flow network. This
+# guarantees every invariant together, including caps smaller than K.
+class _MatchingEdge:
+    def __init__(self, to, reverse, capacity):
+        self.to = to
+        self.reverse = reverse
+        self.capacity = capacity
+
+_matching_node_count = 2 + _matching_targets + len(_matching_people)
+_matching_source = _matching_node_count - 2
+_matching_sink = _matching_node_count - 1
+_matching_graph = [[] for _ in range(_matching_node_count)]
+
+def _matching_add_edge(start, end, capacity):
+    forward = _MatchingEdge(end, len(_matching_graph[end]), capacity)
+    backward = _MatchingEdge(start, len(_matching_graph[start]), 0)
+    _matching_graph[start].append(forward)
+    _matching_graph[end].append(backward)
+    return forward
+
+for _target_index in range(_matching_targets):
+    _matching_add_edge(_matching_source, _target_index, _matching_settings["matchesPerTarget"])
+
+_matching_pair_edges = []
+for _target_index, _preferences in enumerate(_matching_preferences):
+    for _preference_rank, (_, _, _candidate_index, _shared) in enumerate(_preferences):
+        _candidate_node = _matching_targets + _candidate_index
+        _edge = _matching_add_edge(_target_index, _candidate_node, 1)
+        _matching_pair_edges.append((_target_index, _candidate_index, _preference_rank, _shared, _edge))
+
+for _candidate_index in range(len(_matching_people)):
+    _matching_add_edge(
+        _matching_targets + _candidate_index,
+        _matching_sink,
+        _matching_settings["suggestionCap"],
+    )
+
+def _matching_flow():
+    total = 0
+    while True:
+        levels = [-1] * _matching_node_count
+        levels[_matching_source] = 0
+        queue = [_matching_source]
+        for node in queue:
+            for edge in _matching_graph[node]:
+                if edge.capacity > 0 and levels[edge.to] < 0:
+                    levels[edge.to] = levels[node] + 1
+                    queue.append(edge.to)
+        if levels[_matching_sink] < 0:
+            return total
+        positions = [0] * _matching_node_count
+
+        def send(node, amount):
+            if node == _matching_sink:
+                return amount
+            while positions[node] < len(_matching_graph[node]):
+                edge = _matching_graph[node][positions[node]]
+                if edge.capacity > 0 and levels[edge.to] == levels[node] + 1:
+                    pushed = send(edge.to, min(amount, edge.capacity))
+                    if pushed:
+                        edge.capacity -= pushed
+                        _matching_graph[edge.to][edge.reverse].capacity += pushed
+                        return pushed
+                positions[node] += 1
+            return 0
+
+        while True:
+            pushed = send(_matching_source, _matching_required - total)
+            if not pushed:
+                break
+            total += pushed
+            if total == _matching_required:
+                return total
+
+if _matching_flow() != _matching_required:
+    raise RuntimeError("The requested matching constraints cannot be satisfied by this dataset")
+
 _matching_selected = [[] for _ in range(_matching_targets)]
-
-def _matching_assign(_target_index, _seen_candidates, _round_assignments, _round_selected):
-    for _, _, _candidate_index, _shared in _matching_preferences[_target_index]:
-        if (_target_index, _candidate_index) in _matching_used_pairs or _candidate_index in _seen_candidates:
-            continue
-        _seen_candidates.add(_candidate_index)
-        _displaced_target = _round_assignments.get(_candidate_index)
-        if _displaced_target is None or _matching_assign(
-            _displaced_target,
-            _seen_candidates,
-            _round_assignments,
-            _round_selected,
-        ):
-            _round_assignments[_candidate_index] = _target_index
-            _round_selected[_target_index] = (_candidate_index, _shared)
-            return True
-    return False
-
-for _matching_round in range(_matching_settings["matchesPerTarget"]):
-    _round_assignments = {}
-    _round_selected = {}
-    for _target_index in range(_matching_targets):
-        if not _matching_assign(_target_index, set(), _round_assignments, _round_selected):
-            raise RuntimeError("Could not construct a complete balanced matching assignment")
-    if len(_round_selected) != _matching_targets:
-        raise RuntimeError("Balanced matching assignment is incomplete")
-    for _target_index in range(_matching_targets):
-        _candidate_index, _shared = _round_selected[_target_index]
-        _matching_used_pairs.add((_target_index, _candidate_index))
-        _matching_selected[_target_index].append((_candidate_index, _shared))
+for _target_index, _candidate_index, _preference_rank, _shared, _edge in _matching_pair_edges:
+    if _edge.capacity == 0:
+        _matching_selected[_target_index].append((_preference_rank, _candidate_index, _shared))
         _matching_usage[_candidate_index] += 1
+for _selected in _matching_selected:
+    _selected.sort()
 
 for _target_index, _selected in enumerate(_matching_selected):
-    for _rank, (_candidate_index, _shared) in enumerate(_selected, start=1):
+    for _rank, (_, _candidate_index, _shared) in enumerate(_selected, start=1):
         _target_label = _matching_labels_all[_target_index]
         _candidate_label = _matching_labels_all[_candidate_index]
         _selected_candidate = _matching_people[_candidate_index]

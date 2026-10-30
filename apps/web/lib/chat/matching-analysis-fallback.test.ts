@@ -153,4 +153,89 @@ describe('buildMatchingAnalysisFallback', () => {
       valid: true,
     });
   });
+
+  it('honors a reuse cap smaller than the matches per target when enough candidates exist', () => {
+    const constrainedRequest =
+      'For the first 8 people from the list, make 2 matches. Every person can be suggested at most 1 time.';
+    const columns = ['Profile Label', 'Prompt Alpha', 'Prompt Beta'];
+    const code = buildMatchingAnalysisFallback(constrainedRequest, {
+      columns: columns.map((name) => ({ name })) as never,
+      rowCount: 16,
+    });
+    expect(code).toBeTruthy();
+
+    const directory = mkdtempSync(join(tmpdir(), 'larkup-matching-cap-'));
+    const csv = [
+      columns.map((column) => JSON.stringify(column)).join(','),
+      ...Array.from({ length: 16 }, (_, index) =>
+        [
+          JSON.stringify(`Profile ${index + 1}`),
+          JSON.stringify(index % 2 ? '' : `Topic ${index % 5}`),
+          JSON.stringify(index % 3 ? `Skill ${(index + 1) % 5}` : ''),
+        ].join(','),
+      ),
+    ].join('\n');
+    writeFileSync(join(directory, 'data.csv'), csv);
+    const stdout = execFileSync('python3', ['-c', withAnalysisPresentationHelpers(code!, 8)], {
+      cwd: directory,
+      encoding: 'utf8',
+    });
+    const presentation = extractAnalysisPresentation(stdout).presentation;
+
+    expect(presentation).toMatchObject({ kind: 'table', totalItems: 16, requestedItems: 8 });
+    if (presentation?.kind === 'table') {
+      const incoming = new Map<string, number>();
+      for (const row of presentation.rows) {
+        incoming.set(String(row.Match), (incoming.get(String(row.Match)) ?? 0) + 1);
+      }
+      expect(Math.max(...incoming.values())).toBe(1);
+    }
+    expect(validateAnalysisCompleteness(constrainedRequest, presentation, 16)).toEqual({
+      valid: true,
+    });
+  });
+
+  it('completes a large survey with duplicate names, blank answers, and arbitrary extra fields', () => {
+    const largeRequest =
+      'For all 258 participants, make 3 matches. Every participant can be suggested no more than 3 times.';
+    const columns = [
+      'name',
+      'created_at',
+      'approval_status',
+      'Your company / organisation',
+      'Question 1: Knowledge & Expertise "Where can you help others with your experience?',
+      'Question 2: Current Needs: "What would you benefit from most right now?"',
+      'Question 3: "Anything else you would like to add?"',
+    ];
+    const code = buildMatchingAnalysisFallback(largeRequest, {
+      columns: columns.map((name) => ({ name })) as never,
+      rowCount: 258,
+    });
+    expect(code).toBeTruthy();
+
+    const directory = mkdtempSync(join(tmpdir(), 'larkup-matching-large-'));
+    const csv = [
+      columns.map((column) => JSON.stringify(column)).join(','),
+      ...Array.from({ length: 258 }, (_, index) =>
+        [
+          JSON.stringify(index < 2 ? 'Duplicate Person' : `Person ${index + 1}`),
+          JSON.stringify('2026-10-30'),
+          JSON.stringify('approved'),
+          JSON.stringify(`Company ${index % 13}`),
+          JSON.stringify(index % 11 === 0 ? '' : `Expertise ${index % 17}`),
+          JSON.stringify(index % 7 === 0 ? '' : `Need ${(index + 4) % 17}`),
+          JSON.stringify(index % 5 === 0 ? '' : `Additional context ${index % 19}`),
+        ].join(','),
+      ),
+    ].join('\n');
+    writeFileSync(join(directory, 'data.csv'), csv);
+    const stdout = execFileSync('python3', ['-c', withAnalysisPresentationHelpers(code!, 258)], {
+      cwd: directory,
+      encoding: 'utf8',
+    });
+    const presentation = extractAnalysisPresentation(stdout).presentation;
+
+    expect(presentation).toMatchObject({ kind: 'table', totalItems: 774, requestedItems: 258 });
+    expect(validateAnalysisCompleteness(largeRequest, presentation, 258)).toEqual({ valid: true });
+  });
 });

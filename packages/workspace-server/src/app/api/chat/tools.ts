@@ -2875,6 +2875,13 @@ export async function getChatTools(context: {
             requestText ?? '',
             mountedDatasets.length === 1 ? mountedDatasets[0].rowCount : undefined,
           );
+          const matchingEngine =
+            mountedDatasets.length === 1
+              ? buildMatchingAnalysisFallback(requestText ?? '', mountedDatasets[0])
+              : undefined;
+          // Constrained matching has hard global invariants. Prefer the
+          // deterministic engine instead of asking generated code to satisfy them.
+          if (matchingEngine) finalCode = matchingEngine;
           finalCode = withAnalysisPresentationHelpers(finalCode, analysisTargetCount);
           if (requestedDatasetIds.length === 1) {
             finalCode = remapSingleDatasetRead(finalCode);
@@ -2919,27 +2926,6 @@ export async function getChatTools(context: {
                   mountedDatasets.length === 1 ? mountedDatasets[0].rowCount : undefined,
                 )
               : { valid: true };
-          const matchingFallback =
-            mountedDatasets.length === 1
-              ? buildMatchingAnalysisFallback(requestText ?? '', mountedDatasets[0])
-              : undefined;
-          if ((result.exitCode !== 0 || !completeness.valid) && matchingFallback) {
-            result = await sandboxManager.execute({
-              code: withAnalysisPresentationHelpers(matchingFallback, analysisTargetCount),
-              language: 'python',
-              files,
-              timeout: 30_000,
-            });
-            extracted = extractAnalysisPresentation(result.stdout);
-            completeness =
-              result.exitCode === 0
-                ? validateAnalysisCompleteness(
-                    requestText ?? '',
-                    extracted.presentation,
-                    mountedDatasets.length === 1 ? mountedDatasets[0].rowCount : undefined,
-                  )
-                : { valid: true };
-          }
           const completenessError = completeness.valid ? undefined : completeness.error;
           const exitCode = result.exitCode === 0 && completenessError ? 1 : result.exitCode;
           const stderr = [result.stderr.trim(), completenessError].filter(Boolean).join('\n\n');
