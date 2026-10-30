@@ -13,7 +13,7 @@ import { runWithWorkspaceRuntime } from '../src/runtime-host.ts';
 
 const executeFile = promisify(execFile);
 
-test('failed model matching code is replaced by a complete balanced artifact', async () => {
+test('constrained matching uses the deterministic engine on the first execution', async () => {
   const columns = ['Name', 'Current Needs', 'What can you offer?'];
   const needs = ['t3 t6', 't0 t1 t2', 't5', 't1 t2 t5 t6', 't7', 't6', 't2 t3 t6 t7', ''];
   const offers = [
@@ -170,7 +170,7 @@ test('failed model matching code is replaced by a complete balanced artifact', a
             complete?: boolean;
           };
         };
-        assert.equal(executions, 3);
+        assert.equal(executions, 1);
         assert.equal(output.exitCode, 0);
         assert.equal(output.presentation?.kind, 'table');
         assert.equal(output.presentation?.rows?.length, 24);
@@ -201,7 +201,7 @@ test('failed model matching code is replaced by a complete balanced artifact', a
             complete?: boolean;
           };
         };
-        assert.equal(executions, 6);
+        assert.equal(executions, 2);
         assert.equal(longOutput.exitCode, 0);
         assert.equal(longOutput.presentation?.kind, 'table');
         assert.equal(longOutput.presentation?.rows?.length, 306);
