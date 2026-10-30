@@ -7,10 +7,10 @@
  * with a different SDK shape (commands.run, runCommand, exec, ...). Rather
  * than re-implement file staging + artifact capture per provider, adapters
  * plug their SDK's exec call in as a `RemoteExecFn` and hand it to
- * `runScriptedExecution`, which builds one POSIX shell script that writes
- * any input files, runs the code, and reports back any files written to an
- * output directory (mirroring what the Docker adapter gets for free via a
- * bind mount).
+ * `runScriptedExecution`, which stages inputs, runs the code, and reports
+ * back files written to an output directory (mirroring what the Docker
+ * adapter gets for free via a bind mount). Providers with a native filesystem
+ * API can stage large files without embedding them in a process command.
  */
 
 import type { ExecutionArtifact, ExecutionRequest, ExecutionResult } from './types.js';
@@ -33,6 +33,14 @@ export interface RemoteCommandResult {
 
 /** Runs a single shell command/script inside a provider's sandbox instance. */
 export type RemoteExecFn = (script: string) => Promise<RemoteCommandResult>;
+
+export interface RemoteExecutionFile {
+  path: string;
+  data: string | ArrayBuffer;
+}
+
+/** Optional native filesystem staging used by providers that support it. */
+export type RemoteStageFilesFn = (files: RemoteExecutionFile[]) => Promise<void>;
 
 function assertSafeFileName(name: string): void {
   if (
@@ -58,7 +66,10 @@ function writeBase64FileScript(name: string, base64: string): string {
 }
 
 /** Builds the POSIX shell script a remote adapter hands to its provider's exec call. */
-export function buildExecutionScript(request: ExecutionRequest): string {
+export function buildExecutionScript(
+  request: ExecutionRequest,
+  filesAlreadyStaged = false,
+): string {
   const lines: string[] = [
     'set -e',
     `mkdir -p ${shellSingleQuote(OUTPUT_DIR)}`,
@@ -67,6 +78,7 @@ export function buildExecutionScript(request: ExecutionRequest): string {
 
   for (const file of request.files ?? []) {
     assertSafeFileName(file.name);
+    if (filesAlreadyStaged) continue;
     const base64 = file.isBase64
       ? file.content
       : Buffer.from(file.content, 'utf8').toString('base64');
@@ -75,8 +87,10 @@ export function buildExecutionScript(request: ExecutionRequest): string {
 
   const scriptName = request.language === 'python' ? 'run.py' : 'run.js';
   const runner = request.language === 'python' ? 'python3' : 'node';
-  const codeBase64 = Buffer.from(request.code, 'utf8').toString('base64');
-  lines.push(writeBase64FileScript(scriptName, codeBase64));
+  if (!filesAlreadyStaged) {
+    const codeBase64 = Buffer.from(request.code, 'utf8').toString('base64');
+    lines.push(writeBase64FileScript(scriptName, codeBase64));
+  }
   lines.push(`${runner} ${shellSingleQuote(scriptName)}`);
   lines.push(
     `if [ -d ${shellSingleQuote(
@@ -87,6 +101,22 @@ export function buildExecutionScript(request: ExecutionRequest): string {
   );
 
   return lines.join('\n');
+}
+
+function executionFiles(request: ExecutionRequest): RemoteExecutionFile[] {
+  const files = (request.files ?? []).map((file) => {
+    assertSafeFileName(file.name);
+    if (!file.isBase64) return { path: `${WORKDIR}/${file.name}`, data: file.content };
+    const bytes = Buffer.from(file.content, 'base64');
+    const data = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+    return { path: `${WORKDIR}/${file.name}`, data };
+  });
+  const scriptName = request.language === 'python' ? 'run.py' : 'run.js';
+  files.push({ path: `${WORKDIR}/${scriptName}`, data: request.code });
+  return files;
 }
 
 function extractArtifactMarker(stdout: string): { stdout: string; artifactNames: string[] } {
@@ -108,16 +138,21 @@ function extractArtifactMarker(stdout: string): { stdout: string; artifactNames:
 }
 
 /**
- * Runs `request` via `execFn` and reassembles an `ExecutionResult`,
- * including a best-effort fetch of any files the code wrote to the output
+ * Runs `request` via `execFn` and reassembles an `ExecutionResult`. When
+ * `stageFiles` is supplied, inputs are written through the provider filesystem;
+ * otherwise the portable shell-script staging path is used.
+ *
+ * It includes a best-effort fetch of any files the code wrote to the output
  * directory (one follow-up `base64 <file>` call per artifact).
  */
 export async function runScriptedExecution(
   execFn: RemoteExecFn,
   request: ExecutionRequest,
+  stageFiles?: RemoteStageFilesFn,
 ): Promise<ExecutionResult> {
   const startTime = Date.now();
-  const script = buildExecutionScript(request);
+  if (stageFiles) await stageFiles(executionFiles(request));
+  const script = buildExecutionScript(request, Boolean(stageFiles));
   const main = await execFn(script);
 
   const { stdout, artifactNames } = extractArtifactMarker(main.stdout);
