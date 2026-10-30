@@ -1,5 +1,12 @@
 # @larkup/tool-doc-editor
 
+## 0.3.5
+
+### Patch Changes
+
+- Updated dependencies [3bf4b48]
+  - @larkup/sandbox@0.1.11
+
 ## 0.3.4
 
 ### Patch Changes

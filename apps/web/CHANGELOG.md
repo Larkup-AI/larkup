@@ -1,5 +1,15 @@
 # larkup
 
+## 0.4.57
+
+### Patch Changes
+
+- Updated dependencies [3bf4b48]
+  - @larkup/sandbox@0.1.11
+  - @larkup/tool-doc-editor@0.3.5
+  - @larkup/workspace-server@0.2.33
+  - @larkup/workspace-app@0.2.13
+
 ## 0.4.56
 
 ### Patch Changes
