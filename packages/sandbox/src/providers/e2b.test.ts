@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const listMock = vi.fn();
 const runMock = vi.fn();
+const writeMock = vi.fn();
 const killMock = vi.fn();
 const createMock = vi.fn();
 
@@ -17,9 +18,15 @@ const { DEFAULT_E2B_ANALYSIS_TEMPLATE, e2bAdapter } = await import('./e2b.js');
 beforeEach(() => {
   listMock.mockReset();
   runMock.mockReset();
+  writeMock.mockReset();
   killMock.mockReset();
   createMock.mockReset();
-  createMock.mockResolvedValue({ commands: { run: runMock }, kill: killMock });
+  writeMock.mockResolvedValue([]);
+  createMock.mockResolvedValue({
+    commands: { run: runMock },
+    files: { write: writeMock },
+    kill: killMock,
+  });
 });
 
 describe('e2bAdapter.verifyCredentials', () => {
@@ -84,9 +91,35 @@ describe('e2bAdapter.execute', () => {
       expect.objectContaining({ allowInternetAccess: false }),
     );
     expect(runMock).toHaveBeenCalledTimes(1);
+    expect(writeMock).toHaveBeenCalledWith([
+      { path: '/tmp/larkup-sandbox/run.py', data: 'print("hi")' },
+    ]);
     expect(result.stdout).toBe('hi\n');
     expect(result.exitCode).toBe(0);
     expect(killMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('stages large input files through the filesystem instead of the process command', async () => {
+    runMock.mockResolvedValue({ stdout: 'ok\n', stderr: '', exitCode: 0 });
+    const content = 'a,b\n' + 'large-row,1\n'.repeat(50_000);
+
+    const result = await e2bAdapter.execute(
+      {
+        code: 'print("ok")',
+        language: 'python',
+        files: [{ name: 'data.csv', content }],
+      },
+      { apiKey: 'key' },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(writeMock).toHaveBeenCalledWith([
+      { path: '/tmp/larkup-sandbox/data.csv', data: content },
+      { path: '/tmp/larkup-sandbox/run.py', data: 'print("ok")' },
+    ]);
+    const command = String(runMock.mock.calls[0]?.[0]);
+    expect(command.length).toBeLessThan(1_000);
+    expect(command).not.toContain('large-row');
   });
 
   it('starts from a configured snapshot when one is supplied', async () => {

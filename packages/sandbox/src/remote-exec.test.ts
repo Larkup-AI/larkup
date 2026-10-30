@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildExecutionScript, failedResult, runScriptedExecution, withTimeout } from './remote-exec.js';
+import {
+  buildExecutionScript,
+  failedResult,
+  runScriptedExecution,
+  withTimeout,
+} from './remote-exec.js';
 import type { ExecutionRequest } from './types.js';
 
 describe('buildExecutionScript', () => {
@@ -72,6 +77,24 @@ describe('buildExecutionScript', () => {
 });
 
 describe('runScriptedExecution', () => {
+  it('uses native file staging without embedding input contents in the command', async () => {
+    const execFn = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 });
+    const stageFiles = vi.fn().mockResolvedValue(undefined);
+    const content = 'large-row\n'.repeat(50_000);
+
+    await runScriptedExecution(
+      execFn,
+      { code: 'print(1)', language: 'python', files: [{ name: 'data.csv', content }] },
+      stageFiles,
+    );
+
+    expect(stageFiles).toHaveBeenCalledWith([
+      { path: '/tmp/larkup-sandbox/data.csv', data: content },
+      { path: '/tmp/larkup-sandbox/run.py', data: 'print(1)' },
+    ]);
+    expect(String(execFn.mock.calls[0]?.[0])).not.toContain(content);
+  });
+
   it('passes stdout/stderr/exitCode straight through when there are no artifacts', async () => {
     const execFn = vi.fn().mockResolvedValue({ stdout: 'hello\n', stderr: '', exitCode: 0 });
     const result = await runScriptedExecution(execFn, { code: 'print(1)', language: 'python' });
@@ -101,14 +124,22 @@ describe('runScriptedExecution', () => {
     expect(result.stdout).toBe('analysis done');
     expect(execFn).toHaveBeenCalledTimes(3);
     expect(result.artifacts).toHaveLength(2);
-    expect(result.artifacts[0]).toEqual({ name: 'chart_0.png', mimeType: 'image/png', data: chartBase64 });
+    expect(result.artifacts[0]).toEqual({
+      name: 'chart_0.png',
+      mimeType: 'image/png',
+      data: chartBase64,
+    });
     expect(result.artifacts[1].name).toBe('chart_1.png');
   });
 
   it('drops an artifact whose follow-up fetch fails instead of failing the whole execution', async () => {
     const execFn = vi
       .fn()
-      .mockResolvedValueOnce({ stdout: '__LARKUP_ARTIFACTS__:missing.png\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({
+        stdout: '__LARKUP_ARTIFACTS__:missing.png\n',
+        stderr: '',
+        exitCode: 0,
+      })
       .mockRejectedValueOnce(new Error('file gone'));
 
     const result = await runScriptedExecution(execFn, { code: 'x=1', language: 'python' });
@@ -118,7 +149,10 @@ describe('runScriptedExecution', () => {
 
   it('leaves a non-zero exit code and stderr message untouched', async () => {
     const execFn = vi.fn().mockResolvedValue({ stdout: '', stderr: 'Traceback...', exitCode: 1 });
-    const result = await runScriptedExecution(execFn, { code: 'raise ValueError()', language: 'python' });
+    const result = await runScriptedExecution(execFn, {
+      code: 'raise ValueError()',
+      language: 'python',
+    });
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toBe('Traceback...');
   });
