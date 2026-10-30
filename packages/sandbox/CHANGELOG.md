@@ -1,5 +1,11 @@
 # @larkup/sandbox
 
+## 0.1.11
+
+### Patch Changes
+
+- 3bf4b48: Stage E2B input files through its filesystem API so large analysis datasets are not embedded in process command arguments.
+
 ## 0.1.10
 
 ### Patch Changes

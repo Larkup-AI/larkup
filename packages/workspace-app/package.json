@@ -1,6 +1,6 @@
 {
   "name": "@larkup/workspace-app",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "type": "module",
   "description": "Canonical Larkup chat, data and settings pages with host adapters",
   "files": [
@@ -562,7 +562,7 @@
     "zustand": "^5.0.14",
     "react": "^19",
     "@larkup/vector-stores": "^0.1.27",
-    "@larkup/sandbox": "^0.1.10",
+    "@larkup/sandbox": "^0.1.11",
     "next": "16.3.8"
   },
   "peerDependencies": {
