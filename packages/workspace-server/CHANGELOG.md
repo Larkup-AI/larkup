@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.32
+
+### Patch Changes
+
+- Run constrained list matching through a deterministic capacity-aware engine with flexible schema inference and complete balanced output.
+
 ## 0.2.31
 
 ### Patch Changes
