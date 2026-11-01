@@ -91,17 +91,44 @@ function decodeSimplePythonString(value: string) {
 }
 
 function normalizedColumnName(value: string) {
-  return value.toLocaleLowerCase().replace(/\s+/g, ' ').trim();
+  return value
+    .toLocaleLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchingSchemaColumn(authored: string, columns: string[]) {
+  const normalizedAuthored = normalizedColumnName(authored);
+  if (normalizedAuthored.length < 12) return undefined;
+  const authoredTokens = new Set(normalizedAuthored.split(' ').filter((token) => token.length > 2));
+  const candidates = columns.filter((column) => {
+    const normalizedColumn = normalizedColumnName(column);
+    if (normalizedColumn === normalizedAuthored) return true;
+    if (
+      normalizedAuthored.length >= 18 &&
+      (normalizedColumn.startsWith(normalizedAuthored) ||
+        normalizedColumn.endsWith(normalizedAuthored) ||
+        normalizedAuthored.startsWith(normalizedColumn) ||
+        normalizedAuthored.endsWith(normalizedColumn))
+    ) {
+      return true;
+    }
+    const columnTokens = new Set(normalizedColumn.split(' ').filter((token) => token.length > 2));
+    const shared = [...authoredTokens].filter((token) => columnTokens.has(token)).length;
+    return shared >= 4 && shared / Math.min(authoredTokens.size, columnTokens.size) >= 0.8;
+  });
+  return candidates.length === 1 ? candidates[0] : undefined;
 }
 
 /**
- * Repair a model-authored column reference only when its long label is an
- * unambiguous suffix of one real column. Form exports commonly prepend form
- * descriptions to otherwise exact question labels, which small models omit.
+ * Repair model-authored column references only when they map unambiguously to
+ * one real column. Form exports commonly wrap a short question in a much
+ * longer heading, and generated Python may also quote apostrophes incorrectly.
  */
 export function remapSingleDatasetColumnReferences(code: string, dataset: TabularDataset) {
   const columns = dataset.columns.map((column) => column.name);
-  const exactColumns = new Set(columns.map(normalizedColumnName));
   const stringLiteral = /(['"])((?:\\.|(?!\1)[^\\])*)\1/g;
 
   // A form-export header can contain the same apostrophe or quote a model used
@@ -114,18 +141,24 @@ export function remapSingleDatasetColumnReferences(code: string, dataset: Tabula
     repairedCode = repairedCode.split(`"${column}"`).join(safeLiteral);
   }
 
+  // Recover malformed quoted entries in Python lists. The closing quote must
+  // be followed by a list delimiter, so apostrophes inside contractions do not
+  // terminate the candidate early.
+  const tolerantListLiteral = /(^|,\s*)(['"])((?:\\.|[\s\S]){1,2000}?)\2(?=\s*(?:,|$))/g;
+  repairedCode = repairedCode.replace(/\[\[([\s\S]{1,10000}?)\]\]/g, (selection) =>
+    selection.replace(
+      tolerantListLiteral,
+      (literal, prefix: string, _quote: string, encoded: string) => {
+        const column = matchingSchemaColumn(decodeSimplePythonString(encoded), columns);
+        return column ? `${prefix}${JSON.stringify(column)}` : literal;
+      },
+    ),
+  );
+
   return repairedCode.replace(stringLiteral, (literal, _quote: string, encoded: string) => {
     const authored = decodeSimplePythonString(encoded);
-    const normalizedAuthored = normalizedColumnName(authored);
-    if (normalizedAuthored.length < 20 || exactColumns.has(normalizedAuthored)) return literal;
-
-    const candidates = columns.filter((column) => {
-      const normalizedColumn = normalizedColumnName(column);
-      return (
-        normalizedColumn.endsWith(normalizedAuthored) ||
-        normalizedAuthored.endsWith(normalizedColumn)
-      );
-    });
-    return candidates.length === 1 ? JSON.stringify(candidates[0]) : literal;
+    if (columns.includes(authored)) return literal;
+    const column = matchingSchemaColumn(authored, columns);
+    return column ? JSON.stringify(column) : literal;
   });
 }
