@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.34
+
+### Patch Changes
+
+- Repair unambiguous generated dataframe column references, including shortened form-export headings, malformed apostrophes, and smart-quote variants.
+
 ## 0.2.33
 
 ### Patch Changes
