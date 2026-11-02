@@ -170,7 +170,7 @@ test('constrained matching uses the deterministic engine on the first execution'
             complete?: boolean;
           };
         };
-        assert.equal(executions, 1);
+        assert.equal(executions, 1, JSON.stringify(output));
         assert.equal(output.exitCode, 0);
         assert.equal(output.presentation?.kind, 'table');
         assert.equal(output.presentation?.rows?.length, 24);
@@ -210,8 +210,9 @@ test('constrained matching uses the deterministic engine on the first execution'
         assert.equal(longOutput.presentation?.complete, true);
         assert.deepEqual(longOutput.presentation?.columns, [
           'Participant',
+          'Participant Email',
           'Match',
-          'Email',
+          'Match Email',
           'Rank',
           'Reason',
         ]);
@@ -223,7 +224,7 @@ test('constrained matching uses the deterministic engine on the first execution'
           const suggestion = String(row.Match ?? '');
           targetCounts.set(target, (targetCounts.get(target) ?? 0) + 1);
           suggestionCounts.set(suggestion, (suggestionCounts.get(suggestion) ?? 0) + 1);
-          assert.match(String(row.Email ?? ''), /^participant\d+@example\.com$/);
+          assert.match(String(row['Match Email'] ?? ''), /^participant\d+@example\.com$/);
           assert.match(String(row.Reason ?? ''), /\.$/);
         }
         assert.equal(targetCounts.size, 102);
