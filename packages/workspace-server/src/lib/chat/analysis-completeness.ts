@@ -6,12 +6,34 @@ export interface AnalysisCompletenessResult {
   error?: string;
 }
 
-export function requestedMatchesPerTarget(text: string) {
-  const match = text.match(
-    /\b(?:make|find|give|suggest|recommend|provide|create)?\s*(\d{1,2})\s+(?:best\s+)?matches?\b/i,
+export interface RequestedMatchRange {
+  min: number;
+  max: number;
+}
+
+export function requestedMatchRange(text: string): RequestedMatchRange | undefined {
+  const range = text.match(
+    /\b(\d{1,2})\s*(?:-|–|—|to)\s*(\d{1,2})\s+(?:best\s+)?(?:unique\s+)?matches?\b/i,
   );
-  const value = Number(match?.[1]);
-  return Number.isInteger(value) && value > 0 ? value : undefined;
+  if (range) {
+    const first = Number(range[1]);
+    const second = Number(range[2]);
+    const min = Math.min(first, second);
+    const max = Math.max(first, second);
+    if (Number.isInteger(min) && min > 0 && max <= 20) return { min, max };
+  }
+  const exact = text.match(
+    /\b(?:make|find|give|suggest|recommend|provide|create)?\s*(?:exactly\s+)?(\d{1,2})\s+(?:best\s+)?(?:unique\s+)?matches?\b/i,
+  );
+  const value = Number(exact?.[1]);
+  return Number.isInteger(value) && value > 0 && value <= 20
+    ? { min: value, max: value }
+    : undefined;
+}
+
+export function requestedMatchesPerTarget(text: string) {
+  const range = requestedMatchRange(text);
+  return range && range.min === range.max ? range.min : undefined;
 }
 
 export function requestedSuggestionCap(text: string) {
@@ -39,15 +61,26 @@ export function validateAnalysisCompleteness(
   presentation: AnalysisPresentation | undefined,
   availableItems?: number,
 ): AnalysisCompletenessResult {
-  const targets = requestedLongAnalysisItemCount(requestText, availableItems);
-  const matchesPerTarget = requestedMatchesPerTarget(requestText);
-  if (!targets || !matchesPerTarget) return { valid: true };
+  const requestedTargets = requestedLongAnalysisItemCount(requestText, availableItems);
+  const matchRange = requestedMatchRange(requestText);
+  if (!requestedTargets || !matchRange) return { valid: true };
+  const eligibilityScoped = /\b(?:eligible|opt(?:ed)?[ -]?in|stated\s+(?:a\s+)?need)\b/i.test(
+    requestText,
+  );
   if (!presentation || presentation.kind !== 'table') {
+    const expectation =
+      matchRange.min === matchRange.max && !eligibilityScoped
+        ? `${requestedTargets} targets with ${matchRange.min} matches each`
+        : `${eligibilityScoped ? 'every eligible' : requestedTargets} target with ${matchRange.min}-${matchRange.max} matches`;
     return {
       valid: false,
-      error: `Completeness validation failed: expected ${targets} targets with ${matchesPerTarget} matches each, but no result table was produced.`,
+      error: `Completeness validation failed: expected ${expectation}, but no result table was produced.`,
     };
   }
+  const targets = eligibilityScoped
+    ? (presentation.requestedItems ?? requestedTargets)
+    : requestedTargets;
+  const exactMatches = matchRange.min === matchRange.max ? matchRange.min : undefined;
 
   const participantColumn = presentation.columns.find(
     (column) =>
@@ -57,18 +90,20 @@ export function validateAnalysisCompleteness(
   const matchColumns = presentation.columns.filter(
     (column) =>
       column !== participantColumn &&
-      !/e-?mail|reason|explanation|why|rank|score/i.test(column) &&
+      !/e-?mail|reason|explanation|why|rank|score|company|organi[sz]ation|linked\s?in|number|\bid\b/i.test(
+        column,
+      ) &&
       /match|matched|to.*(?:name|guest|participant)|suggest|recommend/i.test(column),
   );
   if (!participantColumn || matchColumns.length === 0) {
     return {
       valid: false,
-      error: `Completeness validation failed: the result table must identify each target and its ${matchesPerTarget} matches.`,
+      error: `Completeness validation failed: the result table must identify each target and its ${matchRange.min}${exactMatches ? '' : `-${matchRange.max}`} matches.`,
     };
   }
 
-  if (matchColumns.length >= matchesPerTarget && presentation.rows.length === targets) {
-    const selectedMatchColumns = matchColumns.slice(0, matchesPerTarget);
+  if (exactMatches && matchColumns.length >= exactMatches && presentation.rows.length === targets) {
+    const selectedMatchColumns = matchColumns.slice(0, exactMatches);
     const reasonColumns = presentation.columns.filter((column) =>
       /reason|explanation|why/i.test(column),
     );
@@ -85,13 +120,12 @@ export function validateAnalysisCompleteness(
         !participant ||
         targetIdentities.has(participant) ||
         matches.some((match) => !match || match === participant) ||
-        new Set(matches).size !== matchesPerTarget ||
-        (requiresReasons && reasonColumns.length < matchesPerTarget) ||
+        new Set(matches).size !== exactMatches ||
+        (requiresReasons && reasonColumns.length < exactMatches) ||
         (requiresReasons &&
-          reasonColumns.slice(0, matchesPerTarget).some((column) => !cell(row, column))) ||
-        (requiresEmails && emailColumns.length < matchesPerTarget) ||
-        (requiresEmails &&
-          emailColumns.slice(0, matchesPerTarget).some((column) => !cell(row, column)))
+          reasonColumns.slice(0, exactMatches).some((column) => !cell(row, column))) ||
+        (requiresEmails && emailColumns.length < exactMatches) ||
+        (requiresEmails && emailColumns.slice(0, exactMatches).some((column) => !cell(row, column)))
       ) {
         complete = false;
         break;
@@ -108,7 +142,7 @@ export function validateAnalysisCompleteness(
       ? { valid: true }
       : {
           valid: false,
-          error: `Completeness validation failed: every one of the ${targets} unique targets must have ${matchesPerTarget} unique, non-self matches${
+          error: `Completeness validation failed: every one of the ${targets} unique targets must have ${exactMatches} unique, non-self matches${
             requiresReasons ? ', populated reasons' : ''
           }${requiresEmails ? ', populated email addresses' : ''}${
             cap === undefined ? '' : `, and candidate reuse no greater than ${cap}`
@@ -119,7 +153,7 @@ export function validateAnalysisCompleteness(
   if (matchColumns.length !== 1) {
     return {
       valid: false,
-      error: `Completeness validation failed: expected ${targets} targets with ${matchesPerTarget} matches each in either long or wide table form.`,
+      error: `Completeness validation failed: expected ${targets} targets with ${matchRange.min}${exactMatches ? '' : `-${matchRange.max}`} matches each in either long or wide table form.`,
     };
   }
 
@@ -153,13 +187,15 @@ export function validateAnalysisCompleteness(
     if (suggestion) suggestionCounts.set(suggestion, (suggestionCounts.get(suggestion) ?? 0) + 1);
   }
   const incompleteTargets = [...participantCounts.values()].filter(
-    (count) => count !== matchesPerTarget,
+    (count) => count < matchRange.min || count > matchRange.max,
   ).length;
-  const expectedRows = targets * matchesPerTarget;
+  const minimumRows = targets * matchRange.min;
+  const maximumRows = targets * matchRange.max;
   const cap = requestedSuggestionCap(requestText);
   const maximumReuse = Math.max(0, ...suggestionCounts.values());
   if (
-    presentation.rows.length === expectedRows &&
+    presentation.rows.length >= minimumRows &&
+    presentation.rows.length <= maximumRows &&
     participantCounts.size === targets &&
     incompleteTargets === 0 &&
     !invalidRow &&
@@ -170,7 +206,7 @@ export function validateAnalysisCompleteness(
 
   return {
     valid: false,
-    error: `Completeness validation failed: expected ${targets} targets × ${matchesPerTarget} matches (${expectedRows} rows); got ${participantCounts.size} targets and ${presentation.rows.length} rows${
+    error: `Completeness validation failed: expected ${targets} targets × ${matchRange.min}${exactMatches ? '' : `-${matchRange.max}`} matches (${minimumRows}${minimumRows === maximumRows ? '' : `-${maximumRows}`} rows); got ${participantCounts.size} targets and ${presentation.rows.length} rows${
       cap === undefined ? '' : `, with maximum suggestion reuse ${maximumReuse} (limit ${cap})`
     }. Do not skip empty or zero-overlap targets; fill them with the best remaining eligible candidates, then assert all counts and limits before presenting.`,
   };

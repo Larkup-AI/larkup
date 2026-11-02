@@ -89,12 +89,14 @@ describe('buildMatchingAnalysisFallback', () => {
       complete: true,
       fileName: 'participant-matches.csv',
     });
-    expect(presentation?.kind === 'table' && presentation.columns).toContain('Email');
+    expect(presentation?.kind === 'table' && presentation.columns).toContain('Match Email');
     if (presentation?.kind === 'table') {
       const outgoing = new Map<string, number>();
       const incoming = new Map<string, number>();
       for (const row of presentation.rows) {
-        expect(row.Email).toBe(`${String(row.Match).replace('Person ', 'person')}@example.test`);
+        expect(row['Match Email']).toBe(
+          `${String(row.Match).replace('Person ', 'person')}@example.test`,
+        );
         expect(String(row.Reason)).toMatch(/^[^.]+\.$/);
         outgoing.set(String(row.Participant), (outgoing.get(String(row.Participant)) ?? 0) + 1);
         incoming.set(String(row.Match), (incoming.get(String(row.Match)) ?? 0) + 1);

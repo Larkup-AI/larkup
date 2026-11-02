@@ -2892,7 +2892,7 @@ export async function getChatTools(context: {
             code: finalCode,
             language: 'python',
             files,
-            timeout: 30_000,
+            timeout: matchingEngine ? 120_000 : 30_000,
           });
 
           // Auto-retry once if code crashes
@@ -2913,7 +2913,7 @@ export async function getChatTools(context: {
               code: finalCode,
               language: 'python',
               files,
-              timeout: 30_000,
+              timeout: matchingEngine ? 120_000 : 30_000,
             });
           }
 
