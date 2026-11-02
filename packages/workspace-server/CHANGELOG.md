@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.35
+
+### Patch Changes
+
+- Make large participant matching deterministic, eligibility-aware, range-aware, globally constrained, and completely validated before presentation.
+
 ## 0.2.34
 
 ### Patch Changes
