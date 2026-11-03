@@ -352,20 +352,21 @@ export function extractLatestTabularExportResult(
 ): ReusableTabularEvidence | undefined {
   for (const message of [...messages].reverse()) {
     if (message.role !== 'assistant') continue;
-    const result = toolParts(message)
-      .filter(
-        (part) =>
-          part.name === 'queryTabularData' ||
-          part.name === 'executeAnalysis' ||
-          part.name === 'analyzeCorpusWithCode',
-      )
-      .map((part) =>
-        completeTabularEvidence(
-          part.input,
-          part.name === 'queryTabularData' ? part.output : analysisPresentation(part.output),
-        ),
-      )
+    const parts = toolParts(message);
+    // A long analysis turn commonly starts with a bounded query preview and
+    // then emits the complete generated table. Prefer that final artifact;
+    // otherwise a follow-up such as "count the matches above" silently sees
+    // only the preview rows even though the complete table is visible in chat.
+    const analysisResult = parts
+      .filter((part) => part.name === 'executeAnalysis' || part.name === 'analyzeCorpusWithCode')
+      .map((part) => completeTabularEvidence(part.input, analysisPresentation(part.output)))
       .find(Boolean);
+    const result =
+      analysisResult ??
+      parts
+        .filter((part) => part.name === 'queryTabularData')
+        .map((part) => completeTabularEvidence(part.input, part.output))
+        .find(Boolean);
     if (result) return result;
   }
   return undefined;

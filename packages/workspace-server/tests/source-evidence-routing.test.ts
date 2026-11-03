@@ -119,6 +119,15 @@ test('a derived follow-up can reuse every row from the preceding generated table
       role: 'assistant',
       parts: [
         {
+          type: 'tool-queryTabularData',
+          input: { datasetId: 'participants' },
+          output: {
+            columns: ['participant', 'match'],
+            rows: rows.slice(0, 20),
+            totalRows: 268,
+          },
+        },
+        {
           type: 'tool-executeAnalysis',
           input: { code: '...' },
           output: {
