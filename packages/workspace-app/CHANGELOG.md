@@ -1,5 +1,11 @@
 # @larkup/workspace-app
 
+## 0.2.14
+
+### Patch Changes
+
+- c10c7d5: Route AI chat requests through the configured workspace host transport so managed hosts can consistently observe service errors.
+
 ## 0.2.13
 
 ### Patch Changes
