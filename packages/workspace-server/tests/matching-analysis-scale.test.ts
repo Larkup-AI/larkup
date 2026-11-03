@@ -81,9 +81,10 @@ test('range matching filters eligibility and validates every target at 1,000 row
     assert.doesNotMatch(String(row['Match LinkedIn']), /^tracking-/);
     assert.match(
       String(row.Reason),
-      /is a strong match for .* because they can provide knowledge or support in .* directly addressing the need for/,
+      /^Person \d+ is a good match for you because they can support you with fundraising and investor outreach, which directly aligns with your current needs\.$/,
     );
     assert.doesNotMatch(String(row.Reason), /\bstated\b/i);
+    assert.doesNotMatch(String(row.Reason), /[\"“”]|topic \d+/i);
     outgoing.set(participant, (outgoing.get(participant) ?? 0) + 1);
     incoming.set(match, (incoming.get(match) ?? 0) + 1);
   }
