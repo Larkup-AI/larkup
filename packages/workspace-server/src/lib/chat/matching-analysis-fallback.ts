@@ -148,7 +148,18 @@ export function buildMatchingAnalysisFallback(
     { pattern: /\bcompany\b/, score: 80 },
     { pattern: /\borganisation\b|\borganization\b/, score: 70 },
   ]);
-  const linkedin = bestColumn(columns, [{ pattern: /\blinked ?in\b/, score: 100 }]);
+  const linkedin = bestColumn(
+    columns.filter(
+      (column) => !/\b(?:click|tracking|campaign|advertising)[ _-]?id\b/i.test(normalized(column)),
+    ),
+    [
+      { pattern: /^linkedin (?:profile|url|link)$/, score: 180 },
+      { pattern: /\bshare (?:your )?linkedin\b/, score: 150 },
+      { pattern: /\blinked ?in\b.*\b(?:profile|url|link)\b/, score: 130 },
+      { pattern: /\b(?:profile|url|link)\b.*\blinked ?in\b/, score: 120 },
+      { pattern: /\blinked ?in\b/, score: 40 },
+    ],
+  );
 
   const metadataPattern =
     /\b(?:created|updated|timestamp|date|status|approval|consent|ticket|referrer|linkedin|phone|address|company|organisation|organization|industry)\b/;
@@ -221,6 +232,18 @@ def _matching_tokens(value):
                 break
         tokens.add(token)
     return tokens
+
+def _matching_evidence(person, columns, shared):
+    shared_tokens = set(shared)
+    candidates = []
+    for position, column in enumerate(columns):
+        value = _matching_text(person.get(column))
+        if not value:
+            continue
+        overlap = len(_matching_tokens(value).intersection(shared_tokens))
+        candidates.append((-overlap, position, value))
+    candidates.sort()
+    return _matching_clip(candidates[0][2]) if candidates else "the relevant area"
 
 def _matching_allowed_status(person):
     column = _matching_settings.get("approval")
@@ -411,15 +434,15 @@ for _selected in _matching_selected:
 for _target_position, _selected in enumerate(_matching_selected):
     _target_index = _matching_target_indexes[_target_position]
     _target = _matching_people[_target_index]
-    _target_need = _matching_clip(_matching_fields(_target, _matching_settings["needs"]))
     for _rank, (_, _candidate_index, _score, _shared) in enumerate(_selected, start=1):
         _target_label = _matching_labels_all[_target_index]
         _candidate_label = _matching_labels_all[_candidate_index]
         _selected_candidate = _matching_people[_candidate_index]
-        _candidate_offer = _matching_clip(_matching_fields(_selected_candidate, _matching_settings["offers"]))
+        _target_need = _matching_evidence(_target, _matching_settings["needs"], _shared)
+        _candidate_offer = _matching_evidence(_selected_candidate, _matching_settings["offers"], _shared)
         _candidate_email = _matching_text(_selected_candidate.get(_matching_settings.get("email"))) if _matching_settings.get("email") else ""
         if _shared:
-            _reason = _candidate_label + " stated \"" + _candidate_offer + "\", which directly overlaps with " + _target_label + "'s stated need \"" + _target_need + "\"."
+            _reason = _candidate_label + " is a strong match for " + _target_label + " because they can provide knowledge or support in \"" + _candidate_offer + "\", directly addressing the need for \"" + _target_need + "\"."
         else:
             _reason = _candidate_label + " is the strongest remaining eligible profile under the global limits, although the dataset contains limited direct need-to-offer evidence."
         _row = {
