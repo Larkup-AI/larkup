@@ -3,7 +3,10 @@ import test from 'node:test';
 import { hasRetrievedSourceEvidence } from '../src/lib/chat/media-retrieval-routing.ts';
 import {
   extractConversationEvidence,
+  extractLatestAnalysisArtifact,
+  extractLatestTabularExportResult,
   imagePreviewInput,
+  isAnalysisArtifactFollowUp,
   isImagePreviewFollowUp,
 } from '../src/lib/chat/conversation-memory.ts';
 import {
@@ -104,6 +107,59 @@ test('an extracted image remains reusable when no PDF page is available', () => 
   };
   assert.equal(isImagePreviewFollowUp('show it', evidence), true);
   assert.deepEqual(imagePreviewInput(evidence), { imageUrl: '/indexed-image.png' });
+});
+
+test('a derived follow-up can reuse every row from the preceding generated table', () => {
+  const rows = Array.from({ length: 650 }, (_, index) => ({
+    participant: `Participant ${Math.floor(index / 3) + 1}`,
+    match: `Match ${index + 1}`,
+  }));
+  const messages = [
+    {
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-executeAnalysis',
+          input: { code: '...' },
+          output: {
+            exitCode: 0,
+            presentation: {
+              kind: 'table',
+              title: 'Participant matches',
+              columns: ['participant', 'match'],
+              rows,
+              totalItems: rows.length,
+              complete: true,
+            },
+          },
+        },
+      ],
+    },
+  ];
+
+  const artifact = extractLatestAnalysisArtifact(messages);
+  const table = extractLatestTabularExportResult(messages);
+  assert.equal(
+    isAnalysisArtifactFollowUp(
+      'Use the matches it created and calculate the number of matches for every participant.',
+      artifact,
+    ),
+    true,
+  );
+  assert.equal(table?.rows.length, 650);
+  assert.deepEqual(table?.rows.at(-1), rows.at(-1));
+});
+
+test('an unrelated calculation does not silently reuse a generated table', () => {
+  assert.equal(
+    isAnalysisArtifactFollowUp('Calculate the average age in the uploaded participant list.', {
+      kind: 'table',
+      title: 'Participant matches',
+      totalItems: 650,
+      complete: true,
+    }),
+    false,
+  );
 });
 
 const recurringSubjectEvidence = {
