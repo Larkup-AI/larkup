@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.38
+
+### Patch Changes
+
+- Let follow-up analysis reuse the complete generated result table instead of returning to the original source dataset.
+
 ## 0.2.37
 
 ### Patch Changes
