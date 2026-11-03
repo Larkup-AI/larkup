@@ -78,5 +78,7 @@ widget-demo
 .vercel
 copy.sh
 test-hpi-connection.sh
+molmo2-client.py
+molmo2-hpi.sh
 dist-types/
 scratch/
