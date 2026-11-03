@@ -18,7 +18,8 @@ test('range matching filters eligibility and validates every target at 1,000 row
     'name',
     'email',
     'company / organisation',
-    'LinkedIn profile',
+    'linkedin_click_id',
+    'Share your LinkedIn profile with us (optional)',
     'opted in',
     'approval_status',
     'Question 1: Knowledge & Expertise: Where can you help others?',
@@ -40,6 +41,7 @@ test('range matching filters eligibility and validates every target at 1,000 row
         JSON.stringify(`Person ${index + 1}`),
         JSON.stringify(`person${index + 1}@example.test`),
         JSON.stringify(`Company ${index % 41}`),
+        JSON.stringify(`tracking-${index + 1}`),
         JSON.stringify(`https://linkedin.example/person-${index + 1}`),
         index < 800 ? 'yes' : 'no',
         'approved',
@@ -75,6 +77,13 @@ test('range matching filters eligibility and validates every target at 1,000 row
     assert.match(String(row['Match Email']), /@example\.test$/);
     assert.match(String(row['Participant LinkedIn']), /^https:\/\/linkedin\.example\//);
     assert.match(String(row['Match LinkedIn']), /^https:\/\/linkedin\.example\//);
+    assert.doesNotMatch(String(row['Participant LinkedIn']), /^tracking-/);
+    assert.doesNotMatch(String(row['Match LinkedIn']), /^tracking-/);
+    assert.match(
+      String(row.Reason),
+      /is a strong match for .* because they can provide knowledge or support in .* directly addressing the need for/,
+    );
+    assert.doesNotMatch(String(row.Reason), /\bstated\b/i);
     outgoing.set(participant, (outgoing.get(participant) ?? 0) + 1);
     incoming.set(match, (incoming.get(match) ?? 0) + 1);
   }
