@@ -1,5 +1,12 @@
 # @larkup/workspace-server
 
+## 0.2.37
+
+### Patch Changes
+
+- 7164165: Personalize constrained participant-match reasons and prioritize structured
+  need-to-expertise evidence over mixed free-text context.
+
 ## 0.2.36
 
 ### Patch Changes
