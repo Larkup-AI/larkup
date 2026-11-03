@@ -327,6 +327,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
     () =>
       new DefaultChatTransport({
         api: workspaceUrl('/api/chat'),
+        fetch,
         headers: {
           'Content-Type': 'application/json',
         },

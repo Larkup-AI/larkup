@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
 import {
   configureWorkspaceHost,
   workspaceUrl,
@@ -49,4 +50,15 @@ test('canonical assets survive bundling and reject unlisted paths', async () => 
   );
   assert.equal(workspaceAssetResponse('../../package.json').status, 404);
   assert.equal(workspaceAssetResponse('__proto__').status, 404);
+});
+
+test('chat requests use the configured workspace transport', async () => {
+  const source = await readFile(
+    new URL('../src/components/chat/chat-workspace.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(
+    source,
+    /new DefaultChatTransport\(\{\s*api: workspaceUrl\('\/api\/chat'\),\s*fetch,/,
+  );
 });
