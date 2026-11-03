@@ -37,6 +37,7 @@ describe('published npm metadata', () => {
       webPackage.dependencies['@ai-sdk/anthropic'],
     );
     expect(webPackage.bundledDependencies).toContain('xlsx');
+    expect(corePackage.bundledDependencies).toContain('xlsx');
     expect(webPackage.dependencies.xlsx).toBe(
       'https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz',
     );

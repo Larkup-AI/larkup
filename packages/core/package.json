@@ -1,6 +1,9 @@
 {
   "name": "@larkup/core",
   "version": "0.8.2",
+  "bundledDependencies": [
+    "xlsx"
+  ],
   "scripts": {
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "type-check": "tsc --noEmit",
