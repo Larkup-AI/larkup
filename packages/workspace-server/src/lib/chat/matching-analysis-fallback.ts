@@ -186,6 +186,8 @@ export function buildMatchingAnalysisFallback(
     identity,
     needs: needColumns,
     offers: offerColumns,
+    reasonNeeds: needs ? [needs] : needColumns,
+    reasonOffers: resolvedOffers ? [resolvedOffers] : offerColumns,
     email,
     optIn,
     approval,
@@ -207,7 +209,25 @@ with open("data.csv", "r", encoding="utf-8-sig", newline="") as _matching_file:
 _matching_stopwords = {
     "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "i", "in", "is",
     "it", "my", "of", "on", "or", "our", "that", "the", "their", "this", "to", "we", "with",
+    "also", "can", "current", "experience", "help", "knowledge", "looking", "need", "needs",
+    "others", "provide", "right", "share", "support", "topic", "work", "would",
 }
+
+_matching_topic_catalog = (
+    ("fundraising and investor outreach", "fundraising investor investment capital pitch funding"),
+    ("product development and MVP building", "product mvp prototype development building roadmap"),
+    ("product validation and user research", "validation validate testing tests research feedback user customer"),
+    ("go-to-market strategy and sales", "market sales selling customer acquisition revenue commercial"),
+    ("positioning, marketing, and brand storytelling", "positioning marketing brand branding storytelling communication"),
+    ("hiring, team building, and leadership", "hiring hires recruitment recruiting team culture leadership talent"),
+    ("legal and contractual questions", "legal contract contractual compliance regulation regulatory"),
+    ("financial planning and runway management", "finance financial runway controlling budget cashflow accounting"),
+    ("scaling and international expansion", "scaling scale international internationalization internationalisation expansion markets"),
+    ("technical architecture and product delivery", "technical technology architecture backend frontend software engineering delivery"),
+    ("partnerships and relevant introductions", "partnership partner introductions introduce network networking connections"),
+    ("exit strategy and M&A", "exit acquisition merger selling succession"),
+    ("founder workload and peer support", "founder workload wellbeing wellbeing mental peer loneliness stress"),
+)
 
 def _matching_text(value):
     return " ".join(str(value or "").split())
@@ -233,17 +253,45 @@ def _matching_tokens(value):
         tokens.add(token)
     return tokens
 
-def _matching_evidence(person, columns, shared):
+def _matching_support_areas(candidate, target, shared):
+    candidate_text = (_matching_fields(candidate, _matching_settings["reasonOffers"]) or
+                      _matching_fields(candidate, _matching_settings["offers"]))
+    target_text = (_matching_fields(target, _matching_settings["reasonNeeds"]) or
+                   _matching_fields(target, _matching_settings["needs"]))
+    candidate_tokens = _matching_tokens(candidate_text)
+    target_tokens = _matching_tokens(target_text)
     shared_tokens = set(shared)
-    candidates = []
-    for position, column in enumerate(columns):
-        value = _matching_text(person.get(column))
-        if not value:
-            continue
-        overlap = len(_matching_tokens(value).intersection(shared_tokens))
-        candidates.append((-overlap, position, value))
-    candidates.sort()
-    return _matching_clip(candidates[0][2]) if candidates else "the relevant area"
+    areas = []
+    for label, keywords in _matching_topic_catalog:
+        topic_tokens = _matching_tokens(keywords)
+        if (candidate_tokens.intersection(topic_tokens) and
+                target_tokens.intersection(topic_tokens) and
+                shared_tokens.intersection(topic_tokens)):
+            areas.append(label)
+        if len(areas) == 3:
+            break
+    if areas:
+        return areas
+
+    # Preserve specificity for uncommon domains by selecting readable words
+    # that genuinely occur in both profiles instead of quoting whole answers.
+    fallback = []
+    for word in re.findall(r"[^\W_]+", candidate_text.casefold(), flags=re.UNICODE):
+        word_tokens = _matching_tokens(word)
+        if (word_tokens and word_tokens.intersection(shared_tokens) and
+                word_tokens.intersection(target_tokens) and word not in fallback):
+            fallback.append(word)
+        if len(fallback) == 3:
+            break
+    return fallback
+
+def _matching_natural_list(values):
+    values = [value for value in values if value]
+    if len(values) <= 1:
+        return values[0] if values else "the most relevant area in your request"
+    if len(values) == 2:
+        return values[0] + " and " + values[1]
+    return ", ".join(values[:-1]) + ", and " + values[-1]
 
 def _matching_allowed_status(person):
     column = _matching_settings.get("approval")
@@ -291,6 +339,7 @@ for _target_position, _target_index in enumerate(_matching_target_indexes):
     _target = _matching_people[_target_index]
     _need_text = _matching_fields(_target, _matching_settings["needs"])
     _need_tokens = _matching_tokens(_need_text)
+    _primary_need_tokens = _matching_tokens(_matching_fields(_target, _matching_settings["reasonNeeds"]))
     _candidates = []
     for _candidate_index in _matching_candidate_indexes:
         if _candidate_index == _target_index:
@@ -298,14 +347,20 @@ for _target_position, _target_index in enumerate(_matching_target_indexes):
         _candidate = _matching_people[_candidate_index]
         _offer_text = _matching_fields(_candidate, _matching_settings["offers"])
         _offer_tokens = _matching_tokens(_offer_text)
+        _primary_offer_tokens = _matching_tokens(_matching_fields(_candidate, _matching_settings["reasonOffers"]))
         _shared = sorted(_need_tokens.intersection(_offer_tokens))
+        _primary_shared = sorted(_primary_need_tokens.intersection(_primary_offer_tokens))
         _union = _need_tokens.union(_offer_tokens)
         _jaccard = len(_shared) / len(_union) if _union else 0.0
-        _score = len(_shared) * 10.0 + _jaccard * 3.0
+        # Structured needs-to-expertise evidence drives the ranking. Mixed
+        # free-text context can improve a match but cannot outweigh the fields
+        # the participant explicitly completed as needs and offers.
+        _score = len(_primary_shared) * 20.0 + len(_shared) * 4.0 + _jaccard * 3.0
+        _reason_shared = _primary_shared or _shared
         # Rotate equal-score candidates per target. Besides deterministic
         # fairness this avoids a shared top-N bottleneck on sparse large data.
         _rotation = (_candidate_index - _target_index) % max(1, len(_matching_people))
-        _candidates.append((-_score, _rotation, _matching_labels_all[_candidate_index].casefold(), _candidate_index, _shared))
+        _candidates.append((-_score, _rotation, _matching_labels_all[_candidate_index].casefold(), _candidate_index, _reason_shared))
     _candidates.sort()
     _matching_window = min(len(_candidates), max(128, _matching_settings["maximumMatches"] * 32))
     _matching_preferences.append(_candidates[:_matching_window])
@@ -438,11 +493,10 @@ for _target_position, _selected in enumerate(_matching_selected):
         _target_label = _matching_labels_all[_target_index]
         _candidate_label = _matching_labels_all[_candidate_index]
         _selected_candidate = _matching_people[_candidate_index]
-        _target_need = _matching_evidence(_target, _matching_settings["needs"], _shared)
-        _candidate_offer = _matching_evidence(_selected_candidate, _matching_settings["offers"], _shared)
         _candidate_email = _matching_text(_selected_candidate.get(_matching_settings.get("email"))) if _matching_settings.get("email") else ""
         if _shared:
-            _reason = _candidate_label + " is a strong match for " + _target_label + " because they can provide knowledge or support in \"" + _candidate_offer + "\", directly addressing the need for \"" + _target_need + "\"."
+            _support_areas = _matching_natural_list(_matching_support_areas(_selected_candidate, _target, _shared))
+            _reason = _candidate_label + " is a good match for you because they can support you with " + _support_areas + ", which directly aligns with your current needs."
         else:
             _reason = _candidate_label + " is the strongest remaining eligible profile under the global limits, although the dataset contains limited direct need-to-offer evidence."
         _row = {
