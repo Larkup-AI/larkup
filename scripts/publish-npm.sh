@@ -36,6 +36,13 @@ pnpm --filter @larkup/tool-video-audio build
 pnpm --filter @larkup/tool-video-intelligence build
 pnpm --filter @larkup/sdk build
 pnpm --filter @larkup/cli build
+# The web package imports @larkup/workspace-ui through its compiled exports.
+# A clean checkout has no dist directory yet, so build it before Next resolves
+# those exports during the standalone web build.
+pnpm --filter @larkup/workspace-ui build
+# The workspace app also generates its asset manifest during build. The web
+# package imports that manifest through the shared asset route.
+pnpm --filter @larkup/workspace-app build
 # The npm package ships Next's standalone output. Rebuild it from scratch so a
 # previous release's traced bundle is never republished with a new outer version.
 rm -rf apps/web/.next
