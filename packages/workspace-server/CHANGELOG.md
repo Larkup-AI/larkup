@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.40
+
+### Patch Changes
+
+- 93fe0e0: Prefer the complete generated analysis table over an earlier bounded query preview when answering follow-up calculations.
+
 ## 0.2.39
 
 ### Patch Changes
