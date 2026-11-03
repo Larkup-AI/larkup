@@ -1,5 +1,13 @@
 # @larkup/tool-doc-editor
 
+## 0.3.6
+
+### Patch Changes
+
+- 3772d4e: Bundle the pinned SheetJS dependency with Core so npm 12 can install Video Intelligence and Document Editor without allowing remote tarball dependencies.
+- Updated dependencies [3772d4e]
+  - @larkup/core@0.8.3
+
 ## 0.3.5
 
 ### Patch Changes

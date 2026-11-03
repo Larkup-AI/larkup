@@ -1,5 +1,11 @@
 # @larkup/core
 
+## 0.8.3
+
+### Patch Changes
+
+- 3772d4e: Bundle the pinned SheetJS dependency with Core so npm 12 can install Video Intelligence and Document Editor without allowing remote tarball dependencies.
+
 ## 0.8.2
 
 ### Patch Changes
