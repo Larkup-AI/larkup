@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.36
+
+### Patch Changes
+
+- Prefer real LinkedIn profile columns over tracking identifiers and explain participant matches as a concrete offer-to-need connection.
+
 ## 0.2.35
 
 ### Patch Changes
