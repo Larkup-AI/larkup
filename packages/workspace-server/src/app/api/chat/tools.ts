@@ -108,6 +108,7 @@ import {
   remapLegacyMultiDatasetReads,
   remapSingleDatasetColumnReferences,
   remapSingleDatasetRead,
+  tabularRowsToCsv,
 } from '../../../lib/chat/tabular-sandbox-files';
 import {
   extractAnalysisPresentation,
@@ -880,6 +881,11 @@ export async function getChatTools(context: {
     columns: string[];
     rows: Array<Record<string, unknown>>;
   };
+  /** Complete generated table from the preceding turn, for derived follow-up analysis. */
+  recentAnalysisTable?: {
+    columns: string[];
+    rows: Array<Record<string, unknown>>;
+  };
   /** Conversational answer fallback when no structured table preceded the export request. */
   recentAnswerText?: string;
 }) {
@@ -893,6 +899,7 @@ export async function getChatTools(context: {
     contextualKnowledgeQuery,
     recentExportTable,
     recentVisualizationTable,
+    recentAnalysisTable,
     recentAnswerText,
   } = context;
   // Installed tools are shared, while their connection/runtime selection is
@@ -2770,7 +2777,10 @@ export async function getChatTools(context: {
 
     executeAnalysis: tool({
       description:
-        'Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. Hard counts are acceptance criteria: when the user asks for K matches for N targets, emit exactly N×K long-form rows or N rows with K populated match fields. Never skip a target with empty data or zero semantic overlap; fill it from the best remaining eligible candidates, while honoring global reuse limits, and assert all counts before presentation. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.',
+        'Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. Hard counts are acceptance criteria: when the user asks for K matches for N targets, emit exactly N×K long-form rows or N rows with K populated match fields. Never skip a target with empty data or zero semantic overlap; fill it from the best remaining eligible candidates, while honoring global reuse limits, and assert all counts before presentation. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.' +
+        (recentAnalysisTable
+          ? ` The complete result table from the preceding turn is mounted as data.csv with ${recentAnalysisTable.rows.length} rows and these columns: ${recentAnalysisTable.columns.join(', ')}. Use that file, not the original uploaded dataset, for this follow-up.`
+          : ''),
       inputSchema: z.object({
         code: z
           .string()
@@ -2802,16 +2812,22 @@ export async function getChatTools(context: {
           const sandboxManager = workspaceSandbox(resolveSandboxConfig(config));
           const files: SandboxFile[] = [];
 
-          const requestedDatasetIds = [
-            ...new Set([...(datasetIds ?? []), ...(datasetId ? [datasetId] : [])]),
-          ];
+          const requestedDatasetIds = recentAnalysisTable
+            ? []
+            : [...new Set([...(datasetIds ?? []), ...(datasetId ? [datasetId] : [])])];
+          if (recentAnalysisTable) {
+            files.push({
+              name: 'data.csv',
+              content: tabularRowsToCsv(recentAnalysisTable.columns, recentAnalysisTable.rows),
+            });
+          }
           const availableDatasets = await readAssistantTabularDatasets();
           // Some providers emit valid analysis code but omit an optional
           // datasetId. When the request maps unambiguously to one indexed
           // schema, stage it automatically so `data.csv` remains a reliable
           // single-sheet contract. Ambiguous workbooks still require the
           // model to make an explicit selection.
-          if (requestedDatasetIds.length === 0) {
+          if (requestedDatasetIds.length === 0 && !recentAnalysisTable) {
             const automaticDatasetId = selectTabularDatasetForAnalysis(
               requestText,
               code,
@@ -2883,7 +2899,9 @@ export async function getChatTools(context: {
           // deterministic engine instead of asking generated code to satisfy them.
           if (matchingEngine) finalCode = matchingEngine;
           finalCode = withAnalysisPresentationHelpers(finalCode, analysisTargetCount);
-          if (requestedDatasetIds.length === 1) {
+          if (recentAnalysisTable) {
+            finalCode = remapSingleDatasetRead(finalCode);
+          } else if (requestedDatasetIds.length === 1) {
             finalCode = remapSingleDatasetRead(finalCode);
             finalCode = remapSingleDatasetColumnReferences(finalCode, mountedDatasets[0]);
           }

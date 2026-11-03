@@ -48,6 +48,23 @@ export type AnalysisArtifactSummary = {
   complete: boolean;
 };
 
+/** Route transformations that explicitly refer to the preceding generated result back to it. */
+export function isAnalysisArtifactFollowUp(
+  text: string,
+  artifact: AnalysisArtifactSummary | undefined,
+) {
+  if (artifact?.kind !== 'table' || artifact.complete !== true) return false;
+  const referencesGeneratedResult =
+    /\b(?:previous|above|created|generated|prepared|result|output|table|matches?|recommendations?|assignments?|it|this|that)\b/i.test(
+      text,
+    );
+  const transformsGeneratedResult =
+    /\b(?:use|work\s+with|count|calculate|how\s+many|group|aggregate|summari[sz]e|sort|rank|filter|validate|verify|check|compare|chart|graph|deduplicat(?:e|ion)|export)\b/i.test(
+      text,
+    );
+  return referencesGeneratedResult && transformsGeneratedResult;
+}
+
 /** Only reuse table evidence while its source is still present in the live data store. */
 export function tabularEvidenceDatasetIsAvailable(
   evidence: ReusableTabularEvidence | undefined,
@@ -283,7 +300,7 @@ function completeTabularEvidence(
   return {
     datasetId: typeof params?.datasetId === 'string' ? params.datasetId : undefined,
     columns,
-    rows: rows.slice(0, 500),
+    rows: rows.slice(0, 5_000),
     totalRows:
       typeof result.totalRows === 'number' && Number.isFinite(result.totalRows)
         ? result.totalRows

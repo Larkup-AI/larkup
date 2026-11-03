@@ -19,13 +19,18 @@ function csvCell(value: unknown) {
     : text;
 }
 
+/** Serialize an in-memory result table so a later analysis can use it as its exact input. */
+export function tabularRowsToCsv(columns: string[], rows: Array<Record<string, unknown>>) {
+  return [
+    columns.map(csvCell).join(','),
+    ...rows.map((row) => columns.map((column) => csvCell(row[column])).join(',')),
+  ].join('\n');
+}
+
 /** Serialize a stored dataset with RFC 4180-compatible quoting for sandbox analysis. */
 export function tabularDatasetToCsv(dataset: TabularDataset) {
   const columns = dataset.columns.map((column) => column.name);
-  return [
-    columns.map(csvCell).join(','),
-    ...dataset.rows.map((row) => columns.map((column) => csvCell(row[column])).join(',')),
-  ].join('\n');
+  return tabularRowsToCsv(columns, dataset.rows);
 }
 
 /**

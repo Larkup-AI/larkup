@@ -103,7 +103,7 @@ export function requestsLongAnalysisArtifact(text: string): boolean {
       text,
     );
   const transformsEachTarget =
-    /\b(?:match(?:es|ed|ing)?|recommend(?:ation|ations|ed|ing)?|explain(?:ed|ing|s)?|summari[sz](?:e|ed|es|ing|ation)|profile(?:d|s|ing)?|assess(?:ed|ment|ments|ing)?|evaluat(?:e|ed|es|ing|ion)|classif(?:y|ied|ies|ication)|score(?:d|s|ing)?|rewrite|generate\s+(?:a\s+)?(?:description|report|answer))\b/i.test(
+    /\b(?:match(?:es|ed|ing)?|recommend(?:ation|ations|ed|ing)?|count(?:ed|ing|s)?|calculat(?:e|ed|es|ing|ion)|aggregat(?:e|ed|es|ing|ion)|explain(?:ed|ing|s)?|summari[sz](?:e|ed|es|ing|ation)|profile(?:d|s|ing)?|assess(?:ed|ment|ments|ing)?|evaluat(?:e|ed|es|ing|ion)|classif(?:y|ied|ies|ication)|score(?:d|s|ing)?|rewrite|generate\s+(?:a\s+)?(?:description|report|answer))\b/i.test(
       text,
     );
   return hasManyTargets && transformsEachTarget;

@@ -51,6 +51,7 @@ import {
   formatConversationEvidence,
   findImmediateExactGroundedAnswer,
   imagePreviewInput,
+  isAnalysisArtifactFollowUp,
   isImagePreviewFollowUp,
   isTabularFollowUp,
   tabularEvidenceDatasetIsAvailable,
@@ -1227,6 +1228,9 @@ ${fieldLines}`;
     );
   }
   const latestTabularExportResult = extractLatestTabularExportResult(evidenceMessages);
+  const analysisArtifactFollowUp = Boolean(
+    latestTabularExportResult && isAnalysisArtifactFollowUp(userText, latestAnalysisArtifact),
+  );
   // This compact string is used by retrieval only, not appended to model
   // history. It preserves the immediate topic while keeping the model context
   // at the existing 20-message bound.
@@ -1247,8 +1251,10 @@ ${fieldLines}`;
     datasetNames: tabularDatasetNames,
   });
   const requestsLongArtifact = requestsLongAnalysisArtifact(userText);
-  const requiresCorpusSandboxAnalysis = !tabularQuestion && requestsLongArtifact;
+  const requiresCorpusSandboxAnalysis =
+    !analysisArtifactFollowUp && !tabularQuestion && requestsLongArtifact;
   const requiresSandboxAnalysis =
+    analysisArtifactFollowUp ||
     (hasTabularData && tabularQuestion && requiresTabularSandbox(userText)) ||
     requiresCorpusSandboxAnalysis;
   const isExplicitVideoCorrection =
@@ -1328,6 +1334,7 @@ ${fieldLines}`;
     preferredMediaAssetId: continuesMediaTopic ? reusableEvidence.mediaAssetIds[0] : undefined,
     recentExportTable: directDataExportSource,
     recentVisualizationTable: directFollowUpVisualization ? reusableEvidence.tabular : undefined,
+    recentAnalysisTable: analysisArtifactFollowUp ? latestTabularExportResult : undefined,
     recentAnswerText: directDataExport && !directDataExportSource ? recentAssistantText : undefined,
   });
   // Every installed marketplace/Enterprise tool the model may call this turn
@@ -2144,6 +2151,21 @@ ${fieldLines}`;
                 activeTools: [],
                 messages: withFinalAnswerNudge(compactToolContextForModel(messages)),
               };
+            }
+
+            if (analysisArtifactFollowUp && builtInTools.executeAnalysis) {
+              return stepNumber === 0
+                ? {
+                    ...tabularToolStepOverrides,
+                    toolChoice: { type: 'tool' as const, toolName: 'executeAnalysis' as const },
+                    activeTools: ['executeAnalysis'] as any,
+                    messages: compactToolContextForModel(messages),
+                  }
+                : {
+                    toolChoice: 'none' as const,
+                    activeTools: [],
+                    messages: withFinalAnswerNudge(compactToolContextForModel(messages)),
+                  };
             }
 
             if (requiresCorpusSandboxAnalysis && builtInTools.analyzeCorpusWithCode) {
