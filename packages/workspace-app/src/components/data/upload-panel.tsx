@@ -834,6 +834,18 @@ export function UploadPanel({
         </div>
       )}
 
+      {progress && (
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{progress.message || 'Processing...'}</span>
+            <span className="tabular-nums font-mono">
+              {progress.current} / {progress.total}
+            </span>
+          </div>
+          <Progress value={(progress.current / progress.total) * 100} />
+        </div>
+      )}
+
       {staged.length > 0 && (
         <div className="space-y-2 pb-5">
           {staged.some((file) => file.name.toLowerCase().endsWith('.pdf')) &&
@@ -1027,18 +1039,6 @@ export function UploadPanel({
               </li>
             ))}
           </ul>
-        </div>
-      )}
-
-      {progress && (
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{progress.message || 'Processing...'}</span>
-            <span className="tabular-nums font-mono">
-              {progress.current} / {progress.total}
-            </span>
-          </div>
-          <Progress value={(progress.current / progress.total) * 100} />
         </div>
       )}
 
