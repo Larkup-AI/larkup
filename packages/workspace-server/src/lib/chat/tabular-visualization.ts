@@ -1,4 +1,9 @@
-import { formatChartLabel, normalizeChartConfig, numericValue } from '@larkup/core/chart-config';
+import {
+  formatChartLabel,
+  normalizeChartConfig,
+  numericValue,
+  type ChartConfig,
+} from '@larkup/core/chart-config';
 
 export type TabularChartConfig = {
   chartType: 'bar' | 'line';
@@ -15,6 +20,37 @@ type TabularVisualizationResult = {
   visualization?: TabularChartConfig;
   error?: unknown;
 };
+
+function normalizedIntentTerms(value: string) {
+  return new Set(
+    (value.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(
+      (term) =>
+        term.length >= 3 && !['the', 'and', 'with', 'chart', 'graph', 'plot'].includes(term),
+    ),
+  );
+}
+
+/** Reject a valid-looking chart when its explicit grouping is absent. */
+export function validateChartIntent(
+  requestText: string | undefined,
+  chart: ChartConfig,
+  evidenceRows: Array<Record<string, unknown>> | undefined,
+) {
+  if (!requestText || chart.error || !evidenceRows?.length) return chart;
+  const byMatch = requestText.match(/\bby\s+(?:the\s+)?([^,.;]{2,80})/iu);
+  if (!byMatch) return chart;
+  const requestedTerms = normalizedIntentTerms(byMatch[1].split(/\b(?:and|with|including)\b/iu)[0]);
+  if (requestedTerms.size === 0) return chart;
+  const plottedTerms = normalizedIntentTerms(
+    [chart.xAxisKey, ...chart.series.flatMap((series) => [series.dataKey, series.label])].join(' '),
+  );
+  if ([...requestedTerms].some((term) => plottedTerms.has(term))) return chart;
+  return {
+    ...chart,
+    data: [],
+    error: `The chart grouping does not match the requested grouping: ${byMatch[1].trim()}.`,
+  };
+}
 
 function formatChartCategory(value: string) {
   const calendarMonth = value.match(/^(\d{4})-(\d{2})$/);

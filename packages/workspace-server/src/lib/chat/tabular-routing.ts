@@ -59,6 +59,85 @@ function requiredTabularSourceSets(text: string, datasets: TabularDatasetMeta[])
   return requiredSources;
 }
 
+function normalizedRelationshipKey(value: string) {
+  return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function isRelationshipKey(value: string) {
+  const normalized = normalizedRelationshipKey(value);
+  return (
+    normalized.length >= 3 &&
+    (normalized.endsWith('id') || normalized.endsWith('key') || normalized.endsWith('code'))
+  );
+}
+
+export function tabularRelationships(datasets: TabularDatasetMeta[]) {
+  const relationships: Array<{
+    leftDatasetId: string;
+    leftFileName: string;
+    rightDatasetId: string;
+    rightFileName: string;
+    column: string;
+  }> = [];
+  for (let leftIndex = 0; leftIndex < datasets.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < datasets.length; rightIndex += 1) {
+      const left = datasets[leftIndex];
+      const right = datasets[rightIndex];
+      for (const leftColumn of left.columns.filter((column) => isRelationshipKey(column.name))) {
+        const rightColumn = right.columns.find(
+          (column) =>
+            isRelationshipKey(column.name) &&
+            normalizedRelationshipKey(column.name) === normalizedRelationshipKey(leftColumn.name),
+        );
+        if (!rightColumn) continue;
+        relationships.push({
+          leftDatasetId: left.id,
+          leftFileName: left.fileName,
+          rightDatasetId: right.id,
+          rightFileName: right.fileName,
+          column: leftColumn.name,
+        });
+      }
+    }
+  }
+  return relationships;
+}
+
+/**
+ * Expand directly requested schemas through exact key relationships. Small
+ * connected components are mounted whole so a planner cannot omit a bridge
+ * table (for example an event -> visit -> subject path). Large workspaces stay
+ * bounded to the directly relevant component frontier.
+ */
+export function tabularDatasetIdsForAnalysis(
+  text: string,
+  datasets: TabularDatasetMeta[],
+  maximumDatasets = 12,
+): string[] {
+  const sourceSets = requiredTabularSourceSets(text, datasets);
+  const seeds = new Set(sourceSets.flatMap((sources) => [...sources]));
+  if (seeds.size === 0) return [];
+
+  const neighbors = new Map(datasets.map((dataset) => [dataset.id, new Set<string>()]));
+  for (const relationship of tabularRelationships(datasets)) {
+    neighbors.get(relationship.leftDatasetId)?.add(relationship.rightDatasetId);
+    neighbors.get(relationship.rightDatasetId)?.add(relationship.leftDatasetId);
+  }
+
+  const selected = new Set(seeds);
+  const queue = [...seeds];
+  while (queue.length > 0 && selected.size < maximumDatasets) {
+    const current = queue.shift()!;
+    for (const neighbor of neighbors.get(current) ?? []) {
+      if (selected.has(neighbor)) continue;
+      selected.add(neighbor);
+      queue.push(neighbor);
+      if (selected.size >= maximumDatasets) break;
+    }
+  }
+  return datasets.filter((dataset) => selected.has(dataset.id)).map((dataset) => dataset.id);
+}
+
 /** Return only unambiguous schemas named by the question. */
 export function tabularDatasetIdsRequiredByQuestion(
   text: string,
@@ -265,6 +344,32 @@ export function tabularToolPlannerModel(requiresSandbox: boolean) {
   return requiresSandbox ? 'openai/gpt-4.1-mini' : 'openai/gpt-4o-mini';
 }
 
+export function analysisValidationRequirements(text: string) {
+  const requirements: string[] = [];
+  if (
+    /\b(?:rate|incidence|percentage|proportion|per\s+(?:patient|subject|record|site))\b/iu.test(
+      text,
+    )
+  ) {
+    requirements.push(
+      'derive and report each numerator and denominator separately from the requested population before filtering or joining; never use only matched rows as the denominator unless the request explicitly says so',
+    );
+  }
+  if (/\b(?:join|across|between|overlap|orphan|foreign\s+key)\b/iu.test(text)) {
+    requirements.push(
+      'validate join keys, unmatched rows, and one to one or one to many cardinality before aggregation',
+    );
+  }
+  if (/\b(?:chart|graph|plot|visuali[sz])\b/iu.test(text)) {
+    requirements.push(
+      'assert that plotted grouping and measures exactly match the requested chart intent',
+    );
+  }
+  return requirements.length > 0
+    ? ` Validation requirements: ${requirements.join('; ')}. Include source filenames, key columns, and the calculation formula in the usable output.`
+    : '';
+}
+
 export function supportsStableTabularPlanner(provider: string) {
   return provider === 'vercel_ai_gateway' || provider === 'openai';
 }
@@ -290,6 +395,29 @@ export function latestAnalysisAttemptFailed(messages: unknown[]) {
   return false;
 }
 
+/** Stop the stream on repeated failed analysis instead of inviting prose that
+ * could turn an incomplete calculation into a confident final answer. */
+export function hasExhaustedAnalysisAttempts(
+  steps: Array<{ toolResults?: readonly unknown[] }>,
+  maximumAttempts = 3,
+) {
+  let failedAttempts = 0;
+  for (const step of steps) {
+    for (const result of step.toolResults ?? []) {
+      if (!result || typeof result !== 'object') continue;
+      const toolResult = result as { toolName?: unknown; output?: unknown };
+      if (toolResult.toolName !== 'executeAnalysis') continue;
+      const wrapped = toolResult.output as { value?: unknown } | undefined;
+      const output = (
+        wrapped && typeof wrapped === 'object' && 'value' in wrapped ? wrapped.value : wrapped
+      ) as { exitCode?: unknown } | undefined;
+      if (output?.exitCode === 0) failedAttempts = 0;
+      else if (typeof output?.exitCode === 'number') failedAttempts += 1;
+    }
+  }
+  return failedAttempts >= maximumAttempts;
+}
+
 /**
  * A workspace can contain spreadsheets alongside PDFs, media, and notes.
  * Only force the table path when the wording actually asks for tabular facts;
@@ -303,7 +431,7 @@ export function isLikelyTabularQuestion(input: {
   const text = input.text.trim().toLocaleLowerCase();
   if (!text) return false;
   if (
-    /\b(?:spreadsheet|excel|csv|worksheet|sheet|dataset|data document|row|column|filter|sort|group(?:ed|ing)?|aggregate|average|median|total|sum|count|highest|lowest|largest|smallest|maximum|minimum|trend|distribution)\b/.test(
+    /\b(?:spreadsheet|excel|csv|worksheet|sheet|dataset|data document|row|column|filter|sort|group(?:ed|ing)?|aggregate|average|median|total|sum|count|highest|lowest|largest|smallest|maximum|minimum|trend|distribution|primary\s+key|foreign\s+key|orphan(?:ed)?|duplicates?)\b/.test(
       text,
     ) ||
     /\b(?:arithmetic|geometric|weighted)\s+mean\b|\bmean\s+(?:of|for|by)\b/.test(text)

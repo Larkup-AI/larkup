@@ -10,7 +10,26 @@ export type TabularSandboxManifest = {
     rowCount: number;
     columns: string[];
   }>;
+  relationships: Array<{
+    leftDatasetId: string;
+    rightDatasetId: string;
+    leftColumn: string;
+    rightColumn: string;
+    leftUnique: boolean;
+    rightUnique: boolean;
+  }>;
 };
+
+function normalizedRelationshipKey(value: string) {
+  return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function relationshipColumns(dataset: TabularDataset) {
+  return dataset.columns.filter((column) => {
+    const key = normalizedRelationshipKey(column.name);
+    return key.length >= 3 && (key.endsWith('id') || key.endsWith('key') || key.endsWith('code'));
+  });
+}
 
 function csvCell(value: unknown) {
   const text = String(value ?? '');
@@ -46,7 +65,7 @@ export function createTabularSandboxFiles(datasets: TabularDataset[]): {
   if (datasets.length === 0) return { files: [] };
 
   const multiple = datasets.length > 1;
-  const manifest: TabularSandboxManifest = { datasets: [] };
+  const manifest: TabularSandboxManifest = { datasets: [], relationships: [] };
   const files = datasets.map((dataset, index) => {
     const name = multiple ? `dataset-${index + 1}.csv` : 'data.csv';
     manifest.datasets.push({
@@ -58,6 +77,28 @@ export function createTabularSandboxFiles(datasets: TabularDataset[]): {
     });
     return { name, content: tabularDatasetToCsv(dataset) };
   });
+
+  for (let leftIndex = 0; leftIndex < datasets.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < datasets.length; rightIndex += 1) {
+      const left = datasets[leftIndex];
+      const right = datasets[rightIndex];
+      for (const leftColumn of relationshipColumns(left)) {
+        const rightColumn = relationshipColumns(right).find(
+          (column) =>
+            normalizedRelationshipKey(column.name) === normalizedRelationshipKey(leftColumn.name),
+        );
+        if (!rightColumn) continue;
+        manifest.relationships.push({
+          leftDatasetId: left.id,
+          rightDatasetId: right.id,
+          leftColumn: leftColumn.name,
+          rightColumn: rightColumn.name,
+          leftUnique: leftColumn.uniqueCount === left.rowCount,
+          rightUnique: rightColumn.uniqueCount === right.rowCount,
+        });
+      }
+    }
+  }
 
   if (multiple) {
     files.push({ name: 'datasets.json', content: JSON.stringify(manifest, null, 2) });
@@ -113,6 +154,60 @@ export function remapSingleDatasetRead(code: string): string {
     const open = match.slice(0, match.indexOf('(') + 1);
     return `${open}'data.csv'`;
   });
+}
+
+/**
+ * Notebook-style planners often leave a DataFrame, mapping, or tuple as the
+ * final expression. Python scripts discard that value, so expose only a
+ * clearly bare final expression while keeping assignments intentionally silent.
+ */
+export function printBareFinalPythonExpression(code: string) {
+  const lines = code.split('\n');
+  let index = lines.length - 1;
+  while (index >= 0 && (!lines[index].trim() || lines[index].trim().startsWith('#'))) index -= 1;
+  if (index < 0) return code;
+  const expression = lines[index].trim();
+  const identifier = '[A-Za-z_]\\w*';
+  const literal = `(?:${identifier}|[-+]?\\d+(?:\\.\\d+)?|['"][^'"]*['"])`;
+  const isBareIdentifier = new RegExp(`^${identifier}$`).test(expression);
+  const isSimpleTuple = new RegExp(`^\\(?${literal}(?:\\s*,\\s*${literal})+\\)?$`).test(expression);
+  if (!isBareIdentifier && !isSimpleTuple) return code;
+  const indentation = lines[index].match(/^\s*/)?.[0] ?? '';
+  lines[index] = `${indentation}print(repr(${expression}))`;
+  return lines.join('\n');
+}
+
+/** Repair string comparisons emitted for CSV columns that parsed as booleans. */
+export function remapBooleanStringLiterals(code: string, datasets: TabularDataset[]) {
+  const booleanColumns = datasets.flatMap((dataset) =>
+    dataset.columns
+      .filter((column) => {
+        const values = dataset.rows
+          .slice(0, 200)
+          .map((row) => row[column.name])
+          .filter((value) => value !== null && value !== undefined);
+        const normalized = values.map((value) =>
+          typeof value === 'string' ? value.trim().toLocaleLowerCase() : value,
+        );
+        return (
+          normalized.length > 0 &&
+          normalized.every(
+            (value) => value === true || value === false || value === 'true' || value === 'false',
+          )
+        );
+      })
+      .map((column) => column.name),
+  );
+  const referencesBooleanColumn = booleanColumns.some(
+    (column) => code.includes(JSON.stringify(column)) || code.includes(`'${column}'`),
+  );
+  if (!referencesBooleanColumn) return code;
+  return code.replace(/(['"])True\1/g, 'True').replace(/(['"])False\1/g, 'False');
+}
+
+/** Route model-authored saved figures through the sandbox's captured display hook. */
+export function remapSavedFiguresToShow(code: string) {
+  return code.replace(/\b(?:plt|fig)\.savefig\([^\n]*\)/g, 'plt.show()');
 }
 
 function decodeSimplePythonString(value: string) {

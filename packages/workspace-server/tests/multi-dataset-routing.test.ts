@@ -2,9 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { TabularDatasetMeta } from '@larkup/core/tabular-store';
 import {
+  analysisValidationRequirements,
+  isLikelyTabularQuestion,
+  hasExhaustedAnalysisAttempts,
   requiresMultiDatasetAnalysis,
   resolveTabularDatasetReferences,
+  tabularDatasetIdsForAnalysis,
   tabularDatasetIdsRequiredByQuestion,
+  tabularRelationships,
 } from '../src/lib/chat/tabular-routing.ts';
 import { remapMountedDatasetReads } from '../src/lib/chat/tabular-sandbox-files.ts';
 
@@ -76,6 +81,66 @@ test('routes biomarker drift, severity charts, and monitoring summaries across r
   ]);
 });
 
+test('expands requested schemas through bridge tables for deterministic join planning', () => {
+  assert.deepEqual(
+    tabularDatasetIdsForAnalysis(
+      'Find patients with abnormal lab results and adverse events.',
+      datasets,
+    ).sort(),
+    ['events', 'labs', 'patients', 'sites', 'visits'],
+  );
+  assert.deepEqual(
+    tabularDatasetIdsForAnalysis(
+      'Which sites have the highest missed visit rate? Include site name and status totals.',
+      datasets,
+    ).sort(),
+    ['events', 'labs', 'patients', 'sites', 'trials', 'visits'],
+  );
+});
+
+test('exposes exact schema relationships to the analysis planner', () => {
+  assert.deepEqual(
+    tabularRelationships(datasets)
+      .filter((relationship) => relationship.column === 'patient_id')
+      .map((relationship) => [relationship.leftDatasetId, relationship.rightDatasetId]),
+    [
+      ['patients', 'events'],
+      ['patients', 'visits'],
+      ['events', 'visits'],
+    ],
+  );
+});
+
+test('stops after repeated failed analysis attempts but resets after a success', () => {
+  const step = (exitCode: number) => ({
+    toolResults: [{ toolName: 'executeAnalysis', output: { exitCode } }],
+  });
+  assert.equal(hasExhaustedAnalysisAttempts([step(1), step(1)], 3), false);
+  assert.equal(hasExhaustedAnalysisAttempts([step(1), step(1), step(1)], 3), true);
+  assert.equal(hasExhaustedAnalysisAttempts([step(1), step(0), step(1)], 2), false);
+});
+
+test('adds denominator, join, and chart validation requirements from user intent', () => {
+  const requirements = analysisValidationRequirements(
+    'Chart adverse event incidence per patient across files by arm.',
+  );
+  assert.match(requirements, /numerator and denominator separately/i);
+  assert.match(requirements, /join keys/i);
+  assert.match(requirements, /plotted grouping/i);
+  assert.match(requirements, /source filenames/i);
+});
+
+test('routes key integrity validation through tabular analysis', () => {
+  assert.equal(
+    isLikelyTabularQuestion({
+      text: 'Validate primary key duplicates and orphan foreign keys.',
+      columnNames: [],
+      datasetNames: [],
+    }),
+    true,
+  );
+});
+
 test('keeps a calculation whose columns coexist in one dataset on the single-table path', () => {
   assert.equal(requiresMultiDatasetAnalysis('Compare average age by arm.', datasets), false);
 });
@@ -90,6 +155,7 @@ test('resolves exact dataset filenames and stems to stored IDs without guessing'
 
 test('remaps model-authored source filenames and dataset IDs to mounted sandbox files', () => {
   const manifest = {
+    relationships: [],
     datasets: [
       {
         id: 'patients-id',
