@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.41
+
+### Patch Changes
+
+- 752e8ef: Prevent new chart questions from silently reusing unrelated tabular evidence from a previous answer.
+
 ## 0.2.40
 
 ### Patch Changes
