@@ -1,5 +1,11 @@
 # @larkup/workspace-app
 
+## 0.2.18
+
+### Patch Changes
+
+- Show document upload progress above the staged file list on the Add page.
+
 ## 0.2.17
 
 ### Patch Changes
