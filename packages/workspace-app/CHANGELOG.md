@@ -1,5 +1,11 @@
 # @larkup/workspace-app
 
+## 0.2.19
+
+### Patch Changes
+
+- Show per-file indexing stages and analyze PDF pages as they render with bounded concurrency.
+
 ## 0.2.18
 
 ### Patch Changes
