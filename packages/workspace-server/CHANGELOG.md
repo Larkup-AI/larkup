@@ -1,5 +1,14 @@
 # @larkup/workspace-server
 
+## 0.2.45
+
+### Patch Changes
+
+- Improve compound clinical-data analysis with reliable multi-file routing, safer aggregation validation, complete artifact evidence, robust generated Python repair, captured analysis charts, and clearer PDF endpoint synthesis.
+- Updated dependencies
+  - @larkup/sandbox@0.1.12
+  - @larkup/tool-doc-editor@0.3.8
+
 ## 0.2.44
 
 ### Patch Changes
