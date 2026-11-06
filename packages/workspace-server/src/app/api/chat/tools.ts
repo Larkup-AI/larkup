@@ -91,16 +91,20 @@ import {
   retrievalFallbackMediaAsset,
   shouldKeepActiveMediaSource,
 } from '../../../lib/chat/media-source-routing';
-import { createTabularVisualization } from '../../../lib/chat/tabular-visualization';
+import {
+  createTabularVisualization,
+  validateChartIntent,
+} from '../../../lib/chat/tabular-visualization';
 import { normalizeChartConfigWithEvidence } from '@larkup/core/chart-config';
 import { createDataExport, selectDataExportSource } from '@larkup/core/data-export';
 import { assistantSourceScopeFingerprint } from '../../../lib/chat/assistant-source-scope';
 import { inferTabularPlan } from '../../../lib/chat/tabular-query-plan';
 import {
+  analysisValidationRequirements,
   requestedLongAnalysisItemCount,
   resolveTabularDatasetReferences,
   requiresMultiDatasetAnalysis,
-  tabularDatasetIdsRequiredByQuestion,
+  tabularDatasetIdsForAnalysis,
 } from '../../../lib/chat/tabular-routing';
 import {
   resolveTabularDatasetForQuestion,
@@ -112,6 +116,9 @@ import {
   createTabularSandboxFiles,
   remapLegacyMultiDatasetReads,
   remapMountedDatasetReads,
+  printBareFinalPythonExpression,
+  remapBooleanStringLiterals,
+  remapSavedFiguresToShow,
   remapSingleDatasetColumnReferences,
   remapSingleDatasetRead,
   tabularRowsToCsv,
@@ -2774,16 +2781,16 @@ export async function getChatTools(context: {
         // Chart arguments are model-authored. Require every plotted value to
         // match authoritative table rows so unrelated image/text retrieval can
         // never be turned into a plausible-looking invented chart.
-        return normalizeChartConfigWithEvidence(
-          config,
-          currentTurnExportTable?.rows ?? recentVisualizationTable?.rows,
-        );
+        const evidenceRows = currentTurnExportTable?.rows ?? recentVisualizationTable?.rows;
+        const verified = normalizeChartConfigWithEvidence(config, evidenceRows);
+        return validateChartIntent(requestText, verified, evidenceRows);
       },
     }),
 
     executeAnalysis: tool({
       description:
         'Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. Every successful execution must expose its answer: print a concise labeled numeric/text result, create an artifact, or call a LarkUp presentation helper; assignments with no output are invalid. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. Hard counts are acceptance criteria: when the user asks for K matches for N targets, emit exactly N×K long-form rows or N rows with K populated match fields. Never skip a target with empty data or zero semantic overlap; fill it from the best remaining eligible candidates, while honoring global reuse limits, and assert all counts before presentation. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.' +
+        analysisValidationRequirements(requestText ?? '') +
         (recentAnalysisTable
           ? ` The complete result table from the preceding turn is mounted as data.csv with ${recentAnalysisTable.rows.length} rows and these columns: ${recentAnalysisTable.columns.join(', ')}. Use that file, not the original uploaded dataset, for this follow-up.`
           : ''),
@@ -2835,7 +2842,7 @@ export async function getChatTools(context: {
           );
           if (requiresMultiDatasetAnalysis(requestText ?? '', availableDatasets)) {
             requestedDatasetIds.push(
-              ...tabularDatasetIdsRequiredByQuestion(requestText ?? '', availableDatasets),
+              ...tabularDatasetIdsForAnalysis(requestText ?? '', availableDatasets),
             );
             requestedDatasetIds.splice(
               0,
@@ -2923,6 +2930,9 @@ export async function getChatTools(context: {
           // Constrained matching has hard global invariants. Prefer the
           // deterministic engine instead of asking generated code to satisfy them.
           if (matchingEngine) finalCode = matchingEngine;
+          finalCode = remapBooleanStringLiterals(finalCode, mountedDatasets);
+          finalCode = remapSavedFiguresToShow(finalCode);
+          finalCode = printBareFinalPythonExpression(finalCode);
           finalCode = withAnalysisPresentationHelpers(finalCode, analysisTargetCount);
           if (recentAnalysisTable) {
             finalCode = remapSingleDatasetRead(finalCode);

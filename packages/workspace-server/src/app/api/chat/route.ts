@@ -82,12 +82,14 @@ import {
 } from '../../../lib/chat/tabular-visualization';
 import {
   hasCompletedLongAnalysisStep,
+  hasExhaustedAnalysisAttempts,
   isLikelyTabularQuestion,
   latestAnalysisAttemptFailed,
   requiresMultiDatasetAnalysis,
   requestsLongAnalysisArtifact,
   requiresTabularSandbox,
   supportsStableTabularPlanner,
+  tabularRelationships,
   tabularToolPlannerModel,
   tabularToolsForStep,
 } from '../../../lib/chat/tabular-routing';
@@ -1152,6 +1154,18 @@ export async function POST(req: Request) {
           ? `\n- ${datasets.length - detailedDatasets.length - compactDatasets.length} further datasets are available; ask the user which file they mean if it is not named in the question.`
           : ''
       }`;
+      const relationships = tabularRelationships(datasets);
+      if (relationships.length > 0) {
+        tabularContext += `\nSchema relationships inferred from exact key columns:\n${relationships
+          .slice(0, 40)
+          .map(
+            (relationship) =>
+              `- ${relationship.leftFileName}.${relationship.column} = ${relationship.rightFileName}.${relationship.column}`,
+          )
+          .join(
+            '\n',
+          )}\nFor multi-file calculations, follow the complete key path and validate join cardinality before aggregating.`;
+      }
     }
   } catch {
     /* no tabular data */
@@ -2009,6 +2023,7 @@ ${fieldLines}`;
           // reveals a video claim that needs source-level corroboration.
           stopWhen: [
             stepCountIs(5),
+            ({ steps }) => hasExhaustedAnalysisAttempts(steps),
             ({ steps }) =>
               requestsLongAnalysisArtifact(userText) && hasCompletedLongAnalysisStep(steps),
           ],
