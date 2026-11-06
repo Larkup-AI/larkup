@@ -1,3 +1,132 @@
+import type { TabularDatasetMeta } from '@larkup/core/tabular-store';
+
+const DATASET_NAME_STOP_WORDS = new Set(['data', 'dataset', 'table', 'sheet', 'file']);
+
+function routingTerms(value: string) {
+  return (value.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
+    .map((term) => (term.length > 4 && term.endsWith('s') ? term.slice(0, -1) : term))
+    .filter((term) => term.length >= 3);
+}
+
+function questionMentionsColumn(questionTerms: Set<string>, column: string) {
+  const terms = routingTerms(column).filter((term) => term !== 'id');
+  return terms.length > 0 && terms.every((term) => questionTerms.has(term));
+}
+
+function requiredTabularSourceSets(text: string, datasets: TabularDatasetMeta[]) {
+  const questionTerms = new Set(routingTerms(text));
+  const requiredSources: Array<Set<string>> = [];
+  const mentionedColumns = new Set<string>();
+  for (const dataset of datasets) {
+    for (const column of dataset.columns) {
+      if (questionMentionsColumn(questionTerms, column.name)) {
+        mentionedColumns.add(column.name.toLocaleLowerCase());
+      }
+    }
+  }
+  const mostSpecificMentionedColumns = [...mentionedColumns].filter((column) => {
+    const terms = new Set(routingTerms(column).filter((term) => term !== 'id'));
+    return ![...mentionedColumns].some((candidate) => {
+      if (candidate === column) return false;
+      const candidateTerms = new Set(routingTerms(candidate).filter((term) => term !== 'id'));
+      return (
+        candidateTerms.size > terms.size && [...terms].every((term) => candidateTerms.has(term))
+      );
+    });
+  });
+  for (const column of mostSpecificMentionedColumns) {
+    requiredSources.push(
+      new Set(
+        datasets
+          .filter((dataset) =>
+            dataset.columns.some((candidate) => candidate.name.toLocaleLowerCase() === column),
+          )
+          .map((dataset) => dataset.id),
+      ),
+    );
+  }
+  for (const dataset of datasets) {
+    const fileTerms = routingTerms(dataset.fileName.replace(/\.[^.]+$/, '')).filter(
+      (term) => !DATASET_NAME_STOP_WORDS.has(term),
+    );
+    if (
+      fileTerms.length > 0 &&
+      fileTerms.every((term) => term.length < 4 || questionTerms.has(term))
+    ) {
+      requiredSources.push(new Set([dataset.id]));
+    }
+  }
+  return requiredSources;
+}
+
+/** Return only unambiguous schemas named by the question. */
+export function tabularDatasetIdsRequiredByQuestion(
+  text: string,
+  datasets: TabularDatasetMeta[],
+): string[] {
+  return [
+    ...new Set(
+      requiredTabularSourceSets(text, datasets).flatMap((sources) =>
+        sources.size === 1 ? [...sources] : [],
+      ),
+    ),
+  ];
+}
+
+/**
+ * Accept the stable ID contract while recovering exact visible filenames that
+ * a model may copy from the dataset manifest into the datasetIds field.
+ * Ambiguous names are deliberately left unresolved.
+ */
+export function resolveTabularDatasetReferences(
+  references: string[],
+  datasets: TabularDatasetMeta[],
+): string[] {
+  const byReference = new Map<string, Set<string>>();
+  const add = (reference: string, id: string) => {
+    const normalized = reference.trim().toLocaleLowerCase();
+    if (!normalized) return;
+    const ids = byReference.get(normalized) ?? new Set<string>();
+    ids.add(id);
+    byReference.set(normalized, ids);
+  };
+  for (const dataset of datasets) {
+    const fileName = dataset.fileName.split(/[\\/]/).at(-1) ?? dataset.fileName;
+    add(dataset.id, dataset.id);
+    add(fileName, dataset.id);
+    add(fileName.replace(/\.[^.]+$/, ''), dataset.id);
+  }
+  return references.map((reference) => {
+    const fileName = reference.trim().split(/[\\/]/).at(-1) ?? reference.trim();
+    const candidates = [reference.trim(), fileName, fileName.replace(/\.[^.]+$/, '')];
+    for (const candidate of candidates) {
+      const ids = byReference.get(candidate.toLocaleLowerCase());
+      if (ids?.size === 1) return [...ids][0];
+    }
+    return reference;
+  });
+}
+
+/**
+ * Detect questions whose requested concepts cannot be satisfied by one
+ * indexed table. This is schema-led rather than domain-led: filenames and
+ * column names provide the evidence that multiple related sources are needed.
+ */
+export function requiresMultiDatasetAnalysis(
+  text: string,
+  datasets: TabularDatasetMeta[],
+): boolean {
+  if (datasets.length < 2) return false;
+  const requiredSources = requiredTabularSourceSets(text, datasets);
+
+  if (requiredSources.length < 2) return false;
+  const commonSources = new Set(requiredSources[0]);
+  for (const sources of requiredSources.slice(1)) {
+    for (const source of commonSources) if (!sources.has(source)) commonSources.delete(source);
+  }
+  return commonSources.size === 0;
+}
+
 /**
  * Route ordinary sheet questions through the structured query engine, while
  * sending explicit joins and advanced analytics to the sandbox. This keeps

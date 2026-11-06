@@ -172,6 +172,29 @@ test('an unrelated calculation does not silently reuse a generated table', () =>
   );
 });
 
+test('generic source-table wording does not reuse the preceding generated artifact', () => {
+  const artifact = {
+    kind: 'table' as const,
+    title: 'Adverse event incidence',
+    totalItems: 2,
+    complete: true,
+  };
+  assert.equal(
+    isAnalysisArtifactFollowUp(
+      'Generate a grouped adverse-event severity chart by arm. The chart data must match the source tables.',
+      artifact,
+    ),
+    false,
+  );
+  assert.equal(
+    isAnalysisArtifactFollowUp(
+      'Create a clinical trial monitoring summary with a chart and state all source files used.',
+      artifact,
+    ),
+    false,
+  );
+});
+
 test('a new chart question does not silently reuse an unrelated prior table', () => {
   const evidence = {
     sources: [],

@@ -9,6 +9,7 @@ import { DEFAULT_CONFIG } from '@larkup/core/types';
 import { runWithWorkspaceHost, type WorkspaceHost } from '@larkup/core/workspace-host';
 import type { ExecutionRequest, ExecutionResult } from '@larkup/sandbox/types';
 import { getChatTools } from '../src/app/api/chat/tools.ts';
+import { requiresMultiDatasetAnalysis } from '../src/lib/chat/tabular-routing.ts';
 import { runWithWorkspaceRuntime } from '../src/runtime-host.ts';
 
 const executeFile = promisify(execFile);
@@ -179,6 +180,10 @@ test('constrained matching uses the deterministic engine on the first execution'
         assert.equal(output.presentation?.complete, true);
 
         const longRequestText = `You have a data document listing 102 participants. For each person from the list, make 3 matches with other people from the list based on people's needs and offers - Question 2: Current Needs: "What would you benefit from most right now?" Question 3: "Anything else you'd like to add? Share what you're bringing to the table or what you're looking for." Each person should be matched with no more than 6 people in total: 3 times they might be a good match for someone, and 3 times they should be matched with someone. For every match, write a one-sentence explanation of why this is the best choice and mention their email. Other information is not important.`;
+        assert.equal(
+          requiresMultiDatasetAnalysis(longRequestText, await host.readTabularDatasets()),
+          false,
+        );
         const longTools = await getChatTools({ config, requestText: longRequestText });
         const longAnalysis = longTools.tools.executeAnalysis as {
           execute?: (input: unknown, options: unknown) => Promise<unknown>;
@@ -230,6 +235,24 @@ test('constrained matching uses the deterministic engine on the first execution'
         assert.equal(targetCounts.size, 102);
         assert.ok([...targetCounts.values()].every((count) => count === 3));
         assert.ok([...suggestionCounts.values()].every((count) => count <= 3));
+
+        const multiDatasetTools = await getChatTools({
+          config,
+          requestText: 'Compare the two datasets and report the result.',
+        });
+        const multiDatasetAnalysis = multiDatasetTools.tools.executeAnalysis as {
+          execute?: (input: unknown, options: unknown) => Promise<unknown>;
+        };
+        assert.ok(multiDatasetAnalysis.execute);
+        const emptyOutput = (await multiDatasetAnalysis.execute(
+          {
+            code: 'value = 1',
+            datasetIds: [datasetId, longDatasetId],
+          },
+          {},
+        )) as { exitCode: number; stderr: string };
+        assert.equal(emptyOutput.exitCode, 1);
+        assert.match(emptyOutput.stderr, /without a usable result/i);
       },
     ),
   );

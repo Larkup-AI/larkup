@@ -84,6 +84,7 @@ import {
   hasCompletedLongAnalysisStep,
   isLikelyTabularQuestion,
   latestAnalysisAttemptFailed,
+  requiresMultiDatasetAnalysis,
   requestsLongAnalysisArtifact,
   requiresTabularSandbox,
   supportsStableTabularPlanner,
@@ -1080,6 +1081,7 @@ export async function POST(req: Request) {
   let availableTabularDatasetIds = new Set<string>();
   let tabularColumnNames: string[] = [];
   let tabularDatasetNames: string[] = [];
+  let requiresMultiDatasetTabularAnalysis = false;
   try {
     const readAvailableDatasets = async () => {
       const [allDatasets, groups, documents] = await Promise.all([
@@ -1102,6 +1104,7 @@ export async function POST(req: Request) {
         dataset.columns.map((column) => column.name),
       );
       tabularDatasetNames = datasets.map((dataset) => dataset.fileName);
+      requiresMultiDatasetTabularAnalysis = requiresMultiDatasetAnalysis(userText, datasets);
       // Keep complete schemas for the most likely targets, then keep a compact
       // ID/name listing for the remaining uploads. Previously only eight files
       // were visible to the model, making a later spreadsheet effectively
@@ -1256,7 +1259,9 @@ ${fieldLines}`;
     !analysisArtifactFollowUp && !tabularQuestion && requestsLongArtifact;
   const requiresSandboxAnalysis =
     analysisArtifactFollowUp ||
-    (hasTabularData && tabularQuestion && requiresTabularSandbox(userText)) ||
+    (hasTabularData &&
+      tabularQuestion &&
+      (requiresTabularSandbox(userText) || requiresMultiDatasetTabularAnalysis)) ||
     requiresCorpusSandboxAnalysis;
   const isExplicitVideoCorrection =
     /^(?:no|nah),\s+|\b(?:that(?:'s| is) (?:wrong|incorrect)|correction\s*:|actually\s*,|instead\s*,|should be|not .{0,80}\bbut|i meant)\b/i.test(
@@ -2229,7 +2234,7 @@ ${fieldLines}`;
                 };
               }
               const retryFailedAnalysis =
-                requiresTabularSandbox(userText) &&
+                (requiresTabularSandbox(userText) || requiresMultiDatasetTabularAnalysis) &&
                 stepNumber > 0 &&
                 stepNumber <= 2 &&
                 latestAnalysisAttemptFailed(messages as unknown[]);
@@ -2244,7 +2249,8 @@ ${fieldLines}`;
               const routing = tabularToolsForStep({
                 stepNumber,
                 toolNames: toolNames as string[],
-                requiresSandbox: requiresTabularSandbox(userText),
+                requiresSandbox:
+                  requiresTabularSandbox(userText) || requiresMultiDatasetTabularAnalysis,
               });
               return {
                 ...routing,

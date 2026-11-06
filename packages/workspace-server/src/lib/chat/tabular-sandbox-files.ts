@@ -82,6 +82,30 @@ export function remapLegacyMultiDatasetReads(code: string, datasetCount: number)
   return code.replace(legacyRead, () => `pd.read_csv('dataset-${++datasetIndex}.csv')`);
 }
 
+/**
+ * Repoint literal filenames generated from visible dataset metadata to the
+ * generic files mounted in the sandbox. Exact filename or dataset-ID matches
+ * are required, so unrelated external paths remain untouched.
+ */
+export function remapMountedDatasetReads(
+  code: string,
+  manifest: TabularSandboxManifest | undefined,
+): string {
+  if (!manifest || manifest.datasets.length < 2) return code;
+  const mountedByReference = new Map<string, string>();
+  for (const dataset of manifest.datasets) {
+    mountedByReference.set(dataset.fileName.toLocaleLowerCase(), dataset.file);
+    mountedByReference.set(`${dataset.id}.csv`.toLocaleLowerCase(), dataset.file);
+    mountedByReference.set(dataset.file.toLocaleLowerCase(), dataset.file);
+  }
+  const reader = /(\b(?:pd|pandas)\s*\.\s*read_(?:csv|excel)\(\s*)(['"])([^'"]+)\2/g;
+  return code.replace(reader, (match, prefix: string, quote: string, path: string) => {
+    const baseName = path.split(/[\\/]/).at(-1)?.toLocaleLowerCase() ?? '';
+    const mounted = mountedByReference.get(baseName);
+    return mounted ? `${prefix}${quote}${mounted}${quote}` : match;
+  });
+}
+
 /** Repoint only the first model-authored input read to the staged source. */
 export function remapSingleDatasetRead(code: string): string {
   const firstCsvRead = /\b(?:pd|pandas)\s*\.\s*read_csv\(\s*(?:(["'])[^"']*\1|[A-Za-z_]\w*)/;
