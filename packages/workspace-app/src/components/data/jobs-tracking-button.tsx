@@ -2,11 +2,11 @@
 
 import { workspaceUrl, workspaceFetch as fetch } from '../../host';
 import { useCallback, useState } from 'react';
-import type { IndexRun } from '@larkup/core/types';
-import { BriefcaseBusiness, ListTodo, Loader2, TriangleAlert } from 'lucide-react';
+import { BriefcaseBusiness, ListTodo, TriangleAlert } from 'lucide-react';
 import useSWR from 'swr';
 import { useProject } from '../projects/project-provider';
 import { JobsPanel } from './jobs-panel';
+import { FileIndexingJobsPanel, type FileIndexStatus } from './file-indexing-jobs-panel';
 import {
   isActiveMediaIndexing,
   MediaIndexingJobsPanel,
@@ -30,13 +30,6 @@ const fetcher = async <T,>(url: string): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
-interface IndexStatus {
-  unindexedCount: number;
-  running: boolean;
-  run: IndexRun | null;
-  blockers: string[];
-}
-
 export function JobsTrackingButton() {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<'running' | 'all'>('running');
@@ -56,7 +49,7 @@ export function JobsTrackingButton() {
     data: indexData,
     error: indexError,
     mutate: mutateIndex,
-  } = useSWR<IndexStatus>(workspaceUrl('/api/index'), fetcher, {
+  } = useSWR<FileIndexStatus>(workspaceUrl('/api/index'), fetcher, {
     refreshInterval: (data) => (data?.running ? 2_000 : 0),
     revalidateOnFocus: true,
   });
@@ -78,7 +71,11 @@ export function JobsTrackingButton() {
   const indexRunning = indexData?.running ?? false;
   const activeJobCount = activeCrawlJobs.length + activeMediaAssets.length + (indexRunning ? 1 : 0);
   const hasActiveJobs = activeJobCount > 0;
-  const hasAnyJobs = jobs.length > 0 || activeMediaAssets.length > 0 || indexRunning;
+  const hasAnyJobs =
+    jobs.length > 0 ||
+    activeMediaAssets.length > 0 ||
+    indexRunning ||
+    Boolean(indexData?.sources?.some((source) => source.status === 'failed'));
   const loadError = jobsError || indexError || mediaError;
   const visibleJobs = filter === 'running' ? activeCrawlJobs : jobs;
 
@@ -173,17 +170,7 @@ export function JobsTrackingButton() {
             <div className="space-y-5">
               <MediaIndexingJobsPanel assets={activeMediaAssets} />
 
-              {indexRunning && (
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
-                  <Loader2 className="size-4 shrink-0 animate-spin text-emerald-600" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground">Indexing files</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Running in the background — new files will join the queue.
-                    </p>
-                  </div>
-                </div>
-              )}
+              <FileIndexingJobsPanel status={indexData} />
 
               {jobs.length > 0 && (
                 <section

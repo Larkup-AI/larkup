@@ -512,73 +512,59 @@ export function UploadPanel({
           f.name.toLowerCase().endsWith('.pdf')
         ) {
           try {
-            setProgress({ message: `Extracting images from ${f.name}...`, current: 0, total: 100 });
+            setProgress({ message: `Rendering PDF pages from ${f.name}...`, current: 0, total: 1 });
             const { extractImagesFromPDF } = await import('../../lib/media/pdf');
-            const images = await extractImagesFromPDF(f.fileObject);
-            const BATCH_SIZE = 5;
-            for (let i = 0; i < images.length; i += BATCH_SIZE) {
-              const batch = images.slice(i, i + BATCH_SIZE);
+            let completedImages = 0;
+            await extractImagesFromPDF(f.fileObject, async (img, totalPages) => {
+              setProgress({
+                message: `Analyzing PDF pages from ${f.name}...`,
+                current: completedImages,
+                total: totalPages,
+              });
+              try {
+                const res = await fetch(img.base64);
+                const blob = await res.blob();
+                const file = new File([blob], `image-${img.index}.jpg`, { type: 'image/jpeg' });
 
-              await Promise.all(
-                batch.map(async (img, batchIdx) => {
-                  const currentIdx = i + batchIdx;
-                  setProgress({
-                    message: `Analyzing image ${currentIdx + 1} of ${images.length} from ${
-                      f.name
-                    }...`,
-                    current: currentIdx,
-                    total: images.length || 1,
-                  });
+                const formData = new FormData();
+                formData.append('file', file);
+                const uploadRes = await fetch(workspaceUrl('/api/upload-file'), {
+                  method: 'POST',
+                  body: formData,
+                });
 
-                  const res = await fetch(img.base64);
-                  const blob = await res.blob();
-                  const file = new File([blob], `image-${img.index}.jpg`, { type: 'image/jpeg' });
-
-                  const formData = new FormData();
-                  formData.append('file', file);
-                  const uploadRes = await fetch(workspaceUrl('/api/upload-file'), {
-                    method: 'POST',
-                    body: formData,
-                  });
-
-                  if (uploadRes.ok) {
-                    const { url } = await uploadRes.json();
-
-                    let description = '';
-                    try {
-                      const descRes = await fetch(workspaceUrl('/api/describe-image'), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          base64: img.base64,
-                          prompt:
-                            'Create accurate retrieval notes for this rendered document page. Preserve captions, figure and table identifiers, equations and their grouping, readable labels, legends, headings, row/column relationships, and diagram connections. Do not invent unreadable text; say when text is unclear. Use concise labeled bullets so later questions can retrieve the correct page without re-reading the visual.',
-                        }),
-                      });
-                      if (descRes.ok) {
-                        const descData = await descRes.json();
-                        if (descData.description) {
-                          description = descData.description;
-                        }
-                      }
-                    } catch (e) {
-                      console.error('Failed to describe image:', e);
-                    }
-
-                    if (description.trim()) {
-                      uploadedImages.push({
-                        imageUrl: url,
-                        pageNumber: img.pageNumber,
-                        index: img.index,
-                        description,
-                      });
-                    } else {
-                      skippedImageCount++;
-                    }
-                  }
-                }),
-              );
-            }
+                if (!uploadRes.ok) throw new Error('Could not upload the rendered page.');
+                const { url } = await uploadRes.json();
+                const descRes = await fetch(workspaceUrl('/api/describe-image'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    base64: img.base64,
+                    prompt:
+                      'Create accurate retrieval notes for this rendered document page. Preserve captions, figure and table identifiers, equations and their grouping, readable labels, legends, headings, row/column relationships, and diagram connections. Do not invent unreadable text; say when text is unclear. Use concise labeled bullets so later questions can retrieve the correct page without re-reading the visual.',
+                  }),
+                });
+                if (!descRes.ok) throw new Error('Could not analyze the rendered page.');
+                const descData = await descRes.json();
+                if (!descData.description?.trim()) throw new Error('The page analysis was empty.');
+                uploadedImages.push({
+                  imageUrl: url,
+                  pageNumber: img.pageNumber,
+                  index: img.index,
+                  description: descData.description,
+                });
+              } catch (error) {
+                skippedImageCount++;
+                console.error(`Could not index PDF page ${img.pageNumber} from ${f.name}:`, error);
+              } finally {
+                completedImages++;
+                setProgress({
+                  message: `Analyzed ${completedImages} of ${totalPages} PDF pages from ${f.name}`,
+                  current: completedImages,
+                  total: totalPages,
+                });
+              }
+            });
             // Ensure images remain in original order after concurrent processing
             uploadedImages.sort((a, b) => a.index - b.index);
             if (skippedImageCount > 0) {

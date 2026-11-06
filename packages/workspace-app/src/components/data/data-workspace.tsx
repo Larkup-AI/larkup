@@ -7,7 +7,7 @@ import Link from 'next/link';
 import useSWR, { useSWRConfig } from 'swr';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
-import type { CrawlJob, DataGroup, SourceDocument, IndexRun, RagConfig } from '@larkup/core/types';
+import type { CrawlJob, DataGroup, SourceDocument, RagConfig } from '@larkup/core/types';
 import { Globe, FileUp, Type, Image, Plug, History, Loader2, Plus, KeyRound } from 'lucide-react';
 import { ScrapePanel } from './scrape-panel';
 import { WebCrawlerStatus } from './web-crawler-status';
@@ -16,6 +16,7 @@ import { UploadPanel } from './upload-panel';
 import { MediaPanel } from './media-panel';
 import { IntegrationsPanel } from './integrations-panel';
 import { JobsPanel } from './jobs-panel';
+import { FileIndexingJobsPanel, type FileIndexStatus } from './file-indexing-jobs-panel';
 import {
   isActiveMediaIndexing,
   MediaIndexingJobsPanel,
@@ -156,12 +157,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
   const jobs = jobsQuery.data?.jobs ?? [];
   const hasActiveCrawlJobs = jobs.some((j) => j.status === 'running' || j.status === 'queued');
 
-  const indexQuery = useSWR<{
-    unindexedCount: number;
-    running: boolean;
-    run: IndexRun | null;
-    blockers: string[];
-  }>(workspaceUrl('/api/index'), fetcher, {
+  const indexQuery = useSWR<FileIndexStatus>(workspaceUrl('/api/index'), fetcher, {
     refreshInterval: (d) => (d?.running ? 2000 : 0),
   });
   const indexRunning = indexQuery.data?.running ?? false;
@@ -185,7 +181,11 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
     .filter((job) => job.status === 'running' || job.status === 'queued')
     .reduce((count, job) => count + (job.targets?.length || 1), 0);
   const activeJobCount = activeCrawlTargetCount + activeMediaAssets.length + (indexRunning ? 1 : 0);
-  const hasJobsDrawerContent = jobs.length > 0 || hasActiveMedia || indexRunning;
+  const hasJobsDrawerContent =
+    jobs.length > 0 ||
+    hasActiveMedia ||
+    indexRunning ||
+    Boolean(indexQuery.data?.sources?.some((source) => source.status === 'failed'));
   const activeOrAttentionJobs = jobs.filter((job) => job.status !== 'completed');
   const completedJobs = jobs.filter((job) => job.status === 'completed');
   const [jobsFilterTab, setJobsFilterTab] = useState<'running' | 'all'>('running');
@@ -476,22 +476,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
               </button>
             </div>
             <MediaIndexingJobsPanel assets={activeMediaAssets} />
-            {indexRunning && (
-              <div
-                className={cn(
-                  'flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5',
-                  activeMediaAssets.length > 0 && 'mt-3',
-                )}
-              >
-                <Loader2 className="size-4 shrink-0 animate-spin text-emerald-600" />
-                <div className="min-w-0">
-                  <p className="text-xs font-medium">Indexing files</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Running in the background — new files will join the queue.
-                  </p>
-                </div>
-              </div>
-            )}
+            <FileIndexingJobsPanel status={indexQuery.data} />
             {jobs.length > 0 && (
               <div
                 className={cn(activeMediaAssets.length > 0 && 'mt-4 border-t border-border pt-4')}
