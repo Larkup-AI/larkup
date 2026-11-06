@@ -59,7 +59,12 @@ import {
   continuesRecentMediaTopic,
   resolveParallelPreferenceQuestion,
 } from '../../../lib/chat/conversation-memory';
-import { PERSONALIZED_RESPONSE_STYLE } from '../../../lib/chat/response-style';
+import {
+  PERSONALIZED_RESPONSE_STYLE,
+  evidenceCoverageRequirement,
+  namedComparisonLabelRequirement,
+  numberedCategoryGroupingRequirement,
+} from '../../../lib/chat/response-style';
 import {
   compactToolContextForModel,
   collectAnswerLevelMediaStatements,
@@ -424,7 +429,7 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
     unverifiedMedia
       ? 'The verification status above limits certainty, not access to the source material. Give the most useful source-grounded answer that is supported.'
       : "Answer the user's question directly from this evidence."
-  } Answer only the current question above. Never repeat an earlier answer when the current question introduces a different subject. Do not mention tools, retrieval, frames, transcripts, or analysis.`;
+  }${numberedCategoryGroupingRequirement(question)}${namedComparisonLabelRequirement(question)}${evidenceCoverageRequirement(question)} Answer only the current question above. Never repeat an earlier answer when the current question introduces a different subject. Do not mention tools, retrieval, frames, transcripts, or analysis.`;
 }
 
 /**
@@ -1335,6 +1340,9 @@ ${fieldLines}`;
     (skillInstructions ? `\nAVAILABLE AGENT SKILLS:\n${skillInstructions}\n` : '') +
     'Never print a tool name, JSON arguments, or tool-call syntax in a user-facing answer. Use tools silently, then give the result in natural language.\n' +
     CHAT_POLICY +
+    numberedCategoryGroupingRequirement(userText) +
+    namedComparisonLabelRequirement(userText) +
+    evidenceCoverageRequirement(userText) +
     tabularContext +
     docContext +
     (imagePreviewFollowUp || tabularFollowUp || reusesPriorEvidence || isExplicitVideoCorrection

@@ -2,11 +2,19 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { TabularDatasetMeta } from '@larkup/core/tabular-store';
 import {
+  analysisCodeValidationError,
   analysisValidationRequirements,
+  appendExplicitValidationZeroCounts,
+  normalizePercentagePrecisionInStdout,
   isLikelyTabularQuestion,
   hasExhaustedAnalysisAttempts,
   requiresMultiDatasetAnalysis,
+  requiresTabularSandbox,
+  repairUnavailableTabularDatasetReferences,
   resolveTabularDatasetReferences,
+  shouldUseRecentAnalysisTable,
+  splitTabularDatasetReferences,
+  tabularDatasetIdsReferencedByCode,
   tabularDatasetIdsForAnalysis,
   tabularDatasetIdsRequiredByQuestion,
   tabularRelationships,
@@ -47,12 +55,37 @@ test('routes a cross-file safety question to multi-dataset analysis without requ
   );
 });
 
+test('mounts every exact dataset filename read by generated code', () => {
+  assert.deepEqual(
+    tabularDatasetIdsReferencedByCode(
+      'patients = pd.read_csv(\'patients.csv\')\nevents = pd.read_csv("adverse_events.csv")',
+      datasets,
+    ),
+    ['patients', 'events'],
+  );
+});
+
 test('routes a site missed-visit question to multi-dataset analysis from filenames and schemas', () => {
   assert.equal(
     requiresMultiDatasetAnalysis(
       'Which sites have the highest missed-visit rate? Include site name and status totals.',
       datasets,
     ),
+    true,
+  );
+});
+
+test('fresh multi-file questions never reuse the preceding analysis table', () => {
+  assert.equal(
+    shouldUseRecentAnalysisTable(
+      'How many distinct patients have an out-of-range laboratory result and an adverse event?',
+      datasets,
+      true,
+    ),
+    false,
+  );
+  assert.equal(
+    shouldUseRecentAnalysisTable('Calculate the average from this result.', datasets, true),
     true,
   );
 });
@@ -125,9 +158,25 @@ test('adds denominator, join, and chart validation requirements from user intent
     'Chart adverse event incidence per patient across files by arm.',
   );
   assert.match(requirements, /numerator and denominator separately/i);
+  assert.match(requirements, /denominator from the complete subject or population table/i);
+  assert.match(requirements, /percentages rounded to one decimal place/i);
   assert.match(requirements, /join keys/i);
   assert.match(requirements, /plotted grouping/i);
   assert.match(requirements, /source filenames/i);
+  assert.match(
+    analysisValidationRequirements('Create a monitoring summary for both trials.'),
+    /human-readable code or name/i,
+  );
+  assert.match(
+    analysisValidationRequirements('Compare visit 1 versus later visits.'),
+    /never interpret a globally unique visit ID/i,
+  );
+  assert.match(
+    analysisValidationRequirements(
+      'Validate duplicates, orphan foreign keys, and adverse events before enrollment.',
+    ),
+    /explicit numeric zero/i,
+  );
 });
 
 test('routes key integrity validation through tabular analysis', () => {
@@ -141,8 +190,64 @@ test('routes key integrity validation through tabular analysis', () => {
   );
 });
 
+test('routes ranked entity rates through analysis instead of a lossy grouped query', () => {
+  assert.equal(
+    requiresTabularSandbox(
+      'Which three sites have the highest missed-visit rates? Report missed count, scheduled count, and missed percentage for each, sorted highest first.',
+    ),
+    true,
+  );
+});
+
+test('routes exhaustive relational integrity validation through analysis', () => {
+  assert.equal(
+    requiresTabularSandbox(
+      'Validate primary-key duplicates, orphan patient/visit foreign keys, and adverse-event onset dates before enrollment. Report every detected inconsistency.',
+    ),
+    true,
+  );
+});
+
+test('routes longitudinal visit comparisons through related-table analysis', () => {
+  assert.equal(
+    requiresTabularSandbox(
+      'Compare out-of-range biomarker percentages at visit 1 versus later visits by treatment arm. Which analyte/arm has the largest increase?',
+    ),
+    true,
+  );
+});
+
+test('routes grouped severity charts through related-table analysis', () => {
+  assert.equal(
+    requiresTabularSandbox(
+      'Generate a grouped adverse-event severity chart by arm, and summarize serious events and grade 3+ events.',
+    ),
+    true,
+  );
+});
+
+test('routes multi-cohort charted monitoring summaries through analysis', () => {
+  assert.equal(
+    requiresTabularSandbox(
+      'Create a concise clinical trial monitoring summary for both trials with a chart. Include status, target enrollment, current enrolled patients, enrollment gap, missed-visit risk, and safety signal.',
+    ),
+    true,
+  );
+});
+
 test('keeps a calculation whose columns coexist in one dataset on the single-table path', () => {
   assert.equal(requiresMultiDatasetAnalysis('Compare average age by arm.', datasets), false);
+});
+
+test('routes composite dashboards and confidence intervals through code analysis', () => {
+  assert.equal(
+    requiresTabularSandbox('Generate a demographics dashboard with dropout rate by arm.'),
+    true,
+  );
+  assert.equal(
+    requiresTabularSandbox('Using complete cases, report a normal 95% confidence interval.'),
+    true,
+  );
 });
 
 test('resolves exact dataset filenames and stems to stored IDs without guessing', () => {
@@ -151,6 +256,150 @@ test('resolves exact dataset filenames and stems to stored IDs without guessing'
     ['patients', 'events', 'visits'],
   );
   assert.deepEqual(resolveTabularDatasetReferences(['missing.csv'], datasets), ['missing.csv']);
+});
+
+test('splits comma-serialized dataset references emitted in a scalar field', () => {
+  assert.deepEqual(splitTabularDatasetReferences(['visits-id, sites-id']), [
+    'visits-id',
+    'sites-id',
+  ]);
+});
+
+test('appends numeric zero counts for empty integrity findings', () => {
+  assert.match(
+    appendExplicitValidationZeroCounts(
+      'Validate duplicates, orphan foreign keys, and events before enrollment.',
+      "{'duplicated_visit_ids': [], 'orphan_patient_ids': [], 'events_before_enrollment': []}",
+    ),
+    /duplicated visit ids count: 0[\s\S]*orphan patient ids count: 0[\s\S]*events before enrollment count: 0/i,
+  );
+  assert.match(
+    appendExplicitValidationZeroCounts(
+      'Validate events before enrollment.',
+      'ae_before_enrollment: 0',
+    ),
+    /ae before enrollment count: 0/i,
+  );
+});
+
+test('normalizes displayed percentage evidence to one decimal by default', () => {
+  assert.equal(
+    normalizePercentagePrecisionInStdout(
+      'Report missed count, scheduled count, and missed percentage.',
+      'Munich 13 218 5.963303\nMadrid 12 225 5.333333\nBoston 18 351 5.128205',
+    ),
+    'Munich 13 218 5.963303\nMadrid 12 225 5.333333\nBoston 18 351 5.128205\ndisplay percentage values (1 decimal): 6.0, 5.3, 5.1',
+  );
+  assert.equal(
+    normalizePercentagePrecisionInStdout('Report the value to 3 decimal places.', 'effect 4.321'),
+    'effect 4.321',
+  );
+});
+
+test('rejects treating a global visit foreign key as the visit sequence', () => {
+  assert.match(
+    analysisCodeValidationError(
+      'Compare percentages at visit 1 versus later visits.',
+      "visit1 = labs[labs['visit_id'] == 1]",
+    ) ?? '',
+    /visit_id is a relationship key/i,
+  );
+  assert.equal(
+    analysisCodeValidationError(
+      'Compare percentages at visit 1 versus later visits.',
+      "visit1 = labs[labs['visit_number'] == 1]",
+    ),
+    undefined,
+  );
+  assert.match(
+    analysisCodeValidationError(
+      'Compare percentages at visit 1 versus later visits.',
+      "labs['visit_group'] = labs['visit_id'].map(lambda x: 'visit_1' if x == 1 else 'later')",
+    ) ?? '',
+    /visit_id is a relationship key/i,
+  );
+});
+
+test('rejects a safety incidence denominator derived from event-joined rows', () => {
+  const invalid = [
+    "merged = adae.merge(adsl, on='USUBJID')",
+    "safety_pop = merged[merged['SAFFL'] == 'Y']",
+    "safety_sizes = safety_pop.groupby('ARM')['USUBJID'].nunique()",
+  ].join('\n');
+  assert.match(
+    analysisCodeValidationError(
+      'Report the percent of safety subjects with a TEAE in each arm.',
+      invalid,
+    ) ?? '',
+    /complete subject table/i,
+  );
+  assert.equal(
+    analysisCodeValidationError(
+      'Report the percent of safety subjects with a TEAE in each arm.',
+      "safety_sizes = adsl[adsl['SAFFL'] == 'Y'].groupby('ARM')['USUBJID'].nunique()",
+    ),
+    undefined,
+  );
+
+  assert.match(
+    analysisCodeValidationError(
+      'Report the percent of safety subjects with a TEAE in each arm.',
+      [
+        "merged = adsl.merge(adae, on='USUBJID', how='left')",
+        "merged['TEAE'] = merged['TRTEMFL'] == 'Y'",
+        "teae_by_arm = merged.groupby('ARM')['TEAE'].mean()",
+      ].join('\n'),
+    ) ?? '',
+    /weights subjects by their number of events/i,
+  );
+});
+
+test('rejects summing event rows as the count of patients with any event', () => {
+  assert.match(
+    analysisCodeValidationError(
+      'Report patients with any AE as a percentage.',
+      [
+        "merged['has_ae'] = merged['ae_id'].notnull()",
+        "ae_patients = merged.groupby('arm').agg(patients_with_ae=('has_ae', 'sum'))",
+      ].join('\n'),
+    ) ?? '',
+    /counts one patient repeatedly/i,
+  );
+  assert.equal(
+    analysisCodeValidationError(
+      'Report patients with any AE as a percentage.',
+      "patients_with_ae = events.groupby('arm')['patient_id'].nunique()",
+    ),
+    undefined,
+  );
+  assert.equal(
+    analysisCodeValidationError(
+      'Report patients with any AE as a percentage.',
+      [
+        "patients['has_ae'] = patients['patient_id'].isin(ae_patients['patient_id'])",
+        "summary = patients.groupby('arm').agg(patients_with_ae=('has_ae', 'sum'))",
+      ].join('\n'),
+    ),
+    undefined,
+  );
+});
+
+test('repairs opaque dataset ID typos only when code filenames identify every missing source', () => {
+  const code = ["patients = pd.read_csv('patients.csv')", "sites = pd.read_csv('sites.csv')"].join(
+    '\n',
+  );
+  assert.deepEqual(
+    repairUnavailableTabularDatasetReferences(['patients', 'site-typo'], code, datasets),
+    ['patients', 'sites'],
+  );
+  assert.deepEqual(
+    repairUnavailableTabularDatasetReferences(
+      ['patients', 'unknown-a', 'unknown-b'],
+      code,
+      datasets,
+    ),
+    ['patients', 'unknown-a', 'unknown-b'],
+  );
 });
 
 test('remaps model-authored source filenames and dataset IDs to mounted sandbox files', () => {

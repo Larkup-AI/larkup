@@ -77,6 +77,7 @@ describe('tabular sandbox files', () => {
           columns: ['Name', 'Amount'],
         },
       ],
+      relationships: [],
     });
   });
 

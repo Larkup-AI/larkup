@@ -156,6 +156,11 @@ export function remapSingleDatasetRead(code: string): string {
   });
 }
 
+/** Remove accidental one-space indentation from generated top-level Python. */
+export function repairAccidentalTopLevelPythonIndent(code: string): string {
+  return code.replace(/^ (?=\S)/gm, '');
+}
+
 /**
  * Notebook-style planners often leave a DataFrame, mapping, or tuple as the
  * final expression. Python scripts discard that value, so expose only a
@@ -167,14 +172,150 @@ export function printBareFinalPythonExpression(code: string) {
   while (index >= 0 && (!lines[index].trim() || lines[index].trim().startsWith('#'))) index -= 1;
   if (index < 0) return code;
   const expression = lines[index].trim();
+  if (expression === '}') {
+    let quote: "'" | '"' | "'''" | '\"\"\"' | undefined;
+    let escaped = false;
+    let comment = false;
+    let depth = 0;
+    let opening = -1;
+    let finalRange: { start: number; end: number } | undefined;
+    for (let cursor = 0; cursor < code.length; cursor += 1) {
+      const character = code[cursor];
+      if (comment) {
+        if (character === '\n') comment = false;
+        continue;
+      }
+      if (quote) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (character === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (quote.length === 3) {
+          if (code.slice(cursor, cursor + 3) === quote) {
+            cursor += 2;
+            quote = undefined;
+          }
+        } else if (character === quote) {
+          quote = undefined;
+        }
+        continue;
+      }
+      if (character === '#') {
+        comment = true;
+        continue;
+      }
+      if (character === "'" || character === '"') {
+        const triple = character.repeat(3) as "'''" | '\"\"\"';
+        if (code.slice(cursor, cursor + 3) === triple) {
+          quote = triple;
+          cursor += 2;
+        } else {
+          quote = character;
+        }
+        continue;
+      }
+      if (character === '{') {
+        if (depth === 0) opening = cursor;
+        depth += 1;
+      } else if (character === '}' && depth > 0) {
+        depth -= 1;
+        if (depth === 0 && opening >= 0) finalRange = { start: opening, end: cursor + 1 };
+      }
+    }
+    if (finalRange && !code.slice(finalRange.end).trim()) {
+      const lineStart = code.lastIndexOf('\n', finalRange.start - 1) + 1;
+      if (!code.slice(lineStart, finalRange.start).trim()) {
+        const dictionary = code.slice(finalRange.start, finalRange.end);
+        return `${code.slice(0, finalRange.start)}print(repr((${dictionary})))${code.slice(finalRange.end)}`;
+      }
+    }
+  }
   const identifier = '[A-Za-z_]\\w*';
   const literal = `(?:${identifier}|[-+]?\\d+(?:\\.\\d+)?|['"][^'"]*['"])`;
   const isBareIdentifier = new RegExp(`^${identifier}$`).test(expression);
+  const mappingSelection = expression.match(
+    new RegExp(`^(${identifier})\\s*\\[\\s*['"][^'"]+['"]\\s*\\]$`),
+  );
+  const isCompleteMappingSelection = Boolean(
+    mappingSelection && new RegExp(`^\\s*${mappingSelection[1]}\\s*=\\s*\\{`, 'm').test(code),
+  );
   const isSimpleTuple = new RegExp(`^\\(?${literal}(?:\\s*,\\s*${literal})+\\)?$`).test(expression);
-  if (!isBareIdentifier && !isSimpleTuple) return code;
+  const isSelectedColumnsTuple = new RegExp(`^${identifier}\\s*\\[.+\\]\\s*,\\s*.+$`).test(
+    expression,
+  );
+  const isResultAndRecordsTuple = new RegExp(
+    `^${identifier}\\s*,\\s*${identifier}(?:\\s*\\[[^\\n]+\\])?\\s*\\.\\s*to_dict\\s*\\([^\\n]*\\)$`,
+  ).test(expression);
+  const isSelectedColumns = new RegExp(
+    `^${identifier}\\s*\\[\\s*\\[\\s*['"][^'"]+['"](?:\\s*,\\s*['"][^'"]+['"])*\\s*\\]\\s*\\]$`,
+  ).test(expression);
+  const isToDictCall = new RegExp(
+    `^${identifier}(?:\\s*\\[[^\\n]+\\])?\\s*\\.\\s*to_dict\\s*\\([^\\n]*\\)$`,
+  ).test(expression);
+  if (
+    !isBareIdentifier &&
+    !isCompleteMappingSelection &&
+    !isSimpleTuple &&
+    !isSelectedColumnsTuple &&
+    !isResultAndRecordsTuple &&
+    !isSelectedColumns &&
+    !isToDictCall
+  ) {
+    return code;
+  }
   const indentation = lines[index].match(/^\s*/)?.[0] ?? '';
-  lines[index] = `${indentation}print(repr(${expression}))`;
+  if (isSelectedColumns) {
+    lines[index] = `${indentation}print((${expression}).to_string(index=False))`;
+    return lines.join('\n');
+  }
+  if (isBareIdentifier) {
+    lines[index] = `${indentation}_larkup_print_result(${expression})`;
+    return lines.join('\n');
+  }
+  if (isToDictCall) {
+    lines[index] = `${indentation}_larkup_print_result(${expression})`;
+    return lines.join('\n');
+  }
+  if (isCompleteMappingSelection && mappingSelection) {
+    lines[index] = `${indentation}_larkup_print_result(${mappingSelection[1]})`;
+    return lines.join('\n');
+  }
+  if (isSimpleTuple || isSelectedColumnsTuple || isResultAndRecordsTuple) {
+    lines[index] = `${indentation}_larkup_print_result((${expression}))`;
+    return lines.join('\n');
+  }
+  // Parenthesize the expression explicitly. An unparenthesized tuple such as
+  // `count, examples, explanation` would otherwise become repr(a, b, c),
+  // which raises because repr accepts one argument.
+  lines[index] = `${indentation}print(repr((${expression})))`;
   return lines.join('\n');
+}
+
+/** Route simple explicit prints through the same stable DataFrame formatter. */
+export function remapSimplePythonPrints(code: string) {
+  return code.replace(
+    /(^|\n)(\s*)print\(\s*([A-Za-z_]\w*)\s*\)(?=\s*(?:\n|$))/gu,
+    (_match, lineStart: string, indentation: string, identifier: string) =>
+      `${lineStart}${indentation}_larkup_print_result(${identifier})`,
+  );
+}
+
+/** Preserve notebook-style scalar tuples that appear before later explanation code. */
+export function printBareTopLevelPythonTuples(code: string) {
+  const tuple = /^([A-Za-z_]\w*)(\s*,\s*[A-Za-z_]\w*)+\s*$/;
+  const identifierAndCall = /^([A-Za-z_]\w*)\s*,\s*[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\([^\n]*\)\s*$/;
+  return code
+    .split('\n')
+    .map((line) =>
+      tuple.test(line) || identifierAndCall.test(line)
+        ? `_larkup_print_result((${line.trim()}))`
+        : line,
+    )
+    .join('\n');
 }
 
 /** Repair string comparisons emitted for CSV columns that parsed as booleans. */
@@ -202,12 +343,127 @@ export function remapBooleanStringLiterals(code: string, datasets: TabularDatase
     (column) => code.includes(JSON.stringify(column)) || code.includes(`'${column}'`),
   );
   if (!referencesBooleanColumn) return code;
-  return code.replace(/(['"])True\1/g, 'True').replace(/(['"])False\1/g, 'False');
+  let repaired = code;
+  for (const column of booleanColumns) {
+    const escapedColumn = column.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const stringAccessor = `(\\b[A-Za-z_]\\w*\\s*\\[\\s*['"]${escapedColumn}['"]\\s*\\])\\.str\\.lower\\(\\)`;
+    const booleanStringAccessor = (value: 'true' | 'false') =>
+      new RegExp(`${stringAccessor}\\.eq\\(\\s*['"]${value}['"]\\s*\\)`, 'gi');
+    const booleanStringComparison = (operator: '==' | '!=', value: 'true' | 'false') =>
+      new RegExp(`${stringAccessor}\\s*${operator}\\s*['"]${value}['"]`, 'gi');
+    repaired = repaired
+      .replace(booleanStringAccessor('true'), '$1.eq(True)')
+      .replace(booleanStringAccessor('false'), '$1.eq(False)')
+      .replace(booleanStringComparison('==', 'true'), '$1 == True')
+      .replace(booleanStringComparison('==', 'false'), '$1 == False')
+      .replace(booleanStringComparison('!=', 'true'), '$1 != True')
+      .replace(booleanStringComparison('!=', 'false'), '$1 != False');
+  }
+  return repaired.replace(/(['"])True\1/g, 'True').replace(/(['"])False\1/g, 'False');
 }
 
 /** Route model-authored saved figures through the sandbox's captured display hook. */
 export function remapSavedFiguresToShow(code: string) {
   return code.replace(/\b(?:plt|fig)\.savefig\([^\n]*\)/g, 'plt.show()');
+}
+
+/** Apply Python's own unambiguous identifier suggestion before the one retry. */
+export function repairSuggestedPythonNameError(code: string, stderr: string) {
+  const suggestion = stderr.match(
+    /NameError: name '([A-Za-z_]\w*)' is not defined\. Did you mean: '([A-Za-z_]\w*)'\?/,
+  );
+  if (!suggestion || suggestion[1] === suggestion[2]) return code;
+  return code.replace(new RegExp(`\\b${suggestion[1]}\\b`, 'g'), suggestion[2]);
+}
+
+/** Repair a common pandas misconception: merge keys are not given _y suffixes. */
+export function repairMissingPandasMergeKeySuffix(code: string, stderr: string) {
+  const missing = stderr.match(/KeyError:\s*['"]([A-Za-z_]\w*)_y['"]/);
+  if (!missing) return code;
+  const key = missing[1];
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const framePattern = new RegExp(
+    `\\b([A-Za-z_]\\w*)\\s*\\[\\s*['"]${escapedKey}_y['"]\\s*\\]`,
+    'g',
+  );
+  const frames = [...code.matchAll(framePattern)].map((match) => match[1]);
+  if (frames.length === 0) return code;
+
+  let repaired = code;
+  for (const frame of new Set(frames)) {
+    const escapedFrame = frame.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const mergePattern = new RegExp(
+      `^(\\s*${escapedFrame}\\s*=\\s*(?:pd|pandas)\\.merge\\([^\\n]*\\))$`,
+      'm',
+    );
+    const merge = repaired.match(mergePattern)?.[1];
+    if (
+      !merge ||
+      !new RegExp(`\\bon\\s*=\\s*['"]${escapedKey}['"]`).test(merge) ||
+      !/\bhow\s*=\s*['"]left['"]/.test(merge)
+    ) {
+      continue;
+    }
+    if (!/\bindicator\s*=/.test(merge)) {
+      repaired = repaired.replace(merge, merge.replace(/\)$/, ', indicator=True)'));
+    }
+    const access = `${escapedFrame}\\s*\\[\\s*['"]${escapedKey}_y['"]\\s*\\]`;
+    repaired = repaired
+      .replace(new RegExp(`~\\s*${access}\\.isna\\(\\)`, 'g'), `${frame}['_merge'].eq('both')`)
+      .replace(
+        new RegExp(`${access}\\.(?:notna|notnull)\\(\\)`, 'g'),
+        `${frame}['_merge'].eq('both')`,
+      )
+      .replace(
+        new RegExp(`${access}\\.(?:isna|isnull)\\(\\)`, 'g'),
+        `${frame}['_merge'].eq('left_only')`,
+      );
+  }
+  return repaired;
+}
+
+/** Prefer the left copy when pandas suffixes a duplicated non-key merge column. */
+export function repairMissingPandasMergeColumnSuffix(
+  code: string,
+  stderr: string,
+  datasets: TabularDataset[],
+) {
+  const missing = stderr.match(/KeyError:\s*['"]([A-Za-z_]\w*)['"]/);
+  if (!missing || missing[1].endsWith('_x') || missing[1].endsWith('_y')) return code;
+  const column = missing[1];
+  const datasetCount = datasets.filter((dataset) =>
+    dataset.columns.some((candidate) => candidate.name === column),
+  ).length;
+  if (datasetCount < 2) return code;
+
+  const escapedColumn = column.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const accessPattern = new RegExp(
+    `\\b([A-Za-z_]\\w*)\\s*\\[\\s*['"]${escapedColumn}['"]\\s*\\]`,
+    'g',
+  );
+  const frames = [...code.matchAll(accessPattern)].map((match) => match[1]);
+  let repaired = code;
+  for (const frame of new Set(frames)) {
+    const escapedFrame = frame.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const createsMergedFrame = new RegExp(
+      `^\\s*${escapedFrame}\\s*=\\s*[^\\n]*\\.merge\\s*\\(`,
+      'm',
+    ).test(code);
+    if (!createsMergedFrame) continue;
+    repaired = repaired.replace(
+      new RegExp(`\\b${escapedFrame}\\s*\\[\\s*(['"])${escapedColumn}\\1\\s*\\]`, 'g'),
+      `${frame}['${column}_x']`,
+    );
+  }
+  return repaired;
+}
+
+/** Remove a terminal escape that consumes the only closing quote on a Python line. */
+export function repairEscapedPythonClosingQuote(code: string) {
+  return code
+    .split('\n')
+    .map((line) => line.replace(/\\(["'])(\s*\))\s*$/, '$1$2'))
+    .join('\n');
 }
 
 function decodeSimplePythonString(value: string) {
@@ -279,10 +535,18 @@ export function remapSingleDatasetColumnReferences(code: string, dataset: Tabula
     ),
   );
 
-  return repairedCode.replace(stringLiteral, (literal, _quote: string, encoded: string) => {
-    const authored = decodeSimplePythonString(encoded);
-    if (columns.includes(authored)) return literal;
-    const column = matchingSchemaColumn(authored, columns);
-    return column ? JSON.stringify(column) : literal;
-  });
+  return repairedCode.replace(
+    stringLiteral,
+    (literal, _quote: string, encoded: string, offset: number) => {
+      // Column repair applies to ordinary literals used as dataframe keys. An
+      // f-string is output text whose embedded column references must stay
+      // intact; replacing the whole label (for example "Dropout Rate in
+      // {row['arm']}") with "arm" destroys otherwise correct artifacts.
+      if (offset > 0 && /[fFrRbBuU]/u.test(repairedCode[offset - 1])) return literal;
+      const authored = decodeSimplePythonString(encoded);
+      if (columns.includes(authored)) return literal;
+      const column = matchingSchemaColumn(authored, columns);
+      return column ? JSON.stringify(column) : literal;
+    },
+  );
 }

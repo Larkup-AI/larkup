@@ -107,7 +107,7 @@ function referencedDocumentLabels(question: string): string[] {
     ...question
       .toLocaleLowerCase()
       .matchAll(
-        /\b(fig(?:ure)?|diagram|chart|graph|illustration|table|eq(?:uation)?|section|chapter|appendix)\.?\s*(\d+(?:\.\d+)+)\b/gu,
+        /\b(fig(?:ure)?|diagram|chart|graph|illustration|table|eq(?:uation)?|section|chapter|appendix)\.?\s*(\d+(?:\.\d+)*)\b/gu,
       ),
   ];
   const labels = matches.flatMap((match) => {
@@ -157,31 +157,62 @@ export function selectRelevantPdfPages(
   const documentFrequency = new Map(
     terms.map((term) => [term, pageText.filter((text) => text.includes(term)).length]),
   );
-  return pages
-    .map((page, index) => {
-      const text = pageText[index];
-      const score = terms.reduce((total, term) => {
-        const count = text.match(new RegExp(`\\b${escapeRegExp(term)}\\b`, 'gu'))?.length ?? 0;
-        const frequency = documentFrequency.get(term) ?? pages.length;
-        // A term found on only one or two pages is a stronger page anchor
-        // than common prose found throughout the document or its contents.
-        const specificity = Math.log((pages.length + 1) / (frequency + 1)) + 1;
-        return total + count * specificity;
-      }, 0);
-      // A caption such as "Figure 5.1" is much more precise than its
-      // individual number tokens, which can occur throughout a long paper.
-      // Prefer the declaration/caption page over a preceding sentence that
-      // merely says "see Figure 5.1".
-      const labelScore = labels.reduce(
-        (total, label) =>
-          total + (text.includes(label) ? 20 : 0) + declaredDocumentLabelScore(text, label),
-        0,
-      );
-      return { pageNumber: page.num, score: score + labelScore };
-    })
-    .sort((left, right) => right.score - left.score || left.pageNumber - right.pageNumber)
-    .slice(0, limit)
-    .map((page) => page.pageNumber);
+  const candidates = pages.map((page, index) => {
+    const text = pageText[index];
+    const termScores = new Map<string, number>();
+    const score = terms.reduce((total, term) => {
+      const count = text.match(new RegExp(`\\b${escapeRegExp(term)}\\b`, 'gu'))?.length ?? 0;
+      const frequency = documentFrequency.get(term) ?? pages.length;
+      // A term found on only one or two pages is a stronger page anchor
+      // than common prose found throughout the document or its contents.
+      const specificity = Math.log((pages.length + 1) / (frequency + 1)) + 1;
+      const contribution = count * specificity;
+      if (contribution > 0) termScores.set(term, contribution);
+      return total + contribution;
+    }, 0);
+    // A caption such as "Figure 5.1" is much more precise than its
+    // individual number tokens, which can occur throughout a long paper.
+    // Prefer the declaration/caption page over a preceding sentence that
+    // merely says "see Figure 5.1".
+    const labelScores = new Map<string, number>();
+    const labelScore = labels.reduce((total, label) => {
+      const contribution =
+        (text.includes(label) ? 20 : 0) + declaredDocumentLabelScore(text, label);
+      if (contribution > 0) labelScores.set(label, contribution);
+      return total + contribution;
+    }, 0);
+    return { pageNumber: page.num, score: score + labelScore, termScores, labelScores };
+  });
+
+  const selected: typeof candidates = [];
+  const coveredTerms = new Set<string>();
+  const coveredLabels = new Set<string>();
+  while (selected.length < Math.min(limit, candidates.length)) {
+    const remaining = candidates.filter(
+      (candidate) => !selected.some((page) => page.pageNumber === candidate.pageNumber),
+    );
+    remaining.sort((left, right) => {
+      const selectionScore = (candidate: (typeof candidates)[number]) => {
+        if (selected.length === 0) return candidate.score;
+        const novelTerms = [...candidate.termScores].reduce(
+          (total, [term, score]) => total + (coveredTerms.has(term) ? 0 : score),
+          0,
+        );
+        const novelLabels = [...candidate.labelScores].reduce(
+          (total, [label, score]) => total + (coveredLabels.has(label) ? 0 : score),
+          0,
+        );
+        return (novelTerms + novelLabels) * 4 + candidate.score * 0.05;
+      };
+      return selectionScore(right) - selectionScore(left) || left.pageNumber - right.pageNumber;
+    });
+    const next = remaining[0];
+    if (!next) break;
+    selected.push(next);
+    for (const term of next.termScores.keys()) coveredTerms.add(term);
+    for (const label of next.labelScores.keys()) coveredLabels.add(label);
+  }
+  return selected.map((page) => page.pageNumber);
 }
 
 function escapeRegExp(value: string): string {

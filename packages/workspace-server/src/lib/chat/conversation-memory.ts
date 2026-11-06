@@ -564,12 +564,18 @@ function isNearComparisonWord(word: string): boolean {
   const targets = ['biggest', 'largest', 'highest', 'smallest', 'lowest', 'least', 'most', 'top'];
   if (targets.includes(word)) return true;
   // Do not fuzz short function words such as "was" into "most". Fuzzy
-  // matching is only for a meaningful comparison word like "begisst".
+  // matching is only for a meaningful comparison typo like "begisst". Keep
+  // the initial letter stable so ordinary analytical words such as "chart",
+  // "treat", and "target" cannot become "least" or "largest".
   return (
     word.length >= 5 &&
     targets
       .filter((target) => target.length >= 5)
-      .some((target) => editDistanceAtMost(word, target, 3))
+      .some(
+        (target) =>
+          word[0] === target[0] &&
+          editDistanceAtMost(word, target, word.length >= 7 && target.length >= 7 ? 3 : 2),
+      )
   );
 }
 
@@ -609,7 +615,10 @@ export function isTabularFollowUp(text: string, evidence: ConversationEvidence):
     const columnTerms = column.toLocaleLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? [];
     return columnTerms.some((term) => term.length >= 3 && words.includes(term));
   });
-  const comparison = words.some(isNearComparisonWord);
+  // A bare "which is biggest?" is a useful follow-up. A full new analytical
+  // request that happens to ask for its largest result is not: it needs fresh
+  // source routing instead of inheriting a stale bounded table.
+  const comparison = words.length <= 12 && words.some(isNearComparisonWord);
   return directReference || tableColumnReference || comparison;
 }
 

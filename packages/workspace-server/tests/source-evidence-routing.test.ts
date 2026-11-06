@@ -9,6 +9,7 @@ import {
   isAnalysisArtifactFollowUp,
   isDirectTabularPresentationFollowUp,
   isImagePreviewFollowUp,
+  isTabularFollowUp,
 } from '../src/lib/chat/conversation-memory.ts';
 import {
   retrievalFallbackMediaAsset,
@@ -216,6 +217,29 @@ test('a new chart question does not silently reuse an unrelated prior table', ()
     false,
   );
   assert.equal(isDirectTabularPresentationFollowUp('Chart the previous result.', evidence), true);
+});
+
+test('new substantive analyses do not become follow-ups through fuzzy comparison words', () => {
+  const evidence = {
+    sources: [],
+    images: [],
+    mediaAssetIds: [],
+    tabular: {
+      datasetId: 'prior-result',
+      columns: ['site_name', 'missed_count', 'scheduled_count', 'missed_percentage'],
+      rows: [{ site_name: 'Example', missed_count: 1, scheduled_count: 10, missed_percentage: 10 }],
+      totalRows: 1,
+    },
+  };
+  const newQuestions = [
+    'Validate primary-key duplicates, orphan patient/visit foreign keys, and adverse-event onset dates before enrollment. Report every detected inconsistency; do not treat expected missing actual visit dates as corruption.',
+    'Compare out-of-range biomarker percentages at visit 1 versus later visits by treatment arm. Which analyte/arm has the largest increase, and what are the two rates and percentage-point change?',
+    'Generate a grouped adverse-event severity chart by arm, and summarize serious events and grade 3+ events for treatment versus control_placebo. The chart data must match the source tables.',
+    'Create a concise clinical trial monitoring summary for both trials with a chart. Include status, target enrollment, current enrolled patients, enrollment gap, missed-visit risk, and safety signal. Keep each trial separate and state all source files used.',
+  ];
+
+  for (const question of newQuestions) assert.equal(isTabularFollowUp(question, evidence), false);
+  assert.equal(isTabularFollowUp('Which is higest?', evidence), true);
 });
 
 const recurringSubjectEvidence = {
