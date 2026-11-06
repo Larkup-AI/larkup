@@ -52,6 +52,7 @@ import {
   findImmediateExactGroundedAnswer,
   imagePreviewInput,
   isAnalysisArtifactFollowUp,
+  isDirectTabularPresentationFollowUp,
   isImagePreviewFollowUp,
   isTabularFollowUp,
   tabularEvidenceDatasetIsAvailable,
@@ -1287,7 +1288,9 @@ ${fieldLines}`;
   // evidence. A direct chart may reuse its visible rows only while the source
   // dataset still exists in the current project.
   const canAnswerFromRecentTable = false;
-  const tabularFollowUpNeedsVisualization = tabularFollowUp && requestsVisualization(userText);
+  const tabularFollowUpNeedsVisualization =
+    isDirectTabularPresentationFollowUp(userText, reusableEvidence) &&
+    requestsVisualization(userText);
   const reusableTabularDatasetStillExists = tabularEvidenceDatasetIsAvailable(
     reusableEvidence.tabular,
     availableTabularDatasetIds,
