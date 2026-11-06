@@ -73,7 +73,11 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
       {images.length > 0 && (
         <div className="space-y-3 p-4">
           {images.map((img, i) => (
-            <div key={i} className="overflow-hidden rounded-lg border border-border/40">
+            <div
+              key={i}
+              data-testid="analysis-artifact-image"
+              className="overflow-hidden rounded-lg border border-border/40"
+            >
               <img
                 src={`data:${img.mimeType};base64,${img.data}`}
                 alt={img.name}

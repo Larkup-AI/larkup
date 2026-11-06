@@ -101,9 +101,17 @@ import { assistantSourceScopeFingerprint } from '../../../lib/chat/assistant-sou
 import { inferTabularPlan } from '../../../lib/chat/tabular-query-plan';
 import {
   analysisValidationRequirements,
+  analysisCodeValidationError,
+  normalizePercentagePrecisionInStdout,
+  appendExplicitValidationZeroCounts,
   requestedLongAnalysisItemCount,
+  repairUnavailableTabularDatasetReferences,
   resolveTabularDatasetReferences,
   requiresMultiDatasetAnalysis,
+  requiresTabularSandbox,
+  shouldUseRecentAnalysisTable,
+  splitTabularDatasetReferences,
+  tabularDatasetIdsReferencedByCode,
   tabularDatasetIdsForAnalysis,
 } from '../../../lib/chat/tabular-routing';
 import {
@@ -116,15 +124,24 @@ import {
   createTabularSandboxFiles,
   remapLegacyMultiDatasetReads,
   remapMountedDatasetReads,
+  repairAccidentalTopLevelPythonIndent,
   printBareFinalPythonExpression,
+  printBareTopLevelPythonTuples,
   remapBooleanStringLiterals,
   remapSavedFiguresToShow,
+  repairEscapedPythonClosingQuote,
+  repairMissingPandasMergeKeySuffix,
+  repairMissingPandasMergeColumnSuffix,
+  repairSuggestedPythonNameError,
+  remapSimplePythonPrints,
   remapSingleDatasetColumnReferences,
   remapSingleDatasetRead,
   tabularRowsToCsv,
 } from '../../../lib/chat/tabular-sandbox-files';
 import {
+  analysisPresentationEvidence,
   extractAnalysisPresentation,
+  normalizeAnalysisPresentationForRequest,
   withAnalysisPresentationHelpers,
 } from '../../../lib/chat/analysis-presentation';
 import { validateAnalysisCompleteness } from '../../../lib/chat/analysis-completeness';
@@ -2825,22 +2842,55 @@ export async function getChatTools(context: {
           const sandboxManager = workspaceSandbox(resolveSandboxConfig(config));
           const files: SandboxFile[] = [];
 
-          const requestedDatasetIds = recentAnalysisTable
+          const availableDatasets = await readAssistantTabularDatasets();
+          const useRecentAnalysisTable = shouldUseRecentAnalysisTable(
+            requestText ?? '',
+            availableDatasets,
+            Boolean(recentAnalysisTable),
+          );
+          const requestedDatasetIds = useRecentAnalysisTable
             ? []
-            : [...new Set([...(datasetIds ?? []), ...(datasetId ? [datasetId] : [])])];
-          if (recentAnalysisTable) {
+            : [
+                ...new Set(
+                  splitTabularDatasetReferences([
+                    ...(datasetIds ?? []),
+                    ...(datasetId ? [datasetId] : []),
+                  ]),
+                ),
+              ];
+          if (useRecentAnalysisTable && recentAnalysisTable) {
             files.push({
               name: 'data.csv',
               content: tabularRowsToCsv(recentAnalysisTable.columns, recentAnalysisTable.rows),
             });
           }
-          const availableDatasets = await readAssistantTabularDatasets();
           requestedDatasetIds.splice(
             0,
             requestedDatasetIds.length,
             ...resolveTabularDatasetReferences(requestedDatasetIds, availableDatasets),
           );
-          if (requiresMultiDatasetAnalysis(requestText ?? '', availableDatasets)) {
+          requestedDatasetIds.splice(
+            0,
+            requestedDatasetIds.length,
+            ...repairUnavailableTabularDatasetReferences(
+              requestedDatasetIds,
+              code,
+              availableDatasets,
+            ),
+          );
+          // Providers sometimes put only one of several exact filenames in
+          // datasetId. Stage everything the generated program explicitly
+          // reads before deciding whether single-table rewrites are safe.
+          requestedDatasetIds.push(...tabularDatasetIdsReferencedByCode(code, availableDatasets));
+          requestedDatasetIds.splice(
+            0,
+            requestedDatasetIds.length,
+            ...new Set(requestedDatasetIds),
+          );
+          if (
+            requiresMultiDatasetAnalysis(requestText ?? '', availableDatasets) ||
+            requiresTabularSandbox(requestText ?? '')
+          ) {
             requestedDatasetIds.push(
               ...tabularDatasetIdsForAnalysis(requestText ?? '', availableDatasets),
             );
@@ -2855,7 +2905,7 @@ export async function getChatTools(context: {
           // schema, stage it automatically so `data.csv` remains a reliable
           // single-sheet contract. Ambiguous workbooks still require the
           // model to make an explicit selection.
-          if (requestedDatasetIds.length === 0 && !recentAnalysisTable) {
+          if (requestedDatasetIds.length === 0 && !useRecentAnalysisTable) {
             const automaticDatasetId = selectTabularDatasetForAnalysis(
               requestText,
               code,
@@ -2931,10 +2981,14 @@ export async function getChatTools(context: {
           // deterministic engine instead of asking generated code to satisfy them.
           if (matchingEngine) finalCode = matchingEngine;
           finalCode = remapBooleanStringLiterals(finalCode, mountedDatasets);
+          finalCode = repairEscapedPythonClosingQuote(finalCode);
+          finalCode = repairAccidentalTopLevelPythonIndent(finalCode);
           finalCode = remapSavedFiguresToShow(finalCode);
+          finalCode = remapSimplePythonPrints(finalCode);
+          finalCode = printBareTopLevelPythonTuples(finalCode);
           finalCode = printBareFinalPythonExpression(finalCode);
           finalCode = withAnalysisPresentationHelpers(finalCode, analysisTargetCount);
-          if (recentAnalysisTable) {
+          if (useRecentAnalysisTable) {
             finalCode = remapSingleDatasetRead(finalCode);
           } else if (requestedDatasetIds.length === 1) {
             finalCode = remapSingleDatasetRead(finalCode);
@@ -2956,6 +3010,13 @@ export async function getChatTools(context: {
             ) {
               finalCode = remapLegacyMultiDatasetReads(finalCode, requestedDatasetIds.length);
             }
+            finalCode = repairSuggestedPythonNameError(finalCode, result.stderr);
+            finalCode = repairMissingPandasMergeKeySuffix(finalCode, result.stderr);
+            finalCode = repairMissingPandasMergeColumnSuffix(
+              finalCode,
+              result.stderr,
+              mountedDatasets,
+            );
             // Apply regex patches for common LLM mistakes
             finalCode = finalCode.replace(/resample\((['"])M(['"])\)/g, 'resample($1ME$2)');
             finalCode = finalCode.replace(/resample\((['"])Q(['"])\)/g, 'resample($1QE$2)');
@@ -2971,6 +3032,14 @@ export async function getChatTools(context: {
           }
 
           let extracted = extractAnalysisPresentation(result.stdout);
+          extracted = {
+            ...extracted,
+            presentation: normalizeAnalysisPresentationForRequest(
+              requestText ?? '',
+              extracted.presentation,
+              mountedDatasets,
+            ),
+          };
           let completeness =
             result.exitCode === 0
               ? validateAnalysisCompleteness(
@@ -2980,6 +3049,10 @@ export async function getChatTools(context: {
                 )
               : { valid: true };
           const completenessError = completeness.valid ? undefined : completeness.error;
+          const codeValidationError =
+            result.exitCode === 0
+              ? analysisCodeValidationError(requestText ?? '', finalCode)
+              : undefined;
           const hasUsableOutput =
             extracted.stdout.trim().length > 0 ||
             Boolean(extracted.presentation) ||
@@ -2989,12 +3062,34 @@ export async function getChatTools(context: {
               ? 'Analysis completed without a usable result.'
               : undefined;
           const exitCode =
-            result.exitCode === 0 && (completenessError || emptyOutputError) ? 1 : result.exitCode;
-          const stderr = [result.stderr.trim(), completenessError, emptyOutputError]
+            result.exitCode === 0 && (completenessError || codeValidationError || emptyOutputError)
+              ? 1
+              : result.exitCode;
+          const stderr = [
+            result.stderr.trim(),
+            completenessError,
+            codeValidationError,
+            emptyOutputError,
+          ]
             .filter(Boolean)
             .join('\n\n');
+          // A semantically rejected calculation is not evidence. Do not render
+          // its plausible-looking numbers in the failure card before the
+          // corrected retry, because evaluators and users could mistake those
+          // values for part of the final answer.
+          const groundedStdout = codeValidationError
+            ? ''
+            : appendExplicitValidationZeroCounts(
+                requestText ?? '',
+                normalizePercentagePrecisionInStdout(
+                  requestText ?? '',
+                  [extracted.stdout, analysisPresentationEvidence(extracted.presentation)]
+                    .filter(Boolean)
+                    .join('\n'),
+                ),
+              );
           return {
-            stdout: extracted.stdout.slice(0, 5000),
+            stdout: groundedStdout.slice(0, 5000),
             stderr: stderr.slice(0, 2000),
             exitCode,
             ...(extracted.presentation && !completenessError

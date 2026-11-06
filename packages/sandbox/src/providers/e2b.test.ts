@@ -92,7 +92,10 @@ describe('e2bAdapter.execute', () => {
     );
     expect(runMock).toHaveBeenCalledTimes(1);
     expect(writeMock).toHaveBeenCalledWith([
-      { path: '/tmp/larkup-sandbox/run.py', data: 'print("hi")' },
+      {
+        path: '/tmp/larkup-sandbox/run.py',
+        data: expect.stringContaining(Buffer.from('print("hi")').toString('base64')),
+      },
     ]);
     expect(result.stdout).toBe('hi\n');
     expect(result.exitCode).toBe(0);
@@ -115,7 +118,10 @@ describe('e2bAdapter.execute', () => {
     expect(result.exitCode).toBe(0);
     expect(writeMock).toHaveBeenCalledWith([
       { path: '/tmp/larkup-sandbox/data.csv', data: content },
-      { path: '/tmp/larkup-sandbox/run.py', data: 'print("ok")' },
+      {
+        path: '/tmp/larkup-sandbox/run.py',
+        data: expect.stringContaining(Buffer.from('print("ok")').toString('base64')),
+      },
     ]);
     const command = String(runMock.mock.calls[0]?.[0]);
     expect(command.length).toBeLessThan(1_000);

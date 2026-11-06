@@ -1,3 +1,5 @@
+import type { TabularDataset } from '@larkup/core/tabular-store';
+
 const PRESENTATION_MARKER = '__LARKUP_PRESENTATION__:';
 const MAX_PRESENTATION_CHARS = 3_000_000;
 const MAX_TABLE_ROWS = 5_000;
@@ -34,6 +36,93 @@ export interface AnalysisDocumentPresentation {
 }
 
 export type AnalysisPresentation = AnalysisTablePresentation | AnalysisDocumentPresentation;
+
+/**
+ * Give the answering model a compact copy of successful structured output.
+ * UI artifacts can paginate documents, but the final answer still needs every
+ * requested number rather than inventing values from the first visible page.
+ */
+export function analysisPresentationEvidence(
+  presentation: AnalysisPresentation | undefined,
+  maximumChars = 4_500,
+): string {
+  if (!presentation) return '';
+  const lines = [
+    'Complete analysis artifact evidence (use these values in the final answer):',
+    presentation.title,
+    ...(presentation.summary ? [presentation.summary] : []),
+  ];
+  if (presentation.kind === 'table') {
+    lines.push(presentation.columns.join('\t'));
+    for (const row of presentation.rows) {
+      lines.push(presentation.columns.map((column) => String(row[column] ?? '')).join('\t'));
+    }
+  } else {
+    for (const page of presentation.pages) {
+      if (page.title) lines.push(page.title);
+      lines.push(page.content);
+    }
+  }
+  return lines.join('\n').slice(0, maximumChars);
+}
+
+function requestMentionsEntity(requestText: string, entity: string) {
+  const escaped = entity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\b${escaped}(?:s|es)?\\b`, 'iu').test(requestText);
+}
+
+/**
+ * Add unambiguous dimension labels and presentation precision without changing
+ * the underlying calculation. Generated analysis often returns a correct
+ * `site_id` ranking while omitting the requested human-readable site name.
+ */
+export function normalizeAnalysisPresentationForRequest(
+  requestText: string,
+  presentation: AnalysisPresentation | undefined,
+  datasets: TabularDataset[],
+): AnalysisPresentation | undefined {
+  if (!presentation || presentation.kind !== 'table') return presentation;
+
+  let columns = [...presentation.columns];
+  let rows = presentation.rows.map((row) => ({ ...row }));
+  for (const idColumn of presentation.columns.filter((column) => /_id$/i.test(column))) {
+    const entity = idColumn.replace(/_id$/i, '');
+    const nameColumn = `${entity}_name`;
+    if (columns.includes(nameColumn) || !requestMentionsEntity(requestText, entity)) continue;
+    const dimensions = datasets.filter(
+      (dataset) =>
+        dataset.columns.some((column) => column.name === idColumn) &&
+        dataset.columns.some((column) => column.name === nameColumn),
+    );
+    if (dimensions.length !== 1) continue;
+    const labels = new Map(
+      dimensions[0].rows
+        .filter((row) => row[idColumn] !== null && row[idColumn] !== undefined)
+        .map((row) => [String(row[idColumn]), normalizeCell(row[nameColumn])]),
+    );
+    if (!rows.every((row) => labels.has(String(row[idColumn])))) continue;
+    const idIndex = columns.indexOf(idColumn);
+    columns.splice(idIndex + 1, 0, nameColumn);
+    rows = rows.map((row) => ({ ...row, [nameColumn]: labels.get(String(row[idColumn])) ?? null }));
+  }
+
+  const explicitPrecision = requestText.match(/\b(\d+)\s+decimal\s+places?\b/i);
+  const decimals = explicitPrecision ? Number(explicitPrecision[1]) : 1;
+  if (Number.isInteger(decimals) && decimals >= 0 && decimals <= 8) {
+    const scale = 10 ** decimals;
+    for (const column of columns.filter((name) => /percent(?:age)?|\bpct\b/i.test(name))) {
+      rows = rows.map((row) => ({
+        ...row,
+        [column]:
+          typeof row[column] === 'number' && Number.isFinite(row[column])
+            ? Math.round(row[column] * scale) / scale
+            : row[column],
+      }));
+    }
+  }
+
+  return { ...presentation, columns, rows };
+}
 
 function boundedText(value: unknown, max: number): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -187,6 +276,48 @@ def _larkup_json_default(value):
         except Exception:
             pass
     return str(value)
+
+_larkup_original_json_dumps = _larkup_json.dumps
+
+def _larkup_safe_json_dumps(*args, **kwargs):
+    kwargs.setdefault("default", _larkup_json_default)
+    return _larkup_original_json_dumps(*args, **kwargs)
+
+_larkup_json.dumps = _larkup_safe_json_dumps
+
+def _larkup_print_result(value):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            print(f"{key}:")
+            _larkup_print_result(item)
+        return
+    if isinstance(value, tuple) and any(callable(getattr(item, "to_string", None)) for item in value):
+        for item in value:
+            _larkup_print_result(item)
+        return
+    to_string = getattr(value, "to_string", None)
+    if callable(to_string):
+        try:
+            display_value = value
+            columns = getattr(value, "columns", None)
+            if columns is not None:
+                display_value = value.copy()
+                for column in columns:
+                    normalized_column = str(column).lower().replace("_", " ")
+                    if "percent" in normalized_column or "percentage" in normalized_column:
+                        try:
+                            display_value[column] = display_value[column].round(1)
+                        except Exception:
+                            pass
+            print(display_value.to_string(index=False))
+            return
+        except TypeError:
+            try:
+                print(to_string())
+                return
+            except Exception:
+                pass
+    print(repr(value))
 
 def larkup_table(title, rows, columns=None, summary=None, requested_items=None, file_name=None):
     global _LARKUP_PRESENTATION_EMITTED

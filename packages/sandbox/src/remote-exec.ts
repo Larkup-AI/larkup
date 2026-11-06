@@ -65,6 +65,39 @@ function writeBase64FileScript(name: string, base64: string): string {
   )} <<'${HEREDOC_DELIMITER}'\n${base64}\n${HEREDOC_DELIMITER}`;
 }
 
+/** Add the same headless chart capture contract used by the local sandbox. */
+function executionSource(request: ExecutionRequest): string {
+  if (request.language !== 'python') return request.code;
+  const encodedCode = Buffer.from(request.code, 'utf8').toString('base64');
+  return `import base64, os
+os.makedirs(${JSON.stringify(OUTPUT_DIR)}, exist_ok=True)
+_larkup_figure_count = [0]
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    def _larkup_save_figures(*args, **kwargs):
+        for number in plt.get_fignums():
+            figure = plt.figure(number)
+            filename = os.path.join(${JSON.stringify(
+              OUTPUT_DIR,
+            )}, f'chart_{_larkup_figure_count[0]}.png')
+            figure.savefig(filename, dpi=150, bbox_inches='tight', facecolor='white')
+            _larkup_figure_count[0] += 1
+        plt.close('all')
+    plt.show = _larkup_save_figures
+except ImportError:
+    pass
+_larkup_encoded_code = ${JSON.stringify(encodedCode)}
+exec(compile(base64.b64decode(_larkup_encoded_code), 'analysis.py', 'exec'), globals(), globals())
+try:
+    if 'plt' in globals() and plt.get_fignums():
+        plt.show()
+except Exception:
+    pass
+`;
+}
+
 /** Builds the POSIX shell script a remote adapter hands to its provider's exec call. */
 export function buildExecutionScript(
   request: ExecutionRequest,
@@ -88,7 +121,7 @@ export function buildExecutionScript(
   const scriptName = request.language === 'python' ? 'run.py' : 'run.js';
   const runner = request.language === 'python' ? 'python3' : 'node';
   if (!filesAlreadyStaged) {
-    const codeBase64 = Buffer.from(request.code, 'utf8').toString('base64');
+    const codeBase64 = Buffer.from(executionSource(request), 'utf8').toString('base64');
     lines.push(writeBase64FileScript(scriptName, codeBase64));
   }
   lines.push(`${runner} ${shellSingleQuote(scriptName)}`);
@@ -115,7 +148,7 @@ function executionFiles(request: ExecutionRequest): RemoteExecutionFile[] {
     return { path: `${WORKDIR}/${file.name}`, data };
   });
   const scriptName = request.language === 'python' ? 'run.py' : 'run.js';
-  files.push({ path: `${WORKDIR}/${scriptName}`, data: request.code });
+  files.push({ path: `${WORKDIR}/${scriptName}`, data: executionSource(request) });
   return files;
 }
 

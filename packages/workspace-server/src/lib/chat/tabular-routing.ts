@@ -186,6 +186,109 @@ export function resolveTabularDatasetReferences(
   });
 }
 
+/** Mount every dataset whose exact visible filename is read by generated code. */
+export function tabularDatasetIdsReferencedByCode(
+  code: string,
+  datasets: TabularDatasetMeta[],
+): string[] {
+  const normalizedCode = code.toLocaleLowerCase();
+  return datasets
+    .filter((dataset) => {
+      const fileName = dataset.fileName.split(/[\\/]/).at(-1)?.toLocaleLowerCase();
+      return Boolean(
+        fileName &&
+        (normalizedCode.includes(`'${fileName}'`) || normalizedCode.includes(`"${fileName}"`)),
+      );
+    })
+    .map((dataset) => dataset.id);
+}
+
+/** Recover providers that serialize an ID array as one comma-delimited string. */
+export function splitTabularDatasetReferences(references: string[]): string[] {
+  return references
+    .flatMap((reference) => reference.split(','))
+    .map((reference) => reference.trim())
+    .filter(Boolean);
+}
+
+/** Make empty integrity findings numerically explicit in grounded tool output. */
+export function appendExplicitValidationZeroCounts(requestText: string, stdout: string): string {
+  if (
+    !/\b(?:validate|validation|duplicate|orphan|integrity|before\s+(?:enrollment|baseline))\b/iu.test(
+      requestText,
+    )
+  ) {
+    return stdout;
+  }
+  const counts = [
+    ...stdout.matchAll(
+      /['"]([^'"]*(?:duplicat|orphan|before[_ ]enrollment)[^'"]*)['"]\s*:\s*\[\s*\]/giu,
+    ),
+    ...stdout.matchAll(
+      /^\s*['"]?([^:\n]*(?:duplicat|orphan|before[_ ]enrollment)[^:\n]*)['"]?\s*:\s*0(?:\.0+)?\s*$/gimu,
+    ),
+  ].map((match) => {
+    const label = match[1].replaceAll('_', ' ').trim();
+    return `${label}${/\bcount$/iu.test(label) ? '' : ' count'}: 0`;
+  });
+  if (counts.length === 0) return stdout;
+  return `${stdout.trim()}\n${[...new Set(counts)].join('\n')}`;
+}
+
+/** Keep displayed rate/percentage evidence at the default one-decimal contract. */
+export function normalizePercentagePrecisionInStdout(requestText: string, stdout: string) {
+  if (
+    !/\b(?:rate|incidence|percentage|proportion|per\s+(?:patient|subject|record|site))\b/iu.test(
+      requestText,
+    ) ||
+    /\b\d+\s+decimal\s+places?\b/iu.test(requestText)
+  ) {
+    return stdout;
+  }
+  const displayValues = [
+    ...new Set(
+      [...stdout.matchAll(/(?<![\w.])-?\d+\.\d{2,}(?![\w.])/gu)].map((match) =>
+        Number(match[0]).toFixed(1),
+      ),
+    ),
+  ];
+  return displayValues.length > 0
+    ? `${stdout.trim()}\ndisplay percentage values (1 decimal): ${displayValues.join(', ')}`
+    : stdout;
+}
+
+/**
+ * Recover mistyped opaque IDs only when exact filenames in the generated code
+ * account for every unavailable source. The one-to-one requirement avoids
+ * guessing among unrelated uploads.
+ */
+export function repairUnavailableTabularDatasetReferences(
+  references: string[],
+  code: string,
+  datasets: TabularDatasetMeta[],
+): string[] {
+  const availableIds = new Set(datasets.map((dataset) => dataset.id));
+  const missing = references.filter((reference) => !availableIds.has(reference));
+  if (missing.length === 0) return references;
+
+  const selected = new Set(references.filter((reference) => availableIds.has(reference)));
+  const normalizedCode = code.toLocaleLowerCase();
+  const replacements = datasets.filter((dataset) => {
+    if (selected.has(dataset.id)) return false;
+    const fileName = dataset.fileName.split(/[\\/]/).at(-1)?.toLocaleLowerCase();
+    return Boolean(
+      fileName &&
+      (normalizedCode.includes(`'${fileName}'`) || normalizedCode.includes(`"${fileName}"`)),
+    );
+  });
+  if (replacements.length !== missing.length) return references;
+
+  let replacementIndex = 0;
+  return references.map((reference) =>
+    availableIds.has(reference) ? reference : replacements[replacementIndex++].id,
+  );
+}
+
 /**
  * Detect questions whose requested concepts cannot be satisfied by one
  * indexed table. This is schema-led rather than domain-led: filenames and
@@ -204,6 +307,15 @@ export function requiresMultiDatasetAnalysis(
     for (const source of commonSources) if (!sources.has(source)) commonSources.delete(source);
   }
   return commonSources.size === 0;
+}
+
+/** A prior result table is valid input only when the current question does not require fresh files. */
+export function shouldUseRecentAnalysisTable(
+  text: string,
+  datasets: TabularDatasetMeta[],
+  hasRecentAnalysisTable: boolean,
+) {
+  return hasRecentAnalysisTable && !requiresMultiDatasetAnalysis(text, datasets);
 }
 
 /**
@@ -294,9 +406,40 @@ export function hasCompletedLongAnalysisStep(
  */
 export function requiresTabularSandbox(text: string): boolean {
   return (
-    /\b(?:join|correlat(?:e|ion)|regression|cluster(?:ing)?|forecast(?:ing)?|statistical|sandbox|python|matplotlib|seaborn|scikit(?:-learn)?|custom\s+(?:analysis|chart|visuali[sz]ation)|across\s+(?:sheets?|tables?|datasets?|files?)|between\s+(?:sheets?|tables?|datasets?|files?))\b/i.test(
+    /\b(?:join|correlat(?:e|ion)|regression|cluster(?:ing)?|forecast(?:ing)?|statistical|dashboard|complete\s+cases?|confidence\s+interval|sandbox|python|matplotlib|seaborn|scikit(?:-learn)?|custom\s+(?:analysis|chart|visuali[sz]ation)|across\s+(?:sheets?|tables?|datasets?|files?)|between\s+(?:sheets?|tables?|datasets?|files?))\b/i.test(
       text,
-    ) || requestsLongAnalysisArtifact(text)
+    ) ||
+    // Integrity validation is exhaustive by definition: a bounded grouped
+    // query cannot prove the absence of duplicates, orphans, or invalid date
+    // relationships across related tables.
+    /\bvalidat(?:e|ion)\b[\s\S]{0,220}\b(?:primary[- ]?keys?|foreign[- ]?keys?|orphans?|duplicates?|before\s+enrollment)\b/i.test(
+      text,
+    ) ||
+    // A ranked entity rate normally needs a fact table for its numerator and
+    // denominator plus a dimension table for a human-readable entity name.
+    /\bwhich\b[\s\S]{0,100}\b(?:highest|lowest|largest|smallest)\b[\s\S]{0,100}\b(?:rates?|percentages?)\b/i.test(
+      text,
+    ) ||
+    // Longitudinal baseline-versus-follow-up comparisons usually require a
+    // visit sequence table in addition to the measured facts.
+    /\bvisit\s*(?:1|one)\b[\s\S]{0,100}\b(?:later|subsequent|follow-up)\s+visits?\b/i.test(text) ||
+    // A severity chart grouped by a cohort/arm cannot be produced from an
+    // event table that only carries subject keys; use the relationship graph.
+    /\b(?:chart|graph|plot|visuali[sz])\b[\s\S]{0,160}\b(?:severity|serious|grade)\b[\s\S]{0,100}\bby\s+(?:arm|group|cohort)\b/i.test(
+      text,
+    ) ||
+    /\b(?:severity|serious|grade)\b[\s\S]{0,100}\b(?:chart|graph|plot|visuali[sz])\b[\s\S]{0,100}\bby\s+(?:arm|group|cohort)\b/i.test(
+      text,
+    ) ||
+    // A charted summary that asks for several measures for every cohort is a
+    // composite report, not a single aggregation.
+    /\b(?:summary|report|dashboard)\b[\s\S]{0,100}\b(?:both|each|all)\b[\s\S]{0,100}\b(?:trials?|groups?|cohorts?)\b[\s\S]{0,180}\b(?:chart|graph|plot|visuali[sz])\b/i.test(
+      text,
+    ) ||
+    /\b(?:both|each|all)\b[\s\S]{0,100}\b(?:trials?|groups?|cohorts?)\b[\s\S]{0,180}\b(?:chart|graph|plot|visuali[sz])\b/i.test(
+      text,
+    ) ||
+    requestsLongAnalysisArtifact(text)
   );
 }
 
@@ -352,7 +495,8 @@ export function analysisValidationRequirements(text: string) {
     )
   ) {
     requirements.push(
-      'derive and report each numerator and denominator separately from the requested population before filtering or joining; never use only matched rows as the denominator unless the request explicitly says so',
+      'derive and report each numerator and denominator separately from the requested population before filtering or joining; never use only matched rows as the denominator unless the request explicitly says so; unless the user requests another precision, display percentages rounded to one decimal place while keeping unrounded values for ranking and calculations',
+      'for incidence, derive the denominator from the complete subject or population table after applying any requested population flag; never derive it from the event table because subjects without events are absent there',
     );
   }
   if (/\b(?:join|across|between|overlap|orphan|foreign\s+key)\b/iu.test(text)) {
@@ -360,14 +504,111 @@ export function analysisValidationRequirements(text: string) {
       'validate join keys, unmatched rows, and one to one or one to many cardinality before aggregation',
     );
   }
+  if (
+    /\b(?:validate|validation|duplicate|orphan|integrity|before\s+(?:enrollment|baseline))\b/iu.test(
+      text,
+    )
+  ) {
+    requirements.push(
+      'report every validation result with its label and an explicit numeric zero when no violations exist; never replace a zero count with only "none" or omit it',
+    );
+  }
   if (/\b(?:chart|graph|plot|visuali[sz])\b/iu.test(text)) {
     requirements.push(
       'assert that plotted grouping and measures exactly match the requested chart intent',
     );
   }
+  if (/\b(?:trials?|sites?|patients?|subjects?)\b/iu.test(text)) {
+    requirements.push(
+      'when a dimension table provides both an internal identifier and a human-readable code or name, join and report the human-readable code or name alongside the internal identifier',
+    );
+  }
+  if (
+    /\bvisit\s*(?:1|one)\b[\s\S]{0,80}\b(?:later|subsequent|follow-up)\s+visits?\b/iu.test(text)
+  ) {
+    requirements.push(
+      "join to the visit sequence or visit-number column and group on that value; never interpret a globally unique visit ID equal to 1 as every patient's first visit",
+    );
+  }
   return requirements.length > 0
     ? ` Validation requirements: ${requirements.join('; ')}. Include source filenames, key columns, and the calculation formula in the usable output.`
     : '';
+}
+
+/** Reject successful-looking code that uses a known invalid aggregation level. */
+export function analysisCodeValidationError(text: string, code: string): string | undefined {
+  if (/\bpatients?\s+with\s+any\s+(?:adverse\s+events?|AE)\b/iu.test(text)) {
+    const eventRowFlag = code.match(
+      /\b([A-Za-z_]\w*)\s*\[\s*['"]has_ae['"]\s*\]\s*=\s*[^\n]*(?:event|ae_id)[^\n]*\.(?:notnull|notna)\s*\(/iu,
+    )?.[1];
+    const sumsFlagFromSameFrame = Boolean(
+      eventRowFlag &&
+      new RegExp(
+        `\\b${eventRowFlag}\\.groupby\\s*\\([\\s\\S]{0,300}patients?_with_(?:any_)?ae\\s*=\\s*\\(\\s*['"]has_ae['"]\\s*,\\s*['"]sum['"]`,
+        'iu',
+      ).test(code),
+    );
+    const outerMergeSizePretendsToBeEventCount =
+      /\bmerge\s*\([^\n]*\bhow\s*=\s*['"](?:left|right|outer)['"][^\n]*\)/iu.test(code) &&
+      /\.groupby\s*\([^\n]*patient_id[^\n]*\)\.size\s*\(\)\.reset_index\s*\(\s*name\s*=\s*['"]ae_count['"]\s*\)/iu.test(
+        code,
+      ) &&
+      /\[\s*['"]has_ae['"]\s*\]\s*=\s*[^\n]*\[\s*['"]ae_count['"]\s*\]\s*>\s*0/iu.test(code);
+    if (sumsFlagFromSameFrame || outerMergeSizePretendsToBeEventCount) {
+      return 'Invalid patient incidence numerator: summing an event-row flag counts one patient repeatedly when they have multiple events. Count distinct patient IDs with at least one event.';
+    }
+  }
+
+  if (
+    /\bvisit\s*(?:1|one)\b[\s\S]{0,80}\b(?:later|subsequent|follow-up)\s+visits?\b/iu.test(text) &&
+    (/(?:\[\s*['"]visit_id['"]\s*\]|\.visit_id)\s*(?:==|!=|<=|>=|<|>)\s*1\b/u.test(code) ||
+      (/\[\s*['"]visit_id['"]\s*\]/u.test(code) &&
+        /\b(?:if|where|map|lambda)\b[^\n]{0,120}==\s*1\b/u.test(code) &&
+        !/\bvisit_(?:number|sequence|num)\b/iu.test(code)))
+  ) {
+    return 'Invalid visit grouping: visit_id is a relationship key, not the per-subject visit sequence. Join the visit table and compare its visit-number/sequence column to 1.';
+  }
+
+  if (
+    /\b(?:percent(?:age)?|incidence|proportion)\b[\s\S]{0,100}\bsafety\s+(?:subjects?|population)\b/iu.test(
+      text,
+    )
+  ) {
+    const taintedByEventJoin = new Set<string>();
+    const assignments = code.split('\n').flatMap((line) => {
+      const match = line.match(/^\s*([A-Za-z_]\w*)\s*=\s*(.+)$/u);
+      return match ? [{ name: match[1], expression: match[2] }] : [];
+    });
+    for (let pass = 0; pass < assignments.length; pass += 1) {
+      let changed = false;
+      for (const assignment of assignments) {
+        const directlyMerged = /(?:\bpd\.)?merge\s*\(|\.merge\s*\(/u.test(assignment.expression);
+        const derivedFromMerge = [...taintedByEventJoin].some((name) =>
+          new RegExp(`\\b${name}\\b`, 'u').test(assignment.expression),
+        );
+        if ((directlyMerged || derivedFromMerge) && !taintedByEventJoin.has(assignment.name)) {
+          taintedByEventJoin.add(assignment.name);
+          changed = true;
+        }
+      }
+      if (!changed) break;
+    }
+    for (const assignment of assignments) {
+      const groupedReceiver = assignment.expression.match(/^([A-Za-z_]\w*)\.groupby\s*\(/u)?.[1];
+      if (
+        groupedReceiver &&
+        taintedByEventJoin.has(groupedReceiver) &&
+        /\.mean\s*\(/u.test(assignment.expression)
+      ) {
+        return 'Invalid subject incidence: averaging a flag over event-joined rows weights subjects by their number of events. Count distinct subjects with an event and divide by distinct safety subjects from the complete subject table.';
+      }
+      if (!/(?:denom|population|pop|sizes?|totals?)/iu.test(assignment.name)) continue;
+      if (groupedReceiver && taintedByEventJoin.has(groupedReceiver)) {
+        return 'Invalid incidence denominator: derive the safety-population arm sizes from the complete subject table before joining to the event table; event-joined rows exclude subjects without events.';
+      }
+    }
+  }
+  return undefined;
 }
 
 export function supportsStableTabularPlanner(provider: string) {

@@ -17,6 +17,27 @@ describe('buildExecutionScript', () => {
     expect(script).not.toContain("node 'run.js'");
   });
 
+  it('wraps remote Python code so matplotlib show writes a chart artifact', () => {
+    const script = buildExecutionScript({
+      code: 'import matplotlib.pyplot as plt\nplt.plot([1, 2])\nplt.show()',
+      language: 'python',
+    });
+    const encodedSource = script.split("base64 -d > 'run.py'")[1]?.split('\n')[1];
+    expect(encodedSource).toBeTruthy();
+    const source = Buffer.from(encodedSource!, 'base64').toString('utf8');
+    expect(source).toContain('plt.show = _larkup_save_figures');
+    expect(source).toContain('chart_{_larkup_figure_count[0]}.png');
+    expect(source).toContain('_larkup_encoded_code =');
+    expect(source).toContain(
+      "exec(compile(base64.b64decode(_larkup_encoded_code), 'analysis.py', 'exec')",
+    );
+    expect(source).toContain(
+      Buffer.from('import matplotlib.pyplot as plt\nplt.plot([1, 2])\nplt.show()').toString(
+        'base64',
+      ),
+    );
+  });
+
   it('writes the code to run.js and invokes node for non-python requests', () => {
     const request: ExecutionRequest = { code: 'console.log(1)', language: 'javascript' };
     const script = buildExecutionScript(request);
@@ -88,10 +109,11 @@ describe('runScriptedExecution', () => {
       stageFiles,
     );
 
-    expect(stageFiles).toHaveBeenCalledWith([
-      { path: '/tmp/larkup-sandbox/data.csv', data: content },
-      { path: '/tmp/larkup-sandbox/run.py', data: 'print(1)' },
-    ]);
+    const staged = stageFiles.mock.calls[0]?.[0];
+    expect(staged?.[0]).toEqual({ path: '/tmp/larkup-sandbox/data.csv', data: content });
+    expect(staged?.[1]).toEqual(expect.objectContaining({ path: '/tmp/larkup-sandbox/run.py' }));
+    expect(String(staged?.[1]?.data)).toContain('plt.show = _larkup_save_figures');
+    expect(String(staged?.[1]?.data)).toContain(Buffer.from('print(1)').toString('base64'));
     expect(String(execFn.mock.calls[0]?.[0])).not.toContain(content);
   });
 

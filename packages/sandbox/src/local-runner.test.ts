@@ -32,6 +32,29 @@ summary = pd.DataFrame({'Region': ['East', 'West'], 'Profit': [12.5, 18.25]})
     11 * 60_000,
   );
 
+  it(
+    'captures a matplotlib figure even when the analysis also prints a summary',
+    async () => {
+      const result = await executeLocally({
+        language: 'python',
+        code: `
+import matplotlib.pyplot as plt
+plt.figure()
+plt.bar(['control', 'treatment'], [12, 30])
+plt.show()
+print('serious events: 12, 30')
+`,
+      });
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toContain('serious events: 12, 30');
+      expect(result.artifacts).toEqual([
+        expect.objectContaining({ name: 'chart_0.png', mimeType: 'image/png' }),
+      ]);
+    },
+    11 * 60_000,
+  );
+
   it('runs JavaScript without Docker and returns output artifacts', async () => {
     const result = await executeLocally({
       language: 'javascript',
