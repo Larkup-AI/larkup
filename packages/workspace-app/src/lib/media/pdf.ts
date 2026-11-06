@@ -2,6 +2,10 @@ import * as pdfjsLib from 'pdfjs-dist';
 
 export async function extractImagesFromPDF(
   file: File,
+  onPage?: (
+    image: { base64: string; pageNumber: number; index: number },
+    totalPages: number,
+  ) => Promise<void>,
 ): Promise<{ base64: string; pageNumber: number; index: number }[]> {
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -9,9 +13,11 @@ export async function extractImagesFromPDF(
   ).toString();
 
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+  const pdf = await loadingTask.promise;
   const numPages = pdf.numPages;
   const images: { base64: string; pageNumber: number; index: number }[] = [];
+  const active = new Set<Promise<void>>();
 
   let imageIndex = 0;
   const toDataUrl = (source: HTMLCanvasElement) => {
@@ -47,11 +53,25 @@ export async function extractImagesFromPDF(
       const ctx = canvas.getContext('2d');
       if (!ctx) continue;
       await page.render({ canvas, viewport }).promise;
-      images.push({ base64: toDataUrl(canvas), pageNumber: i, index: imageIndex++ });
+      const image = { base64: toDataUrl(canvas), pageNumber: i, index: imageIndex++ };
+      if (onPage) {
+        const task = onPage(image, numPages);
+        active.add(task);
+        void task.then(
+          () => active.delete(task),
+          () => active.delete(task),
+        );
+        if (active.size >= 5) await Promise.race(active);
+      } else {
+        images.push(image);
+      }
     } catch (err) {
       console.error(`Error processing page ${i}`, err);
     }
   }
+
+  await Promise.all(active);
+  await loadingTask.destroy();
 
   return images;
 }
