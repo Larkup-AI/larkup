@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.42
+
+### Patch Changes
+
+- 7b821b3: Improve schema-led multi-dataset routing, sandbox filename resolution, and empty analysis validation.
+
 ## 0.2.41
 
 ### Patch Changes
