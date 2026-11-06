@@ -2,7 +2,7 @@ import type { UsageEvent } from './analytics-store';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { DataGroup, MediaAsset, RagConfig, SourceDocument } from './types';
 import type { ProjectMeta } from './project-store';
-import type { TabularDataset } from './tabular-store';
+import type { TabularDataset, TabularDatasetMeta } from './tabular-store';
 
 /** Request-scoped persistence; Cloud supplies tenant-bound repositories. */
 export interface WorkspaceHost {
@@ -20,6 +20,13 @@ export interface WorkspaceHost {
   writeMediaAssets(assets: MediaAsset[]): Promise<void>;
   readTabularDatasets(): Promise<TabularDataset[]>;
   writeTabularDatasets(datasets: TabularDataset[]): Promise<void>;
+  /** Optional bounded persistence operations for hosts that keep large rows outside metadata storage. */
+  listTabularDatasets?(): Promise<TabularDatasetMeta[]>;
+  getTabularDataset?(id: string): Promise<TabularDataset | null>;
+  saveTabularDataset?(dataset: TabularDataset): Promise<void>;
+  deleteTabularDataset?(id: string): Promise<void>;
+  clearTabularDatasets?(): Promise<void>;
+  updateTabularDatasetsGroup?(ids: string[], groupId: string): Promise<TabularDatasetMeta[]>;
   queryKnowledge(
     query: string,
     topK: number,
