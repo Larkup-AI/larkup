@@ -174,7 +174,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
     ),
     fetcher,
     {
-      refreshInterval: (data) => (data?.assets?.some(isActiveMediaIndexing) ? 2_000 : 8_000),
+      refreshInterval: (data) => (data?.assets?.some(isActiveMediaIndexing) ? 2_000 : 0),
       revalidateOnFocus: true,
     },
   );

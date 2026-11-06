@@ -368,6 +368,12 @@ export async function saveTabularDataset(
     createdAt: new Date().toISOString(),
   };
 
+  const host = workspaceHost();
+  if (host?.saveTabularDataset) {
+    await host.saveTabularDataset(dataset);
+    return dataset;
+  }
+
   await serialize(async () => {
     const all = await readAll();
     all.push(dataset);
@@ -379,18 +385,24 @@ export async function saveTabularDataset(
 
 /** List all datasets (metadata only, no row data). */
 export async function listTabularDatasets(): Promise<TabularDatasetMeta[]> {
+  const host = workspaceHost();
+  if (host?.listTabularDatasets) return host.listTabularDatasets();
   const all = await readAll();
   return all.map(({ rows: _rows, ...meta }) => meta);
 }
 
 /** Get a full dataset including rows. */
 export async function getTabularDataset(id: string): Promise<TabularDataset | null> {
+  const host = workspaceHost();
+  if (host?.getTabularDataset) return host.getTabularDataset(id);
   const all = await readAll();
   return all.find((d) => d.id === id) ?? null;
 }
 
 /** Delete a dataset by ID. */
 export async function deleteTabularDataset(id: string): Promise<void> {
+  const host = workspaceHost();
+  if (host?.deleteTabularDataset) return host.deleteTabularDataset(id);
   await serialize(async () => {
     const all = await readAll();
     await writeAll(all.filter((d) => d.id !== id));
@@ -399,6 +411,8 @@ export async function deleteTabularDataset(id: string): Promise<void> {
 
 /** Removes raw tabular sidecar data when the whole knowledge base is cleared. */
 export async function clearTabularDatasets(): Promise<void> {
+  const host = workspaceHost();
+  if (host?.clearTabularDatasets) return host.clearTabularDatasets();
   await serialize(() => writeAll([]));
 }
 
@@ -407,6 +421,10 @@ export function updateTabularDatasetsGroup(
   ids: string[],
   groupId: string,
 ): Promise<TabularDatasetMeta[]> {
+  const host = workspaceHost();
+  if (host?.updateTabularDatasetsGroup) {
+    return host.updateTabularDatasetsGroup(ids, groupId);
+  }
   return serialize(async () => {
     const idSet = new Set(ids);
     if (idSet.size === 0) return [];

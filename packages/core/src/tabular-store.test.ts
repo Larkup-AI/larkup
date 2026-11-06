@@ -5,10 +5,13 @@ import {
   aggregateTabularValues,
   boundTabularRows,
   DEFAULT_TABULAR_RESULT_LIMIT,
+  getTabularDataset,
+  listTabularDatasets,
   MAX_TABULAR_RESULT_LIMIT,
   resolveTabularDatasetGroups,
   type TabularDatasetMeta,
 } from './tabular-store';
+import { runWithWorkspaceHost, type WorkspaceHost } from './workspace-host';
 
 test('counts text values and distinct identifiers without numeric coercion', () => {
   const values = ['ORD-1', 'ORD-2', 'ORD-1', '', null, undefined];
@@ -100,4 +103,42 @@ test('resolves new and legacy tabular sidecars to their owning document group', 
     resolveTabularDatasetGroups(datasets, documents).map((dataset) => dataset.groupId),
     ['linked-group', 'legacy-group', 'stored-group'],
   );
+});
+
+test('metadata listing uses the bounded host operation without loading dataset rows', async () => {
+  const metadata: TabularDatasetMeta = {
+    id: 'bounded',
+    fileName: 'bounded.csv',
+    columns: [],
+    summary: {
+      totalRows: 1_000_000,
+      totalColumns: 0,
+      numericColumns: 0,
+      categoricalColumns: 0,
+      dateColumns: 0,
+    },
+    rowCount: 1_000_000,
+    createdAt: '2026-11-06T00:00:00.000Z',
+  };
+  let legacyReads = 0;
+  let fullReads = 0;
+  const host = {
+    readTabularDatasets: async () => {
+      legacyReads += 1;
+      throw new Error('metadata listing must not load every row');
+    },
+    listTabularDatasets: async () => [metadata],
+    getTabularDataset: async (id: string) => {
+      fullReads += 1;
+      return id === metadata.id ? { ...metadata, rows: [{ id: 1 }] } : null;
+    },
+  } as unknown as WorkspaceHost;
+
+  await runWithWorkspaceHost(host, async () => {
+    assert.deepEqual(await listTabularDatasets(), [metadata]);
+    assert.deepEqual((await getTabularDataset('bounded'))?.rows, [{ id: 1 }]);
+  });
+
+  assert.equal(legacyReads, 0);
+  assert.equal(fullReads, 1);
 });
