@@ -7,6 +7,7 @@ import {
   extractLatestTabularExportResult,
   imagePreviewInput,
   isAnalysisArtifactFollowUp,
+  isDirectTabularPresentationFollowUp,
   isImagePreviewFollowUp,
 } from '../src/lib/chat/conversation-memory.ts';
 import {
@@ -169,6 +170,29 @@ test('an unrelated calculation does not silently reuse a generated table', () =>
     }),
     false,
   );
+});
+
+test('a new chart question does not silently reuse an unrelated prior table', () => {
+  const evidence = {
+    sources: [],
+    images: [],
+    mediaAssetIds: [],
+    tabular: {
+      datasetId: 'adverse-events',
+      columns: ['ae_id', 'count_ae_id'],
+      rows: [{ ae_id: 1, count_ae_id: 1 }],
+      totalRows: 25,
+    },
+  };
+
+  assert.equal(
+    isDirectTabularPresentationFollowUp(
+      'Generate a grouped adverse-event severity chart by arm.',
+      evidence,
+    ),
+    false,
+  );
+  assert.equal(isDirectTabularPresentationFollowUp('Chart the previous result.', evidence), true);
 });
 
 const recurringSubjectEvidence = {

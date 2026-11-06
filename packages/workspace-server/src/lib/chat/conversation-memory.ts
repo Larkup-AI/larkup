@@ -613,6 +613,19 @@ export function isTabularFollowUp(text: string, evidence: ConversationEvidence):
   return directReference || tableColumnReference || comparison;
 }
 
+/**
+ * Only present the preceding table directly when the user explicitly points
+ * back to it. Mentioning one overlapping column is not enough: a new chart
+ * question may need fresh retrieval and analysis from different source files.
+ */
+export function isDirectTabularPresentationFollowUp(
+  text: string,
+  evidence: ConversationEvidence,
+): boolean {
+  if (!evidence.tabular) return false;
+  return /\b(?:it|this|that|these|those|above|previous|same|result|output|table)\b/i.test(text);
+}
+
 export function isImagePreviewFollowUp(text: string, evidence: ConversationEvidence): boolean {
   if (evidence.images.length === 0) return false;
   return /\b(?:show|preview|display|open|view|render|need|give|provide|want)\b[\s\S]{0,40}\b(?:image|picture|diagram|page|figure|visual|it)\b|\b(?:image|picture|diagram|figure|visual)\s+(?:preview|view)\b/i.test(
