@@ -96,7 +96,12 @@ import { normalizeChartConfigWithEvidence } from '@larkup/core/chart-config';
 import { createDataExport, selectDataExportSource } from '@larkup/core/data-export';
 import { assistantSourceScopeFingerprint } from '../../../lib/chat/assistant-source-scope';
 import { inferTabularPlan } from '../../../lib/chat/tabular-query-plan';
-import { requestedLongAnalysisItemCount } from '../../../lib/chat/tabular-routing';
+import {
+  requestedLongAnalysisItemCount,
+  resolveTabularDatasetReferences,
+  requiresMultiDatasetAnalysis,
+  tabularDatasetIdsRequiredByQuestion,
+} from '../../../lib/chat/tabular-routing';
 import {
   resolveTabularDatasetForQuestion,
   selectTabularDatasetForAnalysis,
@@ -106,6 +111,7 @@ import {
 import {
   createTabularSandboxFiles,
   remapLegacyMultiDatasetReads,
+  remapMountedDatasetReads,
   remapSingleDatasetColumnReferences,
   remapSingleDatasetRead,
   tabularRowsToCsv,
@@ -2777,7 +2783,7 @@ export async function getChatTools(context: {
 
     executeAnalysis: tool({
       description:
-        'Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. Hard counts are acceptance criteria: when the user asks for K matches for N targets, emit exactly N×K long-form rows or N rows with K populated match fields. Never skip a target with empty data or zero semantic overlap; fill it from the best remaining eligible candidates, while honoring global reuse limits, and assert all counts before presentation. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.' +
+        'Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. Every successful execution must expose its answer: print a concise labeled numeric/text result, create an artifact, or call a LarkUp presentation helper; assignments with no output are invalid. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. Hard counts are acceptance criteria: when the user asks for K matches for N targets, emit exactly N×K long-form rows or N rows with K populated match fields. Never skip a target with empty data or zero semantic overlap; fill it from the best remaining eligible candidates, while honoring global reuse limits, and assert all counts before presentation. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.' +
         (recentAnalysisTable
           ? ` The complete result table from the preceding turn is mounted as data.csv with ${recentAnalysisTable.rows.length} rows and these columns: ${recentAnalysisTable.columns.join(', ')}. Use that file, not the original uploaded dataset, for this follow-up.`
           : ''),
@@ -2822,6 +2828,21 @@ export async function getChatTools(context: {
             });
           }
           const availableDatasets = await readAssistantTabularDatasets();
+          requestedDatasetIds.splice(
+            0,
+            requestedDatasetIds.length,
+            ...resolveTabularDatasetReferences(requestedDatasetIds, availableDatasets),
+          );
+          if (requiresMultiDatasetAnalysis(requestText ?? '', availableDatasets)) {
+            requestedDatasetIds.push(
+              ...tabularDatasetIdsRequiredByQuestion(requestText ?? '', availableDatasets),
+            );
+            requestedDatasetIds.splice(
+              0,
+              requestedDatasetIds.length,
+              ...new Set(requestedDatasetIds),
+            );
+          }
           // Some providers emit valid analysis code but omit an optional
           // datasetId. When the request maps unambiguously to one indexed
           // schema, stage it automatically so `data.csv` remains a reliable
@@ -2836,6 +2857,7 @@ export async function getChatTools(context: {
             if (automaticDatasetId) requestedDatasetIds.push(automaticDatasetId);
           }
           let mountedDatasets: NonNullable<Awaited<ReturnType<typeof getTabularDataset>>>[] = [];
+          let mountedManifest: ReturnType<typeof createTabularSandboxFiles>['manifest'];
           if (requestedDatasetIds.length > 0) {
             const availableDatasetIds = new Set(availableDatasets.map((dataset) => dataset.id));
             let unavailableDatasetId = requestedDatasetIds.find(
@@ -2862,7 +2884,9 @@ export async function getChatTools(context: {
               throw new Error(`Tabular dataset is not available: ${missingDatasetId}`);
             }
             mountedDatasets = datasets as typeof mountedDatasets;
-            files.push(...createTabularSandboxFiles(mountedDatasets).files);
+            const mounted = createTabularSandboxFiles(mountedDatasets);
+            mountedManifest = mounted.manifest;
+            files.push(...mounted.files);
           }
 
           if (pdfDocumentId) {
@@ -2877,6 +2901,7 @@ export async function getChatTools(context: {
           finalCode = finalCode.replace(/^```python\s*\n?/m, '');
           finalCode = finalCode.replace(/^```\s*\n?/m, '');
           finalCode = finalCode.replace(/```\s*$/m, '');
+          finalCode = remapMountedDatasetReads(finalCode, mountedManifest);
           // Generated notebook snippets occasionally use `os` only for
           // plotting-cache setup. The execution wrapper already configures
           // those paths, but importing os here makes such harmless snippets
@@ -2945,8 +2970,19 @@ export async function getChatTools(context: {
                 )
               : { valid: true };
           const completenessError = completeness.valid ? undefined : completeness.error;
-          const exitCode = result.exitCode === 0 && completenessError ? 1 : result.exitCode;
-          const stderr = [result.stderr.trim(), completenessError].filter(Boolean).join('\n\n');
+          const hasUsableOutput =
+            extracted.stdout.trim().length > 0 ||
+            Boolean(extracted.presentation) ||
+            result.artifacts.length > 0;
+          const emptyOutputError =
+            result.exitCode === 0 && !hasUsableOutput
+              ? 'Analysis completed without a usable result.'
+              : undefined;
+          const exitCode =
+            result.exitCode === 0 && (completenessError || emptyOutputError) ? 1 : result.exitCode;
+          const stderr = [result.stderr.trim(), completenessError, emptyOutputError]
+            .filter(Boolean)
+            .join('\n\n');
           return {
             stdout: extracted.stdout.slice(0, 5000),
             stderr: stderr.slice(0, 2000),
