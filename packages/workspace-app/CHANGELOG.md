@@ -1,5 +1,14 @@
 # @larkup/workspace-app
 
+## 0.2.16
+
+### Patch Changes
+
+- aa01538: Allow managed hosts to list and mutate tabular metadata without loading every dataset row, and stop inactive media polling from repeatedly reading workspace state.
+- Updated dependencies [aa01538]
+  - @larkup/core@0.8.4
+  - @larkup/tool-doc-editor@0.3.7
+
 ## 0.2.15
 
 ### Patch Changes

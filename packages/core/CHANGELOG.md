@@ -1,5 +1,11 @@
 # @larkup/core
 
+## 0.8.4
+
+### Patch Changes
+
+- aa01538: Allow managed hosts to list and mutate tabular metadata without loading every dataset row, and stop inactive media polling from repeatedly reading workspace state.
+
 ## 0.8.3
 
 ### Patch Changes
