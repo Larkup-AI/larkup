@@ -13,6 +13,7 @@ import {
   repairUnavailableTabularDatasetReferences,
   resolveTabularDatasetReferences,
   shouldUseRecentAnalysisTable,
+  shouldPrioritizeTabularAnalysisBeforePdf,
   splitTabularDatasetReferences,
   tabularDatasetIdsReferencedByCode,
   tabularDatasetIdsForAnalysis,
@@ -52,6 +53,27 @@ test('routes a cross-file safety question to multi-dataset analysis without requ
       datasets,
     ),
     true,
+  );
+});
+
+test('prioritizes a requested multi-file calculation over an incidental PDF hit', () => {
+  assert.equal(
+    shouldPrioritizeTabularAnalysisBeforePdf({
+      hasTabularData: true,
+      tabularQuestion: true,
+      requiresSandbox: false,
+      requiresMultiDatasetAnalysis: true,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldPrioritizeTabularAnalysisBeforePdf({
+      hasTabularData: true,
+      tabularQuestion: false,
+      requiresSandbox: false,
+      requiresMultiDatasetAnalysis: true,
+    }),
+    false,
   );
 });
 

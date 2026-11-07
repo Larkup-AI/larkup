@@ -309,6 +309,23 @@ export function requiresMultiDatasetAnalysis(
   return commonSources.size === 0;
 }
 
+/**
+ * A related PDF may explain the study but cannot replace the joins requested
+ * across the indexed tables. Keep that PDF from short-circuiting analysis.
+ */
+export function shouldPrioritizeTabularAnalysisBeforePdf(input: {
+  hasTabularData: boolean;
+  tabularQuestion: boolean;
+  requiresSandbox: boolean;
+  requiresMultiDatasetAnalysis: boolean;
+}): boolean {
+  return (
+    input.hasTabularData &&
+    input.tabularQuestion &&
+    (input.requiresSandbox || input.requiresMultiDatasetAnalysis)
+  );
+}
+
 /** A prior result table is valid input only when the current question does not require fresh files. */
 export function shouldUseRecentAnalysisTable(
   text: string,

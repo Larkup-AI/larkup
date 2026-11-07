@@ -94,6 +94,66 @@ export function countTitleTermMatches(query: string, title: string): number {
   return countMatchesIn(buildQueryTermMatchers(query), title);
 }
 
+type VisualPdfDocument = {
+  id: string;
+  title: string;
+  content: string;
+  status?: string;
+  url?: string;
+  metadata?: {
+    mimeType?: unknown;
+    fileKind?: unknown;
+    images?: unknown;
+  };
+};
+
+function visualPdfSearchText(document: VisualPdfDocument): string {
+  const imageDescriptions = Array.isArray(document.metadata?.images)
+    ? document.metadata.images.flatMap((image) => {
+        if (!image || typeof image !== 'object') return [];
+        const description = (image as { description?: unknown }).description;
+        return typeof description === 'string' ? [description] : [];
+      })
+    : [];
+  return [document.title, document.content, ...imageDescriptions].join(' ');
+}
+
+/**
+ * Recover a visual PDF when dense rows from a large table crowd it out of the
+ * semantic candidate pool. This is intentionally bounded and requires several
+ * literal query matches in the document text or indexed page descriptions.
+ */
+export function selectVisualPdfFallbackDocuments<T extends VisualPdfDocument>(
+  query: string,
+  documents: T[],
+  maximum = 2,
+): T[] {
+  const matchers = buildQueryTermMatchers(query);
+  if (matchers.length === 0) return [];
+  const minimumMatches = Math.min(3, Math.max(2, Math.ceil(matchers.length * 0.25)));
+  return documents
+    .filter(
+      (document) =>
+        document.status === 'indexed' &&
+        (document.metadata?.fileKind === 'pdf' ||
+          document.metadata?.mimeType === 'application/pdf' ||
+          /\.pdf$/iu.test(document.title)) &&
+        Array.isArray(document.metadata?.images) &&
+        document.metadata.images.length > 0,
+    )
+    .map((document) => ({
+      document,
+      matches: countMatchesIn(matchers, visualPdfSearchText(document)),
+    }))
+    .filter((candidate) => candidate.matches >= minimumMatches)
+    .sort(
+      (left, right) =>
+        right.matches - left.matches || left.document.title.localeCompare(right.document.title),
+    )
+    .slice(0, maximum)
+    .map((candidate) => candidate.document);
+}
+
 /** Merge semantic recall with exact terminology from names, labels, and IDs. */
 export function rankKnowledgeHits<T extends { text?: string; title?: string; metadata?: any }>(
   query: string,
