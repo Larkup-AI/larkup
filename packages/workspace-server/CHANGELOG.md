@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.59
+
+### Patch Changes
+
+- Require printed numerators and denominators for composite response rates before a sandbox result can ground an answer.
+
 ## 0.2.58
 
 ### Patch Changes
