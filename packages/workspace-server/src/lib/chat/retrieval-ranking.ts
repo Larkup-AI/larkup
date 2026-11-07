@@ -131,7 +131,7 @@ export function selectVisualPdfFallbackDocuments<T extends VisualPdfDocument>(
   const matchers = buildQueryTermMatchers(query);
   if (matchers.length === 0) return [];
   const minimumMatches = Math.min(3, Math.max(2, Math.ceil(matchers.length * 0.25)));
-  return documents
+  const candidates = documents
     .filter(
       (document) =>
         document.status === 'indexed' &&
@@ -140,14 +140,36 @@ export function selectVisualPdfFallbackDocuments<T extends VisualPdfDocument>(
           /\.pdf$/iu.test(document.title)) &&
         Boolean(document.content.trim() || document.metadata?.images),
     )
-    .map((document) => ({
-      document,
-      matches: countMatchesIn(matchers, visualPdfSearchText(document)),
+    .map((document) => {
+      const searchable = visualPdfSearchText(document).toLocaleLowerCase();
+      return {
+        document,
+        matchedTerms: matchers
+          .filter(({ regex }) => regex.test(searchable))
+          .map(({ term }) => term),
+      };
+    });
+  const frequency = new Map(
+    matchers.map(({ term }) => [
+      term,
+      candidates.filter((candidate) => candidate.matchedTerms.includes(term)).length,
+    ]),
+  );
+  return candidates
+    .filter((candidate) => candidate.matchedTerms.length >= minimumMatches)
+    .map((candidate) => ({
+      ...candidate,
+      score: candidate.matchedTerms.reduce(
+        (total, term) =>
+          total + Math.log((candidates.length + 1) / ((frequency.get(term) ?? 0) + 1)) + 1,
+        0,
+      ),
     }))
-    .filter((candidate) => candidate.matches >= minimumMatches)
     .sort(
       (left, right) =>
-        right.matches - left.matches || left.document.title.localeCompare(right.document.title),
+        right.score - left.score ||
+        right.matchedTerms.length - left.matchedTerms.length ||
+        left.document.title.localeCompare(right.document.title),
     )
     .slice(0, maximum)
     .map((candidate) => candidate.document);
@@ -157,12 +179,13 @@ export function selectVisualPdfFallbackDocuments<T extends VisualPdfDocument>(
 export function retainPreferredPdfHit<T extends { documentId: string }>(
   selected: T[],
   ranked: T[],
-  preferredDocumentIds: ReadonlySet<string>,
+  preferredDocumentIds: readonly string[],
   maximum: number,
 ): T[] {
-  if (maximum < 1 || selected.some((hit) => preferredDocumentIds.has(hit.documentId)))
-    return selected;
-  const pdf = ranked.find((hit) => preferredDocumentIds.has(hit.documentId));
+  if (maximum < 1) return selected;
+  const bestId = preferredDocumentIds.find((id) => ranked.some((hit) => hit.documentId === id));
+  if (!bestId || selected.some((hit) => hit.documentId === bestId)) return selected;
+  const pdf = ranked.find((hit) => hit.documentId === bestId);
   if (!pdf) return selected;
   return selected.length < maximum ? [...selected, pdf] : [...selected.slice(0, -1), pdf];
 }
