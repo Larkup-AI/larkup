@@ -50,6 +50,17 @@ test('canonical assets survive bundling and reject unlisted paths', async () => 
   );
   assert.equal(workspaceAssetResponse('../../package.json').status, 404);
   assert.equal(workspaceAssetResponse('__proto__').status, 404);
+  for (const icon of [
+    'lancedb2.png',
+    'pgvector2.png',
+    'pinecone.png',
+    'weaviate.webp',
+    'qdrant.svg',
+    'chroma.png',
+    'supabase.png',
+  ]) {
+    assert.equal(workspaceAssetResponse(`icons/${icon}`).status, 200);
+  }
 });
 
 test('chat requests use the configured workspace transport', async () => {

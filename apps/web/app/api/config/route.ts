@@ -10,7 +10,7 @@ import {
   toChatDescriptor,
 } from '@larkup/core/chat-models/registry';
 import { runWithProject } from '@larkup/core/project-store';
-import type { RagConfig } from '@larkup/core/types';
+import { validateChunkingParams, type RagConfig } from '@larkup/core/types';
 import { getToolById } from '@larkup/marketplace/registry';
 
 export const runtime = 'nodejs';
@@ -116,6 +116,11 @@ export async function PUT(request: Request) {
     body = (await request.json()) as RagConfig;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const chunkingError = validateChunkingParams(body.chunking);
+  if (chunkingError) {
+    return NextResponse.json({ error: chunkingError }, { status: 422 });
   }
 
   const defaultEmbeddingModels: Record<string, string> = {

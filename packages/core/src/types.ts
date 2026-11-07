@@ -57,6 +57,19 @@ export interface ChunkingParams {
   strategy: 'recursive' | 'sentence' | 'fixed';
 }
 
+export function validateChunkingParams(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return 'Invalid chunking settings.';
+  const { chunkSize, chunkOverlap, strategy } = value as Partial<ChunkingParams>;
+  if (!Number.isInteger(chunkSize) || chunkSize! < 64 || chunkSize! > 8192)
+    return 'Chunk size must be between 64 and 8192 tokens.';
+  if (!Number.isInteger(chunkOverlap) || chunkOverlap! < 0 || chunkOverlap! > 2048)
+    return 'Chunk overlap must be between 0 and 2048 tokens.';
+  if (chunkOverlap! >= chunkSize!) return 'Chunk overlap must be smaller than chunk size.';
+  if (!['recursive', 'sentence', 'fixed'].includes(strategy ?? ''))
+    return 'Invalid chunking strategy.';
+  return null;
+}
+
 export interface RagConfig {
   /** project label, used when generating the server */
   projectName: string;
