@@ -599,8 +599,16 @@ export function analysisValidationRequirements(text: string) {
     )
   ) {
     requirements.push(
-      'derive each numerator and denominator separately from the requested population before filtering or joining, then print each numerator and denominator with its source label; never use only matched rows as the denominator unless the request explicitly says so; unless the user requests another precision, display percentages rounded to one decimal place while keeping unrounded values for ranking and calculations',
+      'filter to the requested arm or cohort first, then derive each numerator and denominator separately for that population and its subgroups; print each numerator and denominator with its source label; never use only matched rows as the denominator unless the request explicitly says so; unless the user requests another precision, display percentages rounded to one decimal place while keeping unrounded values for ranking and calculations',
       'for incidence, derive the denominator from the complete subject or population table after applying any requested population flag; never derive it from the event table because subjects without events are absent there',
+    );
+  }
+  if (
+    /\b(?:highest|lowest|largest|smallest)\b[\s\S]{0,60}\b(?:ORR|DCR|rate)\b/iu.test(text) &&
+    /\b(?:arm|cohort|group)\b/iu.test(text)
+  ) {
+    requirements.push(
+      'before ranking subgroup rates, assert in Python that the requested arm or cohort was filtered and that the subgroup denominators sum to that cohort size when categories are exhaustive; never group the full dataset and label the result as one arm',
     );
   }
   if (/\b(?:join|across|between|overlap|orphan|foreign\s+key)\b/iu.test(text)) {
@@ -685,6 +693,14 @@ export function analysisCodeValidationError(
     mountedDatasetSchemas?: Array<{ fileName: string; columns: string[] }>;
   } = {},
 ): string | undefined {
+  if (
+    /\b(?:highest|lowest|largest|smallest)\b[\s\S]{0,60}\b(?:ORR|DCR|rate)\b/iu.test(text) &&
+    /\b(?:arm|cohort|group)\b/iu.test(text) &&
+    /\.groupby\s*\(/u.test(code) &&
+    !/\bassert\b[^\n]*(?:sum|len|count|total)/iu.test(code)
+  ) {
+    return 'Subgroup rate ranking needs a cohort reconciliation check: filter the requested arm first and assert subgroup denominators sum to that arm size before ranking.';
+  }
   for (const dataset of options.mountedDatasetSchemas ?? []) {
     const literalColumns = dataset.columns.filter((column) => {
       const escaped = column.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
