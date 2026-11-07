@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.48
+
+### Patch Changes
+
+- Verify mixed PDF and uploaded-table calculations against visual source evidence, preserve chart population labels, and reject analysis code that reconstructs uploaded rows instead of reading mounted files.
+
 ## 0.2.47
 
 ### Patch Changes
