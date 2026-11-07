@@ -499,7 +499,7 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
       // descriptions so the deterministic PDF inspection path remains
       // available instead of asking the answer model to infer a chart from
       // unrelated records.
-      let preferredPdfDocumentIds = new Set<string>();
+      let preferredPdfDocumentIds: string[] = [];
       if (requiresPdfVisualAnalysis(query)) {
         const presentDocumentIds = new Set(hits.map((hit: any) => hit.documentId));
         const visualPdfFallbacks = selectVisualPdfFallbackDocuments(query, documents);
@@ -508,7 +508,7 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
             query,
           )
         ) {
-          preferredPdfDocumentIds = new Set(visualPdfFallbacks.map((document) => document.id));
+          preferredPdfDocumentIds = visualPdfFallbacks.map((document) => document.id);
         }
         const missingVisualPdfs = visualPdfFallbacks.filter(
           (document) => !presentDocumentIds.has(document.id),
@@ -592,7 +592,7 @@ async function formatKnowledgeHits(
   topK: number,
   indexedDocuments?: Awaited<ReturnType<typeof readDocuments>>,
   indexedMediaAssets?: Awaited<ReturnType<typeof readMediaAssets>>,
-  preferredPdfDocumentIds: ReadonlySet<string> = new Set(),
+  preferredPdfDocumentIds: readonly string[] = [],
 ) {
   const [storedDocuments, storedMediaAssets] = await Promise.all([
     readDocuments(),

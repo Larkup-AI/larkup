@@ -65,10 +65,40 @@ test('retains one relevant PDF when ranked table chunks fill a mixed visual answ
   const rows = ['row-1', 'row-2', 'row-3', 'row-4'].map((documentId) => ({ documentId }));
   const pdf = { documentId: 'report' };
   assert.deepEqual(
-    retainPreferredPdfHit(rows, [...rows, pdf], new Set(['report']), 4).map(
-      (hit) => hit.documentId,
-    ),
+    retainPreferredPdfHit(rows, [...rows, pdf], ['report'], 4).map((hit) => hit.documentId),
     ['row-1', 'row-2', 'row-3', 'report'],
   );
-  assert.deepEqual(retainPreferredPdfHit(rows, [...rows, pdf], new Set(), 4), rows);
+  assert.deepEqual(retainPreferredPdfHit(rows, [...rows, pdf], [], 4), rows);
+  assert.equal(
+    retainPreferredPdfHit(rows, [...rows, { documentId: 'other' }, pdf], ['report', 'other'], 4)[3]
+      ?.documentId,
+    'report',
+  );
+});
+
+test('ranks rare visual-topic terms above generic figure and arm mentions', () => {
+  const documents = [
+    {
+      id: 'generic',
+      title: 'clinical_report.pdf',
+      content: 'Figure 1 shows results for each treatment arm.',
+      status: 'indexed',
+      metadata: { fileKind: 'pdf' },
+    },
+    {
+      id: 'design',
+      title: 'study_protocol.pdf',
+      content: 'Figure 1 shows the study design, randomization, and stratification factors.',
+      status: 'indexed',
+      metadata: { fileKind: 'pdf' },
+    },
+  ];
+  assert.equal(
+    selectVisualPdfFallbackDocuments(
+      'Per the design figure, what are the stratification factors for each arm?',
+      documents,
+      1,
+    )[0]?.id,
+    'design',
+  );
 });
