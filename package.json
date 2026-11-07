@@ -36,18 +36,19 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "read-yaml-file@1.1.0": "patches/read-yaml-file@1.1.0.patch",
-      "tsup": "patches/tsup.patch"
+      "tsup": "patches/tsup.patch",
+      "deepmerge@4.3.1": "patches/deepmerge@4.3.1.patch",
+      "read-yaml-file@1.1.0": "patches/read-yaml-file@1.1.0.patch"
     },
     "overrides": {
       "argparse@1.0.10": "2.0.1",
       "typescript": "^6.0.3",
-      "undici": "^6.28.1",
+      "undici": "^6.29.1",
       "body-parser": "^2.3.0",
       "esbuild": "^0.25.0",
-      "minimatch": "^9.0.4",
+      "minimatch": "^11.0.1",
       "tar": "^7.5.21",
-      "glob": "^11.0.0",
+      "glob": "^14.0.2",
       "ajv": "^8.16.0",
       "path-to-regexp": "^8.4.0",
       "postcss": "^8.4.38",
@@ -62,7 +63,7 @@
       "proxy-addr": "^2.0.8",
       "hono": "^4.12.34",
       "@hono/node-server": "^2.0.5",
-      "ip-address": "^10.7.1",
+      "ip-address": "^10.7.4",
       "js-yaml": "^4.3.2",
       "@grpc/grpc-js": "^1.14.5",
       "smol-toml": "^1.6.1",
@@ -70,7 +71,9 @@
       "sharp": "^0.35.0",
       "nanoid": "^3.3.17",
       "@modelcontextprotocol/sdk": "^1.31.0",
-      "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+      "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+      "katex": "^0.19.1",
+      "zod@^4.0.0": "^4.6.7"
     }
   }
 }
