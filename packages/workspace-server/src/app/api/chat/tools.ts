@@ -1340,6 +1340,14 @@ export async function getChatTools(context: {
             inspection.pages.map(async (page) => {
               const rendered = await renderStoredPdfPage(document, page.pageNumber, 2_000);
               const visionImages = await pdfPageVisionImages(rendered.data, page.text);
+              const question = prompt.match(/\bQuestion:\s*([\s\S]*)$/iu)?.[1]?.trim() ?? prompt;
+              const singleChartExtremum =
+                visionImages.length > 1 &&
+                /\b(?:which|what)\b/iu.test(question) &&
+                /\b(?:threshold|exceed|largest|smallest|highest|lowest|maximum|minimum|highlighted)\b/iu.test(
+                  question,
+                ) &&
+                /\b(?:fig(?:ure)?|chart|graph)\b/iu.test(page.text);
               const response = await fetch(
                 new URL(
                   workspaceServerUrl(
@@ -1354,8 +1362,9 @@ export async function getChatTools(context: {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     base64Images: visionImages,
-                    prompt:
-                      visionImages.length > 1
+                    prompt: singleChartExtremum
+                      ? `Independently read the PDF images for this question: ${question}. The first image is the full page; the next two are overlapping close-ups. Locate the relevant figure and find the mark that meets the question's condition. Trace straight down from that mark to its exact axis label. State the mark's value and the labels and values immediately to its left and right. Ignore prior text descriptions and do not infer facts from other files.`
+                      : visionImages.length > 1
                         ? `The first image is the full PDF page; the next images are overlapping upper and lower close-ups of that same page. Use the close-ups to align chart marks with their axis labels. ${prompt}`
                         : prompt,
                   }),
