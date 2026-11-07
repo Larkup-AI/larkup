@@ -10,6 +10,7 @@ import {
   isLikelyTabularQuestion,
   hasExhaustedAnalysisAttempts,
   requiresPdfAndTabularEvidence,
+  requiresPdfStatisticSource,
   requiresMultiDatasetAnalysis,
   requiresTabularSandbox,
   repairUnavailableTabularDatasetReferences,
@@ -105,6 +106,8 @@ test('keeps document and table evidence together for compound questions', () => 
     }),
     false,
   );
+  assert.equal(requiresPdfStatisticSource('What are the median PFS and patients at risk?'), true);
+  assert.equal(requiresPdfStatisticSource('What is the median age in patients.csv?'), false);
 });
 
 test('rejects an embedded CSV reconstruction while allowing inspected PDF values beside mounted rows', () => {

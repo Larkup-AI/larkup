@@ -172,6 +172,10 @@ test('prefers the PDF named in a mixed-source question over a different visual h
 
 test('reads a referenced chart for numeric facts even when the question names only the report', () => {
   assert.equal(
+    inspectedPdfNeedsVisualReading('How many patients are at risk at month 12?', { pages: [] }),
+    true,
+  );
+  assert.equal(
     inspectedPdfNeedsVisualReading('Which site exceeded the threshold, and how many deviations?', {
       pages: [
         { text: 'Figure 2 shows cumulative deviations by site. Red sites exceed the threshold.' },

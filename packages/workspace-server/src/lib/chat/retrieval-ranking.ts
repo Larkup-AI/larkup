@@ -120,8 +120,8 @@ function visualPdfSearchText(document: VisualPdfDocument): string {
 
 /**
  * Recover a visual PDF when dense rows from a large table crowd it out of the
- * semantic candidate pool. This is intentionally bounded and requires several
- * literal query matches in the document text or indexed page descriptions.
+ * semantic candidate pool. Older PDFs may have text but no indexed images;
+ * their original pages can still be rendered for visual verification.
  */
 export function selectVisualPdfFallbackDocuments<T extends VisualPdfDocument>(
   query: string,
@@ -138,8 +138,7 @@ export function selectVisualPdfFallbackDocuments<T extends VisualPdfDocument>(
         (document.metadata?.fileKind === 'pdf' ||
           document.metadata?.mimeType === 'application/pdf' ||
           /\.pdf$/iu.test(document.title)) &&
-        Array.isArray(document.metadata?.images) &&
-        document.metadata.images.length > 0,
+        Boolean(document.content.trim() || document.metadata?.images),
     )
     .map((document) => ({
       document,

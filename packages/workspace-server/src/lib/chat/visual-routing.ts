@@ -510,7 +510,7 @@ export function requestsImagePresentation(text: string): boolean {
  * than tied to any particular paper or diagram format.
  */
 export function requiresPdfVisualAnalysis(text: string): boolean {
-  return /\b(?:figure|fig\.?|diagram|chart|graph|image|picture|visual|table|equation|formula|notation|layout|caption|legend|label|matrix)\b|\\(?:frac|sqrt|sum|alpha|beta|gamma|delta|theta|[()[\]{}])|[∂∑√ᵀ]/i.test(
+  return /\b(?:figure|fig\.?|diagram|chart|graph|image|picture|visual|table|equation|formula|notation|layout|caption|legend|label|matrix|kaplan[ -]meier|at[ -]risk)\b|\\(?:frac|sqrt|sum|alpha|beta|gamma|delta|theta|[()[\]{}])|[∂∑√ᵀ]/i.test(
     text,
   );
 }

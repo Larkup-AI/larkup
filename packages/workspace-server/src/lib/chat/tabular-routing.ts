@@ -393,6 +393,11 @@ export function requiresPdfAndTabularEvidence(input: {
   );
 }
 
+/** A chart-derived statistic needs its PDF source even when a CSV is available. */
+export function requiresPdfStatisticSource(text: string): boolean {
+  return /\b(?:kaplan[ -]meier|survival\s+curve|at[ -]risk(?:\s+table)?)\b/iu.test(text);
+}
+
 /** A prior result table is valid input only when the current question does not require fresh files. */
 export function shouldUseRecentAnalysisTable(
   text: string,
