@@ -37,3 +37,23 @@ test('recovers a chart PDF from indexed page descriptions when row-level data do
     ['csr'],
   );
 });
+
+test('recovers a text-indexed PDF without images so its original page can be inspected', () => {
+  const documents = [
+    {
+      id: 'legacy-report',
+      title: 'clinical_report.pdf',
+      content:
+        'The Kaplan-Meier progression-free survival curve and number at risk are shown in Figure 2.',
+      status: 'indexed',
+      metadata: { fileKind: 'pdf' },
+    },
+  ];
+  assert.deepEqual(
+    selectVisualPdfFallbackDocuments(
+      'What does the Kaplan-Meier curve show for patients at risk?',
+      documents,
+    ).map((document) => document.id),
+    ['legacy-report'],
+  );
+});

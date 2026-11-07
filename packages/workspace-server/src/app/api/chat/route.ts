@@ -94,6 +94,7 @@ import {
   latestAnalysisAttemptFailed,
   requiresMultiDatasetAnalysis,
   requiresPdfAndTabularEvidence,
+  requiresPdfStatisticSource,
   requestsLongAnalysisArtifact,
   requiresTabularSandbox,
   shouldPrioritizeTabularAnalysisBeforePdf,
@@ -217,6 +218,7 @@ If the user asks for a chart, graph, or visual distribution, ALWAYS use the \`ge
 When search results identify a PDF source without indexed visuals, use inspectPdfPages before answering. It reads and ranks pages locally. Then use analyzePdfPages for visual claims or presentMedia for an explicit page preview.
 When a question combines a PDF fact with structured data, use both sources in the same answer. Read the document value and its row, label, or figure first, then calculate from the table using explicit numerators and denominators. A missing column in the CSV does not prove the fact is absent from the PDF. If the PDF value is not available, state that limit rather than replacing it with a similarly named table field.
 When a PDF plot and CSV describe different populations, calculate the difference explicitly. Attribute it to a specific exclusion only when the plot population definition and CSV fields support that explanation.
+For a statistic requested from a chart, use the rendered chart's method and label. A raw-data median is not a Kaplan-Meier estimate. State the source file, page and figure or table when available, and name the calculation method and denominator for computed values. If the chart and CSV disagree, report both with their methods; do not average them or invent an explanation. Never infer an arm size, subgroup count, or threshold without source evidence.
 When identifying one entity from joined sources, include its exact source identifier as well as its human-readable name or location in the final answer.
 
 For media questions, searchKnowledgeBase first, then use an installed evidence-query action with the returned mediaAssetId. Use its active evidence and include supporting time ranges. Inspect or present media only when necessary or explicitly requested.
@@ -1434,7 +1436,8 @@ ${fieldLines}`;
     !(requiresCorpusSandboxAnalysis && builtInTools.analyzeCorpusWithCode) &&
     (!hasTabularData ||
       !tabularQuestion ||
-      requiresPdfAndTabularEvidence({ hasTabularData, tabularQuestion, text: userText })) &&
+      requiresPdfAndTabularEvidence({ hasTabularData, tabularQuestion, text: userText }) ||
+      requiresPdfStatisticSource(userText)) &&
     builtInTools.searchKnowledgeBase,
   );
 
@@ -1804,7 +1807,7 @@ ${fieldLines}`;
               const analysisInput = {
                 documentId: pdfSource.documentId,
                 pageNumbers: pdfPagesForVisualAnalysis(userText, selectedPageNumbers),
-                prompt: `Extract only what is visible on this PDF page for the question below. Start with the exact figure/table title and caption, including any population qualifier in parentheses. Then transcribe each relevant chart group or table row with its exact label, comparison sign (≥, >, ≤, <), value, units, and sample size n. For a bar or point chart, pair each mark with the axis label directly aligned below it; count neighboring marks and labels to verify any highlighted or extreme value before naming its category. Do not transfer a value from another figure on the same page. Do not answer the combined question or infer any counts or facts from CSV, spreadsheets, or other files. For a signed effect, compare absolute magnitudes when the user asks for the smallest effect. If a requested fact belongs to another file, leave it out entirely.\n\nQuestion: ${userText}`,
+                prompt: `Extract only what is visible on this PDF page for the question below. Start with the exact figure/table title and caption, including any population qualifier in parentheses. For plots, transcribe axes, units, legend labels, annotated values, thresholds, and any embedded at-risk table with each time point aligned to its arm. For diagrams, transcribe each box, arrow, label, and number. For structured tables, preserve row and column headers. Pair each mark with its axis label; verify highlighted or extreme values against neighboring marks and labels. Distinguish a Kaplan-Meier estimate from a raw-data median and do not substitute one for the other. Do not transfer a value from another figure on the same page. Do not answer the combined question or infer any counts or facts from CSV, spreadsheets, or other files. If a requested fact belongs to another file, leave it out entirely.\n\nQuestion: ${userText}`,
               };
               writer.write({
                 type: 'tool-input-available',
