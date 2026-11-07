@@ -608,7 +608,7 @@ export function analysisValidationRequirements(text: string) {
     /\b(?:arm|cohort|group)\b/iu.test(text)
   ) {
     requirements.push(
-      'before ranking subgroup rates, assert in Python that the requested arm or cohort was filtered and that the subgroup denominators sum to that cohort size when categories are exhaustive; never group the full dataset and label the result as one arm',
+      'first filter source rows to the requested arm or cohort, then group that filtered frame by subgroup; assert subgroup denominators sum to the filtered arm size when categories are exhaustive; print the numerator, denominator, and rate for every arm and subgroup used in the comparison before naming the winner; never group the full dataset and label the result as one arm',
     );
   }
   if (/\b(?:join|across|between|overlap|orphan|foreign\s+key)\b/iu.test(text)) {
@@ -673,10 +673,16 @@ export function rateAnalysisEvidenceError(question: string, stdout: string): str
   const namedCounts =
     /\b(?:numerator|response count|CR\s*\+\s*PR)\b/iu.test(stdout) &&
     /\b(?:denominator|population|arm size|total patients|n\s*=)\b/iu.test(stdout);
+  const componentCounts =
+    /\bCR\s+Count\b/iu.test(stdout) &&
+    /\bPR\s+Count\b/iu.test(stdout) &&
+    /\b(?:arm size|patient count|subject count|population count)\b/iu.test(stdout) &&
+    /\b\d+\b/u.test(stdout);
   if (
     explicitRatios >=
       (/(?:\bper\s+arm\b|\beach\s+arm\b|\bboth\s+arms\b)/iu.test(question) ? 2 : 1) ||
-    namedCounts
+    namedCounts ||
+    componentCounts
   ) {
     return undefined;
   }
@@ -693,13 +699,26 @@ export function analysisCodeValidationError(
     mountedDatasetSchemas?: Array<{ fileName: string; columns: string[] }>;
   } = {},
 ): string | undefined {
+  // When ORR/DCR is computed by subgroup within a named arm/cohort, the code
+  // must filter to that arm BEFORE grouping by any subgroup column. This check
+  // is broader than just "highest/lowest" so it also catches plain per-arm
+  // subgroup breakdowns that mix rows from both arms simultaneously.
   if (
-    /\b(?:highest|lowest|largest|smallest)\b[\s\S]{0,60}\b(?:ORR|DCR|rate)\b/iu.test(text) &&
+    /\b(?:ORR|DCR|overall\s+response\s+rate|disease\s+control\s+rate)\b/iu.test(text) &&
     /\b(?:arm|cohort|group)\b/iu.test(text) &&
-    /\.groupby\s*\(/u.test(code) &&
-    !/\bassert\b[^\n]*(?:sum|len|count|total)/iu.test(code)
+    /\.groupby\s*\(/u.test(code)
   ) {
-    return 'Subgroup rate ranking needs a cohort reconciliation check: filter the requested arm first and assert subgroup denominators sum to that arm size before ranking.';
+    const subgroupGroup = [...code.matchAll(/\.groupby\s*\(([^)]*)\)/gu)].find(
+      (match) => !/^\s*["'](?:arm|cohort|group)["']\s*$/iu.test(match[1]),
+    );
+    const beforeGroup = code.slice(0, subgroupGroup?.index ?? code.length);
+    const hasArmFilter =
+      /\[[^\n]*\b(?:arm|cohort|group)\b[^\n]*(?:==|\.eq\s*\()/iu.test(beforeGroup) ||
+      /\.query\s*\([^\n]*\b(?:arm|cohort|group)\b/iu.test(beforeGroup) ||
+      /\.loc\s*\[[^\n]*\b(?:arm|cohort|group)\b[^\n]*(?:==|\.eq\s*\()/iu.test(beforeGroup);
+    if (subgroupGroup && !hasArmFilter) {
+      return 'Rate calculation by subgroup must filter to the requested arm or cohort before grouping by subgroup categories. Filter first, then groupby the subgroup column.';
+    }
   }
   for (const dataset of options.mountedDatasetSchemas ?? []) {
     const literalColumns = dataset.columns.filter((column) => {

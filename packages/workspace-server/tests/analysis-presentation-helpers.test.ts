@@ -37,3 +37,18 @@ _larkup_print_result(result)
   assert.match(stdout, /Madrid\s+12\s+5\.3/);
   assert.doesNotMatch(stdout, /5\.963303|5\.333333/);
 });
+
+test('uses the preloaded presentation helper when generated code imports a module for it', () => {
+  const stdout = execFileSync(
+    'python3',
+    [
+      '-c',
+      withAnalysisPresentationHelpers(
+        "import functions\nfunctions.larkup_table('Counts', [{'group': 'A', 'count': 2}])",
+      ),
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.match(stdout, /__LARKUP_PRESENTATION__:/);
+  assert.match(stdout, /"count": 2/);
+});

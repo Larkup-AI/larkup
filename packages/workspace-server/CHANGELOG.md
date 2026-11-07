@@ -1,5 +1,27 @@
 # @larkup/workspace-server
 
+## 0.2.61
+
+### Patch Changes
+
+- Fix ORR/DCR sandbox arm-filter validation and PDF treatment-name spelling
+
+  - Broaden `analysisCodeValidationError` to reject any ORR/DCR by-subgroup
+    code that groups by a category column without first filtering to the
+    requested arm or cohort — previously only "highest/lowest" ranking
+    questions were checked, which left plain per-arm subgroup breakdowns
+    able to mix rows from both arms simultaneously.
+  - Add `.loc[...]` as an additional recognized arm-filter form.
+  - Add `componentCounts` evidence path in `rateAnalysisEvidenceError` so
+    CR-count + PR-count + arm-size is accepted as complete rate evidence
+    without requiring an explicit "numerator/denominator" label.
+  - Repair `withAnalysisPresentationHelpers` to strip `import functions` and
+    rewrite `functions.larkup_table(` / `functions.larkup_document(` calls
+    that some models emit.
+  - Extend visual-reading prompt to include extracted page-text spelling for
+    proper names and treatment labels so figure OCR does not override the
+    text layer when they differ.
+
 ## 0.2.60
 
 ### Patch Changes
