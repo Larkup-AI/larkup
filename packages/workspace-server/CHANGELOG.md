@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.60
+
+### Patch Changes
+
+- Require subgroup rate calculations to reconcile with the selected cohort and preserve PDF text spellings for proper names.
+
 ## 0.2.59
 
 ### Patch Changes
