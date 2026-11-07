@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.53
+
+### Patch Changes
+
+- Validate PDF visual rates against the count for the entity returned by analysis.
+
 ## 0.2.52
 
 ### Patch Changes
