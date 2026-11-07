@@ -347,7 +347,8 @@ export function ChatDataTable({ config, compact = false }: ChatDataTableProps) {
             <span className="text-[11px] text-muted-foreground">Show</span>
             <Select
               value={String(pageSize)}
-              onValueChange={(v) => {
+              onValueChange={(v: string | null) => {
+                if (!v) return;
                 setPageSize(Number(v));
                 setPage(0);
               }}

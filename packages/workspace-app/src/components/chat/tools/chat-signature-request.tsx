@@ -486,7 +486,9 @@ export function ChatSignatureRequest({
                 <Label className="text-xs">Font Style</Label>
                 <Select
                   value={font}
-                  onValueChange={(val) => val && setFont(val)}
+                  onValueChange={(val: string | null) => {
+                    if (val) setFont(val);
+                  }}
                   disabled={mode !== 'type'}
                 >
                   <SelectTrigger className="bg-white h-8 text-xs">
