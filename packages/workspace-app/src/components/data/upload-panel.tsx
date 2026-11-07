@@ -46,6 +46,7 @@ import { Progress } from '../ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { DataEntryModeSwitch } from './data-entry-mode-switch';
+import { saveStructuredFilesAsTabularDatasets } from './tabular-upload';
 
 const ACCEPT = '.txt,.md,.markdown,.toml,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx';
 const CONTENT_PREVIEW_LIMIT = 100_000;
@@ -451,31 +452,29 @@ export function UploadPanel({
     const filesToIngest = files ? [...files] : [...stagedRef.current];
     const payloads: any[] = [];
     const destinationGroupId = groupIdRef.current;
-    const tabularDatasetIds = new Map<string, string>();
-
-    for (const f of filesToIngest) {
-      if (f.format === 'structured' && f.rows && f.indexAsTabular) {
-        try {
-          const res = await fetch(workspaceUrl('/api/tabular'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileName: f.name,
-              rows: f.rows,
-              groupId: destinationGroupId,
-            }),
-          });
-          if (res.ok) {
-            const result = await res.json();
-            if (typeof result.id === 'string') tabularDatasetIds.set(f.id, result.id);
-            toast.success(
-              `Saved "${f.name}" as tabular dataset (${result.rowCount} rows, ${result.columns.length} columns)`,
-            );
-          }
-        } catch {
-          /* continue — still add as documents */
-        }
+    let tabularDatasetIds = new Map<string, string>();
+    try {
+      const savedTabularDatasets = await saveStructuredFilesAsTabularDatasets(
+        filesToIngest,
+        destinationGroupId,
+        (url, init) => fetch(workspaceUrl(String(url)), init),
+      );
+      tabularDatasetIds = new Map(
+        savedTabularDatasets.map((dataset) => [dataset.sourceFileId, dataset.id]),
+      );
+      for (const dataset of savedTabularDatasets) {
+        toast.success(
+          `Saved "${dataset.fileName}" as tabular dataset (${dataset.rowCount} rows, ${dataset.columnCount} columns)`,
+        );
       }
+    } catch (error) {
+      savingRef.current = false;
+      setSaving(false);
+      setProgress(null);
+      toast.error(
+        `${formatErrorMessage(error)}. The file was not added; retry to preserve data analysis.`,
+      );
+      return;
     }
 
     // Then: create document payloads
