@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.56
+
+### Patch Changes
+
+- Keep a relevant PDF in bounded mixed-source retrieval results so figure questions can inspect the original page alongside table evidence.
+
 ## 0.2.55
 
 ### Patch Changes
