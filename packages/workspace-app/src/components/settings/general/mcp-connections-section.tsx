@@ -570,9 +570,10 @@ export function McpConnectionsSection() {
                 </Label>
                 <Select
                   value={draft.transport}
-                  onValueChange={(transport) =>
-                    setDraft({ ...draft, transport: transport as Draft['transport'] })
-                  }
+                  onValueChange={(transport: string | null) => {
+                    if (transport)
+                      setDraft({ ...draft, transport: transport as Draft['transport'] });
+                  }}
                   disabled={saving}
                 >
                   <SelectTrigger className="w-full">
@@ -590,12 +591,13 @@ export function McpConnectionsSection() {
                 </Label>
                 <Select
                   value={draft.connectionType}
-                  onValueChange={(connectionType) =>
-                    setDraft({
-                      ...draft,
-                      connectionType: connectionType as Draft['connectionType'],
-                    })
-                  }
+                  onValueChange={(connectionType: string | null) => {
+                    if (connectionType)
+                      setDraft({
+                        ...draft,
+                        connectionType: connectionType as Draft['connectionType'],
+                      });
+                  }}
                   disabled={saving}
                 >
                   <SelectTrigger className="w-full" aria-label="Connection type">
@@ -750,9 +752,9 @@ export function McpConnectionsSection() {
                 </Label>
                 <Select
                   value={editDraft.transport}
-                  onValueChange={(v) =>
-                    setEditDraft({ ...editDraft, transport: v as Draft['transport'] })
-                  }
+                  onValueChange={(v: string | null) => {
+                    if (v) setEditDraft({ ...editDraft, transport: v as Draft['transport'] });
+                  }}
                   disabled={editSaving}
                 >
                   <SelectTrigger className="w-full">
@@ -770,12 +772,13 @@ export function McpConnectionsSection() {
                 </Label>
                 <Select
                   value={editDraft.connectionType}
-                  onValueChange={(v) =>
-                    setEditDraft({
-                      ...editDraft,
-                      connectionType: v as Draft['connectionType'],
-                    })
-                  }
+                  onValueChange={(v: string | null) => {
+                    if (v)
+                      setEditDraft({
+                        ...editDraft,
+                        connectionType: v as Draft['connectionType'],
+                      });
+                  }}
                   disabled={editSaving}
                 >
                   <SelectTrigger className="w-full" aria-label="Connection type">
