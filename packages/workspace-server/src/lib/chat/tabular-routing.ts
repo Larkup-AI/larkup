@@ -661,7 +661,7 @@ export function withAnalysisNumericProvenance(code: string, question: string): s
   ) {
     return code;
   }
-  return `${code}\n\n# Report named numeric population values used in rate and risk calculations.\nimport numbers as _larkup_numbers\nimport re as _larkup_re\n_larkup_provenance = [(name, value) for name, value in list(globals().items()) if not name.startswith('_') and _larkup_re.search(r'(?:^|_)(?:n|count|size|total|denom(?:inator)?|population)(?:_|$)', name, _larkup_re.I) and isinstance(value, _larkup_numbers.Number) and not isinstance(value, bool)]\nfor _larkup_name, _larkup_value in _larkup_provenance[:24]:\n    print(f"Verified calculation input {_larkup_name}: {_larkup_value}")\n`;
+  return `${code}\n\n# Report named numeric population values used in rate and risk calculations.\nimport numbers as _larkup_numbers\nimport re as _larkup_re\n_larkup_provenance = [(name, value) for name, value in list(globals().items()) if not name.startswith('_') and _larkup_re.search(r'(?:^|_)(?:n|count|size|total|denom(?:inator)?|population)(?:_|$)', name, _larkup_re.I) and isinstance(value, _larkup_numbers.Number) and not isinstance(value, bool)]\nfor _larkup_name, _larkup_value in _larkup_provenance[:24]:\n    print(f"Verified calculation input {_larkup_name}: {_larkup_value}")\n# Also surface rate-related DataFrames so evidence is not lost.\nimport pandas as _larkup_pd\nfor _larkup_name, _larkup_obj in list(globals().items())[:60]:\n    if _larkup_name.startswith('_'):\n        continue\n    if isinstance(_larkup_obj, _larkup_pd.DataFrame) and 0 < len(_larkup_obj) <= 30:\n        _larkup_cols = ' '.join(str(c).lower() for c in _larkup_obj.columns)\n        if any(k in _larkup_cols for k in ['count', 'numerator', 'denominator', 'rate', 'orr', 'dcr', 'n_', 'arm size', 'patient', 'total']):\n            print(f"Rate evidence from {_larkup_name}:")\n            print(_larkup_obj.to_string())\n    elif isinstance(_larkup_obj, _larkup_pd.Series) and 0 < len(_larkup_obj) <= 30:\n        if _larkup_re.search(r'(?:count|rate|orr|dcr|size|total|numerator|denominator|response)', _larkup_name, _larkup_re.I):\n            print(f"Rate evidence from {_larkup_name}:")\n            print(_larkup_obj.to_string())\n`;
 }
 
 /** A rate without printed source counts invites invented denominators in prose. */
@@ -682,7 +682,8 @@ export function rateAnalysisEvidenceError(question: string, stdout: string): str
     explicitRatios >=
       (/(?:\bper\s+arm\b|\beach\s+arm\b|\bboth\s+arms\b)/iu.test(question) ? 2 : 1) ||
     namedCounts ||
-    componentCounts
+    componentCounts ||
+    (/\bRate evidence from\b/u.test(stdout) && /\b\d+\b/u.test(stdout))
   ) {
     return undefined;
   }
