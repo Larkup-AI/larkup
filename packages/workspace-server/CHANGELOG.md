@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.55
+
+### Patch Changes
+
+- Route unnumbered PDF figures alongside CSV questions and recover unambiguous named datasets when a model supplies an invalid dataset ID.
+
 ## 0.2.54
 
 ### Patch Changes
