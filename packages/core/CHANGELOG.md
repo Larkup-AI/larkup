@@ -1,5 +1,11 @@
 # @larkup/core
 
+## 0.8.5
+
+### Patch Changes
+
+- 87617dc: Add validated project chunking settings and show the local and Cloud storage defaults with vector store logos.
+
 ## 0.8.4
 
 ### Patch Changes

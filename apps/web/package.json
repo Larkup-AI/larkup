@@ -1,6 +1,6 @@
 {
   "name": "larkup",
-  "version": "0.4.90",
+  "version": "0.4.91",
   "engines": {
     "node": ">=22"
   },
@@ -38,12 +38,12 @@
     "@ffprobe-installer/ffprobe": "2.1.2",
     "@lancedb/lancedb": "^0.40.0",
     "@larkup/connections": "^0.2.0",
-    "@larkup/core": "^0.8.4",
+    "@larkup/core": "^0.8.5",
     "@larkup/integrations": "^0.2.1",
-    "@larkup/marketplace": "^0.3.13",
+    "@larkup/marketplace": "^0.3.14",
     "@larkup/sandbox": "^0.1.12",
-    "@larkup/scraper": "^0.2.4",
-    "@larkup/tool-doc-editor": "^0.3.8",
+    "@larkup/scraper": "^0.2.5",
+    "@larkup/tool-doc-editor": "^0.3.9",
     "@larkup/vector-stores": "^0.1.27",
     "@larkup/workspace-ui": "workspace:*",
     "@napi-rs/canvas": "1.0.13",
