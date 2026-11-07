@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.54
+
+### Patch Changes
+
+- Recover visual PDF evidence from older text-indexed documents and route chart-derived statistics to rendered page verification before answering.
+
 ## 0.2.53
 
 ### Patch Changes
