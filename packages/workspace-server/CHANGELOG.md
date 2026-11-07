@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.57
+
+### Patch Changes
+
+- Prioritize distinctive document terms and preserve the best PDF source in mixed visual and tabular searches.
+
 ## 0.2.56
 
 ### Patch Changes
