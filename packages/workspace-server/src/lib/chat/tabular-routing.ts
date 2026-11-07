@@ -388,8 +388,13 @@ export function requiresPdfAndTabularEvidence(input: {
   tabularQuestion: boolean;
 }): boolean {
   if (!input.hasTabularData || !input.tabularQuestion) return false;
-  return /\b(?:fig(?:ure)?\s*(?:\d+|[ivx]+)|table\s*(?:\d+|[ivx]+)|diagram|appendix|equation|report|protocol|paper|document|pdf)\b/iu.test(
-    input.text,
+  return (
+    /\b(?:fig(?:ure)?\s*(?:\d+|[ivx]+)|table\s*(?:\d+|[ivx]+)|diagram|appendix|equation|report|protocol|paper|document|pdf)\b/iu.test(
+      input.text,
+    ) ||
+    /\b(?:per|in|from|on|according to|shown in)\s+(?:the\s+)?(?:[\w-]+\s+){0,4}(?:figure|chart|plot)\b/iu.test(
+      input.text,
+    )
   );
 }
 
