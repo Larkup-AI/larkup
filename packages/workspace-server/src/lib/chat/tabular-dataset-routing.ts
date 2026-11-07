@@ -116,7 +116,9 @@ export function resolveTabularDatasetForQuestion(
   selectedDatasetId: string,
 ) {
   const selected = datasets.find((dataset) => dataset.id === selectedDatasetId);
-  if (!text || !selected || datasets.length < 2) return selectedDatasetId;
+  if (!text) return selectedDatasetId;
+  if (!selected) return selectTabularDatasetForQuestion(text, datasets) ?? selectedDatasetId;
+  if (datasets.length < 2) return selectedDatasetId;
 
   const selectedScore = scoreDataset(text, selected);
   const resolved = selectTabularDatasetForQuestion(text, datasets);

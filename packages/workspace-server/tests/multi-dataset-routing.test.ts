@@ -25,6 +25,7 @@ import {
   withAnalysisNumericProvenance,
 } from '../src/lib/chat/tabular-routing.ts';
 import { remapMountedDatasetReads } from '../src/lib/chat/tabular-sandbox-files.ts';
+import { resolveTabularDatasetForQuestion } from '../src/lib/chat/tabular-dataset-routing.ts';
 
 const dataset = (id: string, fileName: string, columns: string[]): TabularDatasetMeta => ({
   id,
@@ -84,6 +85,14 @@ test('prioritizes a requested multi-file calculation over an incidental PDF hit'
 test('keeps document and table evidence together for compound questions', () => {
   assert.equal(
     requiresPdfAndTabularEvidence({
+      text: 'Per the design figure, which factors matter, and how many matching rows are in patients.csv?',
+      hasTabularData: true,
+      tabularQuestion: true,
+    }),
+    true,
+  );
+  assert.equal(
+    requiresPdfAndTabularEvidence({
       text: 'In Figure 2, which subgroup is smallest, and how many matching subjects are in subjects.csv?',
       hasTabularData: true,
       tabularQuestion: true,
@@ -108,6 +117,17 @@ test('keeps document and table evidence together for compound questions', () => 
   );
   assert.equal(requiresPdfStatisticSource('What are the median PFS and patients at risk?'), true);
   assert.equal(requiresPdfStatisticSource('What is the median age in patients.csv?'), false);
+});
+
+test('recovers an invalid model-selected dataset ID from an unambiguous named file', () => {
+  assert.equal(
+    resolveTabularDatasetForQuestion(
+      'Count matching rows in patients.csv.',
+      datasets,
+      'missing-id',
+    ),
+    'patients',
+  );
 });
 
 test('rejects an embedded CSV reconstruction while allowing inspected PDF values beside mounted rows', () => {
