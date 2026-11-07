@@ -53,3 +53,85 @@ export function evidenceCoverageRequirement(requestText: string): string {
   if (requirements.length === 0) return '';
   return `\nCOMPOUND ANSWER CHECKLIST: ${requirements.join(' ')} Before finishing, verify that every field explicitly requested in the question appears in the answer.\n`;
 }
+
+/**
+ * Guidelines for medical and scientific research queries:
+ * Allows clean metrics, mermaid diagrams, KaTeX math, tabs, and embedded evidence figures,
+ * while forbidding raw HTML/CSS tags or raw Python tuple/dict dumps.
+ */
+export const SCIENTIFIC_PRESENTATION_STYLE = `
+For medical, clinical trial, and scientific research analysis:
+- Present key metrics, comparisons, arm results, and endpoints cleanly:
+  You may present key numeric comparisons (such as trial arms, hazard ratios, risk differences, or blood pressure changes) using a metrics block:
+  \`\`\`metrics
+  {
+    "title": "Week 12 Mean SBP",
+    "items": [
+      {"label": "Cardiolex 10mg", "value": "141.6", "unit": "mmHg"},
+      {"label": "Placebo", "value": "154.0", "unit": "mmHg"}
+    ],
+    "highlight": {"label": "Gap (Placebo - Cardiolex)", "value": "12.4", "unit": "mmHg"}
+  }
+  \`\`\`
+- When illustrating clinical trial flow (e.g. CONSORT enrollment/allocation), study timelines, or biological pathways, you may use a mermaid block:
+  \`\`\`mermaid
+  graph TD
+    Screened[Screened n=720] --> Randomized[Randomized n=600]
+    Randomized --> ArmA[Cardiolex 10mg n=298]
+    Randomized --> ArmB[Placebo n=302]
+  \`\`\`
+- For formulas, statistical tests, or p-values, use standard LaTeX ($inline$ or $$block$$).
+- When multi-faceted comparisons are needed (e.g. Efficacy vs Safety vs Subgroups), you may organize them with tabs:
+  \`\`\`tabs
+  [
+    {"label": "Efficacy", "content": "Analysis of primary endpoints..."},
+    {"label": "Safety", "content": "Adverse events and tolerability..."}
+  ]
+  \`\`\`
+- When an indexed document figure, plot, or image is returned by the evidence with an imageUrl or previewUrl, you can embed it directly as ![Figure title](imageUrl).
+- Never output raw HTML or CSS tags.
+- Never output raw Python tuples, unformatted dictionaries, or execution print traces into your answer. Explain statistical conclusions in natural language and clean metrics.
+`;
+
+export function sanitizeAssistantHistoryText(text: string): string {
+  if (!text) return '';
+  // 1. Convert metrics JSON to plain text summary
+  let cleaned = text.replace(/```(?:metrics|stats|larkup-metrics)\s*([\s\S]*?)```/gi, (_m, raw) => {
+    try {
+      const parsed = JSON.parse(raw);
+      const items = Array.isArray(parsed?.items) ? parsed.items : [];
+      const lines: string[] = [];
+      if (parsed?.title) lines.push(String(parsed.title));
+      for (const item of items) {
+        if (item?.label && item?.value !== undefined) {
+          lines.push(`- ${item.label}: ${item.value}${item.unit ? ' ' + item.unit : ''}`);
+        }
+      }
+      if (parsed?.highlight?.label && parsed?.highlight?.value !== undefined) {
+        lines.push(
+          `- ${parsed.highlight.label}: ${parsed.highlight.value}${parsed.highlight.unit ? ' ' + parsed.highlight.unit : ''}`,
+        );
+      }
+      return lines.join('\n');
+    } catch {
+      return '';
+    }
+  });
+
+  // 2. Convert tabs JSON to combined plain text
+  cleaned = cleaned.replace(/```(?:tabs|larkup-tabs)\s*([\s\S]*?)```/gi, (_m, raw) => {
+    try {
+      const parsed = JSON.parse(raw);
+      const tabs = Array.isArray(parsed) ? parsed : parsed?.tabs;
+      if (Array.isArray(tabs)) {
+        return tabs.map((t: any) => `${t.label || 'Tab'}:\n${t.content || ''}`).join('\n\n');
+      }
+    } catch {}
+    return '';
+  });
+
+  // 3. Strip stray HTML tags
+  cleaned = cleaned.replace(/<[^>]+>/g, '');
+
+  return cleaned.trim();
+}

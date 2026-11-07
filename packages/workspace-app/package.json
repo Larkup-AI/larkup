@@ -541,7 +541,9 @@
     "@base-ui/react": "^1.5.0",
     "@larkup/core": "^0.8.4",
     "@larkup/integrations": "workspace:*",
+    "@larkup/sandbox": "^0.1.12",
     "@larkup/tool-doc-editor": "workspace:*",
+    "@larkup/vector-stores": "^0.1.27",
     "@larkup/workspace-ui": "workspace:*",
     "ai": "7.0.156",
     "class-variance-authority": "^0.7.1",
@@ -551,32 +553,31 @@
     "idb-keyval": "^6.3.0",
     "katex": "^0.19.0",
     "lucide-react": "^1.16.0",
+    "mermaid": "^11.17.2",
+    "next": "16.4.3",
     "papaparse": "^5.5.3",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.1.200",
+    "react": "^19",
     "recharts": "^3.9.2",
     "sonner": "^2.0.7",
     "swr": "^2.4.1",
     "tailwind-merge": "^3.3.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zustand": "^5.0.14",
-    "react": "^19",
-    "@larkup/vector-stores": "^0.1.27",
-    "@larkup/sandbox": "^0.1.12",
-    "next": "16.4.3"
+    "zustand": "^5.0.14"
   },
   "peerDependencies": {
+    "next": ">=16",
     "react": ">=19",
-    "react-dom": ">=19",
-    "next": ">=16"
+    "react-dom": ">=19"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "tsx": "^4.23.5",
+    "@types/katex": "^0.16.8",
     "@types/node": "^26",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/katex": "^0.16.8",
-    "@types/papaparse": "^5.5.2"
+    "tsx": "^4.23.5",
+    "typescript": "^7.0.2"
   }
 }
