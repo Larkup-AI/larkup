@@ -3,10 +3,10 @@
 import { workspaceCapabilities, workspaceUrl, workspaceFetch as fetch } from '../../../host';
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { Loader2, Save, Database, Clock, Layers } from 'lucide-react';
+import { Loader2, Save, Database, Clock, Layers, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@larkup/workspace-ui/button';
+import { Input } from '@larkup/workspace-app/components/ui/input';
 import { Label } from '@larkup/workspace-ui/label';
-import { cn } from '@larkup/workspace-app/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@larkup/workspace-ui/select';
 import {
   Card,
@@ -14,7 +14,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from '@larkup/workspace-app/components/ui/card';
 import {
   AlertDialog,
@@ -35,7 +34,12 @@ import {
   validateStoreConfig,
 } from '@larkup/vector-stores/registry';
 import { StoreFields } from '@larkup/workspace-app/components/configure/store-fields';
-import type { RagConfig, VectorStoreId, IndexType } from '@larkup/core/types';
+import {
+  validateChunkingParams,
+  type RagConfig,
+  type VectorStoreId,
+  type IndexType,
+} from '@larkup/core/types';
 
 const INDEX_TYPES: { value: IndexType; label: string; description: string }[] = [
   {
@@ -144,6 +148,12 @@ export function StorageSection() {
 
   async function handleSave() {
     if (!data?.config) return;
+
+    const chunkingError = validateChunkingParams(form.chunking);
+    if (chunkingError) {
+      toast.error(chunkingError);
+      return;
+    }
 
     let hasError = false;
     const newErrors: Record<string, string> = {};
@@ -258,11 +268,100 @@ export function StorageSection() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-sm">
+            <SlidersHorizontal className="size-3.5 text-primary" />
+            RAG &amp; Search
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Control how new documents are split for search. Existing documents need re-indexing to
+            use new chunk settings.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-xs" htmlFor="chunk-strategy">
+              Chunking strategy
+            </Label>
+            <Select
+              value={form.chunking?.strategy ?? 'recursive'}
+              onValueChange={(strategy) =>
+                setForm((current) => ({
+                  ...current,
+                  chunking: {
+                    ...current.chunking!,
+                    strategy: strategy as RagConfig['chunking']['strategy'],
+                  },
+                }))
+              }
+            >
+              <SelectTrigger id="chunk-strategy" className="w-full">
+                <span className="font-medium text-sm capitalize">
+                  {form.chunking?.strategy ?? 'recursive'}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recursive">Recursive · paragraphs and lines</SelectItem>
+                <SelectItem value="sentence">Sentence · sentence boundaries</SelectItem>
+                <SelectItem value="fixed">Fixed · equal sized windows</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-xs" htmlFor="chunk-size">
+                Chunk size · tokens
+              </Label>
+              <Input
+                id="chunk-size"
+                type="number"
+                min={64}
+                max={8192}
+                step={1}
+                value={form.chunking?.chunkSize ?? 512}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    chunking: { ...current.chunking!, chunkSize: Number(event.target.value) },
+                  }))
+                }
+              />
+              <p className="text-xs text-muted-foreground">Default: 512 · range: 64–8192</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs" htmlFor="chunk-overlap">
+                Chunk overlap · tokens
+              </Label>
+              <Input
+                id="chunk-overlap"
+                type="number"
+                min={0}
+                max={2048}
+                step={1}
+                value={form.chunking?.chunkOverlap ?? 64}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    chunking: { ...current.chunking!, chunkOverlap: Number(event.target.value) },
+                  }))
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Default: 64 · must be smaller than chunk size
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
             <Database className="size-3.5 text-primary" />
             Storage Engine
           </CardTitle>
           <CardDescription className="text-xs">
-            Configure your vector database connection.
+            {workspaceCapabilities().managedStorage
+              ? 'Cloud uses managed pgvector storage for every project.'
+              : 'Local projects use LanceDB by default. Configure another available engine here.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -286,25 +385,31 @@ export function StorageSection() {
                     <span className="font-medium text-sm">
                       {getVectorStore(form.vectorStore)?.label ?? form.vectorStore}
                     </span>
+                    {form.vectorStore ===
+                      (workspaceCapabilities().managedStorage ? 'pgvector' : 'lancedb') && (
+                      <span className="text-xs text-muted-foreground">Default</span>
+                    )}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">Select storage engine…</span>
                 )}
               </SelectTrigger>
               <SelectContent>
-                {VECTOR_STORE_LIST.filter(
-                  (store) =>
-                    !workspaceCapabilities().vectorStores ||
-                    workspaceCapabilities().vectorStores!.includes(store.id),
-                ).map((s) => {
+                {VECTOR_STORE_LIST.map((s) => {
                   const meta = STORE_META[s.id];
-                  const isComingSoon = s.installStatus === 'coming-soon';
+                  const isUnavailable =
+                    (s.installStatus === 'coming-soon' &&
+                      !(workspaceCapabilities().managedStorage && s.id === 'pgvector')) ||
+                    Boolean(
+                      workspaceCapabilities().vectorStores &&
+                      !workspaceCapabilities().vectorStores!.includes(s.id),
+                    );
                   return (
                     <SelectItem
                       key={s.id}
                       value={s.id}
-                      disabled={isComingSoon}
-                      className={isComingSoon ? 'opacity-50' : ''}
+                      disabled={isUnavailable}
+                      className={isUnavailable ? 'opacity-50' : ''}
                     >
                       <span className="flex items-center gap-2.5 w-full">
                         {meta && (
@@ -317,10 +422,14 @@ export function StorageSection() {
                         )}
                         <span className="flex items-center gap-2">
                           <span className="font-medium text-sm">{s.label}</span>
-                          {isComingSoon && (
+                          {s.id ===
+                            (workspaceCapabilities().managedStorage ? 'pgvector' : 'lancedb') && (
+                            <span className="text-[10px] text-muted-foreground">Default</span>
+                          )}
+                          {isUnavailable && (
                             <span className="h-3.5 px-1 text-[9px] font-medium shrink-0 text-muted-foreground border rounded-full flex items-center bg-transparent">
                               <Clock className="size-2.5 mr-0.5" />
-                              Coming Soon
+                              Coming soon
                             </span>
                           )}
                         </span>
@@ -344,18 +453,14 @@ export function StorageSection() {
             </div>
           )}
         </CardContent>
-        <CardFooter className="flex justify-end pt-4 border-t">
-          <Button
-            size="lg"
-            disabled={saving || !dirty}
-            onClick={handleSave}
-            className="gap-1.5 px-4"
-          >
-            {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-            Save
-          </Button>
-        </CardFooter>
       </Card>
+
+      <div className="flex justify-end">
+        <Button size="lg" disabled={saving || !dirty} onClick={handleSave} className="gap-1.5 px-4">
+          {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+          Save settings
+        </Button>
+      </div>
 
       <AlertDialog open={storageChangeOpen} onOpenChange={setStorageChangeOpen}>
         <AlertDialogContent>
