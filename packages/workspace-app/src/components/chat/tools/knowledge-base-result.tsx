@@ -111,6 +111,31 @@ export function KnowledgeBaseResult({
       }),
     [parts],
   );
+  const pdfHits = useMemo(
+    () => [...new Map(hits.filter(isPdfHit).map((hit) => [hit.url || hit.title, hit])).values()],
+    [hits],
+  );
+  const otherHits = useMemo(() => hits.filter((hit) => !isPdfHit(hit)), [hits]);
+  const inspectedPages = useMemo(() => {
+    const pages = new Map<string, Set<number>>();
+    for (const part of parts) {
+      const rawResult =
+        part.type === 'tool-invocation'
+          ? part.toolInvocation?.result
+          : (part.output ?? part.result);
+      const result = parseToolResult(rawResult) as {
+        title?: string;
+        pages?: Array<{ pageNumber?: number }>;
+      } | null;
+      if (!result?.title || !Array.isArray(result.pages)) continue;
+      const selected = pages.get(result.title) ?? new Set<number>();
+      for (const page of result.pages) {
+        if (Number.isInteger(page.pageNumber)) selected.add(page.pageNumber!);
+      }
+      pages.set(result.title, selected);
+    }
+    return pages;
+  }, [parts]);
   useEffect(() => {
     setOpen(isRunning);
   }, [isRunning]);
@@ -152,7 +177,7 @@ export function KnowledgeBaseResult({
             )}
           </span>
           {!isRunning && hits.length > 0 ? (
-            <span className="shrink-0 text-[10px] bg-secondary text-foreground px-1.5 py-0.5 rounded-full font-medium ml-1">
+            <span className="shrink-0 text-[10px] text-muted-foreground font-medium ml-1">
               {hits.length} source{hits.length === 1 ? '' : 's'}
             </span>
           ) : null}
@@ -201,65 +226,33 @@ export function KnowledgeBaseResult({
       ) : null}
 
       {open && hits.length > 0 ? (
-        <div
-          className="mt-2 overflow-hidden rounded-xl border border-border bg-card"
-          data-testid="citation-list"
-        >
+        <div className="mt-1.5 pl-0.5" data-testid="citation-list">
           {isRunning && hits.length === 0 ? (
-            <div className="flex items-center gap-2 px-3.5 py-2.5">
+            <div className="flex items-center gap-2 py-2">
               <Loader2 className="size-3 animate-spin text-muted-foreground" />
             </div>
           ) : null}
-          {hits.slice(0, 4).map((h, i) => (
-            <div
-              key={`${h.title}-${i}`}
-              className="flex gap-3 border-b border-border/60 px-3.5 py-3 last:border-0"
-              data-testid="citation-source"
-            >
-              <SourceThumbnail hit={h} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                  <SourceTitle hit={h} />
-                  {isSafeSourceUrl(h.url) ? (
-                    <a
-                      href={h.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Open ${h.title}`}
-                      className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <ExternalLink className="size-3.5" />
-                    </a>
-                  ) : null}
-                </div>
-                {h.metadata?.mediaType ? (
-                  <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span className="capitalize">{h.metadata.mediaType} source</span>
-                    {Number.isFinite(h.metadata.startSecs) ? (
-                      <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono tabular-nums">
-                        {formatTimestamp(h.metadata.startSecs!)}
-                        {Number.isFinite(h.metadata.endSecs)
-                          ? `–${formatTimestamp(h.metadata.endSecs!)}`
-                          : ''}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
-                {contextForHit(h) ? (
-                  <div className="mt-2 rounded-lg bg-muted/55 px-2.5 py-2">
-                    <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Indexed context
-                    </div>
-                    <p
-                      className="line-clamp-4 text-xs leading-relaxed text-foreground/80"
-                      dir="auto"
-                    >
-                      {contextForHit(h)}
-                    </p>
-                  </div>
-                ) : null}
+          {pdfHits.length > 0 ? (
+            <details open className="group" data-testid="pdf-source-list">
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+                <ChevronDown className="size-3 transition-transform group-open:rotate-180" />
+                <img src="/icons/pdf.png" alt="" className="size-3.5 object-contain" />
+                PDFs ({pdfHits.length})
+              </summary>
+              <div className="ml-4">
+                {pdfHits.map((hit, index) => (
+                  <SourceRow
+                    key={`${hit.title}-${index}`}
+                    hit={hit}
+                    compact
+                    selectedPages={[...(inspectedPages.get(hit.title) ?? [])].sort((a, b) => a - b)}
+                  />
+                ))}
               </div>
-            </div>
+            </details>
+          ) : null}
+          {otherHits.map((hit, index) => (
+            <SourceRow key={`${hit.title}-${index}`} hit={hit} />
           ))}
         </div>
       ) : null}
@@ -299,6 +292,70 @@ function parseToolResult(value: unknown): { hits?: KBHit[] } | null {
 
 function isSafeSourceUrl(url: string | undefined) {
   return Boolean(url && (url.startsWith('/') || /^https?:\/\//i.test(url)));
+}
+
+function isPdfHit(hit: KBHit) {
+  return /\.pdf(?:$|[?#])/iu.test(hit.title ?? '') || /\.pdf(?:$|[?#])/iu.test(hit.url ?? '');
+}
+
+function SourceRow({
+  hit,
+  compact = false,
+  selectedPages = [],
+}: {
+  hit: KBHit;
+  compact?: boolean;
+  selectedPages?: number[];
+}) {
+  const pdf = isPdfHit(hit);
+  return (
+    <div className="flex gap-2 py-1.5" data-testid="citation-source">
+      {pdf ? (
+        <img src="/icons/pdf.png" alt="" className="mt-0.5 size-3.5 shrink-0 object-contain" />
+      ) : (
+        <SourceThumbnail hit={hit} />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <SourceTitle hit={hit} />
+          {isSafeSourceUrl(hit.url) ? (
+            <a
+              href={hit.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open ${hit.title}`}
+              className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ExternalLink className="size-3.5" />
+            </a>
+          ) : null}
+        </div>
+        {compact && selectedPages.length > 0 ? (
+          <span className="text-[11px] text-muted-foreground">
+            {selectedPages.length === 1 ? 'Page' : 'Pages'} {selectedPages.join(', ')}
+          </span>
+        ) : null}
+        {!compact && hit.metadata?.mediaType ? (
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="capitalize">{hit.metadata.mediaType} source</span>
+            {Number.isFinite(hit.metadata.startSecs) ? (
+              <span className="font-mono tabular-nums">
+                {formatTimestamp(hit.metadata.startSecs!)}
+                {Number.isFinite(hit.metadata.endSecs)
+                  ? `–${formatTimestamp(hit.metadata.endSecs!)}`
+                  : ''}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {!compact && contextForHit(hit) ? (
+          <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground" dir="auto">
+            {contextForHit(hit)}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function SourceTitle({ hit }: { hit: KBHit }) {

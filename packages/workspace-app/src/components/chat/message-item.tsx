@@ -483,9 +483,26 @@ export function MessageItem({
   const webSearchParts = toolParts.filter(
     (p: any) => getChatToolBehavior(getToolInfo(p).toolName).placement === 'web-search',
   );
+  // A planner may make one repairable sandbox attempt before returning a
+  // successful calculation in the same assistant turn. Keep diagnostics out
+  // of the user-facing transcript once that later result is authoritative.
+  const hasCompletedSandboxAnalysis = toolParts.some((part: any) => {
+    const info = getToolInfo(part);
+    return (
+      info.toolName === 'executeAnalysis' &&
+      info.isCompleted &&
+      typeof info.output?.exitCode === 'number' &&
+      info.output.exitCode === 0
+    );
+  });
   const nonVizToolParts = toolParts.filter((p: any) => {
-    const placement = getChatToolBehavior(getToolInfo(p).toolName).placement;
-    return !isVizPart(p) && placement === 'inline';
+    const info = getToolInfo(p);
+    const behavior = getChatToolBehavior(info.toolName);
+    const resolvedSandboxFailure =
+      hasCompletedSandboxAnalysis &&
+      info.toolName === 'executeAnalysis' &&
+      (info.isFailed || (typeof info.output?.exitCode === 'number' && info.output.exitCode !== 0));
+    return !isVizPart(p) && behavior.placement === 'inline' && !resolvedSandboxFailure;
   });
   const firstCitationToolPartIndex = toolParts.findIndex(
     (part: any) => getToolInfo(part).output?.ui?.kind === 'citations',

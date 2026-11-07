@@ -8,6 +8,7 @@ import {
   normalizePercentagePrecisionInStdout,
   isLikelyTabularQuestion,
   hasExhaustedAnalysisAttempts,
+  requiresPdfAndTabularEvidence,
   requiresMultiDatasetAnalysis,
   requiresTabularSandbox,
   repairUnavailableTabularDatasetReferences,
@@ -72,6 +73,33 @@ test('prioritizes a requested multi-file calculation over an incidental PDF hit'
       tabularQuestion: false,
       requiresSandbox: false,
       requiresMultiDatasetAnalysis: true,
+    }),
+    false,
+  );
+});
+
+test('keeps document and table evidence together for compound questions', () => {
+  assert.equal(
+    requiresPdfAndTabularEvidence({
+      text: 'In Figure 2, which subgroup is smallest, and how many matching subjects are in subjects.csv?',
+      hasTabularData: true,
+      tabularQuestion: true,
+    }),
+    true,
+  );
+  assert.equal(
+    requiresPdfAndTabularEvidence({
+      text: 'Which row has the largest value in subjects.csv?',
+      hasTabularData: true,
+      tabularQuestion: true,
+    }),
+    false,
+  );
+  assert.equal(
+    requiresPdfAndTabularEvidence({
+      text: 'Make a chart from subjects.csv.',
+      hasTabularData: true,
+      tabularQuestion: true,
     }),
     false,
   );
@@ -219,6 +247,16 @@ test('routes ranked entity rates through analysis instead of a lossy grouped que
     ),
     true,
   );
+});
+
+test('routes comparative risks and per-entity rates through reproducible analysis', () => {
+  assert.equal(
+    requiresTabularSandbox(
+      'Which event has the largest absolute risk difference and which has the largest relative risk?',
+    ),
+    true,
+  );
+  assert.equal(requiresTabularSandbox('Report deviations per randomized subject.'), true);
 });
 
 test('routes exhaustive relational integrity validation through analysis', () => {

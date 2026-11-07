@@ -304,6 +304,19 @@ export function remapSimplePythonPrints(code: string) {
   );
 }
 
+/**
+ * Notebook-style code generators occasionally emit ``value.print()`` after a
+ * pandas selection. Series and DataFrames do not expose that method; route it
+ * through the already-installed result formatter before the first execution.
+ */
+export function remapPythonObjectPrintMethods(code: string) {
+  return code.replace(
+    /(^|\n)(\s*)([A-Za-z_]\w*(?:\[[^\n]+\]|\.[A-Za-z_]\w*|\([^\n]*\))*)\.print\(\)(?=\s*(?:\n|$))/gu,
+    (_match, lineStart: string, indentation: string, expression: string) =>
+      `${lineStart}${indentation}_larkup_print_result(${expression})`,
+  );
+}
+
 /** Preserve notebook-style scalar tuples that appear before later explanation code. */
 export function printBareTopLevelPythonTuples(code: string) {
   const tuple = /^([A-Za-z_]\w*)(\s*,\s*[A-Za-z_]\w*)+\s*$/;

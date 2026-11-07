@@ -15,7 +15,7 @@ export type RetrievedPdfSource = {
 // explicit request for an object that the local PDF index can locate by its
 // own page text and caption.
 const NUMBERED_DOCUMENT_REFERENCE =
-  /\b(?:fig(?:ure)?|table|eq(?:uation)?|section|chapter|appendix)\.?\s*(?:no\.?\s*)?\(?\d+(?:\.\d+)+\b/iu;
+  /\b(?:fig(?:ure)?|table|eq(?:uation)?|section|chapter|appendix)\.?\s*(?:no\.?\s*)?\(?\d+(?:\.\d+)*\b/iu;
 
 /** Resolve both current parent-document images and legacy standalone image records. */
 export function findIndexedImageSource<T extends ImageDocument>(documents: T[], imageUrl: string) {
@@ -157,10 +157,13 @@ function pdfSourceFromRecord(value: unknown): RetrievedPdfSource | undefined {
  * carries its page number, so it is preferred over a document-level text
  * chunk that would otherwise make a preview fall back to page one.
  */
-export function findRetrievedPdfSource(value: unknown): RetrievedPdfSource | undefined {
+export function findRetrievedPdfSource(
+  value: unknown,
+  question = '',
+): RetrievedPdfSource | undefined {
   if (typeof value === 'string') {
     try {
-      return findRetrievedPdfSource(JSON.parse(value));
+      return findRetrievedPdfSource(JSON.parse(value), question);
     } catch {
       return undefined;
     }
@@ -169,7 +172,46 @@ export function findRetrievedPdfSource(value: unknown): RetrievedPdfSource | und
   const record = value as Record<string, unknown>;
   const hits = Array.isArray(record.hits) ? record.hits : [];
   const sources = hits.map(pdfSourceFromRecord).filter(Boolean) as RetrievedPdfSource[];
-  return sources.find((source) => source.pageNumber !== undefined) ?? sources[0];
+  if (sources.length === 0) return undefined;
+  const questionTerms = new Set(
+    (question.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((term) => term.length > 2),
+  );
+  const scored = sources.map((source) => ({
+    source,
+    matches: (source.title?.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
+      .filter((term) => term.length > 2 && term !== 'pdf')
+      .filter((term) => questionTerms.has(term)).length,
+  }));
+  const bestMatch = scored.reduce((best, current) =>
+    current.matches > best.matches ? current : best,
+  );
+  const chosen = bestMatch.matches >= 2 ? bestMatch.source : sources[0];
+  return (
+    sources.find(
+      (source) => source.documentId === chosen.documentId && source.pageNumber !== undefined,
+    ) ?? chosen
+  );
+}
+
+/** A PDF may refer the requested numeric fact to a figure even when the user does not say "figure". */
+export function inspectedPdfNeedsVisualReading(question: string, value: unknown): boolean {
+  if (requiresPdfVisualAnalysis(question)) return true;
+  if (
+    !/\b(?:which|highest|lowest|largest|smallest|exceed|threshold|how many|count|value|rate|per\s+subject)\b/iu.test(
+      question,
+    )
+  )
+    return false;
+  if (!value || typeof value !== 'object') return false;
+  const pages = (value as { pages?: Array<{ text?: unknown }> }).pages;
+  return (
+    Array.isArray(pages) &&
+    pages.some(
+      (page) =>
+        typeof page.text === 'string' &&
+        /\b(?:figure|chart|graph|plot|diagram)\s*\d+\b/iu.test(page.text),
+    )
+  );
 }
 
 /**

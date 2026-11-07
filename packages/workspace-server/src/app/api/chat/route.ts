@@ -91,6 +91,7 @@ import {
   isLikelyTabularQuestion,
   latestAnalysisAttemptFailed,
   requiresMultiDatasetAnalysis,
+  requiresPdfAndTabularEvidence,
   requestsLongAnalysisArtifact,
   requiresTabularSandbox,
   shouldPrioritizeTabularAnalysisBeforePdf,
@@ -104,6 +105,7 @@ import {
   hasRetrievedPdfEvidence,
   hasNumberedDocumentReference,
   findRetrievedPdfSource,
+  inspectedPdfNeedsVisualReading,
   latestNumberedDocumentReferenceText,
   preferredPdfPagesForInspection,
   requiresPdfVisualAnalysis,
@@ -205,6 +207,7 @@ When the user asks for every item and the media evidence marks its continuation 
 If the user asks for a chart, graph, or visual distribution, ALWAYS use the \`generateVisualization\` tool. Never attempt to draw ASCII charts, output Markdown tables, JSON, or tool-call syntax as a substitute for a chart. Its \`xAxisKey\` and each \`series[].dataKey\` must exactly match the fields in the supplied \`data\` rows; never use placeholder names such as EMPTY, null, or undefined. Give both axes clear human-readable labels and include units when known.
 
 When search results identify a PDF source without indexed visuals, use inspectPdfPages before answering. It reads and ranks pages locally. Then use analyzePdfPages for visual claims or presentMedia for an explicit page preview.
+When a question combines a PDF fact with structured data, use both sources in the same answer. Read the document value and its row, label, or figure first, then calculate from the table using explicit numerators and denominators. A missing column in the CSV does not prove the fact is absent from the PDF. If the PDF value is not available, state that limit rather than replacing it with a similarly named table field.
 
 For media questions, searchKnowledgeBase first, then use an installed evidence-query action with the returned mediaAssetId. Use its active evidence and include supporting time ranges. Inspect or present media only when necessary or explicitly requested.
 
@@ -1414,7 +1417,9 @@ ${fieldLines}`;
     !isGreeting &&
     !docSessionId &&
     !(requiresCorpusSandboxAnalysis && builtInTools.analyzeCorpusWithCode) &&
-    (!hasTabularData || !tabularQuestion) &&
+    (!hasTabularData ||
+      !tabularQuestion ||
+      requiresPdfAndTabularEvidence({ hasTabularData, tabularQuestion, text: userText })) &&
     builtInTools.searchKnowledgeBase,
   );
 
@@ -1607,7 +1612,10 @@ ${fieldLines}`;
           // End no-evidence turns deterministically. A prose model may answer
           // from general knowledge or mistake a sole media source for evidence
           // even when the retrieval instruction says not to.
-          if (!hasRetrievedSourceEvidence(preloadedEvidence)) {
+          if (
+            !hasRetrievedSourceEvidence(preloadedEvidence) &&
+            !requiresPdfAndTabularEvidence({ hasTabularData, tabularQuestion, text: userText })
+          ) {
             const retrievalError =
               preloadedEvidence && typeof preloadedEvidence === 'object'
                 ? (preloadedEvidence as { error?: unknown }).error
@@ -1629,7 +1637,7 @@ ${fieldLines}`;
           // model to compose an answer. This works whether or not visual
           // derivatives were enabled at upload time and avoids selecting the
           // first embedded image (often a cover) for a later preview request.
-          const pdfSource = findRetrievedPdfSource(preloadedEvidence);
+          const pdfSource = findRetrievedPdfSource(preloadedEvidence, userText);
           if (pdfSource && builtInTools.inspectPdfPages) {
             const inspectionCallId = `pdf-pages-${crypto.randomUUID()}`;
             const pdfInspectionQuestion = [
@@ -1640,10 +1648,13 @@ ${fieldLines}`;
             ]
               .filter((text): text is string => Boolean(text?.trim()))
               .join('\n\n');
-            const preferredPageNumbers = preferredPdfPagesForInspection(
-              pdfSource.pageNumber,
-              pdfInspectionQuestion,
-            );
+            const preferredPageNumbers = requiresPdfAndTabularEvidence({
+              hasTabularData,
+              tabularQuestion,
+              text: userText,
+            })
+              ? undefined
+              : preferredPdfPagesForInspection(pdfSource.pageNumber, pdfInspectionQuestion);
             const inspectionInput = {
               documentId: pdfSource.documentId,
               // Resolve a terse follow-up ("render it") against the same
@@ -1710,7 +1721,7 @@ ${fieldLines}`;
             // source pages.
             if (
               !requestsImagePresentation(userText) &&
-              requiresPdfVisualAnalysis(userText) &&
+              inspectedPdfNeedsVisualReading(userText, pdfInspection) &&
               selectedPageNumbers.length > 0 &&
               builtInTools.analyzePdfPages
             ) {
@@ -1718,7 +1729,7 @@ ${fieldLines}`;
               const analysisInput = {
                 documentId: pdfSource.documentId,
                 pageNumbers: selectedPageNumbers,
-                prompt: userText,
+                prompt: `${userText}\nRead the relevant labels, values, units, and table row/column associations exactly. For a signed effect, distinguish the smallest numerical value from the smallest absolute magnitude. State the evidence for any comparison and do not fill missing values by inference.`,
               };
               writer.write({
                 type: 'tool-input-available',
@@ -2039,6 +2050,35 @@ ${fieldLines}`;
           toolChoice: 'auto',
           prepareStep: ({ stepNumber, messages }) => {
             if (preloadedEvidence !== undefined) {
+              const requiresCombinedPdfTabularEvidence = requiresPdfAndTabularEvidence({
+                hasTabularData,
+                tabularQuestion,
+                text: userText,
+              });
+              // Search and local PDF inspection above establish the document
+              // fact. Complete a compound request with an authoritative table
+              // operation before composing prose, even when vector retrieval
+              // only returned the PDF and not a representative table row.
+              if (requiresCombinedPdfTabularEvidence) {
+                const routing = tabularToolsForStep({
+                  stepNumber,
+                  toolNames: toolNames as string[],
+                  requiresSandbox:
+                    requiresTabularSandbox(userText) || requiresMultiDatasetTabularAnalysis,
+                });
+                return {
+                  ...routing,
+                  ...(routing.toolChoice !== 'none' ? tabularToolStepOverrides : {}),
+                  toolChoice: routing.toolChoice as any,
+                  activeTools: routing.activeTools.filter(
+                    (name) => !evidenceQueryTools.includes(name as any),
+                  ) as any,
+                  messages:
+                    routing.toolChoice === 'none'
+                      ? withFinalAnswerNudge(compactToolContextForModel(messages))
+                      : compactToolContextForModel(messages),
+                };
+              }
               const preloadedMediaAssetId = explicitMediaEvidenceAssetId(preloadedEvidence);
               if (
                 !preloadedVideoEvidence &&
@@ -2067,6 +2107,7 @@ ${fieldLines}`;
               // fidelity need a second, rendered-page analysis pass.
               if (
                 hasRetrievedPdfEvidence(preloadedEvidence) &&
+                !requiresCombinedPdfTabularEvidence &&
                 !shouldPrioritizeTabularAnalysisBeforePdf({
                   hasTabularData,
                   tabularQuestion,
