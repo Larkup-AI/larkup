@@ -108,7 +108,13 @@ import {
   inspectedPdfNeedsVisualReading,
   latestNumberedDocumentReferenceText,
   preferredPdfPagesForInspection,
+  pdfPagesForVisualAnalysis,
+  prioritizeFreshPdfVisualEvidence,
   requiresPdfVisualAnalysis,
+  visualEntityMismatch,
+  visualEntityEvidenceLine,
+  pdfPlotTabularCountDifference,
+  visualRateMismatch,
   requestsImagePresentation,
   shouldInspectRetrievedImage,
 } from '../../../lib/chat/visual-routing';
@@ -208,6 +214,8 @@ If the user asks for a chart, graph, or visual distribution, ALWAYS use the \`ge
 
 When search results identify a PDF source without indexed visuals, use inspectPdfPages before answering. It reads and ranks pages locally. Then use analyzePdfPages for visual claims or presentMedia for an explicit page preview.
 When a question combines a PDF fact with structured data, use both sources in the same answer. Read the document value and its row, label, or figure first, then calculate from the table using explicit numerators and denominators. A missing column in the CSV does not prove the fact is absent from the PDF. If the PDF value is not available, state that limit rather than replacing it with a similarly named table field.
+When a PDF plot and CSV describe different populations, calculate the difference explicitly. Attribute it to a specific exclusion only when the plot population definition and CSV fields support that explanation.
+When identifying one entity from joined sources, include its exact source identifier as well as its human-readable name or location in the final answer.
 
 For media questions, searchKnowledgeBase first, then use an installed evidence-query action with the returned mediaAssetId. Use its active evidence and include supporting time ranges. Inspect or present media only when necessary or explicitly requested.
 
@@ -1507,6 +1515,66 @@ ${fieldLines}`;
       originalMessages: messages,
       execute: async ({ writer }) => {
         let preloadedEvidence: unknown;
+        if (tools.executeAnalysis) {
+          const originalAnalysis = tools.executeAnalysis as any;
+          (tools as any).executeAnalysis = {
+            ...originalAnalysis,
+            execute: async (...args: any[]) => {
+              const result = await originalAnalysis.execute(...args);
+              const visualAnalysis =
+                preloadedEvidence && typeof preloadedEvidence === 'object'
+                  ? (preloadedEvidence as { pdfVisualAnalysis?: unknown }).pdfVisualAnalysis
+                  : undefined;
+              const mismatch =
+                result?.exitCode === 0
+                  ? (visualEntityMismatch(userText, visualAnalysis, String(result.stdout ?? '')) ??
+                    visualRateMismatch(userText, visualAnalysis, String(result.stdout ?? '')))
+                  : undefined;
+              if (mismatch) {
+                return {
+                  ...result,
+                  stdout: '',
+                  stderr: mismatch,
+                  exitCode: 1,
+                  presentation: undefined,
+                  artifacts: [],
+                };
+              }
+              const sourceLine =
+                result?.exitCode === 0
+                  ? visualEntityEvidenceLine(userText, visualAnalysis)
+                  : undefined;
+              return sourceLine
+                ? {
+                    ...result,
+                    stdout: `${String(result.stdout ?? '').trim()}\n${sourceLine}`.trim(),
+                  }
+                : result;
+            },
+          };
+        }
+        if (tools.queryTabularData) {
+          const originalQuery = tools.queryTabularData as any;
+          (tools as any).queryTabularData = {
+            ...originalQuery,
+            execute: async (...args: any[]) => {
+              const result = await originalQuery.execute(...args);
+              const visualAnalysis =
+                preloadedEvidence && typeof preloadedEvidence === 'object'
+                  ? (preloadedEvidence as { pdfVisualAnalysis?: unknown }).pdfVisualAnalysis
+                  : undefined;
+              const populationComparison = pdfPlotTabularCountDifference(
+                userText,
+                visualAnalysis,
+                result,
+                args[0],
+              );
+              return populationComparison
+                ? { ...result, crossSourcePopulationComparison: populationComparison }
+                : result;
+            },
+          };
+        }
         let preloadedVideoEvidence = false;
         let preloadedEvidenceQueryAttempted = false;
         let preloadedVideoInvestigation: VideoInvestigationDirective | undefined;
@@ -1728,8 +1796,8 @@ ${fieldLines}`;
               const analysisCallId = `pdf-analysis-${crypto.randomUUID()}`;
               const analysisInput = {
                 documentId: pdfSource.documentId,
-                pageNumbers: selectedPageNumbers,
-                prompt: `${userText}\nRead the relevant labels, values, units, and table row/column associations exactly. For a signed effect, distinguish the smallest numerical value from the smallest absolute magnitude. State the evidence for any comparison and do not fill missing values by inference.`,
+                pageNumbers: pdfPagesForVisualAnalysis(userText, selectedPageNumbers),
+                prompt: `Extract only what is visible on this PDF page for the question below. Start with the exact figure/table title and caption, including any population qualifier in parentheses. Then transcribe each relevant chart group or table row with its exact label, comparison sign (≥, >, ≤, <), value, units, and sample size n. Do not answer the combined question or infer any counts or facts from CSV, spreadsheets, or other files. For a signed effect, compare absolute magnitudes when the user asks for the smallest effect. If a requested fact belongs to another file, leave it out entirely.\n\nQuestion: ${userText}`,
               };
               writer.write({
                 type: 'tool-input-available',
@@ -1765,6 +1833,14 @@ ${fieldLines}`;
                   : { retrieval: preloadedEvidence }),
                 pdfVisualAnalysis,
               };
+              if (
+                requiresPdfAndTabularEvidence({ hasTabularData, tabularQuestion, text: userText })
+              ) {
+                preloadedEvidence = prioritizeFreshPdfVisualEvidence(
+                  preloadedEvidence,
+                  analysisInput.pageNumbers,
+                );
+              }
             }
 
             if (requestsImagePresentation(userText) && selectedPage && builtInTools.presentMedia) {
@@ -2060,6 +2136,19 @@ ${fieldLines}`;
               // operation before composing prose, even when vector retrieval
               // only returned the PDF and not a representative table row.
               if (requiresCombinedPdfTabularEvidence) {
+                const retryFailedAnalysis =
+                  (requiresTabularSandbox(userText) || requiresMultiDatasetTabularAnalysis) &&
+                  stepNumber > 0 &&
+                  stepNumber <= 2 &&
+                  latestAnalysisAttemptFailed(messages as unknown[]);
+                if (retryFailedAnalysis) {
+                  return {
+                    ...tabularToolStepOverrides,
+                    toolChoice: { type: 'tool' as const, toolName: 'executeAnalysis' as const },
+                    activeTools: ['executeAnalysis'] as any,
+                    messages: compactToolContextForModel(messages),
+                  };
+                }
                 const routing = tabularToolsForStep({
                   stepNumber,
                   toolNames: toolNames as string[],
@@ -2075,7 +2164,10 @@ ${fieldLines}`;
                   ) as any,
                   messages:
                     routing.toolChoice === 'none'
-                      ? withFinalAnswerNudge(compactToolContextForModel(messages))
+                      ? withFinalAnswerNudge(
+                          compactToolContextForModel(messages),
+                          'Check every part of the original question. Include the PDF figure or table value and sample size, the structured-data value, and the explicit difference or numerator/denominator calculation when requested. Keep source labels attached to their values.',
+                        )
                       : compactToolContextForModel(messages),
                 };
               }
@@ -2519,7 +2611,10 @@ ${fieldLines}`;
             })
             .pipeThrough(
               recoverEmptyUIMessageStream(
-                fallbackAnswerFromEvidence(preloadedEvidence, answerQuestion),
+                requiresSandboxAnalysis &&
+                  requiresPdfAndTabularEvidence({ hasTabularData, tabularQuestion, text: userText })
+                  ? 'I found the relevant sources, but could not verify the combined calculation. Please retry.'
+                  : fallbackAnswerFromEvidence(preloadedEvidence, answerQuestion),
               )(),
             ),
         );

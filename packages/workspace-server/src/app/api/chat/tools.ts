@@ -2815,6 +2815,7 @@ export async function getChatTools(context: {
       description:
         'Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. Every successful execution must expose its answer: print a concise labeled numeric/text result, create an artifact, or call a LarkUp presentation helper; assignments with no output are invalid. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. Hard counts are acceptance criteria: when the user asks for K matches for N targets, emit exactly N×K long-form rows or N rows with K populated match fields. Never skip a target with empty data or zero semantic overlap; fill it from the best remaining eligible candidates, while honoring global reuse limits, and assert all counts before presentation. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.' +
         analysisValidationRequirements(requestText ?? '') +
+        ' For uploaded CSV, Excel, or JSON facts, always read the mounted dataset files in the sandbox. Never paste or reconstruct uploaded rows as a Python string, DataFrame literal, or guessed mapping. Use datasets.json for multiple files. PDF counts may be entered as literal values only when the inspected page or visual reading supplied the exact label and value; pair every such value with its source label before joining to a mounted table.' +
         (recentAnalysisTable
           ? ` The complete result table from the preceding turn is mounted as data.csv with ${recentAnalysisTable.rows.length} rows and these columns: ${recentAnalysisTable.columns.join(', ')}. Use that file, not the original uploaded dataset, for this follow-up.`
           : ''),
@@ -2846,6 +2847,9 @@ export async function getChatTools(context: {
       }),
       execute: async ({ code, datasetId, datasetIds, pdfDocumentId }) => {
         try {
+          const authoredCodeValidationError = analysisCodeValidationError(requestText ?? '', code, {
+            requiresMountedRead: Boolean(datasetId || datasetIds?.length),
+          });
           const sandboxManager = workspaceSandbox(resolveSandboxConfig(config));
           const files: SandboxFile[] = [];
 
@@ -3059,8 +3063,11 @@ export async function getChatTools(context: {
               : { valid: true };
           const completenessError = completeness.valid ? undefined : completeness.error;
           const codeValidationError =
-            result.exitCode === 0
-              ? analysisCodeValidationError(requestText ?? '', finalCode)
+            result.exitCode === 0 && !matchingEngine
+              ? (authoredCodeValidationError ??
+                analysisCodeValidationError(requestText ?? '', finalCode, {
+                  requiresMountedRead: mountedDatasets.length > 0,
+                }))
               : undefined;
           const hasUsableOutput =
             extracted.stdout.trim().length > 0 ||
@@ -3101,7 +3108,7 @@ export async function getChatTools(context: {
             stdout: groundedStdout.slice(0, 5000),
             stderr: stderr.slice(0, 2000),
             exitCode,
-            ...(extracted.presentation && !completenessError
+            ...(extracted.presentation && !completenessError && !codeValidationError
               ? { presentation: extracted.presentation }
               : {}),
             artifacts: result.artifacts.map((a) => ({

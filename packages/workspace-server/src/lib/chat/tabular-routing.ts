@@ -582,7 +582,23 @@ export function analysisValidationRequirements(text: string) {
 }
 
 /** Reject successful-looking code that uses a known invalid aggregation level. */
-export function analysisCodeValidationError(text: string, code: string): string | undefined {
+export function analysisCodeValidationError(
+  text: string,
+  code: string,
+  options: { requiresMountedRead?: boolean } = {},
+): string | undefined {
+  const asksForUploadedTable =
+    options.requiresMountedRead === true ||
+    /\.csv\b|\b(?:spreadsheet|excel|dataset|table)\b/iu.test(text);
+  if (
+    /\bper\s+(?:randomi[sz]ed\s+)?(?:subject|patient|participant|record|site)\b/iu.test(text) &&
+    /(?:^|_)per_(?:randomi[sz]ed_)?(?:subject|patient|participant|record|site)\b/iu.test(code) &&
+    !code
+      .split('\n')
+      .some((line) => !line.trimStart().startsWith('#') && /(?<!\/)\/(?!\/)|\.div\s*\(/u.test(line))
+  ) {
+    return 'Invalid per-entity rate: the generated code never divides the source count by the matching population denominator. Compute numerator / denominator explicitly.';
+  }
   if (/\bpatients?\s+with\s+any\s+(?:adverse\s+events?|AE)\b/iu.test(text)) {
     const eventRowFlag = code.match(
       /\b([A-Za-z_]\w*)\s*\[\s*['"]has_ae['"]\s*\]\s*=\s*[^\n]*(?:event|ae_id)[^\n]*\.(?:notnull|notna)\s*\(/iu,
@@ -653,6 +669,21 @@ export function analysisCodeValidationError(text: string, code: string): string 
         return 'Invalid incidence denominator: derive the safety-population arm sizes from the complete subject table before joining to the event table; event-joined rows exclude subjects without events.';
       }
     }
+  }
+  if (
+    asksForUploadedTable &&
+    /\b(?:StringIO|BytesIO)\s*\(|\b(?:pd|pandas)\s*\.\s*read_csv\s*\(\s*(?:r?["']{3}|[A-Za-z_]\w*_data\b)/u.test(
+      code,
+    )
+  ) {
+    return 'Invalid tabular evidence: the code embeds or reconstructs a dataset instead of reading the mounted uploaded file. Read the selected data.csv or datasets.json files and derive every CSV value from those rows.';
+  }
+  if (
+    asksForUploadedTable &&
+    (options.requiresMountedRead || /\b(?:pd|pandas)\s*\.\s*DataFrame\s*\(/u.test(code)) &&
+    !/\b(?:read_csv|read_excel|read_parquet|DictReader)\s*\(/u.test(code)
+  ) {
+    return 'Invalid tabular evidence: the code did not read a mounted uploaded dataset. Read data.csv or the files listed in datasets.json before calculating table-derived values.';
   }
   return undefined;
 }
