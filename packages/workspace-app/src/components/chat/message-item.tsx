@@ -13,6 +13,14 @@ import { ChatDataTable, type DataTableConfig } from './tools/chat-data-table';
 import { ChatFileExport } from './tools/chat-file-export';
 import { ChatSandboxResult, type SandboxResultConfig } from './tools/chat-sandbox-result';
 import { ChatTabs } from './tools/chat-tabs';
+import { ChatMetricCards } from './tools/chat-metric-cards';
+import { ChatMermaid } from './tools/chat-mermaid';
+import {
+  splitRichSegments,
+  richBlocksToPlainText,
+  collectToolImageUrls,
+  isSafeImageUrl,
+} from '../../lib/chat/rich-blocks';
 import { CorpusDataResult, type CorpusDataConfig } from './tools/corpus-data-result';
 import { ChatSignatureRequest } from './tools/chat-signature-request';
 import { Sparkles, FileEdit, CheckCircle2, Globe, ChevronDown } from 'lucide-react';
@@ -456,6 +464,9 @@ export function MessageItem({
     [allCleanTexts],
   );
 
+  const safeImageUrls = useMemo(() => collectToolImageUrls(parts), [parts]);
+  const answerPlainText = useMemo(() => richBlocksToPlainText(answerText), [answerText]);
+
   const answerFeedback = answerFeedbackForMessage(message);
   const liked = answerFeedback === 'liked';
   const disliked = answerFeedback === 'disliked';
@@ -612,7 +623,7 @@ export function MessageItem({
           </div>
         )}
 
-      {/* Text parts — with markdown table detection + think-tag stripping */}
+      {/* Text parts — with markdown table detection, think-tag stripping, and rich blocks */}
       {textParts.map((part: any, i: number) => {
         const rawText = part.text || '';
         if (!rawText.trim()) return null;
@@ -622,27 +633,82 @@ export function MessageItem({
 
         if (!cleanText.trim()) return null;
 
-        const segments = splitTextAndTables(cleanText);
+        const richSegments = splitRichSegments(cleanText);
 
         return (
           <div key={i} className="flex flex-col gap-4">
-            {segments.map((seg, j) => {
-              if (seg.type === 'table') {
-                const tableConfig: DataTableConfig = {
-                  columns: seg.table.columns,
-                  rows: seg.table.rows,
-                  totalRows: seg.table.rows.length,
-                };
-                return <ChatDataTable key={`table-${j}`} config={tableConfig} />;
+            {richSegments.map((richSeg, j) => {
+              if (richSeg.type === 'metrics') {
+                return <ChatMetricCards key={`metrics-${j}`} block={richSeg.block} />;
               }
+              if (richSeg.type === 'mermaid') {
+                return <ChatMermaid key={`mermaid-${j}`} code={richSeg.code} />;
+              }
+              if (richSeg.type === 'tabs') {
+                return (
+                  <ChatTabs
+                    key={`tabs-${j}`}
+                    config={{
+                      tabs: richSeg.block.tabs.map((tab) => ({
+                        label: tab.label,
+                        content: (
+                          <div
+                            className="assistant-text-content"
+                            dangerouslySetInnerHTML={{
+                              __html: renderMarkdown(tab.content, safeImageUrls),
+                            }}
+                          />
+                        ),
+                      })),
+                    }}
+                  />
+                );
+              }
+              if (richSeg.type === 'chart') {
+                return <ChatChart key={`chart-${j}`} config={richSeg.config} />;
+              }
+              if (richSeg.type === 'math') {
+                return (
+                  <div
+                    key={`math-${j}`}
+                    className="my-3 overflow-x-auto py-1"
+                    dangerouslySetInnerHTML={{
+                      __html: katex.renderToString(richSeg.tex, {
+                        displayMode: true,
+                        throwOnError: false,
+                      }),
+                    }}
+                  />
+                );
+              }
+              if (richSeg.type === 'pending') {
+                return null;
+              }
+
+              // Ordinary Markdown segments — with table detection
+              const segments = splitTextAndTables(richSeg.content);
               return (
-                <div
-                  key={`text-${j}`}
-                  className="assistant-text-content"
-                  dangerouslySetInnerHTML={{
-                    __html: renderMarkdown(seg.content),
-                  }}
-                />
+                <div key={`md-${j}`} className="flex flex-col gap-4">
+                  {segments.map((seg, k) => {
+                    if (seg.type === 'table') {
+                      const tableConfig: DataTableConfig = {
+                        columns: seg.table.columns,
+                        rows: seg.table.rows,
+                        totalRows: seg.table.rows.length,
+                      };
+                      return <ChatDataTable key={`table-${k}`} config={tableConfig} />;
+                    }
+                    return (
+                      <div
+                        key={`text-${k}`}
+                        className="assistant-text-content"
+                        dangerouslySetInnerHTML={{
+                          __html: renderMarkdown(seg.content, safeImageUrls),
+                        }}
+                      />
+                    );
+                  })}
+                </div>
               );
             })}
           </div>
@@ -657,7 +723,7 @@ export function MessageItem({
 
       {answerText && !(isLast && isStreaming) && (
         <MessageActions
-          text={answerText}
+          text={answerPlainText || answerText}
           liked={liked}
           disliked={disliked}
           onLike={onFeedback ? handleLike : undefined}
@@ -1361,7 +1427,7 @@ function normalizeRepeatedOrderedListMarkers(text: string): string {
   return lines.join('\n');
 }
 
-export function renderMarkdown(text: string): string {
+export function renderMarkdown(text: string, safeImageUrls?: Set<string>): string {
   if (!text) return '';
 
   let html = normalizeRepeatedOrderedListMarkers(text)
@@ -1389,13 +1455,20 @@ export function renderMarkdown(text: string): string {
     }
   });
 
-  html = html.replace(
-    /!\[([^\]]*)\]\([^)]*\)/g,
-    (_match, alt) =>
-      `<span class="text-muted-foreground italic">[Image unavailable${
-        alt ? `: ${alt}` : ''
-      }]</span>`,
-  );
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, url) => {
+    const cleanUrl = url.trim();
+    const isWhitelisted =
+      (safeImageUrls && safeImageUrls.has(cleanUrl)) ||
+      cleanUrl.startsWith('/api/') ||
+      cleanUrl.startsWith('/icons/') ||
+      cleanUrl.startsWith('data:image/');
+    if (isWhitelisted || isSafeImageUrl(cleanUrl)) {
+      return `<figure class="my-3 overflow-hidden rounded-xl border border-border/70 bg-card p-1 shadow-xs"><img src="${cleanUrl}" alt="${alt}" class="w-full max-h-96 object-contain rounded-lg bg-muted/10" loading="lazy" /><figcaption class="px-3 py-2 text-center text-xs text-muted-foreground font-medium border-t border-border/40">${alt || 'Indexed figure'}</figcaption></figure>`;
+    }
+    return `<span class="text-muted-foreground italic text-xs">[Image reference${
+      alt ? `: ${alt}` : ''
+    }]</span>`;
+  });
 
   // Code blocks — styled premium
   html = html.replace(

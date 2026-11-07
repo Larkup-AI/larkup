@@ -61,6 +61,8 @@ import {
 } from '../../../lib/chat/conversation-memory';
 import {
   PERSONALIZED_RESPONSE_STYLE,
+  SCIENTIFIC_PRESENTATION_STYLE,
+  sanitizeAssistantHistoryText,
   evidenceCoverageRequirement,
   namedComparisonLabelRequirement,
   numberedCategoryGroupingRequirement,
@@ -1027,6 +1029,10 @@ export async function POST(req: Request) {
           ) {
             return [];
           }
+          if (anyM.role === 'assistant' && part.type === 'text' && typeof part.text === 'string') {
+            return [{ ...part, text: sanitizeAssistantHistoryText(part.text) }];
+          }
+
           // File parts — strip large non-image files (PDF base64)
           if (part.type === 'file') {
             const data = part.data || part.url || '';
@@ -1352,6 +1358,7 @@ ${fieldLines}`;
     (skillInstructions ? `\nAVAILABLE AGENT SKILLS:\n${skillInstructions}\n` : '') +
     'Never print a tool name, JSON arguments, or tool-call syntax in a user-facing answer. Use tools silently, then give the result in natural language.\n' +
     CHAT_POLICY +
+    SCIENTIFIC_PRESENTATION_STYLE +
     numberedCategoryGroupingRequirement(userText) +
     namedComparisonLabelRequirement(userText) +
     evidenceCoverageRequirement(userText) +

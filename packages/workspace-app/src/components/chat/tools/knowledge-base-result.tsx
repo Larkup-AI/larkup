@@ -8,6 +8,7 @@ import {
   FileText,
   Image as ImageIcon,
   Loader2,
+  Table,
 } from 'lucide-react';
 import { isIndeterminateProgress } from '../../../lib/chat/live-tool-progress';
 
@@ -50,7 +51,7 @@ interface KBHit {
   images?: { imageUrl: string; index: number; pageNumber?: number }[];
   metadata?: {
     mediaAssetId?: string;
-    mediaType?: 'image' | 'video' | 'audio';
+    mediaType?: 'image' | 'video' | 'audio' | 'table';
     fileName?: string;
     startSecs?: number;
     endSecs?: number;
@@ -99,6 +100,7 @@ export function KnowledgeBaseResult({
     }
     return '';
   }, [parts]);
+
   const hits = useMemo<KBHit[]>(
     () =>
       parts.flatMap((part: any) => {
@@ -111,11 +113,32 @@ export function KnowledgeBaseResult({
       }),
     [parts],
   );
+
   const pdfHits = useMemo(
     () => [...new Map(hits.filter(isPdfHit).map((hit) => [hit.url || hit.title, hit])).values()],
     [hits],
   );
-  const otherHits = useMemo(() => hits.filter((hit) => !isPdfHit(hit)), [hits]);
+
+  const tabularGroups = useMemo(() => {
+    const map = new Map<string, { hit: KBHit; count: number; texts: string[] }>();
+    for (const hit of hits.filter(isTabularHit)) {
+      const key = hit.url || hit.title || 'Table Data';
+      const existing = map.get(key);
+      if (existing) {
+        existing.count += 1;
+        if (hit.text) existing.texts.push(hit.text);
+      } else {
+        map.set(key, { hit, count: 1, texts: hit.text ? [hit.text] : [] });
+      }
+    }
+    return [...map.values()];
+  }, [hits]);
+
+  const otherHits = useMemo(
+    () => hits.filter((hit) => !isPdfHit(hit) && !isTabularHit(hit)),
+    [hits],
+  );
+
   const inspectedPages = useMemo(() => {
     const pages = new Map<string, Set<number>>();
     for (const part of parts) {
@@ -136,6 +159,7 @@ export function KnowledgeBaseResult({
     }
     return pages;
   }, [parts]);
+
   useEffect(() => {
     setOpen(isRunning);
   }, [isRunning]);
@@ -226,12 +250,14 @@ export function KnowledgeBaseResult({
       ) : null}
 
       {open && hits.length > 0 ? (
-        <div className="mt-1.5 pl-0.5" data-testid="citation-list">
+        <div className="mt-1.5 pl-0.5 space-y-2" data-testid="citation-list">
           {isRunning && hits.length === 0 ? (
             <div className="flex items-center gap-2 py-2">
               <Loader2 className="size-3 animate-spin text-muted-foreground" />
             </div>
           ) : null}
+
+          {/* PDFs Section */}
           {pdfHits.length > 0 ? (
             <details open className="group" data-testid="pdf-source-list">
               <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
@@ -251,6 +277,29 @@ export function KnowledgeBaseResult({
               </div>
             </details>
           ) : null}
+
+          {/* Clean Tabular / CSVs Section */}
+          {tabularGroups.length > 0 ? (
+            <details open className="group" data-testid="tabular-source-list">
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+                <ChevronDown className="size-3 transition-transform group-open:rotate-180" />
+                <img src="/icons/excel.png" alt="" className="size-3.5 object-contain" />
+                Data Tables & CSVs ({tabularGroups.length})
+              </summary>
+              <div className="ml-4 space-y-1.5 pt-0.5">
+                {tabularGroups.map(({ hit, count, texts }, index) => (
+                  <TabularSourceRow
+                    key={`${hit.title}-${index}`}
+                    hit={hit}
+                    matchCount={count}
+                    allTexts={texts}
+                  />
+                ))}
+              </div>
+            </details>
+          ) : null}
+
+          {/* Other Sources (Video, Audio, Images, Web) */}
           {otherHits.map((hit, index) => (
             <SourceRow key={`${hit.title}-${index}`} hit={hit} />
           ))}
@@ -296,6 +345,148 @@ function isSafeSourceUrl(url: string | undefined) {
 
 function isPdfHit(hit: KBHit) {
   return /\.pdf(?:$|[?#])/iu.test(hit.title ?? '') || /\.pdf(?:$|[?#])/iu.test(hit.url ?? '');
+}
+
+function isTabularHit(hit: KBHit) {
+  const name = (hit.title ?? '') + ' ' + (hit.url ?? '');
+  return (
+    /\.(csv|tsv|xlsx?)(?:$|[?#\s])/iu.test(name) ||
+    hit.metadata?.mediaType === 'table' ||
+    Boolean(hit.metadata?.fileName?.match(/\.(csv|tsv|xlsx?)$/i))
+  );
+}
+
+function extractTabularHeaders(texts: string[]): string[] {
+  const headers = new Set<string>();
+  const STOP_WORDS = new Set([
+    'and',
+    'or',
+    'the',
+    'is',
+    'at',
+    'in',
+    'of',
+    'for',
+    'with',
+    'true',
+    'false',
+    'null',
+    'nan',
+  ]);
+
+  for (const text of texts) {
+    if (!text) continue;
+    // 1. Match key-value patterns: key: value
+    const kvMatches = text.matchAll(/(?:^|[\s,;])([a-zA-Z_][a-zA-Z0-9_]{1,35}):\s*/g);
+    let foundKv = false;
+    for (const match of kvMatches) {
+      const key = match[1].trim();
+      if (!STOP_WORDS.has(key.toLowerCase()) && !/^\d+$/.test(key)) {
+        headers.add(key);
+        foundKv = true;
+      }
+    }
+    // 2. If no key-value pairs, check for comma-delimited header row
+    if (!foundKv) {
+      const firstLine = text.split(/\r?\n/)[0]?.trim();
+      if (firstLine && firstLine.includes(',')) {
+        const tokens = firstLine.split(',').map((t) => t.trim().replace(/^["']|["']$/g, ''));
+        if (
+          tokens.length >= 2 &&
+          tokens.every((t) => t.length > 0 && t.length < 40 && !/^\d+$/.test(t))
+        ) {
+          tokens.forEach((t) => headers.add(t));
+        }
+      }
+    }
+  }
+  return [...headers];
+}
+
+function TabularSourceRow({
+  hit,
+  matchCount,
+  allTexts,
+}: {
+  hit: KBHit;
+  matchCount: number;
+  allTexts: string[];
+}) {
+  const [showPreview, setShowPreview] = useState(false);
+  const headers = useMemo(() => extractTabularHeaders(allTexts), [allTexts]);
+  const previewSnippet = useMemo(() => {
+    const raw = allTexts[0] || hit.text || '';
+    return raw.trim().slice(0, 300);
+  }, [allTexts, hit.text]);
+
+  const visibleHeaders = headers.slice(0, 8);
+  const remainingCount = headers.length - visibleHeaders.length;
+
+  return (
+    <div className="flex gap-2 py-1.5" data-testid="citation-source-tabular">
+      <img src="/icons/excel.png" alt="CSV" className="mt-0.5 size-3.5 shrink-0 object-contain" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <SourceTitle hit={hit} />
+          {isSafeSourceUrl(hit.url) ? (
+            <a
+              href={hit.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open ${hit.title}`}
+              className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ExternalLink className="size-3.5" />
+            </a>
+          ) : null}
+        </div>
+
+        {/* Clean column badges */}
+        {headers.length > 0 ? (
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            <span className="text-[10px] font-medium text-muted-foreground/80 mr-0.5">
+              Columns:
+            </span>
+            {visibleHeaders.map((col) => (
+              <span
+                key={col}
+                className="inline-flex items-center rounded border border-border/60 bg-muted/40 px-1.5 py-0.2 font-mono text-[10px] text-foreground/80"
+              >
+                {col}
+              </span>
+            ))}
+            {remainingCount > 0 && (
+              <span className="text-[10px] text-muted-foreground font-mono">
+                +{remainingCount} more
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-[11px] text-muted-foreground">
+            {matchCount > 1 ? `${matchCount} matched segments` : 'Structured dataset'}
+          </span>
+        )}
+
+        {/* Toggleable data preview */}
+        {previewSnippet ? (
+          <div className="mt-1">
+            <button
+              type="button"
+              onClick={() => setShowPreview((p) => !p)}
+              className="text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              {showPreview ? 'Hide sample snippet' : 'View sample snippet'}
+            </button>
+            {showPreview && (
+              <pre className="mt-1 max-h-24 overflow-auto rounded border border-border/40 bg-muted/20 p-2 font-mono text-[10px] leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                {previewSnippet}
+              </pre>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function SourceRow({
@@ -378,8 +569,6 @@ function SourceThumbnail({ hit }: { hit: KBHit }) {
   );
   if (image && !imageUnavailable) {
     return (
-      // Retrieval supplies this URL; it is never a model-suggested placeholder.
-      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={image.imageUrl}
         alt=""

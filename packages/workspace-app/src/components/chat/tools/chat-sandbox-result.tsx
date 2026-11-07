@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ChevronDown, Play, Clock, Image as ImageIcon, Table2 } from 'lucide-react';
+import { ChevronDown, Play, Clock, Image as ImageIcon, Table2, Terminal } from 'lucide-react';
 import { ChatDataTable, type DataTableConfig } from './chat-data-table';
 import { ChatAnalysisResult, type AnalysisPresentation } from './chat-analysis-result';
 import { Card, CardContent } from '../../ui/card';
@@ -76,16 +76,16 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
             <div
               key={i}
               data-testid="analysis-artifact-image"
-              className="overflow-hidden rounded-lg border border-border/40"
+              className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-xs"
             >
               <img
                 src={`data:${img.mimeType};base64,${img.data}`}
                 alt={img.name}
-                className="w-full"
+                className="w-full object-contain max-h-96"
               />
-              <div className="flex items-center gap-2 border-t border-border/40 px-3 py-1.5">
+              <div className="flex items-center gap-2 border-t border-border/40 px-3 py-1.5 bg-muted/20">
                 <ImageIcon className="size-3 text-muted-foreground" />
-                <span className="text-[10px] text-muted-foreground">{img.name}</span>
+                <span className="text-[10px] font-medium text-muted-foreground">{img.name}</span>
               </div>
             </div>
           ))}
@@ -105,17 +105,35 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
         </CardContent>
       )}
 
-      {/* Plain stdout (only if not parsed as table) */}
+      {/* Plain calculation stdout rendered in a clean collapsible audit panel */}
       {stdout && !stdoutTable && !presentation && (
-        <div className="border-b border-border/40 px-4 py-3">
-          <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-foreground [&::-webkit-scrollbar]:hidden">
-            {stdout}
-          </pre>
+        <div className="my-2 overflow-hidden rounded-xl border border-border/70 bg-card/60 shadow-xs">
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+              <div className="flex items-center gap-2">
+                <Terminal className="size-3.5 text-foreground" />
+                <span>Calculation & Execution Details</span>
+                <span className="font-mono text-[10px] text-muted-foreground/80">
+                  (
+                  {executionTimeMs < 1000
+                    ? `${executionTimeMs}ms`
+                    : `${(executionTimeMs / 1000).toFixed(1)}s`}
+                  )
+                </span>
+              </div>
+              <ChevronDown className="size-3 transition-transform group-open:rotate-180 text-muted-foreground" />
+            </summary>
+            <div className="border-t border-border/40 bg-muted/20 p-3">
+              <pre className="max-h-52 overflow-auto font-mono text-[11px] leading-relaxed text-foreground whitespace-pre-wrap [&::-webkit-scrollbar]:hidden">
+                {stdout}
+              </pre>
+            </div>
+          </details>
         </div>
       )}
 
       {isEmptySuccess && (
-        <div className="border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+        <div className="border border-amber-500/20 bg-amber-500/5 px-4 py-3 rounded-lg">
           <div className="text-sm font-medium text-amber-800 dark:text-amber-300">
             Analysis completed without a usable result
           </div>
@@ -127,7 +145,7 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
 
       {/* Error display */}
       {!isSuccess && (
-        <div className="border-t border-border/40 bg-red-50/50 p-4 dark:bg-red-900/10">
+        <div className="border-t border-border/40 bg-red-50/50 p-4 dark:bg-red-900/10 rounded-lg">
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium text-red-800 dark:text-red-400">
               {isRuntimeUnavailable ? 'Analysis is unavailable' : 'Analysis encountered an issue'}
