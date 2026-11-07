@@ -75,6 +75,14 @@ test('rejects a raw PDF count mislabeled as a per-person rate', () => {
     visualRateMismatch(question, pdf, 'enrollment: 32\ndeviations_per_randomized_subject: 1.22'),
     undefined,
   );
+  assert.equal(
+    visualRateMismatch(
+      question,
+      { pages: [{ analysis: 'S01: 13 deviations. S07: 39 deviations.' }] },
+      'enrollment: 32\ndeviations_per_randomized_subject: 1.22',
+    ),
+    undefined,
+  );
 });
 
 test('fresh visual evidence replaces stale OCR snippets for mixed PDF and table reasoning', () => {

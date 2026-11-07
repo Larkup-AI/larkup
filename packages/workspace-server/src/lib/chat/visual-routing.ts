@@ -284,9 +284,12 @@ export function visualRateMismatch(
     .map((page) => (typeof page.analysis === 'string' ? page.analysis : ''))
     .join('\n');
   const metric = intent[1].toLocaleLowerCase();
-  const sourceCount = visualText.match(
-    new RegExp(`\\b(\\d+(?:\\.\\d+)?)\\s+(?:total\\s+)?${metric}\\b`, 'iu'),
-  );
+  const sourceCounts = [
+    ...visualText.matchAll(
+      new RegExp(`\\b(\\d+(?:\\.\\d+)?)\\s+(?:total\\s+)?${metric}\\b`, 'giu'),
+    ),
+  ].map((match) => Number(match[1]));
+  if (new Set(sourceCounts).size !== 1) return undefined;
   const denominator = resultText.match(
     /\b(?:enrollment|randomi[sz]ed[_ ]?subjects?|total[_ ]?subjects?|subject[_ ]?count)\s*[:=]\s*(?:np\.int64\()?\s*(\d+(?:\.\d+)?)/iu,
   );
@@ -295,8 +298,8 @@ export function visualRateMismatch(
     'iu',
   );
   const reportedRate = resultText.match(rateKey);
-  if (!sourceCount || !denominator || !reportedRate) return undefined;
-  const count = Number(sourceCount[1]);
+  if (sourceCounts.length === 0 || !denominator || !reportedRate) return undefined;
+  const count = sourceCounts[0];
   const population = Number(denominator[1]);
   const reported = Number(reportedRate[1]);
   if (population <= 0 || !Number.isFinite(count / population)) return undefined;
