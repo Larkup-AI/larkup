@@ -455,6 +455,21 @@ test('rejects composite rate output that hides its numerators and denominators',
   );
 });
 
+test('requires a cohort reconciliation check before ranking subgroup rates', () => {
+  const question = 'In the treatment arm, which category has the highest ORR?';
+  assert.match(
+    analysisCodeValidationError(question, "rates = patients.groupby('category').size()") ?? '',
+    /cohort/i,
+  );
+  assert.equal(
+    analysisCodeValidationError(
+      question,
+      "cohort = patients[patients.arm == target_arm]; rates = cohort.groupby('category').size(); assert rates.sum() == len(cohort)",
+    ),
+    undefined,
+  );
+});
+
 test('routes exhaustive relational integrity validation through analysis', () => {
   assert.equal(
     requiresTabularSandbox(
