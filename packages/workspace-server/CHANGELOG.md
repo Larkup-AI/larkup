@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.58
+
+### Patch Changes
+
+- Route composite response rates through sandbox calculations and read small PDF figure labels using close-ups anchored to extracted page text.
+
 ## 0.2.57
 
 ### Patch Changes
