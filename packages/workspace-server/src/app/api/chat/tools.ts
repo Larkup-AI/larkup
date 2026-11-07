@@ -82,6 +82,7 @@ import {
   buildQueryTermMatchers,
   countMatchesIn,
   rankKnowledgeHits,
+  retainPreferredPdfHit,
   selectVisualPdfFallbackDocuments,
 } from '../../../lib/chat/retrieval-ranking';
 import { requiresPdfVisualAnalysis } from '../../../lib/chat/visual-routing';
@@ -498,13 +499,22 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
       // descriptions so the deterministic PDF inspection path remains
       // available instead of asking the answer model to infer a chart from
       // unrelated records.
+      let preferredPdfDocumentIds = new Set<string>();
       if (requiresPdfVisualAnalysis(query)) {
         const presentDocumentIds = new Set(hits.map((hit: any) => hit.documentId));
-        const visualPdfFallbacks = selectVisualPdfFallbackDocuments(query, documents).filter(
+        const visualPdfFallbacks = selectVisualPdfFallbackDocuments(query, documents);
+        if (
+          /\b(?:figure|diagram|pdf|paper|protocol|report|kaplan[ -]meier|at[ -]risk)\b/iu.test(
+            query,
+          )
+        ) {
+          preferredPdfDocumentIds = new Set(visualPdfFallbacks.map((document) => document.id));
+        }
+        const missingVisualPdfs = visualPdfFallbacks.filter(
           (document) => !presentDocumentIds.has(document.id),
         );
         hits.push(
-          ...visualPdfFallbacks.map((document) => ({
+          ...missingVisualPdfs.map((document) => ({
             id: document.id,
             documentId: document.id,
             score: 0,
@@ -521,6 +531,7 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
         topK,
         documents,
         availableMediaAssets,
+        preferredPdfDocumentIds,
       );
       if (formatted.hits.length === 0)
         return uniqueCompletedMediaFallback(query, activeVideoRuntimeScope, mediaAssets, groups);
@@ -581,6 +592,7 @@ async function formatKnowledgeHits(
   topK: number,
   indexedDocuments?: Awaited<ReturnType<typeof readDocuments>>,
   indexedMediaAssets?: Awaited<ReturnType<typeof readMediaAssets>>,
+  preferredPdfDocumentIds: ReadonlySet<string> = new Set(),
 ) {
   const [storedDocuments, storedMediaAssets] = await Promise.all([
     readDocuments(),
@@ -645,6 +657,11 @@ async function formatKnowledgeHits(
     hitsPerDocument.set(hit.documentId, seen + 1);
     if (selected.length >= topK) break;
   }
+  selected.splice(
+    0,
+    selected.length,
+    ...retainPreferredPdfHit(selected, hydrated, preferredPdfDocumentIds, topK),
+  );
   const primaryMediaAssetId = selected.find((hit) => hit.metadata?.mediaAssetId)?.metadata
     .mediaAssetId;
   const mediaDocuments = primaryMediaAssetId
