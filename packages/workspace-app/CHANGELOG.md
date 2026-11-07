@@ -1,5 +1,14 @@
 # @larkup/workspace-app
 
+## 0.2.22
+
+### Patch Changes
+
+- 87617dc: Add validated project chunking settings and show the local and Cloud storage defaults with vector store logos.
+- Updated dependencies [87617dc]
+  - @larkup/core@0.8.5
+  - @larkup/tool-doc-editor@0.3.9
+
 ## 0.2.21
 
 ### Patch Changes
