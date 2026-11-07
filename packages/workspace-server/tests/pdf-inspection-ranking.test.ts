@@ -1,6 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { selectRelevantPdfPages } from '../src/lib/media/pdf-inspection.ts';
+import { selectRelevantPdfPages, pdfPageVisionImages } from '../src/lib/media/pdf-inspection.ts';
+import { createCanvas } from '@napi-rs/canvas';
+
+test('multi-figure PDF pages give vision overlapping close-ups with the correct PNG type', async () => {
+  const canvas = createCanvas(100, 200);
+  const rendered = canvas.toBuffer('image/png');
+  assert.equal(
+    (await pdfPageVisionImages(rendered, 'Figure 1 shows volume. Figure 2 shows cost.')).length,
+    3,
+  );
+  assert.equal((await pdfPageVisionImages(rendered, 'Figure 1 shows volume.')).length, 1);
+  assert.match(
+    (await pdfPageVisionImages(rendered, 'Figure 1. Figure 2.'))[1],
+    /^data:image\/png;base64,/u,
+  );
+});
 
 test('covers distinct endpoint and schedule clauses in a compound PDF question', () => {
   const pages = [

@@ -6,6 +6,7 @@ import {
   analysisValidationRequirements,
   appendExplicitValidationZeroCounts,
   normalizePercentagePrecisionInStdout,
+  populationDatasetIdsForPerEntityRate,
   isLikelyTabularQuestion,
   hasExhaustedAnalysisAttempts,
   requiresPdfAndTabularEvidence,
@@ -295,6 +296,87 @@ test('risk analysis exposes named numeric denominators for final-answer provenan
   assert.match(
     analysisValidationRequirements('Find the largest risk difference.'),
     /print each numerator and denominator/,
+  );
+});
+
+test('per-entity rates require a related unique population table instead of a guessed mapping', () => {
+  const sites = dataset('sites', 'sites.csv', ['site_id', 'city']);
+  const people = dataset('people', 'people.csv', ['person_id', 'site_id']);
+  const visits = dataset('visits', 'visits.csv', ['person_id', 'site_id', 'visit_id']);
+  const population = {
+    ...people,
+    columns: people.columns.map((column) =>
+      column.name === 'person_id' ? { ...column, uniqueCount: people.rowCount } : column,
+    ),
+  };
+  assert.deepEqual(
+    populationDatasetIdsForPerEntityRate(
+      'How many events per person at each site?',
+      [sites, population, visits],
+      ['sites'],
+    ),
+    ['people'],
+  );
+  const subjects = dataset('subjects', 'subjects.csv', ['subject_id', 'site_id']);
+  const observations = dataset('observations', 'observations.csv', [
+    'subject_id',
+    'site_id',
+    'visit_id',
+  ]);
+  const uniqueSubjects = {
+    ...subjects,
+    columns: subjects.columns.map((column) =>
+      column.name === 'subject_id' ? { ...column, uniqueCount: subjects.rowCount } : column,
+    ),
+  };
+  assert.deepEqual(
+    populationDatasetIdsForPerEntityRate(
+      'Deviations per randomized subject at a site',
+      [sites, uniqueSubjects, observations],
+      ['sites'],
+    ),
+    ['subjects'],
+  );
+  assert.match(
+    analysisCodeValidationError(
+      'Deviations per randomized subject',
+      "sites = pd.read_csv('sites.csv')\nsite_enrollment = {'A': 50}",
+      {
+        requiresMountedRead: true,
+        requiredPopulationFiles: ['subjects.csv'],
+      },
+    ) ?? '',
+    /read the mounted population dataset subjects\.csv/i,
+  );
+  const reconstructedSites =
+    "import pandas as pd\nsubjects = pd.read_csv('subjects.csv')\nsites_data = {'site_id': ['A'], 'city': ['Paris'], 'target_enrollment': [30]}\nsites = pd.DataFrame(sites_data)";
+  assert.match(
+    analysisCodeValidationError(
+      'Find the deviations per subject at each site',
+      reconstructedSites,
+      {
+        requiresMountedRead: true,
+        requiredPopulationFiles: ['subjects.csv'],
+        mountedDatasetSchemas: [
+          { fileName: 'sites.csv', columns: ['site_id', 'city', 'target_enrollment'] },
+        ],
+      },
+    ) ?? '',
+    /reconstructs rows from uploaded sites\.csv/i,
+  );
+  assert.equal(
+    analysisCodeValidationError(
+      'Find the deviations per subject at each site',
+      "subjects = pd.read_csv('subjects.csv')\nsites = pd.read_csv('sites.csv')\nprint(sites)",
+      {
+        requiresMountedRead: true,
+        requiredPopulationFiles: ['subjects.csv'],
+        mountedDatasetSchemas: [
+          { fileName: 'sites.csv', columns: ['site_id', 'city', 'target_enrollment'] },
+        ],
+      },
+    ),
+    undefined,
   );
 });
 

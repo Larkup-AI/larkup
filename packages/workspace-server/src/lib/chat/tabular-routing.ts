@@ -138,6 +138,55 @@ export function tabularDatasetIdsForAnalysis(
   return datasets.filter((dataset) => selected.has(dataset.id)).map((dataset) => dataset.id);
 }
 
+/** Find the entity-level population table for a per-entity rate, using keys and cardinality. */
+export function populationDatasetIdsForPerEntityRate(
+  text: string,
+  datasets: TabularDatasetMeta[],
+  selectedIds: string[],
+): string[] {
+  const entity = text
+    .match(
+      /\bper\s+(?:randomi[sz]ed\s+)?(subject|patient|participant|person|individual|record)\b/iu,
+    )?.[1]
+    ?.toLocaleLowerCase();
+  if (!entity || selectedIds.length === 0) return [];
+  const entityKey = `${entity}id`;
+  const selectedKeys = new Set(
+    datasets
+      .filter((dataset) => selectedIds.includes(dataset.id))
+      .flatMap((dataset) =>
+        dataset.columns
+          .filter((column) => isRelationshipKey(column.name))
+          .map((column) => normalizedRelationshipKey(column.name)),
+      ),
+  );
+  const candidates = datasets
+    .flatMap((dataset) => {
+      const idColumn = dataset.columns.find(
+        (column) => normalizedRelationshipKey(column.name) === entityKey,
+      );
+      if (
+        !idColumn ||
+        !dataset.columns.some((column) => {
+          const key = normalizedRelationshipKey(column.name);
+          return key !== entityKey && selectedKeys.has(key);
+        })
+      )
+        return [];
+      return [
+        {
+          id: dataset.id,
+          uniqueness: dataset.rowCount > 0 ? idColumn.uniqueCount / dataset.rowCount : 0,
+        },
+      ];
+    })
+    .sort((left, right) => right.uniqueness - left.uniqueness);
+  return candidates.length === 1 ||
+    (candidates[0]?.uniqueness ?? 0) > (candidates[1]?.uniqueness ?? 0)
+    ? [candidates[0].id]
+    : [];
+}
+
 /** Return only unambiguous schemas named by the question. */
 export function tabularDatasetIdsRequiredByQuestion(
   text: string,
@@ -597,8 +646,29 @@ export function withAnalysisNumericProvenance(code: string, question: string): s
 export function analysisCodeValidationError(
   text: string,
   code: string,
-  options: { requiresMountedRead?: boolean } = {},
+  options: {
+    requiresMountedRead?: boolean;
+    requiredPopulationFiles?: string[];
+    mountedDatasetSchemas?: Array<{ fileName: string; columns: string[] }>;
+  } = {},
 ): string | undefined {
+  for (const dataset of options.mountedDatasetSchemas ?? []) {
+    const literalColumns = dataset.columns.filter((column) => {
+      const escaped = column.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+      return new RegExp(`["']${escaped}["']\\s*:\\s*\\[`, 'u').test(code);
+    });
+    if (literalColumns.length >= 2) {
+      return `Invalid tabular evidence: the code reconstructs rows from uploaded ${dataset.fileName} as literal column arrays. Read the mounted file instead and derive those fields from its rows.`;
+    }
+  }
+  const missingPopulationFile = options.requiredPopulationFiles?.find(
+    (fileName) =>
+      !code.toLocaleLowerCase().includes(fileName.toLocaleLowerCase()) &&
+      !/\bdatasets\.json\b/iu.test(code),
+  );
+  if (missingPopulationFile) {
+    return `Invalid rate denominator: read the mounted population dataset ${missingPopulationFile} and count distinct entities by the requested group before dividing. Do not infer a population from another table or a literal mapping.`;
+  }
   const asksForUploadedTable =
     options.requiresMountedRead === true ||
     /\.csv\b|\b(?:spreadsheet|excel|dataset|table)\b/iu.test(text);

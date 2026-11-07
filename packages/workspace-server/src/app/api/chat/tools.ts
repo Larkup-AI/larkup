@@ -104,6 +104,7 @@ import { inferTabularPlan } from '../../../lib/chat/tabular-query-plan';
 import {
   analysisValidationRequirements,
   analysisCodeValidationError,
+  populationDatasetIdsForPerEntityRate,
   withAnalysisNumericProvenance,
   normalizePercentagePrecisionInStdout,
   appendExplicitValidationZeroCounts,
@@ -155,6 +156,7 @@ import { findIndexedImageSource } from '../../../lib/chat/visual-routing';
 import { indexedVideoEvidenceIsSufficient } from '../../../lib/chat/video-rag-routing';
 import {
   inspectStoredPdf,
+  pdfPageVisionImages,
   readStoredPdfBytes,
   renderStoredPdfPage,
 } from '../../../lib/media/pdf-inspection';
@@ -1336,7 +1338,8 @@ export async function getChatTools(context: {
           );
           const pages = await Promise.all(
             inspection.pages.map(async (page) => {
-              const rendered = await renderStoredPdfPage(document, page.pageNumber);
+              const rendered = await renderStoredPdfPage(document, page.pageNumber, 2_000);
+              const visionImages = await pdfPageVisionImages(rendered.data, page.text);
               const response = await fetch(
                 new URL(
                   workspaceServerUrl(
@@ -1349,7 +1352,13 @@ export async function getChatTools(context: {
                 {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ base64: rendered.data.toString('base64'), prompt }),
+                  body: JSON.stringify({
+                    base64Images: visionImages,
+                    prompt:
+                      visionImages.length > 1
+                        ? `The first image is the full PDF page; the next images are overlapping upper and lower close-ups of that same page. Use the close-ups to align chart marks with their axis labels. ${prompt}`
+                        : prompt,
+                  }),
                 },
               );
               const data = await response.json().catch(() => ({}));
@@ -2848,9 +2857,6 @@ export async function getChatTools(context: {
       }),
       execute: async ({ code, datasetId, datasetIds, pdfDocumentId }) => {
         try {
-          const authoredCodeValidationError = analysisCodeValidationError(requestText ?? '', code, {
-            requiresMountedRead: Boolean(datasetId || datasetIds?.length),
-          });
           const sandboxManager = workspaceSandbox(resolveSandboxConfig(config));
           const files: SandboxFile[] = [];
 
@@ -2925,6 +2931,33 @@ export async function getChatTools(context: {
             );
             if (automaticDatasetId) requestedDatasetIds.push(automaticDatasetId);
           }
+          const populationDatasetIds = useRecentAnalysisTable
+            ? []
+            : populationDatasetIdsForPerEntityRate(
+                requestText ?? '',
+                availableDatasets,
+                requestedDatasetIds,
+              );
+          requestedDatasetIds.push(...populationDatasetIds);
+          requestedDatasetIds.splice(
+            0,
+            requestedDatasetIds.length,
+            ...new Set(requestedDatasetIds),
+          );
+          const requiredPopulationFiles = availableDatasets
+            .filter((dataset) => populationDatasetIds.includes(dataset.id))
+            .map((dataset) => dataset.fileName.split(/[\\/]/u).at(-1) ?? dataset.fileName);
+          const mountedDatasetSchemas = availableDatasets
+            .filter((dataset) => requestedDatasetIds.includes(dataset.id))
+            .map((dataset) => ({
+              fileName: dataset.fileName,
+              columns: dataset.columns.map((column) => column.name),
+            }));
+          const authoredCodeValidationError = analysisCodeValidationError(requestText ?? '', code, {
+            requiresMountedRead: requestedDatasetIds.length > 0,
+            requiredPopulationFiles,
+            mountedDatasetSchemas,
+          });
           let mountedDatasets: NonNullable<Awaited<ReturnType<typeof getTabularDataset>>>[] = [];
           let mountedManifest: ReturnType<typeof createTabularSandboxFiles>['manifest'];
           if (requestedDatasetIds.length > 0) {
@@ -3071,6 +3104,7 @@ export async function getChatTools(context: {
               ? (authoredCodeValidationError ??
                 analysisCodeValidationError(requestText ?? '', finalCode, {
                   requiresMountedRead: mountedDatasets.length > 0,
+                  mountedDatasetSchemas,
                 }))
               : undefined;
           const hasUsableOutput =
