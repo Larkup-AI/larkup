@@ -1,5 +1,11 @@
 # @larkup/workspace-app
 
+## 0.2.20
+
+### Patch Changes
+
+- 5e39f0f: Prevent structured file uploads from silently losing their analytical dataset when tabular storage fails.
+
 ## 0.2.19
 
 ### Patch Changes
