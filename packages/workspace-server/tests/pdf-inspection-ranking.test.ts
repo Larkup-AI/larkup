@@ -10,7 +10,8 @@ test('multi-figure PDF pages give vision overlapping close-ups with the correct 
     (await pdfPageVisionImages(rendered, 'Figure 1 shows volume. Figure 2 shows cost.')).length,
     3,
   );
-  assert.equal((await pdfPageVisionImages(rendered, 'Figure 1 shows volume.')).length, 1);
+  assert.equal((await pdfPageVisionImages(rendered, 'Figure 1 shows volume.')).length, 3);
+  assert.equal((await pdfPageVisionImages(rendered, 'A plain text page.')).length, 1);
   assert.match(
     (await pdfPageVisionImages(rendered, 'Figure 1. Figure 2.'))[1],
     /^data:image\/png;base64,/u,

@@ -431,6 +431,12 @@ test('routes comparative risks and per-entity rates through reproducible analysi
     true,
   );
   assert.equal(requiresTabularSandbox('Report deviations per randomized subject.'), true);
+  assert.equal(
+    requiresTabularSandbox(
+      'Compute ORR and DCR per arm from CR, PR, and SD counts, then find the highest ORR by subgroup.',
+    ),
+    true,
+  );
 });
 
 test('routes exhaustive relational integrity validation through analysis', () => {

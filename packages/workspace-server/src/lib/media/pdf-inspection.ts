@@ -311,7 +311,7 @@ export async function renderStoredPdfPage(
   }
 }
 
-/** Give vision closer views when multiple numbered visuals share a PDF page. */
+/** Give vision closer views for figures; full-page text can make labels too small. */
 export async function pdfPageVisionImages(rendered: Buffer, pageText: string): Promise<string[]> {
   const imageUrl = (bytes: Buffer) => `data:image/png;base64,${bytes.toString('base64')}`;
   const full = imageUrl(rendered);
@@ -320,7 +320,8 @@ export async function pdfPageVisionImages(rendered: Buffer, pageText: string): P
       (match) => match[1],
     ),
   );
-  if (references.size < 2) return [full];
+  if (references.size < 2 && !/\b(?:fig(?:ure)?|chart|diagram|graph)\b/iu.test(pageText))
+    return [full];
   const image = await loadImage(rendered);
   const split = Math.ceil(image.height * 0.55);
   const top = Math.floor(image.height * 0.45);
