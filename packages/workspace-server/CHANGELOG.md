@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.47
+
+### Patch Changes
+
+- Keep PDF page and visual evidence with structured data in compound answers, repair notebook-style analysis output, and group PDF search sources in a simple collapsible list.
+
 ## 0.2.46
 
 ### Patch Changes
