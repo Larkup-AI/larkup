@@ -647,13 +647,32 @@ export function analysisValidationRequirements(text: string) {
 /** Surface scalar population counts calculated by Python so final prose can use verified denominators. */
 export function withAnalysisNumericProvenance(code: string, question: string): string {
   if (
-    !/\b(?:risk|rate|ratio|incidence|percentage|proportion|per\s+(?:patient|subject|record|site))\b/iu.test(
+    !/\b(?:risk|rate|ratio|incidence|percentage|proportion|ORR|DCR|per\s+(?:patient|subject|record|site))\b/iu.test(
       question,
     )
   ) {
     return code;
   }
   return `${code}\n\n# Report named numeric population values used in rate and risk calculations.\nimport numbers as _larkup_numbers\nimport re as _larkup_re\n_larkup_provenance = [(name, value) for name, value in list(globals().items()) if not name.startswith('_') and _larkup_re.search(r'(?:^|_)(?:n|count|size|total|denom(?:inator)?|population)(?:_|$)', name, _larkup_re.I) and isinstance(value, _larkup_numbers.Number) and not isinstance(value, bool)]\nfor _larkup_name, _larkup_value in _larkup_provenance[:24]:\n    print(f"Verified calculation input {_larkup_name}: {_larkup_value}")\n`;
+}
+
+/** A rate without printed source counts invites invented denominators in prose. */
+export function rateAnalysisEvidenceError(question: string, stdout: string): string | undefined {
+  if (!/\b(?:ORR|DCR|overall\s+response\s+rate|disease\s+control\s+rate)\b/iu.test(question)) {
+    return undefined;
+  }
+  const explicitRatios = [...stdout.matchAll(/\b\d+\s*\/\s*\d+\b/gu)].length;
+  const namedCounts =
+    /\b(?:numerator|response count|CR\s*\+\s*PR)\b/iu.test(stdout) &&
+    /\b(?:denominator|population|arm size|total patients|n\s*=)\b/iu.test(stdout);
+  if (
+    explicitRatios >=
+      (/(?:\bper\s+arm\b|\beach\s+arm\b|\bboth\s+arms\b)/iu.test(question) ? 2 : 1) ||
+    namedCounts
+  ) {
+    return undefined;
+  }
+  return 'Rate evidence is incomplete: print each requested arm and subgroup with its numeric numerator, denominator, and calculated rate (for example 54/122 = 44.3%). Do not print only decimal rates.';
 }
 
 /** Reject successful-looking code that uses a known invalid aggregation level. */
