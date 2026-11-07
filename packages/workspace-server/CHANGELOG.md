@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.51
+
+### Patch Changes
+
+- Focus multi-figure visual reading on the mark that satisfies the question and its neighboring axis labels, while avoiding false rate checks against unrelated chart values.
+
 ## 0.2.50
 
 ### Patch Changes
