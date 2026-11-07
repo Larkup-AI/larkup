@@ -93,6 +93,7 @@ import {
   requiresMultiDatasetAnalysis,
   requestsLongAnalysisArtifact,
   requiresTabularSandbox,
+  shouldPrioritizeTabularAnalysisBeforePdf,
   supportsStableTabularPlanner,
   tabularRelationships,
   tabularToolPlannerModel,
@@ -2064,7 +2065,15 @@ ${fieldLines}`;
               // applies equally to equations, captions, tables, scans, and
               // vector diagrams. Only requests that depend on visual/layout
               // fidelity need a second, rendered-page analysis pass.
-              if (hasRetrievedPdfEvidence(preloadedEvidence)) {
+              if (
+                hasRetrievedPdfEvidence(preloadedEvidence) &&
+                !shouldPrioritizeTabularAnalysisBeforePdf({
+                  hasTabularData,
+                  tabularQuestion,
+                  requiresSandbox: requiresTabularSandbox(userText),
+                  requiresMultiDatasetAnalysis: requiresMultiDatasetTabularAnalysis,
+                })
+              ) {
                 const inspection =
                   preloadedEvidence && typeof preloadedEvidence === 'object'
                     ? (preloadedEvidence as { pdfInspection?: { success?: unknown } }).pdfInspection

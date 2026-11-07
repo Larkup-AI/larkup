@@ -82,7 +82,9 @@ import {
   buildQueryTermMatchers,
   countMatchesIn,
   rankKnowledgeHits,
+  selectVisualPdfFallbackDocuments,
 } from '../../../lib/chat/retrieval-ranking';
+import { requiresPdfVisualAnalysis } from '../../../lib/chat/visual-routing';
 import {
   activeMediaFollowUpResult,
   clearlyTitleMatchedMediaAsset,
@@ -486,6 +488,28 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
             metadata: document.metadata,
           }));
         if (titleMatched.length > 0) hits.push(...titleMatched);
+      }
+      // A large row-level CSV can consume the full vector candidate pool for
+      // a chart question. Recover a tightly matched visual PDF from its page
+      // descriptions so the deterministic PDF inspection path remains
+      // available instead of asking the answer model to infer a chart from
+      // unrelated records.
+      if (requiresPdfVisualAnalysis(query)) {
+        const presentDocumentIds = new Set(hits.map((hit: any) => hit.documentId));
+        const visualPdfFallbacks = selectVisualPdfFallbackDocuments(query, documents).filter(
+          (document) => !presentDocumentIds.has(document.id),
+        );
+        hits.push(
+          ...visualPdfFallbacks.map((document) => ({
+            id: document.id,
+            documentId: document.id,
+            score: 0,
+            title: document.title,
+            text: document.content.slice(0, 1_200),
+            url: document.url,
+            metadata: document.metadata,
+          })),
+        );
       }
       const formatted = await formatKnowledgeHits(
         query,
