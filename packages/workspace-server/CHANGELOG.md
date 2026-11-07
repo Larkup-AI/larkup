@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.50
+
+### Patch Changes
+
+- Use close-up PDF views to verify chart labels when a page contains multiple figures, and require population and metadata values to come from their uploaded tables during mixed-source analysis.
+
 ## 0.2.49
 
 ### Patch Changes
