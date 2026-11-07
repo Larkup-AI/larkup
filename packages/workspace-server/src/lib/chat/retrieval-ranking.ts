@@ -153,6 +153,20 @@ export function selectVisualPdfFallbackDocuments<T extends VisualPdfDocument>(
     .map((candidate) => candidate.document);
 }
 
+/** Keep one relevant document source when table chunks fill a mixed visual query. */
+export function retainPreferredPdfHit<T extends { documentId: string }>(
+  selected: T[],
+  ranked: T[],
+  preferredDocumentIds: ReadonlySet<string>,
+  maximum: number,
+): T[] {
+  if (maximum < 1 || selected.some((hit) => preferredDocumentIds.has(hit.documentId)))
+    return selected;
+  const pdf = ranked.find((hit) => preferredDocumentIds.has(hit.documentId));
+  if (!pdf) return selected;
+  return selected.length < maximum ? [...selected, pdf] : [...selected.slice(0, -1), pdf];
+}
+
 /** Merge semantic recall with exact terminology from names, labels, and IDs. */
 export function rankKnowledgeHits<T extends { text?: string; title?: string; metadata?: any }>(
   query: string,

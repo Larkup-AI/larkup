@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { selectVisualPdfFallbackDocuments } from '../src/lib/chat/retrieval-ranking.ts';
+import {
+  retainPreferredPdfHit,
+  selectVisualPdfFallbackDocuments,
+} from '../src/lib/chat/retrieval-ranking.ts';
 
 test('recovers a chart PDF from indexed page descriptions when row-level data dominates retrieval', () => {
   const documents = [
@@ -56,4 +59,16 @@ test('recovers a text-indexed PDF without images so its original page can be ins
     ).map((document) => document.id),
     ['legacy-report'],
   );
+});
+
+test('retains one relevant PDF when ranked table chunks fill a mixed visual answer', () => {
+  const rows = ['row-1', 'row-2', 'row-3', 'row-4'].map((documentId) => ({ documentId }));
+  const pdf = { documentId: 'report' };
+  assert.deepEqual(
+    retainPreferredPdfHit(rows, [...rows, pdf], new Set(['report']), 4).map(
+      (hit) => hit.documentId,
+    ),
+    ['row-1', 'row-2', 'row-3', 'report'],
+  );
+  assert.deepEqual(retainPreferredPdfHit(rows, [...rows, pdf], new Set(), 4), rows);
 });
