@@ -412,15 +412,7 @@ function TabularSourceRow({
   matchCount: number;
   allTexts: string[];
 }) {
-  const [showPreview, setShowPreview] = useState(false);
-  const headers = useMemo(() => extractTabularHeaders(allTexts), [allTexts]);
-  const previewSnippet = useMemo(() => {
-    const raw = allTexts[0] || hit.text || '';
-    return raw.trim().slice(0, 300);
-  }, [allTexts, hit.text]);
-
-  const visibleHeaders = headers.slice(0, 8);
-  const remainingCount = headers.length - visibleHeaders.length;
+  // Headers kept only for potential future use; columns UI is hidden.
 
   return (
     <div className="flex gap-2 py-1.5" data-testid="citation-source-tabular">
@@ -440,50 +432,6 @@ function TabularSourceRow({
             </a>
           ) : null}
         </div>
-
-        {/* Clean column badges */}
-        {headers.length > 0 ? (
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            <span className="text-[10px] font-medium text-muted-foreground/80 mr-0.5">
-              Columns:
-            </span>
-            {visibleHeaders.map((col) => (
-              <span
-                key={col}
-                className="inline-flex items-center rounded border border-border/60 bg-muted/40 px-1.5 py-0.2 font-mono text-[10px] text-foreground/80"
-              >
-                {col}
-              </span>
-            ))}
-            {remainingCount > 0 && (
-              <span className="text-[10px] text-muted-foreground font-mono">
-                +{remainingCount} more
-              </span>
-            )}
-          </div>
-        ) : (
-          <span className="text-[11px] text-muted-foreground">
-            {matchCount > 1 ? `${matchCount} matched segments` : 'Structured dataset'}
-          </span>
-        )}
-
-        {/* Toggleable data preview */}
-        {previewSnippet ? (
-          <div className="mt-1">
-            <button
-              type="button"
-              onClick={() => setShowPreview((p) => !p)}
-              className="text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
-              {showPreview ? 'Hide sample snippet' : 'View sample snippet'}
-            </button>
-            {showPreview && (
-              <pre className="mt-1 max-h-24 overflow-auto rounded border border-border/40 bg-muted/20 p-2 font-mono text-[10px] leading-relaxed text-muted-foreground whitespace-pre-wrap">
-                {previewSnippet}
-              </pre>
-            )}
-          </div>
-        ) : null}
       </div>
     </div>
   );
@@ -521,11 +469,7 @@ function SourceRow({
             </a>
           ) : null}
         </div>
-        {compact && selectedPages.length > 0 ? (
-          <span className="text-[11px] text-muted-foreground">
-            {selectedPages.length === 1 ? 'Page' : 'Pages'} {selectedPages.join(', ')}
-          </span>
-        ) : null}
+
         {!compact && hit.metadata?.mediaType ? (
           <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="capitalize">{hit.metadata.mediaType} source</span>
