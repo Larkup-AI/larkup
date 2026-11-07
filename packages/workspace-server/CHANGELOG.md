@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.52
+
+### Patch Changes
+
+- Keep PDF table questions on full table extraction while using focused mark-to-axis verification for chart questions.
+
 ## 0.2.51
 
 ### Patch Changes
