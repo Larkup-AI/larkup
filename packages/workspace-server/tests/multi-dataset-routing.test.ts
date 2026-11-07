@@ -20,6 +20,7 @@ import {
   tabularDatasetIdsForAnalysis,
   tabularDatasetIdsRequiredByQuestion,
   tabularRelationships,
+  withAnalysisNumericProvenance,
 } from '../src/lib/chat/tabular-routing.ts';
 import { remapMountedDatasetReads } from '../src/lib/chat/tabular-sandbox-files.ts';
 
@@ -277,6 +278,23 @@ test('adds denominator, join, and chart validation requirements from user intent
       'Validate duplicates, orphan foreign keys, and adverse events before enrollment.',
     ),
     /explicit numeric zero/i,
+  );
+});
+
+test('risk analysis exposes named numeric denominators for final-answer provenance', () => {
+  const code = withAnalysisNumericProvenance(
+    "group_size = 302\nprint('result')",
+    'Which result has the largest risk difference?',
+  );
+  assert.match(code, /Verified calculation input/);
+  assert.match(code, /group_size/);
+  assert.equal(
+    withAnalysisNumericProvenance("print('hello')", 'Summarize the document.'),
+    "print('hello')",
+  );
+  assert.match(
+    analysisValidationRequirements('Find the largest risk difference.'),
+    /print each numerator and denominator/,
   );
 });
 

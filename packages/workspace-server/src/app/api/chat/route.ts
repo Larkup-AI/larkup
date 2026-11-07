@@ -2166,7 +2166,7 @@ ${fieldLines}`;
                     routing.toolChoice === 'none'
                       ? withFinalAnswerNudge(
                           compactToolContextForModel(messages),
-                          'Check every part of the original question. Include the PDF figure or table value and sample size, the structured-data value, and the explicit difference or numerator/denominator calculation when requested. Keep source labels attached to their values.',
+                          'Check every part of the original question. Include the PDF figure or table value and sample size, the structured-data value, and the explicit difference or numerator/denominator calculation when requested. Keep source labels attached to their values. Use only verified calculation inputs from tool output for denominators; if none were printed, omit detailed arithmetic instead of inventing a population size. Check that every formula agrees with the reported result.',
                         )
                       : compactToolContextForModel(messages),
                 };

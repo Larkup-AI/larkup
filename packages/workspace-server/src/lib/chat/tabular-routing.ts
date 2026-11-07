@@ -531,12 +531,12 @@ export function tabularToolPlannerModel(requiresSandbox: boolean) {
 export function analysisValidationRequirements(text: string) {
   const requirements: string[] = [];
   if (
-    /\b(?:rate|incidence|percentage|proportion|per\s+(?:patient|subject|record|site))\b/iu.test(
+    /\b(?:risk|rate|ratio|incidence|percentage|proportion|per\s+(?:patient|subject|record|site))\b/iu.test(
       text,
     )
   ) {
     requirements.push(
-      'derive and report each numerator and denominator separately from the requested population before filtering or joining; never use only matched rows as the denominator unless the request explicitly says so; unless the user requests another precision, display percentages rounded to one decimal place while keeping unrounded values for ranking and calculations',
+      'derive each numerator and denominator separately from the requested population before filtering or joining, then print each numerator and denominator with its source label; never use only matched rows as the denominator unless the request explicitly says so; unless the user requests another precision, display percentages rounded to one decimal place while keeping unrounded values for ranking and calculations',
       'for incidence, derive the denominator from the complete subject or population table after applying any requested population flag; never derive it from the event table because subjects without events are absent there',
     );
   }
@@ -579,6 +579,18 @@ export function analysisValidationRequirements(text: string) {
   return requirements.length > 0
     ? ` Validation requirements: ${requirements.join('; ')}. Include source filenames, key columns, and the calculation formula in the usable output.`
     : '';
+}
+
+/** Surface scalar population counts calculated by Python so final prose can use verified denominators. */
+export function withAnalysisNumericProvenance(code: string, question: string): string {
+  if (
+    !/\b(?:risk|rate|ratio|incidence|percentage|proportion|per\s+(?:patient|subject|record|site))\b/iu.test(
+      question,
+    )
+  ) {
+    return code;
+  }
+  return `${code}\n\n# Report named numeric population values used in rate and risk calculations.\nimport numbers as _larkup_numbers\nimport re as _larkup_re\n_larkup_provenance = [(name, value) for name, value in list(globals().items()) if not name.startswith('_') and _larkup_re.search(r'(?:^|_)(?:n|count|size|total|denom(?:inator)?|population)(?:_|$)', name, _larkup_re.I) and isinstance(value, _larkup_numbers.Number) and not isinstance(value, bool)]\nfor _larkup_name, _larkup_value in _larkup_provenance[:24]:\n    print(f"Verified calculation input {_larkup_name}: {_larkup_value}")\n`;
 }
 
 /** Reject successful-looking code that uses a known invalid aggregation level. */

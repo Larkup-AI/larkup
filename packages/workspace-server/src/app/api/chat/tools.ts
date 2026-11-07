@@ -104,6 +104,7 @@ import { inferTabularPlan } from '../../../lib/chat/tabular-query-plan';
 import {
   analysisValidationRequirements,
   analysisCodeValidationError,
+  withAnalysisNumericProvenance,
   normalizePercentagePrecisionInStdout,
   appendExplicitValidationZeroCounts,
   requestedLongAnalysisItemCount,
@@ -3005,6 +3006,9 @@ export async function getChatTools(context: {
           } else if (requestedDatasetIds.length === 1) {
             finalCode = remapSingleDatasetRead(finalCode);
             finalCode = remapSingleDatasetColumnReferences(finalCode, mountedDatasets[0]);
+          }
+          if (!matchingEngine) {
+            finalCode = withAnalysisNumericProvenance(finalCode, requestText ?? '');
           }
 
           let result = await sandboxManager.execute({
