@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.46
+
+### Patch Changes
+
+- 5c77131: Prioritize requested multi-file analysis over incidental PDF retrieval and recover tightly matched visual PDFs when dense row-level data crowds them out of search.
+
 ## 0.2.45
 
 ### Patch Changes
