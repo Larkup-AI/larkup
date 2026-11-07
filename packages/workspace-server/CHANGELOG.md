@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.49
+
+### Patch Changes
+
+- Expose calculated numeric population inputs to final answers for risk and rate questions, and prevent invented denominator explanations.
+
 ## 0.2.48
 
 ### Patch Changes
