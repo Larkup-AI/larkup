@@ -500,6 +500,10 @@ export function hasCompletedLongAnalysisStep(
  */
 export function requiresTabularSandbox(text: string): boolean {
   return (
+    // Composite response rates need separate response numerators and full
+    // population denominators for every arm and subgroup. A bounded grouped
+    // table query can silently return only subgroup sizes.
+    /\b(?:ORR|DCR|overall\s+response\s+rate|disease\s+control\s+rate)\b/i.test(text) ||
     /\b(?:join|correlat(?:e|ion)|regression|cluster(?:ing)?|forecast(?:ing)?|statistical|dashboard|complete\s+cases?|confidence\s+interval|sandbox|python|matplotlib|seaborn|scikit(?:-learn)?|custom\s+(?:analysis|chart|visuali[sz]ation)|across\s+(?:sheets?|tables?|datasets?|files?)|between\s+(?:sheets?|tables?|datasets?|files?))\b/i.test(
       text,
     ) ||
@@ -590,7 +594,7 @@ export function tabularToolPlannerModel(requiresSandbox: boolean) {
 export function analysisValidationRequirements(text: string) {
   const requirements: string[] = [];
   if (
-    /\b(?:risk|rate|ratio|incidence|percentage|proportion|per\s+(?:patient|subject|record|site))\b/iu.test(
+    /\b(?:risk|rate|ratio|incidence|percentage|proportion|ORR|DCR|per\s+(?:patient|subject|record|site))\b/iu.test(
       text,
     )
   ) {
