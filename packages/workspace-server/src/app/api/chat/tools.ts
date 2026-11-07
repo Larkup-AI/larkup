@@ -136,6 +136,7 @@ import {
   repairMissingPandasMergeColumnSuffix,
   repairSuggestedPythonNameError,
   remapSimplePythonPrints,
+  remapPythonObjectPrintMethods,
   remapSingleDatasetColumnReferences,
   remapSingleDatasetRead,
   tabularRowsToCsv,
@@ -1304,17 +1305,6 @@ export async function getChatTools(context: {
             documentId: document.id,
             title: document.title,
             ...result,
-            ui: {
-              kind: 'card',
-              title: `Inspected ${document.title}`,
-              facts: [
-                {
-                  label: 'Pages selected',
-                  value: result.pages.map((page) => String(page.pageNumber)).join(', '),
-                },
-                { label: 'Total pages', value: String(result.totalPages) },
-              ],
-            },
           };
         } catch (error: any) {
           return { success: false, error: error.message ?? 'Could not inspect the PDF locally.' };
@@ -1377,13 +1367,6 @@ export async function getChatTools(context: {
             title: document.title,
             totalPages: inspection.totalPages,
             pages,
-            ui: {
-              kind: 'card',
-              title: `Analyzed pages from ${document.title}`,
-              facts: [
-                { label: 'Pages', value: pages.map((page) => String(page.pageNumber)).join(', ') },
-              ],
-            },
           };
         } catch (error: any) {
           return { success: false, error: error.message ?? 'Could not analyze PDF pages.' };
@@ -3009,6 +2992,7 @@ export async function getChatTools(context: {
           finalCode = repairAccidentalTopLevelPythonIndent(finalCode);
           finalCode = remapSavedFiguresToShow(finalCode);
           finalCode = remapSimplePythonPrints(finalCode);
+          finalCode = remapPythonObjectPrintMethods(finalCode);
           finalCode = printBareTopLevelPythonTuples(finalCode);
           finalCode = printBareFinalPythonExpression(finalCode);
           finalCode = withAnalysisPresentationHelpers(finalCode, analysisTargetCount);
@@ -3046,6 +3030,7 @@ export async function getChatTools(context: {
             finalCode = finalCode.replace(/resample\((['"])Q(['"])\)/g, 'resample($1QE$2)');
             finalCode = finalCode.replace(/resample\((['"])Y(['"])\)/g, 'resample($1YE$2)');
             finalCode = finalCode.replace(/freq=(['"])M(['"])/g, 'freq=$1ME$2');
+            finalCode = remapPythonObjectPrintMethods(finalCode);
 
             result = await sandboxManager.execute({
               code: finalCode,

@@ -326,6 +326,24 @@ export function shouldPrioritizeTabularAnalysisBeforePdf(input: {
   );
 }
 
+/**
+ * Some questions require a document fact and a table-derived calculation in
+ * the same answer. Treat the document reference as evidence, not an excuse to
+ * skip the structured-data path (or vice versa). The wording is deliberately
+ * source-generic: it recognizes document objects and reports rather than a
+ * particular study, filename, or domain vocabulary.
+ */
+export function requiresPdfAndTabularEvidence(input: {
+  text: string;
+  hasTabularData: boolean;
+  tabularQuestion: boolean;
+}): boolean {
+  if (!input.hasTabularData || !input.tabularQuestion) return false;
+  return /\b(?:fig(?:ure)?\s*(?:\d+|[ivx]+)|table\s*(?:\d+|[ivx]+)|diagram|appendix|equation|report|protocol|paper|document|pdf)\b/iu.test(
+    input.text,
+  );
+}
+
 /** A prior result table is valid input only when the current question does not require fresh files. */
 export function shouldUseRecentAnalysisTable(
   text: string,
@@ -448,6 +466,12 @@ export function requiresTabularSandbox(text: string): boolean {
     /\b(?:severity|serious|grade)\b[\s\S]{0,100}\b(?:chart|graph|plot|visuali[sz])\b[\s\S]{0,100}\bby\s+(?:arm|group|cohort)\b/i.test(
       text,
     ) ||
+    // Comparative metrics need reproducible numerators and denominators for
+    // each group. A single bounded table query is not sufficient evidence for
+    // a risk difference, relative risk, or per-entity rate.
+    /\b(?:absolute\s+)?risk\s+(?:difference|ratio)|relative\s+risk|odds\s+ratio|\bper\s+(?:randomi[sz]ed\s+)?(?:subject|patient|participant|site)\b/i.test(
+      text,
+    ) ||
     // A charted summary that asks for several measures for every cohort is a
     // composite report, not a single aggregation.
     /\b(?:summary|report|dashboard)\b[\s\S]{0,100}\b(?:both|each|all)\b[\s\S]{0,100}\b(?:trials?|groups?|cohorts?)\b[\s\S]{0,180}\b(?:chart|graph|plot|visuali[sz])\b/i.test(
@@ -533,6 +557,11 @@ export function analysisValidationRequirements(text: string) {
   if (/\b(?:chart|graph|plot|visuali[sz])\b/iu.test(text)) {
     requirements.push(
       'assert that plotted grouping and measures exactly match the requested chart intent',
+    );
+  }
+  if (/\b(?:pdf|report|fig(?:ure)?\s*\d+|table\s*\d+|diagram)\b/iu.test(text)) {
+    requirements.push(
+      'when combining document facts with tabular calculations, transcribe the needed document values from the inspected source first, keep row and column labels paired, and show the exact source value and formula; never substitute a similarly named CSV field for a document count',
     );
   }
   if (/\b(?:trials?|sites?|patients?|subjects?)\b/iu.test(text)) {

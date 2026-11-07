@@ -38,6 +38,8 @@ export interface ChatToolBehavior {
 
 export const CHAT_TOOL_BEHAVIORS: Record<string, ChatToolBehavior> = {
   searchKnowledgeBase: { placement: 'source', resultView: 'none' },
+  inspectPdfPages: { placement: 'source', pendingLabel: 'Checking PDF pages…', resultView: 'none' },
+  analyzePdfPages: { placement: 'source', pendingLabel: 'Reading PDF pages…', resultView: 'none' },
   // Renders through the generic output.ui.kind:'citations' contract
   // (message-item.tsx / chat-citations.tsx), same as any other tool --
   // nothing video-specific is hardcoded in the placement/resultView here.

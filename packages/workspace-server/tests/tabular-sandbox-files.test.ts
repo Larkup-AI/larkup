@@ -5,6 +5,7 @@ import {
   createTabularSandboxFiles,
   printBareFinalPythonExpression,
   remapSimplePythonPrints,
+  remapPythonObjectPrintMethods,
   printBareTopLevelPythonTuples,
   repairAccidentalTopLevelPythonIndent,
   remapBooleanStringLiterals,
@@ -178,6 +179,17 @@ test('routes simple dataframe prints through the stable result formatter', () =>
   assert.equal(
     remapSimplePythonPrints('result = frame.head()\nprint(result)'),
     'result = frame.head()\n_larkup_print_result(result)',
+  );
+});
+
+test('repairs object print methods emitted for pandas selections', () => {
+  assert.equal(
+    remapPythonObjectPrintMethods('winner = result.iloc[0]\nwinner.print()'),
+    'winner = result.iloc[0]\n_larkup_print_result(winner)',
+  );
+  assert.equal(
+    remapPythonObjectPrintMethods("frame.groupby('arm').size().print()"),
+    "_larkup_print_result(frame.groupby('arm').size())",
   );
 });
 
