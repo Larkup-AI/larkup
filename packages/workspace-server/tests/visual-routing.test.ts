@@ -85,6 +85,37 @@ test('rejects a raw PDF count mislabeled as a per-person rate', () => {
   );
 });
 
+test('checks a visual rate against the count for the returned entity', () => {
+  const question = 'Which site exceeds the threshold? Give deviations per randomized subject.';
+  const pdf = {
+    pages: [{ analysis: 'S01: 13 deviations. S07: 39 deviations.' }],
+  };
+  assert.equal(
+    visualRateMismatch(
+      question,
+      pdf,
+      'site_id: S07\nenrollment: 32\ndeviations_per_randomized_subject: 1.21875',
+    ),
+    undefined,
+  );
+  assert.match(
+    visualRateMismatch(
+      question,
+      pdf,
+      'site_id: S07\nenrollment: 32\ndeviations_per_randomized_subject: 39',
+    ) ?? '',
+    /39 \/ 32 = 1\.2188/u,
+  );
+  assert.equal(
+    visualRateMismatch(
+      question,
+      { pages: [{ analysis: 'S01: 13 deviations. The threshold is exceeded at S07.' }] },
+      'site_id: S07\nenrollment: 32\ndeviations_per_randomized_subject: 1.21875',
+    ),
+    undefined,
+  );
+});
+
 test('fresh visual evidence replaces stale OCR snippets for mixed PDF and table reasoning', () => {
   const evidence = prioritizeFreshPdfVisualEvidence(
     {

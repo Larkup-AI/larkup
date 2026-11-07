@@ -24,6 +24,7 @@ Always prefer the most specific agent instructions for the area you are modifyin
 ## Local / Cloud parity
 
 - This repository owns product behavior. Cloud (`../larkup-cloud`) consumes the canonical `@larkup/*` packages and adds managed-host adapters; do not copy implementations into Cloud.
+- Make fixes general across file types, schemas, and questions. Reproduce with a concrete case, but never encode its names, IDs, values, or answer into product logic.
 - Keep web chat, Cloud chat and public agent runs on `@larkup/workspace-server`'s shared route, prompt and tool registry. Preserve parity for RAG, CSV/chart analysis, sandbox execution, custom instructions, PDF images and video evidence when host capabilities are configured.
 - Fix shared behavior here first, add focused tests and changesets, then run `./scripts/sync-packages.sh --source ../larkup` from Cloud. Include mixed tabular plus video/document cases and tenant isolation; a chart request must not fall through to media retrieval.
 - Video Intelligence and its existing Modal-backed service remain canonical. Preserve source language and timestamps; use full-source artifacts/paging for complete speech, not unbounded transcript context. Do not create replacement GPU/transcription infrastructure for Cloud.

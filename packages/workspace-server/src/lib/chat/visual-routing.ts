@@ -284,11 +284,18 @@ export function visualRateMismatch(
     .map((page) => (typeof page.analysis === 'string' ? page.analysis : ''))
     .join('\n');
   const metric = intent[1].toLocaleLowerCase();
-  const sourceCounts = [
-    ...visualText.matchAll(
-      new RegExp(`\\b(\\d+(?:\\.\\d+)?)\\s+(?:total\\s+)?${metric}\\b`, 'giu'),
-    ),
-  ].map((match) => Number(match[1]));
+  const resultIds = new Set(
+    [...resultText.toUpperCase().matchAll(/\b[A-Z]{1,6}[-_]?\d{1,8}\b/gu)].map((match) => match[0]),
+  );
+  const countPattern = new RegExp(`\\b(\\d+(?:\\.\\d+)?)\\s+(?:total\\s+)?${metric}\\b`, 'giu');
+  const sourceCounts = visualText
+    .split(/\n|[.!?](?=\s|$)/u)
+    .filter(
+      (statement) =>
+        resultIds.size === 0 ||
+        (resultIds.size === 1 && new RegExp(`\\b${[...resultIds][0]}\\b`, 'iu').test(statement)),
+    )
+    .flatMap((statement) => [...statement.matchAll(countPattern)].map((match) => Number(match[1])));
   if (new Set(sourceCounts).size !== 1) return undefined;
   const denominator = resultText.match(
     /\b(?:enrollment|randomi[sz]ed[_ ]?subjects?|total[_ ]?subjects?|subject[_ ]?count)\s*[:=]\s*(?:np\.int64\()?\s*(\d+(?:\.\d+)?)/iu,
