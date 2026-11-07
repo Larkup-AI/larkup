@@ -453,9 +453,16 @@ test('rejects composite rate output that hides its numerators and denominators',
     ),
     undefined,
   );
+  assert.equal(
+    rateAnalysisEvidenceError(
+      question,
+      'Arm\tArm Size\tCR Count\tPR Count\tORR (%)\nA\t122\t3\t51\t44.3\nB\t138\t0\t11\t8.0',
+    ),
+    undefined,
+  );
 });
 
-test('requires a cohort reconciliation check before ranking subgroup rates', () => {
+test('requires arm filtering before ranking subgroup rates', () => {
   const question = 'In the treatment arm, which category has the highest ORR?';
   assert.match(
     analysisCodeValidationError(question, "rates = patients.groupby('category').size()") ?? '',
@@ -464,7 +471,54 @@ test('requires a cohort reconciliation check before ranking subgroup rates', () 
   assert.equal(
     analysisCodeValidationError(
       question,
-      "cohort = patients[patients.arm == target_arm]; rates = cohort.groupby('category').size(); assert rates.sum() == len(cohort)",
+      "cohort = patients[patients.arm == target_arm]; rates = cohort.groupby('category').size()",
+    ),
+    undefined,
+  );
+});
+
+test('rejects subgroup ranking that reconciles a pooled population before filtering an arm', () => {
+  const question = 'In one treatment arm, which category has the highest ORR?';
+  assert.match(
+    analysisCodeValidationError(
+      question,
+      "rates = patients.groupby('category').size(); assert rates.sum() == len(patients); cohort = patients[patients.arm == target_arm]",
+    ) ?? '',
+    /filter.*before|cohort/i,
+  );
+  assert.equal(
+    analysisCodeValidationError(
+      question,
+      "arm_sizes = patients.groupby('arm').size(); cohort = patients[patients.arm == target_arm]; rates = cohort.groupby('category').size(); assert rates.sum() == len(cohort)",
+    ),
+    undefined,
+  );
+});
+
+test('rejects ORR/DCR by subgroup that does not filter the arm first', () => {
+  // Generic: any ORR/DCR question that mentions an arm AND uses a subgroup
+  // groupby must filter to that arm before grouping by the subgroup column.
+  const question = 'Compute ORR by biomarker category for arm A';
+  assert.match(
+    analysisCodeValidationError(
+      question,
+      "orr = df.groupby('category').apply(lambda g: (g.response.isin(['CR','PR'])).sum() / len(g))",
+    ) ?? '',
+    /arm|cohort|filter/i,
+  );
+  // Code that filters first must pass validation
+  assert.equal(
+    analysisCodeValidationError(
+      question,
+      "arm_df = df[df.arm == 'A']; orr = arm_df.groupby('category').apply(lambda g: (g.response.isin(['CR','PR'])).sum() / len(g))",
+    ),
+    undefined,
+  );
+  // Groupby on the arm column itself is fine — that is the filter axis
+  assert.equal(
+    analysisCodeValidationError(
+      question,
+      "orr = df.groupby('arm').apply(lambda g: (g.response.isin(['CR','PR'])).sum() / len(g))",
     ),
     undefined,
   );

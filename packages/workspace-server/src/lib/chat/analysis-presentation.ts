@@ -384,6 +384,8 @@ def _larkup_auto_present():
 export function withAnalysisPresentationHelpers(code: string, requestedItems?: number): string {
   const requested = requestedItems === undefined ? 'None' : String(requestedItems);
   const sanitizedCode = code
+    .replace(/^\s*import\s+functions\s*(?:#.*)?$/gm, '')
+    .replace(/\bfunctions\s*\.\s*larkup_(table|document)\s*\(/g, 'larkup_$1(')
     .replace(/^\s*import\s+larkup_(?:table|document)(?:\s+as\s+\w+)?\s*(?:#.*)?$/gm, '')
     .replace(/^\s*import\s+larkup(?:\s+as\s+\w+)?\s*(?:#.*)?$/gm, '')
     .replace(
