@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { getData } from 'pdf-parse/worker';
 import { getLarkupDataDir } from '@larkup/core/project-store';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
 
 const MAX_SOURCE_BYTES = 100 * 1024 * 1024;
 const MAX_PAGES = 3;
@@ -308,4 +309,36 @@ export async function renderStoredPdfPage(
   } finally {
     await parser.destroy();
   }
+}
+
+/** Give vision closer views when multiple numbered visuals share a PDF page. */
+export async function pdfPageVisionImages(rendered: Buffer, pageText: string): Promise<string[]> {
+  const imageUrl = (bytes: Buffer) => `data:image/png;base64,${bytes.toString('base64')}`;
+  const full = imageUrl(rendered);
+  const references = new Set(
+    [...pageText.matchAll(/\b(?:fig(?:ure)?|chart|table|diagram)\s*(\d+(?:\.\d+)*)\b/giu)].map(
+      (match) => match[1],
+    ),
+  );
+  if (references.size < 2) return [full];
+  const image = await loadImage(rendered);
+  const split = Math.ceil(image.height * 0.55);
+  const top = Math.floor(image.height * 0.45);
+  const upper = createCanvas(image.width, split);
+  upper.getContext('2d').drawImage(image, 0, 0, image.width, split, 0, 0, image.width, split);
+  const lower = createCanvas(image.width, image.height - top);
+  lower
+    .getContext('2d')
+    .drawImage(
+      image,
+      0,
+      top,
+      image.width,
+      image.height - top,
+      0,
+      0,
+      image.width,
+      image.height - top,
+    );
+  return [full, imageUrl(upper.toBuffer('image/png')), imageUrl(lower.toBuffer('image/png'))];
 }
