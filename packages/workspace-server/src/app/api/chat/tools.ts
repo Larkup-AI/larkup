@@ -1347,6 +1347,7 @@ export async function getChatTools(context: {
                 /\b(?:threshold|exceed|largest|smallest|highest|lowest|maximum|minimum|highlighted)\b/iu.test(
                   question,
                 ) &&
+                !/\b(?:table|rows?|columns?)\b/iu.test(question) &&
                 /\b(?:fig(?:ure)?|chart|graph)\b/iu.test(page.text);
               const response = await fetch(
                 new URL(
