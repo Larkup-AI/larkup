@@ -1187,19 +1187,27 @@ function compactValue(value: unknown, toolName?: string): unknown {
   } else if (typeof result.mediaAssetId === 'string' && Array.isArray(result.evidence)) {
     compact = compactMediaEvidence(result) as Record<string, any>;
   } else if (toolName === 'queryTabularData' && Array.isArray(result.rows)) {
-    compact = result.visualization
+    compact = result.crossSourcePopulationComparison
       ? {
           columns: result.columns,
           totalRows: result.totalRows,
           aggregationResults: result.aggregationResults,
-          chartSynopsis: formatTabularVisualizationAnswer(result),
+          crossSourcePopulationComparison: result.crossSourcePopulationComparison,
+          comparisonSummary: `PDF plot subgroup n=${result.crossSourcePopulationComparison.plotN}; filtered table count=${result.crossSourcePopulationComparison.tableCount}; difference=${result.crossSourcePopulationComparison.difference}.${result.crossSourcePopulationComparison.plotPopulation ? ` PDF population: ${result.crossSourcePopulationComparison.plotPopulation}.` : ''}`,
         }
-      : {
-          columns: result.columns,
-          rows: result.rows.slice(0, 50),
-          totalRows: result.totalRows,
-          aggregationResults: result.aggregationResults,
-        };
+      : result.visualization
+        ? {
+            columns: result.columns,
+            totalRows: result.totalRows,
+            aggregationResults: result.aggregationResults,
+            chartSynopsis: formatTabularVisualizationAnswer(result),
+          }
+        : {
+            columns: result.columns,
+            rows: result.rows.slice(0, 50),
+            totalRows: result.totalRows,
+            aggregationResults: result.aggregationResults,
+          };
   } else if (toolName === 'executeAnalysis' || toolName === 'analyzeCorpusWithCode') {
     const presentation =
       result.presentation && typeof result.presentation === 'object'
@@ -1254,7 +1262,7 @@ function tryParse(value: string): unknown {
  * answer") reliably produced a real answer where the bare absence of tools
  * didn't -- reproduced and confirmed live before and after this fix.
  */
-export function withFinalAnswerNudge(messages: readonly any[]): any[] {
+export function withFinalAnswerNudge(messages: readonly any[], additionalInstruction = ''): any[] {
   return [
     ...messages,
     {
@@ -1262,7 +1270,7 @@ export function withFinalAnswerNudge(messages: readonly any[]): any[] {
       content: [
         {
           type: 'text',
-          text: 'You have every tool result gathered above. Answer the original question now, directly, using that evidence -- do not call another tool.',
+          text: `You have every tool result gathered above. Answer the original question now, directly, using that evidence -- do not call another tool.${additionalInstruction ? ` ${additionalInstruction}` : ''}`,
         },
       ],
     },

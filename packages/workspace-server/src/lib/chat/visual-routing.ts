@@ -214,6 +214,245 @@ export function inspectedPdfNeedsVisualReading(question: string, value: unknown)
   );
 }
 
+/** Keep a single visual claim on its highest-ranked page; extra pages can introduce unrelated values. */
+export function pdfPagesForVisualAnalysis(question: string, rankedPages: number[]): number[] {
+  const references = new Set(
+    [
+      ...question.matchAll(/\b(?:fig(?:ure)?|table|chart|graph|diagram)\s*(\d+(?:\.\d+)*)\b/giu),
+    ].map((match) => match[1]),
+  );
+  return references.size > 1 ||
+    /\b(?:across|between|compare)\s+(?:the\s+)?(?:pages|figures|charts|tables)\b/iu.test(question)
+    ? rankedPages.slice(0, 3)
+    : rankedPages.slice(0, 1);
+}
+
+/** Reject a single-entity table result that contradicts an explicitly read PDF visual label. */
+export function visualEntityMismatch(
+  question: string,
+  pdfAnalysis: unknown,
+  resultText: string,
+): string | undefined {
+  if (
+    !/\b(?:which|what)\b[\s\S]{0,100}\b(?:site|record|subject|group|cohort|arm|item)\b/iu.test(
+      question,
+    )
+  )
+    return undefined;
+  if (!pdfAnalysis || typeof pdfAnalysis !== 'object') return undefined;
+  const pages = (pdfAnalysis as { pages?: Array<{ analysis?: unknown }> }).pages;
+  if (!Array.isArray(pages)) return undefined;
+  const labels = new Set(
+    pages.flatMap((page) =>
+      typeof page.analysis === 'string'
+        ? [
+            ...page.analysis.matchAll(
+              /\b(?:site|record|subject|group|cohort|arm|item)\s*(?:id)?\s*(?:\*{0,2}:?\*{0,2}\s*)?([A-Z]{1,6}[-_]?\d{1,8})\b/giu,
+            ),
+          ].map((match) => match[1].toUpperCase())
+        : [],
+    ),
+  );
+  if (labels.size !== 1) return undefined;
+  const expected = [...labels][0];
+  const prefix = expected.match(/^[A-Z]{1,6}[-_]?/u)?.[0];
+  if (!prefix) return undefined;
+  const resultIds = new Set(
+    [...resultText.toUpperCase().matchAll(/\b[A-Z]{1,6}[-_]?\d{1,8}\b/gu)]
+      .map((match) => match[0])
+      .filter((id) => id.startsWith(prefix)),
+  );
+  if (resultIds.size === 1 && !resultIds.has(expected)) {
+    return `The PDF visual identifies ${expected}, but the calculation returned ${[...resultIds][0]}. Recalculate from the uploaded table using the PDF identifier and value; do not reconstruct table rows.`;
+  }
+  return undefined;
+}
+
+/** Check a stated per-person rate against an explicit PDF count and table denominator. */
+export function visualRateMismatch(
+  question: string,
+  pdfAnalysis: unknown,
+  resultText: string,
+): string | undefined {
+  const intent = question.match(
+    /\b([a-z]+)\s+per\s+(?:randomi[sz]ed\s+)?(subject|patient|participant|record|site)\b/iu,
+  );
+  if (!intent || !pdfAnalysis || typeof pdfAnalysis !== 'object') return undefined;
+  const pages = (pdfAnalysis as { pages?: Array<{ analysis?: unknown }> }).pages;
+  if (!Array.isArray(pages)) return undefined;
+  const visualText = pages
+    .map((page) => (typeof page.analysis === 'string' ? page.analysis : ''))
+    .join('\n');
+  const metric = intent[1].toLocaleLowerCase();
+  const sourceCount = visualText.match(
+    new RegExp(`\\b(\\d+(?:\\.\\d+)?)\\s+(?:total\\s+)?${metric}\\b`, 'iu'),
+  );
+  const denominator = resultText.match(
+    /\b(?:enrollment|randomi[sz]ed[_ ]?subjects?|total[_ ]?subjects?|subject[_ ]?count)\s*[:=]\s*(?:np\.int64\()?\s*(\d+(?:\.\d+)?)/iu,
+  );
+  const rateKey = new RegExp(
+    `\\b${metric}_per_(?:randomi[sz]ed_)?${intent[2]}\\s*[:=]\\s*(?:np\\.float64\\()?\\s*(\\d+(?:\\.\\d+)?)`,
+    'iu',
+  );
+  const reportedRate = resultText.match(rateKey);
+  if (!sourceCount || !denominator || !reportedRate) return undefined;
+  const count = Number(sourceCount[1]);
+  const population = Number(denominator[1]);
+  const reported = Number(reportedRate[1]);
+  if (population <= 0 || !Number.isFinite(count / population)) return undefined;
+  return Math.abs(reported - count / population) > Math.max(0.02, (count / population) * 0.02)
+    ? `The reported ${metric}-per-${intent[2]} rate conflicts with the sources: ${count} / ${population} = ${(count / population).toFixed(4)}. Recalculate from the verified numerator and denominator.`
+    : undefined;
+}
+
+/** Carry a single PDF identifier and its explicitly stated numerator into the final calculation result. */
+export function visualEntityEvidenceLine(
+  question: string,
+  pdfAnalysis: unknown,
+): string | undefined {
+  if (
+    !/\b(?:which|what)\b[\s\S]{0,100}\b(?:site|record|subject|group|cohort|arm|item)\b/iu.test(
+      question,
+    )
+  )
+    return undefined;
+  if (!pdfAnalysis || typeof pdfAnalysis !== 'object') return undefined;
+  const pages = (pdfAnalysis as { pages?: Array<{ analysis?: unknown }> }).pages;
+  if (!Array.isArray(pages)) return undefined;
+  const text = pages
+    .map((page) => (typeof page.analysis === 'string' ? page.analysis : ''))
+    .join('\n');
+  const ids = new Set(
+    [
+      ...text.matchAll(
+        /\b(?:site|record|subject|group|cohort|arm|item)\s*(?:id)?\s*(?:\*{0,2}:?\*{0,2}\s*)?([A-Z]{1,6}[-_]?\d{1,8})\b/giu,
+      ),
+    ].map((match) => match[1].toUpperCase()),
+  );
+  if (ids.size !== 1) return undefined;
+  const id = [...ids][0];
+  const metric = question.match(
+    /\b([a-z]+)\s+per\s+(?:randomi[sz]ed\s+)?(?:subject|patient|participant|record|site)\b/iu,
+  )?.[1];
+  const count = metric
+    ? text.match(new RegExp(`\\b(\\d+(?:\\.\\d+)?)\\s+(?:total\\s+)?${metric}\\b`, 'iu'))?.[1]
+    : undefined;
+  return `Verified PDF visual: ${id}${count && metric ? `; ${count} ${metric}` : ''}.`;
+}
+
+/** Compute a comparable population gap from a PDF plot n and a filtered table count. */
+export function pdfPlotTabularCountDifference(
+  question: string,
+  pdfAnalysis: unknown,
+  tabularOutput: unknown,
+  queryInput: unknown,
+): { plotN: number; tableCount: number; difference: number; plotPopulation?: string } | undefined {
+  if (!/\b(?:plot|figure|chart)\b[\s\S]{0,220}\b(?:n|count|number|differ)\b/iu.test(question))
+    return undefined;
+  if (
+    !pdfAnalysis ||
+    typeof pdfAnalysis !== 'object' ||
+    !tabularOutput ||
+    typeof tabularOutput !== 'object'
+  )
+    return undefined;
+  const pages = (pdfAnalysis as { pages?: Array<{ analysis?: unknown }> }).pages;
+  const output = tabularOutput as { totalRows?: unknown };
+  const input = queryInput as
+    | {
+        aggregations?: Array<{ op?: unknown }>;
+        filters?: Array<{ column?: string; op?: string; value?: unknown }>;
+      }
+    | undefined;
+  if (!Array.isArray(pages) || !input?.aggregations?.some((item) => item.op === 'count'))
+    return undefined;
+  const text = pages
+    .map((page) => (typeof page.analysis === 'string' ? page.analysis : ''))
+    .join('\n');
+  const labeledCounts = [...text.matchAll(/^([^\n]{0,160}?)\bn\s*=\s*(\d[\d,]*)\b/gimu)].map(
+    (match) => ({ label: match[1], n: Number(match[2].replaceAll(',', '')) }),
+  );
+  const filterMatchesLabel = (
+    label: string,
+    filter: { column?: string; op?: string; value?: unknown },
+  ) => {
+    if (!filter.column || filter.value === undefined) return false;
+    const normalized = label.toLocaleLowerCase();
+    const column = filter.column.replaceAll('_', ' ').toLocaleLowerCase();
+    if (
+      !normalized.includes(column) ||
+      !normalized.includes(String(filter.value).toLocaleLowerCase())
+    )
+      return false;
+    const operator = filter.op;
+    return operator === 'gte'
+      ? /≥|>=|at least/iu.test(label)
+      : operator === 'gt'
+        ? />|greater than/iu.test(label)
+        : operator === 'lte'
+          ? /≤|<=|at most/iu.test(label)
+          : operator === 'lt'
+            ? /<|less than/iu.test(label)
+            : operator === 'eq'
+              ? true
+              : false;
+  };
+  const matched = labeledCounts.filter(
+    (row) =>
+      (input.filters ?? []).length > 0 &&
+      (input.filters ?? []).every((filter) => filterMatchesLabel(row.label, filter)),
+  );
+  const selected =
+    matched.length === 1 ? matched[0] : labeledCounts.length === 1 ? labeledCounts[0] : undefined;
+  const plotN = selected?.n;
+  const tableCount = output.totalRows;
+  if (
+    !Number.isSafeInteger(plotN) ||
+    !plotN ||
+    plotN <= 0 ||
+    !Number.isSafeInteger(tableCount) ||
+    Number(tableCount) < 0
+  )
+    return undefined;
+  return {
+    plotN,
+    tableCount: Number(tableCount),
+    difference: Number(tableCount) - plotN,
+    ...(/\bcompleters?\b/iu.test(text) ? { plotPopulation: 'completers' } : {}),
+  };
+}
+
+/** After a fresh visual read, keep source locators but discard older OCR snippets that may conflict. */
+export function prioritizeFreshPdfVisualEvidence(value: unknown, selectedPages: number[]): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const record = value as Record<string, any>;
+  if (!Array.isArray(record.pdfVisualAnalysis?.pages) || record.pdfVisualAnalysis.success !== true)
+    return value;
+  return {
+    ...record,
+    hits: Array.isArray(record.hits)
+      ? record.hits.map((hit: any) => ({
+          documentId: hit.documentId,
+          title: hit.title,
+          url: hit.url,
+          score: hit.score,
+          metadata: hit.metadata,
+        }))
+      : record.hits,
+    pdfInspection:
+      record.pdfInspection && typeof record.pdfInspection === 'object'
+        ? {
+            ...record.pdfInspection,
+            pages: Array.isArray(record.pdfInspection.pages)
+              ? record.pdfInspection.pages.filter((page: any) =>
+                  selectedPages.includes(page.pageNumber),
+                )
+              : record.pdfInspection.pages,
+          }
+        : record.pdfInspection,
+  };
+}
+
 /**
  * Reuse relevant descriptions produced during image indexing, and reserve a
  * fresh vision pass for details those descriptions do not cover.

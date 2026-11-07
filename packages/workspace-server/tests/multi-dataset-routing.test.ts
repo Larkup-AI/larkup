@@ -105,6 +105,57 @@ test('keeps document and table evidence together for compound questions', () => 
   );
 });
 
+test('rejects an embedded CSV reconstruction while allowing inspected PDF values beside mounted rows', () => {
+  const request = 'Use the report and sites.csv to calculate deviations per subject.';
+  assert.match(
+    analysisCodeValidationError(
+      request,
+      "from io import StringIO\nsites = pd.read_csv(StringIO('site_id,city\\nA,Paris'))",
+    ) ?? '',
+    /mounted uploaded file/u,
+  );
+  assert.equal(
+    analysisCodeValidationError(
+      request,
+      "sites = pd.read_csv('data.csv')\ndeviations = {'A': 39}\nprint(deviations['A'])",
+    ),
+    undefined,
+  );
+  assert.match(
+    analysisCodeValidationError(
+      request,
+      "sites = pd.DataFrame({'site_id': ['A'], 'city': ['Paris']})\nprint(sites)",
+    ) ?? '',
+    /mounted uploaded dataset/u,
+  );
+  assert.match(
+    analysisCodeValidationError(
+      request,
+      "sites = [{'site_id': 'A', 'city': 'Paris'}]\nprint(sites)",
+      { requiresMountedRead: true },
+    ) ?? '',
+    /mounted uploaded dataset/u,
+  );
+});
+
+test('rejects a per-subject value copied from a raw count without division', () => {
+  const request = 'Give protocol deviations per randomized subject.';
+  assert.match(
+    analysisCodeValidationError(
+      request,
+      "result = {'deviations_per_randomized_subject': deviations}\nprint(result)",
+    ) ?? '',
+    /never divides/u,
+  );
+  assert.equal(
+    analysisCodeValidationError(
+      request,
+      "rate = deviations / enrolled\nresult = {'deviations_per_randomized_subject': rate}\nprint(result)",
+    ),
+    undefined,
+  );
+});
+
 test('mounts every exact dataset filename read by generated code', () => {
   assert.deepEqual(
     tabularDatasetIdsReferencedByCode(
