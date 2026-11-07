@@ -389,6 +389,20 @@ export function repairSuggestedPythonNameError(code: string, stderr: string) {
   return code.replace(new RegExp(`\\b${suggestion[1]}\\b`, 'g'), suggestion[2]);
 }
 
+/** Strip trailing truncated code when model output was cut off mid-statement. */
+export function repairUnterminatedPythonCode(code: string, stderr: string): string {
+  if (!/SyntaxError.*unterminated (?:string literal|f-string)/i.test(stderr)) return code;
+  const lineMatch = stderr.match(/(?:detected at |at )?line\s+(\d+)/i);
+  if (!lineMatch) return code;
+  const errorLine = parseInt(lineMatch[1], 10);
+  const lines = code.split('\n');
+  if (errorLine > 1 && errorLine <= lines.length) {
+    // The model hit its output limit; drop the incomplete tail
+    return lines.slice(0, errorLine - 1).join('\n');
+  }
+  return code;
+}
+
 /** Repair a common pandas misconception: merge keys are not given _y suffixes. */
 export function repairMissingPandasMergeKeySuffix(code: string, stderr: string) {
   const missing = stderr.match(/KeyError:\s*['"]([A-Za-z_]\w*)_y['"]/);

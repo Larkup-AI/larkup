@@ -139,6 +139,7 @@ import {
   repairMissingPandasMergeKeySuffix,
   repairMissingPandasMergeColumnSuffix,
   repairSuggestedPythonNameError,
+  repairUnterminatedPythonCode,
   remapSimplePythonPrints,
   remapPythonObjectPrintMethods,
   remapSingleDatasetColumnReferences,
@@ -3089,6 +3090,7 @@ export async function getChatTools(context: {
             ) {
               finalCode = remapLegacyMultiDatasetReads(finalCode, requestedDatasetIds.length);
             }
+            finalCode = repairUnterminatedPythonCode(finalCode, result.stderr);
             finalCode = repairSuggestedPythonNameError(finalCode, result.stderr);
             finalCode = repairMissingPandasMergeKeySuffix(finalCode, result.stderr);
             finalCode = repairMissingPandasMergeColumnSuffix(

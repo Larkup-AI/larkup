@@ -1,5 +1,23 @@
 # @larkup/workspace-server
 
+## 0.2.62
+
+### Patch Changes
+
+- Repair truncated sandbox code and auto-surface rate evidence DataFrames
+
+  - Add `repairUnterminatedPythonCode` that strips trailing incomplete lines
+    when a SyntaxError from model output truncation is detected, so the
+    auto-retry executes valid code instead of repeating the same error.
+  - Enhance `withAnalysisNumericProvenance` to also print any small DataFrame
+    or Series whose columns/name contain rate-related terms (count, rate,
+    ORR, DCR, numerator, denominator, total, etc.), giving the evidence
+    validator the structured counts it requires.
+  - Accept provenance DataFrame dumps as valid rate evidence in
+    `rateAnalysisEvidenceError`, preventing false rejections when the model
+    computed correct values but printed them via DataFrames rather than
+    explicit numerator/denominator labels.
+
 ## 0.2.61
 
 ### Patch Changes
