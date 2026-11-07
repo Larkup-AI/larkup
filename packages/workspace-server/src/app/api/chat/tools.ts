@@ -105,6 +105,7 @@ import { inferTabularPlan } from '../../../lib/chat/tabular-query-plan';
 import {
   analysisValidationRequirements,
   analysisCodeValidationError,
+  rateAnalysisEvidenceError,
   populationDatasetIdsForPerEntityRate,
   withAnalysisNumericProvenance,
   normalizePercentagePrecisionInStdout,
@@ -3136,6 +3137,15 @@ export async function getChatTools(context: {
                   mountedDatasetSchemas,
                 }))
               : undefined;
+          const rateEvidenceError =
+            result.exitCode === 0
+              ? rateAnalysisEvidenceError(
+                  requestText ?? '',
+                  [extracted.stdout, analysisPresentationEvidence(extracted.presentation)]
+                    .filter(Boolean)
+                    .join('\n'),
+                )
+              : undefined;
           const hasUsableOutput =
             extracted.stdout.trim().length > 0 ||
             Boolean(extracted.presentation) ||
@@ -3145,13 +3155,15 @@ export async function getChatTools(context: {
               ? 'Analysis completed without a usable result.'
               : undefined;
           const exitCode =
-            result.exitCode === 0 && (completenessError || codeValidationError || emptyOutputError)
+            result.exitCode === 0 &&
+            (completenessError || codeValidationError || rateEvidenceError || emptyOutputError)
               ? 1
               : result.exitCode;
           const stderr = [
             result.stderr.trim(),
             completenessError,
             codeValidationError,
+            rateEvidenceError,
             emptyOutputError,
           ]
             .filter(Boolean)
@@ -3160,22 +3172,26 @@ export async function getChatTools(context: {
           // its plausible-looking numbers in the failure card before the
           // corrected retry, because evaluators and users could mistake those
           // values for part of the final answer.
-          const groundedStdout = codeValidationError
-            ? ''
-            : appendExplicitValidationZeroCounts(
-                requestText ?? '',
-                normalizePercentagePrecisionInStdout(
+          const groundedStdout =
+            codeValidationError || rateEvidenceError
+              ? ''
+              : appendExplicitValidationZeroCounts(
                   requestText ?? '',
-                  [extracted.stdout, analysisPresentationEvidence(extracted.presentation)]
-                    .filter(Boolean)
-                    .join('\n'),
-                ),
-              );
+                  normalizePercentagePrecisionInStdout(
+                    requestText ?? '',
+                    [extracted.stdout, analysisPresentationEvidence(extracted.presentation)]
+                      .filter(Boolean)
+                      .join('\n'),
+                  ),
+                );
           return {
             stdout: groundedStdout.slice(0, 5000),
             stderr: stderr.slice(0, 2000),
             exitCode,
-            ...(extracted.presentation && !completenessError && !codeValidationError
+            ...(extracted.presentation &&
+            !completenessError &&
+            !codeValidationError &&
+            !rateEvidenceError
               ? { presentation: extracted.presentation }
               : {}),
             artifacts: result.artifacts.map((a) => ({

@@ -13,6 +13,7 @@ import {
   requiresPdfStatisticSource,
   requiresMultiDatasetAnalysis,
   requiresTabularSandbox,
+  rateAnalysisEvidenceError,
   repairUnavailableTabularDatasetReferences,
   resolveTabularDatasetReferences,
   shouldUseRecentAnalysisTable,
@@ -436,6 +437,21 @@ test('routes comparative risks and per-entity rates through reproducible analysi
       'Compute ORR and DCR per arm from CR, PR, and SD counts, then find the highest ORR by subgroup.',
     ),
     true,
+  );
+});
+
+test('rejects composite rate output that hides its numerators and denominators', () => {
+  const question = 'Compute ORR and DCR per arm and identify the highest ORR subgroup.';
+  assert.match(
+    rateAnalysisEvidenceError(question, 'Arm A ORR: 0.44; DCR: 0.84') ?? '',
+    /numerator/i,
+  );
+  assert.equal(
+    rateAnalysisEvidenceError(
+      question,
+      'Arm A ORR 54/122, DCR 102/122; Arm B ORR 11/138, DCR 90/138',
+    ),
+    undefined,
   );
 });
 
