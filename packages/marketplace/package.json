@@ -42,7 +42,7 @@
     "@aws-sdk/s3-request-presigner": "^3.700.0",
     "@larkup/core": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.9",
+    "postgres": "^4.0.0",
     "tsx": "^4.23.5"
   },
   "devDependencies": {
