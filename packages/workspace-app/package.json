@@ -537,7 +537,7 @@
     "build": "node scripts/build-assets.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@ai-sdk/react": "4.0.160",
+    "@ai-sdk/react": "4.0.167",
     "@base-ui/react": "^1.5.0",
     "@larkup/core": "^0.8.5",
     "@larkup/integrations": "workspace:*",
@@ -545,7 +545,7 @@
     "@larkup/tool-doc-editor": "workspace:*",
     "@larkup/vector-stores": "^0.1.27",
     "@larkup/workspace-ui": "workspace:*",
-    "ai": "7.0.156",
+    "ai": "7.0.163",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -553,8 +553,8 @@
     "idb-keyval": "^6.3.0",
     "katex": "^0.19.0",
     "lucide-react": "^1.16.0",
-    "mermaid": "^11.17.2",
-    "next": "16.4.3",
+    "mermaid": "^12.3.0",
+    "next": "16.4.5",
     "papaparse": "^5.5.3",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.1.200",
