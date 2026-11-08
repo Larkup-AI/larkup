@@ -73,7 +73,11 @@
       "@modelcontextprotocol/sdk": "^1.31.0",
       "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
       "katex": "^0.19.1",
-      "zod@^4.0.0": "^4.6.7"
+      "zod@^4.0.0": "^4.6.7",
+      "@vercel/python-analysis>zod": "^4.6.7",
+      "@vercel/backends>zod": "^4.6.7",
+      "@vercel/express>zod": "^4.6.7",
+      "@vercel/hono>zod": "^4.6.7"
     }
   }
 }
