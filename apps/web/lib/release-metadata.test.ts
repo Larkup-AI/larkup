@@ -32,7 +32,7 @@ describe('published npm metadata', () => {
     );
 
     expect(webPackage.dependencies['apache-arrow']).toBe('18.1.0');
-    expect(webPackage.dependencies['@ai-sdk/anthropic']).toBe('4.0.91');
+    expect(webPackage.dependencies['@ai-sdk/anthropic']).toBe('4.0.97');
     expect(workspaceServerPackage.dependencies['@ai-sdk/anthropic']).toBe(
       webPackage.dependencies['@ai-sdk/anthropic'],
     );
