@@ -3,7 +3,7 @@
 
   <br />
 
-**Open source tools for building a private AI over your own data.**
+**A local NotebookLM with deeper file analysis, plus a headless RAG server for your AI apps.**
 
 [Documentation](https://www.larkup.de/docs) · [GitHub Issues](https://github.com/Larkup-AI/larkup/issues)
 
@@ -12,19 +12,40 @@
 ---
 
 > [!WARNING]
-> **Larkup is under active development.** It is not yet stable: interfaces,
-> stored data formats, and package APIs change between releases, and some
-> features are still incomplete. Pin an exact version if you build on it, check
-> the [release notes](https://github.com/Larkup-AI/larkup/releases) before
-> upgrading, and expect to migrate. Please do
-> [open issues](https://github.com/Larkup-AI/larkup/issues) — feedback at this
-> stage is genuinely useful.
+> **Larkup is under active development.** Interfaces, stored data formats, and
+> package APIs can change between releases. Pin an exact version if you build on
+> it, check the [release notes](https://github.com/Larkup-AI/larkup/releases)
+> before upgrading, and please [open issues](https://github.com/Larkup-AI/larkup/issues).
 
-Larkup brings files, websites, text, structured data, and media into one searchable knowledge base. Use the Web UI to chat with that data, analyze it, or expose it through a generated RAG API.
+<img src="./docs/images/larkup.gif" alt="Larkup demo" width="900" />
 
-<img src="./docs/images/chat/chat-sidebar-on.png" alt="Larkup Chat with the sources panel open" width="900" />
+## What is Larkup?
+
+Larkup is a local, open source NotebookLM that goes deeper into your files:
+
+- **Search hundreds of files at once.** One question searches across every source in a project.
+- **Analyze tabular data.** CSVs and spreadsheets keep their structure, so answers can be computed and returned as charts.
+- **Headless mode.** Launch a RAG server over your data in minutes and connect your own AI agents and apps to it through the TypeScript or Python SDK.
 
 ## Installation
+
+### Install script (recommended)
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://www.larkup.de/install.sh | bash
+larkup dev
+```
+
+Windows (PowerShell):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/Larkup-AI/larkup/main/scripts/install.ps1').TrimStart([char]0xFEFF))) -NoPrompt"
+larkup dev
+```
+
+The script installs Node.js if needed and adds `larkup` to your PATH.
 
 ### Docker
 
@@ -34,7 +55,7 @@ docker run -d -p 4567:4567 -p 8080-8090:8080-8090 -v larkup_data:/app/apps/web/.
   aboneda/larkup:latest
 ```
 
-Or use Docker Compose:
+Or with Docker Compose:
 
 ```bash
 git clone https://github.com/Larkup-AI/larkup.git
@@ -42,7 +63,7 @@ cd larkup
 docker compose -f docker/docker-compose-prod.yaml up -d
 ```
 
-The dashboard uses port `4567`. Local Knowledge Servers launched from Settings use `8080` through `8090`; keep both mappings and the `/app/apps/web/.larkup` volume when running Docker. See [docker/README.md](./docker/README.md) for the optional web-crawler profile.
+Port `4567` serves the web app; ports `8080` to `8090` serve the RAG servers you launch. See [docker/README.md](./docker/README.md) for details.
 
 ### From source
 
@@ -53,81 +74,34 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:4567](http://localhost:4567) after Larkup starts.
-
-## Quickstart
-
-1. Add an API key during onboarding.
-2. Open **Data** and add a website, integration, CSV, PDF, or video.
-3. Open **Chat** and ask a question about the indexed content.
-
-<img src="./docs/images/onboard-screen.png" alt="Larkup onboarding, choosing a model provider" width="900" />
-
-Larkup opens its local web app at `http://localhost:4567`. Start a regular generated server from **Settings → Server** when you need an API endpoint; Docker users can reach its API and reference at `http://localhost:8080` and `http://localhost:8080/reference`.
-
-See the [Quickstart guide](https://www.larkup.de/docs/guide/quickstart) for screenshots of every data source.
+Open [http://localhost:4567](http://localhost:4567), add an API key, add your data, and start chatting.
 
 ## What you can index
 
-Files, websites, plain text, spreadsheets, and media all land in the same corpus, so one question can draw on all of them.
+- **Documents:** PDF, Word, Markdown, plain text
+- **Tabular data:** CSV and spreadsheets
+- **Websites:** single pages or full crawls
+- **Media:** audio and video
 
-<img src="./docs/images/add/media-tab.png" alt="The Data page, adding media to a project" width="900" />
+See [Data loading](https://www.larkup.de/docs/guide/data-loading) and [Data analysis](https://www.larkup.de/docs/guide/data-analysis).
 
-Tabular sources keep their structure, so a question can be answered by a chart instead of a paragraph.
+## Video intelligence (experimental)
 
-<img src="./docs/images/chat/chat-with-csv-chart.png" alt="Chat answering a question about a CSV with a generated chart" width="900" />
-
-Read [Data loading](https://www.larkup.de/docs/guide/data-loading) and [Data analysis](https://www.larkup.de/docs/guide/data-analysis) for the full set.
-
-## Video intelligence
-
-Video is indexed into timestamped, citable evidence rather than a single transcript blob, so an answer can point at the moment it came from.
+Videos are indexed into timestamped evidence, so answers cite the exact moment they came from.
 
 <img src="./docs/images/add/video-preview-chat-reply.png" alt="A chat answer citing a timestamped moment in an indexed video" width="900" />
 
-See the [Video chat guide](https://www.larkup.de/docs/guide/video-chat) and the [video-intelligence tool](https://www.larkup.de/docs/marketplace/tools/video-intelligence).
+See the [Video chat guide](https://www.larkup.de/docs/guide/video-chat).
 
-## Marketplace tools
+## RAG server
 
-Capabilities that are not part of the core install — video intelligence, the document editor, CLIP embeddings — are installed per project from the marketplace.
+Any project can run as a RAG API with its own OpenAPI reference.
 
-<img src="./docs/images/tools/marketplace-view.png" alt="The marketplace, listing installable tools" width="900" />
+<img src="./docs/images/rag/scalar-api2.png" alt="The RAG server's API reference" width="900" />
 
-See [Installing tools](https://www.larkup.de/docs/marketplace/installing-tools), [Creating tools](https://www.larkup.de/docs/marketplace/creating-tools), and [Publishing tools](https://www.larkup.de/docs/marketplace/publishing-tools).
-
-## Connections
-
-An indexed project can answer from Slack, Discord, or Telegram as well as from the dashboard.
-
-<img src="./docs/images/connections/connection-view.png" alt="Configuring a channel connection for a project" width="900" />
-
-## Generated servers
-
-Every project can be exposed as a documented RAG API with its own OpenAPI reference.
-
-<img src="./docs/images/rag/scalar-api2.png" alt="The generated server's API reference" width="900" />
-
-See [Build a RAG server](https://www.larkup.de/docs/guide/build-rag-server) and [Deploy](https://www.larkup.de/docs/developer/deploy).
-
-## CLI
-
-Install the CLI:
-
-```bash
-npm install -g larkup
-```
-
-Start the Larkup web app:
-
-```bash
-larkup dev
-```
-
-You can also use `larkup query`, `larkup chat`, `larkup documents`, `larkup media`, and `larkup marketplace` from the terminal. See the [CLI reference](https://www.larkup.de/docs/developer/cli) for every command.
+Start it from **Settings → Server**. It listens on `http://localhost:8080`, with the reference at `/reference`. See [Build a RAG server](https://www.larkup.de/docs/guide/build-rag-server) and [Deploy](https://www.larkup.de/docs/developer/deploy).
 
 ## SDKs
-
-Generated servers use port `8080` by default. The TypeScript and Python clients expose the same retrieval, document, scraping, and streaming chat capabilities.
 
 ### TypeScript
 
@@ -173,38 +147,27 @@ for event in client.chat("Summarize the answer."):
         print(event.text or "", end="", flush=True)
 ```
 
-Read the [TypeScript SDK](https://www.larkup.de/docs/sdk/typescript), [Python SDK](https://www.larkup.de/docs/sdk/python), or [API reference](https://www.larkup.de/docs/api-reference/overview) for the complete interfaces.
+See the [TypeScript SDK](https://www.larkup.de/docs/sdk/typescript), [Python SDK](https://www.larkup.de/docs/sdk/python), and [API reference](https://www.larkup.de/docs/api-reference/overview).
 
-## Repository
+## CLI
 
-| Path                          | Purpose                                          |
-| ----------------------------- | ------------------------------------------------ |
-| `apps/web`                    | Web UI and API routes                            |
-| `apps/cli`                    | Command line interface                           |
-| `apps/sdk/js-sdk`             | TypeScript SDK                                   |
-| `apps/sdk/py-sdk`             | Python SDK                                       |
-| `apps/desktop`                | Desktop application                              |
-| `apps/marketplace`            | Marketplace Hub API                              |
-| `packages/core`               | Shared configuration and server generation       |
-| `packages/vector-stores`      | Vector store adapters                            |
-| `packages/marketplace`        | Marketplace client, schema, and tool installer   |
-| `packages/marketplace-tools`  | Installable tools (video intelligence, doc editor, CLIP) |
-| `packages/connections`        | Channel adapters and inbound dispatch            |
-| `packages/scraper`            | Web scraping and crawling                        |
-| `packages/sandbox`            | Sandboxed tool execution                         |
-| `packages/integrations`       | Third-party data source integrations             |
-| `e2e`                         | Playwright end-to-end suite                      |
-| `docs`                        | Mintlify documentation                           |
+The install script includes the CLI. You can also install it with npm:
+
+```bash
+npm install -g larkup
+```
+
+Use `larkup dev` to start the web app, and `larkup query`, `larkup chat`, `larkup documents`, or `larkup media` from the terminal. See the [CLI reference](https://www.larkup.de/docs/developer/cli).
 
 ## Contributing
 
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) for the local setup, the test and type-check commands, and the changeset workflow. Then open an [issue](https://github.com/Larkup-AI/larkup/issues) or submit a pull request.
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) for local setup, tests, and the changeset workflow, then open an [issue](https://github.com/Larkup-AI/larkup/issues) or a pull request.
 
 ## License
 
 Larkup uses an **Open Core** licensing model.
 
-- **Community Edition:** everything in this repository is open source and licensed under the [Apache License 2.0](./LICENSE).
-- **Enterprise Edition:** advanced features are proprietary, are not distributed in this repository, and require a commercial license. Contact [Larkup](https://www.larkup.de) for terms.
+- **Community Edition:** everything in this repository is open source under the [Apache License 2.0](./LICENSE).
+- **Enterprise Edition:** advanced features are proprietary, not distributed in this repository, and require a commercial license. Contact [Larkup](https://www.larkup.de) for terms.
 
-Copyright (c) 2024 to 2026 Larkup UG
+Copyright (c) 2025 to 2026 Larkup UG

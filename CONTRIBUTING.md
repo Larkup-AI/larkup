@@ -7,7 +7,7 @@ There are many ways to contribute to Larkup:
 - Report bugs and suggest features via GitHub Issues.
 - Fix bugs and implement features (see our open issues to get started).
 - Improve documentation and expand test coverage.
-- Create tools, skills, or knowledge integrations for the Marketplace.
+- Add support for new data sources and file types.
 
 ## Local Development
 
@@ -24,7 +24,7 @@ Larkup is a monorepo utilizing [pnpm](https://pnpm.io/) and [Turborepo](https://
    ```bash
    pnpm run dev
    ```
-7. The primary web app usually runs on `http://localhost:3000` (refer to terminal output for specifics).
+7. The web app runs on `http://localhost:4567`. RAG servers launched from **Settings → Server** use ports `8080` to `8090`.
 
 ### Running Individual Packages
 
@@ -67,28 +67,22 @@ scripts/test-e2e.sh
 
 ## Package Ownership
 
-| Package                    | Owner area   | Description                                                        |
-| -------------------------- | ------------ | ------------------------------------------------------------------ |
-| `@larkup/core`             | Core         | Config store, document store, indexer, embedder, server generation |
-| `@larkup/vector-stores`    | Core         | Vector database adapters (LanceDB, Pinecone, etc.)                 |
-| `@larkup/scraper`          | Core         | URL scraping and text extraction                                   |
-| `@larkup/connections`     | Connections | Provider adapters and shared inbound dispatch                       |
-| `@larkup/marketplace`      | Marketplace  | Tool registry, installer, loader, manifest validation              |
-| `@larkup/sandbox`          | Security     | Code sandbox execution                                             |
-| `@larkup/tool-video-audio` | Tools        | Video/audio processing tool                                        |
-| `@larkup/tool-doc-editor`  | Tools        | Document editing tool                                              |
-| `apps/web`                 | Dashboard    | Next.js web application and API server                             |
-| `apps/marketplace`         | Marketplace  | Hub API — catalog, publishing, install tracking                    |
-| `apps/cli`                 | CLI          | Command-line interface                                             |
-| `apps/sdk/js-sdk`          | SDK          | JavaScript/TypeScript SDK client                                   |
-| `apps/sdk/py-sdk`          | SDK          | Python SDK client                                                  |
-| `apps/larkup-proxy`        | Integrations | OAuth proxy for knowledge source integrations                      |
-| `apps/desktop`             | Desktop      | Tauri desktop application                                          |
-
-Future packages (created by upcoming tasks):
-
-- `packages/agent-runtime` — Agent execution engine (currently `@larkup/core/agent-runtime`)
-- `packages/agent-react` — React/Next.js bindings
+| Package                          | Area         | Description                                                        |
+| -------------------------------- | ------------ | ------------------------------------------------------------------ |
+| `larkup` (`apps/web`)            | Web app      | Next.js web UI and API routes                                      |
+| `@larkup/cli`                    | CLI          | Command-line interface                                             |
+| `@larkup/sdk`                    | SDK          | TypeScript SDK client (`apps/sdk/js-sdk`)                          |
+| `apps/sdk/py-sdk`                | SDK          | Python SDK client                                                  |
+| `@larkup/core`                   | Core         | Config store, document store, indexer, embedder, server generation |
+| `@larkup/workspace-server`       | Core         | Shared chat route, prompts, and tool registry                      |
+| `@larkup/workspace-app`          | Core         | Shared workspace application logic                                 |
+| `@larkup/workspace-ui`           | Core         | Shared workspace UI components                                     |
+| `@larkup/vector-stores`          | Core         | Vector database adapters (LanceDB, Pinecone, etc.)                 |
+| `@larkup/scraper`                | Core         | Web scraping and crawling                                          |
+| `@larkup/integrations`           | Data sources | Third-party data source integrations                               |
+| `@larkup/sandbox`                | Security     | Sandboxed code execution                                           |
+| `@larkup/tool-video-intelligence`| Tools        | Video intelligence (experimental)                                  |
+| `@larkup/proxy`                  | Integrations | OAuth proxy for data source integrations                           |
 
 ## Commits & Pull Requests
 
