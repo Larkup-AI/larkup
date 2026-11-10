@@ -17,7 +17,7 @@
 > it, check the [release notes](https://github.com/Larkup-AI/larkup/releases)
 > before upgrading, and please [open issues](https://github.com/Larkup-AI/larkup/issues).
 
-<img src="./docs/images/larkup.gif" alt="Larkup demo" width="900" />
+<img src="./docs/images/larkup2.gif" alt="Larkup demo" width="900" />
 
 ## What is Larkup?
 
