@@ -23,6 +23,11 @@
       {
         "label": "Support",
         "href": "mailto:abdelrahmanaboneda@gmail.com"
+      },
+      {
+        "label": "Cloud",
+        "icon": "cloud",
+        "href": "https://console.larkup.de"
       }
     ],
     "primary": {
