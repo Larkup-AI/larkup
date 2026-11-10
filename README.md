@@ -3,7 +3,7 @@
 
   <br />
 
-**A local NotebookLM with deeper file analysis, plus a headless RAG server for your AI apps.**
+**A local-first AI knowledge platform with deep multi-document analysis and a headless knowledge API.**
 
 [Documentation](https://www.larkup.de/docs) · [GitHub Issues](https://github.com/Larkup-AI/larkup/issues)
 
