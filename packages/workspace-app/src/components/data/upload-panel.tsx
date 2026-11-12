@@ -193,6 +193,11 @@ export function UploadPanel({
   const [indexAllImages, setIndexAllImages] = useState(false);
   const [imageIndexingCapability, setImageIndexingCapability] =
     useState<ImageIndexingCapability | null>(null);
+  // Whether this host can ingest uploaded files through a durable background
+  // worker (upload to storage + server-side parsing). Hosts that do not
+  // advertise it — e.g. the local/self-hosted app — keep the in-browser upload
+  // path. A ref so the async ingest worker always reads the latest value.
+  const serverFileIngestionRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -200,6 +205,9 @@ export function UploadPanel({
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((data) => {
         if (!active) return;
+        serverFileIngestionRef.current = Boolean(
+          data?.capabilities?.backgroundFileIngestion?.available,
+        );
         const capability = data?.capabilities?.imageIndexing;
         setImageIndexingCapability(
           capability?.available
@@ -396,10 +404,9 @@ export function UploadPanel({
               rawContent: content,
             });
           }
-        } else if (ext === 'pdf' || ext === 'docx') {
-          // Parsed server-side from storage during background ingestion. The
-          // browser only stages the raw file, so even scanned/image-only PDFs
-          // stage cleanly and are handled by the worker.
+        } else if (serverFileIngestionRef.current && (ext === 'pdf' || ext === 'docx')) {
+          // Durable path: the browser only stages the raw file; the worker parses
+          // it from storage, so even scanned/image-only PDFs stage cleanly.
           stage({
             id,
             name: file.name,
@@ -408,8 +415,9 @@ export function UploadPanel({
             fileObject: file,
             indexImages: ext === 'pdf' ? indexAllImages : undefined,
           });
-        } else if (ext === 'doc') {
-          // Legacy .doc cannot be parsed server-side; keep client extraction.
+        } else if (ext === 'pdf' || ext === 'doc' || ext === 'docx') {
+          // In-browser extraction: hosts without durable background ingestion, and
+          // legacy .doc, which the worker cannot parse.
           const formData = new FormData();
           formData.append('file', file);
           const res = await fetch(workspaceUrl('/api/parse-file'), {
@@ -417,14 +425,35 @@ export function UploadPanel({
             body: formData,
           });
           const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
+          const legacyImageOnlyPdf =
+            ext === 'pdf' &&
+            res.status === 422 &&
+            /(?:no readable text|does not contain selectable text)/i.test(String(data.error ?? ''));
+          if (!res.ok && !legacyImageOnlyPdf) {
             throw new Error(data.error || `Could not extract text from ${file.name}`);
           }
           const text = typeof data.text === 'string' ? data.text : '';
-          if (!text.trim()) {
+          const hasReadableText = legacyImageOnlyPdf
+            ? false
+            : (data.hasReadableText ?? Boolean(text.trim()));
+          const imageOnlyPdf = ext === 'pdf' && !hasReadableText;
+          if (!hasReadableText && !imageOnlyPdf) {
             throw new Error('This document does not contain selectable text.');
           }
-          stage({ id, name: file.name, size: file.size, format: 'plain', rawContent: text });
+          if (imageOnlyPdf && imageIndexingCapability?.available === false) {
+            throw new Error(
+              'This PDF contains scanned or image-only pages. Configure a vision model in Settings → AI Models to index it.',
+            );
+          }
+          stage({
+            id,
+            name: file.name,
+            size: file.size,
+            format: 'plain',
+            rawContent: hasReadableText ? text : undefined,
+            fileObject: file,
+            indexImages: ext === 'pdf' ? indexAllImages || imageOnlyPdf : undefined,
+          });
         } else {
           const content = await file.text();
           stage({
@@ -562,8 +591,10 @@ export function UploadPanel({
     for (const f of filesToIngest) {
       // Server-parseable files are uploaded to storage and ingested in the
       // background worker: one durable source per file, parsed/chunked/indexed
-      // server-side, with no browser parsing and no split into parts.
-      if (f.fileObject && isServerParseable(f.name)) {
+      // server-side, with no browser parsing and no split into parts. Only on
+      // hosts that support it; otherwise the file falls through to the
+      // in-browser path below.
+      if (serverFileIngestionRef.current && f.fileObject && isServerParseable(f.name)) {
         try {
           setProgress({ message: `Uploading ${f.name}…`, current: 0, total: 1 });
           const uploadId = await uploadToStorage(f.fileObject);
