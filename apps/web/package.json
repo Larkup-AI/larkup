@@ -1,6 +1,6 @@
 {
   "name": "larkup",
-  "version": "0.4.91",
+  "version": "0.4.92",
   "engines": {
     "node": ">=22"
   },
