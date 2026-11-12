@@ -134,8 +134,12 @@ export function renderMarkdown(text: string, safeImageUrls?: Set<string>): strin
       `<blockquote class="msg-quote">${match.replace(/msg-quote-line/g, 'msg-p')}</blockquote>`,
   );
 
-  // Unordered lists — collect consecutive lines into <ul>
-  html = html.replace(/^- (.+)$/gm, '<li class="msg-li">$1</li>');
+  // Unordered lists — collect consecutive lines into <ul>. Accept all three
+  // standard bullet markers (-, *, +); models frequently emit "* item", which
+  // otherwise leaks through as a literal asterisk. A lone leading marker is
+  // safe from the inline-italic pass above, which needs a closing "*" on the
+  // same line.
+  html = html.replace(/^[-*+] (.+)$/gm, '<li class="msg-li">$1</li>');
   // Wrap consecutive <li> in <ul> (including when separated by blank lines)
   html = html.replace(
     /(<li class="msg-li">.*?<\/li>\n?)+/g,

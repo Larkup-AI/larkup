@@ -39,6 +39,22 @@ test('unordered and ordered lists still wrap correctly', () => {
   assert.match(ol, /<ol class="msg-ol" start="1">/);
 });
 
+test('asterisk and plus bullets render as a list, not literal markers', () => {
+  const star = renderMarkdown('* ORR: 7.97%\n* DCR: 65.22%');
+  assert.match(star, /<ul class="msg-ul"><li class="msg-li">ORR: 7.97%<\/li>/);
+  assert.doesNotMatch(star, /(^|>)\* ORR/);
+  const plus = renderMarkdown('+ one\n+ two');
+  assert.match(
+    plus,
+    /<ul class="msg-ul"><li class="msg-li">one<\/li><li class="msg-li">two<\/li><\/ul>/,
+  );
+});
+
+test('inline italic between words is untouched by bullet handling', () => {
+  const html = renderMarkdown('this is *very* important');
+  assert.match(html, /<em>very<\/em>/);
+});
+
 test('display and inline math render as KaTeX, not raw delimiters', () => {
   const html = renderMarkdown('Inline $a^2$ and block:\n\n$$b^2$$');
   assert.match(html, /class="katex"/);
