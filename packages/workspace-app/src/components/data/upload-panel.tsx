@@ -47,6 +47,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { DataEntryModeSwitch } from './data-entry-mode-switch';
 import { saveStructuredFilesAsTabularDatasets } from './tabular-upload';
+import { splitDocumentPayload, type DocumentPayload } from './document-chunking';
 
 const ACCEPT = '.txt,.md,.markdown,.toml,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx';
 const CONTENT_PREVIEW_LIMIT = 100_000;
@@ -91,7 +92,13 @@ interface PreparingFile {
 }
 
 const stagedFilesByScope = new Map<string, StagedFile[]>();
+const queuedFilesByScope = new Map<string, StagedFile[]>();
+// Cross-instance lock keyed by storage scope. Guarantees a single sequential
+// ingest worker per project even when the panel remounts (tab switches) while a
+// batch is still draining, so files are never ingested twice.
+const ingestLockByScope = new Set<string>();
 const UPLOAD_QUEUE_KEY = 'larkup.upload-queue.v1';
+const UPLOAD_INFLIGHT_KEY = 'larkup.upload-inflight.v1';
 
 function restoreQueue(key: string): StagedFile[] {
   if (typeof window === 'undefined') return [];
@@ -122,9 +129,13 @@ export function UploadPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const scope = useRef(workspaceStorageScope()).current;
   const queueKey = useRef(workspaceStorageKey(UPLOAD_QUEUE_KEY)).current;
+  const inflightKey = useRef(workspaceStorageKey(UPLOAD_INFLIGHT_KEY)).current;
   const initialStaged = stagedFilesByScope.get(scope) ?? restoreQueue(queueKey);
+  const initialQueued = queuedFilesByScope.get(scope) ?? restoreQueue(inflightKey);
   const [staged, setStagedState] = useState<StagedFile[]>(initialStaged);
+  const [queued, setQueuedState] = useState<StagedFile[]>(initialQueued);
   const stagedRef = useRef(initialStaged);
+  const queuedRef = useRef(initialQueued);
   const savingRef = useRef(false);
   const groupIdRef = useRef(groupId ?? 'default');
   groupIdRef.current = groupId ?? 'default';
@@ -170,6 +181,13 @@ export function UploadPanel({
     persistQueue(next, queueKey);
     setStagedState(next);
   };
+  const setQueued = (val: React.SetStateAction<StagedFile[]>) => {
+    const next = typeof val === 'function' ? val(queuedRef.current) : val;
+    queuedRef.current = next;
+    queuedFilesByScope.set(scope, next);
+    persistQueue(next, inflightKey);
+    setQueuedState(next);
+  };
   const imageIndexingAvailable = imageIndexingCapability?.available === true;
 
   useEffect(() => {
@@ -201,7 +219,6 @@ export function UploadPanel({
   const isRemoteEntry = entryTab === 'url';
 
   async function readFiles(files: FileList | File[], sourceUrl?: string) {
-    const joinedActiveSave = savingRef.current;
     const next: StagedFile[] = [];
     const stage = (file: StagedFile) => next.push({ ...file, sourceUrl });
     const selectedFiles = Array.from(files).map((file) => ({
@@ -393,10 +410,6 @@ export function UploadPanel({
       }
     }
     setStaged((prev) => [...prev, ...next]);
-    if (joinedActiveSave && next.length > 0) {
-      toast.message(`${next.length} file${next.length === 1 ? '' : 's'} added to the queue`);
-      window.setTimeout(() => void ingest(), 0);
-    }
     return next;
   }
 
@@ -435,7 +448,11 @@ export function UploadPanel({
       if (loadedFiles.length === 0) return;
       setRemoteUrl('');
       setEntryTab('upload');
-      await ingest(loadedFiles);
+      // Move the imported file out of the composer and into the background queue
+      // so the UI returns immediately instead of blocking on ingestion.
+      setStaged((prev) => prev.filter((s) => !loadedFiles.some((l) => l.id === s.id)));
+      setQueued((prev) => [...prev, ...loadedFiles]);
+      window.setTimeout(() => void ingest(), 0);
     } catch (error) {
       toast.error(formatErrorMessage(error));
     } finally {
@@ -444,12 +461,15 @@ export function UploadPanel({
   }
 
   async function ingest(files?: StagedFile[]) {
-    if (savingRef.current || (files?.length ?? stagedRef.current.length) === 0) return;
+    // The module-level lock keeps a single sequential worker per project scope,
+    // even across remounts, so a batch is never ingested twice.
+    if (ingestLockByScope.has(scope) || (files?.length ?? queuedRef.current.length) === 0) return;
+    ingestLockByScope.add(scope);
     savingRef.current = true;
     setSaving(true);
     let ok = 0;
 
-    const filesToIngest = files ? [...files] : [...stagedRef.current];
+    const filesToIngest = files ? [...files] : [...queuedRef.current];
     const payloads: any[] = [];
     const destinationGroupId = groupIdRef.current;
     let tabularDatasetIds = new Map<string, string>();
@@ -469,6 +489,7 @@ export function UploadPanel({
       }
     } catch (error) {
       savingRef.current = false;
+      ingestLockByScope.delete(scope);
       setSaving(false);
       setProgress(null);
       toast.error(
@@ -648,41 +669,65 @@ export function UploadPanel({
       }
     }
 
-    setProgress({ message: 'Uploading documents...', current: 0, total: payloads.length || 1 });
+    // Expand any oversized document into ordered parts the server will accept.
+    const expandedPayloads = payloads.flatMap((p) => splitDocumentPayload(p as DocumentPayload));
 
-    for (const [index, p] of payloads.entries()) {
+    setProgress({
+      message: 'Uploading documents...',
+      current: 0,
+      total: expandedPayloads.length || 1,
+    });
+
+    let lastError: string | undefined;
+    for (const [index, p] of expandedPayloads.entries()) {
       try {
         const res = await fetch(workspaceUrl('/api/documents'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...p, groupId: destinationGroupId }),
         });
-        if (res.ok) ok++;
-      } catch {
-        /* continue */
+        if (res.ok) {
+          ok++;
+        } else {
+          const body = await res.json().catch(() => null);
+          if (body && typeof body === 'object' && typeof body.error === 'string') {
+            lastError = body.error;
+          }
+        }
+      } catch (error) {
+        lastError = formatErrorMessage(error);
       }
       setProgress({
         message: 'Uploading documents...',
         current: index + 1,
-        total: payloads.length || 1,
+        total: expandedPayloads.length || 1,
       });
     }
 
     const stagedCount = filesToIngest.length;
     savingRef.current = false;
+    ingestLockByScope.delete(scope);
     setSaving(false);
     setProgress(null);
-    const remaining = stagedRef.current.filter(
+    const remaining = queuedRef.current.filter(
       (pending) => !filesToIngest.some((ingested) => ingested.id === pending.id),
     );
-    setStaged(remaining);
-    if (remaining.length === 0) sessionStorage.removeItem(queueKey);
+    setQueued(remaining);
+    if (remaining.length === 0) {
+      try {
+        sessionStorage.removeItem(inflightKey);
+      } catch {}
+    }
 
     // Also explicitly clear the input value just in case
     if (inputRef.current) {
       inputRef.current.value = '';
     }
 
+    // A structured file can be fully ingested as a tabular dataset without
+    // producing any searchable document rows. Treat that as success so the user
+    // is not told "nothing could be extracted" after the dataset was saved.
+    const savedTabularOnly = tabularDatasetIds.size > 0;
     if (ok > 0) {
       toast.success(
         `Added ${ok} document${ok > 1 ? 's' : ''} from ${stagedCount} file${
@@ -690,6 +735,10 @@ export function UploadPanel({
         }`,
       );
       onAdded();
+    } else if (savedTabularOnly) {
+      onAdded();
+    } else if (lastError) {
+      toast.error(`Could not add the uploaded files: ${lastError}`);
     } else {
       toast.error('No text or images could be extracted from the uploaded files.');
     }
@@ -697,11 +746,35 @@ export function UploadPanel({
     if (!files && remaining.length > 0) window.setTimeout(() => void ingest(), 0);
   }
 
+  // Hand the staged files to the background worker and return immediately. The
+  // composer clears so the user can keep adding files without waiting for the
+  // current batch to finish ingesting.
+  function enqueueStaged() {
+    const toQueue = stagedRef.current;
+    if (toQueue.length === 0) return;
+    setStaged([]);
+    setQueued((prev) => [...prev, ...toQueue]);
+    toast.message(`${toQueue.length} file${toQueue.length === 1 ? '' : 's'} added to the queue`, {
+      description: 'Processing in the background — you can keep adding files.',
+    });
+    window.setTimeout(() => void ingest(), 0);
+  }
+
+  // Resume a queue left over from a reload or a tab switch. The module lock keeps
+  // this from starting a second worker when one is already draining the queue.
   useEffect(() => {
-    const actionBusy = saving || loadingRemoteFile || preparingFiles.length > 0;
+    if (queuedRef.current.length > 0) window.setTimeout(() => void ingest(), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Background ingestion no longer blocks the button: only file preparation
+    // (reading/parsing) or a remote fetch make the primary action busy, so the
+    // user can keep queueing more files while a batch processes.
+    const actionBusy = loadingRemoteFile || preparingFiles.length > 0;
     onActionChange?.({
       label: 'Add file',
-      onClick: isRemoteEntry ? () => void loadRemoteFile() : () => void ingest(),
+      onClick: isRemoteEntry ? () => void loadRemoteFile() : () => enqueueStaged(),
       disabled: actionBusy || (isRemoteEntry ? !remoteUrl.trim() : staged.length === 0),
       loading: actionBusy,
     });
@@ -709,7 +782,6 @@ export function UploadPanel({
   }, [
     entryTab,
     staged,
-    saving,
     remoteUrl,
     loadingRemoteFile,
     preparingFiles.length,
@@ -828,6 +900,34 @@ export function UploadPanel({
             </span>
           </div>
           <Progress value={(progress.current / progress.total) * 100} />
+        </div>
+      )}
+
+      {queued.length > 0 && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="space-y-2 rounded-md border border-border bg-card px-3 py-3"
+        >
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Loader2 className="size-4 animate-spin text-primary" />
+            {saving ? 'Processing' : 'Queued'} {queued.length} file
+            {queued.length === 1 ? '' : 's'} in the background…
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            You can keep adding more files while these finish.
+          </p>
+          <ul className="space-y-1">
+            {queued.map((file) => (
+              <li
+                key={file.id}
+                className="flex items-center justify-between gap-3 text-xs text-muted-foreground"
+              >
+                <span className="truncate font-mono">{file.name}</span>
+                <span className="shrink-0 tabular-nums">{(file.size / 1024).toFixed(1)} KB</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -1029,15 +1129,14 @@ export function UploadPanel({
 
       {!onActionChange && (
         <Button
-          onClick={isRemoteEntry ? () => void loadRemoteFile() : () => void ingest()}
+          onClick={isRemoteEntry ? () => void loadRemoteFile() : () => enqueueStaged()}
           disabled={
             loadingRemoteFile ||
-            saving ||
             preparingFiles.length > 0 ||
             (isRemoteEntry ? !remoteUrl.trim() : staged.length === 0)
           }
         >
-          {loadingRemoteFile || saving || preparingFiles.length > 0 ? (
+          {loadingRemoteFile || preparingFiles.length > 0 ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
             <FileUp className="size-4" />
