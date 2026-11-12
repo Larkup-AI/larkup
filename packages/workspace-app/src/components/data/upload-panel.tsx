@@ -48,6 +48,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { DataEntryModeSwitch } from './data-entry-mode-switch';
 import { saveStructuredFilesAsTabularDatasets } from './tabular-upload';
 import { splitDocumentPayload, type DocumentPayload } from './document-chunking';
+import { isServerParseable } from './upload-routing';
 
 const ACCEPT = '.txt,.md,.markdown,.toml,.json,.csv,.html,.htm,.log,.xlsx,.xls,.pdf,.doc,.docx';
 const CONTENT_PREVIEW_LIMIT = 100_000;
@@ -185,7 +186,6 @@ export function UploadPanel({
     () => queueStore.snapshot,
   );
   const queued = queueSnapshot.queued;
-  const saving = queueSnapshot.processing;
   const progress = queueSnapshot.progress;
 
   const groupIdRef = useRef(groupId ?? 'default');
@@ -265,7 +265,11 @@ export function UploadPanel({
 
   async function readFiles(files: FileList | File[], sourceUrl?: string) {
     const next: StagedFile[] = [];
-    const stage = (file: StagedFile) => next.push({ ...file, sourceUrl });
+    // The raw file of the current iteration, attached to every staged item so
+    // ingestion can upload it to storage for server-side parsing.
+    let currentFile: File | undefined;
+    const stage = (sf: StagedFile) =>
+      next.push({ ...sf, sourceUrl, fileObject: sf.fileObject ?? currentFile });
     const selectedFiles = Array.from(files).map((file) => ({
       file,
       pending: {
@@ -277,6 +281,7 @@ export function UploadPanel({
     setPreparingFiles((current) => [...current, ...selectedFiles.map(({ pending }) => pending)]);
 
     for (const { file, pending } of selectedFiles) {
+      currentFile = file;
       const ext = file.name.split('.').pop()?.toLowerCase();
 
       // Prevent dragging media into the documents tab
@@ -391,53 +396,35 @@ export function UploadPanel({
               rawContent: content,
             });
           }
-        } else if (ext === 'pdf' || ext === 'doc' || ext === 'docx') {
-          const formData = new FormData();
-          formData.append('file', file);
-
-          const res = await fetch(workspaceUrl('/api/parse-file'), {
-            method: 'POST',
-            body: formData,
-          });
-
-          const data = await res.json().catch(() => ({}));
-          const legacyImageOnlyPdf =
-            ext === 'pdf' &&
-            res.status === 422 &&
-            /(?:no readable text|does not contain selectable text)/i.test(String(data.error ?? ''));
-          if (!res.ok && !legacyImageOnlyPdf) {
-            throw new Error(data.error || `Could not extract text from ${file.name}`);
-          }
-
-          const { text } = data;
-          const hasReadableText = legacyImageOnlyPdf
-            ? false
-            : (data.hasReadableText ?? Boolean(text?.trim()));
-          const imageOnlyPdf = ext === 'pdf' && !hasReadableText;
-          if (!hasReadableText && !imageOnlyPdf) {
-            throw new Error(
-              'This PDF does not contain selectable text. Try another copy of the file.',
-            );
-          }
-          if (imageOnlyPdf && imageIndexingCapability?.available === false) {
-            throw new Error(
-              'This PDF contains scanned or image-only pages. Configure a vision model in Settings → AI Models to index it.',
-            );
-          }
-          if (imageOnlyPdf) {
-            toast.message(
-              `No selectable text found in ${file.name}; PDF image indexing was enabled automatically.`,
-            );
-          }
+        } else if (ext === 'pdf' || ext === 'docx') {
+          // Parsed server-side from storage during background ingestion. The
+          // browser only stages the raw file, so even scanned/image-only PDFs
+          // stage cleanly and are handled by the worker.
           stage({
             id,
             name: file.name,
             size: file.size,
             format: 'plain',
-            rawContent: hasReadableText ? text : undefined,
             fileObject: file,
-            indexImages: indexAllImages || imageOnlyPdf,
+            indexImages: ext === 'pdf' ? indexAllImages : undefined,
           });
+        } else if (ext === 'doc') {
+          // Legacy .doc cannot be parsed server-side; keep client extraction.
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch(workspaceUrl('/api/parse-file'), {
+            method: 'POST',
+            body: formData,
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(data.error || `Could not extract text from ${file.name}`);
+          }
+          const text = typeof data.text === 'string' ? data.text : '';
+          if (!text.trim()) {
+            throw new Error('This document does not contain selectable text.');
+          }
+          stage({ id, name: file.name, size: file.size, format: 'plain', rawContent: text });
         } else {
           const content = await file.text();
           stage({
@@ -505,6 +492,39 @@ export function UploadPanel({
     }
   }
 
+  // Upload a raw file straight to S3 via a presigned URL and return its upload
+  // id. Keeps large files off the serverless request path so hundreds of big
+  // files ingest reliably.
+  async function uploadToStorage(file: File): Promise<string> {
+    const res = await fetch(workspaceUrl('/api/files/upload-url'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        sizeBytes: file.size,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || 'Could not start the file upload.');
+    }
+    const { id, uploadUrl, headers } = (await res.json()) as {
+      id: string;
+      uploadUrl: string;
+      headers?: Record<string, string>;
+    };
+    // The presigned PUT goes directly to object storage, so it must use the
+    // native fetch (no workspace auth headers), with the signed headers.
+    const put = await globalThis.fetch(uploadUrl, {
+      method: 'PUT',
+      headers: headers ?? {},
+      body: file,
+    });
+    if (!put.ok) throw new Error('Could not upload the file to storage.');
+    return id;
+  }
+
   async function ingest(files?: StagedFile[]) {
     // The module-level lock keeps a single sequential worker per project scope,
     // even across remounts, so a batch is never ingested twice.
@@ -517,6 +537,7 @@ export function UploadPanel({
     const filesToIngest = files ? [...files] : [...queueStore.snapshot.queued];
     const payloads: any[] = [];
     const destinationGroupId = groupIdRef.current;
+    let lastError: string | undefined;
     let tabularDatasetIds = new Map<string, string>();
     try {
       const savedTabularDatasets = await saveStructuredFilesAsTabularDatasets(
@@ -527,11 +548,6 @@ export function UploadPanel({
       tabularDatasetIds = new Map(
         savedTabularDatasets.map((dataset) => [dataset.sourceFileId, dataset.id]),
       );
-      for (const dataset of savedTabularDatasets) {
-        toast.success(
-          `Saved "${dataset.fileName}" as tabular dataset (${dataset.rowCount} rows, ${dataset.columnCount} columns)`,
-        );
-      }
     } catch (error) {
       ingestLockByScope.delete(scope);
       setSaving(false);
@@ -544,6 +560,42 @@ export function UploadPanel({
 
     // Then: create document payloads
     for (const f of filesToIngest) {
+      // Server-parseable files are uploaded to storage and ingested in the
+      // background worker: one durable source per file, parsed/chunked/indexed
+      // server-side, with no browser parsing and no split into parts.
+      if (f.fileObject && isServerParseable(f.name)) {
+        try {
+          setProgress({ message: `Uploading ${f.name}…`, current: 0, total: 1 });
+          const uploadId = await uploadToStorage(f.fileObject);
+          const res = await fetch(workspaceUrl('/api/documents/file'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              uploadId,
+              groupId: destinationGroupId,
+              metadata: {
+                ...(f.sourceUrl ? { originalUrl: f.sourceUrl } : {}),
+                ...(tabularDatasetIds.get(f.id)
+                  ? { tabularDatasetId: tabularDatasetIds.get(f.id) }
+                  : {}),
+                ...(f.indexImages ? { indexImages: true } : {}),
+              },
+            }),
+          });
+          if (res.ok) {
+            ok++;
+          } else {
+            const body = await res.json().catch(() => null);
+            lastError =
+              body && typeof body === 'object' && typeof body.error === 'string'
+                ? body.error
+                : `request failed (HTTP ${res.status})`;
+          }
+        } catch (error) {
+          lastError = formatErrorMessage(error);
+        }
+        continue;
+      }
       if (f.format === 'plain' && (f.rawContent || f.name.toLowerCase().endsWith('.pdf'))) {
         let fileUrl = undefined;
         // Upload the physical file so chat can link to it
@@ -722,7 +774,6 @@ export function UploadPanel({
       total: expandedPayloads.length || 1,
     });
 
-    let lastError: string | undefined;
     for (const [index, p] of expandedPayloads.entries()) {
       try {
         const res = await fetch(workspaceUrl('/api/documents'), {
@@ -749,7 +800,6 @@ export function UploadPanel({
       });
     }
 
-    const stagedCount = filesToIngest.length;
     ingestLockByScope.delete(scope);
     setSaving(false);
     setProgress(null);
@@ -773,16 +823,12 @@ export function UploadPanel({
     // is not told "nothing could be extracted" after the dataset was saved.
     const savedTabularOnly = tabularDatasetIds.size > 0;
     if (ok > 0) {
-      toast.success(
-        `Added ${ok} document${ok > 1 ? 's' : ''} from ${stagedCount} file${
-          stagedCount > 1 ? 's' : ''
-        }`,
-      );
+      toast.success(`Added ${ok} file${ok === 1 ? '' : 's'}`);
       onAdded();
     } else if (savedTabularOnly) {
       onAdded();
     } else if (lastError) {
-      toast.error(`Could not add the uploaded files: ${lastError}`);
+      toast.error(`Could not add the file: ${lastError}`);
     } else {
       toast.error('No text or images could be extracted from the uploaded files.');
     }
@@ -798,9 +844,8 @@ export function UploadPanel({
     if (toQueue.length === 0) return;
     setStaged([]);
     setQueued((prev) => [...prev, ...toQueue]);
-    toast.message(`${toQueue.length} file${toQueue.length === 1 ? '' : 's'} added to the queue`, {
-      description: 'Processing in the background — you can keep adding files.',
-    });
+    // No toast here: the file appears in the processing tray immediately and a
+    // plain "Added N files" confirmation is shown once ingestion accepts it.
     window.setTimeout(() => void ingest(), 0);
   }
 
@@ -955,11 +1000,10 @@ export function UploadPanel({
         >
           <div className="flex items-center gap-2 text-sm font-medium">
             <Loader2 className="size-4 animate-spin text-primary" />
-            {saving ? 'Processing' : 'Queued'} {queued.length} file
-            {queued.length === 1 ? '' : 's'} in the background…
+            Adding {queued.length} file{queued.length === 1 ? '' : 's'}…
           </div>
           <p className="text-[11px] text-muted-foreground">
-            You can keep adding more files while these finish.
+            You can keep adding more while these finish.
           </p>
           <ul className="space-y-1">
             {queued.map((file) => (

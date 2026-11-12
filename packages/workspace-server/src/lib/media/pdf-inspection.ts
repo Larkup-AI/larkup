@@ -311,6 +311,58 @@ export async function renderStoredPdfPage(
   }
 }
 
+export type RenderedPdfPage = {
+  pageNumber: number;
+  text: string;
+  /** PNG image of the rendered page, base64-encoded (no data: prefix). */
+  imagePngBase64: string;
+};
+
+/**
+ * Render a PDF's pages to images (with their extracted text) directly from
+ * bytes, for background ingestion of scanned or image-heavy documents. Bounded
+ * by `maxPages` so a very long PDF cannot run unboundedly through vision.
+ */
+export async function renderPdfPagesFromBytes(
+  bytes: Uint8Array,
+  options: { maxPages?: number; width?: number } = {},
+): Promise<{ totalPages: number; pages: RenderedPdfPage[] }> {
+  const maxPages = Math.min(Math.max(options.maxPages ?? 25, 1), 100);
+  const width = Math.min(Math.max(options.width ?? 1_600, 480), 2_000);
+  const PDFParse = await getPdfParser();
+  const parser = new PDFParse({ data: new Uint8Array(bytes) });
+  try {
+    const info = await parser.getInfo();
+    const total = info.total;
+    const pageNumbers = Array.from({ length: Math.min(total, maxPages) }, (_, index) => index + 1);
+    if (pageNumbers.length === 0) return { totalPages: total, pages: [] };
+    const textResult = await parser.getText({ partial: pageNumbers });
+    const textByPage = new Map<number, string>(
+      textResult.pages.map((page) => [page.num, page.text ?? '']),
+    );
+    const screenshots = await parser.getScreenshot({
+      partial: pageNumbers,
+      desiredWidth: width,
+      imageBuffer: true,
+      imageDataUrl: false,
+    });
+    const pages: RenderedPdfPage[] = [];
+    // getScreenshot returns pages in the same order as the requested partial.
+    pageNumbers.forEach((pageNumber, index) => {
+      const shot = screenshots.pages[index];
+      if (!shot?.data) return;
+      pages.push({
+        pageNumber,
+        text: textByPage.get(pageNumber) ?? '',
+        imagePngBase64: Buffer.from(shot.data).toString('base64'),
+      });
+    });
+    return { totalPages: total, pages };
+  } finally {
+    await parser.destroy();
+  }
+}
+
 /** Give vision closer views for figures; full-page text can make labels too small. */
 export async function pdfPageVisionImages(rendered: Buffer, pageText: string): Promise<string[]> {
   const imageUrl = (bytes: Buffer) => `data:image/png;base64,${bytes.toString('base64')}`;
