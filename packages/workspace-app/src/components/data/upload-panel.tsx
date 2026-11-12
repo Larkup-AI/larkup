@@ -8,7 +8,7 @@ import {
 } from '../../host';
 import { SourceUploadDropzone } from '@larkup/workspace-ui';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { formatErrorMessage } from '../../lib/shared/error-formatter';
 import {
@@ -92,7 +92,6 @@ interface PreparingFile {
 }
 
 const stagedFilesByScope = new Map<string, StagedFile[]>();
-const queuedFilesByScope = new Map<string, StagedFile[]>();
 // Cross-instance lock keyed by storage scope. Guarantees a single sequential
 // ingest worker per project even when the panel remounts (tab switches) while a
 // batch is still draining, so files are never ingested twice.
@@ -117,6 +116,46 @@ function persistQueue(files: StagedFile[], key: string) {
   } catch {}
 }
 
+type UploadProgress = { message?: string; current: number; total: number } | null;
+
+interface QueueSnapshot {
+  /** Files accepted for background ingestion (not the editable composer). */
+  queued: StagedFile[];
+  /** True while the worker is actively ingesting a batch. */
+  processing: boolean;
+  progress: UploadProgress;
+}
+
+interface QueueStore {
+  snapshot: QueueSnapshot;
+  listeners: Set<() => void>;
+}
+
+// The background queue lives at module scope, not in component state, so it keeps
+// draining and reporting progress consistently when the panel unmounts and
+// remounts (switching tabs). Every mounted instance subscribes to the same store,
+// so none of them restart or reset the in-flight batch.
+const queueStores = new Map<string, QueueStore>();
+
+function getQueueStore(scope: string, inflightKey: string): QueueStore {
+  let store = queueStores.get(scope);
+  if (!store) {
+    store = {
+      snapshot: { queued: restoreQueue(inflightKey), processing: false, progress: null },
+      listeners: new Set(),
+    };
+    queueStores.set(scope, store);
+  }
+  return store;
+}
+
+function updateQueueStore(scope: string, inflightKey: string, patch: Partial<QueueSnapshot>) {
+  const store = getQueueStore(scope, inflightKey);
+  store.snapshot = { ...store.snapshot, ...patch };
+  if ('queued' in patch) persistQueue(store.snapshot.queued, inflightKey);
+  for (const listener of store.listeners) listener();
+}
+
 export function UploadPanel({
   onAdded,
   onActionChange,
@@ -131,12 +170,24 @@ export function UploadPanel({
   const queueKey = useRef(workspaceStorageKey(UPLOAD_QUEUE_KEY)).current;
   const inflightKey = useRef(workspaceStorageKey(UPLOAD_INFLIGHT_KEY)).current;
   const initialStaged = stagedFilesByScope.get(scope) ?? restoreQueue(queueKey);
-  const initialQueued = queuedFilesByScope.get(scope) ?? restoreQueue(inflightKey);
   const [staged, setStagedState] = useState<StagedFile[]>(initialStaged);
-  const [queued, setQueuedState] = useState<StagedFile[]>(initialQueued);
   const stagedRef = useRef(initialStaged);
-  const queuedRef = useRef(initialQueued);
-  const savingRef = useRef(false);
+
+  // Background queue state is read from a shared module store so it survives
+  // remounts and stays identical across every mounted instance.
+  const queueStore = getQueueStore(scope, inflightKey);
+  const queueSnapshot = useSyncExternalStore(
+    (onChange) => {
+      queueStore.listeners.add(onChange);
+      return () => queueStore.listeners.delete(onChange);
+    },
+    () => queueStore.snapshot,
+    () => queueStore.snapshot,
+  );
+  const queued = queueSnapshot.queued;
+  const saving = queueSnapshot.processing;
+  const progress = queueSnapshot.progress;
+
   const groupIdRef = useRef(groupId ?? 'default');
   groupIdRef.current = groupId ?? 'default';
   const [indexAllImages, setIndexAllImages] = useState(false);
@@ -182,12 +233,12 @@ export function UploadPanel({
     setStagedState(next);
   };
   const setQueued = (val: React.SetStateAction<StagedFile[]>) => {
-    const next = typeof val === 'function' ? val(queuedRef.current) : val;
-    queuedRef.current = next;
-    queuedFilesByScope.set(scope, next);
-    persistQueue(next, inflightKey);
-    setQueuedState(next);
+    const next = typeof val === 'function' ? val(queueStore.snapshot.queued) : val;
+    updateQueueStore(scope, inflightKey, { queued: next });
   };
+  const setSaving = (processing: boolean) => updateQueueStore(scope, inflightKey, { processing });
+  const setProgress = (next: UploadProgress) =>
+    updateQueueStore(scope, inflightKey, { progress: next });
   const imageIndexingAvailable = imageIndexingCapability?.available === true;
 
   useEffect(() => {
@@ -203,13 +254,7 @@ export function UploadPanel({
   const [entryTab, setEntryTab] = useState<'upload' | 'url'>('upload');
   const [remoteUrl, setRemoteUrl] = useState('');
   const [loadingRemoteFile, setLoadingRemoteFile] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [preparingFiles, setPreparingFiles] = useState<PreparingFile[]>([]);
-  const [progress, setProgress] = useState<{
-    message?: string;
-    current: number;
-    total: number;
-  } | null>(null);
 
   // Mapping state
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
@@ -463,13 +508,13 @@ export function UploadPanel({
   async function ingest(files?: StagedFile[]) {
     // The module-level lock keeps a single sequential worker per project scope,
     // even across remounts, so a batch is never ingested twice.
-    if (ingestLockByScope.has(scope) || (files?.length ?? queuedRef.current.length) === 0) return;
+    if (ingestLockByScope.has(scope) || (files?.length ?? queueStore.snapshot.queued.length) === 0)
+      return;
     ingestLockByScope.add(scope);
-    savingRef.current = true;
     setSaving(true);
     let ok = 0;
 
-    const filesToIngest = files ? [...files] : [...queuedRef.current];
+    const filesToIngest = files ? [...files] : [...queueStore.snapshot.queued];
     const payloads: any[] = [];
     const destinationGroupId = groupIdRef.current;
     let tabularDatasetIds = new Map<string, string>();
@@ -488,7 +533,6 @@ export function UploadPanel({
         );
       }
     } catch (error) {
-      savingRef.current = false;
       ingestLockByScope.delete(scope);
       setSaving(false);
       setProgress(null);
@@ -690,9 +734,10 @@ export function UploadPanel({
           ok++;
         } else {
           const body = await res.json().catch(() => null);
-          if (body && typeof body === 'object' && typeof body.error === 'string') {
-            lastError = body.error;
-          }
+          lastError =
+            body && typeof body === 'object' && typeof body.error === 'string'
+              ? body.error
+              : `request failed (HTTP ${res.status})`;
         }
       } catch (error) {
         lastError = formatErrorMessage(error);
@@ -705,11 +750,10 @@ export function UploadPanel({
     }
 
     const stagedCount = filesToIngest.length;
-    savingRef.current = false;
     ingestLockByScope.delete(scope);
     setSaving(false);
     setProgress(null);
-    const remaining = queuedRef.current.filter(
+    const remaining = queueStore.snapshot.queued.filter(
       (pending) => !filesToIngest.some((ingested) => ingested.id === pending.id),
     );
     setQueued(remaining);
@@ -763,7 +807,7 @@ export function UploadPanel({
   // Resume a queue left over from a reload or a tab switch. The module lock keeps
   // this from starting a second worker when one is already draining the queue.
   useEffect(() => {
-    if (queuedRef.current.length > 0) window.setTimeout(() => void ingest(), 0);
+    if (queueStore.snapshot.queued.length > 0) window.setTimeout(() => void ingest(), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
