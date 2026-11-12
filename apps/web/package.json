@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "dev": "next dev -p 4567",
-    "build": "next build --webpack",
+    "build": "NODE_OPTIONS=--max-old-space-size=8192 next build --webpack",
     "postbuild": "node scripts/prepare-standalone.mjs && if pnpm exec prettier --version >/dev/null 2>&1; then pnpm exec prettier --write next-env.d.ts; fi",
     "start": "node .next/standalone/apps/web/server.js",
     "lint": "echo \"No lint configured\"",

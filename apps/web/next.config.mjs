@@ -60,6 +60,12 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version,
   },
+  // The webpack build (`next build --webpack`) transpiles a large set of
+  // workspace packages and was exhausting V8's heap (SIGABRT / exit 134).
+  // This reduces peak memory in webpack at a slight cost to build time.
+  experimental: {
+    webpackMemoryOptimizations: true,
+  },
   async rewrites() {
     return [
       {
