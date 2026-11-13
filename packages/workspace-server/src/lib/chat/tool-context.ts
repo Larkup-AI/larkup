@@ -906,7 +906,10 @@ export function formatExhaustiveMediaAnswer(value: unknown, _question: string): 
     // directive: only an explicit source inventory may bypass answer synthesis.
     const isExplicitSourceInventory =
       directive?.scope === 'source' && directive.goal === 'enumerate';
-    // A structured inventory is already a final data result. It must never be
+    // Mixed evidence rows are retrieval input, not the requested answer.
+    // Preserve synthesis for attributes, events and outcomes in any language.
+    if (inventory?.recordSet === 'all' && Array.isArray(record.rows)) return;
+    // A source-authored or speech inventory is already a final data result. It must never be
     // handed back to a prose model just because the source correctly reports
     // partial coverage. The UI has the complete returned table; this message
     // only explains its scope and truth status.
