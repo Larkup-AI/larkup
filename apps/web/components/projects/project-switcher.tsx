@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Check, ChevronsUpDown, FolderKanban, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Check, ChevronsUpDown, FolderKanban, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,97 +11,131 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import { useProject, type WorkspaceProject } from './project-provider';
 import { ProjectFormDialog } from './project-form-dialog';
 import { DeleteProjectDialog } from './delete-project-dialog';
 
-export function ProjectSwitcher() {
+export function ProjectSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const { projects, activeProject, activateProject } = useProject();
   const [createOpen, setCreateOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<WorkspaceProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WorkspaceProject | null>(null);
+  const [search, setSearch] = useState('');
+
+  const filteredProjects = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return query
+      ? projects.filter((project) => project.name.toLocaleLowerCase().includes(query))
+      : projects;
+  }, [search, projects]);
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={(open) => !open && setSearch('')}>
         <DropdownMenuTrigger
           render={
             <button
               type="button"
-              className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5 text-left transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Switch project"
+              className={cn(
+                'flex w-full items-center border-t border-sidebar-border/60 bg-transparent text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                collapsed ? 'justify-center px-0 py-3' : 'gap-2 px-3 py-3',
+              )}
             />
           }
         >
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/12 text-primary">
-            <FolderKanban className="size-3.5" />
+          <span className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-primary">
+            <FolderKanban className="size-4" />
+            <span
+              className={cn(
+                'absolute bottom-0 right-0 size-2 rounded-full border border-background',
+                activeProject?.running ? 'bg-emerald-500' : 'bg-muted-foreground/60',
+              )}
+            />
           </span>
-          <span className="flex min-w-0 flex-1 flex-col">
-            {/* <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Server
-            </span> */}
-            <span className="flex items-center gap-1.5">
-              <span className="truncate text-sm font-medium text-foreground">
-                {activeProject?.name ?? 'No project'}
+          {!collapsed && (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-bold capitalize">
+                  {activeProject?.name ?? 'Create a project'}
+                </span>
+                <span className="block truncate text-[11px] leading-4 text-muted-foreground">
+                  {activeProject?.running ? 'Project live' : 'Not running'}
+                </span>
               </span>
-              {activeProject?.running && <RunningDot />}
-            </span>
-          </span>
-          <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+              <ChevronsUpDown className="size-4 text-muted-foreground" />
+            </>
+          )}
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="start" sideOffset={6} className="w-(--anchor-width) min-w-65">
+        <DropdownMenuContent
+          align="start"
+          side={collapsed ? 'right' : 'top'}
+          sideOffset={8}
+          className="w-72 max-w-[calc(100vw-2rem)] rounded-xl border-border bg-popover p-1.5 shadow-lg"
+        >
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Your projects</DropdownMenuLabel>
-            {projects.map((s) => {
-              const active = s.id === activeProject?.id;
+            <DropdownMenuLabel className="px-2 py-1 text-xs font-normal text-muted-foreground">
+              Projects
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
+          <div className="relative mb-1 px-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              aria-label="Search projects"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => event.stopPropagation()}
+              placeholder="Search projects..."
+              className="h-9 pl-8"
+            />
+          </div>
+          <DropdownMenuGroup className="max-h-72 overflow-y-auto overscroll-contain">
+            {filteredProjects.map((project) => {
+              const active = project.id === activeProject?.id;
               return (
                 <DropdownMenuItem
-                  key={s.id}
+                  key={project.id}
                   onClick={() => {
-                    if (!active) void activateProject(s.id);
+                    if (!active) void activateProject(project.id);
                   }}
-                  className="gap-2"
+                  className="h-10 gap-2 rounded-lg"
                 >
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                    <FolderKanban className="size-3.5" />
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium">{s.name}</span>
-                    <span className="flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums">
-                      <span>{s.sourceCount} sources</span>
-                      {s.indexed && <span>· indexed</span>}
-                      {s.running && (
-                        <span className="flex items-center gap-1 text-green-500">
-                          <RunningDot />
-                          live
-                        </span>
-                      )}
-                    </span>
-                  </span>
-                  {active && <Check className="size-4 shrink-0 text-primary" />}
+                  <FolderKanban className="size-4" />
+                  <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                  {active && <Check className="size-4 text-primary" />}
                 </DropdownMenuItem>
               );
             })}
+            {!filteredProjects.length && (
+              <p className="px-2 py-3 text-xs text-muted-foreground">
+                {projects.length ? 'No matching projects.' : 'No projects yet.'}
+              </p>
+            )}
           </DropdownMenuGroup>
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={() => setCreateOpen(true)} className="gap-2 h-9">
+          <DropdownMenuItem onClick={() => setCreateOpen(true)} className="h-9 gap-2 rounded-lg">
             <Plus className="size-4" />
             New project
           </DropdownMenuItem>
-          {/* <DropdownMenuSeparator /> */}
           {activeProject && (
-            <DropdownMenuItem onClick={() => setRenameTarget(activeProject)} className="gap-2 h-9">
+            <DropdownMenuItem
+              onClick={() => setRenameTarget(activeProject)}
+              className="h-9 gap-2 rounded-lg"
+            >
               <Pencil className="size-4" />
-              Rename current
+              Edit current project
             </DropdownMenuItem>
           )}
           {activeProject && projects.length > 1 && (
             <DropdownMenuItem
               variant="destructive"
               onClick={() => setDeleteTarget(activeProject)}
-              className="gap-2"
+              className="h-9 gap-2 rounded-lg"
             >
               <Trash2 className="size-4" />
               Delete current project
@@ -123,14 +157,5 @@ export function ProjectSwitcher() {
         onOpenChange={(o) => !o && setDeleteTarget(null)}
       />
     </>
-  );
-}
-
-function RunningDot() {
-  return (
-    <span className="relative flex size-2">
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
-      <span className="relative inline-flex size-2 rounded-full bg-green-500" />
-    </span>
   );
 }

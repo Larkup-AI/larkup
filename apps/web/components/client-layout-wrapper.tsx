@@ -12,6 +12,11 @@ export function ClientLayoutWrapper({ children }: { children: React.ReactNode })
   const { layout } = useThemeCustomizer();
   const pathname = usePathname();
   const isChatPage = pathname?.includes('/chat');
+  const isFullHeight =
+    isChatPage ||
+    ['/settings', '/analytics', '/deploy', '/agent', '/monitor'].some((route) =>
+      pathname?.includes(route),
+    );
   const { isFirstRun, isLoading } = useProject();
 
   if (!isLoading && isFirstRun) {
@@ -42,17 +47,13 @@ export function ClientLayoutWrapper({ children }: { children: React.ReactNode })
             <div
               className={cn(
                 'flex-1 min-h-0',
-                isChatPage || pathname?.includes('/settings') || pathname?.includes('/analytics')
-                  ? 'overflow-hidden flex flex-col'
-                  : 'overflow-auto',
+                isFullHeight ? 'overflow-hidden flex flex-col' : 'overflow-auto',
               )}
             >
               <div
                 className={cn(
                   'h-full w-full',
-                  isChatPage || pathname?.includes('/settings') || pathname?.includes('/analytics')
-                    ? 'flex-1 min-h-0 flex flex-col'
-                    : 'container mx-auto pb-8',
+                  isFullHeight ? 'flex-1 min-h-0 flex flex-col' : 'container mx-auto pb-8',
                 )}
               >
                 {children}
@@ -72,17 +73,13 @@ export function ClientLayoutWrapper({ children }: { children: React.ReactNode })
           <div
             className={cn(
               'flex-1 min-h-0',
-              isChatPage || pathname?.includes('/settings') || pathname?.includes('/analytics')
-                ? 'overflow-hidden flex flex-col'
-                : 'overflow-auto',
+              isFullHeight ? 'overflow-hidden flex flex-col' : 'overflow-auto',
             )}
           >
             <div
               className={cn(
                 'h-full w-full',
-                isChatPage || pathname?.includes('/settings') || pathname?.includes('/analytics')
-                  ? 'flex-1 min-h-0 flex flex-col'
-                  : 'container mx-auto pb-8',
+                isFullHeight ? 'flex-1 min-h-0 flex flex-col' : 'container mx-auto pb-8',
               )}
             >
               {children}

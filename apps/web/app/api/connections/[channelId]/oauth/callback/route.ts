@@ -18,7 +18,7 @@ function responseHtml(message: CallbackMessage) {
   return new NextResponse(
     `<!doctype html><html><body><script>if(window.opener){window.opener.postMessage(${JSON.stringify(
       message,
-    )},window.location.origin);window.close();}else{window.location.href='/settings?section=runtime&tab=connections';}</script><p>Connection setup complete. You can close this window.</p></body></html>`,
+    )},window.location.origin);window.close();}else{window.location.href='/deploy?tab=connections';}</script><p>Connection setup complete. You can close this window.</p></body></html>`,
     { headers: { 'Content-Type': 'text/html' } },
   );
 }

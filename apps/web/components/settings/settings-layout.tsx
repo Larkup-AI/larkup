@@ -1,16 +1,6 @@
 'use client';
 
-import {
-  Settings2,
-  CpuIcon,
-  Database,
-  Store,
-  Globe,
-  Terminal,
-  Activity,
-  Blocks,
-  Wrench,
-} from 'lucide-react';
+import { Settings2, CpuIcon, Database, Store, Globe, Wrench } from 'lucide-react';
 import { WorkspaceSettingsLayout, type WorkspaceSettingsGroup } from '@larkup/workspace-ui';
 
 export type SettingsSection =
@@ -40,15 +30,6 @@ const SECTION_GROUPS: WorkspaceSettingsGroup<SettingsSection>[] = [
     items: [
       { id: 'marketplace', label: 'Marketplace', icon: Store },
       { id: 'tool-settings', label: 'Installed Tools', icon: Wrench },
-    ],
-  },
-  {
-    label: 'Runtime',
-    items: [
-      { id: 'agent-customization', label: 'Agent Customization', icon: Blocks },
-      { id: 'runtime', label: 'Larkup Server', icon: Terminal },
-      { id: 'monitoring', label: 'Monitor', icon: Activity },
-      // { id: 'automations', label: 'Jobs', icon: Clock3 }, // TODO:: Later
     ],
   },
 ];

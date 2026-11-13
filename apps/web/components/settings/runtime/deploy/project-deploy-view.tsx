@@ -965,8 +965,7 @@ export function ProjectDeployView({
                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                                             <AlertDialogAction
                                               onClick={() => {
-                                                window.location.href =
-                                                  '/settings?section=agent-customization';
+                                                window.location.href = '/agent';
                                               }}
                                             >
                                               Continue
@@ -1036,8 +1035,7 @@ export function ProjectDeployView({
                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                                             <AlertDialogAction
                                               onClick={() => {
-                                                window.location.href =
-                                                  '/settings?section=agent-customization';
+                                                window.location.href = '/agent';
                                               }}
                                             >
                                               Continue
@@ -1255,7 +1253,7 @@ export function ProjectDeployView({
                           ? `Project default · ${
                               PROVIDER_META[selectedChatProvider]?.label ?? selectedChatProvider
                             }`
-                          : PROVIDER_META[selectedChatProvider]?.label ?? selectedChatProvider}
+                          : (PROVIDER_META[selectedChatProvider]?.label ?? selectedChatProvider)}
                       </span>
                     </span>
                   </SelectTrigger>

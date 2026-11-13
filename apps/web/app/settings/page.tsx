@@ -5,13 +5,10 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { SettingsLayout, type SettingsSection } from '@/components/settings/settings-layout';
 import { GeneralSection } from '@/components/settings/general/general-section';
 import { ModelsSection } from '@/components/settings/general/models-section';
-import { RunDeployAgentSection } from '@/components/settings/runtime/runtime-section';
-import { AgentCustomizationSection } from '@/components/settings/general/agent-customization-section';
 import { SearchIntegrationsSection } from '@/components/settings/general/search-scraping-section';
 import { StorageSection } from '@/components/settings/general/storage-indexing-section';
 import { MarketplaceSection } from '@/components/settings/hub/marketplace-section';
 import { MarketplaceToolsSettings } from '@/components/settings/hub/marketplace-tools-settings';
-import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
 import { CalendarClock } from 'lucide-react';
 
 const SETTINGS_SECTIONS: SettingsSection[] = [
@@ -19,9 +16,6 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
   'models',
   'storage',
   'search-web',
-  'agent-customization',
-  'runtime',
-  'monitoring',
   'automations',
   'marketplace',
   'tool-settings',
@@ -73,22 +67,9 @@ function SettingsContent() {
       {activeSection === 'general' && <GeneralSection />}
       {activeSection === 'models' && <ModelsSection />}
       {activeSection === 'storage' && <StorageSection />}
-      {activeSection === 'agent-customization' && <AgentCustomizationSection />}
-      {activeSection === 'runtime' && <RunDeployAgentSection />}
       {activeSection === 'marketplace' && <MarketplaceSection />}
       {activeSection === 'tool-settings' && <MarketplaceToolsSettings />}
       {activeSection === 'search-web' && <SearchIntegrationsSection />}
-      {activeSection === 'monitoring' && (
-        <section className="space-y-6">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">Monitoring</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Track this Project’s health, latency, errors, and usage by local or remote deployment.
-            </p>
-          </div>
-          <AnalyticsDashboard />
-        </section>
-      )}
       {activeSection === 'automations' && (
         <section className="space-y-2">
           <h1 className="text-xl font-semibold">Jobs</h1>
