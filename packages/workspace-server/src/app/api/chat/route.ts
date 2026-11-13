@@ -1,6 +1,10 @@
 import { verifiedAnalysisTextStream } from '../../../lib/chat/analysis-response-stream';
 import { modelServiceError } from '../../../lib/chat/model-service-errors';
-import { createChatModel, usageModelAttribution } from '../../../lib/chat/model-provider';
+import {
+  createChatModel,
+  usageModelAttribution,
+  isGatewayChatModelAvailable,
+} from '../../../lib/chat/model-provider';
 import { tabularSchemaDefinitions } from '../../../lib/chat/tabular-schema-definitions';
 import { compactConversationMessages } from '@larkup/core/conversation-history';
 import { filterSupersededTabularDatasets } from '../../../lib/chat/assistant-tabular-scope';
@@ -889,7 +893,7 @@ export async function POST(req: Request) {
   const resolvedProvider = provider;
   if (
     resolvedProvider === 'vercel_ai_gateway' &&
-    !gatewayModels.some((entry) => entry.id === chatModelId)
+    !isGatewayChatModelAvailable(chatModelId, gatewayModels, config.customChatModels)
   ) {
     return Response.json(
       { error: 'The selected model is unavailable. Choose an available model and try again.' },

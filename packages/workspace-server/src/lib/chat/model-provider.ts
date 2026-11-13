@@ -160,3 +160,14 @@ export function createChatModel(
 export function usageModelAttribution(requestedModelId: string, actualModelId?: string) {
   return { modelId: actualModelId || requestedModelId, pricingModelId: requestedModelId };
 }
+
+/** Public catalog availability must preserve explicitly configured workspace models. */
+export function isGatewayChatModelAvailable(
+  modelId: string,
+  publicModels: readonly { id: string }[],
+  customModels: readonly { modelName: string }[] = [],
+): boolean {
+  return modelId.startsWith('custom:')
+    ? customModels.some((model) => model.modelName === modelId.slice('custom:'.length))
+    : publicModels.some((model) => model.id === modelId);
+}
