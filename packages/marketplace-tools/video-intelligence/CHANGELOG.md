@@ -1,5 +1,17 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.14
+
+### Patch Changes
+
+- 9c073a6: Keep priority-driven semantic clip selection within the declared model-read budget.
+  Spool completed clip frames losslessly into job-scoped temporary storage and load
+  frames lazily for parallel vision and embedding consumers. Expose sampling limits
+  and frame-storage diagnostics.
+- 7fd8291: Organize the existing media-agent instructions into reusable investigation skills
+  without changing the rendered prompt, tool contracts, execution budgets or model
+  call count. Keep unfinished video research assets outside published artifacts.
+
 ## 0.3.13
 
 ### Patch Changes
