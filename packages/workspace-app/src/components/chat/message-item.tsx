@@ -12,10 +12,7 @@ import { ChatChart, type ChartConfig } from './tools/chat-chart';
 import { ChatDataTable, type DataTableConfig } from './tools/chat-data-table';
 import { ChatFileExport } from './tools/chat-file-export';
 import { ChatSandboxResult, type SandboxResultConfig } from './tools/chat-sandbox-result';
-import {
-  isSupersededAnalysisFailure,
-  type AnalysisAttemptState,
-} from './analysis-attempt-visibility';
+import { isHiddenAnalysisFailure, type AnalysisAttemptState } from './analysis-attempt-visibility';
 import { ChatTabs } from './tools/chat-tabs';
 import { ChatMetricCards } from './tools/chat-metric-cards';
 import { ChatMermaid } from './tools/chat-mermaid';
@@ -498,28 +495,21 @@ export function MessageItem({
   const webSearchParts = toolParts.filter(
     (p: any) => getChatToolBehavior(getToolInfo(p).toolName).placement === 'web-search',
   );
-  // The planner may make several analysis attempts in one turn, retrying after a
-  // failure. Show only the final attempt: a failed attempt is hidden whenever a
-  // later attempt exists (still running or already completed), so the user never
-  // sees intermediate diagnostics. If every attempt fails, the last is shown.
-  const analysisAttemptStates: AnalysisAttemptState[] = toolParts.map((p: any) => {
+  // A failed code-analysis attempt is an internal diagnostic, never user-facing.
+  // Hide every failed attempt — whether the planner retried, succeeded later, or
+  // gave up — so the user only sees the assistant's message and any successful
+  // analysis output, not a raw "Analysis failed" traceback.
+  const nonVizToolParts = toolParts.filter((p: any) => {
     const info = getToolInfo(p);
-    const isAnalysisAttempt = info.toolName === 'executeAnalysis';
-    return {
-      isAnalysisAttempt,
+    const behavior = getChatToolBehavior(info.toolName);
+    const attempt: AnalysisAttemptState = {
+      isAnalysisAttempt: info.toolName === 'executeAnalysis',
       isFailure:
-        isAnalysisAttempt &&
+        info.toolName === 'executeAnalysis' &&
         (info.isFailed ||
           (typeof info.output?.exitCode === 'number' && info.output.exitCode !== 0)),
     };
-  });
-  const nonVizToolParts = toolParts.filter((p: any, index: number) => {
-    const behavior = getChatToolBehavior(getToolInfo(p).toolName);
-    return (
-      !isVizPart(p) &&
-      behavior.placement === 'inline' &&
-      !isSupersededAnalysisFailure(analysisAttemptStates, index)
-    );
+    return !isVizPart(p) && behavior.placement === 'inline' && !isHiddenAnalysisFailure(attempt);
   });
   const firstCitationToolPartIndex = toolParts.findIndex(
     (part: any) => getToolInfo(part).output?.ui?.kind === 'citations',

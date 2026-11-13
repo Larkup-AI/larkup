@@ -1,8 +1,8 @@
 // Decide which analysis (code-execution) attempts to show in the transcript.
-// The planner may retry a failed analysis within a single assistant turn; only
-// the final attempt should be visible, so a failed attempt is hidden whenever a
-// later attempt exists — whether it is still running or already completed. If
-// every attempt fails, the last one is still shown. Pure and dependency-free so
+// A failed analysis attempt is an internal diagnostic, not user-facing content:
+// it is always hidden, whether the planner retried, succeeded later, or gave up.
+// The assistant's own message conveys the outcome to the user, and successful
+// analysis results (tables, charts) are still shown. Pure and dependency-free so
 // it can be unit-tested without the chat message component.
 
 export interface AnalysisAttemptState {
@@ -12,15 +12,7 @@ export interface AnalysisAttemptState {
   isFailure: boolean;
 }
 
-/**
- * True when the attempt at `index` is a failed analysis attempt that a later
- * attempt supersedes, so it should be hidden from the user.
- */
-export function isSupersededAnalysisFailure(parts: AnalysisAttemptState[], index: number): boolean {
-  const part = parts[index];
-  if (!part?.isAnalysisAttempt || !part.isFailure) return false;
-  for (let i = index + 1; i < parts.length; i += 1) {
-    if (parts[i]?.isAnalysisAttempt) return true;
-  }
-  return false;
+/** True when a part is a failed analysis attempt that should be hidden. */
+export function isHiddenAnalysisFailure(part: AnalysisAttemptState | undefined): boolean {
+  return Boolean(part?.isAnalysisAttempt && part.isFailure);
 }

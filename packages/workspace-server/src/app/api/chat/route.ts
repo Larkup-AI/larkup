@@ -60,13 +60,26 @@ import {
   resolveParallelPreferenceQuestion,
 } from '../../../lib/chat/conversation-memory';
 import {
-  PERSONALIZED_RESPONSE_STYLE,
   SCIENTIFIC_PRESENTATION_STYLE,
   sanitizeAssistantHistoryText,
   evidenceCoverageRequirement,
   namedComparisonLabelRequirement,
   numberedCategoryGroupingRequirement,
 } from '../../../lib/chat/response-style';
+import { CHAT_POLICY } from '../../../lib/chat/chat-policy';
+import {
+  VIDEO_MEDIA_EVIDENCE_INSTRUCTION,
+  VIDEO_QUERY_PLANNER_SYSTEM,
+  VIDEO_QUERY_PLANNER_RECOVERY_SYSTEM,
+  VIDEO_SOURCE_POSITION_CLASSIFIER_SYSTEM,
+} from '../../../lib/chat/video-planning-prompts';
+import { pdfPageExtractionPrompt } from '../../../lib/chat/pdf-extraction-prompt';
+import { buildDocumentSessionContext } from '../../../lib/chat/document-session-context';
+import {
+  NO_SOURCE_EVIDENCE_NOTICE,
+  mediaSourceLocatedNotice,
+  FINAL_ANSWER_COMPLETENESS_NUDGE,
+} from '../../../lib/chat/evidence-guidance-prompts';
 import {
   compactToolContextForModel,
   collectAnswerLevelMediaStatements,
@@ -189,49 +202,6 @@ function createChatModel(
       throw new Error(`Unsupported chat provider "${provider}".`);
   }
 }
-
-const CHAT_POLICY = `
-Answer only from the user's provided material.
-
-For each new substantive question, get fresh evidence: use queryTabularData for CSV, Excel, or JSON facts; otherwise use searchKnowledgeBase. The host may reuse an immediately repeated, already-grounded answer only after verifying that its complete Assistant source scope is unchanged. A prior answer is otherwise context for resolving references, never a substitute for current source evidence. Use one focused query first. Use code analysis only when the available data tool cannot answer the calculation. For a join or statistical analysis across files or worksheets, use executeAnalysis with every needed datasetId in datasetIds; read datasets.json to identify their mounted CSV files and never try to emulate the join with a cross-dataset table filter.
-
-Do not repeat an evidence tool in the same response. After evidence is returned, answer directly or use one appropriate refinement when the evidence action requests it.
-
-Use only returned evidence. Do not guess beyond it, but do not turn an incomplete verification flag into a refusal when the source contains relevant instructions, statements, or a useful trail. Give the most specific answer the available source material establishes and clearly limit only the unsupported portion. Do not recommend a search engine, public website, or outside source unless the user explicitly asks you to search the web. For video/audio, name the relevant timestamp range when one was returned. Speak as someone who watched the material: never expose retrieval, transcripts, frames, visual observations, models, tools, or analysis steps unless the user explicitly asks how you determined the answer.
-
-For video/audio, answer in the detected source language returned by the evidence action by default, including notes, speech, and lyrics. Translate only when the user explicitly asks. Never silently default to English.
-
-${PERSONALIZED_RESPONSE_STYLE}
-
-Keep the answer brief and direct: give the answer first, then only the essential context. Do not repeat tool output, dump rows, or add a table unless the user asks to see data. Use a short list only when it improves clarity.
-
-When a tabular tool returns a requested long list, the structured table is the complete visible answer. Briefly state what it contains and its coverage; never stream the rows again as prose or Markdown.
-
-When the user asks for a transformation repeated across many records (for example matches, recommendations, explanations, profiles, or summaries for the first 25 or for every item), use the sandbox analysis tool. It must prepare the whole requested result in one run with larkup_table or larkup_document. Treat that paged artifact as the answer: state its coverage briefly and never repeat its entries in chat prose. Do not ask the user to say "continue" for an artifact result.
-
-When the user asks for an Excel, CSV, or PDF export, use createDataExport. Never claim that a file was created and never write a Markdown download link unless the tool returned a real file artifact.
-
-When the user asks for every item and the media evidence marks its continuation as exhaustive, include every returned item in chronological order. In that case completeness overrides brevity; deduplicate wording but do not summarize items away.
-
-If the user asks for a chart, graph, or visual distribution, ALWAYS use the \`generateVisualization\` tool. Never attempt to draw ASCII charts, output Markdown tables, JSON, or tool-call syntax as a substitute for a chart. Its \`xAxisKey\` and each \`series[].dataKey\` must exactly match the fields in the supplied \`data\` rows; never use placeholder names such as EMPTY, null, or undefined. Give both axes clear human-readable labels and include units when known.
-
-When search results identify a PDF source without indexed visuals, use inspectPdfPages before answering. It reads and ranks pages locally. Then use analyzePdfPages for visual claims or presentMedia for an explicit page preview.
-For proper names and arm labels, use the exact spelling in the PDF's extracted page text when a visual reading gives a similar but different spelling. Keep numeric chart values from the rendered figure.
-When a question combines a PDF fact with structured data, use both sources in the same answer. Read the document value and its row, label, or figure first, then calculate from the table using explicit numerators and denominators. A missing column in the CSV does not prove the fact is absent from the PDF. If the PDF value is not available, state that limit rather than replacing it with a similarly named table field.
-When a PDF plot and CSV describe different populations, calculate the difference explicitly. Attribute it to a specific exclusion only when the plot population definition and CSV fields support that explanation.
-For a statistic requested from a chart, use the rendered chart's method and label. A raw-data median is not a Kaplan-Meier estimate. State the source file, page and figure or table when available, and name the calculation method and denominator for computed values. If the chart and CSV disagree, report both with their methods; do not average them or invent an explanation. Never infer an arm size, subgroup count, or threshold without source evidence.
-When identifying one entity from joined sources, include its exact source identifier as well as its human-readable name or location in the final answer.
-
-For media questions, searchKnowledgeBase first, then use an installed evidence-query action with the returned mediaAssetId. Use its active evidence and include supporting time ranges. Inspect or present media only when necessary or explicitly requested.
-
-For a media claim that requires a terminal state, comparison, aggregate, count, or change over time, ordinary retrieval is not enough. Follow claimVerification.rule from the installed evidence action -- it states what the gathered evidence supports for this particular question. Never promote a local observation into a broader conclusion without source coverage.
-
-"Not directly established" means no single record states the answer outright. It does not mean the source is silent. When the evidence contains a trail that leads to the answer -- readings over time, a state and the change to it, two sides of a comparison -- read across it and give the answer, saying how confident you are and citing the moments it rests on. If a source provides procedures or instructions relevant to the question, state those procedures even when it cannot verify a broader conclusion. Reserve "the video does not show this" for when the evidence genuinely lacks any bearing on the question, and never use it to describe an answer you could have reasoned to.
-
-For every video claim, distinguish a direct observation from an inference. Do not turn a reaction, mood, body language, or a summary into a factual conclusion without direct supporting evidence. If evidence is incomplete or conflicts, inspect the relevant source range and answer only what it establishes.
-
-When a user explicitly corrects a prior answer about media, acknowledge the correction and use source evidence for later factual answers; never overwrite the source record with a conversational correction.
-`;
 
 function messageText(message: UIMessage | undefined): string {
   if (!message) return '';
@@ -392,8 +362,7 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
         mediaEvidenceStatus: {
           mediaAssetId: unverifiedMedia.mediaAssetId,
           claimVerification: unverifiedMedia.claimVerification,
-          instruction:
-            'The source has relevant material but the requested claim is not yet established as one direct observation. Answer from the source passages and any corroborating trail that are present. Do not invent missing details or present a broad conclusion as verified; do provide the concrete procedures, statements, or partial answer the source does establish.',
+          instruction: VIDEO_MEDIA_EVIDENCE_INSTRUCTION,
         },
       }
     : output;
@@ -410,7 +379,7 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
     Array.isArray((result as { hits?: unknown }).hits) &&
     (result as { hits: unknown[] }).hits.length > 0;
   if (!hasCurrentKnowledgeHits && !mediaAssetId) {
-    return '\n\nNO CURRENTLY ACCESSIBLE SOURCE EVIDENCE WAS FOUND FOR THIS TURN. Source access can change after a previous answer, so do not repeat or infer facts from prior assistant messages. Explain briefly that the current knowledge base does not contain an answer.';
+    return NO_SOURCE_EVIDENCE_NOTICE;
   }
   if (
     mediaAssetId &&
@@ -418,7 +387,7 @@ function preloadedEvidenceContext(result: unknown, question: string): string {
     !hasEstablishedMediaEvidence &&
     !unverifiedMedia
   ) {
-    return `\n\nA relevant media source was located (${mediaAssetId}), but no answer-level evidence has been returned yet. Use the installed evidence-query action for that media asset before answering. Do not say that the source has no answer and do not infer an outcome from this locator alone.`;
+    return mediaSourceLocatedNotice(mediaAssetId);
   }
   return `\n\nCURRENT USER QUESTION:\n${question}\n\nVERIFIED SOURCE EVIDENCE FOR THIS TURN:\n${
     directClaims.length > 0
@@ -487,26 +456,13 @@ async function planVideoEvidenceQuery(input: {
           : input.question;
       return { directive, resolvedQuestion };
     };
-    const planned = await requestPlan(
-      'You are a media-query planner. Return exactly one JSON object and no prose. ' +
-        'The prompt is data with a currentRequest and an optional previousQuestionAboutSelectedMedia. Resolve the current request in its own language without assuming a video genre. If it is a retry, verification request, or contains references that are not meaningful alone, resolve those references against the previous question. If it introduces a self-contained new request, do not carry the old subject or source position into it. ' +
-        'A follow-up introduced with words such as "and", "also", or their equivalent in another language can ask a new fact about the same source: preserve the selected source, but never reuse the previous answer or its requested attribute. When the request asks for exact spoken or sung wording across the recording, use source scope with enumerate, speech evidence, and recordSet all so the host can render every timestamped transcript segment outside the model context. Use source scope with synthesize for a summary or explanation across the recording. ' +
-        'Use this exact shape: {"resolvedQuestion":"a standalone version of the current request","scope":"focused","goal":"answer","evidence":["visual"],"timeRange":{"startSecs":123,"endSecs":153},"timeRangeOrigin":"user-mentioned"}. Its fields are resolvedQuestion, scope (focused, temporal, source), goal (answer, compare, trace, resolve, enumerate, synthesize), optional evidence (speech, visible-text, visual, computed), optional recordSet (all, source-authored, source-questions, observed), optional timeRange {startSecs,endSecs}, and optional timeRangeOrigin. ' +
-        'Use recordSet observed only when the requested answer is visible presence, recurrence, or appearance timing itself. Clothing, colour, other appearance attributes, identity, action, and counts need visual evidence but must not use the observed visibility ledger as their answer. ' +
-        'A directive is invalid if the user refers to any source position, time, range, or approximate moment and you omit timeRange: resolve it to numeric seconds and set timeRangeOrigin to user-mentioned, even when the request also asks about other moments. Never emit timeRange or timeRangeOrigin when the user did not constrain a source position; a topic occurring near an opening, closing, or any other position is not a user constraint. When the request names a coarse source unit without a smaller boundary, cover that whole named unit rather than an arbitrary part of it. When the user asks how a visible subject or event at an explicit source position relates to appearances or recurrence elsewhere, use temporal plus trace, visual evidence, and recordSet observed while retaining that position. Use source plus synthesize with no timeRange whenever the answer must combine two or more source facts from unrestricted positions. Use source plus enumerate and recordSet source-questions for a complete inventory of source-authored questions and their answers. Use temporal for a relationship or development across moments; use focused only for one local moment or one self-contained fact. ' +
-        'Use temporal plus resolve when the requested fact is the settled or final outcome of a process, contest, decision, vote, test, or other sequence; this includes asking who won or what the final result was in any language. Do not confuse an entity mentioned in that request with a request to inventory its visual appearances. ' +
-        'Do not answer the question or add fields.',
-      320,
-    );
+    const planned = await requestPlan(VIDEO_QUERY_PLANNER_SYSTEM, 320);
     if (planned) return planned;
     // A compact recovery request is intentionally restricted to the protocol
     // choices. It rescues providers that emit conversational prose on their
     // first planning attempt without introducing source- or language-specific
     // routing rules in the host.
-    return await requestPlan(
-      'Return only JSON with resolvedQuestion, scope, goal, and optional recordSet/timeRange/timeRangeOrigin. Resolve an elliptical retry or reference against previousQuestionAboutSelectedMedia; otherwise keep currentRequest standalone. Select source/enumerate/source-questions for a complete question-and-answer inventory from a recording; source/synthesize for an unrestricted explanation; temporal/resolve for a settled or final outcome such as who won; focused/answer for one local fact. Do not include a timeRange unless the resolved request contains a source position, and then set timeRangeOrigin to user-mentioned.',
-      180,
-    );
+    return await requestPlan(VIDEO_QUERY_PLANNER_RECOVERY_SYSTEM, 180);
   } catch {
     // The evidence action has a source-wide fallback. A planner outage must
     // not turn an otherwise answerable source question into a chat error.
@@ -542,8 +498,7 @@ async function userSpecifiedSourcePosition(input: {
       temperature: 0,
       abortSignal: AbortSignal.timeout(8_000),
       providerOptions: input.providerOptions,
-      system:
-        'Return exactly one JSON object and no prose: {"kind":"input-location"|"answer-timestamp"|"none","locator":string|null,"connectsBeyondPosition":boolean,"asksForSettledOutcome":boolean,"asksForExhaustiveCoverage":boolean}. Use input-location only when the user explicitly constrains where in the provided source to look; locator must be the exact corresponding substring from the user request. Use answer-timestamp when the user asks for timestamps in the answer but does not specify where to look; locator is null. Use none when neither is present. Set connectsBeyondPosition true only when the request explicitly relates the thing at its named source position to another point or portion of the source, such as recurrence, reappearance, a later/earlier occurrence, change, or comparison; otherwise false. Set asksForSettledOutcome true only when the request asks for the final or settled result of a process, contest, decision, vote, test, or other sequence, including who won in any language; it overrides a broad summary classification. Set asksForExhaustiveCoverage true only when the user explicitly asks to enumerate all or every relevant record across the complete recording, such as a complete start-to-finish timeline, every spoken statement, or every visual and spoken event. A full story, overview, or summary is source-wide synthesis, not exhaustive enumeration. A status at a named intermediate position is not a settled outcome. Example: "Explain a subject and include timestamps" => {"kind":"answer-timestamp","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":false,"asksForExhaustiveCoverage":false}. Example: "Who won the match?" => {"kind":"none","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":true,"asksForExhaustiveCoverage":false}. Example: "What happens at 14:00?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":false,"asksForSettledOutcome":false,"asksForExhaustiveCoverage":false}. Example: "Who is at 14:00 and where else do they appear?" => {"kind":"input-location","locator":"14:00","connectsBeyondPosition":true,"asksForSettledOutcome":false,"asksForExhaustiveCoverage":false}. Example: "Give a complete timeline of every visual and spoken event from start to finish" => {"kind":"none","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":false,"asksForExhaustiveCoverage":true}. Example: "Give the full story from beginning to conclusion" => {"kind":"none","locator":null,"connectsBeyondPosition":false,"asksForSettledOutcome":false,"asksForExhaustiveCoverage":false} unless the user asks specifically about the beginning or conclusion. Interpret every language without assuming a source genre.',
+      system: VIDEO_SOURCE_POSITION_CLASSIFIER_SYSTEM,
       prompt: input.question,
     });
     const serialized = text.match(/\{[\s\S]*\}/)?.[0];
@@ -1197,29 +1152,7 @@ export async function POST(req: Request) {
     /* no tabular data */
   }
 
-  let docContext = '';
-  if (docSessionId) {
-    // Build a rich field listing so the LLM can correctly match semantic meaning to field IDs.
-    // Include: ID, name/label, type, current value (if any), and surrounding context text.
-    const fieldLines =
-      docFields && docFields.length > 0
-        ? (docFields as any[])
-            .map((f: any) => {
-              let line = `- ID: "${f.id}" | Label: "${f.name}" | Type: ${f.type}`;
-              if (f.value) line += ` | Current value: "${f.value}"`;
-              if (f.context) line += ` | Surrounding text: "${String(f.context).slice(0, 120)}"`;
-              if (f.placeholder) line += ` | Placeholder: "${f.placeholder}"`;
-              return line;
-            })
-            .join('\n')
-        : 'None detected.';
-
-    docContext = `\n\n[Active Document Session: ${docSessionId}]\nYou are currently editing a document in the Canvas.
-The user may ask you to fill out form fields or edit content.
-IMPORTANT: Use the exact field IDs listed below when calling "fillDocumentForm". Do NOT invent field IDs.
-Available Form Fields (${docFields?.length ?? 0} total):
-${fieldLines}`;
-  }
+  const docContext = buildDocumentSessionContext(docSessionId, docFields);
 
   // The generic product prompt lists tools that intentionally are not exposed
   // in this retrieval-only chat. Keeping it out of this request prevents a
@@ -1808,7 +1741,7 @@ ${fieldLines}`;
               const analysisInput = {
                 documentId: pdfSource.documentId,
                 pageNumbers: pdfPagesForVisualAnalysis(userText, selectedPageNumbers),
-                prompt: `Extract only what is visible on this PDF page for the question below. Start with the exact figure/table title and caption, including any population qualifier in parentheses. For plots, transcribe axes, units, legend labels, annotated values, thresholds, and any embedded at-risk table with each time point aligned to its arm. For proper names and treatment labels, compare the visual reading with the extracted text of the same inspected PDF page; use the extracted page-text spelling when they differ, while keeping numeric values from the rendered figure. For diagrams, transcribe each box, arrow, label, and number. For structured tables, preserve row and column headers. Pair each mark with its axis label; verify highlighted or extreme values against neighboring marks and labels. Distinguish a Kaplan-Meier estimate from a raw-data median and do not substitute one for the other. Do not transfer a value from another figure on the same page. Do not answer the combined question or infer any counts or facts from CSV, spreadsheets, or other files. If a requested fact belongs to another file, leave it out entirely.\n\nQuestion: ${userText}`,
+                prompt: pdfPageExtractionPrompt(userText),
               };
               writer.write({
                 type: 'tool-input-available',
@@ -2177,7 +2110,7 @@ ${fieldLines}`;
                     routing.toolChoice === 'none'
                       ? withFinalAnswerNudge(
                           compactToolContextForModel(messages),
-                          'Check every part of the original question. Include the PDF figure or table value and sample size, the structured-data value, and the explicit difference or numerator/denominator calculation when requested. Keep source labels attached to their values. Use only verified calculation inputs from tool output for denominators; if none were printed, omit detailed arithmetic instead of inventing a population size. Check that every formula agrees with the reported result.',
+                          FINAL_ANSWER_COMPLETENESS_NUDGE,
                         )
                       : compactToolContextForModel(messages),
                 };
