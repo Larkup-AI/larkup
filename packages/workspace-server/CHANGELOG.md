@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.66
+
+### Patch Changes
+
+- 6bc88e9: Keep speculative calculation prose out of the answer until a successful analysis produces usable evidence. Preserve tool progress, provider error signals, and normal source-answer streaming.
+
 ## 0.2.65
 
 ### Patch Changes
