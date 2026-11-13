@@ -186,32 +186,15 @@ export function UnifiedSidebar() {
     <TooltipProvider delay={150}>
       <aside
         className={cn(
-          'group/sidebar sticky top-0 hidden h-screen shrink-0 flex-col self-start pt-4 md:flex transition-[width] duration-300 ease-in-out bg-sidebar text-sidebar-foreground',
-          collapsed ? 'w-18' : 'w-60',
+          'group/sidebar sticky top-0 hidden h-screen shrink-0 flex-col self-start pl-0.5 md:flex transition-[width] duration-300 ease-in-out bg-sidebar text-sidebar-foreground',
+          collapsed ? 'w-16' : 'w-64',
         )}
       >
-        <div
-          className={cn(
-            'flex w-full items-center mb-5',
-            collapsed ? 'justify-center px-3' : 'px-4',
-          )}
-        >
-          <Link
-            href="/chat"
-            aria-label="Larkup"
-            className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-2.5')}
-          >
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-transform hover:scale-105">
-              <img src="/logo9.png" className="size-5 dark:hidden" alt="logo" />
-              <img src="/logo.png" className="size-5 hidden dark:block" alt="logo" />
-            </span>
-            {!collapsed && (
-              <span className="text-sm font-semibold tracking-tight text-foreground">Larkup</span>
-            )}
-          </Link>
+        <div className={cn('mt-1 py-3', collapsed ? 'px-2' : 'px-3')}>
+          <ProjectSwitcher brand collapsed={collapsed} />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-1.5">
+        <div className="flex-1 overflow-y-auto px-1.5 pt-2">
           <HoverProvider containerRef={contentRef}>
             <nav ref={contentRef} className="relative flex flex-col gap-6 pb-4">
               <HoverIndicator />
@@ -232,18 +215,15 @@ export function UnifiedSidebar() {
           </HoverProvider>
         </div>
 
-        <div className="mt-auto flex w-full flex-col">
-          <div
-            className={cn(
-              'flex flex-col gap-0.5 pt-3 pb-2',
-              collapsed ? 'items-center px-2' : 'px-3',
-            )}
-          >
-            {FOOTER_LINKS.map((item) => (
-              <FooterLink key={item.id} item={item} collapsed={collapsed} />
-            ))}
-          </div>
-          <ProjectSwitcher collapsed={collapsed} />
+        <div
+          className={cn(
+            'mt-auto flex w-full flex-col gap-0.5 border-t border-sidebar-border/60 py-3',
+            collapsed ? 'items-center px-2' : 'px-3',
+          )}
+        >
+          {FOOTER_LINKS.map((item) => (
+            <FooterLink key={item.id} item={item} collapsed={collapsed} />
+          ))}
         </div>
 
         <button

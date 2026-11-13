@@ -17,7 +17,13 @@ import { useProject, type WorkspaceProject } from './project-provider';
 import { ProjectFormDialog } from './project-form-dialog';
 import { DeleteProjectDialog } from './delete-project-dialog';
 
-export function ProjectSwitcher({ collapsed = false }: { collapsed?: boolean }) {
+export function ProjectSwitcher({
+  collapsed = false,
+  brand = false,
+}: {
+  collapsed?: boolean;
+  brand?: boolean;
+}) {
   const { projects, activeProject, activateProject } = useProject();
   const [createOpen, setCreateOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<WorkspaceProject | null>(null);
@@ -40,14 +46,29 @@ export function ProjectSwitcher({ collapsed = false }: { collapsed?: boolean }) 
               type="button"
               aria-label="Switch project"
               className={cn(
-                'flex w-full items-center border-t border-sidebar-border/60 bg-transparent text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-                collapsed ? 'justify-center px-0 py-3' : 'gap-2 px-3 py-3',
+                'flex items-center text-left transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                brand
+                  ? collapsed
+                    ? 'size-10 justify-center rounded-lg'
+                    : 'h-11 w-full gap-2.5 rounded-lg px-1'
+                  : collapsed
+                    ? 'size-10 justify-center rounded-xl border bg-card'
+                    : 'w-full gap-2 rounded-xl border bg-card px-2 py-1.5',
               )}
             />
           }
         >
-          <span className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-primary">
-            <FolderKanban className="size-4" />
+          <span
+            className={cn(
+              'relative flex size-7 shrink-0 items-center justify-center overflow-hidden',
+              !brand && 'rounded-lg bg-primary/10 text-primary',
+            )}
+          >
+            {brand ? (
+              <img src="/logo.png" alt="Larkup" className="size-7 object-contain dark:invert" />
+            ) : (
+              <FolderKanban className="size-4" />
+            )}
             <span
               className={cn(
                 'absolute bottom-0 right-0 size-2 rounded-full border border-background',
@@ -59,10 +80,10 @@ export function ProjectSwitcher({ collapsed = false }: { collapsed?: boolean }) 
             <>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14px] font-bold capitalize">
-                  {activeProject?.name ?? 'Create a project'}
+                  {activeProject?.name ?? (brand ? 'Larkup' : 'Create a project')}
                 </span>
                 <span className="block truncate text-[11px] leading-4 text-muted-foreground">
-                  {activeProject?.running ? 'Project live' : 'Not running'}
+                  {activeProject?.running ? 'Project live' : brand ? 'Larkup' : 'Not running'}
                 </span>
               </span>
               <ChevronsUpDown className="size-4 text-muted-foreground" />
@@ -72,7 +93,7 @@ export function ProjectSwitcher({ collapsed = false }: { collapsed?: boolean }) 
 
         <DropdownMenuContent
           align="start"
-          side={collapsed ? 'right' : 'top'}
+          side={collapsed ? 'right' : 'bottom'}
           sideOffset={8}
           className="w-72 max-w-[calc(100vw-2rem)] rounded-xl border-border bg-popover p-1.5 shadow-lg"
         >
