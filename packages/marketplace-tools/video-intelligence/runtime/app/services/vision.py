@@ -9,6 +9,8 @@ pipeline calls; `GatewayVisionClient` is its HTTP implementation detail.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import base64
 import json
 import os
@@ -203,7 +205,7 @@ class ClipCaptionRequest:
     clip_id: str
     start_ms: int
     end_ms: int
-    frames: list[tuple[int, np.ndarray]]
+    frames: Sequence[tuple[int, np.ndarray]]
 
 
 @dataclass(frozen=True)
@@ -266,7 +268,7 @@ def _frame_to_inline_data(frame: np.ndarray) -> dict[str, str]:
 
 
 def _precision_frames(
-    frames: list[tuple[int, np.ndarray]],
+    frames: Sequence[tuple[int, np.ndarray]],
     max_source_frames: int = 4,
 ) -> list[tuple[int, np.ndarray]]:
     """Keep a bounded chronology spanning the whole clip.
@@ -1448,7 +1450,7 @@ class SemanticVisionService:
 
     def describe_clips(
         self,
-        clips: dict[str, tuple[int, int, list[tuple[int, Any]]]],
+        clips: dict[str, tuple[int, int, Sequence[tuple[int, Any]]]],
         brief: dict[str, Any],
         transcript: list[dict[str, Any]] | None = None,
         on_progress: Callable[[int, int], None] | None = None,

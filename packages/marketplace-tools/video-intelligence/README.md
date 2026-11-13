@@ -41,6 +41,15 @@ runtime/app/
 
 `deploy/` is the operator/infrastructure side for Larkup's managed cloud offering: the AWS control plane (Lambda + API Gateway + DynamoDB + S3) and GPU provider dispatch/worker entrypoints (RunPod, Modal, and other vendors behind one interface). It is public for review and collaboration, but remains fully separate from `runtime/app` so a self-hosted Docker/local install never depends on it. It uses short-lived CI identity and contains no deployed credentials. See `deploy/README.md` for testing, validation, and deploy commands.
 
+## Research and contributor entry point
+
+See [research/README.md](research/README.md) for the current capability audit,
+paper pipeline diagram, dataset normalization and label-blind comparison harness.
+Completed clips use lossless temporary storage instead of retaining every raw
+frame bucket in memory. Priority ranges influence selection inside the bounded
+semantic clip budget. Sparse indexing does not guarantee brief-event recall;
+result coverage reports that limitation explicitly.
+
 ## Current roadmap
 
 Collaborators are currently focused on three connected improvements:

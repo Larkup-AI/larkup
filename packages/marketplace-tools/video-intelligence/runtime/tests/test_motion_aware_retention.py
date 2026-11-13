@@ -121,6 +121,27 @@ class MotionAwareRetentionTests(unittest.TestCase):
         self.assertEqual(len(selected), 60)
         self.assertIn("clip_10", selected)
 
+    def test_source_wide_priority_cannot_bypass_the_model_read_budget(self) -> None:
+        clips = [ClipBounds(f"clip_{i}", i * 20, (i + 1) * 20) for i in range(180)]
+        selected = _select_semantic_clip_ids(
+            clips, {}, [], [], [PriorityRange(0, 3_600, "inspect changes")],
+            "fast", 3_600,
+        )
+        self.assertEqual(len(selected), 30)
+        indexes = [int(value.split("_")[1]) for value in selected]
+        self.assertTrue(all(any(start <= i < start + 6 for i in indexes)
+                            for start in range(0, 180, 6)))
+
+    def test_local_priority_replaces_its_bucket_winner_without_adding_work(self) -> None:
+        clips = [ClipBounds(f"clip_{i}", i * 20, (i + 1) * 20) for i in range(180)]
+        selected = _select_semantic_clip_ids(
+            clips, {"clip_6": [10.0]}, [], [],
+            [PriorityRange(145, 155, "source supported")], "fast", 3_600,
+        )
+        self.assertEqual(len(selected), 30)
+        self.assertIn("clip_7", selected)
+        self.assertNotIn("clip_6", selected)
+
     def test_fast_agentic_skim_bounds_model_reads_without_losing_timeline_coverage(self) -> None:
         clips = [ClipBounds(f"clip_{index}", index * 20, (index + 1) * 20) for index in range(180)]
         selected = _select_semantic_clip_ids(

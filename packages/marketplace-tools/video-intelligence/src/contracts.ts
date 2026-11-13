@@ -229,6 +229,10 @@ export interface VideoEvidenceBundle {
     heavyOperatorsDisabled: boolean;
     priorityRanges?: Array<{ startSecs: number; endSecs: number; reason: string }>;
     semanticClips?: number;
+    selectedSemanticClips?: number;
+    semanticClipBudget?: number;
+    samplingGuarantee?: 'sampled-evidence-only';
+    briefEventsMayBeMissed?: boolean;
   };
   agentPlan?: {
     mode: VideoIndexingMode;
@@ -262,6 +266,7 @@ export interface VideoEvidenceBundle {
     estimatedTotalSeconds: number;
     elapsedSeconds: number;
     estimateErrorSeconds: number;
+    frameStore?: { storage: 'temporary-lossless-npy'; frames: number; bytes: number };
   };
   transcriptionDiagnostics?: {
     provider?: string | null;

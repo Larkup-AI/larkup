@@ -18,6 +18,7 @@ import subprocess
 import threading
 import time
 from collections import Counter, defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -40,6 +41,7 @@ from app.services.brain import (
 )
 from app.services.embedding import VideoClipInput, get_video_embedding_provider
 from app.services.motion import MotionSampler
+from app.services.frame_store import FrameStore
 from app.services.scene import ClipBounds, SceneDetector
 from app.services.transcription import TranscriptionService
 from app.services.vision import SemanticVisionService
@@ -1044,7 +1046,6 @@ def _select_semantic_clip_ids(
         if (item.get("objects") or item.get("ocr"))
     ]
     scored: list[tuple[float, int, ClipBounds]] = []
-    priority_ids: set[str] = set()
     for index, clip in enumerate(clip_plan):
         motion = clip_frame_scores.get(clip.clip_id) or []
         motion_score = (max(motion, default=0.0) * 1.5) + (
@@ -1063,8 +1064,6 @@ def _select_semantic_clip_ids(
             clip.start_secs < item.end_secs and clip.end_secs > item.start_secs
             for item in priority_ranges
         )
-        if prioritized:
-            priority_ids.add(clip.clip_id)
         # Motion, visible evidence, and local speech density are all generic
         # signals. A tiny chronological tie-break keeps selection deterministic.
         score = (
@@ -1075,7 +1074,7 @@ def _select_semantic_clip_ids(
         )
         scored.append((score, index, clip))
 
-    selected: set[str] = set(priority_ids)
+    selected: set[str] = set()
     # Divide the source into equal chronological buckets and keep the most
     # informative clip in each. This guarantees whole-video coverage while
     # behaving like a person who skims and pauses on change-rich moments.
@@ -1264,7 +1263,7 @@ def _planner_transcript_signal(
 
 def _compute_video_embeddings(
     clip_plan: list[ClipBounds],
-    clip_frames: dict[str, list[tuple[int, np.ndarray]]],
+    clip_frames: dict[str, Sequence[tuple[int, np.ndarray]]],
     progress: Callable[[str, int, str], None],
     on_clip_progress: Callable[[int, int], None] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -1450,7 +1449,7 @@ def run_pipeline(
     source_duration_secs: float | None = None,
 ) -> tuple[dict[str, Any], float]:
     pipeline_started = time.monotonic()
-    with SmoothProgress(progress) as smooth:
+    with SmoothProgress(progress) as smooth, FrameStore() as frame_store:
         return _run_pipeline(
             path,
             brief,
@@ -1462,6 +1461,7 @@ def run_pipeline(
             semantic_vision_enabled,
             timestamp_offset_secs,
             source_duration_secs,
+            frame_store,
         )
 
 
@@ -1476,6 +1476,7 @@ def _run_pipeline(
     semantic_vision_enabled: bool,
     timestamp_offset_secs: float,
     source_duration_secs: float | None,
+    frame_store: FrameStore,
 ) -> tuple[dict[str, Any], float]:
     smooth.phase(
         "probe", PHASES["plan"][0], "Reading video metadata", PHASES["plan"][1], 20
@@ -1740,11 +1741,20 @@ def _run_pipeline(
     )
     smooth.configure_eta(plan.estimated_seconds)
     clip_starts_ms = [round(clip.start_secs * 1_000) for clip in clip_plan]
-    clip_frames: dict[str, list[tuple[int, np.ndarray]]] = {
+    clip_frames: dict[str, Sequence[tuple[int, np.ndarray]]] = {
         clip.clip_id: [] for clip in clip_plan
     }
     clip_frame_scores: dict[str, list[float]] = {clip.clip_id: [] for clip in clip_plan}
-    clip_previous_gray: dict[str, np.ndarray] = {}
+    active_clip_id: str | None = None
+    active_frames: list[tuple[int, np.ndarray]] = []
+    previous_gray: np.ndarray | None = None
+
+    def flush_clip() -> None:
+        nonlocal previous_gray
+        if active_clip_id is not None and active_frames:
+            clip_frames[active_clip_id] = frame_store.save(active_frames)
+            active_frames.clear()
+        previous_gray = None
     # The mode and bounded question decide the remote-frame budget. Motion
     # retention below then makes that budget content-aware without assuming a
     # genre from user-supplied descriptive metadata.
@@ -1781,14 +1791,17 @@ def _run_pipeline(
                 len(clip_plan) - 1,
             )
             clip_id = clip_plan[clip_index].clip_id
-            clip_previous_gray[clip_id] = _retain_clip_frame(
+            if clip_id != active_clip_id:
+                flush_clip()
+                active_clip_id = clip_id
+            previous_gray = _retain_clip_frame(
                 motion_sampler,
-                clip_frames[clip_id],
+                active_frames,
                 clip_frame_scores[clip_id],
                 time_ms,
                 frame,
                 frames_per_clip,
-                clip_previous_gray.get(clip_id),
+                previous_gray,
             )
         for detection in detections:
             label_counts[detection["label"]] += 1
@@ -1802,6 +1815,9 @@ def _run_pipeline(
             observations.append(
                 {"timeMs": time_ms, "objects": detections, "ocr": ocr_lines}
             )
+
+    flush_clip()
+    previous_gray = None
 
     clips_for_description = {
         clip.clip_id: (
@@ -2096,6 +2112,7 @@ def _run_pipeline(
         "processingDiagnostics": {
             "estimatedTotalSeconds": plan.estimated_seconds,
             "elapsedSeconds": elapsed_seconds,
+            "frameStore": frame_store.diagnostics(),
             "estimateErrorSeconds": round(elapsed_seconds - plan.estimated_seconds, 3),
         },
         "transcriptionDiagnostics": {
@@ -2146,6 +2163,10 @@ def _run_pipeline(
                 for item in plan.priority_ranges
             ],
             "semanticClips": len(clip_plan),
+            "selectedSemanticClips": caption_total,
+            "semanticClipBudget": _semantic_clip_budget(plan.mode, probe.duration_seconds, len(clip_plan)),
+            "samplingGuarantee": "sampled-evidence-only",
+            "briefEventsMayBeMissed": True,
         },
         "answeringGuide": {
             "goal": brief.get("goal"),

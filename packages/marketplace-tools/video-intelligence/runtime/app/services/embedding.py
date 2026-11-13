@@ -12,6 +12,8 @@ and Hugging Face Inference Endpoint deployments.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import base64
 import os
 import threading
@@ -30,7 +32,7 @@ class VideoClipInput:
     clip_id: str
     start_ms: int
     end_ms: int
-    frames: list[tuple[int, np.ndarray]]
+    frames: Sequence[tuple[int, np.ndarray]]
 
 
 @dataclass(frozen=True)
