@@ -1,10 +1,24 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ChevronDown, Play, Clock, Image as ImageIcon, Table2, Terminal } from 'lucide-react';
+import { ChevronDown, Play, Clock, Image as ImageIcon, Table2 } from 'lucide-react';
 import { ChatDataTable, type DataTableConfig } from './chat-data-table';
 import { ChatAnalysisResult, type AnalysisPresentation } from './chat-analysis-result';
 import { Card, CardContent } from '../../ui/card';
+
+/**
+ * A ringed-dot glyph for the "Thoughts" disclosure. No stock lucide icon has a
+ * filled centre this large, so we draw one: a thin ring with a bold dot almost
+ * touching it, reading as a crisp, confident marker rather than a faint hint.
+ */
+function ThoughtDot({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="12" r="5.5" fill="currentColor" />
+    </svg>
+  );
+}
 
 interface SandboxArtifact {
   name: string;
@@ -76,7 +90,7 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
             <div
               key={i}
               data-testid="analysis-artifact-image"
-              className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-xs"
+              className="overflow-hidden rounded-xl border border-border/60 bg-card"
             >
               <img
                 src={`data:${img.mimeType};base64,${img.data}`}
@@ -107,29 +121,23 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
 
       {/* Plain calculation stdout rendered in a clean collapsible audit panel */}
       {stdout && !stdoutTable && !presentation && (
-        <div className="my-2 overflow-hidden rounded-xl border border-border/70 bg-card/60 shadow-xs">
-          <details className="group">
-            <summary className="flex cursor-pointer list-none items-center justify-between px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
-              <div className="flex items-center gap-2">
-                <Terminal className="size-3.5 text-foreground" />
-                <span>Calculation & Execution Details</span>
-                <span className="font-mono text-[10px] text-muted-foreground/80">
-                  (
-                  {executionTimeMs < 1000
-                    ? `${executionTimeMs}ms`
-                    : `${(executionTimeMs / 1000).toFixed(1)}s`}
-                  )
-                </span>
-              </div>
-              <ChevronDown className="size-3 transition-transform group-open:rotate-180 text-muted-foreground" />
-            </summary>
-            <div className="border-t border-border/40 bg-muted/20 p-3">
-              <pre className="max-h-52 overflow-auto font-mono text-[11px] leading-relaxed text-foreground whitespace-pre-wrap [&::-webkit-scrollbar]:hidden">
-                {stdout}
-              </pre>
-            </div>
-          </details>
-        </div>
+        <details className="group my-1.5">
+          <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 py-1 text-xs font-medium text-muted-foreground/90 transition-colors hover:text-foreground">
+            <ThoughtDot className="size-3.5 text-foreground opacity-60" />
+            <span>Thoughts</span>
+            <span className="font-mono text-[10px] text-muted-foreground/60">
+              {executionTimeMs < 1000
+                ? `${executionTimeMs}ms`
+                : `${(executionTimeMs / 1000).toFixed(1)}s`}
+            </span>
+            <ChevronDown className="size-3 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-1.5 border-l border-border/50 pl-3">
+            <pre className="max-h-52 overflow-auto font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap [&::-webkit-scrollbar]:hidden">
+              {stdout}
+            </pre>
+          </div>
+        </details>
       )}
 
       {isEmptySuccess && (

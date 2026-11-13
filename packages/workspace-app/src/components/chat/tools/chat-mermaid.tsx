@@ -56,7 +56,7 @@ export function ChatMermaid({ code }: { code: string }) {
   return (
     <div
       data-testid="chat-mermaid-diagram"
-      className="my-3.5 w-full overflow-hidden rounded-2xl border border-border/75 bg-card/90 shadow-xs"
+      className="my-3.5 w-full overflow-hidden rounded-2xl border border-border/75 bg-card/90"
     >
       <div className="flex items-center justify-between border-b border-border/40 px-3.5 py-2">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">

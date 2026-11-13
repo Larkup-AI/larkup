@@ -81,7 +81,7 @@ export function renderMarkdown(text: string, safeImageUrls?: Set<string>): strin
       cleanUrl.startsWith('/icons/') ||
       cleanUrl.startsWith('data:image/');
     if (isWhitelisted || isSafeImageUrl(cleanUrl)) {
-      return `<figure class="my-3 overflow-hidden rounded-xl border border-border/70 bg-card p-1 shadow-xs"><img src="${cleanUrl}" alt="${alt}" class="w-full max-h-96 object-contain rounded-lg bg-muted/10" loading="lazy" /><figcaption class="px-3 py-2 text-center text-xs text-muted-foreground font-medium border-t border-border/40">${alt || 'Indexed figure'}</figcaption></figure>`;
+      return `<figure class="my-3 overflow-hidden rounded-xl border border-border/70 bg-card p-1"><img src="${cleanUrl}" alt="${alt}" class="w-full max-h-96 object-contain rounded-lg bg-muted/10" loading="lazy" /><figcaption class="px-3 py-2 text-center text-xs text-muted-foreground font-medium border-t border-border/40">${alt || 'Indexed figure'}</figcaption></figure>`;
     }
     return `<span class="text-muted-foreground italic text-xs">[Image reference${
       alt ? `: ${alt}` : ''

@@ -18,7 +18,7 @@ export function ChatMetricCards({ block }: { block: MetricsBlock }) {
   return (
     <div
       data-testid="chat-metrics-card"
-      className="my-3.5 w-full overflow-hidden rounded-2xl border border-border/75 bg-card/95 p-4 sm:p-5 shadow-xs transition-colors"
+      className="my-3.5 w-full overflow-hidden rounded-2xl border border-border/75 bg-card/95 p-4 sm:p-5 transition-colors"
     >
       {title && (
         <div className="mb-3.5 flex items-center gap-2 border-b border-border/40 pb-2.5">

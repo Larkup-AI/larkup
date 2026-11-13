@@ -29,10 +29,17 @@ import { ChatMediaPreview } from './tools/chat-media-preview';
 import { ChatCitations, type ChatCitationsUi } from './tools/chat-citations';
 import { KnowledgeBaseResult } from './tools/knowledge-base-result';
 import { useDocEditor } from './canvas/doc-editor-provider';
-import { CHAT_TOOL_BEHAVIORS, getChatToolBehavior } from '../../lib/constants/tools';
+import {
+  CHAT_TOOL_BEHAVIORS,
+  getChatToolBehavior,
+  getPendingSteps,
+  getPendingIcon,
+  GENERIC_THINKING_STEPS,
+  GENERIC_THINKING_ICON,
+} from '../../lib/constants/tools';
+import { ThinkingIndicator } from './thinking-indicator';
 import { decodeToolOutput } from '../../lib/chat/tool-output';
 import {
-  isIndeterminateProgress,
   keepToolProgressMonotonic,
   smoothLiveToolProgress,
   smoothPendingToolProgress,
@@ -612,11 +619,7 @@ export function MessageItem({
         !isKnowledgeSearchActive &&
         !hasThinkTags &&
         textParts.every((p: any) => !p.text || p.text.trim().length === 0) && (
-          <div className="flex items-center gap-2">
-            <div className="size-6.5 bg-white border border-border rounded-full flex items-center justify-center p-1 animate-pulse">
-              <img src="/logo.png" alt="logo" className="size-4 animate-spin" />
-            </div>
-          </div>
+          <ThinkingIndicator steps={GENERIC_THINKING_STEPS} icon={GENERIC_THINKING_ICON} />
         )}
 
       {/* Text parts — with markdown table detection, think-tag stripping, and rich blocks */}
@@ -1017,47 +1020,21 @@ function renderToolPart(
     }
 
     const liveProgress = toolProgress && toolProgress.toolCallId === callId ? toolProgress : null;
-    // Past the point where the remaining work has a measurable size, a
-    // percentage is a claim we cannot back. Drop it and shuttle the bar
-    // instead, so the wait still reads as active rather than stalled.
-    const indeterminate = liveProgress
-      ? liveProgress.indeterminate === true || isIndeterminateProgress(liveProgress.percent)
-      : false;
+    // A real server-driven status line (e.g. a video analysis stage) pins the
+    // indicator; the synthetic fallback just echoes the pending label, so treat
+    // that as "no live message" and let the canned step sequence narrate.
+    const liveMessage =
+      liveProgress?.message && liveProgress.message !== behavior.pendingLabel
+        ? liveProgress.message
+        : null;
 
     return (
-      <div key={index} className="flex min-w-0 flex-col gap-1.5 py-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="size-6.5 bg-white dark:bg-card border border-border rounded-full flex items-center justify-center p-1">
-            <img src="/logo.png" alt="" className="size-4 animate-spin" />
-          </div>
-          <span
-            className="larkup-shimmer-text min-w-0 wrap-break-word text-[13px] font-medium leading-5"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {liveProgress?.message || liveProgress?.label || behavior.pendingLabel || 'Working'}
-          </span>
-        </div>
-        {liveProgress && behavior.showProgressBar !== false ? (
-          <div className="ml-9 flex items-center gap-2">
-            <div className="h-1.5 w-48 overflow-hidden rounded-full bg-muted">
-              {indeterminate ? (
-                <div className="larkup-progress-shuttle h-full rounded-full bg-emerald-500" />
-              ) : (
-                <div
-                  className="h-full rounded-full bg-emerald-500 transition-[width] duration-700 ease-out"
-                  style={{ width: `${Math.max(6, Math.min(100, liveProgress.percent))}%` }}
-                />
-              )}
-            </div>
-            {!indeterminate ? (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
-                {Math.round(liveProgress.percent)}%
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+      <ThinkingIndicator
+        key={index}
+        steps={getPendingSteps(toolName)}
+        icon={getPendingIcon(toolName)}
+        liveMessage={liveMessage}
+      />
     );
   }
 

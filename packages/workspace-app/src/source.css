@@ -46,6 +46,44 @@
   animation: larkup-progress-shuttle 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
+/* Step-to-step transition for the thinking indicator: each new status line
+   fades up gently as it replaces the previous one. */
+@keyframes larkup-step-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.larkup-step-fade-in {
+  animation: larkup-step-fade-in 0.45s ease-out;
+}
+
+/* The thinking glyph carries the same shimmer as the status text -- a classy,
+   non-rotating loading cue. Its stroke colour sweeps between muted and full
+   foreground, synced to the text shimmer, with a faint scale breath. */
+@keyframes larkup-shimmer-icon {
+  0%,
+  100% {
+    color: var(--muted-foreground);
+    opacity: 0.65;
+    transform: scale(0.94);
+  }
+  50% {
+    color: var(--foreground);
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.larkup-shimmer-icon {
+  animation: larkup-shimmer-icon 2.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .larkup-shimmer-text {
     animation: none;
@@ -57,6 +95,16 @@
     width: 100%;
     animation: none;
   }
+
+  .larkup-step-fade-in {
+    animation: none;
+  }
+
+  .larkup-shimmer-icon {
+    animation: none;
+    color: var(--foreground);
+    opacity: 0.8;
+  }
 }
 
 /* ── Assistant message typography ──
@@ -66,7 +114,7 @@
    comfortable spacing and a restrained type scale. Changing these rules changes
    how text appears in every chat UI, never what the renderer emits. */
 .assistant-text-content {
-  font-size: 0.9375rem; /* 15px */
+  font-size: 1rem; /* 16px */
   line-height: 1.75;
   color: var(--foreground);
   overflow-wrap: break-word;

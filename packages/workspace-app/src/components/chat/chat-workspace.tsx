@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import useSWR, { mutate as globalMutate } from 'swr';
 import { MessageItem } from './message-item';
+import { ThinkingIndicator } from './thinking-indicator';
+import { GENERIC_THINKING_STEPS, GENERIC_THINKING_ICON } from '../../lib/constants/tools';
 import { MessageQueue, type QueuedMessage } from './message-queue';
 import { JobsTrackingButton } from '../data/jobs-tracking-button';
 import { shouldAutoOpenSupportingClip } from '../../lib/chat-supporting-clip';
@@ -1290,7 +1292,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
                     ? '/settings/models'
                     : '/settings'
                 }
-                className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
               >
                 Go to Settings
               </a>
@@ -1306,7 +1308,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
             }
           />
         ) : (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-0">
             {messages.map((m, idx) => (
               <MessageItem
                 key={m.id}
@@ -1322,11 +1324,7 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
               />
             ))}
             {chatStatus === 'submitted' || isInitializingChat ? (
-              <div className="flex items-center gap-2">
-                <div className="size-7 bg-white border border-border rounded-full flex items-center justify-center p-1 animate-pulse">
-                  <img src="/logo.png" alt="logo" className="size-4  animate-spin" />
-                </div>
-              </div>
+              <ThinkingIndicator steps={GENERIC_THINKING_STEPS} icon={GENERIC_THINKING_ICON} />
             ) : null}
             {error
               ? (() => {

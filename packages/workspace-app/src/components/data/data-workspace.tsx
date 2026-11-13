@@ -373,7 +373,7 @@ export function DataWorkspace({ view }: { view?: TopTabId } = {}) {
                             <History className="size-4" />
                             {hasActive && (
                               <>
-                                <span className="absolute -top-1 -right-1 z-10 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white shadow-sm ring-1 ring-white">
+                                <span className="absolute -top-1 -right-1 z-10 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white ring-1 ring-white">
                                   {activeJobCount}
                                 </span>
                                 <span className="absolute -top-1 -right-1 z-0 flex h-3.5 w-3.5 animate-ping rounded-full bg-emerald-400 opacity-75"></span>

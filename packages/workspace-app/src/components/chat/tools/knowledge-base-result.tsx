@@ -10,7 +10,8 @@ import {
   Loader2,
   Table,
 } from 'lucide-react';
-import { isIndeterminateProgress } from '../../../lib/chat/live-tool-progress';
+import { getPendingSteps } from '../../../lib/constants/tools';
+import { ThinkingIndicator } from '../thinking-indicator';
 
 function Typewriter({ text, animate }: { text: string; animate: boolean }) {
   const [length, setLength] = useState(animate ? 0 : text.length);
@@ -214,38 +215,13 @@ export function KnowledgeBaseResult({
       </div>
 
       {isRunning && activity ? (
-        <div
-          className="mt-2.5 max-w-2xl rounded-xl border border-emerald-500/70 bg-background px-3 py-2.5"
-          aria-live="polite"
-          data-testid="video-analysis-progress"
-        >
-          <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="larkup-shimmer-text font-medium">{activity.message}</span>
-            {isIndeterminateProgress(activity.percent) ? null : (
-              <span className="shrink-0 tabular-nums text-muted-foreground">
-                {Math.max(1, Math.round(activity.percent))}%
-              </span>
-            )}
-          </div>
-          <div
-            className="mt-2 h-1.5 overflow-hidden rounded-full bg-emerald-950/10 dark:bg-emerald-100/10"
-            role="progressbar"
-            aria-label={activity.message}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            {...(isIndeterminateProgress(activity.percent)
-              ? {}
-              : { 'aria-valuenow': Math.max(1, Math.round(activity.percent)) })}
-          >
-            {isIndeterminateProgress(activity.percent) ? (
-              <div className="larkup-progress-shuttle h-full rounded-full bg-emerald-500" />
-            ) : (
-              <div
-                className="h-full rounded-full bg-emerald-500 transition-[width] duration-700 ease-out"
-                style={{ width: `${Math.max(6, Math.min(100, activity.percent))}%` }}
-              />
-            )}
-          </div>
+        <div data-testid="video-analysis-progress">
+          <ThinkingIndicator
+            steps={getPendingSteps('searchKnowledgeBase')}
+            liveMessage={activity.message}
+            showIcon={false}
+            className="mt-1 py-1 pl-0.5 text-muted-foreground"
+          />
         </div>
       ) : null}
 
