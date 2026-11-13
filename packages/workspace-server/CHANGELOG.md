@@ -1,5 +1,14 @@
 # @larkup/workspace-server
 
+## 0.2.69
+
+### Patch Changes
+
+- c8f04c7: Keep mixed chronological media evidence scans available for grounded answer
+  synthesis instead of replacing compound questions with a generic inventory-count
+  message. Preserve deterministic tables for source-authored inventories and full
+  speech extraction.
+
 ## 0.2.68
 
 ### Patch Changes
