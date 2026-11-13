@@ -1,5 +1,11 @@
 # larkup
 
+## 0.5.0
+
+### Minor Changes
+
+- Rework the workspace sidebar to match Larkup Cloud: grouped navigation (workspace, Developer, Account), a brand project switcher docked at the top, a border collapse/expand toggle, and GitHub + Documentation links. Promote the former Settings sections to dedicated pages — /deploy, /agent, and /monitor — and remove the connections feature.
+
 ## 0.4.97
 
 ### Patch Changes
