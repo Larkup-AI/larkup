@@ -1,3 +1,4 @@
+import { verifiedAnalysisTextStream } from '../../../lib/chat/analysis-response-stream';
 import { modelServiceError } from '../../../lib/chat/model-service-errors';
 import { createChatModel, usageModelAttribution } from '../../../lib/chat/model-provider';
 import { tabularSchemaDefinitions } from '../../../lib/chat/tabular-schema-definitions';
@@ -2562,6 +2563,9 @@ export async function POST(req: Request) {
                 return 'Something went wrong while generating a response. Please try again.';
               },
             })
+            .pipeThrough(
+              verifiedAnalysisTextStream(requiresSandboxAnalysis && !hasPreloadedMediaEvidence),
+            )
             .pipeThrough(
               recoverEmptyUIMessageStream(
                 requiresSandboxAnalysis &&
