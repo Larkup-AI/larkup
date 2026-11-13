@@ -1,5 +1,11 @@
 # @larkup/sandbox
 
+## 0.1.14
+
+### Patch Changes
+
+- f670ddc: Add validated structured aggregation plans, retain schema units and value definitions, preserve Python literals when repairing escaped code, and avoid unchanged execution retries. Surface bounded analysis limitations rather than unverified results.
+
 ## 0.1.13
 
 ### Patch Changes

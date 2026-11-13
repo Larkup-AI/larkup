@@ -1,5 +1,13 @@
 # @larkup/workspace-app
 
+## 0.6.1
+
+### Patch Changes
+
+- Updated dependencies [f670ddc]
+  - @larkup/sandbox@0.1.14
+  - @larkup/tool-doc-editor@0.3.11
+
 ## 0.6.0
 
 ### Minor Changes

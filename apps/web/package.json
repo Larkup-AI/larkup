@@ -1,6 +1,6 @@
 {
   "name": "larkup",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "engines": {
     "node": ">=22"
   },
@@ -40,9 +40,9 @@
     "@larkup/core": "^0.8.6",
     "@larkup/integrations": "^0.2.1",
     "@larkup/marketplace": "^0.3.15",
-    "@larkup/sandbox": "^0.1.13",
+    "@larkup/sandbox": "^0.1.14",
     "@larkup/scraper": "^0.2.6",
-    "@larkup/tool-doc-editor": "^0.3.10",
+    "@larkup/tool-doc-editor": "^0.3.11",
     "@larkup/vector-stores": "^0.1.27",
     "@larkup/workspace-ui": "workspace:*",
     "@napi-rs/canvas": "1.1.0",

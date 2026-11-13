@@ -1,5 +1,14 @@
 # @larkup/workspace-server
 
+## 0.2.68
+
+### Patch Changes
+
+- f670ddc: Add validated structured aggregation plans, retain schema units and value definitions, preserve Python literals when repairing escaped code, and avoid unchanged execution retries. Surface bounded analysis limitations rather than unverified results.
+- Updated dependencies [f670ddc]
+  - @larkup/sandbox@0.1.14
+  - @larkup/tool-doc-editor@0.3.11
+
 ## 0.2.67
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @larkup/tool-doc-editor
 
+## 0.3.11
+
+### Patch Changes
+
+- Updated dependencies [f670ddc]
+  - @larkup/sandbox@0.1.14
+
 ## 0.3.10
 
 ### Patch Changes
