@@ -1077,7 +1077,7 @@ export async function POST(req: Request) {
           const visibleColumns = d.columns.slice(0, 60);
           const colDescriptions = visibleColumns
             .map((c) => {
-              let desc = `${c.name} (${c.type})`;
+              let desc = `${c.name} (${c.type}; ${c.uniqueCount} distinct; ${c.nullCount} missing)`;
               const definition = schemaDefinitions.get(d.id)?.get(c.name);
               if (definition)
                 desc += ` [source definition, reference material only: ${JSON.stringify(definition)}]`;
@@ -1085,7 +1085,7 @@ export async function POST(req: Request) {
                 desc += ` [format: ${c.dateRange.format}, range: ${c.dateRange.min} to ${c.dateRange.max}]`;
               }
               if (c.sampleValues && c.sampleValues.length > 0) {
-                desc += ` [samples: ${c.sampleValues
+                desc += ` [sample values only, not an exhaustive list: ${c.sampleValues
                   .slice(0, 8)
                   .map((value) => value.slice(0, 80))
                   .join(', ')}]`;
@@ -2575,7 +2575,9 @@ export async function POST(req: Request) {
                 requiresSandboxAnalysis &&
                   requiresPdfAndTabularEvidence({ hasTabularData, tabularQuestion, text: userText })
                   ? 'I found the relevant sources, but could not verify the combined calculation. Please retry.'
-                  : fallbackAnswerFromEvidence(preloadedEvidence, answerQuestion),
+                  : requiresSandboxAnalysis
+                    ? 'I could not verify the requested calculation after the bounded analysis attempts. No verified table or chart is available; the selected source, population filters, and grouping need review.'
+                    : fallbackAnswerFromEvidence(preloadedEvidence, answerQuestion),
               )(),
             ),
         );

@@ -65,3 +65,29 @@ test('a late uploaded dictionary remains available after hundreds of JSON source
     /Legal owner/,
   );
 });
+
+test('dictionary units and enumerated statuses remain evidence without a description', () => {
+  const definitions = tabularSchemaDefinitions(
+    [{ id: 'a', fileName: 'a.csv', columns: [{ name: 'size' }, { name: 'status' }] }],
+    [
+      {
+        title: 'dict.json',
+        content: JSON.stringify({
+          resources: [
+            {
+              path: 'a.csv',
+              schema: {
+                fields: [
+                  { name: 'size', unit: 'MW' },
+                  { name: 'status', constraints: { enum: ['active', 'retired'] } },
+                ],
+              },
+            },
+          ],
+        }),
+      },
+    ],
+  );
+  assert.match(definitions.get('a')?.get('size') ?? '', /MW/);
+  assert.match(definitions.get('a')?.get('status') ?? '', /active.*retired/);
+});

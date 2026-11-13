@@ -46,3 +46,16 @@ test('explicit group coverage requires a verifiable table before it can pass', (
     false,
   );
 });
+
+test('verified winner plans count distinct groups while preserving tied winners', () => {
+  const result = { ...table(6), rows: [...table(5).rows, table(5).rows[0]] };
+  assert.equal(
+    validateAnalysisCompleteness(
+      'Give the dominant category for all 5 eligible regions.',
+      result,
+      undefined,
+      ['Region'],
+    ).valid,
+    true,
+  );
+});

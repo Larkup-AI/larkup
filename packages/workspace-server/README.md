@@ -14,3 +14,15 @@ Historical user requests are compact context, never verified factual evidence.
 Every substantive research question still requires current accessible sources.
 Validated structured tables remain the visible result; execution diagnostics and
 rejected calculations are excluded from answer evidence.
+
+`executeAnalysis.analysisPlan` accepts a single source dataset, equality/inclusion
+filters, sum measure, population grouping, comparison category, source units,
+and optional numeric-year decade bucketing and expected group count. It produces
+a complete table, tied winners, or a stacked bar from that same table. Unknown
+columns/values, empty populations, missing/nonfinite measures, missing years,
+coverage mismatches, and inconsistent totals fail closed. The plan does not
+infer geographical scope or certify model-selected units; these still require
+source evidence. Python remains available for calculations outside this contract.
+Syntax is parsed before execution; escaped line separators are repaired only
+outside Python strings/comments after parsing fails. Automatic code retries
+run only when a supported repair changes the source.

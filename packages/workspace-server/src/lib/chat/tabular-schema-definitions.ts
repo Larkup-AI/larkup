@@ -37,11 +37,20 @@ export function tabularSchemaDefinitions(
         for (const field of resource.schema.fields.slice(0, 250)) {
           if (
             typeof field?.name !== 'string' ||
-            typeof field.description !== 'string' ||
+            (!field.description && !field.unit && !field.constraints?.enum) ||
             !dataset.columns.some((column) => column.name === field.name)
           )
             continue;
-          const description = `${document.title}: ${field.description.slice(0, 400)}`;
+          const detail = [
+            typeof field.description === 'string' ? field.description.slice(0, 400) : '',
+            typeof field.unit === 'string' ? `unit: ${field.unit}` : '',
+            Array.isArray(field.constraints?.enum)
+              ? `allowed values: ${JSON.stringify(field.constraints.enum.slice(0, 30))}`
+              : '',
+          ]
+            .filter(Boolean)
+            .join('; ');
+          const description = `${document.title}: ${detail}`;
           const previous = fields.get(field.name);
           fields.set(
             field.name,

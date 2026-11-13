@@ -41,3 +41,21 @@ frame
 `);
   expect(result).toContain("STRUCTURED Analysis results ['value'] [{'value': 7}]");
 });
+
+describe('escaped code transport', () => {
+  it('repairs separators outside literals while preserving strings and regex escapes', () => {
+    expect(
+      run(
+        String.raw`import re\nvalue = "a\nb"\nprint(value.split("\n"))\nprint(bool(re.match(r"\d+", "12")))`,
+      ),
+    ).toBe("['a', 'b']\nTrue");
+  });
+  it('leaves valid source and triple-quoted literals unchanged', () => {
+    expect(run('text = """literal \\\\n marker"""\nprint(repr(text))')).toBe(
+      "'literal \\\\n marker'",
+    );
+  });
+  it('does not execute a valid prefix when a later statement fails parsing', () => {
+    expect(() => run(String.raw`print("must not execute")\nif :`)).toThrow();
+  });
+});

@@ -1,3 +1,7 @@
+import {
+  structuredAnalysisPlanSchema,
+  compileStructuredAnalysisPlan,
+} from '../../../lib/chat/structured-analysis-plan';
 import { filterSupersededTabularDatasets } from '../../../lib/chat/assistant-tabular-scope';
 import { workspaceServerUrl, workspaceServerFetch as fetch } from '../../../runtime-host';
 import { workspaceHost } from '@larkup/core/workspace-host';
@@ -2990,15 +2994,21 @@ export async function getChatTools(context: {
 
     executeAnalysis: tool({
       description:
-        'Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. Every successful execution must expose its answer: print a concise labeled numeric/text result, create an artifact, or call a LarkUp presentation helper; assignments with no output are invalid. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. Hard counts are acceptance criteria: when the user asks for K matches for N targets, emit exactly N×K long-form rows or N rows with K populated match fields. Never skip a target with empty data or zero semantic overlap; fill it from the best remaining eligible candidates, while honoring global reuse limits, and assert all counts before presentation. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.' +
+        'For grouped sums, dominant categories, or stacked bar charts, prefer analysisPlan with exact columns, filters, units and coverage instead of writing Python. Execute Python code in a secure sandbox for deep data analysis and complete multi-record results. Use this for correlations, matching or recommendations across many rows, constrained ranking, transformations, clustering, and custom visualizations. Every successful execution must expose its answer: print a concise labeled numeric/text result, create an artifact, or call a LarkUp presentation helper; assignments with no output are invalid. For a result containing many records, do not print the records as prose. Call larkup_table(title, rows, columns, summary, requested_items, file_name) exactly once so Chat renders the complete result with pagination and download. For long narrative sections, call larkup_document(title, pages, summary, requested_items, file_name), where pages is a list of strings or {title, content} objects. Produce every requested item in this one execution, validate counts and global constraints in Python, and keep stdout to a short diagnostic. Hard counts are acceptance criteria: when the user asks for K matches for N targets, emit exactly N×K long-form rows or N rows with K populated match fields. Never skip a target with empty data or zero semantic overlap; fill it from the best remaining eligible candidates, while honoring global reuse limits, and assert all counts before presentation. The code has pandas, numpy, matplotlib, scipy, scikit-learn, and seaborn. Use plt.show() for charts. The sandbox already configures headless plotting and cache directories.' +
         analysisValidationRequirements(requestText ?? '') +
         ' For uploaded CSV, Excel, or JSON facts, always read the mounted dataset files in the sandbox. Never paste or reconstruct uploaded rows as a Python string, DataFrame literal, or guessed mapping. Use datasets.json for multiple files. PDF counts may be entered as literal values only when the inspected page or visual reading supplied the exact label and value; pair every such value with its source label before joining to a mounted table.' +
         (recentAnalysisTable
           ? ` The complete result table from the preceding turn is mounted as data.csv with ${recentAnalysisTable.rows.length} rows and these columns: ${recentAnalysisTable.columns.join(', ')}. Use that file, not the original uploaded dataset, for this follow-up.`
           : ''),
       inputSchema: z.object({
+        analysisPlan: structuredAnalysisPlanSchema
+          .optional()
+          .describe(
+            'Preferred for grouped sums, dominant category per group, and stacked charts. State source via datasetId, exact source columns, all geographic/status filters using observed values, units, and expected group coverage. The server generates and verifies the code; leave code empty. Preserve fine categories when requested; do not substitute a coarser classification.',
+          ),
         code: z
           .string()
+          .default('')
           .describe(
             'Python code to execute. For a list/table longer than a short chat answer, finish with larkup_table(...). For long prose, finish with larkup_document(...). These helpers are preloaded; never redefine them. requested_items must equal the user-requested top/first/all count so completeness is verified. Has pandas (2.0+), numpy, matplotlib, scipy, sklearn, seaborn. ALWAYS use "ME" instead of "M" for resample frequency. Use plt.show() for charts. Plot configuration is already prepared; do not set MPLBACKEND, MPLCONFIGDIR, or XDG_CACHE_HOME.',
           ),
@@ -3022,7 +3032,7 @@ export async function getChatTools(context: {
             "Optional exact PDF documentId. Its original local file will be mounted as 'source.pdf' for pypdf/Pillow analysis.",
           ),
       }),
-      execute: async ({ code, datasetId, datasetIds, pdfDocumentId }) => {
+      execute: async ({ code, analysisPlan, datasetId, datasetIds, pdfDocumentId }) => {
         try {
           const sandboxManager = workspaceSandbox(resolveSandboxConfig(config));
           const files: SandboxFile[] = [];
@@ -3166,6 +3176,14 @@ export async function getChatTools(context: {
           }
 
           let finalCode = code;
+          if (analysisPlan) {
+            if (mountedDatasets.length !== 1)
+              throw new Error('A structured analysis plan requires exactly one datasetId.');
+            finalCode = compileStructuredAnalysisPlan(
+              analysisPlan,
+              mountedDatasets[0].columns.map((column) => column.name),
+            );
+          }
           // Clean up any markdown blocks LLMs might mistakenly wrap the code in
           finalCode = finalCode.replace(/^```python\s*\n?/m, '');
           finalCode = finalCode.replace(/^```\s*\n?/m, '');
@@ -3205,7 +3223,7 @@ export async function getChatTools(context: {
             finalCode = remapSingleDatasetRead(finalCode);
             finalCode = remapSingleDatasetColumnReferences(finalCode, mountedDatasets[0]);
           }
-          if (!matchingEngine) {
+          if (!matchingEngine && !analysisPlan) {
             finalCode = withAnalysisNumericProvenance(finalCode, requestText ?? '');
           }
 
@@ -3217,7 +3235,8 @@ export async function getChatTools(context: {
           });
 
           // Auto-retry once if code crashes
-          if (result.exitCode !== 0) {
+          if (result.exitCode !== 0 && !analysisPlan) {
+            const previousCode = finalCode;
             if (
               requestedDatasetIds.length > 1 &&
               /(?:no such file|data\.csv)/i.test(result.stderr)
@@ -3239,12 +3258,13 @@ export async function getChatTools(context: {
             finalCode = finalCode.replace(/freq=(['"])M(['"])/g, 'freq=$1ME$2');
             finalCode = remapPythonObjectPrintMethods(finalCode);
 
-            result = await sandboxManager.execute({
-              code: finalCode,
-              language: 'python',
-              files,
-              timeout: matchingEngine ? 120_000 : 30_000,
-            });
+            if (finalCode !== previousCode)
+              result = await sandboxManager.execute({
+                code: finalCode,
+                language: 'python',
+                files,
+                timeout: matchingEngine ? 120_000 : 30_000,
+              });
           }
 
           let extracted = extractAnalysisPresentation(result.stdout);
@@ -3262,11 +3282,12 @@ export async function getChatTools(context: {
                   requestText ?? '',
                   extracted.presentation,
                   mountedDatasets.length === 1 ? mountedDatasets[0].rowCount : undefined,
+                  analysisPlan?.output === 'winners' ? analysisPlan.groupBy : undefined,
                 )
               : { valid: true };
           const completenessError = completeness.valid ? undefined : completeness.error;
           const codeValidationError =
-            result.exitCode === 0 && !matchingEngine
+            result.exitCode === 0 && !matchingEngine && !analysisPlan
               ? (authoredCodeValidationError ??
                 analysisCodeValidationError(requestText ?? '', finalCode, {
                   requiresMountedRead: mountedDatasets.length > 0,

@@ -60,6 +60,7 @@ export function validateAnalysisCompleteness(
   requestText: string,
   presentation: AnalysisPresentation | undefined,
   availableItems?: number,
+  verifiedGroupColumns?: string[],
 ): AnalysisCompletenessResult {
   const requestsChartData =
     /\b(?:chart|plot|graph)\b/iu.test(requestText) &&
@@ -90,16 +91,26 @@ export function validateAnalysisCompleteness(
       error: `Population scope validation requires a complete larkup_table with one result for each of ${exactGroups} groups. Stdout or prose cannot verify full group coverage.`,
     };
   }
+  const actualGroups =
+    presentation?.kind === 'table' && verifiedGroupColumns?.length
+      ? new Set(
+          presentation.rows.map((row) =>
+            JSON.stringify(verifiedGroupColumns.map((column) => row[column])),
+          ),
+        ).size
+      : presentation?.kind === 'table'
+        ? presentation.rows.length
+        : 0;
   if (
     oneWinnerPerGroup &&
     Number.isInteger(exactGroups) &&
     exactGroups > 0 &&
     presentation?.kind === 'table' &&
-    presentation.rows.length !== exactGroups
+    actualGroups !== exactGroups
   ) {
     return {
       valid: false,
-      error: `Population scope validation failed: the request requires one result for each of ${exactGroups} groups, but ${presentation.rows.length} rows were returned. Recheck population filters and grouping definitions. Do not truncate rows or invent categories to force the requested count.`,
+      error: `Population scope validation failed: the request requires one result for each of ${exactGroups} groups, but ${actualGroups} groups were returned. Recheck population filters and grouping definitions. Do not truncate rows or invent categories to force the requested count.`,
     };
   }
   const requestedTargets = requestedLongAnalysisItemCount(requestText, availableItems);
