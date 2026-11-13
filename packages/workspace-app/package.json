@@ -1,6 +1,6 @@
 {
   "name": "@larkup/workspace-app",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "type": "module",
   "description": "Canonical Larkup chat, data and settings pages with host adapters",
   "files": [
@@ -539,9 +539,9 @@
   "dependencies": {
     "@ai-sdk/react": "4.0.167",
     "@base-ui/react": "^1.5.0",
-    "@larkup/core": "^0.8.5",
+    "@larkup/core": "^0.8.6",
     "@larkup/integrations": "workspace:*",
-    "@larkup/sandbox": "^0.1.12",
+    "@larkup/sandbox": "^0.1.13",
     "@larkup/tool-doc-editor": "workspace:*",
     "@larkup/vector-stores": "^0.1.27",
     "@larkup/workspace-ui": "workspace:*",

@@ -1,5 +1,38 @@
 # @larkup/workspace-app
 
+## 0.6.0
+
+### Minor Changes
+
+- 7ae20b1: Rework chat loading and surface styling.
+
+  - Replace every chat loading state (message submitted, pre-answer reasoning, and each running tool/skill) with one minimal, NotebookLM/ChatGPT-style `ThinkingIndicator`: a per-skill lucide glyph (search, chart, table, video, code, document, web, …; a neutral `Component` mark for plain reasoning) beside a status line that fades step by step through the real stages of that skill. The glyph and the text share the same shimmer sweep — no spinning logo, no emerald progress bar. Per-skill copy and icons live in `CHAT_TOOL_BEHAVIORS[*]`; genuine server-driven progress messages still take over when present.
+  - Remove drop shadows from all rendered and generated chat UI — sandbox/execution panels, metric blocks, mermaid diagrams, embedded figures, and the primary CTA now rely on borders and tone only. Documented as a flat, shadowless UI convention in the package README.
+  - Restyle the Python-sandbox stdout panel as a classy, collapsed "Thoughts" disclosure with a transparent background (a thin left rule instead of a boxed card), replacing the old "Calculation & Execution Details" card.
+  - Bump the assistant answer body to 16px for readability.
+
+### Patch Changes
+
+- 0ded907: Stabilize source-grounded research and analytical answers.
+
+  - Rank relevant schemas independently of upload order, use matching data-dictionary definitions, and honor authoritative source-to-table links.
+  - Rerank complementary source evidence, preserve bounded supporting passages, and permit one focused research refinement.
+  - Route full-population calculations, integrity checks, and independent rankings to deterministic analysis; validate requested group coverage and isolate failed output from answer evidence.
+  - Capture notebook-style Python expressions consistently across local, Docker, and remote runtimes, and render final DataFrames as complete structured results.
+  - Compact older user context in the background without retaining old assistant claims as facts or removing saved history.
+  - Distinguish source formats from export requests and reuse verified analysis tables for exports.
+  - Cache live model availability, reject retired selections, honor the selected reasoning model, and report the provider's actual model ID instead of a silent cross-model fallback.
+  - Preserve atomic PDF figure annotations and headings, validate passage locators with source quotes, and require the full underlying data for requested analytical charts.
+  - Serialize missing/nonfinite analytical cells as JSON null so sparse joins remain usable structured answers.
+  - Preserve derived analysis fields during schema repair, require verifiable group/chart coverage, and finish completed structured results without regenerating their facts as prose.
+  - Preserve individual user constraints through browser/server compaction and report provider-budget failures explicitly without exposing account details.
+
+- Updated dependencies [bbf229b]
+- Updated dependencies [0ded907]
+  - @larkup/core@0.8.6
+  - @larkup/sandbox@0.1.13
+  - @larkup/tool-doc-editor@0.3.10
+
 ## 0.5.2
 
 ### Patch Changes

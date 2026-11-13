@@ -377,25 +377,25 @@ importers:
         specifier: ^0.41.0
         version: 0.41.0(@types/node@26.6.6)(apache-arrow@18.1.0)
       '@larkup/core':
-        specifier: ^0.8.5
+        specifier: ^0.8.6
         version: link:../../packages/core
       '@larkup/integrations':
         specifier: ^0.2.1
         version: link:../../packages/integrations
       '@larkup/marketplace':
-        specifier: ^0.3.14
+        specifier: ^0.3.15
         version: link:../../packages/marketplace
       '@larkup/runtime-kit':
         specifier: workspace:*
         version: link:../../packages/runtime-kit
       '@larkup/sandbox':
-        specifier: ^0.1.12
+        specifier: ^0.1.13
         version: link:../../packages/sandbox
       '@larkup/scraper':
-        specifier: ^0.2.5
+        specifier: ^0.2.6
         version: link:../../packages/scraper
       '@larkup/tool-doc-editor':
-        specifier: ^0.3.9
+        specifier: ^0.3.10
         version: link:../../packages/marketplace-tools/doc-editor
       '@larkup/vector-stores':
         specifier: ^0.1.27
@@ -816,13 +816,13 @@ importers:
         specifier: ^1.5.0
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@larkup/core':
-        specifier: ^0.8.5
+        specifier: ^0.8.6
         version: link:../core
       '@larkup/integrations':
         specifier: workspace:*
         version: link:../integrations
       '@larkup/sandbox':
-        specifier: ^0.1.12
+        specifier: ^0.1.13
         version: link:../sandbox
       '@larkup/tool-doc-editor':
         specifier: workspace:*
@@ -949,7 +949,7 @@ importers:
         specifier: 2.1.2
         version: 2.1.2
       '@larkup/core':
-        specifier: ^0.8.5
+        specifier: ^0.8.6
         version: link:../core
       '@larkup/marketplace':
         specifier: workspace:*
@@ -961,7 +961,7 @@ importers:
         specifier: workspace:*
         version: link:../scraper
       '@larkup/tool-doc-editor':
-        specifier: ^0.3.9
+        specifier: ^0.3.10
         version: link:../marketplace-tools/doc-editor
       '@larkup/vector-stores':
         specifier: workspace:*
