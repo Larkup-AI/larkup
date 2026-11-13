@@ -82,3 +82,6 @@ molmo2-client.py
 molmo2-hpi.sh
 dist-types/
 scratch/
+
+# Unfinished video paper, diagrams, benchmarks and demo artifacts.
+/packages/marketplace-tools/video-intelligence/research/

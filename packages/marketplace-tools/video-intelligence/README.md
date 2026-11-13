@@ -41,14 +41,27 @@ runtime/app/
 
 `deploy/` is the operator/infrastructure side for Larkup's managed cloud offering: the AWS control plane (Lambda + API Gateway + DynamoDB + S3) and GPU provider dispatch/worker entrypoints (RunPod, Modal, and other vendors behind one interface). It is public for review and collaboration, but remains fully separate from `runtime/app` so a self-hosted Docker/local install never depends on it. It uses short-lived CI identity and contains no deployed credentials. See `deploy/README.md` for testing, validation, and deploy commands.
 
-## Research and contributor entry point
+## Bounded indexing
 
-See [research/README.md](research/README.md) for the current capability audit,
-paper pipeline diagram, dataset normalization and label-blind comparison harness.
 Completed clips use lossless temporary storage instead of retaining every raw
 frame bucket in memory. Priority ranges influence selection inside the bounded
 semantic clip budget. Sparse indexing does not guarantee brief-event recall;
 result coverage reports that limitation explicitly.
+
+## Agent investigation skills
+
+The shared chat tool composes its existing instructions from
+[`src/investigation-skills.ts`](src/investigation-skills.ts). These are reusable
+capability instructions, selected through typed scope and operation rather than
+source genre or keyword lists. The executor still owns permissions, deadlines,
+frame budgets and evidence validation; the skills add no model calls.
+
+The skills cover semantic routing, evidence selection, chronological inventories,
+full-source extraction, index reuse, pagination, source language, claim
+verification, presence interpretation and grounded responses. A person's
+appearance establishes neither their identity nor an action; source-wide scans
+must distinguish indexed observations from complete coverage of reality. Brief
+unsampled events remain a sampling limitation and are reported explicitly.
 
 ## Current roadmap
 

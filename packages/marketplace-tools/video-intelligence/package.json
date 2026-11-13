@@ -45,8 +45,7 @@
     "compose.yaml",
     "compose.gpu.yaml",
     "tool.manifest.json",
-    "README.md",
-    "research"
+    "README.md"
   ],
   "scripts": {
     "dev": "tsc --outDir dist --watch",
@@ -55,8 +54,7 @@
     "test": "vitest run",
     "runtime:test": "cd runtime && uv run --extra cpu --extra test python -m unittest discover -s tests -p 'test_*.py'",
     "runtime:start": "node scripts/runtime.mjs start",
-    "runtime:stop": "node scripts/runtime.mjs stop",
-    "research:test": "python3 -m unittest discover -s research -p 'test_*.py'"
+    "runtime:stop": "node scripts/runtime.mjs stop"
   },
   "peerDependencies": {
     "@larkup/marketplace": ">=0.1.26"
