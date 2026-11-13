@@ -1,5 +1,11 @@
 # @larkup/workspace-server
 
+## 0.2.67
+
+### Patch Changes
+
+- 6ded47c: Preserve explicitly configured workspace models when validating live Gateway model availability. Retired public model IDs and unconfigured custom IDs remain unavailable.
+
 ## 0.2.66
 
 ### Patch Changes
