@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
-import { withAnalysisPresentationHelpers } from '../src/lib/chat/analysis-presentation.ts';
+import {
+  extractAnalysisPresentation,
+  withAnalysisPresentationHelpers,
+} from '../src/lib/chat/analysis-presentation.ts';
 
 function hasPandas(): boolean {
   try {
@@ -64,4 +67,28 @@ test('uses the preloaded presentation helper when generated code imports a modul
   );
   assert.match(stdout, /__LARKUP_PRESENTATION__:/);
   assert.match(stdout, /"count": 2/);
+});
+
+test('sparse joined results preserve missing and nonfinite cells as JSON null', () => {
+  const stdout = execFileSync(
+    'python3',
+    [
+      '-c',
+      withAnalysisPresentationHelpers(`
+larkup_table('Independent rankings', [
+    {'group': 'A', 'count': 7, 'capacity': float('nan')},
+    {'group': 'B', 'count': None, 'capacity': 123.5},
+    {'group': 'C', 'count': float('inf'), 'capacity': -float('inf')},
+])
+`),
+    ],
+    { encoding: 'utf8' },
+  );
+  const result = extractAnalysisPresentation(stdout);
+  assert.ok(result.presentation);
+  assert.deepEqual(result.presentation.rows, [
+    { group: 'A', count: 7, capacity: null },
+    { group: 'B', count: null, capacity: 123.5 },
+    { group: 'C', count: null, capacity: null },
+  ]);
 });

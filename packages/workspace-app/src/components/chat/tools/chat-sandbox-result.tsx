@@ -107,7 +107,11 @@ export function ChatSandboxResult({ config }: { config: SandboxResultConfig }) {
       )}
 
       {/* Structured stdout (rendered as table) */}
-      {isSuccess && presentation && <ChatAnalysisResult presentation={presentation} />}
+      {isSuccess && presentation && (
+        <div data-benchmark-answer="true">
+          <ChatAnalysisResult presentation={presentation} />
+        </div>
+      )}
 
       {stdoutTable && (
         <CardContent className="p-3 pt-3">

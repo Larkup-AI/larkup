@@ -265,6 +265,7 @@ export function extractAnalysisPresentation(stdout: string): {
 /** Injected before generated Python so long results have one stable UI contract. */
 export const ANALYSIS_PRESENTATION_PYTHON = String.raw`
 import json as _larkup_json
+import math as _larkup_math
 
 _LARKUP_PRESENTATION_EMITTED = False
 
@@ -279,9 +280,27 @@ def _larkup_json_default(value):
 
 _larkup_original_json_dumps = _larkup_json.dumps
 
-def _larkup_safe_json_dumps(*args, **kwargs):
+def _larkup_json_clean(value):
+    if isinstance(value, float):
+        return value if _larkup_math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {str(key): _larkup_json_clean(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_larkup_json_clean(item) for item in value]
+    item = getattr(value, "item", None)
+    if callable(item):
+        try:
+            return _larkup_json_clean(item())
+        except Exception:
+            pass
+    # pandas nullable scalars have ambiguous truth values and no item().
+    if type(value).__name__ in ("NAType", "NaTType"):
+        return None
+    return value
+
+def _larkup_safe_json_dumps(value, *args, **kwargs):
     kwargs.setdefault("default", _larkup_json_default)
-    return _larkup_original_json_dumps(*args, **kwargs)
+    return _larkup_original_json_dumps(_larkup_json_clean(value), *args, **kwargs)
 
 _larkup_json.dumps = _larkup_safe_json_dumps
 

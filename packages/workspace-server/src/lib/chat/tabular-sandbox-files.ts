@@ -139,6 +139,19 @@ export function remapMountedDatasetReads(
     mountedByReference.set(`${dataset.id}.csv`.toLocaleLowerCase(), dataset.file);
     mountedByReference.set(dataset.file.toLocaleLowerCase(), dataset.file);
   }
+  const pathVariables = new Set(
+    [...code.matchAll(/\b(?:pd|pandas)\s*\.\s*read_(?:csv|excel)\(\s*([A-Za-z_]\w*)\s*[,)]/g)].map(
+      (match) => match[1],
+    ),
+  );
+  code = code.replace(
+    /^(\s*)([A-Za-z_]\w*)(\s*=\s*)(['"])([^'"\n]+)\4/gm,
+    (match, indent: string, name: string, equals: string, quote: string, path: string) => {
+      if (!pathVariables.has(name)) return match;
+      const mounted = mountedByReference.get(path.split(/[\\/]/).at(-1)?.toLocaleLowerCase() ?? '');
+      return mounted ? `${indent}${name}${equals}${quote}${mounted}${quote}` : match;
+    },
+  );
   const reader = /(\b(?:pd|pandas)\s*\.\s*read_(?:csv|excel)\(\s*)(['"])([^'"]+)\2/g;
   return code.replace(reader, (match, prefix: string, quote: string, path: string) => {
     const baseName = path.split(/[\\/]/).at(-1)?.toLocaleLowerCase() ?? '';
@@ -513,12 +526,15 @@ function matchingSchemaColumn(authored: string, columns: string[]) {
   const candidates = columns.filter((column) => {
     const normalizedColumn = normalizedColumnName(column);
     if (normalizedColumn === normalizedAuthored) return true;
+    // Unknown identifiers can be derived, renamed, or aggregation-created fields.
+    // Only exact normalization is safe; shared prefixes do not establish identity.
+    if (/^[A-Za-z_]\w*$/u.test(authored)) return false;
     if (
       normalizedAuthored.length >= 18 &&
-      (normalizedColumn.startsWith(normalizedAuthored) ||
-        normalizedColumn.endsWith(normalizedAuthored) ||
-        normalizedAuthored.startsWith(normalizedColumn) ||
-        normalizedAuthored.endsWith(normalizedColumn))
+      (normalizedColumn.startsWith(`${normalizedAuthored} `) ||
+        normalizedColumn.endsWith(` ${normalizedAuthored}`) ||
+        normalizedAuthored.startsWith(`${normalizedColumn} `) ||
+        normalizedAuthored.endsWith(` ${normalizedColumn}`))
     ) {
       return true;
     }
@@ -537,6 +553,15 @@ function matchingSchemaColumn(authored: string, columns: string[]) {
 export function remapSingleDatasetColumnReferences(code: string, dataset: TabularDataset) {
   const columns = dataset.columns.map((column) => column.name);
   const stringLiteral = /(['"])((?:\\.|(?!\1)[^\\])*)\1/g;
+  const derivedColumns = new Set<string>();
+  for (const match of code.matchAll(
+    /\[\s*(['"])((?:\\.|[^'"\n])+)\1\s*\]\s*(?:[+*\/-]?=(?!=))/gu,
+  )) {
+    derivedColumns.add(decodeSimplePythonString(match[2]));
+  }
+  for (const call of code.matchAll(/\.assign\(([\s\S]{0,2000}?)\)/gu)) {
+    for (const match of call[1].matchAll(/\b([A-Za-z_]\w*)\s*=/gu)) derivedColumns.add(match[1]);
+  }
 
   // A form-export header can contain the same apostrophe or quote a model used
   // to delimit it, leaving otherwise reasonable code syntactically invalid.
@@ -556,7 +581,9 @@ export function remapSingleDatasetColumnReferences(code: string, dataset: Tabula
     selection.replace(
       tolerantListLiteral,
       (literal, prefix: string, _quote: string, encoded: string) => {
-        const column = matchingSchemaColumn(decodeSimplePythonString(encoded), columns);
+        const authored = decodeSimplePythonString(encoded);
+        if (derivedColumns.has(authored)) return literal;
+        const column = matchingSchemaColumn(authored, columns);
         return column ? `${prefix}${JSON.stringify(column)}` : literal;
       },
     ),
@@ -570,8 +597,19 @@ export function remapSingleDatasetColumnReferences(code: string, dataset: Tabula
       // intact; replacing the whole label (for example "Dropout Rate in
       // {row['arm']}") with "arm" destroys otherwise correct artifacts.
       if (offset > 0 && /[fFrRbBuU]/u.test(repairedCode[offset - 1])) return literal;
+      const prefix = repairedCode
+        .slice(Math.max(0, offset - 2000), offset)
+        .replace(stringLiteral, '""');
+      const isSelection = /\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\s*\[\[?(?:\s*""\s*,)*\s*$/u.test(
+        prefix,
+      );
+      const isColumnMethod =
+        /\.(?:groupby|sort_values|dropna|drop_duplicates|set_index|pivot_table|melt|merge|agg)\s*\([^)]*$/u.test(
+          prefix,
+        );
+      if (!isSelection && !isColumnMethod) return literal;
       const authored = decodeSimplePythonString(encoded);
-      if (columns.includes(authored)) return literal;
+      if (columns.includes(authored) || derivedColumns.has(authored)) return literal;
       const column = matchingSchemaColumn(authored, columns);
       return column ? JSON.stringify(column) : literal;
     },

@@ -1,3 +1,4 @@
+import { pythonExecutionSource } from './python-execution.js';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
@@ -340,9 +341,7 @@ except ImportError:
 try:
     _larkup_stdout = StringIO()
     with redirect_stdout(_larkup_stdout):
-        exec(compile(base64.b64decode(${JSON.stringify(
-          Buffer.from(code).toString('base64'),
-        )}), 'analysis.py', 'exec'))
+${pythonExecutionSource(JSON.stringify(Buffer.from(code).toString('base64')), '        ')}
     _larkup_output = _larkup_stdout.getvalue()
     sys.stdout.write(_larkup_output)
     if not _larkup_output.strip():

@@ -1,3 +1,4 @@
+import { pythonExecutionSource } from './python-execution.js';
 /**
  * Shared execution plumbing for every cloud sandbox adapter (E2B, Vercel
  * Sandbox, Modal, Daytona, Fly Sprites, Northflank).
@@ -89,7 +90,7 @@ try:
 except ImportError:
     pass
 _larkup_encoded_code = ${JSON.stringify(encodedCode)}
-exec(compile(base64.b64decode(_larkup_encoded_code), 'analysis.py', 'exec'), globals(), globals())
+${pythonExecutionSource('_larkup_encoded_code')}
 try:
     if 'plt' in globals() and plt.get_fignums():
         plt.show()

@@ -155,3 +155,8 @@ export function createChatModel(
       throw new Error(`Unsupported chat provider "${provider}".`);
   }
 }
+
+/** Provider version IDs identify execution; the requested catalog ID supplies pricing. */
+export function usageModelAttribution(requestedModelId: string, actualModelId?: string) {
+  return { modelId: actualModelId || requestedModelId, pricingModelId: requestedModelId };
+}

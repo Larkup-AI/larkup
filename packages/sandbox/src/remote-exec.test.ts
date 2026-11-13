@@ -28,9 +28,7 @@ describe('buildExecutionScript', () => {
     expect(source).toContain('plt.show = _larkup_save_figures');
     expect(source).toContain('chart_{_larkup_figure_count[0]}.png');
     expect(source).toContain('_larkup_encoded_code =');
-    expect(source).toContain(
-      "exec(compile(base64.b64decode(_larkup_encoded_code), 'analysis.py', 'exec')",
-    );
+    expect(source).toContain("exec(compile(_larkup_tree, 'analysis.py', 'exec')");
     expect(source).toContain(
       Buffer.from('import matplotlib.pyplot as plt\nplt.plot([1, 2])\nplt.show()').toString(
         'base64',

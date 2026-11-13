@@ -61,6 +61,47 @@ export function validateAnalysisCompleteness(
   presentation: AnalysisPresentation | undefined,
   availableItems?: number,
 ): AnalysisCompletenessResult {
+  const requestsChartData =
+    /\b(?:chart|plot|graph)\b/iu.test(requestText) &&
+    /\b(?:aggregated|underlying|chart|plotted)\s+(?:chart\s+)?data\b/iu.test(requestText);
+  if (requestsChartData && presentation?.kind !== 'table') {
+    return {
+      valid: false,
+      error:
+        'The requested chart data is missing. Return the full aggregated data with larkup_table, including every plotted series and group; chart pixels or truncated stdout are insufficient.',
+    };
+  }
+  const groupCountMatch = requestText.match(
+    /\b(?:all|each\s+of|every\s+one\s+of)\s+(?:the\s+)?(\d{1,4})\s+/iu,
+  );
+  const exactGroups = Number(groupCountMatch?.[1]);
+  const oneWinnerPerGroup =
+    /\b(?:domina\w*|winners?|leaders?|leads?|largest|highest|smallest|lowest)\b/iu.test(
+      requestText,
+    );
+  if (
+    oneWinnerPerGroup &&
+    Number.isInteger(exactGroups) &&
+    exactGroups > 0 &&
+    presentation?.kind !== 'table'
+  ) {
+    return {
+      valid: false,
+      error: `Population scope validation requires a complete larkup_table with one result for each of ${exactGroups} groups. Stdout or prose cannot verify full group coverage.`,
+    };
+  }
+  if (
+    oneWinnerPerGroup &&
+    Number.isInteger(exactGroups) &&
+    exactGroups > 0 &&
+    presentation?.kind === 'table' &&
+    presentation.rows.length !== exactGroups
+  ) {
+    return {
+      valid: false,
+      error: `Population scope validation failed: the request requires one result for each of ${exactGroups} groups, but ${presentation.rows.length} rows were returned. Recheck population filters and grouping definitions. Do not truncate rows or invent categories to force the requested count.`,
+    };
+  }
   const requestedTargets = requestedLongAnalysisItemCount(requestText, availableItems);
   const matchRange = requestedMatchRange(requestText);
   if (!requestedTargets || !matchRange) return { valid: true };

@@ -443,10 +443,9 @@ export function requestedDataExportFormat(text: string): DataExportFormat | unde
   const normalized = text.trim().toLocaleLowerCase();
   // Dataset names describe the source, not the requested output. Without
   // masking them, "create a chart from sales.csv" is misrouted as a CSV export.
-  const outputRequest = normalized.replace(
-    /\b[\p{L}\p{N}_-]+\.(?:csv|xlsx|pdf)\b/gu,
-    'source-file',
-  );
+  const outputRequest = normalized
+    .replace(/\b(?:from|using)\s+(?:[\p{L}_-]+\s+){0,3}?(?:csv|excel|xlsx|pdf)\b/gu, 'source-file')
+    .replace(/\b[\p{L}\p{N}_-]+\.(?:csv|xlsx|pdf)\b/gu, 'source-file');
   const format = /\b(?:excel|xlsx)\b/.test(outputRequest)
     ? 'xlsx'
     : /\bcsv\b/.test(outputRequest)

@@ -11,7 +11,7 @@ function hasColumnMention(text: string, column: string) {
   const query = normalized(text);
   const name = normalized(column);
   if (!query || !name) return false;
-  if (query.includes(name)) return true;
+  if (` ${query} `.includes(` ${name} `)) return true;
 
   const words = name.split(' ').filter(Boolean);
   return (
@@ -48,6 +48,31 @@ function scoreDataset(text: string, dataset: TabularDatasetMeta) {
     else if (/\bby\b/iu.test(text)) score += 3;
   }
   return score;
+}
+
+/** Rank all schemas before bounding model context, independent of upload order. */
+export function rankTabularDatasetsForQuestion<T extends TabularDatasetMeta>(
+  text: string,
+  datasets: T[],
+): T[] {
+  const terms = new Set(
+    normalized(text)
+      .split(' ')
+      .filter((term) => term.length >= 3),
+  );
+  return datasets
+    .map((dataset, index) => ({
+      dataset,
+      index,
+      score:
+        scoreDataset(text, dataset) +
+        normalized(dataset.fileName.replace(/\.[^.]+$/, ''))
+          .split(' ')
+          .filter((term) => term.length >= 3 && terms.has(term)).length *
+          4,
+    }))
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map((item) => item.dataset);
 }
 
 /**

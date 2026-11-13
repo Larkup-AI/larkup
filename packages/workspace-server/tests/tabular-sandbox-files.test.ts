@@ -322,3 +322,30 @@ test('repairs a terminal escaped quote that leaves a Python string unclosed', ()
     `summary.append(f"Safety signal: {int(row['serious_count'])}")`,
   );
 });
+
+test('column repair never rewrites presentation titles or categorical filter values', () => {
+  const registry = {
+    columns: [{ name: 'city' }, { name: 'state' }, { name: 'capacity_net_registry' }],
+  } as TabularDataset;
+  const code = `larkup_table('Top Operators by Plant Count and Net Capacity', rows)
+selected = frame[frame["state"] == 'Operating total state']`;
+  assert.equal(remapSingleDatasetColumnReferences(code, registry), code);
+});
+
+test('schema repair preserves declared derived columns through grouping and pivoting', () => {
+  const dataset = {
+    columns: [{ name: 'installation_year' }, { name: 'capacity' }],
+  } as TabularDataset;
+  const code = `frame['installation_year_bucket'] = (frame["installation_year"] // 5) * 5
+clean = frame.dropna(subset=['installation_year_bucket'])
+summary = clean.groupby('installation_year_bucket')["capacity"].sum().reset_index()
+summary.pivot(index='installation_year_bucket', values="capacity")`;
+  assert.equal(remapSingleDatasetColumnReferences(code, dataset), code);
+});
+
+test('schema repair does not collapse an aggregation-created identifier into its source field', () => {
+  const dataset = { columns: [{ name: 'installed_capacity' }] } as TabularDataset;
+  const code = `totals = frame.groupby("category").agg(installed_capacity_total=("installed_capacity", "sum"))
+totals.sort_values('installed_capacity_total')`;
+  assert.equal(remapSingleDatasetColumnReferences(code, dataset), code);
+});

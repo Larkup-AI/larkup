@@ -369,6 +369,11 @@
       "types": "./dist-types/workspace-common/shared/error-formatter.d.ts",
       "import": "./src/workspace-common/shared/error-formatter.ts",
       "default": "./src/workspace-common/shared/error-formatter.ts"
+    },
+    "./conversation-history": {
+      "types": "./dist-types/conversation-history.d.ts",
+      "import": "./src/conversation-history.ts",
+      "default": "./src/conversation-history.ts"
     }
   },
   "dependencies": {

@@ -26,9 +26,49 @@ export interface GatewayProvider {
   modelCount: number;
 }
 
-/** Get all models from static list. */
+let cachedModels: GatewayModel[] | undefined;
+let refreshedAt = 0;
+let pendingRefresh: Promise<GatewayModel[]> | undefined;
+const CACHE_TTL_MS = 5 * 60_000;
+
+/** Validate public catalog data before replacing the last usable model list. */
+export async function loadGatewayModels(fetcher: typeof fetch = fetch): Promise<GatewayModel[]> {
+  const response = await fetcher('https://ai-gateway.vercel.sh/v1/models', {
+    signal: AbortSignal.timeout(3_000),
+  });
+  if (!response.ok) throw new Error(`Model catalog unavailable (${response.status}).`);
+  const payload = (await response.json()) as { data?: unknown };
+  if (!Array.isArray(payload.data)) throw new Error('Invalid model catalog.');
+  const models = payload.data.filter(
+    (model): model is GatewayModel =>
+      model &&
+      typeof model.id === 'string' &&
+      typeof model.name === 'string' &&
+      typeof model.owned_by === 'string' &&
+      typeof model.type === 'string',
+  );
+  if (!models.some((model) => model.type === 'language')) throw new Error('Empty model catalog.');
+  return models;
+}
+
+/** Cache the live catalog; retain last-known metadata during transient outages. */
 export async function getAllModels(): Promise<GatewayModel[]> {
-  return ALL_MODELS;
+  if (cachedModels && Date.now() - refreshedAt < CACHE_TTL_MS) return cachedModels;
+  if (!pendingRefresh)
+    pendingRefresh = loadGatewayModels()
+      .then((models) => {
+        cachedModels = models;
+        refreshedAt = Date.now();
+        return models;
+      })
+      .catch(() => {
+        refreshedAt = Date.now();
+        return cachedModels ?? (cachedModels = ALL_MODELS);
+      })
+      .finally(() => {
+        pendingRefresh = undefined;
+      });
+  return pendingRefresh;
 }
 
 export async function getModelsByType(type: GatewayModel['type']): Promise<GatewayModel[]> {
@@ -59,7 +99,10 @@ export async function getAllProviders(type?: GatewayModel['type']): Promise<Gate
     .sort((a, b) => b.modelCount - a.modelCount);
 }
 
-export async function refreshModelsCache(): Promise<void> {}
+export async function refreshModelsCache(): Promise<void> {
+  refreshedAt = 0;
+  await getAllModels();
+}
 
 export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   openai: 'OpenAI',

@@ -1,3 +1,4 @@
+import { pythonExecutionSource } from './python-execution.js';
 /**
  * Docker-based sandbox runner.
  *
@@ -231,7 +232,7 @@ except ImportError:
 # Execute user code with robust error handling
 # ============================================================
 try:
-    exec(${JSON.stringify(code)})
+${pythonExecutionSource(JSON.stringify(Buffer.from(code).toString('base64')), '    ')}
     
     # Auto-save any remaining matplotlib figures
     try:

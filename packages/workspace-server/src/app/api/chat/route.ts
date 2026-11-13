@@ -1,3 +1,9 @@
+import { modelServiceError } from '../../../lib/chat/model-service-errors';
+import { createChatModel, usageModelAttribution } from '../../../lib/chat/model-provider';
+import { tabularSchemaDefinitions } from '../../../lib/chat/tabular-schema-definitions';
+import { compactConversationMessages } from '@larkup/core/conversation-history';
+import { filterSupersededTabularDatasets } from '../../../lib/chat/assistant-tabular-scope';
+import { rankTabularDatasetsForQuestion } from '../../../lib/chat/tabular-dataset-routing';
 import {
   generateText,
   streamText,
@@ -28,19 +34,13 @@ import {
   getGroundedAnswerCacheEntry,
 } from '@larkup/core/grounded-answer-cache';
 import { openMcpTools } from '@larkup/core/mcp-store';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createCohere } from '@ai-sdk/cohere';
-import { createMistral } from '@ai-sdk/mistral';
-import { createDeepSeek } from '@ai-sdk/deepseek';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createGateway } from '@ai-sdk/gateway';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import type { CustomModelConfig } from '@larkup/core/types';
 import type { VideoInvestigationDirective } from '@larkup/core/video-knowledge/query-planner';
 import { getChatTools } from './tools';
 import { gatewayProviderOptions } from '../../../lib/chat/gateway-fallbacks';
-import { retrievalToolsForStep } from '../../../lib/chat/retrieval-routing';
+import {
+  documentResearchToolsForStep,
+  retrievalToolsForStep,
+} from '../../../lib/chat/retrieval-routing';
 import { collectExhaustiveVideoEvidencePages } from '../../../lib/chat/video-rag-routing';
 import { reconcileVideoInvestigation } from '../../../lib/chat/video-query-planning';
 import {
@@ -101,7 +101,7 @@ import {
   requestsVisualization,
 } from '../../../lib/chat/tabular-visualization';
 import {
-  hasCompletedLongAnalysisStep,
+  shouldFinishStructuredAnalysis,
   hasExhaustedAnalysisAttempts,
   isLikelyTabularQuestion,
   latestAnalysisAttemptFailed,
@@ -158,50 +158,6 @@ import {
 // merely lets the chat request receive the validated result instead of being
 // cut off mid-analysis.
 export const maxDuration = 480;
-
-/**
- * Creates an AI SDK language model instance based on the provider and model ID.
- */
-function createChatModel(
-  provider: string,
-  modelId: string,
-  apiKey?: string,
-  customChatModels?: CustomModelConfig[],
-) {
-  if (modelId.startsWith('custom:')) {
-    const customName = modelId.slice('custom:'.length);
-    const custom = (customChatModels ?? []).find((m) => m.modelName === customName);
-    if (custom) {
-      const customProvider = createOpenAICompatible({
-        name: 'custom_chat_provider',
-        baseURL: custom.baseUrl,
-        apiKey: custom.apiKey || apiKey || undefined,
-      });
-      return customProvider(custom.modelName);
-    }
-  }
-
-  const modelName = modelId.includes('/') ? modelId.split('/').slice(1).join('/') : modelId;
-
-  switch (provider) {
-    case 'google':
-      return createGoogleGenerativeAI({ apiKey })(modelName);
-    case 'cohere':
-      return createCohere({ apiKey })(modelName);
-    case 'mistral':
-      return createMistral({ apiKey })(modelName);
-    case 'deepseek':
-      return createDeepSeek({ apiKey })(modelName);
-    case 'anthropic':
-      return createAnthropic({ apiKey })(modelName);
-    case 'openai':
-      return createOpenAI({ apiKey })(modelName);
-    case 'vercel_ai_gateway':
-      return createGateway({ apiKey })(modelId);
-    default:
-      throw new Error(`Unsupported chat provider "${provider}".`);
-  }
-}
 
 function messageText(message: UIMessage | undefined): string {
   if (!message) return '';
@@ -738,8 +694,6 @@ function fallbackAnswerFromEvidence(evidence: unknown, question: string) {
   if (established.length > 0) return established.join('\n');
   const trail = collectAnswerLevelMediaStatements(evidence);
   if (trail.length > 0) return trail.join('\n');
-  const excerpts = collectSourceExcerpts(evidence, question);
-  if (excerpts.length > 0) return excerpts.join('\n\n');
   return 'I could not complete the response just now. Please try the question again.';
 }
 
@@ -932,6 +886,15 @@ export async function POST(req: Request) {
   // key must never be routed through the gateway because a model ID has a
   // vendor prefix.
   const resolvedProvider = provider;
+  if (
+    resolvedProvider === 'vercel_ai_gateway' &&
+    !gatewayModels.some((entry) => entry.id === chatModelId)
+  ) {
+    return Response.json(
+      { error: 'The selected model is unavailable. Choose an available model and try again.' },
+      { status: 400 },
+    );
+  }
 
   const apiKey = config.chatApiKey || config.embeddingApiKey || undefined;
   const model = createChatModel(
@@ -948,10 +911,7 @@ export async function POST(req: Request) {
   // This preserves the active table/image after dozens of turns without
   // sending those historical tool payloads to the model.
   const EVIDENCE_HISTORY_MESSAGES = 80;
-  const messagesToProcess =
-    messages.length > MAX_HISTORY_MESSAGES
-      ? messages.slice(messages.length - MAX_HISTORY_MESSAGES)
-      : messages;
+  const messagesToProcess = compactConversationMessages(messages, MAX_HISTORY_MESSAGES);
   const evidenceMessages =
     messages.length > EVIDENCE_HISTORY_MESSAGES
       ? messages.slice(messages.length - EVIDENCE_HISTORY_MESSAGES)
@@ -1063,6 +1023,7 @@ export async function POST(req: Request) {
   let hasTabularData = false;
   let availableTabularDatasetIds = new Set<string>();
   let tabularColumnNames: string[] = [];
+  let numericTabularColumnNames: string[] = [];
   let tabularDatasetNames: string[] = [];
   let requiresMultiDatasetTabularAnalysis = false;
   try {
@@ -1072,19 +1033,30 @@ export async function POST(req: Request) {
         readGroups(),
         readDocuments(),
       ]);
-      return filterGroupOwnedDataAvailableToAssistant(
-        resolveTabularDatasetGroups(allDatasets, documents),
-        groups,
-      );
+      return {
+        datasets: filterGroupOwnedDataAvailableToAssistant(
+          filterSupersededTabularDatasets(
+            resolveTabularDatasetGroups(allDatasets, documents),
+            documents,
+          ),
+          groups,
+        ),
+        documents: filterDocumentsAvailableToAssistant(documents, groups),
+      };
     };
-    const datasets = projectId
+    const available = projectId
       ? await runWithProject(projectId, readAvailableDatasets)
       : await readAvailableDatasets();
+    const datasets = available.datasets;
+    const schemaDefinitions = tabularSchemaDefinitions(datasets, available.documents);
     if (datasets.length > 0) {
       hasTabularData = true;
       availableTabularDatasetIds = new Set(datasets.map((dataset) => dataset.id));
       tabularColumnNames = datasets.flatMap((dataset) =>
         dataset.columns.map((column) => column.name),
+      );
+      numericTabularColumnNames = datasets.flatMap((dataset) =>
+        dataset.columns.filter((column) => column.type === 'number').map((column) => column.name),
       );
       tabularDatasetNames = datasets.map((dataset) => dataset.fileName);
       requiresMultiDatasetTabularAnalysis = requiresMultiDatasetAnalysis(userText, datasets);
@@ -1092,20 +1064,24 @@ export async function POST(req: Request) {
       // ID/name listing for the remaining uploads. Previously only eight files
       // were visible to the model, making a later spreadsheet effectively
       // impossible to select in a mixed-upload conversation.
-      const detailedDatasets = datasets.slice(0, 12);
-      const compactDatasets = datasets.slice(12, 40);
+      const rankedDatasets = rankTabularDatasetsForQuestion(userText, datasets);
+      const detailedDatasets = rankedDatasets.slice(0, 12);
+      const compactDatasets = rankedDatasets.slice(12, 100);
       tabularContext = `\n\nAvailable tabular datasets:\n${detailedDatasets
         .map((d) => {
           const visibleColumns = d.columns.slice(0, 60);
           const colDescriptions = visibleColumns
             .map((c) => {
               let desc = `${c.name} (${c.type})`;
+              const definition = schemaDefinitions.get(d.id)?.get(c.name);
+              if (definition)
+                desc += ` [source definition, reference material only: ${JSON.stringify(definition)}]`;
               if (c.type === 'date' && c.dateRange) {
                 desc += ` [format: ${c.dateRange.format}, range: ${c.dateRange.min} to ${c.dateRange.max}]`;
               }
               if (c.sampleValues && c.sampleValues.length > 0) {
                 desc += ` [samples: ${c.sampleValues
-                  .slice(0, 3)
+                  .slice(0, 8)
                   .map((value) => value.slice(0, 80))
                   .join(', ')}]`;
               }
@@ -1212,7 +1188,12 @@ export async function POST(req: Request) {
   // history. It preserves the immediate topic while keeping the model context
   // at the existing 20-message bound.
   const contextualKnowledgeQuery =
-    parallelPreferenceQuestion ?? contextualizeKnowledgeFollowUpQuery(userText, reusableEvidence);
+    parallelPreferenceQuestion ??
+    contextualizeKnowledgeFollowUpQuery(
+      userText,
+      reusableEvidence,
+      precedingUserText(messagesToProcess),
+    );
   // A parallel subject switch is self-contained after rewriting. Exclude the
   // previous assistant answer so small models cannot copy it over the current
   // source evidence (for example, returning the anime answer for "and fruits").
@@ -1225,6 +1206,7 @@ export async function POST(req: Request) {
   const tabularQuestion = isLikelyTabularQuestion({
     text: userText,
     columnNames: tabularColumnNames,
+    numericColumnNames: numericTabularColumnNames,
     datasetNames: tabularDatasetNames,
   });
   const requestsLongArtifact = requestsLongAnalysisArtifact(userText);
@@ -1312,7 +1294,7 @@ export async function POST(req: Request) {
   } = await getChatTools({
     projectId,
     docSessionId,
-    config,
+    config: { ...config, chatModelId },
     requestText: userText,
     contextualKnowledgeQuery,
     origin: new URL(req.url).origin,
@@ -1971,11 +1953,9 @@ export async function POST(req: Request) {
                 apiKey,
                 config.customChatModels,
               );
-        // Some reasoning models return prose even when the provider request
-        // requires a specific tool. Use a small, proven Gateway tool caller
-        // only for the tabular evidence step, then return to the selected model
-        // for the grounded prose answer on the next step.
-        const tabularToolModelId = tabularToolPlannerModel(requiresSandboxAnalysis);
+        // Keep planning and synthesis on the selected model. Silent planner
+        // downgrades can change source definitions, filters, and calculations.
+        const tabularToolModelId = tabularToolPlannerModel(requiresSandboxAnalysis, chatModelId);
         const tabularToolStepOverrides =
           supportsStableTabularPlanner(resolvedProvider) &&
           hasTabularData &&
@@ -1992,7 +1972,13 @@ export async function POST(req: Request) {
             : {};
         const usageByModel = new Map<
           string,
-          { modelId: string; promptTokens: number; completionTokens: number; totalTokens: number }
+          {
+            modelId: string;
+            pricingModelId: string;
+            promptTokens: number;
+            completionTokens: number;
+            totalTokens: number;
+          }
         >();
         const result = streamText({
           model: evidenceWriterModel,
@@ -2029,10 +2015,10 @@ export async function POST(req: Request) {
                     toolMs: 45_000,
                   }
                 : {
-                    totalMs: 45_000,
-                    stepMs: 35_000,
-                    firstChunkMs: 25_000,
-                    chunkMs: 20_000,
+                    totalMs: 90_000,
+                    stepMs: 60_000,
+                    firstChunkMs: 40_000,
+                    chunkMs: 30_000,
                     toolMs: 30_000,
                   },
           providerOptions: gatewayProviderOptions(resolvedProvider, evidenceWriterModelId),
@@ -2064,8 +2050,7 @@ export async function POST(req: Request) {
           stopWhen: [
             stepCountIs(5),
             ({ steps }) => hasExhaustedAnalysisAttempts(steps),
-            ({ steps }) =>
-              requestsLongAnalysisArtifact(userText) && hasCompletedLongAnalysisStep(steps),
+            ({ steps }) => shouldFinishStructuredAnalysis(steps, Boolean(dataExportFormat)),
           ],
           toolChoice: 'auto',
           prepareStep: ({ stepNumber, messages }) => {
@@ -2172,9 +2157,11 @@ export async function POST(req: Request) {
                     };
                   }
                   return {
-                    toolChoice: 'none' as const,
-                    activeTools: [],
-                    messages: withFinalAnswerNudge(compactToolContextForModel(messages)),
+                    ...documentResearchToolsForStep(stepNumber, toolNames as string[]),
+                    messages:
+                      stepNumber < 2
+                        ? compactToolContextForModel(messages)
+                        : withFinalAnswerNudge(compactToolContextForModel(messages)),
                   };
                 }
                 if (stepNumber === 0) {
@@ -2243,9 +2230,13 @@ export async function POST(req: Request) {
               // the selected model to make (or obey) a second tool call before it
               // can formulate the grounded answer.
               return {
-                toolChoice: 'none' as const,
-                activeTools: [],
-                messages: withFinalAnswerNudge(compactToolContextForModel(messages)),
+                ...(hasPreloadedMediaEvidence
+                  ? { toolChoice: 'none' as const, activeTools: [] }
+                  : documentResearchToolsForStep(stepNumber, toolNames as string[])),
+                messages:
+                  !hasPreloadedMediaEvidence && stepNumber < 2
+                    ? compactToolContextForModel(messages)
+                    : withFinalAnswerNudge(compactToolContextForModel(messages)),
               };
             }
             if (imagePreviewFollowUp && builtInTools.presentMedia) {
@@ -2422,19 +2413,25 @@ export async function POST(req: Request) {
               messages: step?.toolChoice === 'none' ? withFinalAnswerNudge(compacted) : compacted,
             };
           },
-          onStepFinish: ({ usage, model: stepModel }) => {
-            const reportedModelId = stepModel.modelId || chatModelId;
+          onStepFinish: ({ usage, response, model: stepModel }) => {
+            const reportedModelId = response.modelId || stepModel.modelId || chatModelId;
             const modelId =
               [tabularToolModelId, evidenceWriterModelId, chatModelId].find(
                 (candidate) =>
                   candidate === reportedModelId || candidate.endsWith(`/${reportedModelId}`),
               ) ?? reportedModelId;
+            const requestedUsageModelId =
+              [tabularToolModelId, evidenceWriterModelId, chatModelId].find(
+                (candidate) =>
+                  candidate === stepModel.modelId || candidate.endsWith(`/${stepModel.modelId}`),
+              ) ?? chatModelId;
+            const attribution = usageModelAttribution(requestedUsageModelId, modelId);
             const promptTokens = usage.inputTokens ?? 0;
             const completionTokens = usage.outputTokens ?? 0;
             const totalTokens = usage.totalTokens ?? promptTokens + completionTokens;
             const current = usageByModel.get(modelId);
             usageByModel.set(modelId, {
-              modelId,
+              ...attribution,
               promptTokens: (current?.promptTokens ?? 0) + promptTokens,
               completionTokens: (current?.completionTokens ?? 0) + completionTokens,
               totalTokens: (current?.totalTokens ?? 0) + totalTokens,
@@ -2447,7 +2444,7 @@ export async function POST(req: Request) {
                   await import('@larkup/core/analytics-store');
                 for (const usage of usageByModel.values()) {
                   const estimatedCost = estimateCost(
-                    usage.modelId,
+                    usage.pricingModelId,
                     usage.promptTokens,
                     usage.completionTokens,
                   );
@@ -2491,6 +2488,8 @@ export async function POST(req: Request) {
               // Reasoning is execution detail; keep the chat focused on the answer
               // and the compact, inspectable evidence UI.
               sendReasoning: false,
+              messageMetadata: ({ part }) =>
+                part.type === 'finish' ? { modelUsage: [...usageByModel.values()] } : undefined,
               onError: (error: any) => {
                 // Extract the deepest error message available
                 const rawMessage: string =
@@ -2498,6 +2497,16 @@ export async function POST(req: Request) {
                   error?.message ||
                   error?.error?.message ||
                   (typeof error === 'string' ? error : '');
+
+                const serviceFailure = modelServiceError(error, resolvedProvider);
+                if (serviceFailure) {
+                  writer.write({
+                    type: 'data-service-error',
+                    data: { code: serviceFailure.code },
+                    transient: true,
+                  });
+                  return serviceFailure.message;
+                }
 
                 // Only log non-trivial errors to console (skip tool-routing noise)
                 const isToolRouting =
@@ -2514,7 +2523,7 @@ export async function POST(req: Request) {
                   rawMessage.includes('429') ||
                   rawMessage.includes('quota')
                 ) {
-                  return 'Vercel AI Gateway could not serve this model because it is rate-limited. We tried compatible backup models. Try again shortly, choose another model, or add AI Gateway credits / a provider key in Settings.';
+                  return 'The AI provider is rate-limited or its quota is exhausted. Try again later or update the provider allowance in Settings.';
                 }
 
                 // ── Model tried to call a tool that was not available in this step ──

@@ -668,7 +668,7 @@ const SOURCE_SWITCH_LANGUAGE =
 const TOPIC_REFERENCE_LANGUAGE =
   /\b(?:it|its|this|that|these|those|they|them|their|there|above|previous|same|event|conference)\b/i;
 const SHORT_FOLLOW_UP_LANGUAGE =
-  /^(?:how|when|where|who|what|which|can|could|do|does|is|are|will|would)\b/i;
+  /^(?:why[?!.]*|(?:and\s+)?(?:what|how)\s+(?:about|else|next)\b.*|(?:tell\s+me\s+more|explain|elaborate|continue|try\s+again|retry)[?!.]*)$/i;
 const MAX_FOLLOW_UP_TOPIC_CHARS = 1_200;
 
 /**
@@ -704,9 +704,10 @@ export function resolveParallelPreferenceQuestion(
 export function contextualizeKnowledgeFollowUpQuery(
   text: string,
   evidence: ConversationEvidence,
+  previousQuestion?: string,
 ): string | undefined {
   if (
-    evidence.sources.length === 0 ||
+    (!previousQuestion?.trim() && evidence.sources.length === 0) ||
     evidence.mediaAssetIds.length > 0 ||
     evidence.tabular ||
     SOURCE_SWITCH_LANGUAGE.test(text)
@@ -721,14 +722,16 @@ export function contextualizeKnowledgeFollowUpQuery(
     (wordCount <= 8 && SHORT_FOLLOW_UP_LANGUAGE.test(normalized));
   if (!isFollowUp) return undefined;
 
-  const topic = evidence.sources
-    .slice(0, 1)
-    .map((source) => [source.title, source.text].filter(Boolean).join('\n'))
-    .join('\n')
-    .slice(0, MAX_FOLLOW_UP_TOPIC_CHARS)
-    .trim();
+  const topic =
+    previousQuestion?.trim().slice(0, MAX_FOLLOW_UP_TOPIC_CHARS) ||
+    evidence.sources
+      .slice(0, 1)
+      .map((source) => [source.title, source.text].filter(Boolean).join('\n'))
+      .join('\n')
+      .slice(0, MAX_FOLLOW_UP_TOPIC_CHARS)
+      .trim();
   if (!topic) return undefined;
-  return `${normalized}\n\nImmediate prior topic (resolve references against this source only):\n${topic}`;
+  return `${normalized}\n\nImmediate prior topic (resolve references against this question or source only):\n${topic}`;
 }
 
 export function formatConversationEvidence(evidence: ConversationEvidence): string {

@@ -4,6 +4,7 @@ import { workspaceUrl, workspaceFetch as fetch } from '../../host';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
+import { compactConversationMessages } from '@larkup/core/conversation-history';
 import { compactToolResult } from '../../lib/chat/message-compaction';
 import type { RagConfig } from '@larkup/core/types';
 import {
@@ -325,6 +326,8 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
     chatBodyRef.current = chatBody;
   }, [chatBody]);
 
+  const conversationContextCache = useRef<{ source: any[]; compact: any[] } | null>(null);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -336,7 +339,18 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
         prepareSendMessagesRequest({ messages, id, body }) {
           return {
             body: {
-              messages: compactMessagesForLLM(messages),
+              messages: compactMessagesForLLM(
+                (() => {
+                  const cache = conversationContextCache.current;
+                  const prefixMatches =
+                    cache &&
+                    cache.source.length === messages.length - 1 &&
+                    cache.source.every((message, index) => message === messages[index]);
+                  return prefixMatches
+                    ? [...cache.compact, messages[messages.length - 1]]
+                    : compactConversationMessages(messages, 160);
+                })(),
+              ),
               id,
               ...chatBodyRef.current,
               ...body,
@@ -358,6 +372,22 @@ function ChatWorkspaceInner({ chatId }: { chatId?: string }) {
   } = useChat({
     transport,
   });
+
+  useEffect(() => {
+    if (chatStatus !== 'ready') return;
+    const compact = () => {
+      conversationContextCache.current = {
+        source: messages,
+        compact: compactConversationMessages(messages, 160),
+      };
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(compact, { timeout: 1_000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(compact, 0);
+    return () => window.clearTimeout(id);
+  }, [messages, chatStatus]);
 
   // Initialize specific chat if ID is provided via prop
   useEffect(() => {

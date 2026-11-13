@@ -219,3 +219,19 @@ export function retrievalToolsForStep<ToolName extends string>(options: {
   }
   return { activeTools: without('webSearch', 'searchKnowledgeBase') };
 }
+
+/** A missing clause may need one focused lookup and one page inspection. */
+export function documentResearchToolsForStep(stepNumber: number, toolNames: string[]) {
+  const activeTools = toolNames.filter((name) =>
+    ['searchKnowledgeBase', 'inspectPdfPages', 'analyzePdfPages'].includes(name),
+  );
+  return stepNumber < 2 && activeTools.length > 0
+    ? {
+        toolChoice: 'auto' as const,
+        activeTools:
+          stepNumber === 0
+            ? activeTools
+            : activeTools.filter((name) => name !== 'searchKnowledgeBase'),
+      }
+    : { toolChoice: 'none' as const, activeTools: [] };
+}

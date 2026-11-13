@@ -1,7 +1,20 @@
+import { filterSupersededTabularDatasets } from '../../../lib/chat/assistant-tabular-scope';
 import { workspaceServerUrl, workspaceServerFetch as fetch } from '../../../runtime-host';
 import { workspaceHost } from '@larkup/core/workspace-host';
 import { createHash } from 'node:crypto';
-import { jsonSchema, tool } from 'ai';
+import { generateText, jsonSchema, tool, Output } from 'ai';
+import { createChatModel, resolveConfiguredChatModel } from '../../../lib/chat/model-provider';
+import {
+  knowledgeEvidenceLimit,
+  needsResearchReranking,
+  expandResearchPassage,
+  researchPdfPagePassages,
+  researchCandidatePool,
+  verifiedResearchIndices,
+  researchRerankingModel,
+  rerankResearchCandidates,
+  RESEARCH_RERANKING_INSTRUCTION,
+} from '../../../lib/chat/research-reranking';
 import { z } from 'zod';
 import type {
   AgentToolDefinition,
@@ -64,7 +77,7 @@ import {
   fuseFocusRanges,
   type FocusSignal,
 } from '@larkup/core/video-knowledge/focus-ranges';
-import { trackUsageEvent } from '@larkup/core/analytics-store';
+import { trackUsageEvent, estimateCost } from '@larkup/core/analytics-store';
 import { cacheImageAnalysis, getCachedImageAnalysis } from '@larkup/core/image-analysis-cache';
 import {
   normalizeMediaCitationRange,
@@ -131,8 +144,6 @@ import {
   remapLegacyMultiDatasetReads,
   remapMountedDatasetReads,
   repairAccidentalTopLevelPythonIndent,
-  printBareFinalPythonExpression,
-  printBareTopLevelPythonTuples,
   remapBooleanStringLiterals,
   remapSavedFiguresToShow,
   repairEscapedPythonClosingQuote,
@@ -416,7 +427,12 @@ function uniqueCompletedMediaFallback(
   };
 }
 
-export async function queryKnowledgeBase(query: string, topK: number, projectId: string | null) {
+export async function queryKnowledgeBase(
+  query: string,
+  topK: number,
+  projectId: string | null,
+  researchModelId?: string,
+) {
   const doRetrieve = async () => {
     const config = await readConfig();
     const activeVideoRuntimeScope = videoRuntimeScopeFromConfig(config);
@@ -534,6 +550,7 @@ export async function queryKnowledgeBase(query: string, topK: number, projectId:
         documents,
         availableMediaAssets,
         preferredPdfDocumentIds,
+        researchModelId,
       );
       if (formatted.hits.length === 0)
         return uniqueCompletedMediaFallback(query, activeVideoRuntimeScope, mediaAssets, groups);
@@ -595,6 +612,7 @@ async function formatKnowledgeHits(
   indexedDocuments?: Awaited<ReturnType<typeof readDocuments>>,
   indexedMediaAssets?: Awaited<ReturnType<typeof readMediaAssets>>,
   preferredPdfDocumentIds: readonly string[] = [],
+  researchModelId?: string,
 ) {
   const [storedDocuments, storedMediaAssets] = await Promise.all([
     readDocuments(),
@@ -604,19 +622,128 @@ async function formatKnowledgeHits(
   const mediaAssets = indexedMediaAssets ?? storedMediaAssets;
   const documentsById = new Map(documents.map((document) => [document.id, document]));
   const activeMediaDocumentIds = new Set(mediaAssets.flatMap((asset) => asset.documentIds));
-  const hydrated = rankKnowledgeHits(
+  const retrievedIds = new Set(rawHits.map((hit) => hit.documentId));
+  const pageCandidates = documents
+    .filter((document) => retrievedIds.has(document.id) && /\.pdf$/iu.test(document.title))
+    .flatMap((document) =>
+      researchPdfPagePassages(document.content).map((page) => ({
+        id: `${document.id}:page:${page.pageNumber}`,
+        documentId: document.id,
+        title: `${document.title} — page ${page.pageNumber}${page.heading ? ` — ${page.heading}` : ''}`,
+        text: page.text,
+        metadata: {
+          ...document.metadata,
+          pageNumber: page.pageNumber,
+          contentKind: 'pdf-page-annotation',
+        },
+      })),
+    );
+  const atomicPages = rankKnowledgeHits(query, pageCandidates).slice(0, 16);
+  let hydrated = rankKnowledgeHits(
     query,
-    rawHits.map((hit) => {
-      const document = documentsById.get(hit.documentId);
-      return {
-        ...hit,
-        title: hit.title || document?.title || 'Untitled',
-        url: hit.url || document?.url || '',
-        text: hit.text || document?.content || '',
-        metadata: { ...document?.metadata, ...hit.metadata },
-      };
-    }),
+    [...rawHits, ...atomicPages]
+      .filter((hit) => documentsById.get(hit.documentId)?.status === 'indexed')
+      .map((hit) => {
+        const document = documentsById.get(hit.documentId);
+        return {
+          ...hit,
+          title: hit.title || document?.title || 'Untitled',
+          url: hit.url || document?.url || '',
+          text:
+            expandResearchPassage(hit.text || '', document?.content || '') ||
+            document?.content ||
+            '',
+          metadata: { ...document?.metadata, ...hit.metadata },
+        };
+      }),
   );
+
+  const atomicIds = new Set(atomicPages.map((hit) => hit.id));
+  hydrated = researchCandidatePool(
+    hydrated,
+    hydrated.filter((hit) => atomicIds.has(hit.id)),
+  );
+
+  let retrievalDiagnostics: { status: string; reason?: string; modelId?: string } = {
+    status: 'not-needed',
+  };
+  if (needsResearchReranking(query) && !hydrated[0]?.metadata?.mediaAssetId) {
+    try {
+      const config = await readConfig();
+      const resolved = resolveConfiguredChatModel(config);
+      resolved.modelId = researchRerankingModel(
+        resolved.provider,
+        researchModelId || resolved.modelId,
+      );
+      retrievalDiagnostics = { status: 'pending', modelId: resolved.modelId };
+      hydrated = await rerankResearchCandidates(query, hydrated, topK, async (prompt) => {
+        const result = await generateText({
+          model: createChatModel(
+            resolved.provider,
+            resolved.modelId,
+            resolved.apiKey,
+            config.customChatModels,
+          ),
+          system:
+            RESEARCH_RERANKING_INSTRUCTION +
+            ' For each requested fact or metric, select the passage that states its actual value, not merely its title or a neighboring metric. Return {"selections":[{"index":0,"quote":"a short exact answer-bearing excerpt"}]}. Each quote must be copied from its passage and be at most 200 characters. Cover distinct requested definitions before adding general context. Include numerical figure annotations when raw chart text has no values.',
+          output: Output.object({
+            schema: z.object({
+              selections: z
+                .array(
+                  z.object({
+                    index: z.number().int().min(0).max(63),
+                    quote: z.string().min(8).max(200),
+                  }),
+                )
+                .max(topK),
+            }),
+          }),
+          prompt,
+          temperature: 0,
+          maxOutputTokens: 1400,
+          maxRetries: 0,
+          abortSignal: AbortSignal.timeout(20_000),
+        });
+        await trackUsageEvent({
+          type: 'chat',
+          endpoint: 'chat.research-reranking',
+          modelId: resolved.modelId,
+          provider: resolved.provider,
+          promptTokens: result.usage.inputTokens ?? 0,
+          completionTokens: result.usage.outputTokens ?? 0,
+          totalTokens: result.usage.totalTokens ?? 0,
+          estimatedCost: estimateCost(
+            resolved.modelId,
+            result.usage.inputTokens ?? 0,
+            result.usage.outputTokens ?? 0,
+          ),
+          timestamp: new Date().toISOString(),
+        });
+        const verified = verifiedResearchIndices(
+          result.output.selections,
+          JSON.parse(prompt).passages,
+        );
+        if (result.output.selections.length > 0 && verified.length === 0)
+          throw new Error('InvalidEvidenceLocators');
+        return JSON.stringify(verified);
+      });
+      retrievalDiagnostics.status = 'completed';
+    } catch (error) {
+      retrievalDiagnostics = {
+        ...retrievalDiagnostics,
+        status: 'fallback',
+        reason: error instanceof Error ? error.name : 'unknown',
+      };
+      if (
+        /quota|rate.?limit|401|429|unauthorized|authentication/i.test(
+          error instanceof Error ? error.message : String(error),
+        )
+      )
+        throw error;
+      // A bounded reranker timeout preserves the deterministic retrieval order.
+    }
+  }
 
   const selected: any[] = [];
   const hitsPerDocument = new Map<string, number>();
@@ -653,7 +780,7 @@ async function formatKnowledgeHits(
       hit.metadata?.contentKind === 'audio-transcript-segment';
     // One strong hit per timestamped evidence document leaves room for other
     // moments instead of returning eight chunks from the same summary.
-    if (seen >= (isTimestampedMedia ? 1 : 3)) continue;
+    if (seen >= (isTimestampedMedia ? 1 : topK > 4 ? topK : 3)) continue;
     selected.push(hit);
     if (evidenceSourceKey) selectedEvidenceSources.add(evidenceSourceKey);
     hitsPerDocument.set(hit.documentId, seen + 1);
@@ -745,6 +872,7 @@ async function formatKnowledgeHits(
 
   return {
     query,
+    retrievalDiagnostics,
     hits: selected.map((hit, hitIndex) => {
       // Text chunks inherit their source-document ID but not necessarily the
       // document-level PDF image list. Recover it here so a question that
@@ -832,7 +960,7 @@ async function formatKnowledgeHits(
         // window without running the evidence verification tool.
         text: usesEvidenceFirstVideoKnowledge
           ? 'Verified media evidence is available. Use the installed evidence-query action with this mediaAssetId before answering factual questions about this media.'
-          : queryAwareExcerpt(hit.text ?? '', query, 1_600),
+          : queryAwareExcerpt(hit.text ?? '', query, 6_000),
         // UI-only preview of the exact indexed chunk that matched. The model's
         // compact tool context intentionally ignores this field and answers
         // video questions from active evidence instead, while the user can
@@ -1015,7 +1143,10 @@ export async function getChatTools(context: {
         readDocuments(),
       ]);
       return filterGroupOwnedDataAvailableToAssistant(
-        resolveTabularDatasetGroups(datasets, documents),
+        filterSupersededTabularDatasets(
+          resolveTabularDatasetGroups(datasets, documents),
+          documents,
+        ),
         groups,
       );
     });
@@ -1250,7 +1381,7 @@ export async function getChatTools(context: {
   const builtInTools: Record<string, any> = {
     searchKnowledgeBase: tool({
       description:
-        "HIGHEST PRIORITY TOOL — Search the user's private RAG knowledge base. ALWAYS use this FIRST before webSearch or any other tool when the user asks a question. Search once with a focused query. If a result has a mediaAssetId and the question concerns media, call an installed evidence-query action with that exact id before answering. DO NOT call presentMedia automatically; only call it when the user explicitly asks to preview a moment.",
+        "HIGHEST PRIORITY TOOL — Search the user's private RAG knowledge base. ALWAYS use this FIRST before webSearch or any other tool when the user asks a question. Start with a focused query. If a separate requested fact is missing, refine once with a different focused query; never repeat an identical query. If a result has a mediaAssetId and the question concerns media, call an installed evidence-query action with that exact id before answering. DO NOT call presentMedia automatically; only call it when the user explicitly asks to preview a moment.",
       inputSchema: z.object({
         query: z.string().describe('The search query for the knowledge base.'),
       }),
@@ -1291,7 +1422,12 @@ export async function getChatTools(context: {
             ? contextualKnowledgeQuery
             : query;
         const fingerprintBeforeSearch = await readAssistantSourceFingerprint();
-        const retrieval = await queryKnowledgeBase(retrievalQuery, 4, projectId ?? null);
+        const retrieval = await queryKnowledgeBase(
+          retrievalQuery,
+          knowledgeEvidenceLimit(retrievalQuery),
+          projectId ?? null,
+          config?.chatModelId,
+        );
         const fingerprintAfterSearch = await readAssistantSourceFingerprint();
         return {
           ...retrieval,
@@ -2751,7 +2887,7 @@ export async function getChatTools(context: {
 
     createDataExport: tool({
       description:
-        'Create a real downloadable Excel, CSV, or PDF file from answer data already established in this conversation. Use this whenever the user asks to export, save, download, or convert an answer/result to one of these formats. Never write a Markdown download link. Omit columns and rows whenever a data query ran in this turn or the request is a direct follow-up: the host reuses the complete authoritative result. Supply rows only when no structured data result exists.',
+        'Create a real downloadable Excel, CSV, or PDF file from answer data already established in this conversation. Use this whenever the user asks to export, save, download, or convert an answer/result to one of these formats. Never write a Markdown download link. Omit columns and rows whenever a data query or analysis ran in this turn or the request is a direct follow-up: the host reuses the complete authoritative result. Supply rows only when no structured data result exists.',
       inputSchema: z.object({
         format: z.enum(['xlsx', 'csv', 'pdf']).describe('The requested file format.'),
         title: z.string().max(100).optional().describe('A short human-readable file title.'),
@@ -3062,8 +3198,6 @@ export async function getChatTools(context: {
           finalCode = remapSavedFiguresToShow(finalCode);
           finalCode = remapSimplePythonPrints(finalCode);
           finalCode = remapPythonObjectPrintMethods(finalCode);
-          finalCode = printBareTopLevelPythonTuples(finalCode);
-          finalCode = printBareFinalPythonExpression(finalCode);
           finalCode = withAnalysisPresentationHelpers(finalCode, analysisTargetCount);
           if (useRecentAnalysisTable) {
             finalCode = remapSingleDatasetRead(finalCode);
@@ -3186,6 +3320,12 @@ export async function getChatTools(context: {
                       .join('\n'),
                   ),
                 );
+          if (exitCode === 0 && extracted.presentation?.kind === 'table') {
+            currentTurnExportTable = {
+              columns: extracted.presentation.columns,
+              rows: extracted.presentation.rows,
+            };
+          }
           return {
             stdout: groundedStdout.slice(0, 5000),
             stderr: stderr.slice(0, 2000),

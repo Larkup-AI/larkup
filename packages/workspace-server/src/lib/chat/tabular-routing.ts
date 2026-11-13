@@ -500,6 +500,20 @@ export function hasCompletedLongAnalysisStep(
  */
 export function requiresTabularSandbox(text: string): boolean {
   return (
+    /\bby\b[\s\S]{0,100}\band\b[\s\S]{0,70}\bby\b/iu.test(text) ||
+    /\b(?:duplicat(?:e|ed|es|ion)|orphan(?:ed|s)?|integrity|primary[- ]?keys?|foreign[- ]?keys?)\b/iu.test(
+      text,
+    ) ||
+    /\b(?:domina\w*|leads?|leader|largest|highest|lowest|smallest|top)\b[\s\S]{0,140}\b(?:each|every|all)\b|\b(?:each|every|all)\b[\s\S]{0,140}\b(?:domina\w*|leads?|leader|largest|highest|lowest|smallest|top)\b/iu.test(
+      text,
+    ) ||
+    /\b(?:before|after|earlier\s+than|later\s+than)\s+(?:[\p{L}_]+\s+){0,5}(?:date|year|time)\b/iu.test(
+      text,
+    ) ||
+    // Ratios need separate filtered populations; decades need a derived bucket.
+    /\b(?:percent(?:age)?|proportion|fraction|share|ratio|numerator|denominator|decades?|calculate|compute|derive|convert|conversion)\b/i.test(
+      text,
+    ) ||
     // Composite response rates need separate response numerators and full
     // population denominators for every arm and subgroup. A bounded grouped
     // table query can silently return only subgroup sizes.
@@ -586,13 +600,16 @@ export function requestedLongAnalysisItemCount(
   return undefined;
 }
 
-/** Use a consistent capable code planner for deep artifacts across selectable chat models. */
-export function tabularToolPlannerModel(requiresSandbox: boolean) {
-  return requiresSandbox ? 'openai/gpt-4.1-mini' : 'openai/gpt-4o-mini';
+/** Honor the selected planner; retain defaults for callers without a selection. */
+export function tabularToolPlannerModel(requiresSandbox: boolean, selectedModelId?: string) {
+  return selectedModelId || (requiresSandbox ? 'openai/gpt-4.1-mini' : 'openai/gpt-4o-mini');
 }
 
 export function analysisValidationRequirements(text: string) {
   const requirements: string[] = [];
+  requirements.push(
+    'use source field definitions to distinguish the measured entity from related infrastructure or service operators; apply every requested population and geographic scope before grouping, preserve ties, and validate the number and identity of requested groups; never truncate a complete group report to hide out-of-scope groups',
+  );
   if (
     /\b(?:risk|rate|ratio|incidence|percentage|proportion|ORR|DCR|per\s+(?:patient|subject|record|site))\b/iu.test(
       text,
@@ -895,15 +912,15 @@ export function hasExhaustedAnalysisAttempts(
 export function isLikelyTabularQuestion(input: {
   text: string;
   columnNames: string[];
+  numericColumnNames?: string[];
   datasetNames: string[];
 }) {
   const text = input.text.trim().toLocaleLowerCase();
   if (!text) return false;
   if (
-    /\b(?:spreadsheet|excel|csv|worksheet|sheet|dataset|data document|row|column|filter|sort|group(?:ed|ing)?|aggregate|average|median|total|sum|count|highest|lowest|largest|smallest|maximum|minimum|trend|distribution|primary\s+key|foreign\s+key|orphan(?:ed)?|duplicates?)\b/.test(
+    /\b(?:spreadsheet|excel|csv|worksheet|sheet|dataset|data document|rows?|columns?|primary\s+key|foreign\s+key|orphan(?:ed)?|duplicates?)\b/.test(
       text,
-    ) ||
-    /\b(?:arithmetic|geometric|weighted)\s+mean\b|\bmean\s+(?:of|for|by)\b/.test(text)
+    )
   ) {
     return true;
   }
@@ -920,26 +937,50 @@ export function isLikelyTabularQuestion(input: {
     return true;
   }
 
+  const words = new Set(text.match(/[\p{L}\p{N}]+/gu) ?? []);
+  const containsPhrase = (value: string) => {
+    const terms = value.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+    return (
+      terms.length > 0 &&
+      ` ${[...text.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => m[0]).join(' ')} `.includes(
+        ` ${terms.join(' ')} `,
+      )
+    );
+  };
   const mentionsDataset = input.datasetNames.some((name) => {
     const stem = name
       .replace(/\.(?:csv|xlsx|xls|json)$/i, '')
       .trim()
       .toLocaleLowerCase();
-    return stem.length >= 3 && text.includes(stem);
+    return stem.length >= 3 && containsPhrase(stem);
   });
   if (mentionsDataset) return true;
 
-  return input.columnNames.some((column) => {
+  const matchedColumns = [...new Set(input.columnNames)].filter((column) => {
     const normalized = column.trim().toLocaleLowerCase();
-    if (normalized.length >= 4 && text.includes(normalized)) return true;
-    const terms = normalized.match(/[\p{L}\p{N}_]+/gu) ?? [];
-    const matchedTerms = terms.filter((term) => term.length >= 4 && text.includes(term));
+    if (normalized.length >= 4 && containsPhrase(normalized)) return true;
+    const terms = normalized.match(/[\p{L}\p{N}]+/gu) ?? [];
+    const matchedTerms = terms.filter((term) => term.length >= 3 && words.has(term));
     if (matchedTerms.length >= 2) return true;
 
-    // Metrics in real workbooks often have long headers while the user asks
-    // with one distinctive word. A sufficiently specific header token is
-    // enough to choose the exact table tool without relying on dataset- or
-    // domain-specific routing rules.
-    return matchedTerms.some((term) => term.length >= 6);
+    // A lone generic measure word may describe an unavailable fact rather
+    // than this table. Retrieval can locate the right source before calculation.
+    return false;
   });
+  return (
+    matchedColumns.length >= 2 ||
+    matchedColumns.some(
+      (column) =>
+        (column.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) >= 2 ||
+        input.numericColumnNames?.includes(column),
+    )
+  );
+}
+
+/** A verified structured answer is already rendered; do not regenerate its facts as prose. */
+export function shouldFinishStructuredAnalysis(
+  steps: Parameters<typeof hasCompletedLongAnalysisStep>[0],
+  pendingExport = false,
+): boolean {
+  return !pendingExport && hasCompletedLongAnalysisStep(steps);
 }

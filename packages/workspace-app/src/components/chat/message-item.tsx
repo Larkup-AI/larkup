@@ -635,7 +635,7 @@ export function MessageItem({
         const richSegments = splitRichSegments(cleanText);
 
         return (
-          <div key={i} className="flex flex-col gap-4">
+          <div key={i} className="flex flex-col gap-4" data-benchmark-answer="true">
             {richSegments.map((richSeg, j) => {
               if (richSeg.type === 'metrics') {
                 return <ChatMetricCards key={`metrics-${j}`} block={richSeg.block} />;

@@ -1143,12 +1143,12 @@ function compactValue(value: unknown, toolName?: string): unknown {
   if (toolName === 'searchKnowledgeBase' && Array.isArray(result.hits)) {
     compact = {
       query: result.query,
-      hits: result.hits.slice(0, 4).map((hit: any) => ({
+      hits: result.hits.slice(0, 8).map((hit: any) => ({
         documentId: hit.documentId,
         title: hit.title,
         url: hit.url,
         score: hit.score,
-        text: typeof hit.text === 'string' ? hit.text.slice(0, 1_200) : hit.text,
+        text: typeof hit.text === 'string' ? hit.text.slice(0, 6_000) : hit.text,
         images: Array.isArray(hit.images)
           ? hit.images.slice(0, 4).map((image: any) => ({
               imageUrl: image.imageUrl,
@@ -1209,6 +1209,13 @@ function compactValue(value: unknown, toolName?: string): unknown {
             aggregationResults: result.aggregationResults,
           };
   } else if (toolName === 'executeAnalysis' || toolName === 'analyzeCorpusWithCode') {
+    if (result.exitCode !== 0) {
+      compact = {
+        exitCode: result.exitCode,
+        stderr: typeof result.stderr === 'string' ? result.stderr.slice(0, 1_000) : result.stderr,
+      };
+      return isJsonEnvelope ? { type: 'json', value: compact } : compact;
+    }
     const presentation =
       result.presentation && typeof result.presentation === 'object'
         ? (result.presentation as Record<string, any>)
@@ -1263,6 +1270,23 @@ function tryParse(value: string): unknown {
  * didn't -- reproduced and confirmed live before and after this fix.
  */
 export function withFinalAnswerNudge(messages: readonly any[], additionalInstruction = ''): any[] {
+  const completeArtifact = messages.some(
+    (message) =>
+      Array.isArray(message.content) &&
+      message.content.some((part: ToolResultPart) => {
+        if (part.type !== 'tool-result') return false;
+        let output: any = part.output ?? part.result;
+        for (let depth = 0; depth < 3; depth++) {
+          if (typeof output === 'string') output = tryParse(output);
+          else if (output?.type === 'json') output = output.value;
+          else break;
+        }
+        return output?.exitCode === 0 && output?.presentation?.complete === true;
+      }),
+  );
+  const presentationInstruction = completeArtifact
+    ? ' The complete structured result is already visible. Summarize it in at most two sentences; do not repeat its rows or create another artifact unless the user explicitly requested an export.'
+    : '';
   return [
     ...messages,
     {
@@ -1270,7 +1294,7 @@ export function withFinalAnswerNudge(messages: readonly any[], additionalInstruc
       content: [
         {
           type: 'text',
-          text: `You have every tool result gathered above. Answer the original question now, directly, using that evidence -- do not call another tool.${additionalInstruction ? ` ${additionalInstruction}` : ''}`,
+          text: `You have every tool result gathered above. Answer the original question now, directly, using that evidence -- do not call another tool.${presentationInstruction}${additionalInstruction ? ` ${additionalInstruction}` : ''}`,
         },
       ],
     },
