@@ -250,3 +250,18 @@ test('complete structured calculations stop before an unverified prose regenerat
     false,
   );
 });
+
+test('a missing action object inherits context while an explicitly named object does not', () => {
+  const evidence = {
+    ...emptyEvidence,
+    sources: [{ title: 'Workshop instructions', text: 'Registration opens next month.' }],
+  };
+  assert.match(
+    contextualizeKnowledgeFollowUpQuery('How do I participate?', evidence) ?? '',
+    /Registration opens/,
+  );
+  assert.equal(
+    contextualizeKnowledgeFollowUpQuery('How do I access satellite archives?', evidence),
+    undefined,
+  );
+});

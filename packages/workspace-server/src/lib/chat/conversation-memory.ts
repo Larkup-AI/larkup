@@ -669,6 +669,8 @@ const TOPIC_REFERENCE_LANGUAGE =
   /\b(?:it|its|this|that|these|those|they|them|their|there|above|previous|same|event|conference)\b/i;
 const SHORT_FOLLOW_UP_LANGUAGE =
   /^(?:why[?!.]*|(?:and\s+)?(?:what|how)\s+(?:about|else|next)\b.*|(?:tell\s+me\s+more|explain|elaborate|continue|try\s+again|retry)[?!.]*)$/i;
+const MISSING_OBJECT_ACTION_LANGUAGE =
+  /^(?:how|where|when|can|could|should|may)\s+(?:(?:do|can|could|should|may|would)\s+)?(?:i|we|one|you)\s+(?:participate|join|register|apply|attend|enroll|access)(?:\s+(?:in|for|to|with))?[?!.]*$/i;
 const MAX_FOLLOW_UP_TOPIC_CHARS = 1_200;
 
 /**
@@ -719,7 +721,9 @@ export function contextualizeKnowledgeFollowUpQuery(
   const wordCount = normalized.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
   const isFollowUp =
     TOPIC_REFERENCE_LANGUAGE.test(normalized) ||
-    (wordCount <= 8 && SHORT_FOLLOW_UP_LANGUAGE.test(normalized));
+    (wordCount <= 8 &&
+      (SHORT_FOLLOW_UP_LANGUAGE.test(normalized) ||
+        MISSING_OBJECT_ACTION_LANGUAGE.test(normalized)));
   if (!isFollowUp) return undefined;
 
   const topic =

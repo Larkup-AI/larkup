@@ -71,6 +71,14 @@ export async function getAllModels(): Promise<GatewayModel[]> {
   return pendingRefresh;
 }
 
+/** Use refreshed metadata for synchronous usage estimation after model resolution. */
+export function getCachedGatewayModel(modelId: string): GatewayModel | undefined {
+  return (
+    cachedModels?.find((model) => model.id === modelId) ??
+    ALL_MODELS.find((model) => model.id === modelId)
+  );
+}
+
 export async function getModelsByType(type: GatewayModel['type']): Promise<GatewayModel[]> {
   return (await getAllModels()).filter((m) => m.type === type);
 }

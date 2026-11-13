@@ -886,18 +886,19 @@ describe('compactToolContextForModel', () => {
     expect(output.continuation).toMatchObject({ exhaustive: true, hasMore: false });
   });
 
-  it('still bounds hits and truncates long text as before', () => {
+  it('bounds research passages while preserving supporting evidence beyond a short preview', () => {
     const manyHits = Array.from({ length: 10 }, (_, i) => ({
       documentId: `d${i}`,
       title: `t${i}`,
-      text: 'x'.repeat(5_000),
+      text: 'x'.repeat(5_500) + 'Supporting value: 17.' + 'x'.repeat(3_000),
     }));
     const [message] = compactToolContextForModel([
       toolResultMessage('searchKnowledgeBase', { query: 'q', hits: manyHits }),
     ]);
     const output = (message.content[0] as any).output;
-    expect(output.hits).toHaveLength(4);
-    expect(output.hits[0].text.length).toBe(1_200);
+    expect(output.hits).toHaveLength(8);
+    expect(output.hits[0].text.length).toBe(6_000);
+    expect(output.hits[0].text).toContain('Supporting value: 17.');
     expect(output.videoEvidence).toBeUndefined();
   });
 

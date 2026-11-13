@@ -6,7 +6,7 @@ import {
   getProjectDataDir as getDataDir,
   requireProjectDataDir as requireDataDir,
 } from './project-store';
-import { ALL_MODELS } from './models-list';
+import { getCachedGatewayModel } from './models-cache';
 
 export interface UsageEvent {
   id: string;
@@ -141,7 +141,7 @@ export function estimateCost(
 ): number {
   if (modelId.startsWith('custom:')) return 0;
 
-  const model = ALL_MODELS.find((m) => m.id === modelId);
+  const model = getCachedGatewayModel(modelId);
   if (!model || !model.pricing) return 0;
 
   const inputPrice = parseFloat(model.pricing.input || '0');
