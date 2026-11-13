@@ -17,7 +17,6 @@ import {
   Square,
   Terminal,
   Server,
-  Cable,
   CircleCheck,
   CircleDot,
   CircleX,
@@ -34,7 +33,6 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { LineTabs } from '@/components/ui/line-tabs';
-import { ConnectionsSection } from '@/components/settings/runtime/connections-tab';
 import { ProjectDeployButton } from '@/components/settings/runtime/deploy/project-deploy-button';
 import { ProjectDeployView } from '@/components/settings/runtime/deploy/project-deploy-view';
 import {
@@ -49,7 +47,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { getDeploymentTarget, readDeploymentApiKey, removeDeploymentApiKey } from '@/lib/deployments';
+import {
+  getDeploymentTarget,
+  readDeploymentApiKey,
+  removeDeploymentApiKey,
+} from '@/lib/deployments';
 
 type RuntimeState = { running: boolean; endpoint: string; port: number; lastError?: string };
 type Deployment = {
@@ -61,7 +63,7 @@ type Deployment = {
   status: 'unknown' | 'queued' | 'building' | 'ready' | 'error' | 'canceled' | 'unavailable';
   statusMessage?: string;
 };
-type RuntimeTab = 'server' | 'connections' | 'deployments';
+type RuntimeTab = 'server' | 'deployments';
 const fetcher = (url: string) => fetch(url).then((response) => response.json());
 const EMPTY_DEPLOYMENTS: Deployment[] = [];
 
@@ -84,8 +86,7 @@ const DEPLOYMENT_STATUS = {
 } as const;
 
 function runtimeTabFromQuery(value: string | null, profile: 'knowledge' | 'assistant'): RuntimeTab {
-  if (value === 'connections' || value === 'deployments' || value === 'server')
-    return value as RuntimeTab;
+  if (value === 'deployments' || value === 'server') return value as RuntimeTab;
   return 'server';
 }
 
@@ -559,7 +560,6 @@ print()
         onTabChange={(tab) => setRuntimeTab(tab as RuntimeTab)}
         tabs={[
           { id: 'server', label: 'Server', icon: Server },
-          { id: 'connections', label: 'Connections', icon: Cable },
           { id: 'deployments', label: 'Cloud deployments', icon: Cloud },
         ]}
         className="mb-6 pb-0"
@@ -786,12 +786,6 @@ print()
               </section>
             </div>
           </div>
-        </div>
-      )}
-
-      {activeTab === 'connections' && (
-        <div className="pt-2 animate-in fade-in-0 duration-200">
-          <ConnectionsSection embedded />
         </div>
       )}
 

@@ -95,7 +95,6 @@ describe('published npm metadata', () => {
     expect(windowsInstaller).toContain('Prepare-LocalAnalysisRuntime');
     expect(windowsInstaller).toContain('& $larkupCommand.Source prepare');
     for (const dependency of [
-      '@larkup/connections',
       '@larkup/core',
       '@larkup/integrations',
       '@larkup/marketplace',
