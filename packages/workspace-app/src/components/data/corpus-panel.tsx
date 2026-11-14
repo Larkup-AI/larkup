@@ -876,40 +876,20 @@ function VideoKnowledgeInspector({
       const bStart = b.metadata?.startSecs ?? 0;
       return aStart - bStart;
     });
-  const summaryDocument = children.find((child) => child.metadata?.isMediaSummary);
-  const mediaUrl = summaryDocument?.url || doc.url;
-  const previewUrl = mediaUrl ? workspaceUrl(mediaUrl) : undefined;
-  const mediaType = summaryDocument?.metadata?.mediaType || doc.metadata?.mediaType;
-
   return (
     <Dialog open={!!doc} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-full pb-3 max-w-5xl! max-h-[90%]! h-full!">
+      <DialogContent className="w-[calc(100%-1.5rem)] max-w-3xl!">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Film className="size-4 text-muted-foreground" />
-            {doc.title}
+          <DialogTitle className="flex items-center gap-2 pr-6">
+            <Film className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{doc.title}</span>
           </DialogTitle>
           <DialogDescription>
             {children.length} indexed segment{children.length !== 1 ? 's' : ''} ·{' '}
             {doc.charCount.toLocaleString()} total characters
           </DialogDescription>
         </DialogHeader>
-        {/* {previewUrl && (mediaType === 'video' || mediaType === 'audio') && (
-          <div className="overflow-hidden rounded-lg border border-border bg-black/95">
-            {mediaType === 'video' ? (
-              <video
-                src={previewUrl}
-                controls
-                playsInline
-                preload="metadata"
-                className="max-h-[42vh] w-full object-contain"
-              />
-            ) : (
-              <audio src={previewUrl} controls preload="metadata" className="w-full" />
-            )}
-          </div>
-        )} */}
-        <ScrollArea className={previewUrl ? 'max-h-[70vh] h-full' : 'max-h-[70vh]'}>
+        <ScrollArea className="max-h-[70vh]">
           <div className="space-y-4 pr-4">
             {children.map((child, index) => {
               const startSecs = child.metadata?.startSecs;
@@ -939,8 +919,8 @@ function VideoKnowledgeInspector({
             })}
           </div>
         </ScrollArea>
-        <DialogFooter className="h-full">
-          <Button variant="outline" onClick={onClose} className={''}>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
             Close
           </Button>
         </DialogFooter>
