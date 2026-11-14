@@ -16,6 +16,16 @@ const sighting = (identity: string, identityBasis: string) =>
   'Visible subject: ' + JSON.stringify({ identity, identityBasis, startMs: 1000, endMs: 4000 });
 
 describe('visual identity grounding', () => {
+  it('normalizes compatibility characters and escapes punctuation in arbitrary identity labels', () => {
+    for (const name of ['Ａｌｅｘ', 'Guest (R)', 'Person + helper']) {
+      const result = groundVideoIdentityEvidence({
+        observedSubjects: [subject(name, 'unresolved')],
+        evidence: [evidence(name.normalize('NFKC') + ' moves the object.')],
+      });
+      expect(result.evidence[0]?.payload.text).not.toContain('moves the object');
+    }
+  });
+
   it('withholds named actions and table claims for an explicitly unresolved identity', () => {
     const original = {
       success: true,

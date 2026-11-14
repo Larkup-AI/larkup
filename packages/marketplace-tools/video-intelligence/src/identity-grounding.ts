@@ -5,7 +5,7 @@ const key = (value: string) => value.normalize('NFKC').toLocaleLowerCase().trim(
 const label = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
 function mentions(text: string, name: string) {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = name.normalize('NFKC').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, 'iu').test(
     text.normalize('NFKC'),
   );
