@@ -82,12 +82,16 @@ export function groundVideoIdentityEvidence<T>(value: T): T {
       ...Array.from(context.matchAll(/^Present:\s*(.+?)\s+—/gm), (match) => match[1]!.trim()),
     ];
     const blocked = [...new Set(candidates.filter((name) => name && !allowed.has(key(name))))];
-    const hasInference = /^Happened \(inferred\):/mu.test(context);
+    const hasProtocol =
+      /^(?:Visible subject:|Present:|On screen:|Happened(?: \(inferred\))?:|Direct component:|Claim bindings:)/mu.test(
+        context,
+      );
     const lines = text.split(/\r?\n/).filter((line) => {
       const inferred = /^Happened \(inferred\):/u.test(line);
       const unsafe = !line.startsWith('On screen:') && blocked.some((name) => mentions(line, name));
-      // Free-form summaries can repeat an inferred event without its qualifier.
-      const unqualifiedSummary = hasInference && line.trim() && !/^[\w -]+:/.test(line);
+      // Legacy prose can bind unlisted actors or repeat inferred events as facts.
+      const unqualifiedSummary =
+        text === context && hasProtocol && line.trim() && !/^[\w -]+:/.test(line);
       if (inferred || unsafe || unqualifiedSummary) {
         withheld++;
         return false;

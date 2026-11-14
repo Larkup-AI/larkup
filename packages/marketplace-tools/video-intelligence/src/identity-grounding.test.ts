@@ -16,6 +16,19 @@ const sighting = (identity: string, identityBasis: string) =>
   'Visible subject: ' + JSON.stringify({ identity, identityBasis, startMs: 1000, endMs: 4000 });
 
 describe('visual identity grounding', () => {
+  it('does not promote a legacy free-form summary when its actor is absent from the identity ledger', () => {
+    const result = groundVideoIdentityEvidence({
+      evidence: [
+        evidence(
+          'Visitor Q catches the object, according to narration.\nOn screen: entrance\nDirect component: A green sleeve is visible.',
+        ),
+      ],
+    });
+    expect(result.evidence[0]?.payload.text).not.toContain('Visitor Q');
+    expect(result.evidence[0]?.payload.text).toContain('green sleeve');
+    expect(result.evidence[0]?.payload.text).toContain('entrance');
+  });
+
   it('normalizes compatibility characters and escapes punctuation in arbitrary identity labels', () => {
     for (const name of ['Ａｌｅｘ', 'Guest (R)', 'Person + helper']) {
       const result = groundVideoIdentityEvidence({
@@ -74,7 +87,10 @@ describe('visual identity grounding', () => {
       evidence: [evidence(text)],
       observedSubjects: [subject('Guest C', 'source-named')],
     });
-    expect(result.evidence[0]?.payload.text).toBe(text);
+    expect(result.evidence[0]?.payload.text).toContain(
+      'Direct component: Guest C hands over a package.',
+    );
+    expect(result.evidence[0]?.payload.text).toContain(sighting('Guest C', 'source-named'));
     expect(result.observedSubjects).toHaveLength(1);
   });
 
@@ -135,7 +151,10 @@ describe('visual identity grounding', () => {
     const result = groundVideoIdentityEvidence({
       observedSubjects: [subject('علي', 'unresolved')],
       evidence: [
-        evidence('علي حرّك الشيء.\nعلياء ترتدي معطفًا أخضر.\n' + sighting('علي', 'unresolved')),
+        evidence(
+          'علي حرّك الشيء.\nDirect component: علياء ترتدي معطفًا أخضر.\n' +
+            sighting('علي', 'unresolved'),
+        ),
       ],
     });
     expect(result.evidence[0]?.payload.text).not.toContain('علي حرّك');
