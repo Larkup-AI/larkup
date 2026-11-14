@@ -96,7 +96,7 @@ describe('visual identity grounding', () => {
 
   it('does not use a later remote identity anchor to identify an earlier actor', () => {
     const result = groundVideoIdentityEvidence({
-      evidence: [evidence('Guest D touches the object.\nPresent: Guest D — mentioned in speech')],
+      evidence: [evidence('Direct component: Guest D touches the object.')],
       observedSubjects: [subject('Guest D', 'source-named', 100)],
     });
     expect(result.evidence[0]?.payload.text).not.toContain('Guest D');

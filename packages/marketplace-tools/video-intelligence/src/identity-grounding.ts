@@ -16,11 +16,9 @@ export function groundVideoIdentityEvidence<T>(value: T): T {
   const input = record(value);
   if (!input || !Array.isArray(input.evidence)) return value;
   const subjects = Array.isArray(input.observedSubjects) ? input.observedSubjects : [];
-  const unresolved = subjects.flatMap((item) => {
+  const knownIdentities = subjects.flatMap((item) => {
     const subject = record(item);
-    return subject?.identityBasis === 'unresolved' && label(subject.identity)
-      ? [label(subject.identity)]
-      : [];
+    return subject && label(subject.identity) ? [label(subject.identity)] : [];
   });
   let withheld = 0;
   const authored = ['source-authored', 'source-questions', 'speech'].includes(
@@ -51,7 +49,7 @@ export function groundVideoIdentityEvidence<T>(value: T): T {
       const subject = record(item);
       if (
         !subject ||
-        subject.identityBasis !== 'source-named' ||
+        !['source-named', 'source-described'].includes(label(subject.identityBasis)) ||
         !timeRange ||
         !Array.isArray(subject.appearances)
       )
@@ -75,7 +73,7 @@ export function groundVideoIdentityEvidence<T>(value: T): T {
     for (const item of local)
       if (item.identityBasis === 'unresolved') allowed.delete(key(label(item.identity)));
     const candidates = [
-      ...unresolved,
+      ...knownIdentities,
       ...local
         .filter((item) => item.identityBasis === 'unresolved')
         .map((item) => label(item.identity)),
