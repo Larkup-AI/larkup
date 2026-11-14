@@ -23,7 +23,7 @@ export * from './ui.js';
 export const TOOL_META = {
   id: 'video-intelligence',
   name: 'Video Intelligence',
-  version: '0.3.14',
+  version: '0.3.15',
 } as const;
 
 /** Managed infrastructure stays an implementation detail of Larkup Cloud. */

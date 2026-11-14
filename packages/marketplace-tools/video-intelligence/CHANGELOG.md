@@ -1,5 +1,11 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.15
+
+### Patch Changes
+
+- 521f527: Keep unresolved visual identities and inferred actions out of answer evidence, without changing stored source records. Apply grounding consistently to query results, chronological inventories, tables and temporal observations; preserve source speech and authored content.
+
 ## 0.3.14
 
 ### Patch Changes
