@@ -1,5 +1,11 @@
 # @larkup/workspace-app
 
+## 0.6.2
+
+### Patch Changes
+
+- Fix the video source inspector modal: restore segment scrolling, remove the stretched footer gap, and make the dialog width responsive on small screens.
+
 ## 0.6.1
 
 ### Patch Changes
