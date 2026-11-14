@@ -415,7 +415,11 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
             return self._workflow()
 
     def _workflow(self):
-        """Exactly one smoke and one frozen pilot; never opens publication expansion."""
+        """Monitor an explicit selection or the saved smoke/pilot; never expand to publication."""
+        from .run_selection import status
+        current = status(self)
+        if current:
+            return current
         if not hasattr(self, 'workflow_admitted'):
             self.workflow_admitted = set()
         path = self.deployment / 'workflow.json'
@@ -478,8 +482,15 @@ def launch_session(remote, args):
     detached = False
     dashboard_children = []
     try:
+        if args.command in {'new','resume-run'} and not args.view_only:
+            try:
+                live=remote.api('/health',timeout=1).get('availability')=='available'
+            except DomainError:live=False
+            if live:
+                from .run_selection import assert_available
+                assert_available(remote,args.run_id if args.command=='resume-run' else None)
         remote.local_ports(not args.no_dashboard, preserve_transports=args.view_only or manual)
-        if args.command == 'launch' and not args.view_only:
+        if args.command in {'launch','new','resume-run'} and not args.view_only:
             rental_active = True  # Also clean up if startup fails after resume was accepted.
             print('Starting the saved RunPod GPU. No additional Pod will be created.', flush=True)
             remote.resume()
@@ -491,6 +502,11 @@ def launch_session(remote, args):
             remote.relay()
             remote.wait_ready()
             connected = True
+            if args.command in {'new','resume-run'}:
+                from .run_selection import create,activate
+                chosen = create(remote,identifier('cli')) if args.command=='new' else activate(remote,args.run_id)
+                print('Tracking run: '+chosen['runId'],flush=True)
+                print('Dashboard: http://127.0.0.1:3100/?run='+chosen['runId'],flush=True)
             intent(remote.deployment, 'active')
         elif manual:
             intent(remote.deployment, 'observe')
@@ -532,7 +548,7 @@ def launch_session(remote, args):
             if idle_checkpointed:
                 continue
             ticks += 1
-            progress = remote.workflow() if args.command in {'launch','dashboard'} and mode == 'active' else {'state': 'paused' if mode == 'paused' else 'connected'}
+            progress = remote.workflow() if args.command in {'launch','dashboard','new','resume-run'} and mode == 'active' else {'state': 'paused' if mode == 'paused' else 'connected'}
             if mode == 'paused':
                 if ticks % 12 == 1:
                     remote.backup()
@@ -545,7 +561,7 @@ def launch_session(remote, args):
                 print(canonical({'benchmark': progress}), flush=True)
                 if progress.get('runId'):
                     current = remote.api('/runs/' + progress['runId'])
-                    print(canonical({'runId':current['id'],'tasks':current['taskCounts'],'coverage':current['coverage'],'cost':current['cost']}), flush=True)
+                    print(canonical({'runId':current['id'],'tasks':current['taskCounts'],'coverage':current['coverage'],'cost':current['cost'],'providers':remote.api('/runs/'+current['id']+'/metrics').get('summary',[])}), flush=True)
                 previous_progress = signature
             if ticks % 12 == 1:
                 remote.backup()
@@ -598,13 +614,18 @@ def launch_session(remote, args):
 
 def main():
     parser = argparse.ArgumentParser(description='Launch the isolated remote video benchmark and local dashboard')
-    parser.add_argument('command', choices=['resume', 'install', 'connect', 'launch', 'backup', 'stop', 'account', 'status', 'dashboard'])
+    parser.add_argument('command', choices=['resume', 'install', 'connect', 'launch', 'backup', 'stop', 'account', 'status', 'dashboard', 'new', 'resume-run'])
+    parser.add_argument('run_id', nargs='?')
     parser.add_argument('--no-dashboard', action='store_true')
     parser.add_argument('--detach', action='store_true', help='Connect only; leave private transports running')
     parser.add_argument('--view-only', action='store_true', help='Show saved results without starting or renting GPU compute')
     args = parser.parse_args()
-    if args.detach and args.command == 'launch':
+    if args.detach and args.command in {'launch','new','resume-run'}:
         parser.error('Use connect --detach for transports only; launch stays attached to supervise budgets and backups.')
+    if args.command == 'resume-run' and not args.run_id:
+        parser.error('resume-run requires the selected RUN_ID')
+    if args.view_only and args.command in {'new','resume-run'}:
+        parser.error('new/resume-run cannot be combined with --view-only')
     remote = Remote()
     if args.command == 'status':
         from .store import Store
@@ -647,6 +668,9 @@ def main():
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
+                if args.command in {'new','resume-run'}:
+                    from .run_selection import request_existing
+                    request_existing(remote,args);return
                 raise DomainError('LAUNCHER_ALREADY_RUNNING') from None
             launch_session(remote, args)
 

@@ -9,18 +9,30 @@ Read the [implementation plan](data/implementation-report.md),
 [controller API contract](data/dashboard-api-v1.md), and the repository's
 benchmarking guide before changing the scientific protocol.
 
-## Run everything
+## Start a new benchmark
 
 From this directory, with `benchmark.env` present and mode `0600`:
 
 ```sh
-./launch.sh
+./launch.sh new
 ```
 
 The launcher resumes the saved benchmark Pod, opens private SSH forwarding,
 starts the credential relay, and runs the independently supplied dashboard with
-`pnpm run dev` at **http://127.0.0.1:3100**. It resumes the saved smoke/pilot
-workflow rather than creating duplicate runs. A successful smoke opens the
+`pnpm run dev` at **http://127.0.0.1:3100**. `new` creates a distinct frozen
+pilot experiment and selects it automatically in the dashboard. Terminal output
+includes its run ID, task counts, coverage, usage and provider metrics. If the
+dashboard supervisor already runs, the command uses its authenticated operator
+bridge instead of opening duplicate services. Without an existing supervisor,
+keep this terminal running; Ctrl-C drains, saves and stops the GPU. With an
+existing supervisor, Ctrl-C closes only the extra terminal monitor.
+
+A **run** is one independent experiment with immutable source/question/variant
+selection and its own answers, attempts, costs and logs. Start a new run to get
+fresh answers; use `./launch.sh resume-run RUN_ID` to continue exactly that saved
+experiment without repeating its completed tasks. Unknown paid outcomes remain
+blocked until reconciled. `./launch.sh` without a command retains the older
+saved smoke/pilot workflow behavior. A successful smoke opens the
 frozen pilot; the pilot's continue/stop/inconclusive gate never automatically
 opens a larger publication run. Blocked paths require review, not repeated
 billable submissions.
@@ -30,7 +42,7 @@ provider credentials stay on this PC. The Pod receives only revocable benchmark
 capabilities and accesses providers through an SSH reverse tunnel. Local
 canonical transcription uses `uv`, Python 3.12, and `ffmpeg`. Python 3.9+, SSH,
 Node 22+, and pnpm are required locally. The launcher installs dashboard
-dependencies when needed; dashboard implementation belongs to its separate agent.
+dependencies when needed; dashboard source is in `dashboard/`.
 
 At a completed/blocked stage the launcher checkpoints evidence and stops the
 GPU. The dashboard then reads a verified local SQLite snapshot. Stopped RunPod
@@ -39,6 +51,8 @@ calls, backs up, and stops the Pod. No top-ups, additional rentals or silent
 model substitutions occur. An unavailable saved GPU host is reported explicitly.
 
 ```sh
+./launch.sh new                     # New independent pilot, automatically selected in UI
+./launch.sh resume-run RUN_ID       # Continue only this saved experiment
 ./launch.sh dashboard               # Real data + operator UI; no GPU start until clicked
 ./launch.sh --no-dashboard          # Same workflow, CLI only
 ./launch.sh --view-only             # Saved results; no GPU rental or dispatch
@@ -52,6 +66,15 @@ model substitutions occur. An unavailable saved GPU host is reported explicitly.
 Logs and the private Pod connection live in `data/deployment/`. The launcher
 refuses occupied ports; it only stops children it previously started and whose
 process start time still matches. It never selects an arbitrary free web port.
+
+The default **Home** shows four provider scores, answer counts, run status,
+known API cost and response time. Choose an experiment from the dropdown, then
+use **New benchmark**, **Resume selected run**, **Pause**, or **Save & stop GPU**.
+A new run is disabled while another is active; pause it first. **Advanced** keeps
+all task/answer rows, logs, database tables, JSON exports, provider quotas and
+explicit force stop. A score is null before any completed answer; different
+coverage does not establish a fair ranking. Last API checks have timestamps and
+scope limits; they are not a continuous stream of paid health requests.
 
 ## CLI and durable state
 

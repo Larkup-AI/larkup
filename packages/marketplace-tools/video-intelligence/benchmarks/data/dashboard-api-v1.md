@@ -372,3 +372,42 @@ inspection. Tasks additionally expose the latest stored `progress` and
 The current development pilot is partial and paused: two Qwen answers on one
 long video completed, one correct and one incorrect. Infrastructure failures
 have null correctness; this is not a completed comparative accuracy result.
+
+
+## Explicit experiments and simple home (v1 additive extension)
+
+The default Home presents Larkup, Gemini, Qwen and TwelveLabs with nullable score,
+correct/answered denominator, answered/planned coverage, state, known API cash
+and response time. Retrieval ablation and technical panels remain in Advanced.
+Home always labels saved checkpoints and timestamps the last actual API checks;
+a provider metadata/credit response is not proof of video-answer functionality.
+
+`GET /system` additionally returns `selectedRunId: string | null` and nullable
+`readiness: {checkedAt, checks:[{system,route,state,completedAnswers,note}],
+limitations:string[]}`. Readiness records tiny actual checks and their scope;
+indexing on a previous cached artifact is explicitly distinct from new GPU work.
+The UI follows a changed selectedRunId once. Browsing history does not repeatedly
+jump back to the current run. Responses from an older selection cannot replace
+newer selected-run content.
+
+`POST /system/new-run` creates and starts a distinct frozen pilot after smoke
+certificates and active-run admission checks. Existing history is preserved.
+`POST /system/resume-run` requires `runId` and starts/resumes exactly that run.
+Both require the system expectedRevision and Idempotency-Key and return the same
+202 operation schema as other operator actions. A completed operation has
+`result: {runId,state,phase}`. Completed/cancelled runs cannot be resumed.
+`POST /system/resume` now refers only to the explicitly selected experiment;
+it does not resume every paused historical run. An active competing run is 409
+`ANOTHER_RUN_ACTIVE_PAUSE_IT_FIRST`, with no GPU/transport interruption.
+
+CLI equivalents are `./launch.sh new` and `./launch.sh resume-run RUN_ID`. With an
+existing launcher, these commands submit through its private authenticated
+operator bridge, print the created/selected ID, and monitor progress. A browser
+already open on Home selects the new run automatically. Neither route expands
+past the pilot continue/stop/inconclusive gate.
+
+Real data is now the default. `DASHBOARD_MODE=mock` is required for fixtures;
+`offline` also proxies the actual readonly PC snapshot bridge and never supplies
+illustrative scores. The inline native Gemini transport rejects media above
+100 MB before paid submission and records `NATIVE_INLINE_INPUT_LIMIT`; a
+configured task deadline also governs native Gateway and async answer polling.

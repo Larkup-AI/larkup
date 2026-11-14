@@ -21,7 +21,7 @@ try {
     messages: [{ role: 'user', content: [{ type: 'file', data: await readFile(input.sourcePath), mediaType: 'video/mp4' },
                                         { type: 'text', text: input.prompt }] }],
     maxOutputTokens: input.maxOutputTokens, temperature: input.temperature, maxRetries: 0,
-    abortSignal: AbortSignal.timeout(180000) });
+    abortSignal: AbortSignal.timeout(input.deadlineMs ?? 3600000) });
   const usage = result.totalUsage;
   process.stdout.write(JSON.stringify({ model: result.response.modelId ?? input.model,
     choices: [{ message: { content: result.text } }], usage: {

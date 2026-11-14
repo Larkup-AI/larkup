@@ -40,6 +40,31 @@ class Context:
 
 
 class AdapterTest(unittest.TestCase):
+    def test_oversized_inline_video_blocks_before_any_paid_submission(self):
+        with tempfile.TemporaryDirectory() as directory:
+            c=Context('gateway');c.root=Path(directory);c.path=c.root/'oversized.mp4'
+            with c.path.open('wb') as f:f.truncate(100_000_001)
+            with self.assertRaises(DomainError) as error:asyncio.run(Gemini().prepare(c))
+            self.assertEqual(error.exception.code,'NATIVE_INLINE_INPUT_LIMIT')
+            self.assertEqual(c.calls,[]);self.assertEqual(c.handles,[])
+
+    def test_cancelled_gateway_child_is_stopped_and_never_resubmitted(self):
+        c=Context('gateway');c.root=Path('/tmp')
+        c.snapshot=SimpleNamespace(secrets=SimpleNamespace(get=lambda _: 'test-key'),config={'limits':{'deadlineSeconds':900}})
+        c.store=MagicMock();process=SimpleNamespace(returncode=None,communicate=AsyncMock(side_effect=asyncio.CancelledError),kill=MagicMock(),wait=AsyncMock(return_value=-9))
+        with patch('harness.adapters.asyncio.create_subprocess_exec',AsyncMock(return_value=process)):
+            with self.assertRaises(asyncio.CancelledError):asyncio.run(Gemini().answer(c,{'question':'?','options':['A','B']},{'sourcePath':'fixture.mp4'}))
+        process.kill.assert_called_once();process.wait.assert_awaited_once();c.store.mark_submitted.assert_called_once()
+
+    def test_durable_native_answer_poll_respects_configured_long_deadline(self):
+        from harness.adapters import Context as RealContext
+        c=object.__new__(RealContext)
+        c.snapshot=SimpleNamespace(config={'limits':{'deadlineSeconds':900}})
+        c.call=AsyncMock(return_value=Response(200,{},b'{"status":"ready"}',1))
+        with patch('harness.adapters.time',SimpleNamespace(monotonic=MagicMock(side_effect=[0,181]))):
+            value=asyncio.run(c.poll('/saved-task','status',{'ready'},{'failed'}))
+        self.assertEqual(value['status'],'ready');c.call.assert_awaited_once()
+
     def test_private_relay_domain_error_is_not_reclassified_as_provider_capability(self):
         response = MagicMock(status=422)
         response.read.return_value = b'{"benchmarkError":"CANONICAL_ASR_FAILED","retryable":false,"unknown":false}'
@@ -59,7 +84,7 @@ class AdapterTest(unittest.TestCase):
                 c = Context('gateway')
                 c.root = Path(directory)
                 c.route['model'] = 'google/gemini-fixture'
-                c.snapshot = SimpleNamespace(secrets=SimpleNamespace(get=lambda _: 'private-test-key'))
+                c.snapshot = SimpleNamespace(secrets=SimpleNamespace(get=lambda _: 'private-test-key'), config={'limits':{'deadlineSeconds':900}})
                 c.store = MagicMock()
                 process = SimpleNamespace(returncode=1, communicate=AsyncMock(return_value=(json.dumps({'status': status, 'retryAfter': 12}).encode(), b'')))
                 with patch('harness.adapters.asyncio.create_subprocess_exec', AsyncMock(return_value=process)):

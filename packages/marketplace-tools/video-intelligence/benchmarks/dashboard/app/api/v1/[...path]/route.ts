@@ -16,7 +16,6 @@ import { checkMutationGuards, canonicalBodyHash } from '../../../../lib/server/a
 import { proxyToController } from '../../../../lib/server/controllerClient.js';
 import { resultsToCsv, csvChecksum } from '../../../../lib/server/csv.js';
 import { mockController } from '../../../../lib/mock/mockController.js';
-import { OFFLINE_LAST_SYNCED_AT } from '../../../../lib/mock/fixtures.js';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -49,14 +48,14 @@ export async function GET(req: Request, { params }: Ctx) {
 
   if (segments.length === 1 && segments[0] === '_meta') {
     const meta = publicConfig();
-    if (cfg.mode === 'proxy') {
+    if (cfg.mode !== 'mock') {
       try {
         const response = await proxyToController({ method: 'GET', path: 'health', search: '' });
         const health = JSON.parse(response.body);
         return NextResponse.json({
           ...meta,
           writesEnabled: meta.writesEnabled && health.availability === 'available',
-          operatorEnabled: !cfg.readonly,
+          operatorEnabled: cfg.mode === 'proxy' && !cfg.readonly,
           availability: health.availability,
           lastSyncedAt: health.lastSyncedAt ?? null,
         });
@@ -64,7 +63,7 @@ export async function GET(req: Request, { params }: Ctx) {
         return NextResponse.json({
           ...meta,
           writesEnabled: false,
-          operatorEnabled: !cfg.readonly,
+          operatorEnabled: cfg.mode === 'proxy' && !cfg.readonly,
           availability: 'offline',
         });
       }
@@ -72,7 +71,7 @@ export async function GET(req: Request, { params }: Ctx) {
     return NextResponse.json({ ...meta, operatorEnabled: false });
   }
 
-  if (cfg.mode === 'proxy') {
+  if (cfg.mode !== 'mock') {
     const res = await proxyToController({
       method: 'GET',
       path: segments.join('/'),
@@ -81,18 +80,11 @@ export async function GET(req: Request, { params }: Ctx) {
     return rawResponse(res);
   }
 
-  // mock + offline reads share the in-memory controller.
+  // Explicit mock mode is the only source of illustrative fixtures.
   const ctl = mockController();
 
   if (segments.length === 1 && segments[0] === 'health') {
     const h = ctl.health();
-    if (cfg.mode === 'offline')
-      return NextResponse.json({
-        ...h,
-        availability: 'offline',
-        mode: 'offline',
-        lastSyncedAt: OFFLINE_LAST_SYNCED_AT,
-      });
     return NextResponse.json(h);
   }
 
@@ -193,7 +185,15 @@ export async function POST(req: Request, { params }: Ctx) {
   const isSystem =
     segments[0] === 'system' &&
     segments.length === 2 &&
-    new Set(['start', 'pause', 'resume', 'stop-gpu', 'force-stop-gpu']).has(segments[1]);
+    new Set([
+      'new-run',
+      'resume-run',
+      'start',
+      'pause',
+      'resume',
+      'stop-gpu',
+      'force-stop-gpu',
+    ]).has(segments[1]);
 
   if (!isControl && !isCreate && !isSystem) {
     return errResponse(404, 'NOT_FOUND', `No such mutation: /${segments.join('/')}`);

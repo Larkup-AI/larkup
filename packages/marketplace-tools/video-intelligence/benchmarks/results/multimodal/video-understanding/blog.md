@@ -70,3 +70,36 @@ checkpoint gate is **inconclusive**. Known cash is partial, unknown charges are
 retained, and provider estimates must not be added to observed cash. The paused
 run and its source/attempt history remain available in the operator dashboard.
 No publication expansion or paid restart was performed while adding the UI.
+
+
+## Actual API readiness checks, 2026-11-14
+
+These isolated development checks do not complete or replace the partial pilot.
+All four configured systems returned fresh nonempty answers, with Larkup reusing
+its fingerprint-matched cached evidence. The saved RunPod GPU was unavailable on
+two resume attempts, so fresh canonical GPU indexing was **not** reverified.
+
+| Check | Completed answers | Correct answers | Source duration | Scope |
+| --- | ---: | ---: | --- | --- |
+| Gemini Gateway | 2/2 | 2/2 | 8 seconds | Full-video/audio smoke |
+| Qwen Gateway | 2/2 | 2/2 | 8 seconds | Timestamped frames + supplied subtitles |
+| TwelveLabs direct | 2/2 | 2/2 | 8 seconds | Native asset + Analyze |
+| Larkup Gateway answer | 2/2 | 2/2 | 8 seconds | Fresh canonical investigation/retrieval/answer; existing index |
+| Gemini Gateway | 1/1 | 0/1 | 12.6 minutes | Whole original pilot video; API success, incorrect answer |
+| TwelveLabs direct | 1/1 | 1/1 | 12.6 minutes | Whole original pilot video; native async result |
+| Gemini direct background diagnostic | 0/2 | Not scored | 8 seconds | Provider `DEADLINE_EXCEEDED`; excluded from active profile |
+| Gemini direct Files synchronous diagnostic | 0/2 planned | Not scored | 8 seconds | One submitted answer outcome unknown; sibling blocked without resubmission |
+
+Known API cash for this check batch was **USD 0.08886825**, with **8 attempts
+whose cash charges remain unknown**. It excludes earlier pilot/smoke spending
+and RunPod storage. Provider estimates are separate; do not add them to cash.
+Failed infrastructure cells are unscored. `data/service-checks.csv` includes
+preparation and answer rows, nullable costs, timings, route/variant IDs, errors
+and reuse flags; `data/service-checks.json` preserves full sanitized metrics.
+
+The native Gateway adapter now uses the configured deadline and rejects raw
+inline video above 100 MB before a paid submission. This reflects the documented
+[Gemini inline limit](https://ai.google.dev/gemini-api/docs/file-input-methods),
+not a successful long-input test. Longer sources remain coverage limitations;
+no truncation, hidden resampling, key rotation or model substitution was used.
+The comparative gate remains **inconclusive** and no publication expansion ran.

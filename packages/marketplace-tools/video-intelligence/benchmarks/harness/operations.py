@@ -11,7 +11,7 @@ import time
 from .common import DomainError, atomic, canonical, digest, identifier, utc
 from .inspection import logs
 
-ACTIONS={'start','pause','resume','stop-gpu','force-stop-gpu'}
+ACTIONS={'new-run','resume-run','start','pause','resume','stop-gpu','force-stop-gpu'}
 
 
 def intent(deployment, mode=None):
@@ -83,7 +83,11 @@ class Operator:
             observed=subprocess.run(['ps','-p',str(record['pid']),'-o','lstart='],capture_output=True,text=True).stdout.strip()
             services.append({'name':record.get('service','launcher child'),'pid':record['pid'],'location':'PC',
                              'state':'running' if record.get('started') and observed==record['started'] else 'stopped'})
-        return dict(revision=self.revision(),readonly=self.readonly,controllerAvailable=live,pod=self.pod,
+        from .run_selection import selected
+        selection=selected(self.remote)
+        readiness_path=self.remote.deployment/'provider-readiness-summary.json'
+        readiness=self.remote.private.clean(json.loads(readiness_path.read_text())) if readiness_path.exists() else None
+        return dict(readiness=readiness,selectedRunId=selection['runId'] if selection else None,revision=self.revision(),readonly=self.readonly,controllerAvailable=live,pod=self.pod,
                     supervisor=intent(self.remote.deployment),services=services,operations=self.jobs(),serverTime=utc())
 
     def submit(self, action, body, key):
@@ -102,8 +106,10 @@ class Operator:
             active=self.db.execute("SELECT 1 FROM operations WHERE state IN ('pending','running')").fetchone()
             if active and action!='force-stop-gpu':raise DomainError('OPERATION_IN_PROGRESS',status=409)
             if action=='force-stop-gpu':self.generation+=1
+            if action=='resume-run' and (not isinstance(body.get('runId'),str) or not body['runId'].startswith('run-')):
+                raise DomainError('RUN_ID_INVALID',status=400)
             generation=self.generation
-            job={'id':identifier('operation'),'action':action,'state':'pending','createdAt':utc()}
+            job={'id':identifier('operation'),'action':action,'state':'pending','createdAt':utc(),**({'runId':body['runId']} if action=='resume-run' else {})}
             self.db.execute('INSERT INTO operations VALUES(?,?,?,?,?,?)',(job['id'],key,fingerprint,action,'pending',canonical(job)))
             if action in {'pause','stop-gpu','force-stop-gpu'}:intent(self.remote.deployment,'stopped' if action=='force-stop-gpu' else 'paused')
             threading.Thread(target=self.execute,args=(job,generation),daemon=True).start()
@@ -135,34 +141,48 @@ class Operator:
 
     def _execute(self,job,generation):
         remote=self.remote;action=job['action'];self.update(job,'running')
+        previous_intent=intent(remote.deployment)['mode'];started_here=False
         try:
-            if action=='start':
-                intent(remote.deployment,'starting')
+            if action in {'start','new-run','resume-run'}:
                 try:
                     live=remote.api('/health',timeout=1).get('availability')=='available'
                 except DomainError:live=False
-                if live and any(r['state'] in {'running','pausing'} for r in remote.api_items('/runs')):
+                if action=='start' and live and any(r['state'] in {'running','pausing'} for r in remote.api_items('/runs')):
                     intent(remote.deployment,'active')
                     self.update(job,'completed',stage='Existing benchmark is already active; transports preserved',finishedAt=utc())
                     return
+                from .run_selection import assert_available
+                if live and action in {'new-run','resume-run'}:
+                    assert_available(remote,job.get('runId'))
+                intent(remote.deployment,'starting')
                 if not live:
+                    started_here=True
                     self.update(job,'running',stage='Starting saved GPU Pod; no additional Pod is created')
                     remote.resume();self.check(generation)
                     remote.ensure_started();self.check(generation)
                     self.start_transports();self.check(generation)
                 remote.workflow_admitted=set()
-                result=remote.workflow();self.check(generation)
+                from .run_selection import create,activate,selected
+                saved_selection=selected(remote)
+                if action=='new-run':result=create(remote,job['id'])
+                elif action=='resume-run':result=activate(remote,job['runId'])
+                elif saved_selection:result=activate(remote,saved_selection['runId'])
+                else:result=remote.workflow()
+                self.check(generation)
                 intent(remote.deployment,'active')
                 self.update(job,'completed',result=result,finishedAt=utc())
             elif action in {'pause','resume','stop-gpu'}:
                 runs=remote.api_items('/runs')
-                if action=='resume' and not any(r['state']=='paused' for r in runs):raise DomainError('NO_PAUSED_RUNS',status=409)
+                if action=='resume':
+                    from .run_selection import selected,activate
+                    selection=selected(remote)
+                    if not selection:raise DomainError('SELECT_A_RUN_TO_RESUME',status=409)
+                    result=activate(remote,selection['runId']);intent(remote.deployment,'active')
+                    self.update(job,'completed',result=result,finishedAt=utc());return
                 for run in runs:
                     self.check(generation)
-                    op='pause' if action!='resume' else 'resume'
-                    if run['state'] in ({'running'} if op=='pause' else {'paused'}):
-                        remote.api('/runs/'+run['id']+'/'+op,{'expectedRevision':run['revision']})
-                if action=='resume':intent(remote.deployment,'active')
+                    if run['state']=='running':
+                        remote.api('/runs/'+run['id']+'/pause',{'expectedRevision':run['revision']})
                 if action=='stop-gpu':
                     self.update(job,'running',stage='Draining paid work before backup and GPU stop')
                     deadline=time.monotonic()+240
@@ -178,10 +198,11 @@ class Operator:
                 remote.stop();intent(remote.deployment,'stopped');self.pod={'state':'EXITED','observedAt':utc()}
                 self.update(job,'completed',warning='In-flight outcomes may be unknown; use saved handles for recovery.',finishedAt=utc())
         except Exception as error:
-            if action=='start':
-                intent(remote.deployment,'stopped')
-                try:remote.stop()
-                except Exception:pass
+            if action in {'start','new-run','resume-run'}:
+                intent(remote.deployment,'stopped' if started_here else previous_intent)
+                if started_here:
+                    try:remote.stop()
+                    except Exception:pass
             issue=error.issue() if isinstance(error,DomainError) else DomainError('OPERATION_FAILED').issue()
             self.update(job,'failed',issue=issue,finishedAt=utc())
 

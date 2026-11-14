@@ -14,11 +14,11 @@ export type ServerConfig = {
   readonly: boolean;
 };
 
-function parseMode(raw: string | undefined, hasUrl: boolean): BackendMode {
+export function parseMode(raw: string | undefined): BackendMode {
   const v = (raw ?? '').trim().toLowerCase();
   if (v === 'proxy' || v === 'offline' || v === 'mock') return v;
-  // Default: proxy only if a controller URL is configured, otherwise mock.
-  return hasUrl ? 'proxy' : 'mock';
+  // Sample data requires explicit mock mode; an unconfigured launch never fabricates results.
+  return 'proxy';
 }
 
 let cached: ServerConfig | null = null;
@@ -34,7 +34,7 @@ export function serverConfig(): ServerConfig {
     .filter(Boolean);
   const defaultOrigins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`];
   cached = {
-    mode: parseMode(process.env.DASHBOARD_MODE, Boolean(controllerUrl)),
+    mode: parseMode(process.env.DASHBOARD_MODE),
     controllerUrl,
     controllerToken,
     allowedOrigins: explicitOrigins.length ? explicitOrigins : defaultOrigins,

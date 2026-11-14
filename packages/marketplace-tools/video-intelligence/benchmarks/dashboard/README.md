@@ -1,4 +1,4 @@
-# Video benchmark dashboard (local, mock-first)
+# Video benchmark dashboard
 
 Local web dashboard for the **Video Intelligence benchmark controller API v1**
 (see [`../data/dashboard-api-v1.md`](../data/dashboard-api-v1.md)). It is a
@@ -8,9 +8,10 @@ computes billing — it surfaces the controller's fields and exposes run control
 > **Note for the benchmark agent (how to run this without disturbing the monorepo).**
 > This app is intentionally **outside** the `larkup` pnpm workspace (no workspace
 > glob matches `packages/marketplace-tools/video-intelligence/benchmarks/*`).
-> **Install and run it with `npm`, from inside this folder.** Do **not** run
-> `pnpm install`/`pnpm dev` here or from the repo root for this app — that would
-> pull it into the monorepo graph and can corrupt the root lockfile/build.
+> Install dependencies with `npm install` inside this folder. Run real data and
+> all services with `../launch.sh dashboard` or a new experiment with
+> `../launch.sh new`; the launcher runs `pnpm run dev` for this isolated app.
+> Avoid `pnpm install` here, which would involve the parent workspace lockfile.
 > Everything heavy or secret (`node_modules/`, `.next/`, `.env*`, the npm
 > lockfile) is git-ignored and never pushed.
 
@@ -36,9 +37,9 @@ free port and verify the listener (`lsof -nP -iTCP:<port> -sTCP:LISTEN`).
 
 | `DASHBOARD_MODE` | Behavior |
 | --- | --- |
-| `mock` (default when no controller URL) | Serves in-memory contract fixtures covering running / pausing / paused / quota-blocked / mixed-route / partial / negative-pilot / completed / draft. All figures are illustrative, **not** measured results. |
-| `proxy` | BFF forwards approved `/api/v1` ops to `BENCHMARK_CONTROLLER_URL` (your SSH-forwarded controller loopback) with `BENCHMARK_CONTROLLER_TOKEN` attached **server-side**. |
-| `offline` | Read-only last-synced snapshot; all writes return `503 OFFLINE_READONLY` and the UI is labelled stale. |
+| `mock` (explicit opt-in only) | Serves in-memory contract fixtures covering running / pausing / paused / quota-blocked / mixed-route / partial / negative-pilot / completed / draft. All figures are illustrative, **not** measured results. |
+| `proxy` (default) | BFF forwards approved `/api/v1` ops to `BENCHMARK_CONTROLLER_URL` (your SSH-forwarded controller loopback) with `BENCHMARK_CONTROLLER_TOKEN` attached **server-side**. |
+| `offline` | Read real saved data through the authenticated PC bridge; all writes are rejected. Start the bridge with `../launch.sh --view-only`. It never substitutes fixture results. |
 
 Env vars: `BENCHMARK_CONTROLLER_URL`, `BENCHMARK_CONTROLLER_TOKEN`,
 `DASHBOARD_ALLOWED_ORIGINS` (exact origins allowed to mutate; defaults to the

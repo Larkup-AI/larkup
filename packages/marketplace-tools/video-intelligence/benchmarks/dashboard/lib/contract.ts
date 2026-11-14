@@ -405,8 +405,21 @@ export type OperatorOperation = {
   stage?: string;
   issue?: Issue;
   warning?: string;
+  result?: { runId?: string; state?: string };
 };
 export type SystemStatus = {
+  selectedRunId?: string | null;
+  readiness?: {
+    checkedAt: string;
+    checks: {
+      system: BenchmarkSystem;
+      route: string;
+      state: string;
+      completedAnswers: number;
+      note: string;
+    }[];
+    limitations: string[];
+  } | null;
   revision: string;
   readonly: boolean;
   controllerAvailable: boolean;

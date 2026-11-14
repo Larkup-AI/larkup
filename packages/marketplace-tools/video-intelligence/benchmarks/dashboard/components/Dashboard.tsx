@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Home } from './Home.js';
+import { read, type SystemStatus } from '../lib/operator.js';
 import { api, type PublicMeta } from '../lib/client.js';
 import { ControlCenter, DatabaseTab, RecordsTab, LogsTab, ServicesTab } from './ControlCenter.js';
 import {
@@ -34,7 +36,7 @@ type Loaded = {
 };
 
 export default function Dashboard() {
-  const [tab, setTab] = useState('Overview');
+  const [tab, setTab] = useState('Home');
   const [live, setLive] = useState(false);
   const onLive = useCallback((available: boolean) => setLive(available), []);
   const [meta, setMeta] = useState<PublicMeta | null>(null);
@@ -49,6 +51,34 @@ export default function Dashboard() {
 
   const seenEvents = useRef<Set<string>>(new Set());
   const cursorRef = useRef<string | null>(null);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const followedRun = useRef<string | null>(null);
+  const [system, setSystem] = useState<SystemStatus | null>(null);
+  useEffect(() => {
+    if (meta?.mode !== 'proxy') return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const status = await read<SystemStatus>('/system');
+        if (cancelled) return;
+        setSystem(status);
+        setLive(status.controllerAvailable);
+        if (status.selectedRunId && status.selectedRunId !== followedRun.current) {
+          followedRun.current = status.selectedRunId;
+          setSelected(status.selectedRunId);
+        }
+      } catch {
+        if (!cancelled) setLive(false);
+      }
+    };
+    void refresh();
+    const timer = setInterval(refresh, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [meta?.mode]);
 
   // Initial meta + run list.
   useEffect(() => {
@@ -59,7 +89,11 @@ export default function Dashboard() {
         setRuns(r.items);
         setSelected(
           (prev) =>
-            prev ?? r.items.find((x) => x.state === 'running')?.id ?? r.items[0]?.id ?? null,
+            prev ??
+            new URLSearchParams(window.location.search).get('run') ??
+            r.items.find((x) => x.state === 'running')?.id ??
+            r.items[0]?.id ??
+            null,
         );
       } catch (e) {
         setError(describe(e));
@@ -85,6 +119,7 @@ export default function Dashboard() {
           .then((p) => p.items)
           .catch(() => [] as ProviderScope[]),
       ]);
+      if (selectedRef.current !== id) return;
       // Defensive: a live controller may omit empty arrays. Never let a missing
       // field crash a panel (which would leave the page stuck on "Loading run…").
       const safeMetrics = metrics
@@ -102,7 +137,7 @@ export default function Dashboard() {
 
       // Events: poll from cursor, dedupe by id, cap list.
       const page = await api.events(id, cursorRef.current).catch(() => null);
-      if (page) {
+      if (page && selectedRef.current === id) {
         const fresh = page.events.filter((e) => !seenEvents.current.has(e.id));
         fresh.forEach((e) => seenEvents.current.add(e.id));
         if (fresh.length) setEvents((prev) => [...fresh.reverse(), ...prev].slice(0, MAX_EVENTS));
@@ -111,6 +146,7 @@ export default function Dashboard() {
       void isPoll;
     } catch (e) {
       // Surface the failure instead of sitting silently on the spinner.
+      if (selectedRef.current !== id) return;
       console.error('[dashboard] loadSelected failed for', id, e);
       setError(describe(e));
     }
@@ -216,54 +252,77 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="layout">
-        <aside>
-          <div className="panel">
-            <h2>Runs</h2>
-            <ul className="runlist">
-              {runs.map((r) => (
-                <li key={r.id}>
-                  <button
-                    className={r.id === selected ? 'active' : ''}
-                    onClick={() => setSelected(r.id)}
-                  >
-                    <div className="rid">{r.id}</div>
-                    <div className="rmeta">
-                      <Badge tone={STATE_TONE[r.state]}>{r.state}</Badge>{' '}
-                      {r.decision !== 'not_evaluated' ? `· ${r.decision}` : ''} ·{' '}
-                      {relTime(r.updatedAt)}
-                    </div>
-                  </button>
-                </li>
-              ))}
-              {!runs.length && <li className="muted">No runs.</li>}
-            </ul>
-          </div>
-        </aside>
+      <div className={tab === 'Home' ? 'home-layout' : 'layout'}>
+        {tab !== 'Home' && (
+          <aside>
+            <div className="panel">
+              <h2>Runs</h2>
+              <ul className="runlist">
+                {runs.map((r) => (
+                  <li key={r.id}>
+                    <button
+                      className={r.id === selected ? 'active' : ''}
+                      onClick={() => setSelected(r.id)}
+                    >
+                      <div className="rid">{r.id}</div>
+                      <div className="rmeta">
+                        <Badge tone={STATE_TONE[r.state]}>{r.state}</Badge>{' '}
+                        {r.decision !== 'not_evaluated' ? `· ${r.decision}` : ''} ·{' '}
+                        {relTime(r.updatedAt)}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+                {!runs.length && <li className="muted">No runs.</li>}
+              </ul>
+            </div>
+          </aside>
+        )}
 
         <main>
-          <ControlCenter enabled={meta?.mode === 'proxy'} onLive={onLive} />
-          <nav className="tabs" aria-label="Benchmark views" role="tablist">
-            {[
-              'Overview',
-              'Processes',
-              'Results',
-              'Logs',
-              'Database',
-              'Services & providers',
-              'Events',
-            ].map((name) => (
-              <button
-                key={name}
-                role="tab"
-                aria-selected={tab === name}
-                aria-controls="benchmark-tab-panel"
-                onClick={() => setTab(name)}
-              >
-                {name}
-              </button>
-            ))}
+          <nav className="tabs" aria-label="Main views">
+            <button onClick={() => setTab('Home')} aria-pressed={tab === 'Home'}>
+              Home
+            </button>
+            <button onClick={() => setTab('Overview')} aria-pressed={tab !== 'Home'}>
+              Advanced
+            </button>
           </nav>
+          {tab === 'Home' && (
+            <Home
+              runs={runs}
+              selected={selected}
+              onSelect={setSelected}
+              snapshot={snap ?? null}
+              metrics={data?.metrics ?? null}
+              system={system}
+              operatorEnabled={meta?.operatorEnabled === true}
+            />
+          )}
+          {tab !== 'Home' && <ControlCenter enabled={meta?.mode === 'proxy'} onLive={onLive} />}
+          {tab !== 'Home' && (
+            <nav className="tabs" aria-label="Benchmark views" role="tablist">
+              {[
+                'Overview',
+                'Processes',
+                'Results',
+                'Logs',
+                'Database',
+                'Services & providers',
+                'Events',
+              ].map((name) => (
+                <button
+                  key={name}
+                  role="tab"
+                  aria-selected={tab === name}
+                  aria-controls="benchmark-tab-panel"
+                  onClick={() => setTab(name)}
+                >
+                  {name}
+                </button>
+              ))}
+            </nav>
+          )}
           <div id="benchmark-tab-panel" role="tabpanel" aria-label={tab}>
             {tab === 'Processes' && <RecordsTab runId={selected} kind="tasks" />}
             {tab === 'Results' && <RecordsTab runId={selected} kind="results" />}

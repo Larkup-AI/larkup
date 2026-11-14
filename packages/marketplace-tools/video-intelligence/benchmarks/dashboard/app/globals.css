@@ -154,3 +154,9 @@ tr:last-child td { border-bottom: none; }
 .controls label {display:flex;align-items:center;gap:7px;}
 select,input {font:inherit;color:var(--text);background:var(--panel-2);border:1px solid var(--border);border-radius:5px;padding:6px;}
 main {min-width:0;}
+
+.home-layout { display:block; }
+.home-status {display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin-bottom:20px;}
+.home-score {font-size:24px;font-weight:650;}
+.home-score .note {font-size:12px;font-weight:400;}
+#selected-run {max-width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;color:var(--text);background:var(--panel-2);}

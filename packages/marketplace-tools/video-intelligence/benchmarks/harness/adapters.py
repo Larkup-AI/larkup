@@ -129,8 +129,6 @@ class Context:
 
     async def poll(self, suffix: str, field: str, done: set, failed: set, *, delay=2):
         limit = self.snapshot.config['limits']['deadlineSeconds']
-        if self.task['kind'] == 'answer':
-            limit = min(limit, 180)
         deadline = time.monotonic() + limit
         while time.monotonic() < deadline:
             result = (await self.call('GET', suffix)).json()
@@ -184,6 +182,8 @@ class Gemini:
         start = time.monotonic()
         path = c.path
         if c.route['provider'] == 'gateway':
+            if path.stat().st_size > 100_000_000:
+                raise DomainError('NATIVE_INLINE_INPUT_LIMIT')
             return dict(sourcePath=str(path.relative_to(c.root)), fingerprint=digest([c.source.get('sha256'), c.route['secretAlias']]),
                         timing={'prepareMs': (time.monotonic() - start) * 1000, 'indexMs': None},
                         modalityDisclosure='Full video and audio through Gateway AI SDK v4; no persistent native index')
@@ -222,6 +222,7 @@ class Gemini:
             request = dict(sourcePath=str(c.root / prepared['sourcePath']), prompt=question_prompt(question),
                            model=c.route['model'], apiKey=c.snapshot.secrets.get(c.route['secretAlias']),
                            maxOutputTokens=c.variant.get('maxOutputTokens', 2048), temperature=c.variant.get('temperature', 0),
+                           deadlineMs=c.snapshot.config['limits']['deadlineSeconds']*1000,
                            proxy=os.environ.get('BENCHMARK_PROVIDER_PROXY'), capability=os.environ.get('BENCHMARK_RELAY_CAPABILITY'),
                            accountAlias=c.route['secretAlias'], attemptId=c.attempt['id'])
             if c.source.get('subtitles'):
@@ -230,7 +231,11 @@ class Gemini:
             process = await asyncio.create_subprocess_exec('node', '--import', 'tsx', str(package / 'benchmarks/harness/native-gateway.mjs'),
                                                            cwd=package.parents[1] / 'core', stdin=asyncio.subprocess.PIPE,
                                                            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-            stdout, _ = await process.communicate(canonical(request).encode())
+            try:
+                stdout, _ = await process.communicate(canonical(request).encode())
+            finally:
+                if process.returncode is None:
+                    process.kill();await process.wait()
             if process.returncode:
                 try:
                     error = json.loads(stdout)

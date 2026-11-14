@@ -15,6 +15,7 @@ export async function operate(
   action: string,
   revision: string,
   confirmation?: string,
+  runId?: string,
 ): Promise<Operation> {
   const response = await fetch('/api/v1/system/' + action, {
     method: 'POST',
@@ -22,7 +23,11 @@ export async function operate(
       'content-type': 'application/json',
       'idempotency-key': crypto.randomUUID(),
     },
-    body: JSON.stringify({ expectedRevision: revision, ...(confirmation ? { confirmation } : {}) }),
+    body: JSON.stringify({
+      expectedRevision: revision,
+      ...(confirmation ? { confirmation } : {}),
+      ...(runId ? { runId } : {}),
+    }),
   });
   const body = await response.json();
   if (!response.ok) throw Error(body.error?.message ?? `Operation rejected (${response.status})`);

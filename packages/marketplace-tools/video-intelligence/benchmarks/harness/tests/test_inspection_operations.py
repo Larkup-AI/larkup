@@ -87,6 +87,23 @@ class InspectionOperationsTest(unittest.TestCase):
         self.operator.execute({'id':'fixture','action':'start'},0)
         self.remote.resume.assert_not_called();self.remote.tunnel.assert_not_called();self.remote.workflow.assert_not_called()
         self.assertEqual(intent(self.deployment)['mode'],'active')
+    def test_new_run_rejection_preserves_active_gpu_and_transports(self):
+        self.remote.api.side_effect=None;self.remote.api.return_value={'availability':'available'}
+        self.remote.api_items.return_value=[{'id':'run-active','state':'running'}]
+        intent(self.deployment,'active')
+        self.operator.execute({'id':'fixture','action':'new-run'},0)
+        self.remote.stop.assert_not_called();self.remote.resume.assert_not_called();self.remote.tunnel.assert_not_called()
+        self.assertEqual(intent(self.deployment)['mode'],'active')
+
+    def test_selected_resume_never_resumes_all_paused_history(self):
+        self.remote.api.side_effect=None
+        self.remote.api_items.return_value=[{'id':'run-selected','state':'paused'},{'id':'run-other','state':'paused'}]
+        atomic(self.deployment/'selected-run.json',{'runId':'run-selected'})
+        with patch('harness.run_selection.activate',return_value={'runId':'run-selected'}) as activate:
+            self.operator.execute({'id':'fixture','action':'resume'},0)
+            activate.assert_called_once_with(self.remote,'run-selected')
+        self.remote.api.assert_not_called()
+
     def test_full_json_run_export_uses_all_rows_and_preserves_null_accuracy(self):
         from harness.api import Controller
         ctl=Controller(self.store,self.config,self.data,'test-token',readonly=True)
