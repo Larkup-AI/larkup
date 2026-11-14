@@ -1,0 +1,9 @@
+# Private credentials and operational benchmark state; never publish these.
+benchmark.env
+*.env
+.env*
+data/state/
+data/sources/
+data/artifacts/
+data/runs/
+data/exports/
