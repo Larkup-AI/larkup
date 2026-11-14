@@ -94,6 +94,54 @@ function evidenceContext(overrides: {
 }
 
 describe('Video Intelligence chat extension', () => {
+  it('grounds every source-scan answer before exposing visual identities and table claims', async () => {
+    const text =
+      'Visitor Z moves the object.\nVisible subject: {"identity":"Visitor Z","identityBasis":"unresolved"}\nPresent: Visitor Z — mentioned by narrator\nOn screen: entrance';
+    const result: any = await agentClient(vi.fn() as any).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'Who moved it?',
+        investigation: { scope: 'source', goal: 'synthesize', recordSet: 'all' },
+      },
+      evidenceContext({
+        plan: {
+          kinds: ['coverage'],
+          route: 'scan',
+          requiresBroadCoverage: true,
+          requiresInspectionWhenInsufficient: false,
+        },
+        search: async () => [],
+        scan: async () => ({
+          records: [
+            {
+              id: 'visual-record',
+              kind: 'evidence',
+              text,
+              modality: 'visual',
+              timeRange: { startSecs: 1, endSecs: 4 },
+            },
+          ],
+          continuation: { cursor: 0, hasMore: false, totalRecords: 1 },
+          coverage: { complete: true },
+          resultHandle: 'scan',
+        }),
+        aggregate: async () => ({
+          visibleSubjects: [
+            {
+              identity: 'Visitor Z',
+              identityBasis: 'unresolved',
+              appearances: [{ startSecs: 1, endSecs: 4 }],
+            },
+          ],
+        }),
+      }),
+    );
+    expect(result.evidence[0].payload.text).not.toContain('Visitor Z');
+    expect(result.rows[0].Content).not.toContain('Visitor Z');
+    expect(result.evidence[0].payload.text).toContain('entrance');
+    expect(result.claimVerification.status).toBe('needs-corroboration');
+  });
+
   it('declares a generic evidence query plus bounded refinement action', () => {
     expect(AGENT_TOOLS).toEqual(
       expect.arrayContaining([

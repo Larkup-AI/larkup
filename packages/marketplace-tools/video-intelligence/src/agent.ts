@@ -1,3 +1,4 @@
+import { groundVideoIdentityEvidence } from './identity-grounding.js';
 import { VIDEO_INVESTIGATION_GUIDE } from './investigation-skills.js';
 import type { AgentToolDefinition, AgentToolExecutionContext } from '@larkup/marketplace/extension';
 import { trackUsageEvent } from '@larkup/core/analytics-store';
@@ -151,7 +152,7 @@ export function attachVideoIntelligenceAgentClient(
   fetcher: typeof globalThis.fetch = globalThis.fetch,
 ): VideoIntelligenceAgentClient {
   const inspectVideoKnowledge = createInspector(fetcher);
-  return Object.assign(client, {
+  const actions = {
     inspectVideoKnowledge,
     async queryVideoEvidence(input: QueryVideoEvidenceInput, context: AgentToolExecutionContext) {
       if (!isValidQueryInput(input))
@@ -597,6 +598,12 @@ export function attachVideoIntelligenceAgentClient(
         ...(inspection ? { inspection } : {}),
         ...temporalContextResult(hits, plan),
       };
+    },
+  };
+  return Object.assign(client, {
+    ...actions,
+    async queryVideoEvidence(input: QueryVideoEvidenceInput, context: AgentToolExecutionContext) {
+      return groundVideoIdentityEvidence(await actions.queryVideoEvidence(input, context));
     },
   });
 }
