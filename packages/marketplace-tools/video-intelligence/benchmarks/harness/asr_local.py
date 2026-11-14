@@ -2,9 +2,17 @@
 import json
 import os
 import sys
+import subprocess
 from pathlib import Path
 
 request = json.load(sys.stdin)
+probe = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'a',
+                        '-show_entries', 'stream=index', '-of', 'json', request['path']],
+                       check=True, capture_output=True, text=True, timeout=30)
+if not json.loads(probe.stdout).get('streams'):
+    print(json.dumps({'transcript': [], 'detectedLanguage': None,
+                      'diagnostics': {'providerCalled': False, 'skipReason': 'source has no audio track'}}))
+    raise SystemExit(0)
 sys.path.insert(0, request['runtime'])
 os.environ.update(DEEPGRAM_API_KEY=request['apiKey'], LARKUP_VIDEO_TRANSCRIPTION_PROVIDER='deepgram',
                   LARKUP_VIDEO_DEEPGRAM_MODEL=request['model'], LARKUP_VIDEO_DEEPGRAM_AUTO_MODEL=request['model'],

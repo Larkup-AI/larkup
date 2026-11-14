@@ -1,0 +1,26 @@
+{
+  "name": "video-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local, mock-first dashboard for the Video Intelligence benchmark controller API v1. Isolated from the larkup pnpm workspace; install and run with npm.",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p ${PORT:-3100}",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p ${PORT:-3100}",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --import ./test/register.mjs --test test/*.test.ts"
+  },
+  "dependencies": {
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.7.5",
+    "@types/react": "18.3.11",
+    "@types/react-dom": "18.3.0",
+    "typescript": "5.6.3"
+  }
+}

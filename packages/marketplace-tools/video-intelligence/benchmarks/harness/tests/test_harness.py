@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import csv
 import json
 import tempfile
 import threading
@@ -15,7 +16,7 @@ from harness.api import Controller
 from harness.common import DomainError, Secrets, atomic, canonical, digest
 from harness.config import Config
 from harness.scheduler import Scheduler
-from harness.scoring import accuracy, decision, export, parse_option, results
+from harness.scoring import accuracy, decision, export, metrics, parse_option, results
 from harness.store import Store
 from harness.transport import classify
 
@@ -198,6 +199,35 @@ class HarnessTest(unittest.TestCase):
         self.assertEqual(self.store.one('SELECT state FROM tasks WHERE id=?', (task['id'],))['state'], 'blocked')
         self.assertEqual(self.store.one('SELECT state FROM attempts WHERE id=?', (attempt['id'],))['state'], 'unknown')
 
+    def test_unknown_source_outcome_blocks_sibling_questions_but_not_other_sources(self):
+        doc = manifest(2)
+        doc['questions'].append({**doc['questions'][0], 'id': 'source-zero-sibling'})
+        run = self.store.create(doc, ['arm-one'], self.config.active, 'smoke')
+        self.store.control(run['id'], 'start', run['revision'])
+        prep = next(t for t in self.store.ready() if t['run_id'] == run['id'] and t['source_id'] == 'source-0')
+        attempt = self.store.lease(prep, self.config.active, 'direct', self.config.active.config['routes']['direct'], 'fixture')
+        self.store.finish(prep, attempt, {'fingerprint': 'source-zero'})
+        question = next(t for t in self.store.ready() if t['run_id'] == run['id'] and t['source_id'] == 'source-0')
+        attempt = self.store.lease(question, self.config.active, 'direct', self.config.active.config['routes']['direct'], 'fixture')
+        self.store.fail(question, attempt, DomainError('REMOTE_OUTCOME_UNKNOWN', unknown=True), 3)
+        fake = Fake()
+        async def finish():
+            scheduler = self.scheduler(fake)
+            for _ in range(100):
+                await scheduler.tick()
+                if self.store.snapshot(run['id'])['state'] == 'blocked':
+                    return
+                await asyncio.sleep(.005)
+            self.fail('Run did not settle')
+        asyncio.run(finish())
+        self.assertFalse(any(source == 'source-0' for _, source, _ in fake.calls))
+        self.assertTrue(any(source == 'source-1' for _, source, _ in fake.calls))
+        blocked = self.store.rows("SELECT state FROM tasks WHERE run_id=? AND source_id='source-0' AND kind='answer'", (run['id'],))
+        self.assertEqual([t['state'] for t in blocked], ['blocked', 'blocked'])
+        snapshot = self.store.snapshot(run['id'])
+        self.store.control(run['id'], 'resume', snapshot['revision'])
+        self.assertEqual(self.store.one('SELECT state FROM tasks WHERE id=?', (question['id'],))['state'], 'blocked')
+
     def test_saved_remote_handle_is_reconciled(self):
         self.start()
         task = self.store.ready()[0]
@@ -226,6 +256,61 @@ class HarnessTest(unittest.TestCase):
         self.assertTrue((root / 'blog.md').exists())
         self.assertTrue((root / 'results.csv').exists())
         self.assertEqual(decision(self.store, self.run['id'])[0], 'not_evaluated')
+
+    def test_summary_and_flat_exports_separate_question_preparation_and_retry_costs(self):
+        self.start()
+        asyncio.run(self.finish(self.scheduler()))
+        tasks = self.store.rows('SELECT * FROM tasks WHERE run_id=?', (self.run['id'],))
+        prep = next(t for t in tasks if t['kind'] == 'prepare')
+        answer = next(t for t in tasks if t['kind'] == 'answer')
+        self.store.usage(prep['current_attempt'], {'actual': '0.20', 'operation': 'index'})
+        self.store.usage(answer['current_attempt'], {'actual': '0.03', 'operation': 'answer'})
+        unknown = self.store.one("SELECT id FROM usage_events WHERE attempt_id=? AND json_extract(document,'$.actual') IS NULL", (answer['current_attempt'],))
+        self.store.reconcile_usage([dict(usageEventId=unknown['id'], actualUsd='0.01', provenance='provider receipt')])
+        measured = metrics(self.store, self.run['id'])
+        summary = measured['summary'][0]
+        self.assertEqual(summary['cost']['actual'], '0.24')
+        self.assertEqual(summary['preparationCost']['actual'], '0.20')
+        self.assertEqual(summary['questionCost']['actual'], '0.04')
+        self.assertEqual(summary['correctCount'], 2)
+        self.assertEqual(summary['accuracy']['denominator'], 2)
+        target = self.root / 'export'
+        export(self.store, self.run['id'], target)
+        for name in ('questions', 'summary', 'timing', 'provider-usage', 'paired'):
+            self.assertTrue((target / 'data' / (name + '.csv')).exists())
+        with (target / 'data/usage.csv').open() as stream:
+            usage = list(csv.DictReader(stream))
+        reconciled = next(x for x in usage if x['id'] == unknown['id'])
+        self.assertEqual(reconciled['actual'], '0.01')
+        self.assertEqual(reconciled['reconciliationProvenance'], 'provider receipt')
+        with (target / 'data/questions.csv').open() as stream:
+            flat = list(csv.DictReader(stream))
+        self.assertIn('answerMs', flat[0])
+        self.assertIn('taskActual', flat[0])
+        self.assertNotIn('timing', flat[0])
+        controller = Controller(self.store, self.config, self.root, 'test-token')
+        self.assertEqual(len(controller.get('/runs/' + self.run['id'] + '/results', {'system': ['gemini']})['items']), 2)
+        self.assertEqual(controller.get('/runs/' + self.run['id'] + '/results', {'system': ['larkup']})['items'], [])
+        self.assertTrue(controller.get('/runs/' + self.run['id'] + '/exports/summary.csv', {}).startswith(b'accuracy,'))
+
+    def test_first_answer_is_cold_and_following_question_reuses_preparation(self):
+        doc = manifest(1)
+        doc['questions'].append({**doc['questions'][0], 'id': 'q-next'})
+        run = self.store.create(doc, ['arm-one'], self.config.active, 'smoke')
+        self.store.control(run['id'], 'start', run['revision'])
+        async def finish():
+            scheduler = self.scheduler(Fake())
+            for _ in range(100):
+                await scheduler.tick()
+                if self.store.snapshot(run['id'])['state'] == 'completed':
+                    return
+                await asyncio.sleep(.005)
+            self.fail('Cold/warm run did not finish')
+        asyncio.run(finish())
+        measured = results(self.store, run['id'])
+        self.assertEqual(sum(x['timing']['inputReuse'] is False for x in measured), 1)
+        self.assertEqual(sum(x['timing']['inputReuse'] is True for x in measured), 1)
+        self.assertEqual(sum(x['timing']['coldFirstAnswerMs'] is not None for x in measured), 1)
 
     def test_pause_drains_then_resume_without_duplicate_work(self):
         async def exercise():

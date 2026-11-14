@@ -39,9 +39,11 @@ calls, backs up, and stops the Pod. No top-ups, additional rentals or silent
 model substitutions occur. An unavailable saved GPU host is reported explicitly.
 
 ```sh
+./launch.sh dashboard               # Real data + operator UI; no GPU start until clicked
 ./launch.sh --no-dashboard          # Same workflow, CLI only
 ./launch.sh --view-only             # Saved results; no GPU rental or dispatch
 ./launch.sh account                # Observed rental balance/rate
+./launch.sh status                 # Readable saved correctness/status/cost table; no rental
 ./launch.sh backup                 # Consistent SQLite + reviewer snapshots
 ./launch.sh stop                   # Emergency stop; prefer Ctrl-C for a drain
 ./launch.sh install                # Drained code update; provider keys excluded
@@ -97,6 +99,15 @@ protocol. `data/state/remote-backup.sqlite3` is an integrity-checked off-Pod
 backup. A stage checkpoint also preserves canonical evidence/runtime artifacts
 privately. Keep these before deleting a Pod.
 
+For charts, `data/questions.csv` provides flat per-question timing, usage,
+correctness and retry-inclusive cost columns. `data/summary.csv` compares
+systems with completed/planned counts and separate preparation/question costs.
+`timing.csv`, `paired.csv`, `provider-usage.csv` and `indexes.csv` preserve
+latency, paired outcomes, funding usage and source preparation observations.
+The API's `system` filter distinguishes Larkup, Gemini, Qwen and TwelveLabs
+even when they share the Gateway funding provider. See the v1 contract for the
+additive summary fields and authenticated CSV endpoints.
+
 Official MCQ labels are sealed from answering contexts. Invalid model answers
 are wrong; infrastructure failures have null correctness and retain planned
 coverage. Accuracy always has a denominator. Paired uncertainty uses source
@@ -121,3 +132,32 @@ pnpm --filter @larkup/tool-video-intelligence build
 The harness is excluded from the package's published files. This isolated
 benchmark does not require npm publishing, Cloud synchronization or a production
 runtime release.
+
+
+## Dashboard operator console
+
+`./launch.sh dashboard` opens the real local operator console without starting
+GPU compute or inference. It leaves existing SSH/provider transports intact.
+The Start / resume benchmark button explicitly resumes the saved Pod and the
+preregistered workflow. `./launch.sh` starts that workflow directly and prints
+startup stages, state changes, task counts, coverage and known/unknown costs in
+the terminal. `./launch.sh --view-only` reads the saved checkpoint only: all
+mutations are disabled and it makes no RunPod/provider requests.
+
+Tabs separate Overview, Processes, Results, Logs, Database, Services & providers,
+and Events. Processes/results and database rows have cursor pagination; stored
+JSON expands inline. Table JSON and full-run JSON/CSV downloads contain actual
+controller data. Database inspection is readonly and allowlisted, with no SQL
+endpoint. Credentials, gold labels and signed URL parameters are redacted.
+Logs poll every two seconds and support reading from the beginning and exporting
+loaded lines. The view retains the latest 3,000 loaded lines; complete retained
+files are paginated by byte cursor. Remote logs are included in stage backups.
+Service/GPU status carries observed timestamps; unavailable metadata stays unknown.
+
+Run-level start/pause/resume/cancel remain separate from global operator controls.
+Pause all stops new workflow dispatch and drains running requests. Save & stop
+GPU pauses, drains, creates an off-Pod checkpoint, then stops compute. Force stop
+GPU requires typing `STOP GPU`: it skips the final drain/backup, may leave unknown
+paid outcomes, and never makes existing provider charges disappear. Operator
+commands use durable IDs, body-hash idempotency, revisions, server-side credentials
+and exact loopback Origin checks. The supervisor never opens a publication run.

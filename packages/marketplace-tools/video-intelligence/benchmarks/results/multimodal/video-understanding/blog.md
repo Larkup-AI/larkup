@@ -53,3 +53,20 @@ quota exhaustion and cooldown, exact-model routing, immutable hot reload,
 reconciliation/recovery, pause/resume/cancel, scoring, credential boundaries and
 readonly backup access. The canonical package's 117 tests, type check and build
 also passed. No production runtime or Cloud deployment was changed.
+
+
+## Later partial pilot checkpoint
+
+A subsequent development pilot started after the initial smoke handoff and was
+paused before a complete comparison. Two Qwen answers completed on one roughly
+52-minute LongVideoBench source: one correct, one incorrect. These are the only
+completed pilot answers at this checkpoint; they do not estimate comparative
+accuracy. Some input preparations completed for other sources, while native
+transport/capability failures and unknown remote outcomes blocked coverage.
+
+`data/pilot-partial-results.csv` records those measured answers;
+`data/pilot-partial-summary.json` preserves denominators and partial cost. The
+checkpoint gate is **inconclusive**. Known cash is partial, unknown charges are
+retained, and provider estimates must not be added to observed cash. The paused
+run and its source/attempt history remain available in the operator dashboard.
+No publication expansion or paid restart was performed while adding the UI.

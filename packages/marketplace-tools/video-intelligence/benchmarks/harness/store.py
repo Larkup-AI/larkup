@@ -207,8 +207,11 @@ class Store:
                 # Only known rejection/dependency blockers are safe to admit again. Unknown paid outcomes
                 # require handle reconciliation and are never retried by a resume click.
                 cx.execute("""UPDATE tasks SET state='pending',issue=NULL,eligible_at=0 WHERE run_id=? AND state='blocked'
-                  AND json_extract(issue,'$.code') IN ('NO_ELIGIBLE_ROUTE','DEPENDENCY_BLOCKED','AUTH_INVALID','CREDIT_EXHAUSTED','MODEL_UNAVAILABLE')
-                  AND (current_attempt IS NULL OR NOT EXISTS(SELECT 1 FROM attempts a WHERE a.id=tasks.current_attempt AND a.state='unknown'))""", (run,))
+                  AND json_extract(issue,'$.code') IN ('NO_ELIGIBLE_ROUTE','DEPENDENCY_BLOCKED','AUTH_INVALID','CREDIT_EXHAUSTED','MODEL_UNAVAILABLE','REMOTE_OUTCOME_UNKNOWN')
+                  AND (current_attempt IS NULL OR NOT EXISTS(SELECT 1 FROM attempts a WHERE a.id=tasks.current_attempt AND a.state='unknown'))
+                  AND NOT EXISTS(SELECT 1 FROM attempts a JOIN tasks sibling ON sibling.id=a.task_id
+                    WHERE sibling.run_id=tasks.run_id AND sibling.source_id=tasks.source_id
+                      AND sibling.variant_id=tasks.variant_id AND a.state='unknown')""", (run,))
             self.event(cx, 'run.updated', run, {'state': state})
         self.settle(run)
         return self.snapshot(run)
@@ -236,10 +239,18 @@ class Store:
                                   sharedCompletedQuestions=sum(set(core) <= v for v in completed_core.values())),
                     cost=self.cost(run), blockers=blockers, eventCursor=str(cursor))
 
-    def cost(self, run: str, attempt: str | None = None) -> dict:
+    def cost(self, run: str, attempt: str | None = None, *, variant: str | None = None,
+             task: str | None = None, kind: str | None = None) -> dict:
         from decimal import Decimal
-        records = self.rows('SELECT u.attempt_id,u.document,r.actual override FROM usage_events u LEFT JOIN usage_reconciliations r ON r.usage_id=u.id WHERE u.run_id=?' + (' AND u.attempt_id=?' if attempt else ''),
-                            (run, attempt) if attempt else (run,))
+        query = '''SELECT u.attempt_id,u.document,r.actual override FROM usage_events u
+          JOIN attempts a ON a.id=u.attempt_id JOIN tasks t ON t.id=a.task_id
+          LEFT JOIN usage_reconciliations r ON r.usage_id=u.id WHERE u.run_id=?'''
+        args = [run]
+        for column, value in [('u.attempt_id', attempt), ('t.variant_id', variant), ('t.id', task), ('t.kind', kind)]:
+            if value is not None:
+                query += ' AND ' + column + '=?'
+                args.append(value)
+        records = self.rows(query, tuple(args))
         entries = [json.loads(x['document']) for x in records]
         for record, entry in zip(records, entries):
             if record['override'] is not None:

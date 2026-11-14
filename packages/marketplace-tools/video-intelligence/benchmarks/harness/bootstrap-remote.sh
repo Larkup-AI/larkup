@@ -4,6 +4,9 @@ umask 077
 repo="${1:?Repository snapshot path required}"
 bench="$repo/packages/marketplace-tools/video-intelligence/benchmarks"
 cd "$bench"
+mkdir -p data/deployment
+exec 9>data/deployment/bootstrap.lock
+flock -n 9 || exit 0
 if [[ ! -f data/deployment/bootstrap.done ]]; then
   apt-get update -qq
   apt-get install -y -qq ffmpeg espeak curl xz-utils libgomp1 >data/deployment/apt.log 2>&1

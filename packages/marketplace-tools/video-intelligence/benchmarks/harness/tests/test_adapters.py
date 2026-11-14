@@ -1,9 +1,14 @@
 import asyncio
 import json
 import unittest
+import tempfile
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from harness.adapters import Gemini, TwelveLabs, answer_result, extracted_answer
-from harness.transport import Response
+from harness.transport import HTTP, Response
+from harness.common import DomainError
 
 
 class Context:
@@ -35,6 +40,37 @@ class Context:
 
 
 class AdapterTest(unittest.TestCase):
+    def test_private_relay_domain_error_is_not_reclassified_as_provider_capability(self):
+        response = MagicMock(status=422)
+        response.read.return_value = b'{"benchmarkError":"CANONICAL_ASR_FAILED","retryable":false,"unknown":false}'
+        response.getheaders.return_value = [('Content-Type', 'application/json')]
+        connection = MagicMock()
+        connection.getresponse.return_value = response
+        with patch.dict('os.environ', {'BENCHMARK_PROVIDER_PROXY': 'http://127.0.0.1:18891', 'BENCHMARK_RELAY_CAPABILITY': 'test'}), patch('http.client.HTTPConnection', return_value=connection):
+            with self.assertRaises(DomainError) as error:
+                HTTP().sync('POST', 'http://127.0.0.1:18891/canonical-asr', document={})
+        self.assertEqual(error.exception.code, 'CANONICAL_ASR_FAILED')
+        self.assertFalse(error.exception.unknown)
+
+    def test_native_gateway_credit_quota_and_unknown_outcomes_keep_their_scope(self):
+        for status, code, unknown in [(402, 'CREDIT_EXHAUSTED', False), (429, 'QUOTA_WAIT', False),
+                                      (400, 'CAPABILITY_UNSUPPORTED', False), (503, 'REMOTE_OUTCOME_UNKNOWN', True)]:
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as directory:
+                c = Context('gateway')
+                c.root = Path(directory)
+                c.route['model'] = 'google/gemini-fixture'
+                c.snapshot = SimpleNamespace(secrets=SimpleNamespace(get=lambda _: 'private-test-key'))
+                c.store = MagicMock()
+                process = SimpleNamespace(returncode=1, communicate=AsyncMock(return_value=(json.dumps({'status': status, 'retryAfter': 12}).encode(), b'')))
+                with patch('harness.adapters.asyncio.create_subprocess_exec', AsyncMock(return_value=process)):
+                    with self.assertRaises(DomainError) as error:
+                        asyncio.run(Gemini().answer(c, {'question': '?', 'options': ['a', 'b']}, {'sourcePath': 'source.mp4'}))
+                self.assertEqual(error.exception.code, code)
+                self.assertEqual(error.exception.unknown, unknown)
+                if status == 429:
+                    self.assertEqual(error.exception.wait, 12)
+                c.store.mark_submitted.assert_called_once_with(c.attempt['id'])
+
     def test_asset_submission_is_fenced_and_saved_before_polling(self):
         import tempfile
         from pathlib import Path

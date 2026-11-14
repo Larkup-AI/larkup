@@ -122,8 +122,14 @@ class Scheduler:
                 started_wall = __import__('datetime').datetime.fromisoformat(attempt['started_at'].replace('Z', '+00:00')).timestamp()
                 ready_wall = task.get('ready_at') or started_wall
                 queued = max(0, (started_wall - ready_wall) * 1000)
+                previous = self.store.one("""SELECT count(*) n FROM tasks WHERE run_id=? AND source_id=?
+                  AND variant_id=? AND kind='answer' AND state='completed'""",
+                                          (task['run_id'], task['source_id'], task['variant_id']))['n']
+                prep_timing = prepared.get('timing', {})
+                prep_ms = sum(prep_timing.get(k) or 0 for k in ('prepareMs', 'uploadMs', 'indexMs'))
                 output.setdefault('timing', {}).update(answerMs=elapsed, queueMs=queued, endToEndMs=queued + elapsed,
-                                                       inputReuse=True)
+                                                       inputReuse=bool(previous) or prepared.get('reused', False),
+                                                       coldFirstAnswerMs=prep_ms + elapsed if not previous and not prepared.get('reused') else None)
                 output.setdefault('resolvedModel', c.route['model'])
             self.store.finish(task, attempt, snapshot.secrets.clean(output))
         except asyncio.CancelledError:
@@ -174,6 +180,17 @@ class Scheduler:
         for key in keys:
             for task in grouped[key]:
                 if not self.capacity(task, snapshot) or task['id'] in self.inflight:
+                    continue
+                uncertain = self.store.rows('''SELECT 1 FROM attempts a JOIN tasks t ON t.id=a.task_id
+                  WHERE t.run_id=? AND t.source_id=? AND t.variant_id=? AND a.state='unknown' LIMIT 1''',
+                                            (task['run_id'], task['source_id'], task['variant_id']))
+                if uncertain:
+                    # One failed input transport is enough: do not pay for sibling questions
+                    # against the same source until its accepted outcome is reconciled.
+                    with self.store.transaction() as cx:
+                        cx.execute("UPDATE tasks SET state='blocked',issue=? WHERE id=?",
+                                   (canonical(DomainError('REMOTE_OUTCOME_UNKNOWN', unknown=True).issue()), task['id']))
+                        self.store.event(cx, 'task.updated', task['run_id'], {'taskId': task['id'], 'state': 'blocked'})
                     continue
                 selected = self.route(task, snapshot)
                 if not selected:

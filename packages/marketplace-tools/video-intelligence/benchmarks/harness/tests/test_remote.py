@@ -34,6 +34,17 @@ class RemoteWorkflowTest(unittest.TestCase):
         self.assertEqual(self.remote.workflow()['state'], 'smoke_requires_review')
         self.assertFalse(any(c.args[0] == '/runs' for c in self.remote.api.call_args_list))
 
+    def test_backup_pagination_preserves_all_results_and_detects_broken_cursor(self):
+        self.remote.api = MagicMock(side_effect=[
+            {'items': [{'id': 'a'}], 'hasMore': True, 'nextCursor': '1'},
+            {'items': [{'id': 'b'}], 'hasMore': False, 'nextCursor': None}])
+        self.assertEqual(self.remote.api_items('/runs'), [{'id': 'a'}, {'id': 'b'}])
+        self.assertIn('cursor=1', self.remote.api.call_args_list[-1].args[0])
+        self.remote.api = MagicMock(return_value={'items': [], 'hasMore': True, 'nextCursor': 'same'})
+        with self.assertRaises(DomainError) as error:
+            self.remote.api_items('/runs')
+        self.assertEqual(error.exception.code, 'CONTROLLER_PAGINATION_INVALID')
+
     def test_pilot_creation_survives_restart_without_duplicate_work(self):
         calls = []
         runs = {'smoke-run': {'id': 'smoke-run', 'state': 'completed'}}
@@ -57,6 +68,54 @@ class RemoteWorkflowTest(unittest.TestCase):
         runs['pilot-run'].update(state='completed', decision='stop')
         self.assertEqual(self.remote.workflow()['decision'], 'stop')
         self.assertEqual(len([p for p, _ in calls if p == '/runs']), 1)
+
+    def test_workflow_respects_operator_pause_after_initial_session_admission(self):
+        state = {'id': 'smoke-run', 'state': 'running', 'revision': '1'}
+        self.remote.api = MagicMock(side_effect=lambda *a, **kw: dict(state))
+        self.assertEqual(self.remote.workflow()['state'], 'running')
+        state['state'] = 'paused'
+        self.assertEqual(self.remote.workflow()['state'], 'paused')
+        self.assertFalse(any(c.args[0].endswith('/resume') for c in self.remote.api.call_args_list))
+        self.remote.workflow_admitted.clear()  # An explicit new launcher session may resume.
+        self.remote.workflow()
+        self.assertTrue(any(c.args[0].endswith('/resume') for c in self.remote.api.call_args_list))
+
+    def test_launcher_lock_refuses_an_overlapping_session_before_side_effects(self):
+        import fcntl
+        from harness.remote import main
+        with (self.remote.deployment / 'launcher.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with patch('harness.remote.Remote', return_value=self.remote), patch('harness.remote.launch_session') as launch, patch('sys.argv', ['remote', 'launch', '--no-dashboard']):
+                with self.assertRaises(DomainError) as error:
+                    main()
+                self.assertEqual(error.exception.code, 'LAUNCHER_ALREADY_RUNNING')
+                launch.assert_not_called()
+
+    def test_dashboard_only_does_not_start_or_disconnect_existing_gpu_work(self):
+        remote=MagicMock();remote.children=[];remote.deployment=self.remote.deployment
+        args=argparse.Namespace(command='dashboard',view_only=False,no_dashboard=True,detach=False)
+        with patch('harness.remote.threading.Event') as event:
+            event.return_value.wait.return_value=True
+            launch_session(remote,args)
+        for method in ['resume','gql','workflow','api','stop','relay','tunnel','stop_local_services']:
+            getattr(remote,method).assert_not_called()
+        self.assertTrue(remote.local_ports.call_args.kwargs['preserve_transports'])
+
+    def test_reconnecting_legacy_transports_checks_identity_before_signalling(self):
+        from types import SimpleNamespace
+        self.remote.state={'keyPath':'fixture-key-path'}
+        atomic(self.remote.deployment/'local-processes.json',{'processes':[{'pid':12345,'started':'known-start'}]})
+        def observed(command,**kwargs):
+            return SimpleNamespace(stdout='ssh -i fixture-key-path root@fixture' if command[-1]=='command=' else 'known-start')
+        with patch('harness.remote.subprocess.run',side_effect=observed),patch('harness.remote.os.killpg') as kill,patch('harness.remote.time.sleep'):
+            self.remote.stop_local_services({'ssh tunnel'})
+        kill.assert_called_once()
+        self.assertEqual(kill.call_args.args[0],12345)
+
+    def test_stopping_an_already_stopped_gpu_is_idempotent(self):
+        self.remote.state={'podId':'fixture'}
+        self.remote.gql=MagicMock(side_effect=[DomainError('RUNPOD_REQUEST_REJECTED'),{'pod':{'id':'fixture','desiredStatus':'EXITED'}}])
+        self.assertEqual(self.remote.stop()['podStop']['desiredStatus'],'EXITED')
 
     def test_next_explicit_launch_updates_only_a_drained_controller(self):
         from types import SimpleNamespace

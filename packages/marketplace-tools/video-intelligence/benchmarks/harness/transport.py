@@ -105,10 +105,6 @@ class HTTP:
             if len(raw) > 64 * 1024 * 1024:
                 raise DomainError('PROVIDER_RESPONSE_TOO_LARGE')
             h = {k.lower(): v for k, v in response.getheaders()}
-            if response.status >= 300:
-                error = classify(response.status, raw, h, submitted=submitted)
-                error.upstream_status = response.status
-                raise error
             if proxy:
                 try:
                     envelope = json.loads(raw)
@@ -117,6 +113,10 @@ class HTTP:
                 if isinstance(envelope, dict) and envelope.get('benchmarkError'):
                     raise DomainError(envelope['benchmarkError'], retryable=envelope.get('retryable', False),
                                       wait=envelope.get('wait'), unknown=envelope.get('unknown', False))
+            if response.status >= 300:
+                error = classify(response.status, raw, h, submitted=submitted)
+                error.upstream_status = response.status
+                raise error
             return Response(response.status, h, raw, (time.monotonic() - start) * 1000)
         except (TimeoutError, socket.timeout, OSError, http.client.HTTPException):
             raise DomainError('REMOTE_OUTCOME_UNKNOWN' if submitted else 'INFRA_FAILURE',

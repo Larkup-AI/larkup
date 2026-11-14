@@ -59,6 +59,31 @@ class Controller:
             return self.config.public()
         if path == '/provider-scopes':
             return self.page(self.provider_scopes(), query)
+        if path == '/services':
+            if self.readonly:
+                return {'items': [dict(name='benchmark controller',state='offline',location='RunPod'),
+                                  dict(name='canonical video runtime',state='unobserved',location='RunPod')]}
+            from .transport import HTTP
+            services = [dict(name='benchmark controller', state='running', location='RunPod')]
+            try:
+                health = HTTP().sync('GET', self.config.active.config.get('runtime', {}).get('endpoint', 'http://127.0.0.1:8787') + '/v1/health',
+                    headers={'Authorization': 'Bearer ' + self.config.active.secrets.get('BENCHMARK_RUNTIME_TOKEN')}, timeout=2).json()
+                services.append(dict(name='canonical video runtime', state='running', location='RunPod', operators=health.get('operators', {})))
+            except DomainError:
+                services.append(dict(name='canonical video runtime', state='unreachable', location='RunPod'))
+            return {'items': services}
+        if path == '/database/tables':
+            from .inspection import tables
+            return {'items': tables(s), 'readonly': True}
+        if path.startswith('/database/'):
+            from .inspection import database
+            bits = path.strip('/').split('/')
+            if len(bits) not in {2, 3} or (len(bits) == 3 and bits[2] != 'export.json'):
+                raise DomainError('NOT_FOUND', status=404)
+            return database(s, self.config.active.secrets, bits[1], query, export=len(bits) == 3)
+        if path == '/logs':
+            from .inspection import logs
+            return logs(self.data, self.config.active.secrets, query.get('service', ['controller'])[0], query)
         if path == '/runs':
             return self.page([s.snapshot(r['id']) for r in s.rows('SELECT id FROM runs ORDER BY updated_at DESC,id DESC')], query)
         parts = path.strip('/').split('/')
@@ -68,6 +93,14 @@ class Controller:
         s.one('SELECT id FROM runs WHERE id=?', (run,))
         if len(parts) == 2:
             return s.snapshot(run)
+        if parts[2:] == ['exports', 'results.json']:
+            from .inspection import database
+            document = dict(snapshot=s.snapshot(run), metrics=metrics(s, run), results=results(s, run),
+                            usage=database(s,self.config.active.secrets,'usage_events',{'runId':[run]},export=True)['items'],
+                            exportedAt=utc(), redactions=['credentials','gold labels'])
+            for table in ('sources','questions','variants','tasks','attempts','events','artifacts','remote_handles','evaluations','audits'):
+                document[table] = database(s,self.config.active.secrets,table,{'runId':[run]},export=True)['items']
+            return document
         if parts[2] == 'metrics':
             return metrics(s, run)
         if parts[2] == 'events':
@@ -82,37 +115,47 @@ class Controller:
                         nextCursor=str(events[min(limit, len(events)) - 1]['id']) if events else str(after), hasMore=len(events) > limit)
         if parts[2] == 'results':
             rows = results(s, run)
-            for key in ('variantId', 'durationGroup'):
+            for key in ('variantId', 'durationGroup', 'system', 'provider', 'state', 'sourceId'):
                 if key in query:
                     rows = [r for r in rows if r[key] == query[key][0]]
             return self.page(rows, query)
         if parts[2] == 'tasks':
             rows = s.rows('SELECT * FROM tasks WHERE run_id=? ORDER BY created_at,id', (run,))
             out = []
+            progress_by_task = {}
+            for event in s.rows("SELECT data,occurred_at FROM events WHERE run_id=? AND type='task.updated' AND json_type(data,'$.progress') IS NOT NULL ORDER BY id DESC", (run,)):
+                document = json.loads(event['data'])
+                progress_by_task.setdefault(document.get('taskId'), (document.get('progress'), event['occurred_at']))
             for t in rows:
+                variant = json.loads(s.one('SELECT document FROM variants WHERE run_id=? AND id=?', (run, t['variant_id']))['document'])
                 attempt = s.rows('SELECT * FROM attempts WHERE id=?', (t['current_attempt'],))
                 route = json.loads(attempt[0]['route']) if attempt else {}
                 source = json.loads(s.one('SELECT document FROM sources WHERE run_id=? AND id=?', (run, t['source_id']))['document'])
                 attempt_rows = s.rows('SELECT * FROM attempts WHERE task_id=? ORDER BY started_at', (t['id'],))
+                progress, progress_at = progress_by_task.get(t['id'], (None, t['updated_at']))
+                stage = progress.get('stage') if isinstance(progress, dict) else None
+                percent = progress.get('percent') if isinstance(progress, dict) else None
                 doc = dict(id=t['id'], taskId=t['id'], runId=run, sourceId=t['source_id'], questionId=t['question_id'] or None,
                            variantId=t['variant_id'], kind=t['kind'], state=t['state'], attemptCount=t['attempt_count'],
-                           provider=route.get('provider'), attemptId=t['current_attempt'],
+                           provider=route.get('provider'), system=variant['adapter'], attemptId=t['current_attempt'],
                            dataset=source.get('dataset'), accountAlias=route.get('secretAlias'), routeId=attempt[0]['route_id'] if attempt else None,
-                           role=None, durationGroup=source.get('durationGroup'), stage=None, percent=None,
+                           role=None, durationGroup=source.get('durationGroup'), stage=stage, percent=percent, progress=progress, progressObservedAt=progress_at,
                            updatedAt=t['updated_at'], attempts=[dict(attemptId=a['id'], state=a['state'] if a['state'] != 'unknown' else 'blocked',
                                                                     stage=None, percent=None, startedAt=a['started_at'],
                                                                     issue=json.loads(a['issue']) if a['issue'] else None) for a in attempt_rows],
                            issue=json.loads(t['issue']) if t['issue'] else None)
-                if any(key in query and doc.get(key) != query[key][0] for key in ('state', 'provider', 'sourceId')):
+                if any(key in query and doc.get(key) != query[key][0] for key in ('state', 'provider', 'system', 'variantId', 'sourceId')):
                     continue
                 out.append(doc)
             return self.page(out, query)
-        if parts[2:] == ['exports', 'results.csv']:
+        exports = {'results.csv', 'questions.csv', 'summary.csv', 'usage.csv', 'attempts.csv',
+                   'indexes.csv', 'metrics.csv', 'timing.csv', 'provider-usage.csv', 'paired.csv'}
+        if len(parts) == 4 and parts[2] == 'exports' and parts[3] in exports:
             # Generate a snapshot export without mutating run/task state.
             from .scoring import export
             root = self.data / 'exports' / run
             export(s, run, root)
-            return (root / 'results.csv').read_bytes()
+            return (root / ('' if parts[3] == 'results.csv' else 'data') / parts[3]).read_bytes()
         raise DomainError('NOT_FOUND', status=404)
 
     def mutate(self, path: str, body: dict, key: str):
@@ -197,8 +240,9 @@ class Controller:
                 self.send_header('Content-Length', str(len(payload)))
                 self.send_header('Cache-Control', 'no-store')
                 self.send_header('X-Content-Type-Options', 'nosniff')
-                if csv:
-                    self.send_header('Content-Disposition', 'attachment; filename="results.csv"')
+                if csv or urlsplit(self.path).path.endswith('/export.json') or urlsplit(self.path).path.endswith('/results.json'):
+                    filename = urlsplit(self.path).path.rsplit('/', 1)[-1]
+                    self.send_header('Content-Disposition', 'attachment; filename="' + filename + '"')
                     self.send_header('ETag', '"' + hashlib.sha256(payload).hexdigest() + '"')
                 self.end_headers()
                 self.wfile.write(payload)

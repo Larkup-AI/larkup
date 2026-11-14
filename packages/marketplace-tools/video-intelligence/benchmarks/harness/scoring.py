@@ -33,6 +33,7 @@ def results(store, run: str) -> list[dict]:
       ORDER BY t.source_id,t.question_id,t.variant_id''', (run,))
     output = []
     for t in rows:
+        variant = json.loads(store.one('SELECT document FROM variants WHERE run_id=? AND id=?', (run, t['variant_id']))['document'])
         source = json.loads(store.one('SELECT document FROM sources WHERE run_id=? AND id=?', (run, t['source_id']))['document'])
         question = json.loads(store.one('SELECT document FROM questions WHERE run_id=? AND id=?', (run, t['question_id']))['document'])
         route = json.loads(t['route'] or '{}')
@@ -40,7 +41,7 @@ def results(store, run: str) -> list[dict]:
         prep = store.one('SELECT output FROM tasks WHERE id=?', (t['depends_on'],))
         index = json.loads(prep['output'] or '{}')
         timing = dict(queueMs=None, prepareMs=None, uploadMs=None, indexMs=None, answerMs=None,
-                      firstTokenMs=None, endToEndMs=None, inputReuse=None,
+                      firstTokenMs=None, endToEndMs=None, coldFirstAnswerMs=None, inputReuse=None,
                       measurementProfileId='bounded-independent-v1',
                       unavailableReasons={'firstTokenMs': 'non-streaming provider call', 'indexMs': 'referenced by indexArtifactId'})
         timing.update(out.get('timing', {}))
@@ -57,11 +58,12 @@ def results(store, run: str) -> list[dict]:
                            configRevision=t['config_revision'], durationGroup=source.get('durationGroup'),
                            sourceDurationMs=source.get('durationMs'), capability=question.get('capability'),
                            logicalModel=route.get('logicalModel'), resolvedModel=out.get('resolvedModel', route.get('model')),
-                           routeId=t['route_id'], provider=route.get('provider'), accountAlias=route.get('secretAlias'),
+                           routeId=t['route_id'], provider=route.get('provider'), system=variant['adapter'], accountAlias=route.get('secretAlias'),
                            tier=route.get('tier'), state=t['state'], answer=out.get('answer'),
                            predictedOption=out.get('predictedOption'), correct=out.get('correct'),
                            evaluationRevision=out.get('evaluationRevision'), evidence=evidence,
                            cost=store.cost(run, t['current_attempt']) if t['current_attempt'] else dict(currency='USD', actual=None, estimated=None, unknownAttemptCount=0, reconciled=False),
+                           taskCost=store.cost(run, task=t['id']),
                            timing=timing, usage=store.attempt_usage(t['current_attempt']),
                            indexArtifactId=index.get('artifactId'), issue=json.loads(t['issue']) if t['issue'] else None))
     return output
@@ -115,12 +117,24 @@ def metrics(store, run: str) -> dict:
                                ties=sum(a[q]['correct'] == b[q]['correct'] for q in cohort),
                                clusterBootstrap95=[percentile(samples, .025), percentile(samples, .975)]))
     by_variant = []
+    summaries = []
     for vid in variants:
         subset = [x for x in rows if x['variantId'] == vid]
         latency = [x['timing']['answerMs'] for x in subset if x['state'] == 'completed']
         by_variant.append(dict(variantId=vid, accuracy=accuracy(subset),
                                sharedAccuracy=accuracy([x for x in subset if x['questionId'] in shared]),
                                answerTiming=dict(p50Ms=percentile(latency, .5), p95Ms=percentile(latency, .95), count=len(latency))))
+        counts = defaultdict(int)
+        for x in subset:
+            counts[x['state']] += 1
+        summaries.append(dict(variantId=vid, system=subset[0]['system'], plannedCount=len(subset),
+                              completedCount=counts['completed'], correctCount=sum(x['correct'] is True for x in subset),
+                              incorrectCount=sum(x['correct'] is False for x in subset),
+                              blockedCount=sum(counts[s] for s in ('blocked', 'failed', 'waiting_quota')),
+                              stateCounts=dict(counts), accuracy=accuracy(subset),
+                              cost=store.cost(run, variant=vid),
+                              preparationCost=store.cost(run, variant=vid, kind='prepare'),
+                              questionCost=store.cost(run, variant=vid, kind='answer')))
     accuracy_metrics, timings = [], []
     for vid in variants:
         subset = [x for x in rows if x['variantId'] == vid]
@@ -131,7 +145,7 @@ def metrics(store, run: str) -> dict:
                                          durationGroup=group, denominator=a['denominator'], completedCount=a['completedCount'],
                                          plannedCount=a['plannedCount'], correctCount=sum(x['correct'] is True for x in group_rows),
                                          blockedCount=sum(x['state'] in {'blocked', 'failed', 'waiting_quota'} for x in group_rows), accuracy=a['value']))
-        for stage in ('answer', 'firstToken', 'queue', 'endToEnd'):
+        for stage in ('answer', 'firstToken', 'queue', 'endToEnd', 'coldFirstAnswer'):
             measured = [x['timing'][stage + 'Ms'] for x in subset if x['state'] == 'completed' and x['timing'][stage + 'Ms'] is not None]
             timings.append(dict(cohortId=digest(sorted(x['questionId'] for x in subset)), variantId=vid, stage=stage,
                                 p50Ms=percentile(measured, .5), p95Ms=percentile(measured, .95), sampleCount=len(measured),
@@ -162,7 +176,7 @@ def metrics(store, run: str) -> dict:
     return dict(runId=run, configRevision=run_snapshot['configRevision'], evaluationRevision='official-mcq-v1',
                 accuracy=accuracy_metrics, timing=timings, providerUsage=provider_usage, coverage=run_snapshot['coverage'],
                 partial=any(x['state'] != 'completed' for x in rows), cohortId=digest(sorted(x['questionId'] for x in rows)),
-                variants=by_variant, paired=paired, plannedCount=len(rows),
+                variants=by_variant, summary=summaries, paired=paired, plannedCount=len(rows),
                 sharedCompletedQuestions=len(shared), cost=store.cost(run),
                 durationGroups=[dict(variantId=k[0], durationGroup=k[1], accuracy=accuracy(v)) for k, v in groups.items()])
 
@@ -217,7 +231,8 @@ def export(store, run: str, root: Path) -> dict:
     csv_text = buffer.getvalue()
     atomic(root / 'results.csv', csv_text, raw=True)
     data = root / 'data'
-    atomic(data / 'metrics.json', metrics(store, run))
+    measured = metrics(store, run)
+    atomic(data / 'metrics.json', measured)
     atomic(data / 'snapshot.json', store.snapshot(run))
     atomic(data / 'attempts.json', store.rows('SELECT a.* FROM attempts a JOIN tasks t ON t.id=a.task_id WHERE t.run_id=?', (run,)))
     atomic(data / 'usage.json', store.rows('SELECT * FROM usage_events WHERE run_id=?', (run,)))
@@ -234,20 +249,37 @@ def export(store, run: str, root: Path) -> dict:
             cells = {k: "'" + v if isinstance(v, str) and v[:1] in '=+-@\t\r' else v for k, v in cells.items()}
             writer.writerow(cells)
         atomic(data / name, buffer.getvalue(), raw=True)
-    table('usage.csv', [{**json.loads(x['document']), 'id': x['id'], 'attemptId': x['attempt_id'], 'recordedAt': x['recorded_at']}
-                        for x in store.rows('SELECT * FROM usage_events WHERE run_id=?', (run,))])
+    usage_rows = store.rows('''SELECT u.*,r.actual reconciled_actual,r.provenance reconciliation_provenance
+      FROM usage_events u LEFT JOIN usage_reconciliations r ON r.usage_id=u.id WHERE u.run_id=?''', (run,))
+    table('usage.csv', [{**json.loads(x['document']),
+                        **({'actual': x['reconciled_actual'], 'reconciliationProvenance': x['reconciliation_provenance']} if x['reconciled_actual'] is not None else {}),
+                        'id': x['id'], 'attemptId': x['attempt_id'], 'recordedAt': x['recorded_at']}
+                       for x in usage_rows])
     table('attempts.csv', store.rows('SELECT a.* FROM attempts a JOIN tasks t ON t.id=a.task_id WHERE t.run_id=?', (run,)))
-    indexes = store.rows('SELECT a.* FROM artifacts a JOIN tasks t ON t.id=a.task_id WHERE t.run_id=?', (run,))
-    table('indexes.csv', [dict(artifactId=x['id'], fingerprint=x['fingerprint'], taskId=x['task_id'],
+    indexes = store.rows('SELECT a.*,t.source_id,t.variant_id FROM artifacts a JOIN tasks t ON t.id=a.task_id WHERE t.run_id=?', (run,))
+    table('indexes.csv', [dict(runId=run, sourceId=x['source_id'], variantId=x['variant_id'],
+                             artifactId=x['id'], fingerprint=x['fingerprint'], taskId=x['task_id'],
                              **json.loads(x['document']).get('timing', {})) for x in indexes])
-    table('metrics.csv', metrics(store, run)['accuracy'])
+    table('metrics.csv', measured['accuracy'])
+    table('timing.csv', measured['timing'])
+    table('provider-usage.csv', measured['providerUsage'])
+    table('paired.csv', measured['paired'])
+    def flat_cost(cost, prefix):
+        return {prefix + key[0].upper() + key[1:]: value for key, value in cost.items()}
+    table('summary.csv', [{**{k: v for k, v in s.items() if k not in {'cost', 'preparationCost', 'questionCost', 'accuracy', 'stateCounts'}},
+                           'accuracy': s['accuracy']['value'], 'accuracyDenominator': s['accuracy']['denominator'],
+                           **flat_cost(s['cost'], 'total'), **flat_cost(s['preparationCost'], 'preparation'),
+                           **flat_cost(s['questionCost'], 'questions')} for s in measured['summary']])
+    table('questions.csv', [{**{k: x[k] for k in ('runId', 'sourceId', 'dataset', 'questionId', 'variantId', 'system', 'durationGroup', 'sourceDurationMs', 'capability', 'provider', 'routeId', 'resolvedModel', 'state', 'correct', 'predictedOption', 'indexArtifactId')},
+                             **x['timing'], **x['usage'], **flat_cost(x['cost'], 'attempt'),
+                             **flat_cost(x['taskCost'], 'task')} for x in rows])
     run_document = json.loads(store.one('SELECT document FROM runs WHERE id=?', (run,))['document'])
     atomic(data / 'protocol.json', run_document)
     d, reason = decision(store, run)
     report = '# Video understanding benchmark\n\n'
     report += f'Run `{run}`. Exported {utc()}. Decision: **{d}**. {reason}\n\n'
     report += '| Variant | Correct | Completed / planned | Accuracy | Answer p50 ms |\n|---|---:|---:|---:|---:|\n'
-    for v in metrics(store, run)['variants']:
+    for v in measured['variants']:
         a = v['accuracy']
         score = f"{a['value']:.1%}" if a['value'] is not None else 'unknown'
         report += f"| {v['variantId']} | {round(a['value']*a['denominator']) if a['value'] is not None else '—'} | {a['denominator']} / {a['plannedCount']} | {score} | {v['answerTiming']['p50Ms']} |\n"

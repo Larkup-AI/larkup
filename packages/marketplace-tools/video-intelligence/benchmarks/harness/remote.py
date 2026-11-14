@@ -42,6 +42,9 @@ class Remote:
         except Exception:
             raise DomainError('RUNPOD_API_UNAVAILABLE') from None
         if result.get('errors'):
+            messages = ' '.join(str(e.get('message', '')).lower() for e in result['errors'])
+            if 'not enough free gpu' in messages or 'zero gpu' in messages:
+                raise DomainError('RUNPOD_GPU_UNAVAILABLE')
             raise DomainError('RUNPOD_REQUEST_REJECTED')
         return result['data']
 
@@ -177,6 +180,17 @@ if db.exists():
  c.close()
  if active:raise SystemExit(9)
 processes=json.loads(p.read_text())
+# Recover an earlier supervisor whose PID file was overwritten by an overlapping startup.
+# Only this benchmark's exact working directory and module qualify as owned processes.
+for proc in pathlib.Path('/proc').glob('[0-9]*'):
+ try:
+  if (proc/'cwd').resolve()==b and b'harness.remote_runtime' in (proc/'cmdline').read_bytes():
+   processes['supervisorPid_'+proc.name]=int(proc.name)
+ except (OSError,RuntimeError):pass
+for field,pid in processes.items():
+ if field.startswith('supervisorPid_'):
+  try:os.kill(pid,signal.SIGTERM)
+  except ProcessLookupError:pass
 for field,needle in [('controllerPid',b'harness.main'),('runtimePid',b'app'),('supervisorPid',b'harness.remote_runtime')]:
  pid=processes.get(field); f=pathlib.Path('/proc/'+str(pid)+'/cmdline'); cwd=pathlib.Path('/proc/'+str(pid)+'/cwd')
  if f.exists() and needle in f.read_bytes() and str(cwd.resolve()).startswith(str(b.parent)):
@@ -197,17 +211,49 @@ time.sleep(2)
         return process
 
     def save_local_processes(self):
-        records = []
-        for process in self.children:
-            observed = subprocess.run(['ps', '-p', str(process.pid), '-o', 'lstart='], capture_output=True, text=True)
-            records.append({'pid': process.pid, 'started': observed.stdout.strip()})
-        atomic(self.deployment / 'local-processes.json', {'processes': records})
+        import fcntl
+        with (self.deployment / 'processes.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            path = self.deployment / 'local-processes.json'
+            old = json.loads(path.read_text()).get('processes', []) if path.exists() else []
+            own = {p.pid for p in self.children}
+            records = [r for r in old if r['pid'] not in own]
+            for process in self.children:
+                observed = subprocess.run(['ps', '-p', str(process.pid), '-o', 'lstart='], capture_output=True, text=True)
+                args = ' '.join(map(str, process.args))
+                service = ('credential relay' if 'harness.provider_relay' in args else 'dashboard bridge' if 'harness.dashboard_relay' in args
+                           else 'ssh tunnel' if process.args[0] == 'ssh' else 'dashboard')
+                records.append({'pid': process.pid, 'started': observed.stdout.strip(), 'service': service})
+            atomic(path, {'processes': records})
 
-    def local_ports(self, dashboard):
+    def stop_local_services(self, services):
+        path = self.deployment / 'local-processes.json'
+        if not path.exists():
+            return
+        for record in json.loads(path.read_text()).get('processes', []):
+            service = record.get('service')
+            if service is None:
+                command = subprocess.run(['ps', '-p', str(record['pid']), '-o', 'command='], capture_output=True, text=True).stdout
+                service = 'credential relay' if 'harness.provider_relay' in command else 'ssh tunnel' if command.strip().startswith('ssh ') and self.state['keyPath'] in command else None
+            if service not in services:
+                continue
+            observed = subprocess.run(['ps', '-p', str(record['pid']), '-o', 'lstart='], capture_output=True, text=True).stdout.strip()
+            if record.get('started') and observed == record['started']:
+                try:
+                    os.killpg(record['pid'], signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+        time.sleep(.3)
+
+    def local_ports(self, dashboard, *, preserve_transports=False):
         # A repeated launch only stops verified children of this benchmark launcher.
         path = self.deployment / 'local-processes.json'
         if path.exists():
             for record in json.loads(path.read_text()).get('processes', []):
+                if preserve_transports:
+                    command = subprocess.run(['ps', '-p', str(record['pid']), '-o', 'command='], capture_output=True, text=True).stdout
+                    if record.get('service') in {'ssh tunnel','credential relay'} or command.strip().startswith('ssh ') or 'harness.provider_relay' in command:
+                        continue
                 pid = record['pid']
                 observed = subprocess.run(['ps', '-p', str(pid), '-o', 'lstart='], capture_output=True, text=True)
                 if record.get('started') and observed.stdout.strip() == record['started']:
@@ -217,7 +263,7 @@ time.sleep(2)
                         pass
             time.sleep(.5)
         import socket
-        for port in ([28891, 3100] if dashboard else []) + [28890, 8891]:
+        for port in ([28891, 3100] if dashboard else []) + ([] if preserve_transports else [28890, 8891]):
             with socket.socket() as sock:
                 try:
                     sock.bind(('127.0.0.1', port))
@@ -272,6 +318,12 @@ print(json.dumps(dict(revision=revision,running=running,active=active)))
             raise DomainError('CONTROLLER_UNAVAILABLE') from None
 
     def backup(self):
+        import fcntl
+        with (self.deployment / 'backup.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            return self._backup()
+
+    def _backup(self):
         self.ssh('cd ' + REMOTE_BENCH + ' && data/deployment/venv/bin/python -m harness.main backup data/state/pc-backup.sqlite3')
         # The consistent backup includes WAL transactions. No live main-file-only copy.
         result = self.ssh('cat ' + REMOTE_BENCH + '/data/state/pc-backup.sqlite3')
@@ -288,10 +340,12 @@ print(json.dumps(dict(revision=revision,running=running,active=active)))
         finally:
             db.close()
         temporary.replace(destination)
-        # Reviewer exports, not licensed media, are mirrored incrementally.
-        for r in self.api('/runs')['items']:
+        # Fetch every page; larger cohorts must not silently truncate saved progress.
+        for r in self.api_items('/runs'):
             for name, suffix in [('snapshot', ''), ('metrics', '/metrics'), ('results', '/results'), ('tasks', '/tasks')]:
-                atomic(self.data / 'exports' / r['id'] / (name + '.json'), self.api('/runs/' + r['id'] + suffix))
+                endpoint = '/runs/' + r['id'] + suffix
+                value = {'items': self.api_items(endpoint), 'hasMore': False, 'nextCursor': None} if suffix in {'/results', '/tasks'} else self.api(endpoint)
+                atomic(self.data / 'exports' / r['id'] / (name + '.json'), value)
         # Preserve completed evidence and canonical job state, including retained source upload handles.
         # No provider credentials or runtime process environment are included.
         import shlex
@@ -301,6 +355,9 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
  for name in ['data/artifacts','data/runtime','results']:
   p=b/name
   if p.exists():a.add(p,arcname=name,recursive=True)
+ for name in ['controller.log','runtime.log','bootstrap.log']:
+  p=b/'data/deployment'/name
+  if p.exists():a.add(p,arcname='data/deployment/remote-logs/'+name,recursive=False)
 """
         # Incremental source files stay on both disks; a complete evidence checkpoint is taken at
         # stage boundaries, not every polling tick.
@@ -328,6 +385,19 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
                         temporary.replace(destination)
         return {'backup': 'verified', 'at': utc()}
 
+    def api_items(self, path):
+        from urllib.parse import urlencode
+        items, cursor = [], None
+        while True:
+            page = self.api(path + ('&' if '?' in path else '?') + urlencode({'limit': 200, **({'cursor': cursor} if cursor else {})}))
+            items.extend(page['items'])
+            if not page.get('hasMore'):
+                return items
+            next_cursor = page.get('nextCursor')
+            if not next_cursor or next_cursor == cursor:
+                raise DomainError('CONTROLLER_PAGINATION_INVALID')
+            cursor = next_cursor
+
     def wait_ready(self):
         for _ in range(60):
             try:
@@ -339,7 +409,15 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
         raise DomainError('REMOTE_STARTUP_INCOMPLETE')
 
     def workflow(self):
+        import fcntl
+        with (self.deployment / 'workflow.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            return self._workflow()
+
+    def _workflow(self):
         """Exactly one smoke and one frozen pilot; never opens publication expansion."""
+        if not hasattr(self, 'workflow_admitted'):
+            self.workflow_admitted = set()
         path = self.deployment / 'workflow.json'
         state = json.loads(path.read_text()) if path.exists() else {}
         state.setdefault('slot', identifier('workflow'))
@@ -368,78 +446,127 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
                 atomic(path, state)
                 run_id = run['id']
             run = self.api('/runs/' + run_id)
-            if run['state'] in {'draft', 'paused'}:
+            if run['state'] == 'draft' or (run['state'] == 'paused' and run_id not in self.workflow_admitted):
                 run = self.api('/runs/' + run_id + ('/start' if run['state'] == 'draft' else '/resume'),
                                {'expectedRevision': run['revision']})
+            self.workflow_admitted.add(run_id)
             if run['state'] != 'completed':
                 return {'state': run['state'], 'phase': phase, 'runId': run_id}
         return {'state': 'finished', 'runId': state['pilot'], 'decision': run['decision']}
 
     def stop(self):
-        return self.gql('mutation { podStop(input:{podId:' + json.dumps(self.state['podId']) + '}) {id desiredStatus} }')
+        try:
+            result = self.gql('mutation { podStop(input:{podId:' + json.dumps(self.state['podId']) + '}) {id desiredStatus} }')
+        except DomainError:
+            pod = self.gql('query { pod(input:{podId:' + json.dumps(self.state['podId']) + '}) { id desiredStatus } }')['pod']
+            if not pod or pod['desiredStatus'] != 'EXITED':
+                raise
+            result = {'podStop': pod}
+        atomic(self.deployment / 'pod-observation.json', {'state': result['podStop']['desiredStatus'], 'observedAt': utc()})
+        return result
 
 
 def launch_session(remote, args):
     stopping = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stopping.set())
-    idle_checkpointed = args.view_only
+    from .operations import intent, control_lock
+    manual = args.command == 'dashboard'
+    idle_checkpointed = args.view_only or manual
     rental_active = False
     connected = False
     detached = False
     dashboard_children = []
     try:
-        remote.local_ports(not args.no_dashboard)
+        remote.local_ports(not args.no_dashboard, preserve_transports=args.view_only or manual)
         if args.command == 'launch' and not args.view_only:
             rental_active = True  # Also clean up if startup fails after resume was accepted.
+            print('Starting the saved RunPod GPU. No additional Pod will be created.', flush=True)
             remote.resume()
+            print('Checking the canonical runtime and controller version…', flush=True)
             remote.ensure_started()
-        if not args.view_only:
+        if not args.view_only and not manual:
+            print('Opening private SSH forwarding and the PC credential relay…', flush=True)
             remote.tunnel()
             remote.relay()
             remote.wait_ready()
             connected = True
+            intent(remote.deployment, 'active')
+        elif manual:
+            intent(remote.deployment, 'observe')
         if not args.no_dashboard:
             candidates = [BENCHMARK / 'dashboard', BENCHMARK / 'dashboard-ui', BENCHMARK / 'apps/video-dashboard']
             dashboard = next((p for p in candidates if (p / 'package.json').exists()), None)
             if dashboard is None:
                 raise DomainError('DASHBOARD_NOT_INSTALLED')
             credentials = json.loads((remote.deployment / 'relay.json').read_text())
-            dashboard_children.append(remote.child([sys.executable, '-m', 'harness.dashboard_relay'], 'dashboard-relay.log', cwd=BENCHMARK))
+            dashboard_children.append(remote.child([sys.executable, '-m', 'harness.dashboard_relay'], 'dashboard-relay.log', cwd=BENCHMARK,
+                env={**os.environ, 'BENCHMARK_VIEW_ONLY': '1' if args.view_only else '0'}))
             if not (dashboard / 'node_modules/next').exists():
                 manager = ['npm', 'ci'] if (dashboard / 'package-lock.json').exists() else ['npm', 'install']
                 subprocess.run(manager, cwd=dashboard, check=True, stdout=subprocess.DEVNULL)
             env = {**os.environ, 'BENCHMARK_CONTROLLER_URL': 'http://127.0.0.1:28891',
-                   'BENCHMARK_CONTROLLER_TOKEN': credentials['controllerToken'], 'DASHBOARD_MODE': 'proxy', 'PORT': '3100'}
+                   'BENCHMARK_CONTROLLER_TOKEN': credentials['controllerToken'], 'DASHBOARD_MODE': 'proxy', 'BENCHMARK_READ_ONLY': '1' if args.view_only else '0', 'PORT': '3100'}
             dashboard_children.append(remote.child(['pnpm', 'run', 'dev'], 'dashboard.log', cwd=dashboard, env=env))
         print(canonical({'controller': None if args.view_only else 'http://127.0.0.1:28890',
                          'dashboard': None if args.no_dashboard else 'http://127.0.0.1:3100',
-                         'mode': 'saved-results' if args.view_only else 'remote',
+                         'mode': 'saved-results' if args.view_only else 'dashboard-control' if manual else 'remote',
                          'providerKeys': 'PC only; PC and SSH tunnel must remain on during inference'}), flush=True)
         if args.detach:
             detached = True
             return
         ticks = 0
+        previous_progress = None
         while not stopping.wait(5):
-            if any(p.poll() is not None for p in (dashboard_children if idle_checkpointed else remote.children)):
+            mode = intent(remote.deployment)['mode'] if not args.view_only else 'observe'
+            if mode in {'observe', 'stopped', 'starting'}:
+                idle_checkpointed = True
+            elif mode == 'active':
+                idle_checkpointed = False
+                connected = True
+                path = remote.deployment / 'remote.json'
+                if path.exists():
+                    remote.state = json.loads(path.read_text())
+            if any(p.poll() is not None for p in (dashboard_children if idle_checkpointed or manual else remote.children)):
                 raise DomainError('LOCAL_RELAY_OR_DASHBOARD_EXITED')
             if idle_checkpointed:
                 continue
             ticks += 1
-            progress = remote.workflow() if args.command == 'launch' else {'state': 'connected'}
+            progress = remote.workflow() if args.command in {'launch','dashboard'} and mode == 'active' else {'state': 'paused' if mode == 'paused' else 'connected'}
+            if mode == 'paused':
+                if ticks % 12 == 1:
+                    remote.backup()
+                    if remote.account()['clientBalance'] < .5:
+                        stopping.set()
+                continue
+            signature = canonical(progress)
+            if signature != previous_progress or ticks % 6 == 0:
+                print('Benchmark ' + progress.get('runId', '') + ': ' + progress['state'], flush=True)
+                print(canonical({'benchmark': progress}), flush=True)
+                if progress.get('runId'):
+                    current = remote.api('/runs/' + progress['runId'])
+                    print(canonical({'runId':current['id'],'tasks':current['taskCounts'],'coverage':current['coverage'],'cost':current['cost']}), flush=True)
+                previous_progress = signature
             if ticks % 12 == 1:
                 remote.backup()
                 if remote.account()['clientBalance'] < .5:
                     stopping.set()
             if progress['state'] in {'finished', 'blocked', 'smoke_requires_review', 'cancelled', 'failed'}:
-                remote.checkpoint_evidence = True
-                remote.backup()
-                remote.stop()
-                rental_active = False
-                idle_checkpointed = True
-                print(canonical({**progress, 'gpu': 'stopped; dashboard shows verified local snapshot'}), flush=True)
-                if args.no_dashboard:
-                    break
+                with control_lock(remote.deployment):
+                    if progress.get('runId'):
+                        observed = remote.api('/runs/' + progress['runId'])
+                        if observed['state'] in {'running', 'pausing', 'paused'}:
+                            continue
+                    intent(remote.deployment, 'stopping')
+                    remote.checkpoint_evidence = True
+                    remote.backup()
+                    remote.stop()
+                    rental_active = False
+                    intent(remote.deployment, 'stopped')
+                    idle_checkpointed = True
+                    print(canonical({**progress, 'gpu': 'stopped; dashboard shows verified local snapshot'}), flush=True)
+                    if args.no_dashboard:
+                        break
     finally:
         if not detached:
             try:
@@ -454,11 +581,13 @@ def launch_session(remote, args):
                     remote.checkpoint_evidence = True
                     remote.backup()
             finally:
-                if rental_active or (connected and not idle_checkpointed):
+                if rental_active or connected or (manual and intent(remote.deployment)['mode'] != 'observe'):
                     try:
                         remote.stop()
                     except DomainError:
                         print(canonical({'error': 'POD_STOP_FAILED', 'action': 'Run ./launch.sh stop or stop the saved benchmark Pod in RunPod'}), file=sys.stderr)
+                if not args.view_only and (rental_active or connected or (manual and intent(remote.deployment)['mode'] != 'observe')):
+                    remote.stop_local_services({'ssh tunnel', 'credential relay'})
                 for child in remote.children:
                     if child.poll() is None:
                         try:
@@ -469,7 +598,7 @@ def launch_session(remote, args):
 
 def main():
     parser = argparse.ArgumentParser(description='Launch the isolated remote video benchmark and local dashboard')
-    parser.add_argument('command', choices=['resume', 'install', 'connect', 'launch', 'backup', 'stop', 'account'])
+    parser.add_argument('command', choices=['resume', 'install', 'connect', 'launch', 'backup', 'stop', 'account', 'status', 'dashboard'])
     parser.add_argument('--no-dashboard', action='store_true')
     parser.add_argument('--detach', action='store_true', help='Connect only; leave private transports running')
     parser.add_argument('--view-only', action='store_true', help='Show saved results without starting or renting GPU compute')
@@ -477,7 +606,29 @@ def main():
     if args.detach and args.command == 'launch':
         parser.error('Use connect --detach for transports only; launch stays attached to supervise budgets and backups.')
     remote = Remote()
-    if args.command == 'resume':
+    if args.command == 'status':
+        from .store import Store
+        from .scoring import metrics
+        database = remote.data / 'state/remote-backup.sqlite3'
+        if not database.exists():
+            raise DomainError('NO_OFFLINE_SNAPSHOT')
+        store = Store(database, readonly=True)
+        try:
+            print('Saved local checkpoint (may be stale): ' + __import__('datetime').datetime.fromtimestamp(database.stat().st_mtime, __import__('datetime').timezone.utc).isoformat())
+            for row in store.rows('SELECT id FROM runs ORDER BY updated_at DESC'):
+                run = store.snapshot(row['id'])
+                print('\n' + run['id'] + ' | ' + run['phase'] + ' | ' + run['state'] + ' | decision: ' + run['decision'])
+                print('System | Correct | Incorrect | Completed/planned | Known cash USD | Estimated USD | Unknown attempts')
+                for item in metrics(store, row['id'])['summary']:
+                    cost = item['cost']
+                    print(' | '.join(map(str, [item['variantId'], item['correctCount'], item['incorrectCount'],
+                                               str(item['completedCount']) + '/' + str(item['plannedCount']),
+                                               cost['actual'] if cost['actual'] is not None else 'unknown',
+                                               cost['estimated'] if cost['estimated'] is not None else 'unknown', cost['unknownAttemptCount']])))
+            print('\nKnown cash may be partial. Estimates are a separate view; do not add them to cash. Rental/storage is separate.')
+        finally:
+            store.close()
+    elif args.command == 'resume':
         remote.resume()
         print(canonical({'resumed': remote.state['podId']}))
     elif args.command == 'install':
@@ -491,7 +642,13 @@ def main():
     elif args.command == 'account':
         print(canonical(remote.account()))
     else:
-        launch_session(remote, args)
+        import fcntl
+        with (remote.deployment / 'launcher.lock').open('a') as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise DomainError('LAUNCHER_ALREADY_RUNNING') from None
+            launch_session(remote, args)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,22 @@
+# Dependencies and build output for this isolated dashboard app.
+# Nothing heavy or secret from this folder should ever be pushed.
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local lockfiles (this app installs with its own npm lockfile, kept local).
+package-lock.json
+
+# Secrets / local config — the dashboard never reads benchmark.env, but guard anyway.
+.env
+.env.*
+!.env.example
+
+# Logs and local caches
+*.log
+.DS_Store
+coverage/

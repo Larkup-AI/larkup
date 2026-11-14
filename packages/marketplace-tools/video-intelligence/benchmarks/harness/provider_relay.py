@@ -29,6 +29,7 @@ class Relay:
         self.calls = {}
         self.total_calls = {}
         self.exhausted_aliases = set()
+        self.asr_locks = {}
 
     def record(self, entry):
         with self.lock:
@@ -59,6 +60,8 @@ class Relay:
         cache = self.data / 'artifacts' / digest([source['sha256'], spec['provider'], spec['model'],
                                                 __import__('hashlib').sha256(implementation.read_bytes()).hexdigest()]) / 'transcript.json'
         with self.lock:
+            source_lock = self.asr_locks.setdefault(str(cache), threading.Lock())
+        with source_lock:
             if cache.exists():
                 return {**json.loads(cache.read_text()), 'artifactId': cache.parent.name, 'reused': True}
             request = dict(path=str(path), durationSecs=source['durationMs'] / 1000,
@@ -74,8 +77,10 @@ class Relay:
             except ValueError:
                 raise DomainError('CANONICAL_ASR_FAILED') from None
             atomic(cache, self.secrets.clean(output))
-            self.record(dict(operation='canonical_asr', sourceId=source['id'], actual=None,
-                             processingSeconds=source['durationMs'] / 1000,
+            called = output.get('diagnostics', {}).get('providerCalled', True)
+            self.record(dict(operation='canonical_asr', sourceId=source['id'], actual=None if called else '0',
+                             processingSeconds=source['durationMs'] / 1000 if called else 0,
+                             provenance='canonical speech call' if called else 'ffprobe: no audio stream; provider not called',
                              accountAlias=spec['secretAlias'], model=spec['model'], status='completed',
                              attemptId=body.get('attemptId'), provider='deepgram', origin='canonical-asr'))
             return {**output, 'artifactId': cache.parent.name, 'reused': False}

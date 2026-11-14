@@ -297,6 +297,78 @@ The dashboard stays in proxy mode for real saved results; its mock/offline fixtu
 mode is not used for measurements. Clients should use controller health to label
 stale snapshots and disable controls.
 
-The smoke passed on the isolated GPU. At the user's request, the comparative
-pilot was not started. Frozen metadata is under `data/`; the next explicit
-launcher run starts the saved smoke-to-pilot workflow.
+The saved engineering smoke passed on the isolated GPU. Frozen pilot metadata
+is under `data/`; consult the saved run snapshot for actual execution state.
+
+### Additive metrics and chart exports
+
+Results and tasks include `system`: `larkup`, `retrieval`, `gemini`, `qwen`, or
+`twelvelabs`. Use this for the provider/system selector in the UI: `provider`
+identifies the funding transport (for example `gateway`), so several systems
+can share it. Tasks accept `system` and `variantId` filters in addition to the
+existing filters. Results also accept `system`, `provider`, `state`, and
+`sourceId`. These fields and filters are additive in v1.
+
+`metrics.summary` has one row per immutable variant: `system`, `plannedCount`,
+`completedCount`, `correctCount`, `incorrectCount`, `blockedCount`, `stateCounts`,
+`accuracy` with denominator, and three `Cost` objects: `cost` (all attempts),
+`preparationCost`, and `questionCost`. Preparation is counted once through its
+ledger entries. The original run snapshot `cost` remains the total across all
+variants. Null and partial costs retain the existing unknown-charge semantics.
+
+Each result's `cost` is the final attempt's cost; `taskCost` includes every
+attempt for that question, including failures and retries. Neither includes
+the separately recorded source preparation cost. `timing.coldFirstAnswerMs`
+is source preparation plus the first answer's observed response time; it is
+null on later reused-source answers. `inputReuse` distinguishes these cases.
+Queue time remains separate. Historical records without those observations
+remain null; they are not backfilled with invented measurements.
+
+The authenticated CSV export route additionally supports `questions.csv`,
+`summary.csv`, `usage.csv`, `attempts.csv`, `indexes.csv`, `metrics.csv`,
+`timing.csv`, `provider-usage.csv`, and `paired.csv`. Each uses the same
+`/runs/{id}/exports/{filename}` path, checksum header and safe spreadsheet
+escaping as `results.csv`. `questions.csv` flattens timing, usage, attempt cost
+and retry-inclusive task cost into columns; `summary.csv` flattens the per-system
+comparison. `usage.csv` includes immutable reconciliation receipts when present.
+The original nested `results.csv` remains compatible. These extra exports are
+also saved under the report's `data/` directory.
+
+
+### Operator, database, logs and JSON additions
+
+These endpoints are additive in v1. The PC bridge owns `/system` and `/system/*`;
+the remote controller owns inspection of its benchmark database and runtime.
+
+| Method / path | Response / effect |
+|---|---|
+| GET `/system` | `revision`, `readonly`, `controllerAvailable`, observed `pod`, `supervisor`, `services`, latest `operations` |
+| POST `/system/start` | Resume the saved Pod/transports and smoke-to-pilot workflow; never rent an additional Pod |
+| POST `/system/pause` | Pause workflow admission and all running runs |
+| POST `/system/resume` | Resume existing paused runs |
+| POST `/system/stop-gpu` | Pause, drain, backup, stop compute |
+| POST `/system/force-stop-gpu` | Emergency stop after `confirmation: "STOP GPU"`; no final drain/backup |
+| GET `/services` | Controller and canonical runtime/operator metadata; no inference probe |
+| GET `/database/tables` | Allowlisted table names, columns and row counts |
+| GET `/database/{table}` | Readonly `items`, `columns`, `nextCursor`, `hasMore`; optional `runId`, cursor and limit (max 200) |
+| GET `/database/{table}/export.json` | Redacted table JSON, max 100,000 rows; larger tables require pagination |
+| GET `/runs/{id}/exports/results.json` | Complete snapshot, metrics, results, tasks and usage for the run |
+| GET `/logs?service=…&cursor=…&limit=…` | Redacted lines (`id`, `text`), byte `nextCursor`, `hasMore`, `reset`, `available` |
+
+Operator mutations require `expectedRevision`, the existing Content-Type/Origin
+and server bearer guards, and an Idempotency-Key. They return 202 with an
+operation ID/state; poll `/system` for completion or failure. Force stop may
+supersede another pending action. Run controls retain their existing semantics.
+GETs never start a Pod or submit inference. Readonly mode rejects all mutations.
+
+Log services are `operator`, `controller`, `runtime`, `bootstrap`, `relay`,
+`dashboard`, `tunnel`; arbitrary paths are rejected. Missing remote logs are
+explicitly unavailable, or marked as saved snapshots. JSON and CSV exports keep
+null correctness/cost distinct from zero. Stored documents are parsed for display
+and scrubbed; sealed gold fields and credentials are excluded even from raw-row
+inspection. Tasks additionally expose the latest stored `progress` and
+`progressObservedAt`; unobserved stage/percent remain null.
+
+The current development pilot is partial and paused: two Qwen answers on one
+long video completed, one correct and one incorrect. Infrastructure failures
+have null correctness; this is not a completed comparative accuracy result.
