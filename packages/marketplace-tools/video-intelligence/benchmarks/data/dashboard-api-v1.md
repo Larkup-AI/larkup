@@ -1,12 +1,12 @@
 # Video benchmark controller API v1 — local dashboard handoff
 
-Design contract for the **Video Intelligence tool benchmark**, 2026-11-14. **Proposed, not implemented.** Implement and test
-the backend separately; another agent can implement a local dashboard against
-mock fixtures now. See [the implementation plan](implementation-report.md).
+Implemented contract for the **Video Intelligence tool benchmark**, 2026-11-14.
+The standalone controller is in `harness/`; the separately implemented dashboard
+uses this API through its server-side BFF. See [the implementation plan](implementation-report.md).
 
 ## Ownership, location and transport
 
-- Dashboard code: `packages/marketplace-tools/video-intelligence/benchmarks/apps/video-dashboard/`
+- Dashboard code: `packages/marketplace-tools/video-intelligence/benchmarks/dashboard/`
   in the canonical `larkup` repository. The controller/harness lives alongside it
   under this package's `benchmarks/harness/`; no Cloud repository implementation.
 - Runs on the user's PC, with a configurable free local port. No Vercel.
@@ -267,3 +267,36 @@ redaction, empty lists, null metrics, event dedup/reconnect, offline readonly
 mode, and pause draining. Benchmark agent supplies backend contract tests;
 dashboard agent supplies meaningful UI/client tests. No dashboard implementation
 or deployment is part of the current documentation task.
+
+
+## Implemented controller details
+
+The API remains `v1`; the internal SQLite schema revision is 3. The launcher
+binds the dashboard to `127.0.0.1:3100`, the SSH-forwarded controller to
+`127.0.0.1:28890`, and an authenticated server-to-server BFF relay to
+`127.0.0.1:28891`. That relay supplies the controller's exact mutation Origin.
+The dashboard's controller URL is the relay origin, without `/api/v1`.
+Existing provider credentials remain on the PC, behind a separate private SSH
+reverse tunnel; they are never dashboard configuration or browser data.
+
+Controls require revision and body-hash idempotency. Config validation candidates
+expire; activation persists the active snapshot. Startup role changes require a
+drain/restart. Provider metadata refresh is asynchronous (202) and never submits
+billable inference. A key suffix is not proof of an independent quota.
+
+`coverage.sharedCompletedQuestions` counts questions completed across declared
+core variants; unplanned ablation cells do not reduce that cohort.
+`metrics.providerUsage` separates observed cash, estimates and unknown records.
+Index times, attempts and usage have separate CSV exports. Unobserved timings
+remain null.
+
+When SSH is unavailable, the BFF relay serves the verified local SQLite backup
+in readonly mode. Health returns `availability: "offline"`, `readonly: true`
+and `lastSyncedAt`. Mutations return 409 `OFFLINE_READONLY` with no dispatch.
+The dashboard stays in proxy mode for real saved results; its mock/offline fixture
+mode is not used for measurements. Clients should use controller health to label
+stale snapshots and disable controls.
+
+The smoke passed on the isolated GPU. At the user's request, the comparative
+pilot was not started. Frozen metadata is under `data/`; the next explicit
+launcher run starts the saved smoke-to-pilot workflow.

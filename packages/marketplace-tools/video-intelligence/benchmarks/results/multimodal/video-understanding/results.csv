@@ -1,0 +1,126 @@
+runId,sourceId,dataset,questionId,variantId,attemptId,configRevision,durationGroup,sourceDurationMs,capability,logicalModel,resolvedModel,routeId,provider,accountAlias,tier,state,answer,predictedOption,correct,evaluationRevision,evidence,cost,timing,usage,indexArtifactId,issue
+run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-audio,gemini-native-gateway-v1,attempt-b6d21a5caa2ef44b2586,config-adcd200706cc5dbd03ec,short,8000,audio,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
+{
+ ""option"": ""C"",
+ ""explanation"": ""The speaker in the clip explicitly states that the secret number spoken is seven."",
+ ""evidence"": [
+  {
+   ""startMs"": 0,
+   ""endMs"": 4000,
+   ""kind"": ""transcript"",
+   ""claim"": ""The speaker states: 'The secret number spoken in this clip is seven.'""
+  }
+ ]
+}
+```",C,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4000,""kind"":""transcript"",""supportedClaim"":""The speaker states: 'The secret number spoken in this clip is seven.'""}]","{""currency"":""USD"",""actual"":""0.00134925"",""estimated"":""0.00134925"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":54447.23033905029,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":5101.989571936429,""firstTokenMs"":null,""endToEndMs"":59549.21991098672,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":859,""outputTokens"":188,""reasoningTokens"":null,""cachedTokens"":null,""processingSeconds"":8.0,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-6e4426b03091d6e80a4115d6,
+run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-audio,qwen-frames,attempt-a262c148b5559816261d,config-adcd200706cc5dbd03ec,short,8000,audio,qwen3.6-plus,alibaba/qwen3.6-plus,qwen-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
+{
+    ""option"": ""C"",
+    ""explanation"": ""The official subtitle explicitly states, 'The secret number spoken in this clip is seven.'"",
+    ""evidence"": [
+        {
+            ""startMs"": 0,
+            ""endMs"": 4000,
+            ""kind"": ""subtitle"",
+            ""claim"": ""The secret number spoken in this clip is seven.""
+        }
+    ]
+}
+```",C,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4000,""kind"":""subtitle"",""supportedClaim"":""The secret number spoken in this clip is seven.""}]","{""currency"":""USD"",""actual"":""0.0046585"",""estimated"":""0.0046585"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":7393.146514892578,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":5692.081436980516,""firstTokenMs"":null,""endToEndMs"":13085.227951873094,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":7259,""outputTokens"":343,""reasoningTokens"":null,""cachedTokens"":0,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-265941ad1249e0ac5fa34f52,
+run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-audio,twelvelabs-native,attempt-39e6c7d2c449b50ffeed,config-adcd200706cc5dbd03ec,short,8000,audio,pegasus1.5,,twelvelabs-direct,twelvelabs,TWELEVE_LABS_KEY1,unverified,completed,"{
+  ""option"": ""C"",
+  ""explanation"": ""The audio explicitly states that the secret number spoken in the clip is seven."",
+  ""evidence"": [
+    {
+      ""startMs"": 0,
+      ""endMs"": 4000,
+      ""kind"": ""subtitle"",
+      ""claim"": ""The secret number spoken in this clip is seven.""
+    }
+  ]
+}",C,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4000,""kind"":""subtitle"",""supportedClaim"":""The secret number spoken in this clip is seven.""}]","{""currency"":""USD"",""actual"":null,""estimated"":null,""unknownAttemptCount"":1,""reconciled"":false}","{""queueMs"":161.88335418701172,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":10828.176097013056,""firstTokenMs"":null,""endToEndMs"":10990.059451200068,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":2029,""outputTokens"":95,""reasoningTokens"":null,""cachedTokens"":null,""processingSeconds"":8.0,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-375481a5db492d7e12a7407e,
+run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-visual,gemini-native-gateway-v1,attempt-0a310d493590e52ff52a,config-adcd200706cc5dbd03ec,short,8000,visual,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
+{
+ ""option"": ""A"",
+ ""explanation"": ""The video starts with a solid red screen from 00:00 until around 00:03, before transitioning to blue."",
+ ""evidence"": [
+  {
+   ""startMs"": 0,
+   ""endMs"": 3000,
+   ""kind"": ""video"",
+   ""claim"": ""The screen is filled with the color red.""
+  }
+ ]
+}
+```",A,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":3000,""kind"":""video"",""supportedClaim"":""The screen is filled with the color red.""}]","{""currency"":""USD"",""actual"":""0.001887"",""estimated"":""0.001887"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":86.84039115905762,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":6524.2695229826495,""firstTokenMs"":null,""endToEndMs"":6611.109914141707,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":861,""outputTokens"":331,""reasoningTokens"":null,""cachedTokens"":null,""processingSeconds"":8.0,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-6e4426b03091d6e80a4115d6,
+run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-visual,qwen-frames,attempt-8090e98ea0a8aa081b59,config-adcd200706cc5dbd03ec,short,8000,visual,qwen3.6-plus,alibaba/qwen3.6-plus,qwen-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
+{
+    ""option"": ""A"",
+    ""explanation"": ""The video begins with a solid red screen that persists from 0 ms until at least 3386 ms, before switching to blue at 4514 ms. Therefore, the color filling the first part of the video is red."",
+    ""evidence"": [
+        {
+            ""startMs"": 0,
+            ""endMs"": 3386,
+            ""kind"": ""visual"",
+            ""claim"": ""The video displays a solid red screen.""
+        }
+    ]
+}
+```",A,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":3386,""kind"":""visual"",""supportedClaim"":""The video displays a solid red screen.""}]","{""currency"":""USD"",""actual"":""0.0048695"",""estimated"":""0.0048695"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":248.50058555603027,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":6754.883467103355,""firstTokenMs"":null,""endToEndMs"":7003.384052659385,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":7261,""outputTokens"":413,""reasoningTokens"":null,""cachedTokens"":0,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-265941ad1249e0ac5fa34f52,
+run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-visual,twelvelabs-native,attempt-ec7f81305cb90540c4d0,config-adcd200706cc5dbd03ec,short,8000,visual,pegasus1.5,,twelvelabs-direct,twelvelabs,TWELEVE_LABS_KEY1,unverified,completed,"{""option"":""A"",""explanation"":""The video begins with a solid red screen that fills the frame from the start until the color changes at 00:04."",""evidence"":[{""startMs"":0,""endMs"":4000,""kind"":""visual"",""claim"":""The screen is filled with the color red.""}]}",A,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4000,""kind"":""visual"",""supportedClaim"":""The screen is filled with the color red.""}]","{""currency"":""USD"",""actual"":null,""estimated"":null,""unknownAttemptCount"":1,""reconciled"":false}","{""queueMs"":11434.571266174316,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":10506.400706944987,""firstTokenMs"":null,""endToEndMs"":21940.971973119304,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":2031,""outputTokens"":69,""reasoningTokens"":null,""cachedTokens"":null,""processingSeconds"":8.0,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-375481a5db492d7e12a7407e,
+run-6d52d407421c1d1b0be0,development-smoke,development-CC0,smoke-audio,larkup-gateway-brain-v2,attempt-553c14668d7f0a823144,config-f15ac1a74f0541c10c51,short,8000,audio,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
+{
+  ""option"": ""C"",
+  ""explanation"": ""In the audio track, the speaker clearly states, \""The secret number spoken in this clip is 7.\"""",
+  ""evidence"": [
+    {
+      ""startMs"": 0,
+      ""endMs"": 3600,
+      ""kind"": ""speech"",
+      ""claim"": ""The speaker announces: \""The secret number spoken in this clip is 7.\""""
+    }
+  ]
+}
+```",C,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":3600,""kind"":""speech"",""supportedClaim"":""The speaker announces: \""The secret number spoken in this clip is 7.\""""}]","{""currency"":""USD"",""actual"":""0.00748290"",""estimated"":""0.00391875"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":55848.86050224304,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":47582.7071450185,""firstTokenMs"":null,""endToEndMs"":103431.56764726155,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":8401,""outputTokens"":681,""reasoningTokens"":0,""cachedTokens"":2032,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":3}",index-03aae92ee6c5dd343bb8925d,
+run-6d52d407421c1d1b0be0,development-smoke,development-CC0,smoke-audio,same-backbone-retrieval-gateway-brain-v2,attempt-53fcd4c6e0d79f039571,config-f15ac1a74f0541c10c51,short,8000,audio,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
+{
+  ""option"": ""C"",
+  ""explanation"": ""According to the official transcript and audio descriptions, the number spoken in the audio clip is seven."",
+  ""evidence"": [
+    {
+      ""startMs"": 0,
+      ""endMs"": 4000,
+      ""kind"": ""transcript"",
+      ""claim"": ""The secret number spoken in this clip is seven.""
+    }
+  ]
+}
+```",C,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4000,""kind"":""transcript"",""supportedClaim"":""The secret number spoken in this clip is seven.""}]","{""currency"":""USD"",""actual"":""0.00294525"",""estimated"":""0.00294525"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":49410.696268081665,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":10202.880470082164,""firstTokenMs"":null,""endToEndMs"":59613.57673816383,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":2027,""outputTokens"":380,""reasoningTokens"":null,""cachedTokens"":0,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-03aae92ee6c5dd343bb8925d,
+run-6d52d407421c1d1b0be0,development-smoke,development-CC0,smoke-visual,larkup-gateway-brain-v2,attempt-30e4f08292e530093889,config-f15ac1a74f0541c10c51,short,8000,visual,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
+{
+  ""option"": ""A"",
+  ""explanation"": ""I saw that a solid red color fills the screen during the first section of the recording before it transitions to blue."",
+  ""evidence"": [
+    {
+      ""startMs"": 0,
+      ""endMs"": 4500,
+      ""kind"": ""visual"",
+      ""claim"": ""The screen background is solid red during the initial part of the video.""
+    }
+  ]
+}
+```",A,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4500,""kind"":""visual"",""supportedClaim"":""The screen background is solid red during the initial part of the video.""}]","{""currency"":""USD"",""actual"":""0.01163625"",""estimated"":""0.00649425"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":50.5375862121582,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":52665.165330981836,""firstTokenMs"":null,""endToEndMs"":52715.702917193994,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":10280,""outputTokens"":1047,""reasoningTokens"":0,""cachedTokens"":0,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":3}",index-03aae92ee6c5dd343bb8925d,
+run-6d52d407421c1d1b0be0,development-smoke,development-CC0,smoke-visual,same-backbone-retrieval-gateway-brain-v2,attempt-f40b8c5f99648e5c51b4,config-f15ac1a74f0541c10c51,short,8000,visual,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
+{
+  ""option"": ""A"",
+  ""explanation"": ""According to the visual evidence from the beginning of the video (0 to 4.5 seconds), a solid red screen displays continuously before transitioning to solid blue."",
+  ""evidence"": [
+    {
+      ""startMs"": 0,
+      ""endMs"": 4500,
+      ""kind"": ""visual"",
+      ""claim"": ""A solid red screen displays continuously until frame 4, at which point the video transitions to solid blue.""
+    }
+  ]
+}
+```",A,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4500,""kind"":""visual"",""supportedClaim"":""A solid red screen displays continuously until frame 4, at which point the video transitions to solid blue.""}]","{""currency"":""USD"",""actual"":""0.00272025"",""estimated"":""0.00272025"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":61116.84536933899,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":8303.42008289881,""firstTokenMs"":null,""endToEndMs"":69420.2654522378,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":2072,""outputTokens"":311,""reasoningTokens"":null,""cachedTokens"":0,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-03aae92ee6c5dd343bb8925d,

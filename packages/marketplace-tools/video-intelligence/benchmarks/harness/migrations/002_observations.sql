@@ -1,0 +1,4 @@
+ALTER TABLE tasks ADD COLUMN ready_at REAL;
+CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE usage_receipts(id TEXT PRIMARY KEY);
+CREATE TABLE audits(run_id TEXT PRIMARY KEY, document TEXT NOT NULL, recorded_at TEXT NOT NULL);
