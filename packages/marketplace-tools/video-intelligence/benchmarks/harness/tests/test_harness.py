@@ -306,6 +306,8 @@ class HarnessTest(unittest.TestCase):
         with (target/'data/questions.csv').open() as stream:flat=list(csv.DictReader(stream))
         self.assertTrue(all(float(row['indexMs'])==800 for row in flat))
         self.assertTrue(all(row['answerMs'] for row in flat))
+        with (target/'results.csv').open() as stream:download=list(csv.DictReader(stream))
+        self.assertTrue(all(float(row['indexMs'])==800 and row['answerMs'] for row in download))
         prepared=next(x for x in metrics(self.store,self.run['id'])['timing'] if x['stage']=='preparation')
         self.assertEqual(prepared['sampleCount'],2)
         self.assertEqual(prepared['p50Ms'],930)

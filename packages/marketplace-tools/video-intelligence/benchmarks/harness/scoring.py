@@ -230,12 +230,14 @@ def decision(store, run: str) -> tuple[str, str]:
 def export(store, run: str, root: Path) -> dict:
     root.mkdir(parents=True, exist_ok=True)
     rows = results(store, run)
-    fields = list(rows[0]) if rows else ['runId', 'state', 'correct']
+    timing_fields = ['prepareMs','uploadMs','indexMs','answerMs']
+    fields = (list(rows[0]) if rows else ['runId', 'state', 'correct']) + timing_fields
     buffer = io.StringIO(newline='')
     writer = csv.DictWriter(buffer, fieldnames=fields, lineterminator='\n')
     writer.writeheader()
     for row in rows:
         encoded = {k: canonical(v) if isinstance(v, (dict, list)) else v for k, v in row.items()}
+        encoded.update({key:row['timing'].get(key) for key in timing_fields})
         # Prevent spreadsheet formula execution in untrusted model/dataset text.
         encoded = {k: ("'" + str(v) if isinstance(v, str) and v[:1] in '=+-@\t\r' else v) for k, v in encoded.items()}
         writer.writerow(encoded)
