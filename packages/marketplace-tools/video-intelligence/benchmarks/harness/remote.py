@@ -216,21 +216,19 @@ print(json.dumps(result))
         aliases = sorted({r['secretAlias'] for r in config['routes'].values()} |
                          {s['secretAlias'] for v in config['variants'].values() for s in v.get('roles', {}).values()})
         # Generate scoped credentials on the Pod; no existing provider/account key is transferred.
-        init = """import json,secrets,sys
+        init = """import json,sys
 from pathlib import Path
-b=Path(sys.argv[1]);aliases=json.load(sys.stdin);p=b/'data/deployment';p.mkdir(parents=True,exist_ok=True,mode=0o700)
-existing=p/'relay.json';cap=json.loads(existing.read_text())['relayCapability'] if existing.exists() else secrets.token_urlsafe(40)
-f=b/'benchmark.env';f.write_text(''.join(a+'='+cap+'\\n' for a in aliases));f.chmod(0o600)
+from harness.container_credentials import install
 from harness.main import initialize
+b=Path(sys.argv[1]);document=json.load(sys.stdin)
+r=install(b,document['aliases'],document['relayCapability'],document['controllerToken'],document['runtimeToken'])
 initialize(b)
-r={'relayCapability':cap};f=p/'relay.json';f.write_text(json.dumps(r));f.chmod(0o600)
-from harness.common import Secrets
-r['controllerToken']=Secrets(b/'benchmark.env').get('BENCHMARK_CONTROLLER_TOKEN')
 print(json.dumps(r))
 """
         import shlex
         command = 'cd ' + REMOTE_BENCH + ' && python3 -c ' + shlex.quote(init) + ' ' + REMOTE_BENCH
-        response = self.ssh(command, data=canonical(aliases).encode())
+        credentials=json.loads((self.deployment/'relay.json').read_text())
+        response = self.ssh(command, data=canonical(dict(aliases=aliases,relayCapability=credentials['relayCapability'],controllerToken=credentials['controllerToken'],runtimeToken=secrets.token_urlsafe(40))).encode())
         try:
             credentials = json.loads(response.stdout)
         except ValueError:
@@ -365,7 +363,7 @@ running=bool(c.exists() and b'harness.remote_runtime' in c.read_bytes());active=
 if db.exists():
  conn=sqlite3.connect('file:'+str(db)+'?mode=ro',uri=True)
  active=conn.execute("SELECT count(*) FROM runs WHERE state IN ('running','pausing','cancelling')").fetchone()[0];conn.close()
-print(json.dumps(dict(revision=revision,running=running,active=active)))
+print(json.dumps(dict(revision=revision,running=running,active=active,privateReady=(b/'benchmark.env').is_file() and (b/'data/deployment/tokens.env').is_file())))
 """
         import shlex
         from .common import digest
@@ -374,6 +372,9 @@ print(json.dumps(dict(revision=revision,running=running,active=active)))
         local = digest({str(p.relative_to(directory)): hashlib.sha256(p.read_bytes()).hexdigest()
                         for p in sorted(directory.rglob('*')) if p.is_file() and p.suffix in {'.py', '.mjs', '.sql', '.sh'}})
         if probe['revision'] != local and not probe['active']:
+            self.install()
+            return
+        if not probe.get('privateReady',True):
             self.install()
             return
         if not probe['running']:
