@@ -28,6 +28,8 @@ const COLUMNS: Array<{ key: string; get: (r: ResultObject) => unknown }> = [
   { key: 'costEstimated', get: (r) => r.cost.estimated },
   { key: 'costReconciled', get: (r) => r.cost.reconciled },
   { key: 'queueMs', get: (r) => r.timing.queueMs },
+  { key: 'prepareMs', get: (r) => r.timing.prepareMs },
+  { key: 'uploadMs', get: (r) => r.timing.uploadMs },
   { key: 'indexMs', get: (r) => r.timing.indexMs },
   { key: 'answerMs', get: (r) => r.timing.answerMs },
   { key: 'firstTokenMs', get: (r) => r.timing.firstTokenMs },

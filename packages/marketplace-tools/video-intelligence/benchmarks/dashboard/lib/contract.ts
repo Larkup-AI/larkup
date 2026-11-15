@@ -232,7 +232,9 @@ export type PairedMetric = {
 export type TimingMetric = {
   cohortId: string;
   variantId: string;
-  stage: 'index' | 'answer' | 'firstToken' | 'endToEnd' | 'queue' | 'coldFirstAnswer';
+  stage:
+    'index' | 'preparation' | 'answer' | 'firstToken' | 'endToEnd' | 'queue' | 'coldFirstAnswer';
+  reusedCount?: number;
   /** Null with reason for native services without this stage. */
   p50Ms: number | null;
   p95Ms: number | null;

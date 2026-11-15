@@ -44,7 +44,10 @@ def results(store, run: str) -> list[dict]:
                       firstTokenMs=None, endToEndMs=None, coldFirstAnswerMs=None, inputReuse=None,
                       measurementProfileId='bounded-independent-v1',
                       unavailableReasons={'firstTokenMs': 'non-streaming provider call', 'indexMs': 'referenced by indexArtifactId'})
+        timing.update({key:value for key,value in index.get('timing',{}).items() if key in {'prepareMs','uploadMs','indexMs'}})
         timing.update(out.get('timing', {}))
+        if timing['indexMs'] is not None:
+            timing['unavailableReasons'].pop('indexMs',None)
         usage = out.get('usage', {})
         usage = dict(inputTokens=usage.get('promptTokenCount', usage.get('prompt_tokens')),
                      outputTokens=usage.get('candidatesTokenCount', usage.get('completion_tokens')),
@@ -152,11 +155,18 @@ def metrics(store, run: str) -> dict:
                                 p50Ms=percentile(measured, .5), p95Ms=percentile(measured, .95), sampleCount=len(measured),
                                 nullReason=None if measured else 'No completed observed measurements'))
         preparations = store.rows("SELECT output FROM tasks WHERE run_id=? AND variant_id=? AND kind='prepare' AND state='completed'", (run, vid))
-        indexing = [json.loads(x['output']).get('timing', {}).get('indexMs') for x in preparations]
+        prepared_outputs = [json.loads(x['output']) for x in preparations]
+        indexing = [x.get('timing', {}).get('indexMs') for x in prepared_outputs]
         indexing = [x for x in indexing if x is not None]
         timings.append(dict(cohortId=digest(sorted(x['sourceId'] for x in subset)), variantId=vid, stage='index',
                             p50Ms=percentile(indexing, .5), p95Ms=percentile(indexing, .95), sampleCount=len(indexing),
+                            reusedCount=sum(bool(x.get('reused')) for x in prepared_outputs),
                             nullReason=None if indexing else 'Native service has no persistent index, or indexing incomplete'))
+        setup = [sum(value for key,value in x.get('timing',{}).items() if key in {'prepareMs','uploadMs','indexMs'} and isinstance(value,(int,float))) for x in prepared_outputs if any(x.get('timing',{}).get(key) is not None for key in ['prepareMs','uploadMs','indexMs'])]
+        timings.append(dict(cohortId=digest(sorted(x['sourceId'] for x in subset)),variantId=vid,stage='preparation',
+                            p50Ms=percentile(setup,.5),p95Ms=percentile(setup,.95),sampleCount=len(setup),
+                            reusedCount=sum(bool(x.get('reused')) for x in prepared_outputs),
+                            nullReason=None if setup else 'No completed source preparation'))
     run_snapshot = store.snapshot(run)
     provider_records = defaultdict(list)
     for item in store.rows('''SELECT u.document,u.attempt_id,r.actual override,a.route FROM usage_events u

@@ -38,6 +38,20 @@ Multiple-choice accuracy uses the supplied reference option directly; an LLM jud
 is unnecessary for that score. Infrastructure failures remain separate from wrong
 answers, and unresolved paid outcomes must not be blindly submitted again.
 
+## Setup and response timing
+
+The dashboard shows two separate measurements: source indexing/preparation time
+(median per video) and response time (median per answered question). Each exported
+question row includes `indexMs`, `prepareMs`, `uploadMs`, and `answerMs`, with an
+`indexArtifactId` linking repeated questions back to the same source preparation.
+Do not sum repeated index references across questions. `timing.csv` aggregates
+setup once per completed preparation task, independently of answer timing.
+
+Native services without a persistent index have a null `indexMs`, not a fabricated
+zero; their measured upload/preparation appears as setup instead. Reused Larkup
+indexes retain their original build time and are labelled reused. Response timing
+excludes that setup, queue wait, GPU allocation and container startup.
+
 ## Start a new benchmark
 
 From this directory, with `benchmark.env` present and mode `0600`:

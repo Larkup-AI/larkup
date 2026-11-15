@@ -293,6 +293,23 @@ class HarnessTest(unittest.TestCase):
         self.assertEqual(controller.get('/runs/' + self.run['id'] + '/results', {'system': ['larkup']})['items'], [])
         self.assertTrue(controller.get('/runs/' + self.run['id'] + '/exports/summary.csv', {}).startswith(b'accuracy,'))
 
+    def test_results_and_exports_keep_indexing_separate_from_each_answer(self):
+        class Indexed(Fake):
+            async def prepare(self,c):
+                return {'fingerprint':digest(c.source),'timing':{'indexMs':800,'prepareMs':100,'uploadMs':30}}
+        self.start();asyncio.run(self.finish(self.scheduler(Indexed())))
+        rows=results(self.store,self.run['id'])
+        self.assertTrue(all(row['timing']['indexMs']==800 for row in rows))
+        self.assertTrue(all(row['timing']['answerMs'] is not None for row in rows))
+        self.assertTrue(all('indexMs' not in row['timing']['unavailableReasons'] for row in rows))
+        target=self.root/'timed-export';export(self.store,self.run['id'],target)
+        with (target/'data/questions.csv').open() as stream:flat=list(csv.DictReader(stream))
+        self.assertTrue(all(float(row['indexMs'])==800 for row in flat))
+        self.assertTrue(all(row['answerMs'] for row in flat))
+        prepared=next(x for x in metrics(self.store,self.run['id'])['timing'] if x['stage']=='preparation')
+        self.assertEqual(prepared['sampleCount'],2)
+        self.assertEqual(prepared['p50Ms'],930)
+
     def test_first_answer_is_cold_and_following_question_reuses_preparation(self):
         doc = manifest(1)
         doc['questions'].append({**doc['questions'][0], 'id': 'q-next'})

@@ -255,6 +255,7 @@ export function Home({
                 <th>Answered / planned in this stage</th>
                 <th>Status</th>
                 <th>Known API cost</th>
+                <th>Indexing / preparation time</th>
                 <th>Response time</th>
               </tr>
             </thead>
@@ -264,6 +265,13 @@ export function Home({
                   timing = metrics?.timing.find(
                     (t) => t.variantId === row?.variantId && t.stage === 'answer',
                   );
+                const indexing = metrics?.timing.find(
+                  (t) => t.variantId === row?.variantId && t.stage === 'index',
+                );
+                const preparation = metrics?.timing.find(
+                  (t) => t.variantId === row?.variantId && t.stage === 'preparation',
+                );
+                const setup = indexing?.p50Ms != null ? indexing : preparation;
                 const total = row?.completedCount ?? 0;
                 const activity =
                   !metrics && !queueView
@@ -346,7 +354,22 @@ export function Home({
                         <div className="note">{row.cost.unknownAttemptCount} unknown charges</div>
                       )}
                     </td>
-                    <td>{timing?.p50Ms == null ? '—' : fmtDuration(timing.p50Ms)}</td>
+                    <td>
+                      {setup?.p50Ms == null ? '—' : fmtDuration(setup.p50Ms)}
+                      <div className="note">
+                        {indexing?.p50Ms != null
+                          ? 'Index build · median per video'
+                          : preparation?.p50Ms != null
+                            ? 'Preparation · no separate index'
+                            : 'No completed setup measurement'}
+                        {!!setup?.reusedCount &&
+                          ` · ${setup.reusedCount} reused (original build time)`}
+                      </div>
+                    </td>
+                    <td>
+                      {timing?.p50Ms == null ? '—' : fmtDuration(timing.p50Ms)}
+                      <div className="note">Median per answer · excludes source setup</div>
+                    </td>
                   </tr>
                 );
               })}
@@ -354,9 +377,10 @@ export function Home({
           </table>
         </div>
         <p className="note">
-          Accuracy = correct answers / answered questions. A failed API call is a service failure,
-          not an incorrect answer. Compare accuracy only on the same completed questions. Service
-          checks verify responses, independently of answer correctness. Advanced has detailed logs,
+          Source setup is recorded once per video; each answer has its own response time. Accuracy =
+          correct answers / answered questions. A failed API call is a service failure, not an
+          incorrect answer. Compare accuracy only on the same completed questions. Service checks
+          verify responses, independently of answer correctness. Advanced has detailed logs,
           database inspection and exports.
         </p>
         {system?.readiness && (

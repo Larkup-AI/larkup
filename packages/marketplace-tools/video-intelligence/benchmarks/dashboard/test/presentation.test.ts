@@ -72,7 +72,7 @@ test('CSV export is sanitized: null stays empty, commas quoted, no provider keys
       queueMs: 1,
       prepareMs: null,
       uploadMs: null,
-      indexMs: null,
+      indexMs: 800,
       answerMs: 2,
       firstTokenMs: null,
       endToEndMs: 3,
@@ -96,6 +96,8 @@ test('CSV export is sanitized: null stays empty, commas quoted, no provider keys
   const cols = parseCsvLine(row);
   const idx = header.split(',').indexOf('correct');
   assert.equal(cols[idx], '');
+  assert.equal(cols[header.split(',').indexOf('indexMs')], '800');
+  assert.equal(cols[header.split(',').indexOf('answerMs')], '2');
   // comma-bearing field is quoted
   assert.ok(row.includes('"q, with comma"'));
   // no secret-bearing values leaked (token COUNT columns are legitimate)
