@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Home } from './Home.js';
-import { read, type SystemStatus, type Operation } from '../lib/operator.js';
+import { read, shouldFollowRun, type SystemStatus, type Operation } from '../lib/operator.js';
 import { api, type PublicMeta } from '../lib/client.js';
 import { ControlCenter, DatabaseTab, RecordsTab, LogsTab, ServicesTab } from './ControlCenter.js';
 import {
@@ -54,6 +54,10 @@ export default function Dashboard() {
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   const followedRun = useRef<string | null>(null);
+  const requestedRun = useRef<string | null>(null);
+  useEffect(() => {
+    requestedRun.current = new URLSearchParams(window.location.search).get('run');
+  }, []);
   const followedStartup = useRef<string | null>(null);
   useEffect(() => {
     if (!selected) return;
@@ -92,9 +96,16 @@ export default function Dashboard() {
           setTab('Home');
         }
         if (status.selectedRunId && status.selectedRunId !== followedRun.current) {
+          const follow = shouldFollowRun(
+            followedRun.current,
+            status.selectedRunId,
+            requestedRun.current,
+          );
           followedRun.current = status.selectedRunId;
-          setSelected(status.selectedRunId);
-          setTab('Home');
+          if (follow) {
+            setSelected(status.selectedRunId);
+            setTab('Home');
+          }
         }
       } catch {
         if (!cancelled) {

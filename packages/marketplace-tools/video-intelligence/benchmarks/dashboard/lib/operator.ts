@@ -43,3 +43,12 @@ export function download(value: unknown, name: string) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** Honor an explicitly opened run before following later operator selections. */
+export function shouldFollowRun(
+  previous: string | null,
+  next: string,
+  requested: string | null,
+): boolean {
+  return previous !== next && !(previous === null && requested !== null);
+}

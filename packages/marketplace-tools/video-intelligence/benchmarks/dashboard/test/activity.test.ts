@@ -1,3 +1,4 @@
+import { shouldFollowRun } from '../lib/operator.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { providerActivity, retryCountdown } from '../lib/activity.js';
@@ -115,7 +116,17 @@ test('completed provider results keep their meaning in saved checkpoints', () =>
   );
 });
 
- test('preparation is explicit while no answers have completed',()=>{
- const task={variantId:row.variantId,state:'submitted',questionId:null} as TaskObject;
- assert.equal(providerActivity({...base,row:{...row,completedCount:0},tasks:[task]}).label,'Preparing video · no answer completed yet');
- });
+test('preparation is explicit while no answers have completed', () => {
+  const task = { variantId: row.variantId, state: 'submitted', questionId: null } as TaskObject;
+  assert.equal(
+    providerActivity({ ...base, row: { ...row, completedCount: 0 }, tasks: [task] }).label,
+    'Preparing video · no answer completed yet',
+  );
+});
+
+test('explicit run links survive initial operator polling while new selections are followed', () => {
+  assert.equal(shouldFollowRun(null, 'operator-run', 'requested-run'), false);
+  assert.equal(shouldFollowRun(null, 'operator-run', null), true);
+  assert.equal(shouldFollowRun('operator-run', 'new-run', 'requested-run'), true);
+  assert.equal(shouldFollowRun('operator-run', 'operator-run', 'requested-run'), false);
+});
