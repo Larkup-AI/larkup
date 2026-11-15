@@ -102,6 +102,16 @@ export function Home({
   const systems = ['larkup', 'gemini', 'qwen', 'muse', 'minimax', 'twelvelabs'] as const;
   return (
     <>
+      {system?.gpuOffers && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Choose GPU">
+        <div className="modal-card"><h3>Choose a GPU</h3>
+          <p>Listed availability can change. Only your chosen GPU will be reserved. Storage is billed separately.</p>
+          {system.gpuOffers.offers.map((offer,index)=><p key={index}>
+            {offer.gpuTypeId} · {offer.cloudType} · USD {offer.quotedHourlyUsd}/hour{' '}
+            <button disabled={busy} onClick={()=>gpuChoice(String(index))}>Accept this GPU</button>
+          </p>)}
+          <button disabled={busy} onClick={()=>gpuChoice('wait')}>Wait for a cheaper GPU</button>
+        </div></div>}
+
       <section className="panel">
         <h2>Your benchmark</h2>
         <label htmlFor="selected-run">Experiment </label>
