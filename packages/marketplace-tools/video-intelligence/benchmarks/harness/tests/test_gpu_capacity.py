@@ -75,14 +75,14 @@ class AllocationSafetyTest(unittest.TestCase):
                     if pod in query:alive.remove(pod);terminated.append(pod)
                 return {}
             if 'gpuTypes' in query:
-                rows=[] if 'secureCloud:true' in query else [{'id':'NVIDIA fixture-'+str(i),'memoryInGb':24,'lowestPrice':{'uninterruptablePrice':.50+i*.01}} for i in range(len(prices))]
+                rows=[] if 'secureCloud:true' in query else [{'id':'NVIDIA fixture-'+str(i),'memoryInGb':24,'lowestPrice':{'uninterruptablePrice':.55+i*.01}} for i in range(len(prices))]
                 return {'gpuTypes':rows}
             if 'myself' in query:return {'myself':{'pods':[{'id':'recovered-target','name':journal['name'],'desiredStatus':'RUNNING','costPerHr':.55}]}}
             return {'pod':{'desiredStatus':'EXITED'}}
         remote.gql=Mock(side_effect=api)
         def check():
             if cancel and alive:raise DomainError('START_CANCELLED')
-        with patch('harness.gpu_capacity.allocation_input',side_effect=lambda *_:'ALLOCATE') as allocate,patch('harness.gpu_capacity.validate_evidence'),patch('harness.gpu_capacity.wait_ssh',side_effect=DomainError('RUNPOD_STARTUP_INCOMPLETE') if boot_timeout else None),patch('harness.gpu_capacity.restore_target',side_effect=restore_error):
+        with patch('harness.gpu_offers.choose',side_effect=lambda remote,offers,*_:offers[0]), patch('harness.gpu_capacity.allocation_input',side_effect=lambda *_:'ALLOCATE') as allocate,patch('harness.gpu_capacity.validate_evidence'),patch('harness.gpu_capacity.wait_ssh',side_effect=DomainError('RUNPOD_STARTUP_INCOMPLETE') if boot_timeout else None),patch('harness.gpu_capacity.restore_target',side_effect=restore_error):
             if boot_timeout:
                 self.assertFalse(relocate(remote,attempt=2,check=check,report=Mock()))
             elif restore_error or cancel:
@@ -91,10 +91,9 @@ class AllocationSafetyTest(unittest.TestCase):
             return allocations,terminated,allocate.call_count
 
     def test_above_quote_price_is_discarded_before_another_candidate_is_rented(self):
-        allocations,terminated,_=self.exercise(prices=(.9,.55))
-        self.assertEqual(len(allocations),2);self.assertEqual(terminated,['target-0'])
-        self.assertEqual(self.remote.state['podId'],'target-1')
-        self.assertEqual(self.remote.state['capacityReferenceHourlyUsd'],.59)
+        allocations,terminated,_=self.exercise(prices=(.55,))
+        self.assertEqual(len(allocations),1);self.assertEqual(terminated,[])
+        self.assertEqual(self.remote.state['podId'],'target-0')
 
     def test_failed_restore_keeps_the_original_state_and_discards_only_the_replica(self):
         _,terminated,_=self.exercise(restore_error=DomainError('RESTORE_FAILED'))

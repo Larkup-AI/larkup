@@ -207,6 +207,8 @@ def cancellable_ssh(target, command, *, data=None, check_result=True, check):
                     continue
                 result = subprocess.CompletedProcess(arguments, process.returncode, stdout, stderr)
                 if check_result and result.returncode:
+                    if hasattr(target,'deployment'):
+                        atomic(target.deployment/'ssh-failure.json',dict(returncode=result.returncode,stderr=target.private.clean(stderr.decode(errors='replace')[-4000:]),at=utc()))
                     raise DomainError('SSH_OPERATION_FAILED')
                 return result
             raise DomainError('SSH_OPERATION_TIMEOUT')
@@ -308,15 +310,22 @@ def relocate(remote, *, attempt, check, report):
         if pending and pending['desiredStatus'] != 'RUNNING':
             raise DomainError('RUNPOD_RELOCATION_REVIEW_REQUIRED')
         if not pending:
-            available = []
-            for cloud, secure in [('COMMUNITY', 'false'), ('SECURE', 'true')]:
-                check()
+            def quote(cloud, secure):
                 rows = remote.gql('query { gpuTypes { id memoryInGb lowestPrice(input:{gpuCount:1,secureCloud:' + secure + ',supportPublicIp:true,minVcpuCount:2,minMemoryInGb:16,minCudaVersion:' + json.dumps(policy.minCudaVersion) + '}) { uninterruptablePrice stockStatus } } }')['gpuTypes']
-                available.extend(candidates(rows, cloud, budget, policy))
+                return candidates(rows, cloud, policy.maxHourlyUsd, policy)
+            check()
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                queries=[pool.submit(quote,cloud,secure) for cloud,secure in [('COMMUNITY','false'),('SECURE','true')]]
+                available=[offer for query in queries for offer in query.result()]
             history_path = remote.deployment / 'gpu-candidate-attempts.json'
             history = json.loads(history_path.read_text()) if history_path.exists() else {}
             available = ranked_candidates(available, history, time.time())
-            for candidate in available[:policy.maxCandidatesPerPass]:
+            from .gpu_offers import choose
+            if not available:return False
+            candidate=choose(remote,available[:12],check,report)
+            if candidate is None:return False
+            budget=min(policy.maxHourlyUsd,candidate['quotedHourlyUsd'])
+            for candidate in [candidate]:
                 check(); name = identifier('benchmark-capacity')
                 query = allocation_input(remote, candidate, policy, name)
                 history[candidate['cloudType'] + ':' + candidate['gpuTypeId']] = time.time()

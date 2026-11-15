@@ -420,6 +420,10 @@ export type OperatorOperation = {
   result?: { runId?: string; state?: string };
 };
 export type SystemStatus = {
+  gpuOffers?: {
+    id: string;
+    offers: { gpuTypeId: string; cloudType: string; quotedHourlyUsd: number }[];
+  } | null;
   selectedRunId?: string | null;
   readiness?: {
     checkedAt: string;

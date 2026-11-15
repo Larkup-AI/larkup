@@ -87,11 +87,17 @@ class Operator:
         selection=selected(self.remote)
         readiness_path=self.remote.deployment/'provider-readiness-summary.json'
         readiness=self.remote.private.clean(json.loads(readiness_path.read_text())) if readiness_path.exists() else None
-        return dict(readiness=readiness,selectedRunId=selection['runId'] if selection else None,revision=self.revision(),readonly=self.readonly,controllerAvailable=live,pod=self.pod,
+        offers_path=self.remote.deployment/'gpu-offers.json'
+        offers=json.loads(offers_path.read_text()) if offers_path.exists() else None
+        if offers and (offers.get('state')!='pending' or offers.get('expiresAt',0)<=time.time()):offers=None
+        return dict(gpuOffers=offers,readiness=readiness,selectedRunId=selection['runId'] if selection else None,revision=self.revision(),readonly=self.readonly,controllerAvailable=live,pod=self.pod,
                     supervisor=intent(self.remote.deployment),services=services,operations=self.jobs(),serverTime=utc())
 
     def submit(self, action, body, key):
         if self.readonly:raise DomainError('OFFLINE_READONLY',status=409)
+        if action=='gpu-choice':
+            from .gpu_offers import decide
+            with self.lock:return decide(self.remote,body.get('offerId'),body.get('selection'))
         if action not in ACTIONS:raise DomainError('NOT_FOUND',status=404)
         if not key or len(key)>200:raise DomainError('IDEMPOTENCY_KEY_REQUIRED',status=400)
         fingerprint=digest({'action':action,'body':body})

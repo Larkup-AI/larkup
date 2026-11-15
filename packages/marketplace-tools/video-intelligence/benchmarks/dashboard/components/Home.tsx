@@ -76,6 +76,28 @@ export function Home({
       setBusy(false);
     }
   }
+  async function gpuChoice(selection: string) {
+    if (!system?.gpuOffers) return;
+    setBusy(true);
+    try {
+      const response = await fetch('/api/v1/system/gpu-choice', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+        body: JSON.stringify({ offerId: system.gpuOffers.id, selection }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw Error(body.error?.message ?? 'GPU selection failed');
+      setMessage(
+        selection === 'wait'
+          ? 'Waiting for cheaper offers; no GPU reserved.'
+          : 'GPU price accepted. Checking reservation and preparing services.',
+      );
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
   const rows = metrics?.summary?.filter((r) => r.system !== 'retrieval') ?? [];
   const systems = ['larkup', 'gemini', 'qwen', 'muse', 'minimax', 'twelvelabs'] as const;
   return (
