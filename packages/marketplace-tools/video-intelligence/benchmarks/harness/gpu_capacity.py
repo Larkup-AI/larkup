@@ -15,6 +15,7 @@ import subprocess
 import tarfile
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
@@ -192,23 +193,28 @@ def cancellable_ssh(target, command, *, data=None, check_result=True, check):
     arguments = target.connection() + [command]
     process = subprocess.Popen(arguments, stdin=subprocess.PIPE if data is not None else subprocess.DEVNULL,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    first = True; deadline = time.monotonic() + 900
-    try:
-        while time.monotonic() < deadline:
-            check()
-            try:
-                stdout, stderr = process.communicate(input=data if first else None, timeout=1)
+    deadline = time.monotonic() + 900
+    # communicate must own stdin continuously: retrying it with input=None can
+    # strand a partially written checkpoint on Python 3.9 after a timeout.
+    with ThreadPoolExecutor(max_workers=1) as io:
+        transfer = io.submit(process.communicate, data)
+        try:
+            while time.monotonic() < deadline:
+                check()
+                try:
+                    stdout, stderr = transfer.result(timeout=1)
+                except FutureTimeout:
+                    continue
                 result = subprocess.CompletedProcess(arguments, process.returncode, stdout, stderr)
                 if check_result and result.returncode:
                     raise DomainError('SSH_OPERATION_FAILED')
                 return result
-            except subprocess.TimeoutExpired:
-                first = False
-        raise DomainError('SSH_OPERATION_TIMEOUT')
-    except BaseException:
-        if process.poll() is None:
-            process.kill(); process.communicate()
-        raise
+            raise DomainError('SSH_OPERATION_TIMEOUT')
+        except BaseException:
+            if process.poll() is None:
+                process.kill()
+            transfer.result()
+            raise
 
 
 def wait_ssh(target, check, report, *, timeout=900):

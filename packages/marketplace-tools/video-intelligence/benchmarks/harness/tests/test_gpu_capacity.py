@@ -159,3 +159,15 @@ class TransferCancellationTest(unittest.TestCase):
             with self.assertRaises(DomainError) as e:cancellable_ssh(target,'ignored',data=b'fixture',check=cancel)
         self.assertEqual(e.exception.code,'START_CANCELLED')
         self.assertIsNotNone(children[0].poll())
+
+class SlowTransferTest(unittest.TestCase):
+    def test_slow_reader_receives_the_entire_checkpoint_body(self):
+        import sys
+        from unittest.mock import patch
+        from harness.gpu_capacity import cancellable_ssh
+        code='import sys,time;time.sleep(1.3);data=sys.stdin.buffer.read();print(len(data))'
+        target=SimpleNamespace(connection=lambda:[sys.executable,'-c',code]);payload=b'x'*200000
+        # Bound a broken implementation to two communication polls rather than fifteen minutes.
+        with patch('harness.gpu_capacity.time.monotonic',side_effect=[0,0,0,901]):
+            result=cancellable_ssh(target,'ignored',data=payload,check=lambda:None)
+        self.assertEqual(int(result.stdout),len(payload))
