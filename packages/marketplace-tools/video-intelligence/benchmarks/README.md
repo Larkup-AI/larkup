@@ -284,3 +284,22 @@ publication expansion. No scores are mixed with the earlier pilot.
 shows that smoke run, and selects its pilot once every required service returns
 nonempty answers. A failed/incomplete smoke prevents the pilot. Pause/stop still
 work between stages. The continue/stop/inconclusive gate remains unchanged.
+
+### TwelveLabs list-price estimates
+
+Use the user-supplied 2026-11-15 rates in `harness/twelvelabs_pricing.py` even on
+Free: Pegasus video input USD 1.75/hour and output USD 7.50/million tokens.
+The current native adapter uploads an asset and calls Analyze for each question;
+video input is therefore estimated for each Analyze request, not just once per
+video. Missing output-token usage produces an explicitly incomplete lower bound.
+Cash charges remain unknown unless the provider reports them; Free is never
+represented as a zero list-price equivalent. The dashboard shows the estimate
+alongside known cash charges.
+
+Asset preparation records decimal GB and a separate USD 0.065/GB/month storage
+projection in usage evidence. Retention duration is unknown, so monthly storage
+is not silently added to per-run API costs. The catalog also includes the supplied
+Marengo 3.0/3.5, image, Search and Jockey rates. Embed/Search are charged in an
+estimate only when invoked; this adapter invokes neither. Plans/allowances do not
+change these list-price equivalents (Free USD 0/3GB; Plus USD 29/50GB; Pro USD
+99/200GB; Enterprise custom). Estimates are not invoices or plan subscriptions.

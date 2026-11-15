@@ -104,12 +104,30 @@ class Context:
         estimated = None
         if prompt is not None and completion is not None and self.route.get('inputPerMillion') is not None and self.route.get('outputPerMillion') is not None:
             estimated = str((Decimal(prompt) * Decimal(self.route['inputPerMillion']) + Decimal(completion) * Decimal(self.route['outputPerMillion'])) / Decimal(1_000_000))
+        price_details = {}
+        if self.route['provider'] == 'twelvelabs':
+            from .twelvelabs_pricing import analyze_estimate, equivalent, PRICING_REVISION
+            price_details = dict(pricingRevision=PRICING_REVISION,
+                                 estimateDisclosure='List-price equivalent even on Free plan; cash charge unknown.')
+            if operation == 'native_analyze' and processing_seconds is not None:
+                estimated = analyze_estimate(processing_seconds, completion)
+                price_details.update(estimateComplete=completion is not None,
+                    estimateDisclosure=price_details['estimateDisclosure'] +
+                    (' Includes video input and output tokens.' if completion is not None else
+                     ' Video input only: output token usage unavailable, so this is a lower bound.'))
+            elif operation == 'native_asset_preparation':
+                size = self.path.stat().st_size
+                price_details.update(storageGb=str(Decimal(size)/Decimal(1_000_000_000)),
+                    storageUsdPerMonth=equivalent(storageGbMonth=Decimal(size)/Decimal(1_000_000_000)),
+                    estimateDisclosure=price_details['estimateDisclosure'] +
+                    ' Storage is a separate monthly projection; no Marengo embed/search was invoked.')
         observed = usage.get('cost')
         actual = str(observed) if isinstance(observed, (int, float, str)) else None
         doc = dict(operation=operation, provider=self.route['provider'], routeId=self.attempt['route_id'],
                    accountAlias=self.route['secretAlias'], scopeId=self.route['scopeId'], model=self.route['model'],
                    currency='USD', actual=actual, estimated=estimated,
-                   provenance='provider usage.cost' if actual is not None else 'usage tokens / configured list price; cash unknown',
+                   provenance='provider usage.cost' if actual is not None else price_details.get('estimateDisclosure', 'usage tokens / configured list price; cash unknown'),
+                   **price_details,
                    inputTokens=prompt, outputTokens=completion, cachedTokens=cached,
                    processingSeconds=processing_seconds, tier=self.route['tier'],
                    freeAllowanceConsumed=None, unknownReason=None if actual else 'provider did not return a cash charge')

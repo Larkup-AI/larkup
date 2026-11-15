@@ -350,6 +350,12 @@ export function Home({
                     </td>
                     <td>
                       {row?.cost.actual == null ? 'Unknown' : fmtMoney(row.cost.actual, 'USD')}
+                      {row?.cost.estimated != null && (
+                        <div className="note">
+                          List-price estimate: {fmtMoney(row.cost.estimated, 'USD')} · may exclude
+                          unreported usage
+                        </div>
+                      )}
                       {!!row?.cost.unknownAttemptCount && (
                         <div className="note">{row.cost.unknownAttemptCount} unknown charges</div>
                       )}
