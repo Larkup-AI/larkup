@@ -70,7 +70,7 @@ class Remote:
             raise DomainError('SSH_OPERATION_FAILED')
         return result
 
-    def resume(self, *, on_progress=None, check_cancelled=None, sleep=None, clock=None):
+    def resume(self, *, on_progress=None, check_cancelled=None, sleep=None, clock=None, require_choice=False):
         """Retry saved-host capacity, then restore a bounded alternative when needed."""
         from datetime import datetime,timedelta,timezone
         pause=sleep or time.sleep;now=clock or time.monotonic
@@ -90,6 +90,16 @@ class Remote:
             while now()<deadline:
                 check();pause(min(1,deadline-now()))
             check()
+        if require_choice:
+            pod=self.gql('query { pod(input:{podId:'+json.dumps(self.state['podId'])+'}) { desiredStatus } }')['pod']
+            if pod and pod['desiredStatus']=='EXITED':
+                while True:
+                    check()
+                    report('waiting_capacity',stage='Checking GPU types and prices now. No rental is submitted until you choose an offer.')
+                    if self.capacity_fallback(attempt=policy.afterFailures,check=check,report=report):
+                        report('ready',stage='Selected GPU restored. Preparing benchmark services.');return
+                    report('waiting_capacity',stage='Waiting for your next GPU offer check in 60 seconds.',retrySeconds=60)
+                    wait(60)
         journal=self.deployment/'gpu-relocation.json'
         if journal.exists() and json.loads(journal.read_text()).get('status') in {'allocating','allocated','restoring','cleanup_required'}:
             if self.capacity_fallback(attempt=policy.afterFailures,check=check,report=report):

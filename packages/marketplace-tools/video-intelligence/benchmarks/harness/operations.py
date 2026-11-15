@@ -178,7 +178,7 @@ class Operator:
                             atomic(remote.deployment/'pod-observation.json',self.pod)
                         self.update(job,'running',startup=state,stage=state['stage'])
                         intent(remote.deployment,'waiting_gpu' if state['phase']=='waiting_capacity' else 'starting')
-                    remote.resume(on_progress=progress,check_cancelled=lambda:self.check(generation));self.check(generation)
+                    remote.resume(on_progress=progress,check_cancelled=lambda:self.check(generation),require_choice=True);self.check(generation)
                     self.update(job,'running',stage='Starting the benchmark controller and canonical video runtime.')
                     remote.ensure_started();self.check(generation)
                     self.start_transports(generation);self.check(generation)
