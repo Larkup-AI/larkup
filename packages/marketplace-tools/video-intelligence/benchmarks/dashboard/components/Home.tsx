@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { RunSummary, RunSnapshot, RunMetrics, TaskObject } from '../lib/contract.js';
 import { operate, type SystemStatus, type Operation } from '../lib/operator.js';
 import { providerActivity, retryCountdown } from '../lib/activity.js';
@@ -29,6 +29,9 @@ export function Home({
 }) {
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
+  const [dismissedOffer, setDismissedOffer] = useState<string | null>(null);
+  const [offerError, setOfferError] = useState('');
+  const choosingOffer = useRef(false);
   const pending = system?.operations.find((o) => ['pending', 'running'].includes(o.state));
   const queued = system?.operations.find(
     (o) => o.action === 'new-run' && ['pending', 'running'].includes(o.state) && !o.result?.runId,
@@ -77,24 +80,29 @@ export function Home({
     }
   }
   async function gpuChoice(selection: string) {
-    if (!system?.gpuOffers) return;
+    if (!system?.gpuOffers || choosingOffer.current) return;
+    const offer = system.gpuOffers;
+    choosingOffer.current = true;
+    setOfferError('');
     setBusy(true);
     try {
       const response = await fetch('/api/v1/system/gpu-choice', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
-        body: JSON.stringify({ offerId: system.gpuOffers.id, selection }),
+        body: JSON.stringify({ offerId: offer.id, selection }),
       });
       const body = await response.json();
-      if (!response.ok) throw Error(body.error?.message ?? 'GPU selection failed');
+      if (!response.ok) throw Error(body.error?.code === 'GPU_OFFER_EXPIRED' ? 'This price offer expired. Updated offers will appear automatically; please choose again.' : (body.error?.message ?? 'GPU selection failed. Please try again.'));
+      setDismissedOffer(offer.id);
       setMessage(
         selection === 'wait'
           ? 'Waiting for cheaper offers; no GPU reserved.'
           : 'GPU price accepted. Checking reservation and preparing services.',
       );
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : String(e));
+      setOfferError(e instanceof Error ? e.message : String(e));
     } finally {
+      choosingOffer.current = false;
       setBusy(false);
     }
   }
@@ -102,8 +110,10 @@ export function Home({
   const systems = ['larkup', 'gemini', 'qwen', 'muse', 'minimax', 'twelvelabs'] as const;
   return (
     <>
-      {system?.gpuOffers && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Choose GPU">
+      {system?.gpuOffers && system.gpuOffers.id !== dismissedOffer && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Choose GPU">
         <div className="modal-card"><h3>Choose a GPU</h3>
+          {offerError && <p role="alert">{offerError}</p>}
+          {busy && <p role="status">Confirming your choice…</p>}
           <p>Listed availability can change. Only your chosen GPU will be reserved. Storage is billed separately.</p>
           {system.gpuOffers.offers.map((offer,index)=><p key={index}>
             {offer.gpuTypeId} · {offer.cloudType} · USD {offer.quotedHourlyUsd}/hour{' '}
