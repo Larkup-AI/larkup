@@ -216,9 +216,11 @@ class Gemini:
         start = time.monotonic()
         path = c.path
         if c.route['provider'] == 'gateway':
-            if path.stat().st_size > 100_000_000:
+            source_url = c.source.get('sourceUrl')
+            public_video = source_url if source_url and urlsplit(source_url).scheme == 'https' and urlsplit(source_url).hostname in {'youtube.com','www.youtube.com','youtu.be'} else None
+            if path.stat().st_size > 100_000_000 and not public_video:
                 raise DomainError('NATIVE_INLINE_INPUT_LIMIT')
-            return dict(sourcePath=str(path.relative_to(c.root)), fingerprint=digest([c.source.get('sha256'), c.route['secretAlias']]),
+            return dict(sourceUrl=public_video if path.stat().st_size > 100_000_000 else None, sourcePath=str(path.relative_to(c.root)), fingerprint=digest([c.source.get('sha256'), c.route['secretAlias']]),
                         timing={'prepareMs': (time.monotonic() - start) * 1000, 'indexMs': None},
                         modalityDisclosure='Full video and audio through Gateway AI SDK v4; no persistent native index')
         handle = c.resume or {}
@@ -253,7 +255,7 @@ class Gemini:
     async def answer(self, c: Context, question: dict, prepared: dict):
         if c.route['provider'] == 'gateway':
             package = Path(__file__).resolve().parents[2]
-            request = dict(sourcePath=str(c.root / prepared['sourcePath']), prompt=question_prompt(question),
+            request = dict(sourceUrl=prepared.get('sourceUrl'), sourcePath=str(c.root / prepared['sourcePath']), prompt=question_prompt(question),
                            model=c.route['model'], apiKey=c.snapshot.secrets.get(c.route['secretAlias']),
                            maxOutputTokens=c.variant.get('maxOutputTokens', 2048), temperature=c.variant.get('temperature', 0),
                            deadlineMs=c.snapshot.config['limits']['deadlineSeconds']*1000,
@@ -393,8 +395,12 @@ class TwelveLabs:
     async def prepare(self, c: Context):
         start = time.monotonic()
         handle = c.resume
+        from .native_media import normalized_mp4
+        upload_path=await normalized_mp4(c.path,c.root)
+        normalized_ms=(time.monotonic()-start)*1000
+        upload_start=time.monotonic()
         if not handle:
-            body, headers = multipart(c.path, {'method': 'direct'})
+            body, headers = multipart(upload_path, {'method': 'direct'})
             payload = (await c.call('POST', '/assets', body=body, headers=headers, timeout=600, paid=True)).json()
             handle = {'assetId': payload.get('_id') or payload.get('id')}
             if not handle['assetId']:
@@ -403,7 +409,7 @@ class TwelveLabs:
         await c.poll('/assets/' + quote(handle['assetId']), 'status', {'ready'}, {'failed'})
         c.meter({}, operation='native_asset_preparation', processing_seconds=c.source['durationMs'] / 1000)
         return dict(assetId=handle['assetId'], fingerprint=digest([c.source.get('sha256'), c.route['secretAlias']]),
-                    timing={'uploadMs': (time.monotonic() - start) * 1000, 'indexMs': None})
+                    timing={'prepareMs':normalized_ms,'uploadMs': (time.monotonic() - upload_start) * 1000, 'indexMs': None}, normalization='mp4-stream-copy-faststart-v1')
 
     async def answer(self, c: Context, question: dict, prepared: dict):
         handle = c.resume

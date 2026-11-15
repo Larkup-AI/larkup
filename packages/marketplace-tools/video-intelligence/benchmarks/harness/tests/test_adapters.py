@@ -105,6 +105,15 @@ class AdapterTest(unittest.TestCase):
             self.assertEqual(error.exception.code,'NATIVE_INLINE_INPUT_LIMIT')
             self.assertEqual(c.calls,[]);self.assertEqual(c.handles,[])
 
+    def test_large_public_video_uses_native_url_without_inline_submission(self):
+        with tempfile.TemporaryDirectory() as directory:
+            c=Context('gateway');c.root=Path(directory);c.path=c.root/'long.mp4'
+            c.source.update(sourceUrl='https://www.youtube.com/watch?v=independent-video')
+            with c.path.open('wb') as f:f.truncate(100_000_001)
+            prepared=asyncio.run(Gemini().prepare(c))
+            self.assertEqual(prepared['sourceUrl'],c.source['sourceUrl'])
+            self.assertEqual(c.calls,[])
+
     def test_cancelled_gateway_child_is_stopped_and_never_resubmitted(self):
         c=Context('gateway');c.root=Path('/tmp')
         c.snapshot=SimpleNamespace(secrets=SimpleNamespace(get=lambda _: 'test-key'),config={'limits':{'deadlineSeconds':900}})
