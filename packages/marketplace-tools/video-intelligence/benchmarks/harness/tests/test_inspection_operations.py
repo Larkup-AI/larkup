@@ -133,7 +133,7 @@ class InspectionOperationsTest(unittest.TestCase):
             self.assertEqual(order,['gpu','runtime','services'])
             with self.assertRaises(DomainError):self.operator.submit('cancel-start',{'expectedRevision':self.operator.revision()},'too-late')
             return {'runId':'run-new','state':'running'}
-        with patch.object(self.operator,'start_transports',side_effect=lambda:order.append('services')),patch('harness.run_selection.create',side_effect=create):
+        with patch.object(self.operator,'start_transports',side_effect=lambda *_:order.append('services')),patch('harness.run_selection.create',side_effect=create):
             self.operator.execute(startup,0)
         self.assertEqual(self.operator.jobs()[0]['state'],'completed');self.assertFalse(self.operator.jobs()[0]['cancellable'])
 

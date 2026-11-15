@@ -131,9 +131,10 @@ class Operator:
         if generation in self.cancelled_generations:raise DomainError('START_CANCELLED')
         if generation!=self.generation:raise DomainError('OPERATION_SUPERSEDED')
 
-    def start_transports(self):
+    def start_transports(self,generation):
         self.remote.stop_local_services({'ssh tunnel','credential relay'})
-        self.remote.tunnel();self.remote.relay();self.remote.wait_ready()
+        self.check(generation);self.remote.tunnel();self.remote.relay()
+        self.remote.wait_ready(check_cancelled=lambda:self.check(generation))
 
     def execute(self,job,generation):
         if job['action']=='force-stop-gpu':
@@ -174,7 +175,7 @@ class Operator:
                     remote.resume(on_progress=progress,check_cancelled=lambda:self.check(generation));self.check(generation)
                     self.update(job,'running',stage='Starting the benchmark controller and canonical video runtime.')
                     remote.ensure_started();self.check(generation)
-                    self.start_transports();self.check(generation)
+                    self.start_transports(generation);self.check(generation)
                 with self.lock:
                     self.check(generation)
                     self.update(job,'running',cancellable=False,stage='Services are ready. Starting the selected experiment.')

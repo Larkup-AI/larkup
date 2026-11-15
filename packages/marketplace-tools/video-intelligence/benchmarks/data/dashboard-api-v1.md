@@ -454,3 +454,9 @@ responses and the profile has not changed; it uses the original idempotency
 key, preserves historical runs, and selects the pilot automatically. Missing
 coverage, empty responses or a changed profile requires review and prevents
 continuation. No publication run is started by this transition.
+
+Readiness verifies an actual SSH connection after the Pod advertises its port.
+Controller health alone is insufficient: canonical runtime health must also be
+observed before any new experiment is dispatched. Startup cancellation remains
+checked while waiting for both services. SSH authentication and host-key
+verification failures are terminal; no host-key protection is bypassed.

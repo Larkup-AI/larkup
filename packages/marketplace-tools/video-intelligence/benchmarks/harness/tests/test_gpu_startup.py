@@ -1,6 +1,7 @@
 import tempfile,unittest
 from pathlib import Path
 from unittest.mock import Mock
+from types import SimpleNamespace
 from harness.common import DomainError
 from harness.remote import Remote
 
@@ -13,7 +14,7 @@ class GPUStartupTest(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.r=object.__new__(Remote)
         self.r.deployment=Path(self.tmp.name);self.r.state={'podId':'fixture-pod'}
-        self.r.account=Mock(return_value={'clientBalance':10});self.clock=Clock();self.events=[]
+        self.r.ssh=Mock(return_value=SimpleNamespace(returncode=0,stderr=b''));self.r.account=Mock(return_value={'clientBalance':10});self.clock=Clock();self.events=[]
     def tearDown(self):self.tmp.cleanup()
     def resume(self,**kwargs):
         return self.r.resume(on_progress=self.events.append,sleep=self.clock.sleep,clock=self.clock.now,**kwargs)
@@ -50,6 +51,36 @@ class GPUStartupTest(unittest.TestCase):
         self.r.gql=Mock(side_effect=api);self.resume()
         self.assertEqual(sum('podResume' in c.args[0] for c in self.r.gql.call_args_list),1)
         self.assertEqual(self.r.state['sshPort'],40022)
+    def test_port_advertisement_does_not_skip_actual_ssh_readiness(self):
+        self.r.gql=Mock(return_value={'pod':{'desiredStatus':'RUNNING','runtime':{'ports':[{'privatePort':22,'publicPort':50022,'isIpPublic':True,'ip':'127.0.0.1'}]}}})
+        self.r.ssh.side_effect=[SimpleNamespace(returncode=255,stderr=b'Connection refused'),SimpleNamespace(returncode=0,stderr=b'')]
+        self.resume();self.assertEqual(self.r.ssh.call_count,2);self.assertEqual(self.clock.value,5)
+        self.assertEqual(self.events[-1]['phase'],'ready')
+    def test_ssh_authentication_and_host_key_errors_are_permanent(self):
+        self.r.gql=Mock(return_value={'pod':{'desiredStatus':'RUNNING','runtime':{'ports':[{'privatePort':22,'publicPort':50022,'isIpPublic':True,'ip':'127.0.0.1'}]}}})
+        for reason,code in [(b'Permission denied (publickey)','SSH_AUTH_INVALID'),(b'Host key verification failed','SSH_HOST_KEY_CHANGED')]:
+            self.r.ssh.return_value=SimpleNamespace(returncode=255,stderr=reason)
+            with self.subTest(code=code),self.assertRaises(DomainError) as e:self.resume()
+            self.assertEqual(e.exception.code,code);self.assertEqual(self.clock.sleeps,[])
+
+    def test_controller_alone_does_not_admit_work_without_runtime_health(self):
+        observations=0
+        def api(path,**kw):
+            nonlocal observations
+            if path=='/health':return {'availability':'available'}
+            observations+=1;return {'items':[{'name':'canonical video runtime','state':'running' if observations==3 else 'unreachable'}]}
+        self.r.api=Mock(side_effect=api);self.r.wait_ready(sleep=self.clock.sleep,clock=self.clock.now)
+        self.assertEqual(observations,3);self.assertEqual(self.clock.value,4)
+    def test_service_wait_cancellation_is_not_swallowed_as_health_failure(self):
+        self.r.api=Mock(return_value={'availability':'available','items':[{'name':'canonical video runtime','state':'running'}]})
+        checks=0
+        def cancel():
+            nonlocal checks
+            checks+=1
+            if checks==2:raise DomainError('START_CANCELLED')
+        with self.assertRaises(DomainError) as e:self.r.wait_ready(check_cancelled=cancel,sleep=self.clock.sleep,clock=self.clock.now)
+        self.assertEqual(e.exception.code,'START_CANCELLED');self.assertEqual(self.clock.sleeps,[])
+
     def test_permanent_rejection_and_credit_exhaustion_do_not_retry(self):
         for code in ['RUNPOD_AUTH_INVALID','RUNPOD_REQUEST_REJECTED','CREDIT_EXHAUSTED']:
             with self.subTest(code=code):

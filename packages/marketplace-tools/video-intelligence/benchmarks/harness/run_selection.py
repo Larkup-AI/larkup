@@ -111,9 +111,15 @@ def request_existing(remote,args):
     state=call('/system');action='new-run' if args.command=='new' else 'resume-run'
     job=call('/system/'+action,{'expectedRevision':state['revision'],**({'runId':args.run_id} if action=='resume-run' else {})})
     print('Request accepted by the running dashboard supervisor: '+job['id'],flush=True)
-    while job['state'] in {'pending','running'}:
-        time.sleep(1);jobs=call('/system')['operations'];job=next((j for j in jobs if j['id']==job['id']),job)
-        print(job.get('stage') or job['state'],flush=True)
+    previous_stage=None
+    try:
+        while job['state'] in {'pending','running'}:
+            time.sleep(2);jobs=call('/system')['operations'];job=next((j for j in jobs if j['id']==job['id']),job)
+            stage=job.get('stage') or job['state']
+            if stage!=previous_stage:print(stage,flush=True);previous_stage=stage
+    except KeyboardInterrupt:
+        print('Monitor closed. The dashboard keeps supervising this request; use Cancel startup there to cancel a queued start.',flush=True)
+        return
     if job['state']!='completed':raise DomainError((job.get('issue') or {}).get('code','OPERATION_FAILED'))
     run_id=job['result']['runId'];print('Tracking run: '+run_id,flush=True)
     print('Dashboard: http://127.0.0.1:3100/?run='+run_id,flush=True)

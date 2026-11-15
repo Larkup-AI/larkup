@@ -103,8 +103,18 @@ class Remote:
             if pod['desiredStatus']=='RUNNING' and port:
                 self.state.update(sshHost=port['ip'],sshPort=port['publicPort'])
                 atomic(self.deployment/'remote.json',self.state)
-                report('ready',stage='GPU is awake. Preparing benchmark services.')
-                check();return
+                if boot_deadline is None:boot_deadline=now()+900
+                probe=self.ssh('true',check=False)
+                check()
+                if probe.returncode==0:
+                    report('ready',stage='GPU and SSH are ready. Preparing benchmark services.')
+                    check();return
+                reason=probe.stderr.lower()
+                if b'permission denied' in reason:raise DomainError('SSH_AUTH_INVALID')
+                if b'host key verification failed' in reason or b'remote host identification has changed' in reason:
+                    raise DomainError('SSH_HOST_KEY_CHANGED')
+                report('starting_gpu',stage='GPU is awake. Waiting for its SSH service to accept connections.')
+                wait(min(5,max(0,boot_deadline-now())));continue
             if pod['desiredStatus']!='RUNNING' and boot_deadline is None:
                 attempt+=1;check()
                 try:
@@ -439,14 +449,23 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
                 raise DomainError('CONTROLLER_PAGINATION_INVALID')
             cursor = next_cursor
 
-    def wait_ready(self):
-        for _ in range(60):
+    def wait_ready(self, *, check_cancelled=None, sleep=None, clock=None):
+        pause=sleep or time.sleep;now=clock or time.monotonic
+        check=check_cancelled or (lambda:None);deadline=now()+900
+        while now()<deadline:
+            check()
             try:
-                if self.api('/health', timeout=3)['availability'] == 'available':
-                    return
+                if self.api('/health',timeout=3)['availability']=='available':
+                    services=self.api('/services',timeout=5)['items']
+                    if any(s['name']=='canonical video runtime' and s['state']=='running' for s in services):
+                        ready=True
+                    else:ready=False
+                else:ready=False
             except DomainError:
-                pass
-            time.sleep(2)
+                ready=False
+            check()
+            if ready:return
+            for _ in range(2):check();pause(1)
         raise DomainError('REMOTE_STARTUP_INCOMPLETE')
 
     def workflow(self):
@@ -516,6 +535,8 @@ def launch_session(remote, args):
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stopping.set())
     from .operations import intent, control_lock
+    def check_startup_cancelled():
+        if stopping.is_set():raise DomainError('START_CANCELLED')
     manual = args.command == 'dashboard'
     idle_checkpointed = args.view_only or manual
     rental_active = False
@@ -534,8 +555,6 @@ def launch_session(remote, args):
         if args.command in {'launch','new','resume-run'} and not args.view_only:
             rental_active = True  # Also clean up if startup fails after resume was accepted.
             print('Starting the saved RunPod GPU. No additional Pod will be created.', flush=True)
-            def check_startup_cancelled():
-                if stopping.is_set():raise DomainError('START_CANCELLED')
             remote.resume(check_cancelled=check_startup_cancelled)
             print('Checking the canonical runtime and controller version…', flush=True)
             remote.ensure_started()
@@ -543,7 +562,7 @@ def launch_session(remote, args):
             print('Opening private SSH forwarding and the PC credential relay…', flush=True)
             remote.tunnel()
             remote.relay()
-            remote.wait_ready()
+            remote.wait_ready(check_cancelled=check_startup_cancelled)
             connected = True
             if args.command in {'new','resume-run'}:
                 from .run_selection import create,activate

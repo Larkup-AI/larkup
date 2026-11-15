@@ -52,7 +52,9 @@ model substitutions occur. An unavailable saved GPU host stays queued and retrie
 30, 60, 120, then 300 seconds between attempts. Home shows **Waiting for GPU
 capacity**, the next attempt time and **Cancel startup**. Capacity waiting does
 not create a second Pod or dispatch model calls. After RunPod accepts start,
-allow up to 15 minutes for SSH readiness; a stuck accepted start is stopped.
+allow up to 15 minutes for an actual SSH handshake; a published port alone is
+not readiness. Then wait for both the benchmark controller and canonical video
+runtime health checks before dispatch. A stuck accepted start is stopped.
 Authentication/credit/permanent request errors still fail immediately. Keep the
 PC and launcher running while waiting; restarting the bridge marks an unfinished
 startup interrupted instead of silently authorizing a new one.
