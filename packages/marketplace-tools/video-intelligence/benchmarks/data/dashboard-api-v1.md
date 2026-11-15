@@ -411,3 +411,46 @@ Real data is now the default. `DASHBOARD_MODE=mock` is required for fixtures;
 illustrative scores. The inline native Gemini transport rejects media above
 100 MB before paid submission and records `NATIVE_INLINE_INPUT_LIMIT`; a
 configured task deadline also governs native Gateway and async answer polling.
+
+
+## GPU waiting and requested models (v1 additive extension)
+
+GPU startup remains an asynchronous operator operation with state `running`.
+Its `stage` is human readable, `cancellable` is boolean, and optional `startup`
+contains `{phase: 'waiting_capacity'|'starting_gpu'|'ready', attempt,
+nextRetryAt: string|null, retrySeconds?:number, stage}`. Supervisor mode may be
+`waiting_gpu`. A capacity refusal is a waiting state, not a failed operation.
+The saved Pod retries at 30/60/120/300-second intervals without allocating a new
+Pod or submitting inference. Once accepted, startup polls readiness for up to
+15 minutes. Credit/auth/permanent errors remain terminal.
+
+`POST /system/cancel-start` uses the usual system expectedRevision,
+Idempotency-Key and exact-Origin protections. It may be accepted during a
+pending/running cancellable startup even while that operation owns the control
+lock. It invalidates that startup before any experiment is created; the old
+operation becomes `cancelled`, cleanup stops an accepted Pod, and cancellation
+completes. It is rejected with `NO_CANCELLABLE_STARTUP` once the controller is
+ready to create/start a run. Existing pause and typed force-stop semantics remain.
+Cancellation checks occur during backoff and between startup stages. Startup
+records survive as history; a bridge restart marks them interrupted and needs
+an explicit new request.
+
+The `BenchmarkSystem` union adds `muse` and `minimax`. Per-variant metrics.summary
+adds `logicalModel`, taken from its immutable configuration. Historical Qwen
+3.6 and new Qwen 3.8 are separate variants and must not share scores. Last API
+checks may include `model`; UI matches them against the selected variant.
+
+A new requested matrix uses Qwen 3.8 Max, Muse Spark 1.3 and MiniMax M3 via
+Gateway with the shared timestamped-frame/subtitle adapter, Gemini 3.8 Flash
+native via Gateway, TwelveLabs Pegasus 1.5 native, and unchanged canonical
+Larkup/backbone ablation. Input asymmetry is explicit. The v2 frame variants
+use an explicit option-letter mapping; the strict scorer is unchanged.
+
+If new-run admission lacks smoke certificates, the new operation starts a small
+smoke containing only missing variants and returns its runId. Selection mode
+`smoke-before-pilot` persists the request key and profile digest. The supervising
+launcher starts the matching pilot once the smoke completes with nonempty
+responses and the profile has not changed; it uses the original idempotency
+key, preserves historical runs, and selects the pilot automatically. Missing
+coverage, empty responses or a changed profile requires review and prevents
+continuation. No publication run is started by this transition.

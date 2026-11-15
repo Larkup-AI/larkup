@@ -2,7 +2,7 @@
 from __future__ import annotations
 import json
 import re
-from .common import DomainError, atomic, utc
+from .common import DomainError, atomic, utc, digest
 
 
 def selected(remote):
@@ -15,18 +15,22 @@ def assert_available(remote, except_id=None):
         raise DomainError('ANOTHER_RUN_ACTIVE_PAUSE_IT_FIRST',status=409)
 
 
-def smoke_verified(remote,variants):
+def missing_smoke(remote,variants):
     state=json.loads((remote.deployment/'workflow.json').read_text())
     certificates=set(state.get('smokeCertificates',[]))|{state.get('smoke'),state.get('nativeSmoke')}
     passed=set()
     for run_id in certificates-{None}:
         for row in remote.api_items('/runs/'+run_id+'/results'):
-            if row['state']=='completed' and row['correct'] is not None:
+            if row['state']=='completed' and row['correct'] is not None and isinstance(row.get('answer'),str) and row['answer'].strip():
                 # This checks successful API completion, not benchmark superiority.
                 passed.add((row['variantId'],row['questionId']))
     smoke=json.loads((remote.data/'datasets/smoke-v1.json').read_text())
     expected={(v,q['id']) for v in variants for q in smoke['questions']}
-    if not expected<=passed:raise DomainError('SERVICE_SMOKE_REQUIRED_BEFORE_NEW_PILOT',status=409)
+    return [v for v in variants if any((v,q['id']) not in passed for q in smoke['questions'])]
+
+
+def smoke_verified(remote,variants):
+    if missing_smoke(remote,variants):raise DomainError('SERVICE_SMOKE_REQUIRED_BEFORE_NEW_PILOT',status=409)
 
 
 def activate(remote,run_id):
@@ -44,27 +48,46 @@ def activate(remote,run_id):
     return {'runId':run_id,'state':run['state'],'phase':run['phase']}
 
 
+def _pilot(remote,key,config):
+    manifest_id=config['protocol'].get('manifestId','pilot-v1')
+    if not isinstance(manifest_id,str) or not re.fullmatch(r'[A-Za-z0-9_-]+',manifest_id):
+        raise DomainError('MANIFEST_INVALID',status=400)
+    manifest=json.loads((remote.data/'datasets'/(manifest_id+'.json')).read_text())
+    run=remote.api('/runs',dict(datasetManifestId=manifest_id,phase='pilot',variantIds=config['protocol']['variantIds'],
+                               protocolRevision=manifest['protocol']['revision']),key='new-run-'+key)
+    return activate(remote,run['id'])
+
+
 def create(remote,key):
     import fcntl
     with (remote.deployment/'workflow.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
         assert_available(remote)
         config=json.loads((remote.data/'configs/active.json').read_text())
-        variants=config['protocol']['variantIds']
-        smoke_verified(remote,variants)
-        manifest_id=config['protocol'].get('manifestId','pilot-v1')
-        if not isinstance(manifest_id,str) or not re.fullmatch(r'[A-Za-z0-9_-]+',manifest_id):
-            raise DomainError('MANIFEST_INVALID',status=400)
-        manifest=json.loads((remote.data/'datasets'/(manifest_id+'.json')).read_text())
-        run=remote.api('/runs',dict(datasetManifestId=manifest_id,phase='pilot',variantIds=variants,
-                                   protocolRevision=manifest['protocol']['revision']),key='new-run-'+key)
-        return activate(remote,run['id'])
+        missing=missing_smoke(remote,config['protocol']['variantIds'])
+        if not missing:return _pilot(remote,key,config)
+        manifest=json.loads((remote.data/'datasets/smoke-v1.json').read_text())
+        run=remote.api('/runs',dict(datasetManifestId='smoke-v1',phase='smoke',variantIds=missing,
+                                   protocolRevision=manifest.get('protocol',{}).get('revision','engineering-smoke-v1')),key='new-smoke-'+key)
+        result=activate(remote,run['id'])
+        atomic(remote.deployment/'selected-run.json',{'runId':run['id'],'mode':'smoke-before-pilot','pilotKey':key,'profileRevision':digest(config),'selectedAt':utc()})
+        return result
 
 
 def status(remote):
     selection=selected(remote)
     if not selection:return None
     run=remote.api('/runs/'+selection['runId'])
+    if selection.get('mode')=='smoke-before-pilot' and run['state']=='completed':
+        # Remote.workflow holds workflow.lock. Reusing the request key prevents duplicate pilots.
+        workflow_path=remote.deployment/'workflow.json'
+        workflow=json.loads(workflow_path.read_text())
+        workflow['smokeCertificates']=sorted(set(workflow.get('smokeCertificates',[]))|{run['id']})
+        atomic(workflow_path,workflow)
+        config=json.loads((remote.data/'configs/active.json').read_text())
+        if selection.get('profileRevision')!=digest(config) or missing_smoke(remote,config['protocol']['variantIds']):
+            return {'runId':run['id'],'phase':'smoke','state':'smoke_requires_review','decision':'inconclusive'}
+        return _pilot(remote,selection['pilotKey'],config)
     return {'runId':run['id'],'phase':run['phase'],'state':'finished' if run['state']=='completed' else run['state'],
             'decision':run['decision']}
 

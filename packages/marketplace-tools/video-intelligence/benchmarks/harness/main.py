@@ -56,10 +56,11 @@ def default_profile(revision: str) -> dict:
             variants[vid]['extraction'] = dict(mode='balanced', embeddings='disabled', heavyOperators='enabled')
         if adapter == 'gemini':
             variants[vid]['inputProtocol']['api'] = 'gateway-ai-sdk-v4'
-    return dict(routes=routes, variants=variants, limits={'global': 4, 'gpu': 1, 'cpu': 2, 'upload': 2, 'qa': 3,
+    from .profiles import requested_models_profile
+    return requested_models_profile(dict(routes=routes, variants=variants, limits={'global': 4, 'gpu': 1, 'cpu': 2, 'upload': 2, 'qa': 3,
                                                           'judge': 1, 'attempts': 3, 'deadlineSeconds': 3600},
                 runtime=dict(endpoint='http://127.0.0.1:8787', indexingConcurrency=1, profileVariantId='larkup-gateway-brain-v2'),
-                protocol=dict(revision='accuracy-first-pilot-v3', variantIds=list(variants)))
+                protocol=dict(revision='accuracy-first-pilot-v3', variantIds=list(variants))))
 
 
 def initialize(benchmark: Path):
@@ -173,7 +174,7 @@ def main():
             if not all(c.isalnum() or c in '-_' for c in args.manifest):
                 raise DomainError('MANIFEST_INVALID')
             manifest = json.loads((data / 'datasets' / (args.manifest + '.json')).read_text())
-            result = store.create(manifest, args.variants or list(config.active.config['variants']), config.active,
+            result = store.create(manifest, args.variants or config.active.config.get('protocol',{}).get('variantIds') or list(config.active.config['variants']), config.active,
                                   args.phase, manifest['protocol'].get('revision', 'pilot-v1'))
         elif args.command == 'work':
             asyncio.run(Scheduler(store, config, data, benchmark.parent).run(until_idle=args.until_idle))

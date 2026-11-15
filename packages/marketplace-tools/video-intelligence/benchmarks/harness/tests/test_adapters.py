@@ -40,6 +40,13 @@ class Context:
 
 
 class AdapterTest(unittest.TestCase):
+    def test_labelled_choices_preserve_text_and_legacy_prompts(self):
+        from harness.adapters import question_prompt
+        question={'question':'Which material appears?','options':['Cotton','Steel','Glass']}
+        labelled=json.loads(question_prompt(question,'letter-labelled-v1').split('\n')[-1])
+        self.assertEqual(labelled['options'],[{'option':'A','text':'Cotton'},{'option':'B','text':'Steel'},{'option':'C','text':'Glass'}])
+        self.assertEqual(json.loads(question_prompt(question).split('\n')[-1])['options'],question['options'])
+
     def test_oversized_inline_video_blocks_before_any_paid_submission(self):
         with tempfile.TemporaryDirectory() as directory:
             c=Context('gateway');c.root=Path(directory);c.path=c.root/'oversized.mp4'

@@ -1,0 +1,828 @@
+[
+  {
+    "checkedAt": "2026-11-15T03:47:59.567621Z",
+    "cost": {
+      "actual": "0.06320481",
+      "currency": "USD",
+      "estimated": "0.07581025",
+      "reconciled": true,
+      "unknownAttemptCount": 0
+    },
+    "results": [
+      {
+        "accountAlias": "VERCEL_GATEWAY_API_KEY",
+        "answer": "{\"option\":\"Seven\",\"explanation\":\"The supplied subtitle states, \u201cThe secret number spoken in this clip is seven.\u201d No other spoken number is indicated in the source.\",\"evidence\":[{\"startMs\":0,\"endMs\":4000,\"kind\":\"subtitle\",\"claim\":\"The secret number spoken in this clip is seven.\"}]}",
+        "attemptId": "attempt-3882be917bc262702e4e",
+        "capability": "audio",
+        "configRevision": "config-09ec884d3d05543eba62",
+        "correct": false,
+        "cost": {
+          "actual": "0.00302568",
+          "currency": "USD",
+          "estimated": "0.0030564",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "dataset": "development-CC0",
+        "durationGroup": "short",
+        "evaluationRevision": "official-mcq-v1",
+        "evidence": [
+          {
+            "endMs": 4000,
+            "kind": "subtitle",
+            "sourceId": "development-smoke",
+            "startMs": 0,
+            "supportedClaim": "The secret number spoken in this clip is seven."
+          }
+        ],
+        "indexArtifactId": "index-265941ad1249e0ac5fa34f52",
+        "issue": null,
+        "logicalModel": "minimax-m3",
+        "predictedOption": null,
+        "provider": "gateway",
+        "questionId": "smoke-audio",
+        "resolvedModel": "minimax/minimax-m3",
+        "routeId": "minimax-m3-gateway",
+        "runId": "run-73d801467afc482527cd",
+        "sourceDurationMs": 8000,
+        "sourceId": "development-smoke",
+        "state": "completed",
+        "system": "minimax",
+        "taskCost": {
+          "actual": "0.00302568",
+          "currency": "USD",
+          "estimated": "0.0030564",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "tier": "unverified",
+        "timing": {
+          "answerMs": 3350.3925830000003,
+          "coldFirstAnswerMs": null,
+          "endToEndMs": 5176.762583839234,
+          "firstTokenMs": null,
+          "indexMs": null,
+          "inputReuse": true,
+          "measurementProfileId": "bounded-independent-v1",
+          "prepareMs": null,
+          "queueMs": 1826.3700008392334,
+          "unavailableReasons": {
+            "firstTokenMs": "non-streaming provider call",
+            "indexMs": "referenced by indexArtifactId"
+          },
+          "uploadMs": null
+        },
+        "usage": {
+          "apiCallCount": 1,
+          "cachedTokens": 128,
+          "freeAllowanceConsumed": null,
+          "inputTokens": 9924,
+          "outputTokens": 66,
+          "processingSeconds": null,
+          "reasoningTokens": null
+        },
+        "variantId": "minimax-m3-frames-v1"
+      },
+      {
+        "accountAlias": "VERCEL_GATEWAY_API_KEY",
+        "answer": "{\"option\": \"C\", \"explanation\": \"The official subtitle from 0-4000ms states the secret number spoken is seven, which corresponds to option Seven.\", \"evidence\": [{\"startMs\": 0, \"endMs\": 4000, \"kind\": \"subtitle\", \"claim\": \"The secret number spoken in this clip is seven.\"}]}",
+        "attemptId": "attempt-6c65552fd7481f0858d6",
+        "capability": "audio",
+        "configRevision": "config-09ec884d3d05543eba62",
+        "correct": true,
+        "cost": {
+          "actual": "0.01595425",
+          "currency": "USD",
+          "estimated": "0.01595425",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "dataset": "development-CC0",
+        "durationGroup": "short",
+        "evaluationRevision": "official-mcq-v1",
+        "evidence": [
+          {
+            "endMs": 4000,
+            "kind": "subtitle",
+            "sourceId": "development-smoke",
+            "startMs": 0,
+            "supportedClaim": "The secret number spoken in this clip is seven."
+          }
+        ],
+        "indexArtifactId": "index-265941ad1249e0ac5fa34f52",
+        "issue": null,
+        "logicalModel": "muse-spark-1.3",
+        "predictedOption": "C",
+        "provider": "gateway",
+        "questionId": "smoke-audio",
+        "resolvedModel": "meta/muse-spark-1.3",
+        "routeId": "muse-spark13-gateway",
+        "runId": "run-73d801467afc482527cd",
+        "sourceDurationMs": 8000,
+        "sourceId": "development-smoke",
+        "state": "completed",
+        "system": "muse",
+        "taskCost": {
+          "actual": "0.01595425",
+          "currency": "USD",
+          "estimated": "0.01595425",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "tier": "unverified",
+        "timing": {
+          "answerMs": 5171.798417000002,
+          "coldFirstAnswerMs": null,
+          "endToEndMs": 14943.240353492922,
+          "firstTokenMs": null,
+          "indexMs": null,
+          "inputReuse": true,
+          "measurementProfileId": "bounded-independent-v1",
+          "prepareMs": null,
+          "queueMs": 9771.44193649292,
+          "unavailableReasons": {
+            "firstTokenMs": "non-streaming provider call",
+            "indexMs": "referenced by indexArtifactId"
+          },
+          "uploadMs": null
+        },
+        "usage": {
+          "apiCallCount": 1,
+          "cachedTokens": 0,
+          "freeAllowanceConsumed": null,
+          "inputTokens": 9768,
+          "outputTokens": 881,
+          "processingSeconds": null,
+          "reasoningTokens": null
+        },
+        "variantId": "muse-spark13-frames-v1"
+      },
+      {
+        "accountAlias": "VERCEL_GATEWAY_API_KEY",
+        "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"The only supplied source bearing on the audio is the official subtitle track, which covers 0\u20134000 ms and states that the secret number spoken in the clip is seven. The video frames are uniform magenta and carry no additional information, so the subtitle is the sole evidence; it directly answers the question.\",\n  \"evidence\": [\n    {\n      \"startMs\": 0,\n      \"endMs\": 4000,\n      \"kind\": \"subtitle\",\n      \"claim\": \"The secret number spoken in this clip is seven.\"\n    }\n  ]\n}",
+        "attemptId": "attempt-5c04aa39bf9aa7407e76",
+        "capability": "audio",
+        "configRevision": "config-09ec884d3d05543eba62",
+        "correct": true,
+        "cost": {
+          "actual": "0.01674",
+          "currency": "USD",
+          "estimated": "0.01674",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "dataset": "development-CC0",
+        "durationGroup": "short",
+        "evaluationRevision": "official-mcq-v1",
+        "evidence": [
+          {
+            "endMs": 4000,
+            "kind": "subtitle",
+            "sourceId": "development-smoke",
+            "startMs": 0,
+            "supportedClaim": "The secret number spoken in this clip is seven."
+          }
+        ],
+        "indexArtifactId": "index-265941ad1249e0ac5fa34f52",
+        "issue": null,
+        "logicalModel": "qwen3.8-max",
+        "predictedOption": "C",
+        "provider": "gateway",
+        "questionId": "smoke-audio",
+        "resolvedModel": "alibaba/qwen3.8-max",
+        "routeId": "qwen38-max-gateway",
+        "runId": "run-73d801467afc482527cd",
+        "sourceDurationMs": 8000,
+        "sourceId": "development-smoke",
+        "state": "completed",
+        "system": "qwen",
+        "taskCost": {
+          "actual": "0.01674",
+          "currency": "USD",
+          "estimated": "0.01674",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "tier": "unverified",
+        "timing": {
+          "answerMs": 10545.462208,
+          "coldFirstAnswerMs": 10545.553208000001,
+          "endToEndMs": 10546.570377555665,
+          "firstTokenMs": null,
+          "indexMs": null,
+          "inputReuse": false,
+          "measurementProfileId": "bounded-independent-v1",
+          "prepareMs": null,
+          "queueMs": 1.1081695556640625,
+          "unavailableReasons": {
+            "firstTokenMs": "non-streaming provider call",
+            "indexMs": "referenced by indexArtifactId"
+          },
+          "uploadMs": null
+        },
+        "usage": {
+          "apiCallCount": 1,
+          "cachedTokens": 0,
+          "freeAllowanceConsumed": null,
+          "inputTokens": 7272,
+          "outputTokens": 366,
+          "processingSeconds": null,
+          "reasoningTokens": null
+        },
+        "variantId": "qwen38-max-frames-v1"
+      },
+      {
+        "accountAlias": "VERCEL_GATEWAY_API_KEY",
+        "answer": "{\"option\":\"Red\",\"explanation\":\"The first part of the video is filled with a solid red color.\",\"evidence\":[{\"startMs\":0,\"endMs\":1129,\"kind\":\"visual\",\"claim\":\"The screen is filled with solid red.\"}]}",
+        "attemptId": "attempt-2796f1951b097a47a3a9",
+        "capability": "visual",
+        "configRevision": "config-09ec884d3d05543eba62",
+        "correct": false,
+        "cost": {
+          "actual": "0.00301338",
+          "currency": "USD",
+          "estimated": "0.0030441",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "dataset": "development-CC0",
+        "durationGroup": "short",
+        "evaluationRevision": "official-mcq-v1",
+        "evidence": [
+          {
+            "endMs": 1129,
+            "kind": "visual",
+            "sourceId": "development-smoke",
+            "startMs": 0,
+            "supportedClaim": "The screen is filled with solid red."
+          }
+        ],
+        "indexArtifactId": "index-265941ad1249e0ac5fa34f52",
+        "issue": null,
+        "logicalModel": "minimax-m3",
+        "predictedOption": null,
+        "provider": "gateway",
+        "questionId": "smoke-visual",
+        "resolvedModel": "minimax/minimax-m3",
+        "routeId": "minimax-m3-gateway",
+        "runId": "run-73d801467afc482527cd",
+        "sourceDurationMs": 8000,
+        "sourceId": "development-smoke",
+        "state": "completed",
+        "system": "minimax",
+        "taskCost": {
+          "actual": "0.00301338",
+          "currency": "USD",
+          "estimated": "0.0030441",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "tier": "unverified",
+        "timing": {
+          "answerMs": 1718.391458,
+          "coldFirstAnswerMs": 1718.7244170000001,
+          "endToEndMs": 1719.100514854248,
+          "firstTokenMs": null,
+          "indexMs": null,
+          "inputReuse": false,
+          "measurementProfileId": "bounded-independent-v1",
+          "prepareMs": null,
+          "queueMs": 0.7090568542480469,
+          "unavailableReasons": {
+            "firstTokenMs": "non-streaming provider call",
+            "indexMs": "referenced by indexArtifactId"
+          },
+          "uploadMs": null
+        },
+        "usage": {
+          "apiCallCount": 1,
+          "cachedTokens": 128,
+          "freeAllowanceConsumed": null,
+          "inputTokens": 9939,
+          "outputTokens": 52,
+          "processingSeconds": null,
+          "reasoningTokens": null
+        },
+        "variantId": "minimax-m3-frames-v1"
+      },
+      {
+        "accountAlias": "VERCEL_GATEWAY_API_KEY",
+        "answer": "{\"option\": \"A\", \"explanation\": \"The first sampled frames of the video are uniformly solid red, while later frames switch to blue, so the color filling the first part is Red.\", \"evidence\": [{\"startMs\": 0, \"endMs\": 0, \"kind\": \"visual\", \"claim\": \"frame is filled solid red\"}, {\"startMs\": 1129, \"endMs\": 1129, \"kind\": \"visual\", \"claim\": \"frame is filled solid red\"}, {\"startMs\": 2257, \"endMs\": 2257, \"kind\": \"visual\", \"claim\": \"frame is filled solid red\"}, {\"startMs\": 3386, \"endMs\": 3386, \"kind\": \"visual\", \"claim\": \"frame is filled solid red\"}]}",
+        "attemptId": "attempt-545c8543419ba0cbc176",
+        "capability": "visual",
+        "configRevision": "config-09ec884d3d05543eba62",
+        "correct": true,
+        "cost": {
+          "actual": "0.0182135",
+          "currency": "USD",
+          "estimated": "0.0182135",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "dataset": "development-CC0",
+        "durationGroup": "short",
+        "evaluationRevision": "official-mcq-v1",
+        "evidence": [
+          {
+            "endMs": 0,
+            "kind": "visual",
+            "sourceId": "development-smoke",
+            "startMs": 0,
+            "supportedClaim": "frame is filled solid red"
+          },
+          {
+            "endMs": 1129,
+            "kind": "visual",
+            "sourceId": "development-smoke",
+            "startMs": 1129,
+            "supportedClaim": "frame is filled solid red"
+          },
+          {
+            "endMs": 2257,
+            "kind": "visual",
+            "sourceId": "development-smoke",
+            "startMs": 2257,
+            "supportedClaim": "frame is filled solid red"
+          },
+          {
+            "endMs": 3386,
+            "kind": "visual",
+            "sourceId": "development-smoke",
+            "startMs": 3386,
+            "supportedClaim": "frame is filled solid red"
+          }
+        ],
+        "indexArtifactId": "index-265941ad1249e0ac5fa34f52",
+        "issue": null,
+        "logicalModel": "muse-spark-1.3",
+        "predictedOption": "A",
+        "provider": "gateway",
+        "questionId": "smoke-visual",
+        "resolvedModel": "meta/muse-spark-1.3",
+        "routeId": "muse-spark13-gateway",
+        "runId": "run-73d801467afc482527cd",
+        "sourceDurationMs": 8000,
+        "sourceId": "development-smoke",
+        "state": "completed",
+        "system": "muse",
+        "taskCost": {
+          "actual": "0.0182135",
+          "currency": "USD",
+          "estimated": "0.0182135",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "tier": "unverified",
+        "timing": {
+          "answerMs": 9730.271083,
+          "coldFirstAnswerMs": 9730.345458,
+          "endToEndMs": 9731.358033302124,
+          "firstTokenMs": null,
+          "indexMs": null,
+          "inputReuse": false,
+          "measurementProfileId": "bounded-independent-v1",
+          "prepareMs": null,
+          "queueMs": 1.0869503021240234,
+          "unavailableReasons": {
+            "firstTokenMs": "non-streaming provider call",
+            "indexMs": "referenced by indexArtifactId"
+          },
+          "uploadMs": null
+        },
+        "usage": {
+          "apiCallCount": 1,
+          "cachedTokens": 0,
+          "freeAllowanceConsumed": null,
+          "inputTokens": 9770,
+          "outputTokens": 1412,
+          "processingSeconds": null,
+          "reasoningTokens": null
+        },
+        "variantId": "muse-spark13-frames-v1"
+      },
+      {
+        "accountAlias": "VERCEL_GATEWAY_API_KEY",
+        "answer": "{\"option\": \"A\", \"explanation\": \"The sampled frames at the start of the video (0 ms, 1129 ms, 2257 ms, 3386 ms) are entirely filled with solid red. Only later, from 4514 ms onward, does the fill change to blue. Therefore the first part of the video is filled with red.\", \"evidence\": [{\"startMs\": 0, \"endMs\": 3386, \"kind\": \"visual\", \"claim\": \"Frames at 0, 1129, 2257, and 3386 ms show a uniform solid red fill covering the entire frame.\"}, {\"startMs\": 4514, \"endMs\": 7900, \"kind\": \"visual\", \"claim\": \"Frames from 4514 ms through 7900 ms show a uniform solid blue fill, confirming the red fill belongs to the first part of the video.\"}]}",
+        "attemptId": "attempt-67d8569da2079e84974d",
+        "capability": "visual",
+        "configRevision": "config-09ec884d3d05543eba62",
+        "correct": true,
+        "cost": {
+          "actual": "0.006258",
+          "currency": "USD",
+          "estimated": "0.018802",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "dataset": "development-CC0",
+        "durationGroup": "short",
+        "evaluationRevision": "official-mcq-v1",
+        "evidence": [
+          {
+            "endMs": 3386,
+            "kind": "visual",
+            "sourceId": "development-smoke",
+            "startMs": 0,
+            "supportedClaim": "Frames at 0, 1129, 2257, and 3386 ms show a uniform solid red fill covering the entire frame."
+          },
+          {
+            "endMs": 7900,
+            "kind": "visual",
+            "sourceId": "development-smoke",
+            "startMs": 4514,
+            "supportedClaim": "Frames from 4514 ms through 7900 ms show a uniform solid blue fill, confirming the red fill belongs to the first part of the video."
+          }
+        ],
+        "indexArtifactId": "index-265941ad1249e0ac5fa34f52",
+        "issue": null,
+        "logicalModel": "qwen3.8-max",
+        "predictedOption": "A",
+        "provider": "gateway",
+        "questionId": "smoke-visual",
+        "resolvedModel": "alibaba/qwen3.8-max",
+        "routeId": "qwen38-max-gateway",
+        "runId": "run-73d801467afc482527cd",
+        "sourceDurationMs": 8000,
+        "sourceId": "development-smoke",
+        "state": "completed",
+        "system": "qwen",
+        "taskCost": {
+          "actual": "0.006258",
+          "currency": "USD",
+          "estimated": "0.018802",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "tier": "unverified",
+        "timing": {
+          "answerMs": 14963.998042,
+          "coldFirstAnswerMs": null,
+          "endToEndMs": 25663.685284507934,
+          "firstTokenMs": null,
+          "indexMs": null,
+          "inputReuse": true,
+          "measurementProfileId": "bounded-independent-v1",
+          "prepareMs": null,
+          "queueMs": 10699.687242507935,
+          "unavailableReasons": {
+            "firstTokenMs": "non-streaming provider call",
+            "indexMs": "referenced by indexArtifactId"
+          },
+          "uploadMs": null
+        },
+        "usage": {
+          "apiCallCount": 1,
+          "cachedTokens": 7168,
+          "freeAllowanceConsumed": null,
+          "inputTokens": 7274,
+          "outputTokens": 709,
+          "processingSeconds": null,
+          "reasoningTokens": null
+        },
+        "variantId": "qwen38-max-frames-v1"
+      }
+    ],
+    "runId": "run-73d801467afc482527cd",
+    "scope": "One 8-second CC0 fixture, two functional questions per newly requested model, no pilot execution",
+    "state": "completed",
+    "summary": [
+      {
+        "accuracy": {
+          "completedCount": 2,
+          "denominator": 2,
+          "plannedCount": 2,
+          "value": 0.0
+        },
+        "blockedCount": 0,
+        "completedCount": 2,
+        "correctCount": 0,
+        "cost": {
+          "actual": "0.00603906",
+          "currency": "USD",
+          "estimated": "0.0061005",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "incorrectCount": 2,
+        "logicalModel": "minimax-m3",
+        "plannedCount": 2,
+        "preparationCost": {
+          "actual": null,
+          "currency": "USD",
+          "estimated": null,
+          "reconciled": false,
+          "unknownAttemptCount": 0
+        },
+        "questionCost": {
+          "actual": "0.00603906",
+          "currency": "USD",
+          "estimated": "0.0061005",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "stateCounts": {
+          "blocked": 0,
+          "completed": 2,
+          "failed": 0,
+          "waiting_quota": 0
+        },
+        "system": "minimax",
+        "variantId": "minimax-m3-frames-v1"
+      },
+      {
+        "accuracy": {
+          "completedCount": 2,
+          "denominator": 2,
+          "plannedCount": 2,
+          "value": 1.0
+        },
+        "blockedCount": 0,
+        "completedCount": 2,
+        "correctCount": 2,
+        "cost": {
+          "actual": "0.03416775",
+          "currency": "USD",
+          "estimated": "0.03416775",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "incorrectCount": 0,
+        "logicalModel": "muse-spark-1.3",
+        "plannedCount": 2,
+        "preparationCost": {
+          "actual": null,
+          "currency": "USD",
+          "estimated": null,
+          "reconciled": false,
+          "unknownAttemptCount": 0
+        },
+        "questionCost": {
+          "actual": "0.03416775",
+          "currency": "USD",
+          "estimated": "0.03416775",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "stateCounts": {
+          "blocked": 0,
+          "completed": 2,
+          "failed": 0,
+          "waiting_quota": 0
+        },
+        "system": "muse",
+        "variantId": "muse-spark13-frames-v1"
+      },
+      {
+        "accuracy": {
+          "completedCount": 2,
+          "denominator": 2,
+          "plannedCount": 2,
+          "value": 1.0
+        },
+        "blockedCount": 0,
+        "completedCount": 2,
+        "correctCount": 2,
+        "cost": {
+          "actual": "0.022998",
+          "currency": "USD",
+          "estimated": "0.035542",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "incorrectCount": 0,
+        "logicalModel": "qwen3.8-max",
+        "plannedCount": 2,
+        "preparationCost": {
+          "actual": null,
+          "currency": "USD",
+          "estimated": null,
+          "reconciled": false,
+          "unknownAttemptCount": 0
+        },
+        "questionCost": {
+          "actual": "0.022998",
+          "currency": "USD",
+          "estimated": "0.035542",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "stateCounts": {
+          "blocked": 0,
+          "completed": 2,
+          "failed": 0,
+          "waiting_quota": 0
+        },
+        "system": "qwen",
+        "variantId": "qwen38-max-frames-v1"
+      }
+    ]
+  },
+  {
+    "checkedAt": "2026-11-15T03:51:14.831068Z",
+    "cost": {
+      "actual": "0.00604086",
+      "currency": "USD",
+      "estimated": "0.0061023",
+      "reconciled": true,
+      "unknownAttemptCount": 0
+    },
+    "results": [
+      {
+        "accountAlias": "VERCEL_GATEWAY_API_KEY",
+        "answer": "{\"option\":\"C\",\"explanation\":\"The official subtitle states that the secret number spoken in the clip is seven.\",\"evidence\":[{\"startMs\":0,\"endMs\":4000,\"kind\":\"subtitle\",\"claim\":\"The secret number spoken in this clip is seven.\"}]}",
+        "attemptId": "attempt-f2fb32e7b1e6aee4c541",
+        "capability": "audio",
+        "configRevision": "config-bc57f608217370627edb",
+        "correct": true,
+        "cost": {
+          "actual": "0.00302388",
+          "currency": "USD",
+          "estimated": "0.0030546",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "dataset": "development-CC0",
+        "durationGroup": "short",
+        "evaluationRevision": "official-mcq-v1",
+        "evidence": [
+          {
+            "endMs": 4000,
+            "kind": "subtitle",
+            "sourceId": "development-smoke",
+            "startMs": 0,
+            "supportedClaim": "The secret number spoken in this clip is seven."
+          }
+        ],
+        "indexArtifactId": "index-a6f7162a7472098e91c65dc1",
+        "issue": null,
+        "logicalModel": "minimax-m3",
+        "predictedOption": "C",
+        "provider": "gateway",
+        "questionId": "smoke-audio",
+        "resolvedModel": "minimax/minimax-m3",
+        "routeId": "minimax-m3-gateway",
+        "runId": "run-8619aed7896ea14c32f7",
+        "sourceDurationMs": 8000,
+        "sourceId": "development-smoke",
+        "state": "completed",
+        "system": "minimax",
+        "taskCost": {
+          "actual": "0.00302388",
+          "currency": "USD",
+          "estimated": "0.0030546",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "tier": "unverified",
+        "timing": {
+          "answerMs": 1016.2513329999996,
+          "coldFirstAnswerMs": null,
+          "endToEndMs": 4369.3943097608635,
+          "firstTokenMs": null,
+          "indexMs": null,
+          "inputReuse": true,
+          "measurementProfileId": "bounded-independent-v1",
+          "prepareMs": null,
+          "queueMs": 3353.1429767608643,
+          "unavailableReasons": {
+            "firstTokenMs": "non-streaming provider call",
+            "indexMs": "referenced by indexArtifactId"
+          },
+          "uploadMs": null
+        },
+        "usage": {
+          "apiCallCount": 1,
+          "cachedTokens": 128,
+          "freeAllowanceConsumed": null,
+          "inputTokens": 9962,
+          "outputTokens": 55,
+          "processingSeconds": null,
+          "reasoningTokens": null
+        },
+        "variantId": "minimax-m3-frames-v2"
+      },
+      {
+        "accountAlias": "VERCEL_GATEWAY_API_KEY",
+        "answer": "{\"option\":\"A\",\"explanation\":\"The first part of the video is filled with a solid red color.\",\"evidence\":[{\"startMs\":0,\"endMs\":3386,\"kind\":\"visual\",\"claim\":\"The screen shows a solid red fill.\"}]}",
+        "attemptId": "attempt-7ff8e127efb8b54be4be",
+        "capability": "visual",
+        "configRevision": "config-bc57f608217370627edb",
+        "correct": true,
+        "cost": {
+          "actual": "0.00301698",
+          "currency": "USD",
+          "estimated": "0.0030477",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "dataset": "development-CC0",
+        "durationGroup": "short",
+        "evaluationRevision": "official-mcq-v1",
+        "evidence": [
+          {
+            "endMs": 3386,
+            "kind": "visual",
+            "sourceId": "development-smoke",
+            "startMs": 0,
+            "supportedClaim": "The screen shows a solid red fill."
+          }
+        ],
+        "indexArtifactId": "index-a6f7162a7472098e91c65dc1",
+        "issue": null,
+        "logicalModel": "minimax-m3",
+        "predictedOption": "A",
+        "provider": "gateway",
+        "questionId": "smoke-visual",
+        "resolvedModel": "minimax/minimax-m3",
+        "routeId": "minimax-m3-gateway",
+        "runId": "run-8619aed7896ea14c32f7",
+        "sourceDurationMs": 8000,
+        "sourceId": "development-smoke",
+        "state": "completed",
+        "system": "minimax",
+        "taskCost": {
+          "actual": "0.00301698",
+          "currency": "USD",
+          "estimated": "0.0030477",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "tier": "unverified",
+        "timing": {
+          "answerMs": 3236.350125,
+          "coldFirstAnswerMs": 4062.521791,
+          "endToEndMs": 3236.998146697998,
+          "firstTokenMs": null,
+          "indexMs": null,
+          "inputReuse": false,
+          "measurementProfileId": "bounded-independent-v1",
+          "prepareMs": null,
+          "queueMs": 0.6480216979980469,
+          "unavailableReasons": {
+            "firstTokenMs": "non-streaming provider call",
+            "indexMs": "referenced by indexArtifactId"
+          },
+          "uploadMs": null
+        },
+        "usage": {
+          "apiCallCount": 1,
+          "cachedTokens": 128,
+          "freeAllowanceConsumed": null,
+          "inputTokens": 9951,
+          "outputTokens": 52,
+          "processingSeconds": null,
+          "reasoningTokens": null
+        },
+        "variantId": "minimax-m3-frames-v2"
+      }
+    ],
+    "runId": "run-8619aed7896ea14c32f7",
+    "scope": "One 8-second CC0 fixture, two functional questions per newly requested model, no pilot execution",
+    "state": "completed",
+    "summary": [
+      {
+        "accuracy": {
+          "completedCount": 2,
+          "denominator": 2,
+          "plannedCount": 2,
+          "value": 1.0
+        },
+        "blockedCount": 0,
+        "completedCount": 2,
+        "correctCount": 2,
+        "cost": {
+          "actual": "0.00604086",
+          "currency": "USD",
+          "estimated": "0.0061023",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "incorrectCount": 0,
+        "logicalModel": "minimax-m3",
+        "plannedCount": 2,
+        "preparationCost": {
+          "actual": null,
+          "currency": "USD",
+          "estimated": null,
+          "reconciled": false,
+          "unknownAttemptCount": 0
+        },
+        "questionCost": {
+          "actual": "0.00604086",
+          "currency": "USD",
+          "estimated": "0.0061023",
+          "reconciled": true,
+          "unknownAttemptCount": 0
+        },
+        "stateCounts": {
+          "blocked": 0,
+          "completed": 2,
+          "failed": 0,
+          "waiting_quota": 0
+        },
+        "system": "minimax",
+        "variantId": "minimax-m3-frames-v2"
+      }
+    ]
+  }
+]

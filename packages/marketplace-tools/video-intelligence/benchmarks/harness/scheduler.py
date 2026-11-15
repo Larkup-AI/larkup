@@ -95,14 +95,14 @@ class Scheduler:
         if len(self.inflight) >= limits['global']:
             return False
         variant = json.loads(self.store.one('SELECT document FROM variants WHERE run_id=? AND id=?', (task['run_id'], task['variant_id']))['document'])
-        kind = 'gpu' if (task['kind'] == 'prepare' and variant['adapter'] in {'larkup', 'retrieval'}) else 'cpu' if task['kind'] == 'prepare' and variant['adapter'] == 'qwen' else 'upload' if task['kind'] == 'prepare' else 'qa'
+        kind = 'gpu' if (task['kind'] == 'prepare' and variant['adapter'] in {'larkup', 'retrieval'}) else 'cpu' if task['kind'] == 'prepare' and variant['adapter'] in {'qwen','muse','minimax'} else 'upload' if task['kind'] == 'prepare' else 'qa'
         busy = 0
         for tid in self.inflight:
             other = self.store.one('SELECT kind,variant_id,run_id FROM tasks WHERE id=?', (tid,))
             ov = json.loads(self.store.one('SELECT document FROM variants WHERE run_id=? AND id=?', (other['run_id'], other['variant_id']))['document'])
             if variant['adapter'] in {'larkup', 'retrieval'} and ov['adapter'] in {'larkup', 'retrieval'}:
                 return False
-            ok = 'gpu' if other['kind'] == 'prepare' and ov['adapter'] in {'larkup', 'retrieval'} else 'cpu' if other['kind'] == 'prepare' and ov['adapter'] == 'qwen' else 'upload' if other['kind'] == 'prepare' else 'qa'
+            ok = 'gpu' if other['kind'] == 'prepare' and ov['adapter'] in {'larkup', 'retrieval'} else 'cpu' if other['kind'] == 'prepare' and ov['adapter'] in {'qwen','muse','minimax'} else 'upload' if other['kind'] == 'prepare' else 'qa'
             busy += ok == kind
         return busy < limits[kind]
 

@@ -121,6 +121,13 @@ export function ControlCenter({
         </div>
       </div>
       <div className="controls">
+        {status?.operations.some(
+          (job) => ['pending', 'running'].includes(job.state) && job.cancellable,
+        ) && (
+          <button disabled={readonly || busy} onClick={() => action('cancel-start')}>
+            Cancel startup
+          </button>
+        )}
         <button disabled={readonly || busy || active} onClick={() => action('start')}>
           Start / resume benchmark
         </button>
@@ -134,7 +141,7 @@ export function ControlCenter({
           disabled={readonly || busy || active || !status?.controllerAvailable}
           onClick={() => action('resume')}
         >
-          Resume paused runs
+          Resume selected run
         </button>
         <button
           disabled={readonly || busy || active || !status?.controllerAvailable}

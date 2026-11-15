@@ -145,8 +145,11 @@ class Context:
         raise DomainError('REMOTE_OUTCOME_UNKNOWN', unknown=True)
 
 
-def question_prompt(question: dict) -> str:
-    return PROMPT + canonical({k: question[k] for k in ('question', 'options')})
+def question_prompt(question: dict, option_format=None) -> str:
+    public={k:question[k] for k in ('question','options')}
+    if option_format=='letter-labelled-v1':
+        public['options']=[{'option':chr(65+i),'text':value} for i,value in enumerate(question['options'])]
+    return PROMPT+canonical(public)
 
 
 def extracted_answer(payload: dict, provider: str) -> str:
@@ -327,7 +330,7 @@ class Qwen:
             content.append({'type': 'text', 'text': f"Original timestamp: {frame['startMs']} ms"})
             image = base64.b64encode((c.root / frame['path']).read_bytes()).decode()
             content.append({'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + image}})
-        content.append({'type': 'text', 'text': question_prompt(question)})
+        content.append({'type': 'text', 'text': question_prompt(question,c.variant.get('inputProtocol',{}).get('optionFormat'))})
         payload = (await c.call('POST', '/chat/completions', paid=True,
                                document={'model': c.route['model'], 'messages': [{'role': 'user', 'content': content}],
                                          'temperature': c.variant.get('temperature', 0),
@@ -562,4 +565,5 @@ class Larkup:
 
 def adapters(package: Path) -> dict:
     larkup = Larkup(package)
-    return dict(gemini=Gemini(), qwen=Qwen(), twelvelabs=TwelveLabs(), larkup=larkup, retrieval=larkup)
+    frames=Qwen()
+    return dict(gemini=Gemini(), qwen=frames, muse=frames, minimax=frames, twelvelabs=TwelveLabs(), larkup=larkup, retrieval=larkup)

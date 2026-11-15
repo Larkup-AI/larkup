@@ -40,7 +40,9 @@ export function Home({
         name === 'resume-run' ? (selected ?? undefined) : undefined,
       );
       setMessage(
-        `${name === 'new-run' ? 'New benchmark' : name === 'resume-run' ? 'Resume selected run' : name} accepted. Starting services can take a few minutes.`,
+        name === 'cancel-start'
+          ? 'Startup cancellation requested.'
+          : `${name === 'new-run' ? 'New benchmark' : name === 'resume-run' ? 'Resume selected run' : name} accepted. GPU startup and capacity waits are automatic.`,
       );
       if (op.result?.runId) onSelect(op.result.runId);
     } catch (e) {
@@ -50,7 +52,7 @@ export function Home({
     }
   }
   const rows = metrics?.summary?.filter((r) => r.system !== 'retrieval') ?? [];
-  const systems = ['larkup', 'gemini', 'qwen', 'twelvelabs'] as const;
+  const systems = ['larkup', 'gemini', 'qwen', 'muse', 'minimax', 'twelvelabs'] as const;
   return (
     <>
       <section className="panel">
@@ -95,7 +97,24 @@ export function Home({
           and keeps its completed answers.
         </p>
         {message && <p role="status">{message}</p>}
-        {pending && <p role="status">{pending.stage ?? 'Preparing benchmark services…'}</p>}
+        {pending && (
+          <p role="status">
+            {pending.stage ?? 'Preparing benchmark services…'}
+            {pending.startup?.nextRetryAt && (
+              <> Next attempt: {new Date(pending.startup.nextRetryAt).toLocaleTimeString()}.</>
+            )}
+          </p>
+        )}
+        {pending?.cancellable && (
+          <div className="controls">
+            <button
+              disabled={!operatorEnabled || system?.readonly || busy}
+              onClick={() => action('cancel-start')}
+            >
+              Cancel startup
+            </button>
+          </div>
+        )}
         {latest?.state === 'failed' && (
           <p className="banner error">
             {latest.issue?.message ?? 'The last operation failed. See Advanced → Events.'}
@@ -105,7 +124,14 @@ export function Home({
       <section className="panel">
         <div className="home-status">
           <strong>{snapshot?.state ?? 'No run selected'}</strong>
-          <span>GPU: {system?.pod.state ?? 'unknown'}</span>
+          <span>
+            GPU:{' '}
+            {pending?.startup?.phase === 'waiting_capacity'
+              ? 'Waiting for capacity'
+              : pending?.startup?.phase === 'starting_gpu'
+                ? 'Waking up'
+                : (system?.pod.state ?? 'unknown')}
+          </span>
           <span>
             {system?.controllerAvailable ? 'Live · updates every 2 seconds' : 'Saved checkpoint'}
           </span>
@@ -130,7 +156,9 @@ export function Home({
                     (t) => t.variantId === row?.variantId && t.stage === 'answer',
                   );
                 const total = row?.completedCount ?? 0;
-                const check = system?.readiness?.checks.find((c) => c.system === name);
+                const check = system?.readiness?.checks.find(
+                  (c) => c.system === name && (!row?.logicalModel || c.model === row.logicalModel),
+                );
                 const working =
                   row &&
                   Object.entries(row.stateCounts).some(
@@ -156,10 +184,13 @@ export function Home({
                             larkup: 'Larkup video tool',
                             gemini: 'Gemini',
                             qwen: 'Qwen',
+                            muse: 'Meta Muse Spark',
+                            minimax: 'MiniMax',
                             twelvelabs: 'TwelveLabs',
                           }[name]
                         }
                       </strong>
+                      {row?.logicalModel && <div className="note">{row.logicalModel}</div>}
                       {check && (
                         <div className="note" title={check.note}>
                           Last API check: {check.state}

@@ -15,11 +15,11 @@ class RunSelectionTest(unittest.TestCase):
         atomic(self.data/'datasets/pilot-new.json',{'protocol':{'revision':'frozen-next'}})
         self.runs={'run-history':{'id':'run-history','state':'paused','revision':'1','phase':'pilot','decision':'not_evaluated'}}
         self.calls=[]
-        self.r.api_items=Mock(side_effect=lambda path: list(self.runs.values()) if path=='/runs' else [{'variantId':'arm','questionId':q,'correct':True,'state':'completed'} for q in ['visual','audio']])
+        self.r.api_items=Mock(side_effect=lambda path: list(self.runs.values()) if path=='/runs' else [{'variantId':'arm','questionId':q,'correct':True,'state':'completed','answer':'{"option":"A"}'} for q in ['visual','audio']])
         def api(path,doc=None,**kw):
             self.calls.append((path,doc,kw))
             if path=='/runs':
-                rid='run-new-'+str(len(self.runs));self.runs[rid]={'id':rid,'state':'draft','revision':'1','phase':'pilot','decision':'not_evaluated'}
+                rid='run-new-'+str(len(self.runs));self.runs[rid]={'id':rid,'state':'draft','revision':'1','phase':doc['phase'],'decision':'not_evaluated'}
                 return self.runs[rid]
             rid=path.split('/')[2]
             if path.endswith('/start') or path.endswith('/resume'):self.runs[rid]['state']='running'
@@ -43,10 +43,25 @@ class RunSelectionTest(unittest.TestCase):
         with self.assertRaises(DomainError):create(self.r,'one')
         with self.assertRaises(DomainError):activate(self.r,'run-history')
         self.r.api.assert_not_called()
-    def test_missing_smoke_certificate_blocks_new_pilot(self):
-        self.r.api_items.side_effect=lambda path: list(self.runs.values()) if path=='/runs' else []
-        with self.assertRaises(DomainError) as e:create(self.r,'one')
-        self.assertEqual(e.exception.code,'SERVICE_SMOKE_REQUIRED_BEFORE_NEW_PILOT');self.r.api.assert_not_called()
+    def test_missing_smoke_certificate_runs_smoke_then_exactly_one_pilot(self):
+        complete=False
+        self.r.api_items.side_effect=lambda path: list(self.runs.values()) if path=='/runs' else [{'variantId':'arm','questionId':q,'correct':True,'state':'completed','answer':'{"option":"A"}'} for q in ['visual','audio']] if complete else []
+        smoke=create(self.r,'one');self.assertEqual(smoke['phase'],'smoke')
+        self.assertFalse(any(c[1].get('phase')=='pilot' for c in self.calls if c[0]=='/runs'))
+        self.assertEqual(status(self.r)['state'],'running')
+        self.runs[smoke['runId']]['state']='completed';complete=True
+        pilot=status(self.r);self.assertEqual(pilot['phase'],'pilot');self.assertNotEqual(pilot['runId'],smoke['runId'])
+        status(self.r)
+        self.assertEqual(sum(c[1].get('phase')=='pilot' for c in self.calls if c[0]=='/runs'),1)
+        self.assertEqual(self.runs['run-history']['state'],'paused')
+
+    def test_empty_answer_smoke_cannot_admit_pilot(self):
+        self.r.api_items.side_effect=lambda path:list(self.runs.values()) if path=='/runs' else []
+        smoke=create(self.r,'empty');self.runs[smoke['runId']]['state']='completed'
+        self.r.api_items.side_effect=lambda path:list(self.runs.values()) if path=='/runs' else [{'variantId':'arm','questionId':q,'correct':False,'state':'completed','answer':''} for q in ['visual','audio']]
+        self.assertEqual(status(self.r)['state'],'smoke_requires_review')
+        self.assertFalse(any(c[1].get('phase')=='pilot' for c in self.calls if c[0]=='/runs'))
+
     def test_finished_run_cannot_be_resumed_or_overwritten(self):
         self.runs['run-history']['state']='completed'
         with self.assertRaises(DomainError):activate(self.r,'run-history')

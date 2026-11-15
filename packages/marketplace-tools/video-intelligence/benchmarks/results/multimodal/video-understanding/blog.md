@@ -103,3 +103,32 @@ inline video above 100 MB before a paid submission. This reflects the documented
 not a successful long-input test. Longer sources remain coverage limitations;
 no truncation, hidden resampling, key rotation or model substitution was used.
 The comparative gate remains **inconclusive** and no publication expansion ran.
+
+
+## Requested model matrix and GPU queue, 2026-11-15
+
+The next prospective pilot keeps the same eight development videos and 19
+questions and changes the model matrix at the user's request: Qwen 3.8 Max,
+Meta Muse Spark 1.3 and MiniMax M3 via Gateway frame/subtitle input, Gemini 3.8
+Flash via Gateway native video/audio, TwelveLabs Pegasus 1.5 native, and the
+unchanged canonical Larkup profile. Six retrieval-ablation cells keep its answer
+backbone fixed. There are 120 planned answer cells; **this new pilot has not run**.
+The continue/stop/inconclusive rule and held-out publication exclusion are unchanged.
+
+Tiny actual API checks produced eight nonempty responses on the same licensed
+8-second fixture: two Qwen Max, two Muse Spark, and four MiniMax responses across
+two explicitly separate prompt versions. Qwen and Muse answered 2/2 correctly.
+MiniMax's first two responses contained the correct choice text instead of the
+required letter and were marked invalid by the existing strict scorer. The new
+v2 frame variants make option-letter bindings explicit; a focused MiniMax rerun
+then passed 2/2. Earlier rows remain unmodified and were not rescored. This is a
+formatting regression fix before the new pilot, not evidence of comparative
+accuracy. `data/requested-model-smoke.csv` and `.json` retain both versions,
+timings, answers, routes and known/estimated charges. Known API cash for these
+checks was USD 0.06924567; estimates remain separate.
+
+A real saved-Pod startup probe observed capacity waiting and its 30-second retry
+schedule, then was explicitly cancelled before any benchmark dispatch. Mocked
+regressions cover eventual acceptance, SSH readiness, capped 5-minute retry
+intervals, cancellation and exactly-one pilot transition after missing-model
+smoke. Live capacity availability is not guaranteed. No extra Pod was rented.

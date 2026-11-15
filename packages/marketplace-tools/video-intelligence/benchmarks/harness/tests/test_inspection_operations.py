@@ -104,6 +104,39 @@ class InspectionOperationsTest(unittest.TestCase):
             activate.assert_called_once_with(self.remote,'run-selected')
         self.remote.api.assert_not_called()
 
+    def test_cancel_waiting_start_is_accepted_and_never_creates_a_run(self):
+        with patch('harness.operations.threading.Thread'):
+            startup=self.operator.submit('new-run',{'expectedRevision':self.operator.revision()},'waiting-new')
+        def resume(**kw):
+            kw['on_progress']({'phase':'waiting_capacity','attempt':1,'stage':'Waiting for GPU capacity','nextRetryAt':None})
+            self.assertEqual(intent(self.deployment)['mode'],'waiting_gpu')
+            with patch('harness.operations.threading.Thread'):
+                self.operator.submit('cancel-start',{'expectedRevision':self.operator.revision()},'cancel-wait')
+            kw['check_cancelled']()
+        self.remote.resume.side_effect=resume
+        with patch('harness.run_selection.create') as create:
+            self.operator.execute(startup,0);create.assert_not_called()
+        original=next(x for x in self.operator.jobs() if x['action']=='new-run')
+        self.assertEqual(original['state'],'cancelled');self.assertFalse(original['cancellable'])
+        cancel=next(x for x in self.operator.jobs() if x['action']=='cancel-start');self.operator.execute(cancel,self.operator.generation)
+        self.remote.ensure_started.assert_not_called();self.remote.workflow.assert_not_called()
+        self.assertEqual(intent(self.deployment)['mode'],'stopped')
+
+    def test_new_run_begins_only_after_gpu_and_services_ready(self):
+        with patch('harness.operations.threading.Thread'):
+            startup=self.operator.submit('new-run',{'expectedRevision':self.operator.revision()},'start-ready')
+        order=[]
+        def resume(**kw):
+            order.append('gpu');kw['on_progress']({'phase':'waiting_capacity','attempt':1,'stage':'Waiting','nextRetryAt':None});kw['on_progress']({'phase':'ready','attempt':2,'stage':'Ready','nextRetryAt':None})
+        self.remote.resume.side_effect=resume;self.remote.ensure_started.side_effect=lambda:order.append('runtime')
+        def create(*args):
+            self.assertEqual(order,['gpu','runtime','services'])
+            with self.assertRaises(DomainError):self.operator.submit('cancel-start',{'expectedRevision':self.operator.revision()},'too-late')
+            return {'runId':'run-new','state':'running'}
+        with patch.object(self.operator,'start_transports',side_effect=lambda:order.append('services')),patch('harness.run_selection.create',side_effect=create):
+            self.operator.execute(startup,0)
+        self.assertEqual(self.operator.jobs()[0]['state'],'completed');self.assertFalse(self.operator.jobs()[0]['cancellable'])
+
     def test_full_json_run_export_uses_all_rows_and_preserves_null_accuracy(self):
         from harness.api import Controller
         ctl=Controller(self.store,self.config,self.data,'test-token',readonly=True)

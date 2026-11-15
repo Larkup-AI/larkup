@@ -61,11 +61,12 @@ def select(mme: list[dict], lvb: list[dict], seed=731) -> dict:
                 questions.append(dict(id=dataset.lower() + '-' + q.get('question_id', q.get('id', '')),
                                       sourceId=sid, question=q['question'], options=options,
                                       correctOption=answer, capability=q.get('task_type', q.get('question_category'))))
-    arms = [dict(id=k, adapter=v['adapter']) for k, v in default_profile('frozen-at-execution')['variants'].items()]
+    profile=default_profile('frozen-at-execution')
+    arms = [dict(id=k, adapter=profile['variants'][k]['adapter']) for k in profile['protocol']['variantIds']]
     core = [a['id'] for a in arms if a['adapter'] != 'retrieval']
     subset = [q['id'] for q in questions if q['sourceId'] in {sources[0]['id'], sources[2]['id']}]
-    return dict(id='pilot-v1', seed=seed, sources=sources, questions=questions, reserves=reserve,
-                protocol=dict(revision='accuracy-first-pilot-v1', arms=arms, coreVariantIds=core,
+    return dict(id=profile['protocol'].get('manifestId','pilot-v1'), seed=seed, sources=sources, questions=questions, reserves=reserve,
+                protocol=dict(revision=profile['protocol']['revision'], arms=arms, coreVariantIds=core,
                               variantQuestionIds={a['id']: subset for a in arms if a['adapter'] == 'retrieval'},
                               minimumSources=8, minimumNetWins=2, groundingAudit='pending',
                               missingness='original planned denominator retained; infrastructure failures null',
@@ -399,21 +400,25 @@ def main():
     sub.add_parser('subtitles')
     args = parser.parse_args()
     data = BENCHMARK / 'data'
+    config_path=data/'configs/active.json'
+    active=json.loads(config_path.read_text()) if config_path.exists() else default_profile('frozen-at-execution')
+    manifest_id=active['protocol'].get('manifestId','pilot-v1')
+    if not isinstance(manifest_id,str) or not all(c.isalnum() or c in '-_' for c in manifest_id):raise DomainError('MANIFEST_INVALID')
     if args.command == 'select':
         doc = select(json.loads(args.mme.read_text()), json.loads(args.lvb.read_text()))
-        path = data / 'datasets/pilot-v1.json'
+        path = data / 'datasets' / (doc['id']+'.json')
         if path.exists():
             raise DomainError('COHORT_ALREADY_FROZEN')
         atomic(path, doc)
         print(json.dumps({'manifest': doc['id'], 'sources': len(doc['sources']), 'questions': len(doc['questions']), 'hash': digest(doc)}))
     elif args.command == 'subtitles':
-        path = data / 'datasets/pilot-v1.json'
+        path = data / 'datasets' / (manifest_id+'.json')
         doc = json.loads(path.read_text())
         attach_subtitles(doc, data)
         atomic(path, doc)
         print(json.dumps({'alignedSources': len(doc['sources']), 'subtitleCounts': [len(s['subtitles']) for s in doc['sources']]}))
     else:
-        path = data / 'datasets/pilot-v1.json'
+        path = data / 'datasets' / (manifest_id+'.json')
         doc = json.loads(path.read_text())
         if args.official_mme_zip:
             official_zip(doc, data)

@@ -90,7 +90,7 @@ class Config:
                                'maxSteps', 'maxOutputTokens', 'temperature', 'extraction',
                                'canonicalRevision', 'ablationOf'}:
                 raise DomainError('CONFIG_INVALID')
-            if variant.get('adapter') not in {'gemini', 'qwen', 'twelvelabs', 'larkup', 'retrieval'}:
+            if variant.get('adapter') not in {'gemini', 'qwen', 'twelvelabs', 'larkup', 'retrieval', 'muse', 'minimax'}:
                 raise DomainError('CONFIG_INVALID')
             if not variant.get('routes') or not 1 <= variant.get('maxSteps', 4) <= 12:
                 raise DomainError('CONFIG_INVALID')

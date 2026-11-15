@@ -127,7 +127,8 @@ def metrics(store, run: str) -> dict:
         counts = defaultdict(int)
         for x in subset:
             counts[x['state']] += 1
-        summaries.append(dict(variantId=vid, system=subset[0]['system'], plannedCount=len(subset),
+        variant_document=json.loads(store.one('SELECT document FROM variants WHERE run_id=? AND id=?',(run,vid))['document'])
+        summaries.append(dict(variantId=vid, system=subset[0]['system'], logicalModel=variant_document['logicalModel'], plannedCount=len(subset),
                               completedCount=counts['completed'], correctCount=sum(x['correct'] is True for x in subset),
                               incorrectCount=sum(x['correct'] is False for x in subset),
                               blockedCount=sum(counts[s] for s in ('blocked', 'failed', 'waiting_quota')),

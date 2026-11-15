@@ -370,9 +370,11 @@ export function isTerminal(state: RunState): boolean {
   return TERMINAL_RUN_STATES.includes(state);
 }
 
-export type BenchmarkSystem = 'larkup' | 'retrieval' | 'gemini' | 'qwen' | 'twelvelabs';
+export type BenchmarkSystem =
+  'larkup' | 'retrieval' | 'gemini' | 'qwen' | 'twelvelabs' | 'muse' | 'minimax';
 export type VariantSummary = {
   variantId: string;
+  logicalModel?: string;
   system: BenchmarkSystem;
   plannedCount: number;
   completedCount: number;
@@ -403,6 +405,14 @@ export type OperatorOperation = {
   action: string;
   state: string;
   stage?: string;
+  cancellable?: boolean;
+  startup?: {
+    phase: 'waiting_capacity' | 'starting_gpu' | 'ready';
+    attempt: number;
+    nextRetryAt: string | null;
+    retrySeconds?: number;
+    stage: string;
+  };
   issue?: Issue;
   warning?: string;
   result?: { runId?: string; state?: string };
@@ -414,6 +424,7 @@ export type SystemStatus = {
     checks: {
       system: BenchmarkSystem;
       route: string;
+      model?: string;
       state: string;
       completedAnswers: number;
       note: string;

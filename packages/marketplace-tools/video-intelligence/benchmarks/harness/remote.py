@@ -14,6 +14,7 @@ import tarfile
 import threading
 import time
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 from .common import DomainError, Secrets, atomic, canonical, utc, identifier
@@ -39,6 +40,9 @@ class Remote:
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 result = json.load(response)
+        except urllib.error.HTTPError as error:
+            if error.code in {401,403}:raise DomainError('RUNPOD_AUTH_INVALID') from None
+            raise DomainError('RUNPOD_API_UNAVAILABLE') from None
         except Exception:
             raise DomainError('RUNPOD_API_UNAVAILABLE') from None
         if result.get('errors'):
@@ -66,22 +70,58 @@ class Remote:
             raise DomainError('SSH_OPERATION_FAILED')
         return result
 
-    def resume(self):
-        if self.account()['clientBalance'] < 1:
-            raise DomainError('CREDIT_EXHAUSTED')
-        pod = self.gql('query { pod(input:{podId:' + json.dumps(self.state['podId']) + '}) { id desiredStatus runtime { ports { ip isIpPublic privatePort publicPort } } } }')['pod']
-        if pod['desiredStatus'] != 'RUNNING':
-            self.gql('mutation { podResume(input:{podId:' + json.dumps(self.state['podId']) + ',gpuCount:1}) {id desiredStatus} }')
-        for _ in range(60):
-            pod = self.gql('query { pod(input:{podId:' + json.dumps(self.state['podId']) + '}) { id desiredStatus runtime { ports { ip isIpPublic privatePort publicPort } } } }')['pod']
-            ports = (pod.get('runtime') or {}).get('ports', [])
-            port = next((p for p in ports if p['privatePort'] == 22 and p['isIpPublic']), None)
-            if port:
-                self.state.update(sshHost=port['ip'], sshPort=port['publicPort'])
-                atomic(self.deployment / 'remote.json', self.state)
-                return
-            time.sleep(5)
-        raise DomainError('RUNPOD_STARTUP_INCOMPLETE')
+    def resume(self, *, on_progress=None, check_cancelled=None, sleep=None, clock=None):
+        """Wait for saved-host capacity, then for SSH; never allocate another Pod."""
+        from datetime import datetime,timedelta,timezone
+        pause=sleep or time.sleep;now=clock or time.monotonic
+        check=check_cancelled or (lambda:None)
+        attempt=0;boot_deadline=None;last=None
+        def report(phase,**fields):
+            nonlocal last
+            value={'phase':phase,'attempt':attempt,'nextRetryAt':None,**fields}
+            if value==last:return
+            last=value
+            if on_progress:on_progress(value)
+            else:print(canonical({'startup':value}),flush=True)
+        def wait(seconds):
+            deadline=now()+seconds
+            while now()<deadline:
+                check();pause(min(1,deadline-now()))
+            check()
+        while True:
+            check()
+            if boot_deadline is not None and now()>=boot_deadline:
+                raise DomainError('RUNPOD_STARTUP_INCOMPLETE')
+            if boot_deadline is None and self.account()['clientBalance']<1:
+                raise DomainError('CREDIT_EXHAUSTED')
+            check()
+            pod=self.gql('query { pod(input:{podId:'+json.dumps(self.state['podId'])+'}) { id desiredStatus runtime { ports { ip isIpPublic privatePort publicPort } } } }')['pod']
+            check()
+            if not pod:raise DomainError('RUNPOD_POD_NOT_FOUND')
+            ports=(pod.get('runtime') or {}).get('ports',[])
+            port=next((p for p in ports if p['privatePort']==22 and p['isIpPublic']),None)
+            if pod['desiredStatus']=='RUNNING' and port:
+                self.state.update(sshHost=port['ip'],sshPort=port['publicPort'])
+                atomic(self.deployment/'remote.json',self.state)
+                report('ready',stage='GPU is awake. Preparing benchmark services.')
+                check();return
+            if pod['desiredStatus']!='RUNNING' and boot_deadline is None:
+                attempt+=1;check()
+                try:
+                    self.gql('mutation { podResume(input:{podId:'+json.dumps(self.state['podId'])+',gpuCount:1}) {id desiredStatus} }')
+                except DomainError as error:
+                    if error.code!='RUNPOD_GPU_UNAVAILABLE':raise
+                    delay=(30,60,120,300)[min(attempt-1,3)]
+                    report('waiting_capacity',retrySeconds=delay,
+                           nextRetryAt=(datetime.now(timezone.utc)+timedelta(seconds=delay)).isoformat(),
+                           stage='Waiting for GPU capacity on the saved RunPod host. Retrying in '+str(delay)+' seconds automatically.')
+                    wait(delay);continue
+                boot_deadline=now()+900
+                report('starting_gpu',stage='RunPod accepted start. Waiting for the GPU and SSH service.')
+                check();continue
+            if boot_deadline is None:boot_deadline=now()+900
+            report('starting_gpu',stage='RunPod is waking up. Waiting for the GPU and SSH service.')
+            wait(min(5,max(0,boot_deadline-now())))
 
     def bundle(self, remote_hashes=None):
         paths = ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'patches', 'packages/core', 'packages/marketplace',
@@ -164,6 +204,7 @@ print(json.dumps(r))
         except ValueError:
             raise DomainError('REMOTE_BOOTSTRAP_FAILED') from None
         atomic(self.deployment / 'relay.json', credentials)
+        self.ssh('cd '+REMOTE_BENCH+' && python3 -m harness.main reload data/configs/active.json')
         revision = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=REPO, capture_output=True, text=True, check=True).stdout.strip()
         atomic(self.deployment / 'source-revision.json', dict(canonicalRevision=revision,
                baseArchiveSha256=hashlib.sha256(base).hexdigest(), harnessArchiveSha256=hashlib.sha256(overlay).hexdigest()))
@@ -493,7 +534,9 @@ def launch_session(remote, args):
         if args.command in {'launch','new','resume-run'} and not args.view_only:
             rental_active = True  # Also clean up if startup fails after resume was accepted.
             print('Starting the saved RunPod GPU. No additional Pod will be created.', flush=True)
-            remote.resume()
+            def check_startup_cancelled():
+                if stopping.is_set():raise DomainError('START_CANCELLED')
+            remote.resume(check_cancelled=check_startup_cancelled)
             print('Checking the canonical runtime and controller version…', flush=True)
             remote.ensure_started()
         if not args.view_only and not manual:
@@ -535,7 +578,7 @@ def launch_session(remote, args):
         previous_progress = None
         while not stopping.wait(5):
             mode = intent(remote.deployment)['mode'] if not args.view_only else 'observe'
-            if mode in {'observe', 'stopped', 'starting'}:
+            if mode in {'observe', 'stopped', 'starting', 'waiting_gpu'}:
                 idle_checkpointed = True
             elif mode == 'active':
                 idle_checkpointed = False

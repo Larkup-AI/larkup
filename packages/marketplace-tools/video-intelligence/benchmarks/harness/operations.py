@@ -11,7 +11,7 @@ import time
 from .common import DomainError, atomic, canonical, digest, identifier, utc
 from .inspection import logs
 
-ACTIONS={'new-run','resume-run','start','pause','resume','stop-gpu','force-stop-gpu'}
+ACTIONS={'new-run','resume-run','start','pause','resume','stop-gpu','force-stop-gpu','cancel-start'}
 
 
 def intent(deployment, mode=None):
@@ -31,7 +31,7 @@ def control_lock(deployment):
 class Operator:
     def __init__(self, remote, *, readonly=False):
         self.remote,self.readonly=remote,readonly
-        self.lock=threading.RLock();self.generation=0;self.pod={'state':'unknown','observedAt':None}
+        self.lock=threading.RLock();self.generation=0;self.cancelled_generations=set();self.pod={'state':'unknown','observedAt':None}
         observation=remote.deployment/'pod-observation.json'
         if observation.exists():self.pod=json.loads(observation.read_text())
         self.pod_refresh_at=0;self.refreshing=False
@@ -104,18 +104,23 @@ class Operator:
             if action=='force-stop-gpu' and body.get('confirmation')!='STOP GPU':
                 raise DomainError('FORCE_STOP_CONFIRMATION_REQUIRED',status=400)
             active=self.db.execute("SELECT 1 FROM operations WHERE state IN ('pending','running')").fetchone()
-            if active and action!='force-stop-gpu':raise DomainError('OPERATION_IN_PROGRESS',status=409)
+            if action=='cancel-start':
+                if not any(j['state'] in {'pending','running'} and j.get('cancellable') for j in self.jobs()):
+                    raise DomainError('NO_CANCELLABLE_STARTUP',status=409)
+                self.cancelled_generations.add(self.generation);self.generation+=1
+            if active and action not in {'force-stop-gpu','cancel-start'}:raise DomainError('OPERATION_IN_PROGRESS',status=409)
             if action=='force-stop-gpu':self.generation+=1
             if action=='resume-run' and (not isinstance(body.get('runId'),str) or not body['runId'].startswith('run-')):
                 raise DomainError('RUN_ID_INVALID',status=400)
             generation=self.generation
-            job={'id':identifier('operation'),'action':action,'state':'pending','createdAt':utc(),**({'runId':body['runId']} if action=='resume-run' else {})}
+            job={'id':identifier('operation'),'action':action,'state':'pending','createdAt':utc(),'cancellable':action in {'start','new-run','resume-run'},**({'runId':body['runId']} if action=='resume-run' else {})}
             self.db.execute('INSERT INTO operations VALUES(?,?,?,?,?,?)',(job['id'],key,fingerprint,action,'pending',canonical(job)))
-            if action in {'pause','stop-gpu','force-stop-gpu'}:intent(self.remote.deployment,'stopped' if action=='force-stop-gpu' else 'paused')
+            if action in {'pause','stop-gpu','force-stop-gpu','cancel-start'}:intent(self.remote.deployment,'stopped' if action=='force-stop-gpu' else 'paused')
             threading.Thread(target=self.execute,args=(job,generation),daemon=True).start()
             return job
 
     def update(self,job,state,**fields):
+        if state in {'completed','failed','cancelled'}:fields['cancellable']=False
         job.update(state=state,**fields)
         with self.lock:
             self.db.execute('UPDATE operations SET state=?,document=? WHERE id=?',(state,canonical(job),job['id']))
@@ -123,6 +128,7 @@ class Operator:
             stream.write(canonical(self.remote.private.clean({'at':utc(),**job}))+'\n')
 
     def check(self,generation):
+        if generation in self.cancelled_generations:raise DomainError('START_CANCELLED')
         if generation!=self.generation:raise DomainError('OPERATION_SUPERSEDED')
 
     def start_transports(self):
@@ -137,7 +143,7 @@ class Operator:
                 self.check(generation)
                 return self._execute(job,generation)
         except DomainError as error:
-            self.update(job,'failed',issue=error.issue(),finishedAt=utc())
+            self.update(job,'cancelled' if error.code=='START_CANCELLED' else 'failed',cancellable=False,issue=error.issue(),finishedAt=utc())
 
     def _execute(self,job,generation):
         remote=self.remote;action=job['action'];self.update(job,'running')
@@ -158,9 +164,20 @@ class Operator:
                 if not live:
                     started_here=True
                     self.update(job,'running',stage='Starting saved GPU Pod; no additional Pod is created')
-                    remote.resume();self.check(generation)
+                    def progress(state):
+                        self.check(generation)
+                        if state['phase']=='ready':
+                            self.pod={'state':'RUNNING','observedAt':utc()}
+                            atomic(remote.deployment/'pod-observation.json',self.pod)
+                        self.update(job,'running',startup=state,stage=state['stage'])
+                        intent(remote.deployment,'waiting_gpu' if state['phase']=='waiting_capacity' else 'starting')
+                    remote.resume(on_progress=progress,check_cancelled=lambda:self.check(generation));self.check(generation)
+                    self.update(job,'running',stage='Starting the benchmark controller and canonical video runtime.')
                     remote.ensure_started();self.check(generation)
                     self.start_transports();self.check(generation)
+                with self.lock:
+                    self.check(generation)
+                    self.update(job,'running',cancellable=False,stage='Services are ready. Starting the selected experiment.')
                 remote.workflow_admitted=set()
                 from .run_selection import create,activate,selected
                 saved_selection=selected(remote)
@@ -171,6 +188,9 @@ class Operator:
                 self.check(generation)
                 intent(remote.deployment,'active')
                 self.update(job,'completed',result=result,finishedAt=utc())
+            elif action=='cancel-start':
+                intent(remote.deployment,'stopped')
+                self.update(job,'completed',stage='Startup cancelled. No benchmark was started.',finishedAt=utc())
             elif action in {'pause','resume','stop-gpu'}:
                 runs=remote.api_items('/runs')
                 if action=='resume':
@@ -199,12 +219,12 @@ class Operator:
                 self.update(job,'completed',warning='In-flight outcomes may be unknown; use saved handles for recovery.',finishedAt=utc())
         except Exception as error:
             if action in {'start','new-run','resume-run'}:
-                intent(remote.deployment,'stopped' if started_here else previous_intent)
+                intent(remote.deployment,'stopped' if started_here or isinstance(error,DomainError) and error.code=='START_CANCELLED' else previous_intent)
                 if started_here:
                     try:remote.stop()
                     except Exception:pass
             issue=error.issue() if isinstance(error,DomainError) else DomainError('OPERATION_FAILED').issue()
-            self.update(job,'failed',issue=issue,finishedAt=utc())
+            self.update(job,'cancelled' if isinstance(error,DomainError) and error.code=='START_CANCELLED' else 'failed',cancellable=False,issue=issue,finishedAt=utc())
 
     def log_page(self,query):
         service=query.get('service',['operator'])[0]

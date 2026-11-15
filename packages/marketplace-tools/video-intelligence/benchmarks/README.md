@@ -48,7 +48,14 @@ At a completed/blocked stage the launcher checkpoints evidence and stops the
 GPU. The dashboard then reads a verified local SQLite snapshot. Stopped RunPod
 storage can still incur charges. Ctrl-C pauses dispatch, drains outstanding
 calls, backs up, and stops the Pod. No top-ups, additional rentals or silent
-model substitutions occur. An unavailable saved GPU host is reported explicitly.
+model substitutions occur. An unavailable saved GPU host stays queued and retries automatically after
+30, 60, 120, then 300 seconds between attempts. Home shows **Waiting for GPU
+capacity**, the next attempt time and **Cancel startup**. Capacity waiting does
+not create a second Pod or dispatch model calls. After RunPod accepts start,
+allow up to 15 minutes for SSH readiness; a stuck accepted start is stopped.
+Authentication/credit/permanent request errors still fail immediately. Keep the
+PC and launcher running while waiting; restarting the bridge marks an unfinished
+startup interrupted instead of silently authorizing a new one.
 
 ```sh
 ./launch.sh new                     # New independent pilot, automatically selected in UI
@@ -67,7 +74,7 @@ Logs and the private Pod connection live in `data/deployment/`. The launcher
 refuses occupied ports; it only stops children it previously started and whose
 process start time still matches. It never selects an arbitrary free web port.
 
-The default **Home** shows four provider scores, answer counts, run status,
+The default **Home** shows the selected provider scores, answer counts, run status,
 known API cost and response time. Choose an experiment from the dropdown, then
 use **New benchmark**, **Resume selected run**, **Pause**, or **Save & stop GPU**.
 A new run is disabled while another is active; pause it first. **Advanced** keeps
@@ -184,3 +191,28 @@ GPU requires typing `STOP GPU`: it skips the final drain/backup, may leave unkno
 paid outcomes, and never makes existing provider charges disappear. Operator
 commands use durable IDs, body-hash idempotency, revisions, server-side credentials
 and exact loopback Origin checks. The supervisor never opens a publication run.
+
+
+## Current prospective model matrix
+
+| System | Exact model | Route | Input |
+| --- | --- | --- | --- |
+| Qwen | `alibaba/qwen3.8-max` | Vercel Gateway | Up to 128 timestamped frames + official subtitles/canonical ASR |
+| Meta Muse Spark | `meta/muse-spark-1.3` | Vercel Gateway | Same frame/subtitle protocol |
+| MiniMax | `minimax/minimax-m3` | Vercel Gateway | Same frame/subtitle protocol |
+| Gemini | `google/gemini-3.8-flash` | Vercel Gateway | Full native video/audio within declared input limits |
+| TwelveLabs | `pegasus1.5` | TwelveLabs direct Analyze | Full native video/audio |
+| Larkup | Gemini 3.6 Flash brain/vision; Gemini 3.8 Flash answer; Deepgram nova-3 audio | Canonical runtime + Gateway/Deepgram | Canonical evidence/query/inspection |
+
+The same-backbone retrieval ablation keeps the Larkup answer model fixed.
+The three new frame baselines use explicit letter-labelled options (v2 variants).
+Old runs and prompts remain unchanged. `data/frozen-profile-v5.json` and
+`data/frozen-pilot-v5.json` describe the next pilot: the same eight development
+videos and 19 official questions, six main systems plus six retrieval-ablation
+cells (120 planned answers). This is a new requested model matrix, not a
+publication expansion. No scores are mixed with the earlier pilot.
+
+**New benchmark** automatically smoke-tests missing immutable variants first,
+shows that smoke run, and selects its pilot once every required service returns
+nonempty answers. A failed/incomplete smoke prevents the pilot. Pause/stop still
+work between stages. The continue/stop/inconclusive gate remains unchanged.
