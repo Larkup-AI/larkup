@@ -96,3 +96,21 @@ test('retry countdown handles scheduled, due and missing timestamps', () => {
   assert.equal(retryCountdown(null, now), null);
   assert.equal(retryCountdown('invalid', now), null);
 });
+
+test('blocked service checks remain actionable after the controller disconnects', () => {
+  const blocked = { ...row, blockedCount: 4, stateCounts: { blocked: 4 } };
+  for (const live of [true, false]) {
+    assert.deepEqual(providerActivity({ ...base, row: blocked, runState: 'blocked', live }), {
+      label: '4 blocked',
+      tone: 'bad',
+      pulse: false,
+    });
+  }
+});
+
+test('completed provider results keep their meaning in saved checkpoints', () => {
+  assert.deepEqual(
+    providerActivity({ ...base, live: false, row: { ...row, completedCount: 10 } }),
+    { label: 'Complete', tone: 'go', pulse: false },
+  );
+});

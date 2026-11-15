@@ -197,10 +197,54 @@ export function Home({
             {system?.controllerAvailable ? 'Live · updates every 2 seconds' : 'Saved checkpoint'}
           </span>
         </div>
-        <h2>Provider scores</h2>
+        {snapshot && (
+          <div className={`banner ${snapshot.state === 'blocked' ? 'error' : ''}`} role="status">
+            <strong>
+              {snapshot.phase === 'smoke'
+                ? 'Step 1: Service check'
+                : snapshot.phase === 'pilot'
+                  ? 'Step 2: Benchmark comparison'
+                  : `${snapshot.phase} experiment`}
+              {' · '}
+              {snapshot.coverage.plannedQuestions} questions per participating provider
+              {' · '}
+              {snapshot.coverage.plannedVariants} providers
+            </strong>
+            {snapshot.phase === 'smoke' && (
+              <p>
+                This is a short readiness check, not the full comparison. Only providers needing
+                verification participate. The full comparison starts only after every required
+                provider passes; answers below count this check only.
+              </p>
+            )}
+            {snapshot.state === 'blocked' && (
+              <p>
+                Stopped: a service needs attention. Nothing is processing in this experiment. Fix
+                the service errors before starting another benchmark.
+              </p>
+            )}
+            {!!snapshot.blockers.length && (
+              <ul>
+                {snapshot.blockers.map((issue, index) => (
+                  <li key={`${issue.code}-${issue.scopeId}-${index}`}>
+                    {issue.scopeId ? `${issue.scopeId}: ` : ''}
+                    {issue.message} ({issue.code})
+                  </li>
+                ))}
+              </ul>
+            )}
+            {snapshot.phase === 'smoke' && runs.some((run) => run.phase === 'pilot') && (
+              <button onClick={() => onSelect(runs.find((run) => run.phase === 'pilot')!.id)}>
+                View earlier comparison
+              </button>
+            )}
+          </div>
+        )}
+        <h2>{snapshot?.phase === 'smoke' ? 'Service check results' : 'Provider scores'}</h2>
         <p className="note">
-          Orange: waiting / preparing · Pulsing green: processing · Green: complete · Gray: inactive
-          / saved checkpoint
+          Orange: queued / waiting · Pulsing green: processing · Green: complete · Red: blocked /
+          failed · Gray: not participating or paused. Saved results keep their completion/error
+          colors.
         </p>
         <div className="data-scroll">
           <table>
@@ -208,7 +252,7 @@ export function Home({
               <tr>
                 <th>Provider</th>
                 <th>Current score</th>
-                <th>Answers</th>
+                <th>Answered / planned in this stage</th>
                 <th>Status</th>
                 <th>Known API cost</th>
                 <th>Response time</th>
@@ -221,13 +265,16 @@ export function Home({
                     (t) => t.variantId === row?.variantId && t.stage === 'answer',
                   );
                 const total = row?.completedCount ?? 0;
-                const activity = providerActivity({
-                  row,
-                  runState: snapshot?.state,
-                  live: system?.controllerAvailable === true,
-                  tasks,
-                  queueLabel: queueView ? queueLabel : undefined,
-                });
+                const activity =
+                  !metrics && !queueView
+                    ? { label: 'Loading provider results…', tone: 'idle', pulse: false }
+                    : providerActivity({
+                        row,
+                        runState: snapshot?.state,
+                        live: system?.controllerAvailable === true,
+                        tasks,
+                        queueLabel: queueView ? queueLabel : undefined,
+                      });
                 const check = system?.readiness?.checks.find(
                   (c) => c.system === name && (!row?.logicalModel || c.model === row.logicalModel),
                 );
@@ -270,9 +317,29 @@ export function Home({
                       </div>
                     </td>
                     <td>
-                      {total} / {row?.plannedCount ?? '—'}
+                      {!metrics
+                        ? 'Loading results…'
+                        : row
+                          ? `${total} / ${row.plannedCount}`
+                          : 'Not participating'}
                     </td>
-                    <td>{activity.label}</td>
+                    <td>
+                      <strong>{activity.label}</strong>
+                      {row &&
+                        (() => {
+                          const issues = tasks.filter(
+                            (task) => task.variantId === row.variantId && task.issue,
+                          );
+                          const issue =
+                            issues.find((task) => task.issue?.code !== 'DEPENDENCY_BLOCKED')
+                              ?.issue ?? issues[0]?.issue;
+                          return issue ? (
+                            <div className="note">
+                              {issue.message} ({issue.code})
+                            </div>
+                          ) : null;
+                        })()}
+                    </td>
                     <td>
                       {row?.cost.actual == null ? 'Unknown' : fmtMoney(row.cost.actual, 'USD')}
                       {!!row?.cost.unknownAttemptCount && (
@@ -287,13 +354,14 @@ export function Home({
           </table>
         </div>
         <p className="note">
-          Scores use answered questions only. Different answer counts are not a fair ranking.
-          Blocked API calls are not wrong answers. Retrieval ablation, logs, database and full
-          exports are in Advanced.
+          Scores use answered questions in this stage only. Service check scores are not benchmark
+          comparison results. Different answer counts are not a fair ranking. Blocked API calls are
+          not wrong answers. Retrieval ablation, logs, database and full exports are in Advanced.
         </p>
         {system?.readiness && (
           <p className="note">
-            Service checks: {new Date(system.readiness.checkedAt).toLocaleString()}.{' '}
+            Historical service checks (not this experiment):{' '}
+            {new Date(system.readiness.checkedAt).toLocaleString()}.{' '}
             {system.readiness.limitations.join(' ')}
           </p>
         )}

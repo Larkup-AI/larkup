@@ -21,20 +21,24 @@ export function providerActivity({
 }): Activity {
   if (queueLabel) return { label: queueLabel, tone: 'warn', pulse: false };
   if (!row) return { label: 'Not in this run', tone: 'idle', pulse: false };
-  if (!live) return { label: 'Saved checkpoint', tone: 'idle', pulse: false };
   if (row.plannedCount > 0 && row.completedCount === row.plannedCount)
     return { label: 'Complete', tone: 'go', pulse: false };
-  if (runState !== 'running') return { label: runState ?? 'Waiting', tone: 'idle', pulse: false };
   // Summary counts cover the entire run; tasks also include source preparation.
   const active =
     ACTIVE.some((state) => (row.stateCounts[state] ?? 0) > 0) ||
     tasks.some((t) => t.variantId === row.variantId && ACTIVE.includes(t.state));
+  if ((!active || runState !== 'running' || !live) && row.blockedCount)
+    return { label: `${row.blockedCount} blocked`, tone: 'bad', pulse: false };
+  if ((!active || runState !== 'running' || !live) && row.stateCounts.failed)
+    return { label: `${row.stateCounts.failed} failed`, tone: 'bad', pulse: false };
+  if (!live) return { label: 'Saved checkpoint', tone: 'idle', pulse: false };
+  if (runState !== 'running') return { label: runState ?? 'Waiting', tone: 'idle', pulse: false };
   if (active) return { label: 'Processing', tone: 'go', pulse: true };
   if (row.stateCounts.failed)
     return { label: `${row.stateCounts.failed} failed`, tone: 'bad', pulse: false };
   if (row.stateCounts.waiting_quota)
     return { label: 'Waiting for quota', tone: 'warn', pulse: false };
-  if (row.blockedCount) return { label: `${row.blockedCount} blocked`, tone: 'warn', pulse: false };
+  if (row.blockedCount) return { label: `${row.blockedCount} blocked`, tone: 'bad', pulse: false };
   return { label: 'Preparing / queued', tone: 'warn', pulse: false };
 }
 

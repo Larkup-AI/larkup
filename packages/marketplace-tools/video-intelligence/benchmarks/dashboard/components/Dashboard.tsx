@@ -164,7 +164,12 @@ export default function Dashboard() {
             providerUsage: metrics.providerUsage ?? [],
           }
         : null;
-      setData({ snapshot, metrics: safeMetrics, tasks: tasks ?? [], results: results ?? [] });
+      setData((previous) => ({
+        snapshot,
+        metrics: safeMetrics ?? (previous?.snapshot.id === id ? previous.metrics : null),
+        tasks: tasks ?? [],
+        results: results ?? [],
+      }));
       setScopes(scopeList ?? []);
       setError(null);
 
