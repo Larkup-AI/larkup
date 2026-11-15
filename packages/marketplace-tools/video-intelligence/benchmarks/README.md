@@ -76,17 +76,38 @@ dependencies when needed; dashboard source is in `dashboard/`.
 At a completed/blocked stage the launcher checkpoints evidence and stops the
 GPU. The dashboard then reads a verified local SQLite snapshot. Stopped RunPod
 storage can still incur charges. Ctrl-C pauses dispatch, drains outstanding
-calls, backs up, and stops the Pod. No top-ups, additional rentals or silent
-model substitutions occur. An unavailable saved GPU host stays queued and retries automatically after
-30, 60, 120, then 300 seconds between attempts. Home shows **Waiting for GPU
-capacity**, the next attempt time and **Cancel startup**. Capacity waiting does
-not create a second Pod or dispatch model calls. After RunPod accepts start,
-allow up to 15 minutes for an actual SSH handshake; a published port alone is
-not readiness. Then wait for both the benchmark controller and canonical video
-runtime health checks before dispatch. A stuck accepted start is stopped.
-Authentication/credit/permanent request errors still fail immediately. Keep the
-PC and launcher running while waiting; restarting the bridge marks an unfinished
-startup interrupted instead of silently authorizing a new one.
+calls, backs up, and stops the Pod. No top-ups or silent model substitutions occur.
+
+GPU startup retries after 60 seconds, then at most every 120 seconds. After two
+saved-host capacity failures, the PC operator also checks compatible NVIDIA GPUs
+in RunPod Community and Secure Cloud. It tries cheaper compatible offers first,
+then raises the search budget by 15% per round, bounded by
+`data/deployment/gpu-policy.json` (`maxHourlyUsd`, default USD 0.75/hour).
+Rejected quotes are deprioritized for ten minutes so stale low-price listings do
+not prevent trying the next tier. At most three candidates are attempted per pass.
+An allocation whose returned rate exceeds that round's cap is discarded before
+trying another candidate. Provider credits and rental/storage are separate charges.
+
+Automatic relocation requires a verified idle checkpoint containing the database
+and canonical evidence/runtime state. Full saved checkpoints are immutable copies;
+admitting new run work invalidates relocation eligibility until another complete
+idle checkpoint is captured. Unfinished runtime jobs or ambiguous paid outcomes
+are not silently replayed. A unique allocation name/journal recovers interrupted
+allocation requests without creating a second rental. The original Pod's storage
+is retained; only an unsuccessful algorithm-created replica is discarded.
+
+The saved connection switches only after checkpoint restoration is verified.
+SSH, controller and canonical runtime readiness are still required before any
+benchmark dispatch. `Cancel startup` also cancels transfer/setup and cleans up
+an unpromoted replica. If an allocation or cleanup outcome cannot be reconciled,
+startup stops for review instead of renting another Pod. Availability is not a
+guaranteed queue or ETA.
+
+`templateId` in the capacity policy optionally selects an existing compatible
+RunPod template; the saved immutable image and explicit SSH/storage settings still
+apply. The standard PyTorch template avoids an incompatible base image, but does
+not reserve GPU capacity or remove the need to restore data/install benchmark code.
+A genuinely prebuilt benchmark image can shorten that latter step separately.
 
 ```sh
 ./launch.sh new                     # New independent pilot, automatically selected in UI

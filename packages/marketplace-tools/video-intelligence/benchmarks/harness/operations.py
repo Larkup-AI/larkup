@@ -164,7 +164,7 @@ class Operator:
                 intent(remote.deployment,'starting')
                 if not live:
                     started_here=True
-                    self.update(job,'running',stage='Starting saved GPU Pod; no additional Pod is created')
+                    self.update(job,'running',stage='Starting GPU; bounded alternative-host search is enabled')
                     def progress(state):
                         self.check(generation)
                         if state['phase']=='ready':

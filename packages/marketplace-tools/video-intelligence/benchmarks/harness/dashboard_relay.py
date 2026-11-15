@@ -71,6 +71,9 @@ def handler(operator,token):
                 with (control_lock(operator.remote.deployment) if self.command=='POST' else nullcontext()):
                     if self.command=='POST' and intent(operator.remote.deployment)['mode'] in {'starting','stopping','stopped'}:
                         raise DomainError('SUPERVISOR_TRANSITION_USE_OPERATOR_CONTROLS',status=409)
+                    if self.command=='POST' and path.startswith('/runs/') and path.rsplit('/',1)[-1] in {'start','resume'}:
+                        from .gpu_capacity import invalidate_checkpoint
+                        invalidate_checkpoint(operator.remote)
                     try:response=urllib.request.urlopen(request,timeout=10)
                     except urllib.error.HTTPError as error:response=error
                     except OSError:

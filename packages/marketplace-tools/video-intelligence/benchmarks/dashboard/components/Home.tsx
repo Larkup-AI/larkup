@@ -147,7 +147,7 @@ export function Home({
             <div className="note">Request {queued.id}</div>
             <p>
               {queued.startup?.phase === 'waiting_capacity'
-                ? 'Your request is saved. The saved GPU host has no available capacity. The benchmark will start automatically when capacity returns.'
+                ? 'Your request is saved. Checking the saved GPU host and compatible alternatives within the configured price cap. The benchmark starts after data and services are ready.'
                 : 'Your request is saved. Starting GPU and benchmark services; the experiment will open here automatically.'}
             </p>
             <span>No new answers yet. You can browse earlier experiments while waiting.</span>

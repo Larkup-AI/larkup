@@ -47,7 +47,7 @@ class Remote:
             raise DomainError('RUNPOD_API_UNAVAILABLE') from None
         if result.get('errors'):
             messages = ' '.join(str(e.get('message', '')).lower() for e in result['errors'])
-            if 'not enough free gpu' in messages or 'zero gpu' in messages:
+            if any(value in messages for value in ('not enough free gpu', 'zero gpu', 'no longer any instances available')):
                 raise DomainError('RUNPOD_GPU_UNAVAILABLE')
             raise DomainError('RUNPOD_REQUEST_REJECTED')
         return result['data']
@@ -71,10 +71,12 @@ class Remote:
         return result
 
     def resume(self, *, on_progress=None, check_cancelled=None, sleep=None, clock=None):
-        """Wait for saved-host capacity, then for SSH; never allocate another Pod."""
+        """Retry saved-host capacity, then restore a bounded alternative when needed."""
         from datetime import datetime,timedelta,timezone
         pause=sleep or time.sleep;now=clock or time.monotonic
         check=check_cancelled or (lambda:None)
+        from .gpu_capacity import load_policy
+        policy=load_policy(self)
         attempt=0;boot_deadline=None;last=None
         def report(phase,**fields):
             nonlocal last
@@ -88,6 +90,10 @@ class Remote:
             while now()<deadline:
                 check();pause(min(1,deadline-now()))
             check()
+        journal=self.deployment/'gpu-relocation.json'
+        if journal.exists() and json.loads(journal.read_text()).get('status') in {'allocating','allocated','restoring','cleanup_required'}:
+            if self.capacity_fallback(attempt=policy.afterFailures,check=check,report=report):
+                report('ready',stage='Alternative GPU restored. Preparing benchmark services.');check();return
         while True:
             check()
             if boot_deadline is not None and now()>=boot_deadline:
@@ -121,10 +127,12 @@ class Remote:
                     self.gql('mutation { podResume(input:{podId:'+json.dumps(self.state['podId'])+',gpuCount:1}) {id desiredStatus} }')
                 except DomainError as error:
                     if error.code!='RUNPOD_GPU_UNAVAILABLE':raise
-                    delay=(30,60,120,300)[min(attempt-1,3)]
+                    if attempt>=policy.afterFailures and self.capacity_fallback(attempt=attempt,check=check,report=report):
+                        report('ready',stage='Alternative GPU restored. Preparing benchmark services.');check();return
+                    delay=min(120,policy.retrySeconds*(1 if attempt==1 else 2))
                     report('waiting_capacity',retrySeconds=delay,
                            nextRetryAt=(datetime.now(timezone.utc)+timedelta(seconds=delay)).isoformat(),
-                           stage='Waiting for GPU capacity on the saved RunPod host. Retrying in '+str(delay)+' seconds automatically.')
+                           stage='Waiting for GPU capacity. Retrying the saved host and bounded alternatives in '+str(delay)+' seconds automatically.')
                     wait(delay);continue
                 boot_deadline=now()+900
                 report('starting_gpu',stage='RunPod accepted start. Waiting for the GPU and SSH service.')
@@ -132,6 +140,10 @@ class Remote:
             if boot_deadline is None:boot_deadline=now()+900
             report('starting_gpu',stage='RunPod is waking up. Waiting for the GPU and SSH service.')
             wait(min(5,max(0,boot_deadline-now())))
+
+    def capacity_fallback(self, **kwargs):
+        from .gpu_capacity import relocate
+        return relocate(self, **kwargs)
 
     def bundle(self, remote_hashes=None):
         paths = ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'patches', 'packages/core', 'packages/marketplace',
@@ -361,6 +373,9 @@ print(json.dumps(dict(revision=revision,running=running,active=active)))
         credentials = json.loads((self.deployment / 'relay.json').read_text())
         headers = {'Authorization': 'Bearer ' + credentials['controllerToken'], 'Content-Type': 'application/json',
                    'Origin': 'http://127.0.0.1:3100', 'Idempotency-Key': key or 'cli-' + secrets.token_hex(12)}
+        if doc is not None and suffix.startswith('/runs/') and suffix.rsplit('/',1)[-1] in {'start','resume'}:
+            from .gpu_capacity import invalidate_checkpoint
+            invalidate_checkpoint(self)
         req = urllib.request.Request('http://127.0.0.1:28890/api/v1' + suffix, headers=headers,
                                      data=canonical(doc).encode() if doc is not None else None)
         try:
@@ -435,6 +450,11 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
                             __import__('shutil').copyfileobj(source, target_file)
                         temporary.chmod(0o600)
                         temporary.replace(destination)
+        if getattr(self, 'checkpoint_evidence', False):
+            from .gpu_capacity import capture_checkpoint
+            try:capture_checkpoint(self)
+            except DomainError as error:
+                if error.code!='RECOVERY_CHECKPOINT_UNSAFE':raise
         return {'backup': 'verified', 'at': utc()}
 
     def api_items(self, path):
@@ -556,7 +576,7 @@ def launch_session(remote, args):
         remote.local_ports(not args.no_dashboard, preserve_transports=args.view_only or manual)
         if args.command in {'launch','new','resume-run'} and not args.view_only:
             rental_active = True  # Also clean up if startup fails after resume was accepted.
-            print('Starting the saved RunPod GPU. No additional Pod will be created.', flush=True)
+            print('Starting RunPod GPU; compatible alternatives are bounded by the configured hourly cap.', flush=True)
             remote.resume(check_cancelled=check_startup_cancelled)
             print('Checking the canonical runtime and controller version…', flush=True)
             remote.ensure_started()

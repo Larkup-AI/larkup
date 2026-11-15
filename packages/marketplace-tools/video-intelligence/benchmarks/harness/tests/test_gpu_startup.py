@@ -14,7 +14,7 @@ class GPUStartupTest(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.r=object.__new__(Remote)
         self.r.deployment=Path(self.tmp.name);self.r.state={'podId':'fixture-pod'}
-        self.r.ssh=Mock(return_value=SimpleNamespace(returncode=0,stderr=b''));self.r.account=Mock(return_value={'clientBalance':10});self.clock=Clock();self.events=[]
+        self.r.capacity_fallback=Mock(return_value=False);self.r.ssh=Mock(return_value=SimpleNamespace(returncode=0,stderr=b''));self.r.account=Mock(return_value={'clientBalance':10});self.clock=Clock();self.events=[]
     def tearDown(self):self.tmp.cleanup()
     def resume(self,**kwargs):
         return self.r.resume(on_progress=self.events.append,sleep=self.clock.sleep,clock=self.clock.now,**kwargs)
@@ -28,11 +28,20 @@ class GPUStartupTest(unittest.TestCase):
                 accepted=True;return {'podResume':{'desiredStatus':'RUNNING'}}
             return {'pod':{'desiredStatus':'RUNNING' if accepted else 'EXITED','runtime':{'ports':[{'privatePort':22,'publicPort':30022,'isIpPublic':True,'ip':'127.0.0.1'}]} if accepted else None}}
         self.r.gql=Mock(side_effect=api);self.resume()
-        self.assertEqual(len(starts),3);self.assertEqual(self.clock.value,90)
+        self.assertEqual(len(starts),3);self.assertEqual(self.clock.value,180)
         waits=[e for e in self.events if e['phase']=='waiting_capacity']
-        self.assertEqual([e['retrySeconds'] for e in waits],[30,60])
+        self.assertEqual([e['retrySeconds'] for e in waits],[60,120])
         self.assertEqual(self.events[-1]['phase'],'ready');self.assertEqual(self.r.state['sshPort'],30022)
         self.assertTrue(all(x<=1 for x in self.clock.sleeps))
+    def test_capacity_fallback_is_attempted_after_one_minute_without_another_original_rental(self):
+        self.r.gql=Mock(side_effect=lambda q: (_ for _ in ()).throw(DomainError('RUNPOD_GPU_UNAVAILABLE')) if 'podResume' in q else {'pod':{'desiredStatus':'EXITED'}})
+        self.r.capacity_fallback.return_value=True
+        self.resume()
+        self.assertEqual(self.clock.value,60)
+        self.assertEqual(self.r.capacity_fallback.call_count,1)
+        self.assertEqual(self.r.capacity_fallback.call_args.kwargs['attempt'],2)
+        self.assertEqual(self.events[-1]['phase'],'ready')
+
     def test_waiting_can_be_cancelled_before_another_resume_or_connection(self):
         self.r.gql=Mock(side_effect=lambda q: (_ for _ in ()).throw(DomainError('RUNPOD_GPU_UNAVAILABLE')) if 'podResume' in q else {'pod':{'desiredStatus':'EXITED'}})
         def check():
@@ -102,11 +111,11 @@ class GPUStartupTest(unittest.TestCase):
                 if starts<7:raise DomainError('RUNPOD_GPU_UNAVAILABLE')
             return {'pod':{'desiredStatus':'RUNNING' if starts==7 else 'EXITED','runtime':{'ports':[{'privatePort':22,'publicPort':22,'isIpPublic':True,'ip':'127.0.0.1'}]}},'podResume':{}}
         self.r.gql=Mock(side_effect=api);self.resume()
-        self.assertEqual([e['retrySeconds'] for e in self.events if e['phase']=='waiting_capacity'],[30,60,120,300,300,300])
+        self.assertEqual([e['retrySeconds'] for e in self.events if e['phase']=='waiting_capacity'],[60,120,120,120,120,120])
         self.assertEqual(self.r.account.call_count,7)
     def test_accepted_but_stuck_start_has_a_bounded_boot_deadline(self):
         self.r.gql=Mock(return_value={'pod':{'desiredStatus':'RUNNING','runtime':{'ports':[]}},'podResume':{}})
         with self.assertRaises(DomainError) as e:self.resume()
-        self.assertEqual(e.exception.code,'RUNPOD_STARTUP_INCOMPLETE');self.assertLessEqual(self.clock.value,900)
+        self.assertEqual(e.exception.code,'RUNPOD_STARTUP_INCOMPLETE');self.assertLessEqual(self.clock.value,1800)
 
 if __name__=='__main__':unittest.main()
