@@ -128,6 +128,12 @@ def request_existing(remote,args):
     try:
         while True:
             snap=call('/runs/'+run_id);scores=call('/runs/'+run_id+'/metrics')
+            if args.command=='new' and snap.get('phase')=='smoke':
+                system=call('/system')
+                if system.get('selectedRunId') and system['selectedRunId']!=run_id:
+                    run_id=system['selectedRunId'];print('Tracking pilot: '+run_id,flush=True);continue
+                if snap['state']=='completed' and system.get('supervisor',{}).get('mode')=='active':
+                    print('Smoke complete. Waiting for automatic pilot admission.',flush=True);time.sleep(2);continue
             print(canonical({'runId':run_id,'state':snap['state'],'coverage':snap['coverage'],'cost':snap['cost'],'providers':scores.get('summary',[])}),flush=True)
             if snap['state'] not in {'running','pausing','cancelling'}:break
             time.sleep(5)

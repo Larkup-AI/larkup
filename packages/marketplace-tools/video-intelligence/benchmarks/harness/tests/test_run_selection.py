@@ -68,6 +68,23 @@ class RunSelectionTest(unittest.TestCase):
         self.assertEqual(len(self.calls),1)
 
 class ExistingLauncherCommandTest(unittest.TestCase):
+    def test_cli_monitor_follows_smoke_into_automatically_selected_pilot(self):
+        import io
+        from unittest.mock import patch
+        from harness.run_selection import request_existing
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);atomic(root/'relay.json',{'controllerToken':'test-controller-token'})
+            payloads=iter([{'revision':'one'},{'id':'op','state':'completed','result':{'runId':'run-smoke'}},
+                {'state':'completed','phase':'smoke','coverage':{},'cost':{}},{'summary':[]},
+                {'selectedRunId':'run-pilot','supervisor':{'mode':'active'}},
+                {'state':'paused','phase':'pilot','coverage':{},'cost':{}},{'summary':[]}])
+            paths=[]
+            def response(request,**kw):
+                paths.append(request.full_url);return io.BytesIO(json.dumps(next(payloads)).encode())
+            with patch('urllib.request.urlopen',side_effect=response),patch('builtins.print'):
+                request_existing(SimpleNamespace(deployment=root),SimpleNamespace(command='new',detach=False,run_id=None))
+            self.assertTrue(any(path.endswith('/runs/run-pilot') for path in paths))
+
     def test_cli_new_and_selected_resume_use_authenticated_existing_supervisor(self):
         import threading,json
         from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
