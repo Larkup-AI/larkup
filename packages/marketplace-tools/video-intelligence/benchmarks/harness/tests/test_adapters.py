@@ -167,13 +167,15 @@ class AdapterTest(unittest.TestCase):
         from pathlib import Path
         with tempfile.TemporaryDirectory() as directory:
             c = Context('twelvelabs')
+            c.root = Path(directory)
             c.path = Path(directory) / 'source.mp4'
             c.path.write_bytes(b'development media fixture')
             async def submit(method, suffix, **kwargs):
                 c.calls.append((method, suffix, kwargs))
                 return Response(201, {}, b'{"id":"asset-fixture"}', 1)
             c.call = submit
-            result = asyncio.run(TwelveLabs().prepare(c))
+            with patch('harness.native_media.normalized_mp4',new=AsyncMock(return_value=c.path)):
+                result = asyncio.run(TwelveLabs().prepare(c))
             self.assertTrue(c.calls[0][2]['paid'])
             self.assertEqual(c.handles, [{'assetId': 'asset-fixture'}])
             self.assertEqual(result['assetId'], 'asset-fixture')

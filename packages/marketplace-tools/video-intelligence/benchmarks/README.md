@@ -303,3 +303,11 @@ Marengo 3.0/3.5, image, Search and Jockey rates. Embed/Search are charged in an
 estimate only when invoked; this adapter invokes neither. Plans/allowances do not
 change these list-price equivalents (Free USD 0/3GB; Plus USD 29/50GB; Pro USD
 99/200GB; Enterprise custom). Estimates are not invoices or plan subscriptions.
+
+Large native-video ingestion uses provider-supported transport instead of raising
+an inline limit: Gemini Gateway can reference the public original YouTube source
+for oversized files (disclosed as original-source native URL input). TwelveLabs
+receives a standard fast-start MP4 created with FFmpeg stream copy. The source
+file stays unchanged; no frames/audio are re-encoded. Normalization time is
+recorded separately from upload time. Fragmented MP4 ingestion must be verified
+with a real processed asset and answer, not just successful upload acceptance.
