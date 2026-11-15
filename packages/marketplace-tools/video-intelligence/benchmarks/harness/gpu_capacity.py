@@ -250,10 +250,6 @@ def restore_target(remote, target, saved, check, report):
     proof = target.ssh("python3 -c " + shlex.quote("import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('" + REMOTE_BENCH + "/data/state/benchmark.sqlite3').read_bytes()).hexdigest())"))
     if proof.stdout.decode().strip() != saved['databaseSha256']:
         raise DomainError('RECOVERY_CHECKPOINT_INVALID')
-    credentials = json.loads((remote.deployment / 'relay.json').read_text())
-    tokens = 'BENCHMARK_CONTROLLER_TOKEN=' + credentials['controllerToken'] + '\nBENCHMARK_RUNTIME_TOKEN=' + secrets.token_urlsafe(40) + '\n'
-    target.ssh('umask 077; cat > ' + REMOTE_BENCH + '/data/deployment/tokens.env', data=tokens.encode())
-    target.ssh('umask 077; cat > ' + REMOTE_BENCH + '/data/deployment/relay.json', data=canonical(credentials).encode())
     check(); report('starting_gpu', stage='Installing benchmark services on the restored GPU. No model inference is being submitted.')
     target.install(); check()
 
