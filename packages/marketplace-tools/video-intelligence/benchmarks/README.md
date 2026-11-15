@@ -9,6 +9,35 @@ Read the [implementation plan](data/implementation-report.md),
 [controller API contract](data/dashboard-api-v1.md), and the repository's
 benchmarking guide before changing the scientific protocol.
 
+## Execution and resource use
+
+RunPod is temporary benchmark infrastructure only. Production Video Intelligence
+continues to use the canonical managed runtime. Native Gemini and TwelveLabs,
+and frame-based Qwen, Muse and MiniMax, execute model inference at their providers;
+they do not consume this Pod's GPU. The canonical Larkup runtime uses the GPU for
+its local operators. Configured external ASR/vision/brain roles retain their
+explicit provider paths.
+
+The default scheduler admits up to eight tasks, with at most six answer tasks,
+two CPU preparation tasks, two uploads, and one GPU indexing task. Provider
+concurrency, RPM, credit checks and cooldowns still apply. Larkup and its retrieval
+control remain mutually exclusive because they currently share the relay's role
+and usage context. Do not raise that limit without isolating those contexts.
+Independent native/frame providers can overlap that canonical work.
+
+Frame providers sharing a source and extraction protocol decode frames once under
+a shared lock, then issue independent model requests. Temporary frame filenames
+are unique. Verified source hashes are cached by file identity, size, modification
+and change timestamps; modified files are rechecked. A saved bootstrap marker is
+not sufficient after a container restart: the launcher also checks its actual
+system binaries and Python environment.
+
+Service checks verify preparation and non-empty responses, independently of answer
+correctness. Short-fixture success does not establish long-source reliability.
+Multiple-choice accuracy uses the supplied reference option directly; an LLM judge
+is unnecessary for that score. Infrastructure failures remain separate from wrong
+answers, and unresolved paid outcomes must not be blindly submitted again.
+
 ## Start a new benchmark
 
 From this directory, with `benchmark.env` present and mode `0600`:

@@ -57,7 +57,7 @@ def default_profile(revision: str) -> dict:
         if adapter == 'gemini':
             variants[vid]['inputProtocol']['api'] = 'gateway-ai-sdk-v4'
     from .profiles import requested_models_profile
-    return requested_models_profile(dict(routes=routes, variants=variants, limits={'global': 4, 'gpu': 1, 'cpu': 2, 'upload': 2, 'qa': 3,
+    return requested_models_profile(dict(routes=routes, variants=variants, limits={'global': 8, 'gpu': 1, 'cpu': 2, 'upload': 2, 'qa': 6,
                                                           'judge': 1, 'attempts': 3, 'deadlineSeconds': 3600},
                 runtime=dict(endpoint='http://127.0.0.1:8787', indexingConcurrency=1, profileVariantId='larkup-gateway-brain-v2'),
                 protocol=dict(revision='accuracy-first-pilot-v3', variantIds=list(variants))))

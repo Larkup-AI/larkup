@@ -7,7 +7,14 @@ cd "$bench"
 mkdir -p data/deployment
 exec 9>data/deployment/bootstrap.lock
 flock -n 9 || exit 0
-if [[ ! -f data/deployment/bootstrap.done ]]; then
+# The volume survives a stopped Pod; its container-installed binaries may not.
+export PATH="/root/.local/bin:/opt/benchmark-node/bin:$PATH"
+if [[ ! -f data/deployment/bootstrap.done ]] ||
+   ! command -v ffmpeg >/dev/null || ! command -v espeak >/dev/null ||
+   ! command -v uv >/dev/null || ! command -v pnpm >/dev/null ||
+   ! command -v node >/dev/null ||
+   [[ "$(node -p 'Number(process.versions.node.split(".")[0])')" -lt 22 ]] ||
+   [[ ! -x "$bench/data/deployment/venv/bin/python" ]]; then
   apt-get update -qq
   apt-get install -y -qq ffmpeg espeak curl xz-utils libgomp1 >data/deployment/apt.log 2>&1
   if ! command -v uv >/dev/null; then

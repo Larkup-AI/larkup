@@ -51,7 +51,7 @@ class RemoteWorkflowTest(unittest.TestCase):
         def api(path, doc=None, **kwargs):
             calls.append((path, kwargs.get('key')))
             if path.endswith('/results?limit=200'):
-                return {'items': [{'variantId': v, 'questionId': 'q-0', 'state': 'completed', 'correct': True} for v in ['a', 'b']]}
+                return {'items': [{'variantId': v, 'questionId': 'q-0', 'state': 'completed', 'correct': True, 'answer': 'A response'} for v in ['a', 'b']]}
             if path == '/runs':
                 runs['pilot-run'] = {'id': 'pilot-run', 'state': 'draft', 'revision': '1'}
                 return runs['pilot-run']
@@ -90,6 +90,25 @@ class RemoteWorkflowTest(unittest.TestCase):
                     main()
                 self.assertEqual(error.exception.code, 'LAUNCHER_ALREADY_RUNNING')
                 launch.assert_not_called()
+
+    def test_port_guard_allows_closed_connections_but_rejects_a_live_listener(self):
+        import socket
+        original=socket.socket
+        listener=original();listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+        listener.bind(('127.0.0.1',0));listener.listen();port=listener.getsockname()[1]
+        class Probe:
+            def __init__(self,*args,**kwargs):self.socket=original(*args,**kwargs)
+            def __enter__(self):return self
+            def __exit__(self,*args):self.socket.close()
+            def __getattr__(self,name):return getattr(self.socket,name)
+            def bind(self,address):self.socket.bind(('127.0.0.1',port))
+        try:
+            with patch('socket.socket',Probe):
+                with self.assertRaises(DomainError):self.remote.local_ports(True,preserve_transports=True)
+            client=original();client.connect(('127.0.0.1',port));accepted,_=listener.accept()
+            accepted.close();client.recv(1);client.close();listener.close()
+            with patch('socket.socket',Probe):self.remote.local_ports(True,preserve_transports=True)
+        finally:listener.close()
 
     def test_dashboard_only_does_not_start_or_disconnect_existing_gpu_work(self):
         remote=MagicMock();remote.children=[];remote.deployment=self.remote.deployment

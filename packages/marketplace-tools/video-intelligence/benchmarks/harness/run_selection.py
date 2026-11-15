@@ -15,13 +15,18 @@ def assert_available(remote, except_id=None):
         raise DomainError('ANOTHER_RUN_ACTIVE_PAUSE_IT_FIRST',status=409)
 
 
+def service_check_completed(row):
+    return (row.get('state') == 'completed' and isinstance(row.get('answer'), str)
+            and bool(row['answer'].strip()))
+
+
 def missing_smoke(remote,variants):
     state=json.loads((remote.deployment/'workflow.json').read_text())
     certificates=set(state.get('smokeCertificates',[]))|{state.get('smoke'),state.get('nativeSmoke')}
     passed=set()
     for run_id in certificates-{None}:
         for row in remote.api_items('/runs/'+run_id+'/results'):
-            if row['state']=='completed' and row['correct'] is not None and isinstance(row.get('answer'),str) and row['answer'].strip():
+            if service_check_completed(row):
                 # This checks successful API completion, not benchmark superiority.
                 passed.add((row['variantId'],row['questionId']))
     smoke=json.loads((remote.data/'datasets/smoke-v1.json').read_text())

@@ -40,6 +40,56 @@ class Context:
 
 
 class AdapterTest(unittest.TestCase):
+    def test_unchanged_media_fingerprint_is_read_once_across_questions(self):
+        import hashlib
+        from harness.adapters import Context as RealContext
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();media=root/'clip.mp4';media.write_bytes(b'original media')
+            source={'path':'clip.mp4','sha256':hashlib.sha256(media.read_bytes()).hexdigest()}
+            c=object.__new__(RealContext);c.root=root;c.task={'run_id':'run-example','source_id':'source-example'}
+            c.store=MagicMock();c.store.one.return_value={'document':json.dumps(source)}
+            original=hashlib.sha256
+            with patch('harness.adapters.hashlib.sha256',wraps=original) as hasher:
+                for _ in range(5):self.assertEqual(c.path,media)
+                self.assertEqual(hasher.call_count,1)
+
+    def test_fingerprint_cache_rechecks_changed_media_even_when_size_and_mtime_match(self):
+        import hashlib,os
+        from harness.adapters import Context as RealContext
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();media=root/'clip.mp4';media.write_bytes(b'first-media')
+            source={'path':'clip.mp4','sha256':hashlib.sha256(media.read_bytes()).hexdigest()}
+            c=object.__new__(RealContext);c.root=root;c.task={'run_id':'run-example','source_id':'source-example'}
+            c.store=MagicMock();c.store.one.return_value={'document':json.dumps(source)}
+            self.assertEqual(c.path,media);before=media.stat()
+            media.write_bytes(b'other-media');os.utime(media,ns=(before.st_atime_ns,before.st_mtime_ns))
+            with self.assertRaises(DomainError) as error:c.path
+            self.assertEqual(error.exception.code,'SOURCE_FINGERPRINT_MISMATCH')
+
+    def test_concurrent_frame_providers_share_preparation_without_temp_file_races(self):
+        from harness.adapters import Qwen
+        async def exercise(root):
+            calls=[]
+            async def ffmpeg(*args, **kwargs):
+                calls.append(args)
+                Path(args[-1]).write_bytes(b'frame-fixture')
+                async def wait():
+                    await asyncio.sleep(0)
+                    return 0
+                return SimpleNamespace(wait=wait)
+            contexts=[SimpleNamespace(source={'durationMs':3000,'sha256':'independent-content','subtitles':[{'startMs':0,'endMs':3000,'text':'fixture'}]},
+                                      path=root/'source.mp4',root=root,variant={'inputProtocol':{'maxFrames':3}},
+                                      attempt={'id':f'attempt-{i}'}) for i in range(3)]
+            adapter=Qwen()
+            with patch('harness.adapters.asyncio.create_subprocess_exec',side_effect=ffmpeg):
+                values=await asyncio.gather(*(adapter.prepare(c) for c in contexts))
+            self.assertEqual(values[0]['frames'],values[1]['frames'])
+            self.assertEqual(values[1]['frames'],values[2]['frames'])
+            self.assertEqual(len(calls),3,'each sampled frame is decoded once across providers')
+            self.assertFalse(list(root.rglob('*.partial.jpg')))
+        with tempfile.TemporaryDirectory() as directory:
+            asyncio.run(exercise(Path(directory)))
+
     def test_labelled_choices_preserve_text_and_legacy_prompts(self):
         from harness.adapters import question_prompt
         question={'question':'Which material appears?','options':['Cotton','Steel','Glass']}

@@ -208,7 +208,7 @@ export function Home({
               {' · '}
               {snapshot.coverage.plannedQuestions} questions per participating provider
               {' · '}
-              {snapshot.coverage.plannedVariants} providers
+              {snapshot.coverage.plannedVariants} configurations
             </strong>
             {snapshot.phase === 'smoke' && (
               <p>
@@ -354,13 +354,14 @@ export function Home({
           </table>
         </div>
         <p className="note">
-          Scores use answered questions in this stage only. Service check scores are not benchmark
-          comparison results. Different answer counts are not a fair ranking. Blocked API calls are
-          not wrong answers. Retrieval ablation, logs, database and full exports are in Advanced.
+          Accuracy = correct answers / answered questions. A failed API call is a service failure,
+          not an incorrect answer. Compare accuracy only on the same completed questions. Service
+          checks verify responses, independently of answer correctness. Advanced has detailed logs,
+          database inspection and exports.
         </p>
         {system?.readiness && (
           <p className="note">
-            Historical service checks (not this experiment):{' '}
+            Most recent functional checks (separate from this experiment):{' '}
             {new Date(system.readiness.checkedAt).toLocaleString()}.{' '}
             {system.readiness.limitations.join(' ')}
           </p>

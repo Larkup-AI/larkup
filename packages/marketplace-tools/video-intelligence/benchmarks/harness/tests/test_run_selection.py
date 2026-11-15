@@ -62,6 +62,13 @@ class RunSelectionTest(unittest.TestCase):
         self.assertEqual(status(self.r)['state'],'smoke_requires_review')
         self.assertFalse(any(c[1].get('phase')=='pilot' for c in self.calls if c[0]=='/runs'))
 
+    def test_service_readiness_does_not_require_correct_or_scored_answers(self):
+        self.r.api_items.side_effect=lambda path:list(self.runs.values()) if path=='/runs' else [
+            {'variantId':'arm','questionId':q,'correct':score,'state':'completed','answer':'A non-empty provider response'}
+            for q,score in [('visual',False),('audio',None)]]
+        result=create(self.r,'functional-only')
+        self.assertEqual(result['phase'],'pilot')
+
     def test_finished_run_cannot_be_resumed_or_overwritten(self):
         self.runs['run-history']['state']='completed'
         with self.assertRaises(DomainError):activate(self.r,'run-history')

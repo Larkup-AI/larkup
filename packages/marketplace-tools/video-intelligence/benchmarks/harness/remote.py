@@ -316,6 +316,7 @@ time.sleep(2)
         import socket
         for port in ([28891, 3100] if dashboard else []) + ([] if preserve_transports else [28890, 8891]):
             with socket.socket() as sock:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 try:
                     sock.bind(('127.0.0.1', port))
                 except OSError:
@@ -497,7 +498,8 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
                         rows += self.api('/runs/' + certificate + '/results?limit=200')['items']
                     smoke_doc = json.loads((self.data / 'datasets/smoke-v1.json').read_text())
                     expected = {(v, q['id']) for v in variants for q in smoke_doc['questions']}
-                    passed = {(x['variantId'], x['questionId']) for x in rows if x['state'] == 'completed' and x['correct'] is True}
+                    from .run_selection import service_check_completed
+                    passed = {(x['variantId'], x['questionId']) for x in rows if service_check_completed(x)}
                     if not expected <= passed:
                         return {'state': 'smoke_requires_review', 'runId': state['smoke']}
                 doc = json.loads((self.data / 'datasets' / (manifest + '.json')).read_text())

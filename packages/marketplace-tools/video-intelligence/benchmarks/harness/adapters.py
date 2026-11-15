@@ -9,10 +9,11 @@ import os
 import time
 from dataclasses import dataclass
 from decimal import Decimal
+from functools import lru_cache
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 
-from .common import DomainError, atomic, canonical, digest
+from .common import DomainError, atomic, canonical, digest, identifier
 from .transport import HTTP, classify, multipart
 
 PROMPT = ('Answer the multiple-choice question using only the supplied source. '
@@ -20,6 +21,22 @@ PROMPT = ('Answer the multiple-choice question using only the supplied source. '
           'Return a JSON object with option (one uppercase letter), explanation, and '
           'evidence (a list of {startMs,endMs,kind,claim} on the original source clock). '
           'Do not manufacture timestamps. If evidence is insufficient, state that explicitly.\n')
+
+
+def file_signature(path: Path):
+    stat = path.stat()
+    return stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns
+
+
+@lru_cache(maxsize=128)
+def source_digest(path: Path, signature: tuple) -> str:
+    hasher = hashlib.sha256()
+    with path.open('rb') as source:
+        while chunk := source.read(1024 * 1024):
+            hasher.update(chunk)
+    if file_signature(path) != signature:
+        raise DomainError('SOURCE_FINGERPRINT_MISMATCH')
+    return hasher.hexdigest()
 
 
 @dataclass
@@ -53,11 +70,7 @@ class Context:
         if not value.is_relative_to(self.root.resolve()) or not value.is_file():
             raise DomainError('SOURCE_UNAVAILABLE')
         if source.get('sha256'):
-            hasher = hashlib.sha256()
-            with value.open('rb') as f:
-                while chunk := f.read(1024 * 1024):
-                    hasher.update(chunk)
-            if hasher.hexdigest() != source['sha256']:
+            if source_digest(value, file_signature(value)) != source['sha256']:
                 raise DomainError('SOURCE_FINGERPRINT_MISMATCH')
         return value
 
@@ -281,6 +294,9 @@ class Gemini:
 
 
 class Qwen:
+    def __init__(self):
+        self.frame_locks = {}
+
     async def prepare(self, c: Context):
         source, path = c.source, c.path
         protocol = c.variant.get('inputProtocol', {})
@@ -289,20 +305,23 @@ class Qwen:
         frame_root.mkdir(parents=True, exist_ok=True)
         start = time.monotonic()
         frames = []
-        for i in range(count):
-            ms = round(i * max(0, source['durationMs'] - 100) / max(1, count - 1))
-            frame = frame_root / f'{ms:012}.jpg'
-            if not frame.exists():
-                temporary = frame.with_suffix('.partial.jpg')
-                process = await asyncio.create_subprocess_exec('ffmpeg', '-nostdin', '-v', 'error', '-ss', str(ms / 1000),
-                                                               '-i', str(path), '-frames:v', '1', '-vf',
-                                                               'scale=1280:720:force_original_aspect_ratio=decrease',
-                                                               '-q:v', '3', '-y', str(temporary), stdout=asyncio.subprocess.DEVNULL,
-                                                               stderr=asyncio.subprocess.DEVNULL)
-                if await process.wait() != 0:
-                    raise DomainError('SOURCE_DECODE_FAILED')
-                temporary.replace(frame)
-            frames.append({'startMs': ms, 'path': str(frame.relative_to(c.root))})
+        # All frame-based providers share the same immutable source preparation.
+        lock = self.frame_locks.setdefault(str(frame_root), asyncio.Lock())
+        async with lock:
+            for i in range(count):
+                ms = round(i * max(0, source['durationMs'] - 100) / max(1, count - 1))
+                frame = frame_root / f'{ms:012}.jpg'
+                if not frame.exists():
+                    temporary = frame.with_name(frame.stem + '.' + identifier('frame') + '.partial.jpg')
+                    process = await asyncio.create_subprocess_exec('ffmpeg', '-nostdin', '-v', 'error', '-ss', str(ms / 1000),
+                                                                   '-i', str(path), '-frames:v', '1', '-vf',
+                                                                   'scale=1280:720:force_original_aspect_ratio=decrease',
+                                                                   '-q:v', '3', '-y', str(temporary), stdout=asyncio.subprocess.DEVNULL,
+                                                                   stderr=asyncio.subprocess.DEVNULL)
+                    if await process.wait() != 0:
+                        raise DomainError('SOURCE_DECODE_FAILED')
+                    temporary.replace(frame)
+                frames.append({'startMs': ms, 'path': str(frame.relative_to(c.root))})
         subtitles = source.get('subtitles')
         generated_asr = False
         if not subtitles and os.environ.get('BENCHMARK_PROVIDER_PROXY'):
