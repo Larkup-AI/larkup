@@ -171,7 +171,8 @@ class Scheduler:
         grouped = {}
         for t in ready:
             grouped.setdefault(group(t), []).append(t)
-        keys = sorted(grouped)
+        duration_order={'short':0,'medium':1,'long':2}
+        keys = sorted(grouped,key=lambda key:(duration_order.get(key[1],3),key[0],key[2]))
         if self.last_fair in keys:
             i = keys.index(self.last_fair) + 1
             keys = keys[i:] + keys[:i]

@@ -14,3 +14,9 @@ class IdleMonitorTest(unittest.TestCase):
     def test_integrity_failure_is_not_hidden(self):
         remote=Mock();remote.backup.side_effect=DomainError('BACKUP_INVALID')
         with self.assertRaises(DomainError):checkpoint(remote)
+
+    def test_active_monitor_connection_error_is_retried_but_other_errors_propagate(self):
+        from harness.idle_monitor import monitoring_error
+        with patch('builtins.print'):
+            monitoring_error(DomainError('CONTROLLER_UNAVAILABLE'))
+        with self.assertRaises(DomainError):monitoring_error(DomainError('BACKUP_INVALID'))

@@ -348,6 +348,16 @@ class HarnessTest(unittest.TestCase):
             self.assertEqual(len(fake.calls), 4)
         asyncio.run(exercise())
 
+    def test_short_source_preparation_starts_before_long_source(self):
+        async def exercise():
+            config=Config(profile(),self.secret);data=manifest(2)
+            data['sources'][0].update(durationGroup='long',durationMs=1800000)
+            run=self.store.create(data,['arm-one'],config.active,'pilot');self.store.control(run['id'],'start',run['revision'])
+            fake=Fake();scheduler=self.scheduler(config=config,implementations={'gemini':fake})
+            await scheduler.tick();await asyncio.gather(*scheduler.inflight.values())
+            self.assertEqual(fake.calls[0][1],'source-1')
+        asyncio.run(exercise())
+
     def test_fast_provider_does_not_wait_for_slow_provider(self):
         async def exercise():
             doc = profile()

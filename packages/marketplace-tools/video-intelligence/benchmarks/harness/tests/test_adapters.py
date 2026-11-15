@@ -17,6 +17,7 @@ class Context:
         self.variant = {'maxOutputTokens': 512, 'temperature': 0, 'inputProtocol': {'api': 'interactions'}}
         self.source = {'durationMs': 8000}
         self.attempt = {'id': 'attempt-fixture'}
+        self.task = {'run_id':'run-fixture'}
         self.resume = None
         self.calls, self.handles = [], []
 
@@ -81,7 +82,7 @@ class AdapterTest(unittest.TestCase):
                                       path=root/'source.mp4',root=root,variant={'inputProtocol':{'maxFrames':3}},
                                       attempt={'id':f'attempt-{i}'}) for i in range(3)]
             adapter=Qwen()
-            with patch('harness.adapters.asyncio.create_subprocess_exec',side_effect=ffmpeg):
+            with patch('harness.native_media.normalized_mp4',new=AsyncMock(side_effect=lambda source,root:source)), patch('harness.adapters.asyncio.create_subprocess_exec',side_effect=ffmpeg):
                 values=await asyncio.gather(*(adapter.prepare(c) for c in contexts))
             self.assertEqual(values[0]['frames'],values[1]['frames'])
             self.assertEqual(values[1]['frames'],values[2]['frames'])
@@ -111,8 +112,25 @@ class AdapterTest(unittest.TestCase):
             c.source.update(sourceUrl='https://www.youtube.com/watch?v=independent-video')
             with c.path.open('wb') as f:f.truncate(100_000_001)
             prepared=asyncio.run(Gemini().prepare(c))
-            self.assertEqual(prepared['sourceUrl'],c.source['sourceUrl'])
+            self.assertEqual(prepared['nativeInputMode'],'public-source-url');self.assertNotIn('sourceUrl',prepared)
             self.assertEqual(c.calls,[])
+
+    def test_small_public_video_also_avoids_inline_transport(self):
+        with tempfile.TemporaryDirectory() as directory:
+            c=Context('gateway');c.root=Path(directory);c.path=c.root/'clip.mp4';c.path.write_bytes(b'video')
+            c.source.update(sourceUrl='https://www.youtube.com/watch?v=independent-public-video')
+            self.assertEqual(asyncio.run(Gemini().prepare(c))['nativeInputMode'],'public-source-url')
+
+    def test_native_answer_uses_original_source_after_output_redaction(self):
+        from harness.common import Secrets
+        secret=object.__new__(Secrets);secret.values={'key':'private-test-key'}
+        for prepared in [{'nativeInputMode':'public-source-url','sourcePath':'video.mp4'}, {'sourceUrl':'[private URL]','sourcePath':'video.mp4'}]:
+            c=Context('gateway');c.root=Path('/tmp');c.source['sourceUrl']='https://www.youtube.com/watch?v=independent-video'
+            c.snapshot=SimpleNamespace(secrets=SimpleNamespace(get=lambda _:'private-test-key'),config={'limits':{'deadlineSeconds':60}});c.store=MagicMock()
+            process=SimpleNamespace(returncode=0,communicate=AsyncMock(return_value=(b'{"choices":[{"message":{"content":"B"}}]}',b'')))
+            with patch('harness.adapters.asyncio.create_subprocess_exec',AsyncMock(return_value=process)):
+                answer=asyncio.run(Gemini().answer(c,{'question':'Which shape?','options':['circle','square']},secret.clean(prepared)))
+            request=json.loads(process.communicate.call_args.args[0]);self.assertEqual(request['sourceUrl'],c.source['sourceUrl']);self.assertEqual(answer['answer'],'B')
 
     def test_cancelled_gateway_child_is_stopped_and_never_resubmitted(self):
         c=Context('gateway');c.root=Path('/tmp')
@@ -145,14 +163,14 @@ class AdapterTest(unittest.TestCase):
 
     def test_native_gateway_credit_quota_and_unknown_outcomes_keep_their_scope(self):
         for status, code, unknown in [(402, 'CREDIT_EXHAUSTED', False), (429, 'QUOTA_WAIT', False),
-                                      (400, 'CAPABILITY_UNSUPPORTED', False), (503, 'REMOTE_OUTCOME_UNKNOWN', True)]:
+                                      (400, 'CAPABILITY_UNSUPPORTED', False), (503, 'REMOTE_OUTCOME_UNKNOWN', True), (None,'PROVIDER_NO_OUTPUT',False)]:
             with self.subTest(status=status), tempfile.TemporaryDirectory() as directory:
                 c = Context('gateway')
                 c.root = Path(directory)
                 c.route['model'] = 'google/gemini-fixture'
                 c.snapshot = SimpleNamespace(secrets=SimpleNamespace(get=lambda _: 'private-test-key'), config={'limits':{'deadlineSeconds':900}})
                 c.store = MagicMock()
-                process = SimpleNamespace(returncode=1, communicate=AsyncMock(return_value=(json.dumps({'status': status, 'retryAfter': 12}).encode(), b'')))
+                process = SimpleNamespace(returncode=1, communicate=AsyncMock(return_value=(json.dumps({'status': status, 'retryAfter': 12, 'errorType':'AI_NoOutputGeneratedError' if status is None else 'AI_APICallError'}).encode(), b'')))
                 with patch('harness.adapters.asyncio.create_subprocess_exec', AsyncMock(return_value=process)):
                     with self.assertRaises(DomainError) as error:
                         asyncio.run(Gemini().answer(c, {'question': '?', 'options': ['a', 'b']}, {'sourcePath': 'source.mp4'}))

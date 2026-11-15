@@ -11,3 +11,9 @@ def checkpoint(remote):
                          'action': 'Retrying next idle monitoring interval; GPU remains awake.'}), flush=True)
         return False
     return True
+
+def monitoring_error(error):
+    if error.code != 'CONTROLLER_UNAVAILABLE':
+        raise error
+    print(canonical({'warning':'CONTROLLER_POLL_DEFERRED','reason':error.code,
+                     'action':'Retrying monitoring; GPU and in-flight calls remain running.'}),flush=True)

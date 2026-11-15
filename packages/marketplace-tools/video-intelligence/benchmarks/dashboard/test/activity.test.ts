@@ -22,7 +22,7 @@ test('GPU wait is orange without claiming provider execution', () => {
 
 test('active summary includes tasks outside the first task page', () => {
   assert.deepEqual(providerActivity({ ...base, row: { ...row, stateCounts: { submitted: 1 } } }), {
-    label: 'Processing',
+    label: 'Answering questions',
     tone: 'go',
     pulse: true,
   });
@@ -114,3 +114,8 @@ test('completed provider results keep their meaning in saved checkpoints', () =>
     { label: 'Complete', tone: 'go', pulse: false },
   );
 });
+
+ test('preparation is explicit while no answers have completed',()=>{
+ const task={variantId:row.variantId,state:'submitted',questionId:null} as TaskObject;
+ assert.equal(providerActivity({...base,row:{...row,completedCount:0},tasks:[task]}).label,'Preparing video · no answer completed yet');
+ });

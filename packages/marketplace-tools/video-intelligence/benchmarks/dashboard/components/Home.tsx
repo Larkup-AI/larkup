@@ -325,6 +325,10 @@ export function Home({
                         tasks,
                         queueLabel: queueView ? queueLabel : undefined,
                       });
+                const preparationTasks=tasks.filter(t=>t.variantId===row?.variantId && !t.questionId);
+                const preparationDone=preparationTasks.filter(t=>t.state==='completed').length;
+                const progress=preparationTasks.find(t=>['leased','submitted','running'].includes(t.state))?.progress;
+                const preparationMessage=progress && typeof progress==='object' && 'message' in progress && typeof progress.message==='string' ? progress.message : null;
                 const check = system?.readiness?.checks.find(
                   (c) => c.system === name && (!row?.logicalModel || c.model === row.logicalModel),
                 );
@@ -375,6 +379,8 @@ export function Home({
                     </td>
                     <td>
                       <strong>{activity.label}</strong>
+                      {preparationTasks.length>0 && <div className="note">Videos prepared: {preparationDone} / {preparationTasks.length}</div>}
+                      {preparationMessage && <div className="note">{preparationMessage}</div>}
                       {row &&
                         (() => {
                           const issues = tasks.filter(

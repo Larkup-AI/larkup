@@ -33,7 +33,13 @@ export function providerActivity({
     return { label: `${row.stateCounts.failed} failed`, tone: 'bad', pulse: false };
   if (!live) return { label: 'Saved checkpoint', tone: 'idle', pulse: false };
   if (runState !== 'running') return { label: runState ?? 'Waiting', tone: 'idle', pulse: false };
-  if (active) return { label: 'Processing', tone: 'go', pulse: true };
+  if (active) {
+    const working=tasks.filter(t=>t.variantId===row.variantId && ACTIVE.includes(t.state));
+    const preparing=working.some(t=>!t.questionId);
+    const answering=working.some(t=>!!t.questionId) || ACTIVE.some(state=>(row.stateCounts[state] ?? 0)>0);
+    const label=preparing && !answering ? 'Preparing video · no answer completed yet' : 'Answering questions';
+    return {label:row.blockedCount ? `${label} · ${row.blockedCount} blocked` : label,tone:row.blockedCount ? 'bad' : 'go',pulse:true};
+  }
   if (row.stateCounts.failed)
     return { label: `${row.stateCounts.failed} failed`, tone: 'bad', pulse: false };
   if (row.stateCounts.waiting_quota)

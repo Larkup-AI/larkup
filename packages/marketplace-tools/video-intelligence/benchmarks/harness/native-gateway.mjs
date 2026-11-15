@@ -31,7 +31,9 @@ try {
 } catch (error) {
   // Only transport status/cooldown cross the bridge; upstream text can contain credentials.
   const retryAfter = error.responseHeaders?.['retry-after'];
-  process.stdout.write(JSON.stringify({ benchmarkError: 'GATEWAY_NATIVE_FAILED', status: error.statusCode ?? null,
+  process.stdout.write(JSON.stringify({ benchmarkError: 'GATEWAY_NATIVE_FAILED', status: error.statusCode ?? error.cause?.statusCode ?? null,
+    errorType: /^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(error.name ?? '') ? error.name : 'Error',
+    causeCode: /^[A-Z_0-9]{1,40}$/.test(error.cause?.code ?? '') ? error.cause.code : null,
     retryAfter: retryAfter && Number.isFinite(Number(retryAfter)) ? Number(retryAfter) : null }));
   process.exitCode = 1;
 }

@@ -643,42 +643,48 @@ def launch_session(remote, args):
             if idle_checkpointed:
                 continue
             ticks += 1
-            progress = remote.workflow() if args.command in {'launch','dashboard','new','resume-run'} and mode == 'active' else {'state': 'paused' if mode == 'paused' else 'connected'}
-            if mode == 'paused':
+            try:
+                progress = remote.workflow() if args.command in {'launch','dashboard','new','resume-run'} and mode == 'active' else {'state': 'paused' if mode == 'paused' else 'connected'}
+                if mode == 'paused':
+                    if ticks % 12 == 1:
+                        from .idle_monitor import checkpoint
+                        checkpoint(remote)
+                        if remote.account()['clientBalance'] < .5:
+                            stopping.set()
+                    continue
+                signature = canonical(progress)
+                if signature != previous_progress or ticks % 6 == 0:
+                    print('Benchmark ' + progress.get('runId', '') + ': ' + progress['state'], flush=True)
+                    print(canonical({'benchmark': progress}), flush=True)
+                    if progress.get('runId'):
+                        current = remote.api('/runs/' + progress['runId'])
+                        print(canonical({'runId':current['id'],'tasks':current['taskCounts'],'coverage':current['coverage'],'cost':current['cost'],'providers':remote.api('/runs/'+current['id']+'/metrics').get('summary',[])}), flush=True)
+                    previous_progress = signature
                 if ticks % 12 == 1:
-                    from .idle_monitor import checkpoint
-                    checkpoint(remote)
+                    remote.backup()
                     if remote.account()['clientBalance'] < .5:
                         stopping.set()
+                if progress['state'] in {'finished', 'blocked', 'smoke_requires_review', 'cancelled', 'failed'}:
+                    with control_lock(remote.deployment):
+                        if progress.get('runId'):
+                            observed = remote.api('/runs/' + progress['runId'])
+                            if observed['state'] in {'running', 'pausing', 'paused'}:
+                                continue
+                        intent(remote.deployment, 'stopping')
+                        remote.checkpoint_evidence = True
+                        remote.backup()
+                        remote.stop()
+                        rental_active = False
+                        intent(remote.deployment, 'stopped')
+                        idle_checkpointed = True
+                        print(canonical({**progress, 'gpu': 'stopped; dashboard shows verified local snapshot'}), flush=True)
+                        if args.no_dashboard:
+                            break
+            except DomainError as error:
+                from .idle_monitor import monitoring_error
+                monitoring_error(error)
                 continue
-            signature = canonical(progress)
-            if signature != previous_progress or ticks % 6 == 0:
-                print('Benchmark ' + progress.get('runId', '') + ': ' + progress['state'], flush=True)
-                print(canonical({'benchmark': progress}), flush=True)
-                if progress.get('runId'):
-                    current = remote.api('/runs/' + progress['runId'])
-                    print(canonical({'runId':current['id'],'tasks':current['taskCounts'],'coverage':current['coverage'],'cost':current['cost'],'providers':remote.api('/runs/'+current['id']+'/metrics').get('summary',[])}), flush=True)
-                previous_progress = signature
-            if ticks % 12 == 1:
-                remote.backup()
-                if remote.account()['clientBalance'] < .5:
-                    stopping.set()
-            if progress['state'] in {'finished', 'blocked', 'smoke_requires_review', 'cancelled', 'failed'}:
-                with control_lock(remote.deployment):
-                    if progress.get('runId'):
-                        observed = remote.api('/runs/' + progress['runId'])
-                        if observed['state'] in {'running', 'pausing', 'paused'}:
-                            continue
-                    intent(remote.deployment, 'stopping')
-                    remote.checkpoint_evidence = True
-                    remote.backup()
-                    remote.stop()
-                    rental_active = False
-                    intent(remote.deployment, 'stopped')
-                    idle_checkpointed = True
-                    print(canonical({**progress, 'gpu': 'stopped; dashboard shows verified local snapshot'}), flush=True)
-                    if args.no_dashboard:
-                        break
+
     finally:
         if not detached:
             try:

@@ -220,7 +220,7 @@ class Gemini:
             public_video = source_url if source_url and urlsplit(source_url).scheme == 'https' and urlsplit(source_url).hostname in {'youtube.com','www.youtube.com','youtu.be'} else None
             if path.stat().st_size > 100_000_000 and not public_video:
                 raise DomainError('NATIVE_INLINE_INPUT_LIMIT')
-            return dict(sourceUrl=public_video if path.stat().st_size > 100_000_000 else None, sourcePath=str(path.relative_to(c.root)), fingerprint=digest([c.source.get('sha256'), c.route['secretAlias']]),
+            return dict(nativeInputMode='public-source-url' if public_video else 'inline-file', sourcePath=str(path.relative_to(c.root)), fingerprint=digest([c.source.get('sha256'), c.route['secretAlias']]),
                         timing={'prepareMs': (time.monotonic() - start) * 1000, 'indexMs': None},
                         modalityDisclosure='Full video and audio through Gateway AI SDK v4; no persistent native index')
         handle = c.resume or {}
@@ -255,7 +255,9 @@ class Gemini:
     async def answer(self, c: Context, question: dict, prepared: dict):
         if c.route['provider'] == 'gateway':
             package = Path(__file__).resolve().parents[2]
-            request = dict(sourceUrl=prepared.get('sourceUrl'), sourcePath=str(c.root / prepared['sourcePath']), prompt=question_prompt(question),
+            public_url=c.source.get('sourceUrl')
+            if not public_url or urlsplit(public_url).scheme!='https' or urlsplit(public_url).hostname not in {'youtube.com','www.youtube.com','youtu.be'}:public_url=None
+            request = dict(sourceUrl=public_url, sourcePath=str(c.root / prepared['sourcePath']), prompt=question_prompt(question),
                            model=c.route['model'], apiKey=c.snapshot.secrets.get(c.route['secretAlias']),
                            maxOutputTokens=c.variant.get('maxOutputTokens', 2048), temperature=c.variant.get('temperature', 0),
                            deadlineMs=c.snapshot.config['limits']['deadlineSeconds']*1000,
@@ -278,6 +280,10 @@ class Gemini:
                     status = error.get('status')
                 except ValueError:
                     error, status = {}, None
+                with c.store.transaction() as cx:
+                    c.store.event(cx,'attempt.transport_failed',c.task['run_id'],{'attemptId':c.attempt['id'],'status':status,'errorType':error.get('errorType'),'causeCode':error.get('causeCode')})
+                if error.get('errorType')=='AI_NoOutputGeneratedError':
+                    raise DomainError('PROVIDER_NO_OUTPUT')
                 if isinstance(status, int):
                     raise classify(status, b'', {'retry-after': str(error.get('retryAfter') or 60)}, submitted=True)
                 raise DomainError('REMOTE_OUTCOME_UNKNOWN', unknown=True)
@@ -328,6 +334,8 @@ class Qwen:
         # All frame-based providers share the same immutable source preparation.
         lock = self.frame_locks.setdefault(str(frame_root), asyncio.Lock())
         async with lock:
+            from .native_media import normalized_mp4
+            path=await normalized_mp4(path,c.root)
             for i in range(count):
                 ms = round(i * max(0, source['durationMs'] - 100) / max(1, count - 1))
                 frame = frame_root / f'{ms:012}.jpg'
