@@ -4,7 +4,7 @@ import type { RunState } from './contract.js';
 /** ms -> short human duration. null/undefined -> em dash marker. */
 export function fmtDuration(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return '—';
-  if (ms < 1000) return `${ms} ms`;
+  if (ms < 1000) return `${Math.round(ms)} ms`;
   const s = ms / 1000;
   if (s < 60) return `${s.toFixed(s < 10 ? 1 : 0)} s`;
   const m = Math.floor(s / 60);

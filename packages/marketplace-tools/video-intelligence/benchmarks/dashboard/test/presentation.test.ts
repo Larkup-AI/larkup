@@ -19,6 +19,7 @@ test('fmtMoney surfaces unknown explicitly, keeps currency', () => {
 test('fmtDuration marks null and scales units', () => {
   assert.equal(fmtDuration(null), '—');
   assert.equal(fmtDuration(500), '500 ms');
+  assert.equal(fmtDuration(779.713163), '780 ms');
   assert.equal(fmtDuration(5000), '5.0 s');
   assert.equal(fmtDuration(125000), '2m 5s');
 });
