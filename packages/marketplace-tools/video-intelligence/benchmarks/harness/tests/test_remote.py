@@ -91,6 +91,17 @@ class RemoteWorkflowTest(unittest.TestCase):
                 self.assertEqual(error.exception.code, 'LAUNCHER_ALREADY_RUNNING')
                 launch.assert_not_called()
 
+    def test_repeated_dashboard_command_reuses_authenticated_operator_without_restarting_children(self):
+        import fcntl,io
+        from harness.remote import main
+        atomic(self.remote.deployment/'relay.json',{'controllerToken':'test-token'})
+        with (self.remote.deployment/'launcher.lock').open('a') as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            with patch('harness.remote.Remote',return_value=self.remote),patch('harness.remote.launch_session') as launch,patch('harness.remote.urllib.request.urlopen',return_value=io.BytesIO(b'{"operations":[]}')) as read,patch('sys.argv',['remote','dashboard']),patch('builtins.print'):
+                main()
+                launch.assert_not_called()
+                self.assertEqual(read.call_args.args[0].get_method(),'GET')
+
     def test_port_guard_allows_closed_connections_but_rejects_a_live_listener(self):
         import socket
         original=socket.socket

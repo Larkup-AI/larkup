@@ -764,6 +764,14 @@ def main():
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
+                if args.command=='dashboard':
+                    credentials=json.loads((remote.deployment/'relay.json').read_text())
+                    request=urllib.request.Request('http://127.0.0.1:28891/api/v1/system',headers={'Authorization':'Bearer '+credentials['controllerToken']})
+                    try:
+                        with urllib.request.urlopen(request,timeout=5) as response:json.load(response)
+                    except (OSError,ValueError):raise DomainError('EXISTING_DASHBOARD_UNREACHABLE') from None
+                    print('Dashboard is already running: http://127.0.0.1:3100 — existing startup and GPU reservation preserved.',flush=True)
+                    return
                 if args.command in {'new','resume-run'}:
                     from .run_selection import request_existing
                     request_existing(remote,args);return
