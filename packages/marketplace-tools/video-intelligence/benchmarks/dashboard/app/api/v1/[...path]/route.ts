@@ -194,6 +194,7 @@ export async function POST(req: Request, { params }: Ctx) {
       'stop-gpu',
       'force-stop-gpu',
       'cancel-start',
+      'gpu-choice',
     ]).has(segments[1]);
 
   if (!isControl && !isCreate && !isSystem) {
