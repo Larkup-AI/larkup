@@ -27,6 +27,7 @@ class Policy:
     enabled: bool = True
     retrySeconds: int = 60
     afterFailures: int = 2
+    bootTimeoutSeconds: int = 900
     maxHourlyUsd: float = .75
     minMemoryGb: int = 24
     minCudaVersion: str = '12.8'
@@ -42,7 +43,7 @@ class Policy:
             if type(policy.enabled) is not bool:
                 raise ValueError()
             for key, low, high in [('retrySeconds', 60, 120), ('afterFailures', 1, 5),
-                                   ('minMemoryGb', 16, 192), ('maxCandidatesPerPass', 1, 5)]:
+                                   ('minMemoryGb', 16, 192), ('maxCandidatesPerPass', 1, 5), ('bootTimeoutSeconds', 120, 900)]:
                 value = getattr(policy, key)
                 if type(value) is not int or not low <= value <= high:
                     raise ValueError()
@@ -210,8 +211,8 @@ def cancellable_ssh(target, command, *, data=None, check_result=True, check):
         raise
 
 
-def wait_ssh(target, check, report):
-    deadline = time.monotonic() + 900
+def wait_ssh(target, check, report, *, timeout=900):
+    started = time.monotonic(); deadline = started + timeout
     while time.monotonic() < deadline:
         check()
         pod = target.gql('query { pod(input:{podId:' + json.dumps(target.state['podId']) + '}) { desiredStatus runtime { ports { ip isIpPublic privatePort publicPort } } } }')['pod']
@@ -225,7 +226,7 @@ def wait_ssh(target, check, report):
                 return
             if b'permission denied' in probe.stderr.lower():
                 raise DomainError('SSH_AUTH_INVALID')
-        report('starting_gpu', stage='Alternative GPU allocated. Waiting for its SSH service; no benchmark has started.')
+        report('starting_gpu', stage='Alternative GPU allocated; RunPod is preparing the container and SSH service. Elapsed ' + str(int(time.monotonic()-started)) + ' seconds; startup limit ' + str(timeout) + ' seconds. No benchmark has started.')
         for _ in range(5):
             check(); time.sleep(1)
     raise DomainError('RUNPOD_STARTUP_INCOMPLETE')
@@ -348,7 +349,7 @@ def relocate(remote, *, attempt, check, report):
         target.ssh = lambda command, data=None, check=True: cancellable_ssh(target, command, data=data, check_result=check, check=check_cancelled)
         check_cancelled = check
         try:
-            check(); wait_ssh(target, check, report)
+            check(); wait_ssh(target, check, report, timeout=policy.bootTimeoutSeconds)
             journal['status'] = 'restoring'; atomic(journal_path, journal)
             restore_target(remote, target, saved, check, report)
             source = remote.gql('query { pod(input:{podId:' + json.dumps(original_state['podId']) + '}) { desiredStatus } }')['pod']
@@ -362,7 +363,7 @@ def relocate(remote, *, attempt, check, report):
             promoted = True
             journal['status'] = 'promoted'; atomic(journal_path, journal)
             return True
-        except BaseException:
+        except BaseException as error:
             # Original storage and the checkpoint remain available on every failure path.
             if promoted:
                 remote.gql('mutation { podStop(input:{podId:' + json.dumps(pending['id']) + '}) {id} }')
@@ -375,4 +376,12 @@ def relocate(remote, *, attempt, check, report):
                 journal['status'] = 'aborted'; atomic(journal_path, journal)
             except Exception:
                 journal['status'] = 'cleanup_required'; atomic(journal_path, journal)
+            if isinstance(error, DomainError) and error.code == 'RUNPOD_STARTUP_INCOMPLETE' and journal['status'] == 'aborted':
+                history_path = remote.deployment / 'gpu-candidate-attempts.json'
+                history = json.loads(history_path.read_text()) if history_path.exists() else {}
+                candidate = journal['candidate']
+                history[candidate['cloudType'] + ':' + candidate['gpuTypeId']] = time.time()
+                atomic(history_path, history)
+                report('waiting_capacity', stage='Alternative GPU startup timed out and was released. Other compatible offers will be tried at the next capacity check.')
+                return False
             raise

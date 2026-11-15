@@ -100,8 +100,10 @@ The saved connection switches only after checkpoint restoration is verified.
 SSH, controller and canonical runtime readiness are still required before any
 benchmark dispatch. `Cancel startup` also cancels transfer/setup and cleans up
 an unpromoted replica. If an allocation or cleanup outcome cannot be reconciled,
-startup stops for review instead of renting another Pod. Availability is not a
-guaranteed queue or ETA.
+startup stops for review instead of renting another Pod. A replica that cannot
+finish container/SSH startup within `bootTimeoutSeconds` (default 900) is released
+and the search continues with other offers. Availability is not a guaranteed queue
+or ETA.
 
 `templateId` in the capacity policy optionally selects an existing compatible
 RunPod template; the saved immutable image and explicit SSH/storage settings still

@@ -57,7 +57,7 @@ class AllocationSafetyTest(unittest.TestCase):
     setUp=RecoveryCheckpointTest.setUp
     tearDown=RecoveryCheckpointTest.tearDown
 
-    def exercise(self, prices=(.55,), restore_error=None, cancel=False, journal=None):
+    def exercise(self, prices=(.55,), restore_error=None, cancel=False, journal=None, boot_timeout=False):
         from unittest.mock import Mock, patch
         from harness.gpu_capacity import relocate
         remote=self.remote;remote.state.update(actualGpuHourlyUsd=.59,image='pinned-image',keyPath='fixture-key')
@@ -82,8 +82,10 @@ class AllocationSafetyTest(unittest.TestCase):
         remote.gql=Mock(side_effect=api)
         def check():
             if cancel and alive:raise DomainError('START_CANCELLED')
-        with patch('harness.gpu_capacity.allocation_input',side_effect=lambda *_:'ALLOCATE') as allocate,patch('harness.gpu_capacity.validate_evidence'),patch('harness.gpu_capacity.wait_ssh'),patch('harness.gpu_capacity.restore_target',side_effect=restore_error):
-            if restore_error or cancel:
+        with patch('harness.gpu_capacity.allocation_input',side_effect=lambda *_:'ALLOCATE') as allocate,patch('harness.gpu_capacity.validate_evidence'),patch('harness.gpu_capacity.wait_ssh',side_effect=DomainError('RUNPOD_STARTUP_INCOMPLETE') if boot_timeout else None),patch('harness.gpu_capacity.restore_target',side_effect=restore_error):
+            if boot_timeout:
+                self.assertFalse(relocate(remote,attempt=2,check=check,report=Mock()))
+            elif restore_error or cancel:
                 with self.assertRaises(DomainError):relocate(remote,attempt=2,check=check,report=Mock())
             else:self.assertTrue(relocate(remote,attempt=2,check=check,report=Mock()))
             return allocations,terminated,allocate.call_count
@@ -106,6 +108,10 @@ class AllocationSafetyTest(unittest.TestCase):
         journal={'status':'allocating','name':'unique-recovery-request','candidate':{'gpuTypeId':'NVIDIA fixture','cloudType':'SECURE','quotedHourlyUsd':.5}}
         allocations,_,calls=self.exercise(journal=journal)
         self.assertEqual(allocations,[]);self.assertEqual(calls,0);self.assertEqual(self.remote.state['podId'],'recovered-target')
+
+    def test_boot_timeout_releases_the_replica_and_keeps_search_eligible(self):
+        _,terminated,_=self.exercise(boot_timeout=True)
+        self.assertEqual(terminated,['target-0']);self.assertEqual(self.remote.state['podId'],'source-pod')
 
     def test_dirty_checkpoint_and_incomplete_cleanup_prevent_another_rental(self):
         from unittest.mock import Mock
