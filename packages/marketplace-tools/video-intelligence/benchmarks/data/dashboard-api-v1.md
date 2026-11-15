@@ -460,3 +460,19 @@ Controller health alone is insufficient: canonical runtime health must also be
 observed before any new experiment is dispatched. Startup cancellation remains
 checked while waiting for both services. SSH authentication and host-key
 verification failures are terminal; no host-key protection is bypassed.
+
+Home includes pending/running `new-run` operator requests without a result.runId
+in its experiment dropdown immediately, labelled as a request and Waiting for
+GPU / Starting services. The option uses the operation ID, never calls run
+endpoints with that ID, and shows blank scores until an actual run exists.
+Users may browse saved runs while the request waits. Once the backend selects
+the created smoke/pilot run, normal run selection replaces the pending option.
+This is a view of the existing durable operator request, not an additional run
+or an inference submission. Existing queued work is not restarted by this UI.
+
+New startup operations open Home automatically; a changed selectedRunId opens
+that experiment and updates the shareable ?run= URL. Manual history browsing
+is preserved between transitions. A provider pulse reflects leased/submitted/
+running tasks of its selected immutable variant, including preparation; it is
+hidden for GPU capacity waits, disconnected snapshots, paused runs and idle
+providers. Reduced-motion preferences disable the animation.

@@ -54,6 +54,13 @@ export default function Dashboard() {
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   const followedRun = useRef<string | null>(null);
+  const followedStartup = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selected) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('run', selected);
+    window.history.replaceState(null, '', url);
+  }, [selected]);
   const [system, setSystem] = useState<SystemStatus | null>(null);
   useEffect(() => {
     if (meta?.mode !== 'proxy') return;
@@ -64,9 +71,19 @@ export default function Dashboard() {
         if (cancelled) return;
         setSystem(status);
         setLive(status.controllerAvailable);
+        const startup = status.operations.find(
+          (o) =>
+            ['start', 'new-run', 'resume-run'].includes(o.action) &&
+            ['pending', 'running'].includes(o.state),
+        );
+        if (startup && followedStartup.current !== startup.id) {
+          followedStartup.current = startup.id;
+          setTab('Home');
+        }
         if (status.selectedRunId && status.selectedRunId !== followedRun.current) {
           followedRun.current = status.selectedRunId;
           setSelected(status.selectedRunId);
+          setTab('Home');
         }
       } catch {
         if (!cancelled) setLive(false);
@@ -295,6 +312,7 @@ export default function Dashboard() {
               onSelect={setSelected}
               snapshot={snap ?? null}
               metrics={data?.metrics ?? null}
+              tasks={data?.tasks ?? []}
               system={system}
               operatorEnabled={meta?.operatorEnabled === true}
             />

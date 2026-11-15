@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import type { RunSummary, RunSnapshot, RunMetrics } from '../lib/contract.js';
+import { useEffect, useState } from 'react';
+import type { RunSummary, RunSnapshot, RunMetrics, TaskObject } from '../lib/contract.js';
 import { operate, type SystemStatus } from '../lib/operator.js';
 import { fmtMoney, fmtDuration } from '../lib/format.js';
 import { api } from '../lib/client.js';
@@ -9,8 +9,9 @@ export function Home({
   runs,
   selected,
   onSelect,
-  snapshot,
-  metrics,
+  snapshot: loadedSnapshot,
+  metrics: loadedMetrics,
+  tasks,
   system,
   operatorEnabled,
 }: {
@@ -19,12 +20,25 @@ export function Home({
   onSelect: (id: string) => void;
   snapshot: RunSnapshot | null;
   metrics: RunMetrics | null;
+  tasks: TaskObject[];
   system: SystemStatus | null;
   operatorEnabled: boolean;
 }) {
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
   const pending = system?.operations.find((o) => ['pending', 'running'].includes(o.state));
+  const queued = system?.operations.find(
+    (o) => o.action === 'new-run' && ['pending', 'running'].includes(o.state) && !o.result?.runId,
+  );
+  const [showQueue, setShowQueue] = useState(true);
+  useEffect(() => {
+    setShowQueue(true);
+  }, [queued?.id]);
+  const queueView = !!queued && showQueue;
+  const queueLabel =
+    queued?.startup?.phase === 'waiting_capacity' ? 'Waiting for GPU' : 'Starting services';
+  const snapshot = queueView || loadedSnapshot?.id !== selected ? null : loadedSnapshot;
+  const metrics = snapshot ? loadedMetrics : null;
   const latest = system?.operations[0];
   const disabled = !operatorEnabled || !system || system.readonly || busy || !!pending;
   const active = runs.some((r) => ['running', 'pausing', 'cancelling'].includes(r.state));
@@ -58,8 +72,23 @@ export function Home({
       <section className="panel">
         <h2>Your benchmark</h2>
         <label htmlFor="selected-run">Experiment </label>
-        <select id="selected-run" value={selected ?? ''} onChange={(e) => onSelect(e.target.value)}>
-          {!runs.length && <option value="">No experiments yet</option>}
+        <select
+          id="selected-run"
+          value={queueView ? queued.id : (selected ?? '')}
+          onChange={(e) => {
+            if (e.target.value === queued?.id) setShowQueue(true);
+            else {
+              setShowQueue(false);
+              onSelect(e.target.value);
+            }
+          }}
+        >
+          {queued && (
+            <option value={queued.id}>
+              New benchmark · {queueLabel} · request {queued.id}
+            </option>
+          )}
+          {!runs.length && !queued && <option value="">No experiments yet</option>}
           {runs.map((r) => (
             <option key={r.id} value={r.id}>
               {r.phase} · {r.state} · {new Date(r.updatedAt).toLocaleString()} · {r.id}
@@ -93,8 +122,9 @@ export function Home({
           </button>
         </div>
         <p className="note">
-          New benchmark creates a separate experiment. Resume continues only the selected experiment
-          and keeps its completed answers.
+          New requests appear here immediately while GPU capacity is pending. Once services are
+          ready, the request is replaced by its experiment. Resume continues only the selected
+          experiment and keeps its completed answers.
         </p>
         {message && <p role="status">{message}</p>}
         {pending && (
@@ -123,7 +153,7 @@ export function Home({
       </section>
       <section className="panel">
         <div className="home-status">
-          <strong>{snapshot?.state ?? 'No run selected'}</strong>
+          <strong>{queueView ? queueLabel : (snapshot?.state ?? 'No run selected')}</strong>
           <span>
             GPU:{' '}
             {pending?.startup?.phase === 'waiting_capacity'
@@ -156,6 +186,15 @@ export function Home({
                     (t) => t.variantId === row?.variantId && t.stage === 'answer',
                   );
                 const total = row?.completedCount ?? 0;
+                const processing =
+                  !queueView &&
+                  system?.controllerAvailable &&
+                  snapshot?.state === 'running' &&
+                  tasks.some(
+                    (t) =>
+                      t.variantId === row?.variantId &&
+                      ['leased', 'submitted', 'running'].includes(t.state),
+                  );
                 const check = system?.readiness?.checks.find(
                   (c) => c.system === name && (!row?.logicalModel || c.model === row.logicalModel),
                 );
@@ -165,7 +204,9 @@ export function Home({
                     ([k, n]) => ['running', 'submitted', 'leased'].includes(k) && n > 0,
                   );
                 const state = !row
-                  ? 'Not in this run'
+                  ? queueView
+                    ? queueLabel
+                    : 'Not in this run'
                   : row.blockedCount
                     ? `${row.blockedCount} blocked`
                     : total === row.plannedCount
@@ -179,6 +220,14 @@ export function Home({
                   <tr key={name}>
                     <td>
                       <strong>
+                        {processing && (
+                          <span
+                            className="provider-ping"
+                            role="status"
+                            aria-label={`${name} processing`}
+                            title="Processing video or answering"
+                          />
+                        )}
                         {
                           {
                             larkup: 'Larkup video tool',
