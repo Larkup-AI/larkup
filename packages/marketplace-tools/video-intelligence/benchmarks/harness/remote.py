@@ -635,7 +635,8 @@ def launch_session(remote, args):
             progress = remote.workflow() if args.command in {'launch','dashboard','new','resume-run'} and mode == 'active' else {'state': 'paused' if mode == 'paused' else 'connected'}
             if mode == 'paused':
                 if ticks % 12 == 1:
-                    remote.backup()
+                    from .idle_monitor import checkpoint
+                    checkpoint(remote)
                     if remote.account()['clientBalance'] < .5:
                         stopping.set()
                 continue

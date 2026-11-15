@@ -94,6 +94,7 @@ class AllocationSafetyTest(unittest.TestCase):
         allocations,terminated,_=self.exercise(prices=(.9,.55))
         self.assertEqual(len(allocations),2);self.assertEqual(terminated,['target-0'])
         self.assertEqual(self.remote.state['podId'],'target-1')
+        self.assertEqual(self.remote.state['capacityReferenceHourlyUsd'],.59)
 
     def test_failed_restore_keeps_the_original_state_and_discards_only_the_replica(self):
         _,terminated,_=self.exercise(restore_error=DomainError('RESTORE_FAILED'))

@@ -293,7 +293,7 @@ def relocate(remote, *, attempt, check, report):
             return False
         saved = checkpoint(remote)
         validate_evidence(saved['evidence'])
-        budget = policy.budget(remote.state.get('actualGpuHourlyUsd'), attempt - policy.afterFailures)
+        budget = policy.budget(max(remote.state.get('actualGpuHourlyUsd') or 0, remote.state.get('capacityReferenceHourlyUsd') or 0) or None, attempt - policy.afterFailures)
         pending = None
         if journal.get('status') in {'allocating','allocated','restoring'}:
             budget = min(policy.maxHourlyUsd, max(budget, float(journal.get('hourlyBudgetUsd', budget))))
@@ -351,6 +351,7 @@ def relocate(remote, *, attempt, check, report):
         promoted = False
         target = copy.copy(remote); target.children = []
         target.state = {**remote.state, 'podId': pending['id'], 'gpu': journal['candidate']['gpuTypeId'],
+                        'capacityReferenceHourlyUsd': max(budget, remote.state.get('capacityReferenceHourlyUsd') or 0),
                         'actualGpuHourlyUsd': pending['costPerHr'], 'quotedGpuHourlyUsd': journal['candidate']['quotedHourlyUsd']}
         target.ssh = lambda command, data=None, check=True: cancellable_ssh(target, command, data=data, check_result=check, check=check_cancelled)
         check_cancelled = check
