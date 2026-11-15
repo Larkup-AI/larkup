@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { RunSummary, RunSnapshot, RunMetrics, TaskObject } from '../lib/contract.js';
-import { operate, type SystemStatus } from '../lib/operator.js';
+import { operate, type SystemStatus, type Operation } from '../lib/operator.js';
+import { providerActivity, retryCountdown } from '../lib/activity.js';
 import { fmtMoney, fmtDuration } from '../lib/format.js';
 import { api } from '../lib/client.js';
 
@@ -14,6 +15,7 @@ export function Home({
   tasks,
   system,
   operatorEnabled,
+  onOperation,
 }: {
   runs: RunSummary[];
   selected: string | null;
@@ -23,6 +25,7 @@ export function Home({
   tasks: TaskObject[];
   system: SystemStatus | null;
   operatorEnabled: boolean;
+  onOperation: (operation: Operation) => void;
 }) {
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
@@ -35,6 +38,12 @@ export function Home({
     setShowQueue(true);
   }, [queued?.id]);
   const queueView = !!queued && showQueue;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!pending?.startup?.nextRetryAt) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [pending?.startup?.nextRetryAt]);
   const queueLabel =
     queued?.startup?.phase === 'waiting_capacity' ? 'Waiting for GPU' : 'Starting services';
   const snapshot = queueView || loadedSnapshot?.id !== selected ? null : loadedSnapshot;
@@ -53,6 +62,8 @@ export function Home({
         undefined,
         name === 'resume-run' ? (selected ?? undefined) : undefined,
       );
+      onOperation(op);
+      if (name === 'new-run') setShowQueue(true);
       setMessage(
         name === 'cancel-start'
           ? 'Startup cancellation requested.'
@@ -127,11 +138,31 @@ export function Home({
           experiment and keeps its completed answers.
         </p>
         {message && <p role="status">{message}</p>}
+        {queueView && (
+          <div className="banner startup-request" role="status">
+            <strong>
+              <span className="provider-dot warn" aria-hidden="true" />
+              New benchmark · {queueLabel}
+            </strong>
+            <div className="note">Request {queued.id}</div>
+            <p>
+              {queued.startup?.phase === 'waiting_capacity'
+                ? 'Your request is saved. The saved GPU host has no available capacity. The benchmark will start automatically when capacity returns.'
+                : 'Your request is saved. Starting GPU and benchmark services; the experiment will open here automatically.'}
+            </p>
+            <span>No new answers yet. You can browse earlier experiments while waiting.</span>
+          </div>
+        )}
         {pending && (
           <p role="status">
             {pending.stage ?? 'Preparing benchmark services…'}
             {pending.startup?.nextRetryAt && (
-              <> Next attempt: {new Date(pending.startup.nextRetryAt).toLocaleTimeString()}.</>
+              <>
+                {' '}
+                Attempt {pending.startup.attempt}. Next attempt:{' '}
+                {new Date(pending.startup.nextRetryAt).toLocaleTimeString()} (
+                {retryCountdown(pending.startup.nextRetryAt, now)}).
+              </>
             )}
           </p>
         )}
@@ -167,6 +198,10 @@ export function Home({
           </span>
         </div>
         <h2>Provider scores</h2>
+        <p className="note">
+          Orange: waiting / preparing · Pulsing green: processing · Green: complete · Gray: inactive
+          / saved checkpoint
+        </p>
         <div className="data-scroll">
           <table>
             <thead>
@@ -186,48 +221,26 @@ export function Home({
                     (t) => t.variantId === row?.variantId && t.stage === 'answer',
                   );
                 const total = row?.completedCount ?? 0;
-                const processing =
-                  !queueView &&
-                  system?.controllerAvailable &&
-                  snapshot?.state === 'running' &&
-                  tasks.some(
-                    (t) =>
-                      t.variantId === row?.variantId &&
-                      ['leased', 'submitted', 'running'].includes(t.state),
-                  );
+                const activity = providerActivity({
+                  row,
+                  runState: snapshot?.state,
+                  live: system?.controllerAvailable === true,
+                  tasks,
+                  queueLabel: queueView ? queueLabel : undefined,
+                });
                 const check = system?.readiness?.checks.find(
                   (c) => c.system === name && (!row?.logicalModel || c.model === row.logicalModel),
                 );
-                const working =
-                  row &&
-                  Object.entries(row.stateCounts).some(
-                    ([k, n]) => ['running', 'submitted', 'leased'].includes(k) && n > 0,
-                  );
-                const state = !row
-                  ? queueView
-                    ? queueLabel
-                    : 'Not in this run'
-                  : row.blockedCount
-                    ? `${row.blockedCount} blocked`
-                    : total === row.plannedCount
-                      ? 'Complete'
-                      : working
-                        ? 'Answering'
-                        : snapshot?.state === 'running'
-                          ? 'Preparing / queued'
-                          : (snapshot?.state ?? 'Waiting');
                 return (
                   <tr key={name}>
                     <td>
                       <strong>
-                        {processing && (
-                          <span
-                            className="provider-ping"
-                            role="status"
-                            aria-label={`${name} processing`}
-                            title="Processing video or answering"
-                          />
-                        )}
+                        <span
+                          className={`provider-dot ${activity.tone}${activity.pulse ? ' pulsing' : ''}`}
+                          role="img"
+                          aria-label={`${name}: ${activity.label}`}
+                          title={activity.label}
+                        />
                         {
                           {
                             larkup: 'Larkup video tool',
@@ -259,7 +272,7 @@ export function Home({
                     <td>
                       {total} / {row?.plannedCount ?? '—'}
                     </td>
-                    <td>{state}</td>
+                    <td>{activity.label}</td>
                     <td>
                       {row?.cost.actual == null ? 'Unknown' : fmtMoney(row.cost.actual, 'USD')}
                       {!!row?.cost.unknownAttemptCount && (

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Home } from './Home.js';
-import { read, type SystemStatus } from '../lib/operator.js';
+import { read, type SystemStatus, type Operation } from '../lib/operator.js';
 import { api, type PublicMeta } from '../lib/client.js';
 import { ControlCenter, DatabaseTab, RecordsTab, LogsTab, ServicesTab } from './ControlCenter.js';
 import {
@@ -62,6 +62,17 @@ export default function Dashboard() {
     window.history.replaceState(null, '', url);
   }, [selected]);
   const [system, setSystem] = useState<SystemStatus | null>(null);
+  const onOperation = useCallback((operation: Operation) => {
+    setSystem((previous) =>
+      previous
+        ? {
+            ...previous,
+            operations: [operation, ...previous.operations.filter((o) => o.id !== operation.id)],
+          }
+        : previous,
+    );
+    setTab('Home');
+  }, []);
   useEffect(() => {
     if (meta?.mode !== 'proxy') return;
     let cancelled = false;
@@ -86,7 +97,12 @@ export default function Dashboard() {
           setTab('Home');
         }
       } catch {
-        if (!cancelled) setLive(false);
+        if (!cancelled) {
+          setLive(false);
+          setSystem((previous) =>
+            previous ? { ...previous, controllerAvailable: false } : previous,
+          );
+        }
       }
     };
     void refresh();
@@ -315,6 +331,7 @@ export default function Dashboard() {
               tasks={data?.tasks ?? []}
               system={system}
               operatorEnabled={meta?.operatorEnabled === true}
+              onOperation={onOperation}
             />
           )}
           {tab !== 'Home' && <ControlCenter enabled={meta?.mode === 'proxy'} onLive={onLive} />}

@@ -472,7 +472,15 @@ or an inference submission. Existing queued work is not restarted by this UI.
 
 New startup operations open Home automatically; a changed selectedRunId opens
 that experiment and updates the shareable ?run= URL. Manual history browsing
-is preserved between transitions. A provider pulse reflects leased/submitted/
-running tasks of its selected immutable variant, including preparation; it is
-hidden for GPU capacity waits, disconnected snapshots, paused runs and idle
-providers. Reduced-motion preferences disable the animation.
+is preserved between transitions. Accepted new-run operations appear immediately,
+before the next system poll, with a saved-request card, capacity-wait explanation,
+attempt number and retry countdown.
+
+Provider dots are orange for waiting/preparation, pulsing green for observed
+processing, steady green for completion, gray for inactive/saved snapshots, and
+red for failed work. Text labels carry the same status. Activity uses complete
+variant stateCounts plus observed preparation tasks, rather than depending only
+on the first page of tasks. A pulse reflects leased/submitted/running work of
+the selected immutable variant; it is hidden for GPU capacity waits, disconnected
+snapshots, paused runs and idle providers. A failed system poll clears live
+activity. Reduced-motion preferences disable the animation.

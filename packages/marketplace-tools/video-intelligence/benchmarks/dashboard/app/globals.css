@@ -161,7 +161,12 @@ main {min-width:0;}
 .home-score .note {font-size:12px;font-weight:400;}
 #selected-run {max-width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;color:var(--text);background:var(--panel-2);}
 
-.provider-ping {display:inline-block;position:relative;width:8px;height:8px;margin-right:9px;border-radius:50%;background:var(--go);}
-.provider-ping::after {content:"";position:absolute;inset:0;border-radius:50%;background:var(--go);animation:provider-pulse 1.5s ease-out infinite;}
+.startup-request {margin-top:12px;background:var(--warn-bg);border-color:var(--warn);}
+.startup-request p {margin:8px 0;}
+.provider-dot {--dot-color:var(--idle);display:inline-block;position:relative;width:8px;height:8px;margin-right:9px;border-radius:50%;background:var(--dot-color);}
+.provider-dot.go {--dot-color:var(--go);}
+.provider-dot.warn {--dot-color:var(--warn);}
+.provider-dot.bad {--dot-color:var(--bad);}
+.provider-dot.pulsing::after {content:"";position:absolute;inset:0;border-radius:50%;background:var(--dot-color);animation:provider-pulse 1.5s ease-out infinite;}
 @keyframes provider-pulse {from {transform:scale(1);opacity:.7;} to {transform:scale(2.7);opacity:0;}}
-@media (prefers-reduced-motion:reduce) {.provider-ping::after {animation:none;}}
+@media (prefers-reduced-motion:reduce) {.provider-dot.pulsing::after {animation:none;}}
