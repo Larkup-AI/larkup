@@ -84,3 +84,19 @@ def funded_deepseek_matrix(base, *, gemini_aliases=()):
                      'fundingPlan':{'gatewayUsd':10,'deepinfraUsd':10,'automaticTopup':False,
                                     'nativeDeepSeekBaseline':'Unavailable in the existing provider run; report this vision cell as exploratory, without an uplift claim.'}}
     return doc
+
+
+def bounded_funded_matrix(base):
+    """New immutable cells: bound hidden reasoning so structured evidence has output space."""
+    doc=deepcopy(base);cells=[]
+    for original in base['protocol']['variantIds']:
+        variant=deepcopy(base['variants'][original])
+        efforts={'brain':'none'}
+        if variant['roles']['vision']['provider']=='deepinfra':efforts['vision']='none'
+        variant['inputProtocol']={**variant['inputProtocol'],'roleReasoningEffort':efforts,
+            'reasoningPolicy':'Direct structured extraction and synthesis with DeepSeek; no hidden reasoning trace. Fixed prompts, source coverage, answer backbone and question cohort remain unchanged.'}
+        vid=original.replace('-v7-','-v8-');doc['variants'][vid]=variant;cells.append(vid)
+    doc['protocol']={**doc['protocol'],'revision':'larkup-funded-deepseek-v8','variantIds':cells,
+        'implementationPolicy':'Explicit provider reasoning control; preparation cache includes input protocol. Earlier v7 diagnostic answers are retained separately and never mixed into v8 scores.'}
+    doc['runtime']['profileVariantId']=cells[0]
+    return doc

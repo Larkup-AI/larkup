@@ -438,6 +438,11 @@ class TwelveLabs:
         return answer_result(payload, 'twelvelabs', c.meter(payload, operation='native_analyze', processing_seconds=c.source['durationMs'] / 1000))
 
 
+def preparation_fingerprint(source, variant):
+    return digest([source.get('sha256'), variant.get('extraction'), variant.get('roles'),
+                   variant.get('canonicalRevision'), variant.get('inputProtocol')])
+
+
 class Larkup:
     """Canonical Python extraction plus canonical Node tool actions; no app server."""
     def __init__(self, package: Path, runtime_endpoint='http://127.0.0.1:8787'):
@@ -459,7 +464,7 @@ class Larkup:
         # not that its statically launched model names equal this cell's.
         if expected_roles and not (operators.get('semanticVision') and operators.get('agentBrain') and operators.get('agentProvider')):
             raise DomainError('RUNTIME_PROFILE_RESTART_REQUIRED')
-        fingerprint = digest([c.source.get('sha256'), c.variant.get('extraction'), c.variant.get('roles'), c.variant.get('canonicalRevision')])
+        fingerprint = preparation_fingerprint(c.source, c.variant)
         artifact = c.root / 'artifacts' / fingerprint / 'evidence.json'
         if artifact.exists():
             prepared = json.loads(artifact.with_name('prepared.json').read_text())
@@ -489,6 +494,7 @@ class Larkup:
                 await c.http.request('POST', proxy + '/control/index-context', headers=headers,
                                      document={'attemptId': c.attempt['id'], 'roles': c.variant['roles'],
                                                'roleInputModalities': c.variant.get('inputProtocol',{}).get('roleInputModalities',{}),
+                                               'roleReasoningEffort': c.variant.get('inputProtocol',{}).get('roleReasoningEffort',{}),
                                                'roleFallbacks': c.variant.get('inputProtocol',{}).get('roleFallbacks',{})})
                 transcript = (await c.http.request('POST', proxy + '/canonical-asr', headers=headers,
                                                    document={'sourceId': c.source['id'], 'sha256': c.source['sha256'], 'attemptId': c.attempt['id'],
@@ -568,6 +574,7 @@ class Larkup:
                                  headers={'X-Benchmark-Capability': os.environ['BENCHMARK_RELAY_CAPABILITY']},
                                  document={'attemptId': c.attempt['id'], 'roles': c.variant['roles'],
                                                'roleInputModalities': c.variant.get('inputProtocol',{}).get('roleInputModalities',{}),
+                                               'roleReasoningEffort': c.variant.get('inputProtocol',{}).get('roleReasoningEffort',{}),
                                                'roleFallbacks': c.variant.get('inputProtocol',{}).get('roleFallbacks',{})})
         request = dict(evidencePath=str(c.root / prepared['evidencePath']), sourceId=c.source['id'],
                        sourcePath=str(c.path), question={k: question[k] for k in ('question', 'options')},

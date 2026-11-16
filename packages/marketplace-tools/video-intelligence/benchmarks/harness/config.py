@@ -109,6 +109,9 @@ class Config:
                 secret_values.get(role['secretAlias'])
                 check_binding(role['provider'], role['secretAlias'])
             protocol=variant.get('inputProtocol',{})
+            for name,effort in protocol.get('roleReasoningEffort',{}).items():
+                if name not in variant.get('roles',{}) or effort not in {'none','low','medium','high'}:
+                    raise DomainError('CONFIG_INVALID')
             for name,modalities in protocol.get('roleInputModalities',{}).items():
                 if name not in variant.get('roles',{}) or not isinstance(modalities,list) or not modalities or set(modalities)-{'text','image'}:
                     raise DomainError('CONFIG_INVALID')

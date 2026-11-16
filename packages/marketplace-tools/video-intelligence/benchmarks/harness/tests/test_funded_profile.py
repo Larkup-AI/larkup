@@ -25,3 +25,12 @@ class FundedMatrixTest(unittest.TestCase):
             aliases={r['secretAlias'] for r in candidate['routes'].values()}|{r['secretAlias'] for v in candidate['variants'].values() for r in v.get('roles',{}).values()}
             atomic(p/'benchmark.env',''.join(k+'=fixture-'+k+'\n' for k in aliases),raw=True)
             Config(candidate,p/'benchmark.env')
+
+    def test_bounded_cells_keep_historical_protocol_and_make_reasoning_explicit(self):
+        from harness.profiles import funded_deepseek_matrix,bounded_funded_matrix
+        base=funded_deepseek_matrix(default_profile('revision'),gemini_aliases=['GEMINI_APIKEY2'])
+        candidate=bounded_funded_matrix(base)
+        for vid in base['protocol']['variantIds']:self.assertEqual(candidate['variants'][vid],base['variants'][vid])
+        self.assertTrue(all('-v8-' in vid for vid in candidate['protocol']['variantIds']))
+        for vid in candidate['protocol']['variantIds']:
+            self.assertEqual(candidate['variants'][vid]['inputProtocol']['roleReasoningEffort']['brain'],'none')

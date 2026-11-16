@@ -18,7 +18,7 @@ from .main import BENCHMARK
 from .transport import HTTP
 
 
-def runtime_payload(document, spec, input_modalities=None):
+def runtime_payload(document, spec, input_modalities=None, reasoning_effort=None):
     payload=json.loads(json.dumps(document))
     payload['model']=spec['model']
     if spec['provider']!='vercel_ai_gateway':
@@ -26,6 +26,9 @@ def runtime_payload(document, spec, input_modalities=None):
         if reasoning and spec['provider'] in {'deepinfra','gemini_openai'}:
             effort=reasoning.get('effort')
             if effort:payload.setdefault('reasoning_effort',{'minimal':'low'}.get(effort,effort))
+    if reasoning_effort is not None:
+        if spec['provider']=='vercel_ai_gateway':payload['reasoning']={'effort':reasoning_effort}
+        else:payload['reasoning_effort']=reasoning_effort
     if input_modalities is not None and set(input_modalities)=={'text'}:
         for message in payload.get('messages',[]):
             if isinstance(message.get('content'),list):
@@ -122,7 +125,7 @@ class Relay:
         for spec in candidates:
             outbound=body;out_headers=dict(headers)
             if body and 'application/json' in headers.get('content-type',''):
-                doc=runtime_payload(json.loads(body),spec,context.get('roleInputModalities',{}).get(role))
+                doc=runtime_payload(json.loads(body),spec,context.get('roleInputModalities',{}).get(role),context.get('roleReasoningEffort',{}).get(role))
                 outbound=json.dumps(doc).encode();out_headers['content-length']=str(len(outbound))
             try:
                 return self.forward(bases[spec['provider']]+suffix,spec['secretAlias'],method,outbound,out_headers,
