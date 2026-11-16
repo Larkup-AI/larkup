@@ -98,5 +98,4 @@ def bounded_funded_matrix(base):
         vid=original.replace('-v7-','-v8-');doc['variants'][vid]=variant;cells.append(vid)
     doc['protocol']={**doc['protocol'],'revision':'larkup-funded-deepseek-v8','variantIds':cells,
         'implementationPolicy':'Explicit provider reasoning control; preparation cache includes input protocol. Earlier v7 diagnostic answers are retained separately and never mixed into v8 scores.'}
-    doc['runtime']['profileVariantId']=cells[0]
     return doc

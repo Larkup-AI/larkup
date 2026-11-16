@@ -30,6 +30,7 @@ class FundedMatrixTest(unittest.TestCase):
         from harness.profiles import funded_deepseek_matrix,bounded_funded_matrix
         base=funded_deepseek_matrix(default_profile('revision'),gemini_aliases=['GEMINI_APIKEY2'])
         candidate=bounded_funded_matrix(base)
+        self.assertEqual(candidate['runtime'],base['runtime'])
         for vid in base['protocol']['variantIds']:self.assertEqual(candidate['variants'][vid],base['variants'][vid])
         self.assertTrue(all('-v8-' in vid for vid in candidate['protocol']['variantIds']))
         for vid in candidate['protocol']['variantIds']:
