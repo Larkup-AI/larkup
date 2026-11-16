@@ -42,6 +42,14 @@ class GPUStartupTest(unittest.TestCase):
         self.assertEqual(self.r.capacity_fallback.call_args.kwargs['attempt'],2)
         self.assertEqual(self.events[-1]['phase'],'ready')
 
+    def test_ui_capacity_rejection_opens_alternatives_without_backoff(self):
+        self.r.gql=Mock(side_effect=lambda q: (_ for _ in ()).throw(DomainError('RUNPOD_GPU_UNAVAILABLE')) if 'podResume' in q else {'pod':{'desiredStatus':'EXITED'}})
+        self.r.capacity_fallback.return_value=True
+        self.resume(require_choice=True)
+        self.assertEqual(self.clock.sleeps,[])
+        self.r.capacity_fallback.assert_called_once()
+        self.assertEqual(sum('podResume' in c.args[0] for c in self.r.gql.call_args_list),1)
+
     def test_waiting_can_be_cancelled_before_another_resume_or_connection(self):
         self.r.gql=Mock(side_effect=lambda q: (_ for _ in ()).throw(DomainError('RUNPOD_GPU_UNAVAILABLE')) if 'podResume' in q else {'pod':{'desiredStatus':'EXITED'}})
         def check():
@@ -80,6 +88,14 @@ class GPUStartupTest(unittest.TestCase):
             observations+=1;return {'items':[{'name':'canonical video runtime','state':'running' if observations==3 else 'unreachable'}]}
         self.r.api=Mock(side_effect=api);self.r.wait_ready(sleep=self.clock.sleep,clock=self.clock.now)
         self.assertEqual(observations,3);self.assertEqual(self.clock.value,4)
+    def test_failed_bootstrap_is_reported_without_waiting_for_the_service_deadline(self):
+        self.r.api=Mock(side_effect=DomainError('CONTROLLER_UNAVAILABLE'))
+        self.r.ssh.return_value=SimpleNamespace(returncode=1)
+        with self.assertRaises(DomainError) as error:
+            self.r.wait_ready(sleep=self.clock.sleep,clock=self.clock.now)
+        self.assertEqual(error.exception.code,'REMOTE_BOOTSTRAP_FAILED')
+        self.assertEqual(self.clock.value,10)
+
     def test_service_wait_cancellation_is_not_swallowed_as_health_failure(self):
         self.r.api=Mock(return_value={'availability':'available','items':[{'name':'canonical video runtime','state':'running'}]})
         checks=0

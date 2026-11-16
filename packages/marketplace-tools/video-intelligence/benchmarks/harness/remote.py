@@ -90,16 +90,6 @@ class Remote:
             while now()<deadline:
                 check();pause(min(1,deadline-now()))
             check()
-        if require_choice:
-            pod=self.gql('query { pod(input:{podId:'+json.dumps(self.state['podId'])+'}) { desiredStatus } }')['pod']
-            if pod and pod['desiredStatus']=='EXITED':
-                while True:
-                    check()
-                    report('waiting_capacity',stage='Checking GPU types and prices now. No rental is submitted until you choose an offer.')
-                    if self.capacity_fallback(attempt=policy.afterFailures,check=check,report=report):
-                        report('ready',stage='Selected GPU restored. Preparing benchmark services.');return
-                    report('waiting_capacity',stage='Waiting for your next GPU offer check in 60 seconds.',retrySeconds=60)
-                    wait(60)
         journal=self.deployment/'gpu-relocation.json'
         if journal.exists() and json.loads(journal.read_text()).get('status') in {'allocating','allocated','restoring','cleanup_required'}:
             if self.capacity_fallback(attempt=policy.afterFailures,check=check,report=report):
@@ -137,7 +127,7 @@ class Remote:
                     self.gql('mutation { podResume(input:{podId:'+json.dumps(self.state['podId'])+',gpuCount:1}) {id desiredStatus} }')
                 except DomainError as error:
                     if error.code!='RUNPOD_GPU_UNAVAILABLE':raise
-                    if attempt>=policy.afterFailures and self.capacity_fallback(attempt=attempt,check=check,report=report):
+                    if (require_choice or attempt>=policy.afterFailures) and self.capacity_fallback(attempt=max(attempt,policy.afterFailures),check=check,report=report):
                         report('ready',stage='Alternative GPU restored. Preparing benchmark services.');check();return
                     delay=min(120,policy.retrySeconds*(1 if attempt==1 else 2))
                     report('waiting_capacity',retrySeconds=delay,
@@ -238,7 +228,7 @@ print(json.dumps(r))
         revision = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=REPO, capture_output=True, text=True, check=True).stdout.strip()
         atomic(self.deployment / 'source-revision.json', dict(canonicalRevision=revision,
                baseArchiveSha256=hashlib.sha256(base).hexdigest(), harnessArchiveSha256=hashlib.sha256(overlay).hexdigest()))
-        self.ssh('nohup bash ' + REMOTE_BENCH + '/harness/bootstrap-remote.sh ' + REMOTE_REPO + ' >' + REMOTE_BENCH + '/data/deployment/bootstrap.log 2>&1 </dev/null &')
+        self.ssh('rm -f ' + REMOTE_BENCH + '/data/deployment/bootstrap.failed; nohup bash ' + REMOTE_BENCH + '/harness/bootstrap-remote.sh ' + REMOTE_REPO + ' >' + REMOTE_BENCH + '/data/deployment/bootstrap.log 2>&1 </dev/null &')
 
     def stop_owned_processes(self):
         code = """import pathlib,json,sqlite3,os,signal,time
@@ -378,7 +368,7 @@ print(json.dumps(dict(revision=revision,running=running,active=active,privateRea
             self.install()
             return
         if not probe['running']:
-            self.ssh('nohup bash ' + REMOTE_BENCH + '/harness/bootstrap-remote.sh ' + REMOTE_REPO + ' >' + REMOTE_BENCH + '/data/deployment/bootstrap.log 2>&1 </dev/null &')
+            self.ssh('rm -f ' + REMOTE_BENCH + '/data/deployment/bootstrap.failed; nohup bash ' + REMOTE_BENCH + '/harness/bootstrap-remote.sh ' + REMOTE_REPO + ' >' + REMOTE_BENCH + '/data/deployment/bootstrap.log 2>&1 </dev/null &')
 
     def api(self, suffix, doc=None, *, key=None, timeout=30):
         credentials = json.loads((self.deployment / 'relay.json').read_text())
@@ -483,7 +473,7 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
 
     def wait_ready(self, *, check_cancelled=None, sleep=None, clock=None):
         pause=sleep or time.sleep;now=clock or time.monotonic
-        check=check_cancelled or (lambda:None);deadline=now()+900
+        check=check_cancelled or (lambda:None);deadline=now()+900;next_bootstrap_probe=now()+10
         while now()<deadline:
             check()
             try:
@@ -497,6 +487,11 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
                 ready=False
             check()
             if ready:return
+            if now()>=next_bootstrap_probe:
+                probe=self.ssh('test ! -f '+REMOTE_BENCH+'/data/deployment/bootstrap.failed',check=False)
+                check()
+                if probe.returncode==1:raise DomainError('REMOTE_BOOTSTRAP_FAILED')
+                next_bootstrap_probe=now()+10
             for _ in range(2):check();pause(1)
         raise DomainError('REMOTE_STARTUP_INCOMPLETE')
 

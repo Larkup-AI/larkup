@@ -1,4 +1,5 @@
 'use client';
+import { gpuServicesReady } from '../lib/gpu-status.js';
 import { useEffect, useState, useRef } from 'react';
 import type { RunSummary, RunSnapshot, RunMetrics, TaskObject } from '../lib/contract.js';
 import { operate, type SystemStatus, type Operation } from '../lib/operator.js';
@@ -92,7 +93,12 @@ export function Home({
         body: JSON.stringify({ offerId: offer.id, selection }),
       });
       const body = await response.json();
-      if (!response.ok) throw Error(body.error?.code === 'GPU_OFFER_EXPIRED' ? 'This price offer expired. Updated offers will appear automatically; please choose again.' : (body.error?.message ?? 'GPU selection failed. Please try again.'));
+      if (!response.ok)
+        throw Error(
+          body.error?.code === 'GPU_OFFER_EXPIRED'
+            ? 'This price offer expired. Updated offers will appear automatically; please choose again.'
+            : (body.error?.message ?? 'GPU selection failed. Please try again.'),
+        );
       setDismissedOffer(offer.id);
       setMessage(
         selection === 'wait'
@@ -110,17 +116,30 @@ export function Home({
   const systems = ['larkup', 'gemini', 'qwen', 'muse', 'minimax', 'twelvelabs'] as const;
   return (
     <>
-      {system?.gpuOffers && system.gpuOffers.id !== dismissedOffer && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Choose GPU">
-        <div className="modal-card"><h3>Choose a GPU</h3>
-          {offerError && <p role="alert">{offerError}</p>}
-          {busy && <p role="status">Confirming your choice…</p>}
-          <p>Listed availability can change. Only your chosen GPU will be reserved. Storage is billed separately.</p>
-          {system.gpuOffers.offers.map((offer,index)=><p key={index}>
-            {offer.gpuTypeId} · {offer.cloudType} · USD {offer.quotedHourlyUsd}/hour{' '}
-            <button disabled={busy} onClick={()=>gpuChoice(String(index))}>Accept this GPU</button>
-          </p>)}
-          <button disabled={busy} onClick={()=>gpuChoice('wait')}>Wait for a cheaper GPU</button>
-        </div></div>}
+      {system?.gpuOffers && system.gpuOffers.id !== dismissedOffer && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Choose GPU">
+          <div className="modal-card">
+            <h3>Choose a GPU</h3>
+            {offerError && <p role="alert">{offerError}</p>}
+            {busy && <p role="status">Confirming your choice…</p>}
+            <p>
+              Listed availability can change. Only your chosen GPU will be reserved. Storage is
+              billed separately.
+            </p>
+            {system.gpuOffers.offers.map((offer, index) => (
+              <p key={index}>
+                {offer.gpuTypeId} · {offer.cloudType} · USD {offer.quotedHourlyUsd}/hour{' '}
+                <button disabled={busy} onClick={() => gpuChoice(String(index))}>
+                  Accept this GPU
+                </button>
+              </p>
+            ))}
+            <button disabled={busy} onClick={() => gpuChoice('wait')}>
+              Wait for a cheaper GPU
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="panel">
         <h2>Your benchmark</h2>
@@ -236,7 +255,9 @@ export function Home({
                 : (system?.pod.state ?? 'unknown')}
           </span>
           <span>
-            {system?.controllerAvailable ? 'Live · updates every 2 seconds' : 'Saved checkpoint'}
+            {system?.pod.state === 'RUNNING' && gpuServicesReady(system.services)
+              ? 'Live · updates every 2 seconds'
+              : 'Saved checkpoint'}
           </span>
         </div>
         {snapshot && (
@@ -325,10 +346,22 @@ export function Home({
                         tasks,
                         queueLabel: queueView ? queueLabel : undefined,
                       });
-                const preparationTasks=tasks.filter(t=>t.variantId===row?.variantId && !t.questionId);
-                const preparationDone=preparationTasks.filter(t=>t.state==='completed').length;
-                const progress=preparationTasks.find(t=>['leased','submitted','running'].includes(t.state))?.progress;
-                const preparationMessage=progress && typeof progress==='object' && 'message' in progress && typeof progress.message==='string' ? progress.message : null;
+                const preparationTasks = tasks.filter(
+                  (t) => t.variantId === row?.variantId && !t.questionId,
+                );
+                const preparationDone = preparationTasks.filter(
+                  (t) => t.state === 'completed',
+                ).length;
+                const progress = preparationTasks.find((t) =>
+                  ['leased', 'submitted', 'running'].includes(t.state),
+                )?.progress;
+                const preparationMessage =
+                  progress &&
+                  typeof progress === 'object' &&
+                  'message' in progress &&
+                  typeof progress.message === 'string'
+                    ? progress.message
+                    : null;
                 const check = system?.readiness?.checks.find(
                   (c) => c.system === name && (!row?.logicalModel || c.model === row.logicalModel),
                 );
@@ -379,7 +412,11 @@ export function Home({
                     </td>
                     <td>
                       <strong>{activity.label}</strong>
-                      {preparationTasks.length>0 && <div className="note">Videos prepared: {preparationDone} / {preparationTasks.length}</div>}
+                      {preparationTasks.length > 0 && (
+                        <div className="note">
+                          Videos prepared: {preparationDone} / {preparationTasks.length}
+                        </div>
+                      )}
                       {preparationMessage && <div className="note">{preparationMessage}</div>}
                       {row &&
                         (() => {
