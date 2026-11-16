@@ -145,7 +145,7 @@ class Context:
         last = {}
         for entry in entries:
             usage = entry.pop('usage', {})
-            entry.update(currency='USD', estimated=None,
+            entry.update(currency='USD', estimated=str(usage['estimated_cost']) if usage.get('estimated_cost') is not None else entry.get('estimated'),
                          actual=str(entry['actual']) if entry.get('actual') is not None else None,
                          inputTokens=usage.get('promptTokenCount', usage.get('prompt_tokens')),
                          outputTokens=usage.get('candidatesTokenCount', usage.get('completion_tokens')),
@@ -453,7 +453,11 @@ class Larkup:
         health = (await self.runtime(c, 'GET', '/v1/health')).json()
         operators = health.get('operators', {})
         expected_roles = c.variant.get('roles', {})
-        if expected_roles and (operators.get('semanticVision') != expected_roles['vision']['model'] or operators.get('agentBrain') != expected_roles['brain']['model'] or operators.get('agentProvider') != expected_roles['brain']['provider']):
+        # The provider relay rewrites each call's model to this attempt's role (see provider_relay
+        # /runtime/*), so one runtime launched in semantic-vision + agent mode serves every vision/brain
+        # cell without a per-cell relaunch. We therefore require only that the runtime IS in that mode,
+        # not that its statically launched model names equal this cell's.
+        if expected_roles and not (operators.get('semanticVision') and operators.get('agentBrain') and operators.get('agentProvider')):
             raise DomainError('RUNTIME_PROFILE_RESTART_REQUIRED')
         fingerprint = digest([c.source.get('sha256'), c.variant.get('extraction'), c.variant.get('roles'), c.variant.get('canonicalRevision')])
         artifact = c.root / 'artifacts' / fingerprint / 'evidence.json'
@@ -473,12 +477,19 @@ class Larkup:
                            brief={'indexingMode': c.variant.get('extraction', {}).get('mode', 'balanced'),
                                   'processingAuthorityConfirmed': True, 'retainSourceHours': 24,
                                   'skipVideoEmbeddings': True, 'requireSemanticVision': True,
-                                  'goal': 'Index speech, visible text, visual detail and temporal events for evidence-grounded questions.'})
+                                  'goal': ('Build complete evidence for multiple-choice video QA. Transcribe all '
+                                           'speech with timestamps; OCR every on-screen text, caption, sign, slide '
+                                           'and number; catalogue people, objects, actions, settings and scene '
+                                           'changes with their timestamps; and preserve the temporal order of events '
+                                           'so questions about sequence, counting, cause/effect and before/after can '
+                                           'be resolved from the index alone. Prefer precise, grounded detail over summary.')})
             if os.environ.get('BENCHMARK_PROVIDER_PROXY'):
                 proxy = os.environ['BENCHMARK_PROVIDER_PROXY']
                 headers = {'X-Benchmark-Capability': os.environ['BENCHMARK_RELAY_CAPABILITY']}
                 await c.http.request('POST', proxy + '/control/index-context', headers=headers,
-                                     document={'attemptId': c.attempt['id'], 'roles': c.variant['roles']})
+                                     document={'attemptId': c.attempt['id'], 'roles': c.variant['roles'],
+                                               'roleInputModalities': c.variant.get('inputProtocol',{}).get('roleInputModalities',{}),
+                                               'roleFallbacks': c.variant.get('inputProtocol',{}).get('roleFallbacks',{})})
                 transcript = (await c.http.request('POST', proxy + '/canonical-asr', headers=headers,
                                                    document={'sourceId': c.source['id'], 'sha256': c.source['sha256'], 'attemptId': c.attempt['id'],
                                                              'audio': c.variant['roles']['audio']})).json()
@@ -555,7 +566,9 @@ class Larkup:
         if os.environ.get('BENCHMARK_PROVIDER_PROXY'):
             await c.http.request('POST', os.environ['BENCHMARK_PROVIDER_PROXY'] + '/control/index-context',
                                  headers={'X-Benchmark-Capability': os.environ['BENCHMARK_RELAY_CAPABILITY']},
-                                 document={'attemptId': c.attempt['id'], 'roles': c.variant['roles']})
+                                 document={'attemptId': c.attempt['id'], 'roles': c.variant['roles'],
+                                               'roleInputModalities': c.variant.get('inputProtocol',{}).get('roleInputModalities',{}),
+                                               'roleFallbacks': c.variant.get('inputProtocol',{}).get('roleFallbacks',{})})
         request = dict(evidencePath=str(c.root / prepared['evidencePath']), sourceId=c.source['id'],
                        sourcePath=str(c.path), question={k: question[k] for k in ('question', 'options')},
                        protocol=c.variant.get('inputProtocol', {}), runtimeEndpoint=self.runtime_endpoint,

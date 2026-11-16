@@ -9,27 +9,30 @@ from typing import Any
 
 from .common import DomainError, Secrets, canonical, digest, identifier
 
-PROVIDERS = {'gemini', 'qwen', 'twelvelabs', 'gateway', 'deepseek', 'runtime'}
+PROVIDERS = {'gemini', 'gemini_openai', 'qwen', 'twelvelabs', 'gateway', 'deepseek', 'deepinfra', 'runtime'}
 
 
 def check_binding(provider: str, alias: str):
-    provider = {'google': 'gemini', 'vercel_ai_gateway': 'gateway'}.get(provider, provider)
+    provider = {'google': 'gemini', 'gemini_openai': 'gemini', 'vercel_ai_gateway': 'gateway'}.get(provider, provider)
     if alias in {'RUNPOD_APIKEY', 'HUGGINGFACE_APIKEY', 'BENCHMARK_CONTROLLER_TOKEN'}:
         raise DomainError('SECRET_SCOPE_MISMATCH')
     patterns = [(r'GEMINI_APIKEY\d+', 'gemini'), (r'DEEPGRAM_APIKEY\d+', 'deepgram'),
                 (r'TWELEVE_LABS_KEY\d+', 'twelvelabs'), (r'QWEN_APIKEY', 'qwen'),
                 (r'VERCEL_GATEWAY_API_KEY', 'gateway'), (r'DEEPSEEK_APIKEY', 'deepseek'),
+                (r'DEEPINFRA_APIKEY', 'deepinfra'),
                 (r'BENCHMARK_RUNTIME_TOKEN', 'runtime')]
     for pattern, intended in patterns:
         if re.fullmatch(pattern, alias) and provider != intended:
             raise DomainError('SECRET_SCOPE_MISMATCH')
 ENDPOINTS = {
     'gemini': {'https://generativelanguage.googleapis.com/v1beta'},
+    'gemini_openai': {'https://generativelanguage.googleapis.com/v1beta/openai'},
     'qwen': {'https://dashscope.aliyuncs.com/compatible-mode/v1',
              'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
              'https://dashscope-us.aliyuncs.com/compatible-mode/v1'},
     'gateway': {'https://ai-gateway.vercel.sh/v1', 'https://ai-gateway.vercel.sh/v4/ai'},
     'deepseek': {'https://api.deepseek.com/v1'},
+    'deepinfra': {'https://api.deepinfra.com/v1/openai'},
     'twelvelabs': {'https://api.twelvelabs.io/v1.3'},
     'runtime': {'http://127.0.0.1:8787'},
 }
@@ -105,6 +108,17 @@ class Config:
                     raise DomainError('CONFIG_INVALID')
                 secret_values.get(role['secretAlias'])
                 check_binding(role['provider'], role['secretAlias'])
+            protocol=variant.get('inputProtocol',{})
+            for name,modalities in protocol.get('roleInputModalities',{}).items():
+                if name not in variant.get('roles',{}) or not isinstance(modalities,list) or not modalities or set(modalities)-{'text','image'}:
+                    raise DomainError('CONFIG_INVALID')
+            for name,fallbacks in protocol.get('roleFallbacks',{}).items():
+                if name not in variant.get('roles',{}) or not isinstance(fallbacks,list) or len(fallbacks)>8:
+                    raise DomainError('CONFIG_INVALID')
+                for fallback in fallbacks:
+                    if set(fallback)!={'provider','model','secretAlias','verifiedEquivalent'} or fallback['verifiedEquivalent'] is not True:
+                        raise DomainError('ROUTE_EQUIVALENCE_UNVERIFIED')
+                    secret_values.get(fallback['secretAlias']);check_binding(fallback['provider'],fallback['secretAlias'])
         limits = doc.setdefault('limits', {})
         for key, default, maximum in [('global', 4, 32), ('gpu', 1, 1), ('cpu', 2, 8),
                                        ('upload', 2, 8), ('qa', 3, 16), ('judge', 1, 4),

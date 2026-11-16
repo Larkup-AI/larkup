@@ -106,6 +106,15 @@ class Scheduler:
             busy += ok == kind
         return busy < limits[kind]
 
+    def pause_after_infrastructure_failure(self, task, snapshot, error):
+        if not snapshot.config.get('protocol',{}).get('stopOnInfrastructureFailure'):return
+        if error.code not in {'AUTH_INVALID','CREDIT_EXHAUSTED','MODEL_UNAVAILABLE','CAPABILITY_UNSUPPORTED',
+                              'INFRA_FAILURE','CANONICAL_INDEX_FAILED','CANONICAL_ASR_FAILED','CANONICAL_VISION_INCOMPLETE',
+                              'REMOTE_OUTCOME_UNKNOWN','RUNTIME_PROFILE_RESTART_REQUIRED','EXECUTION_BUDGET_EXCEEDED','QUOTA_WAIT'} and not error.code.startswith('ROLE_'):return
+        current=self.store.snapshot(task['run_id'])
+        if current['state'] in {'running','blocked'}:
+            self.store.control(task['run_id'],'pause',current['revision'])
+
     async def perform(self, task: dict, attempt: dict, snapshot, resume=None):
         c = Context(self.store, task, attempt, snapshot, self.root, self.http, resume)
         try:
@@ -137,13 +146,16 @@ class Scheduler:
             raise
         except asyncio.TimeoutError:
             self.store.fail(task, attempt, DomainError('REMOTE_OUTCOME_UNKNOWN', unknown=True), snapshot.config['limits']['attempts'])
+            self.pause_after_infrastructure_failure(task,snapshot,DomainError('REMOTE_OUTCOME_UNKNOWN',unknown=True))
         except DomainError as e:
             self.store.fail(task, attempt, e, snapshot.config['limits']['attempts'])
+            self.pause_after_infrastructure_failure(task,snapshot,e)
             self.store.usage(attempt['id'], dict(operation='unsuccessful_attempt', currency='USD', actual=None,
                                                estimated=None, unknownReason=e.code, provider=c.route['provider']))
         except Exception:
             # No raw exceptions, upstream payloads, URLs, or keys enter state/events/logs.
             self.store.fail(task, attempt, DomainError('INFRA_FAILURE'), snapshot.config['limits']['attempts'])
+            self.pause_after_infrastructure_failure(task,snapshot,DomainError('INFRA_FAILURE'))
 
     async def tick(self):
         for key, future in list(self.refreshes.items()):

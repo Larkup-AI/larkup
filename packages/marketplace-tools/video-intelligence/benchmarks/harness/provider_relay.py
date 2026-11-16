@@ -18,6 +18,30 @@ from .main import BENCHMARK
 from .transport import HTTP
 
 
+def runtime_payload(document, spec, input_modalities=None):
+    payload=json.loads(json.dumps(document))
+    payload['model']=spec['model']
+    if spec['provider']!='vercel_ai_gateway':
+        reasoning=payload.pop('reasoning',None)
+        if reasoning and spec['provider'] in {'deepinfra','gemini_openai'}:
+            effort=reasoning.get('effort')
+            if effort:payload.setdefault('reasoning_effort',{'minimal':'low'}.get(effort,effort))
+    if input_modalities is not None and set(input_modalities)=={'text'}:
+        for message in payload.get('messages',[]):
+            if isinstance(message.get('content'),list):
+                message['content']=[part if part.get('type')=='text' else
+                    {'type':'text','text':'[The reasoning role is text-only: scout image bytes are omitted. Use the supplied timestamped text signals; the vision role supplies visual evidence.]'}
+                    for part in message['content']]
+    return payload
+
+
+def configured_role_specs(config):
+    for variant in config['variants'].values():
+        yield from variant.get('roles',{}).values()
+        for candidates in variant.get('inputProtocol',{}).get('roleFallbacks',{}).values():
+            yield from candidates
+
+
 class Relay:
     def __init__(self, benchmark: Path, capability: str):
         self.benchmark, self.data, self.capability = benchmark, benchmark / 'data', capability
@@ -85,7 +109,30 @@ class Relay:
                              attemptId=body.get('attemptId'), provider='deepgram', origin='canonical-asr'))
             return {**output, 'artifactId': cache.parent.name, 'reused': False}
 
-    def forward(self, target: str, alias: str, method: str, body: bytes, headers: dict, attempt=None, origin='adapter'):
+    def runtime_forward(self, context, role, suffix, method, body, headers):
+        primary=context['roles'][role]
+        fallbacks=context.get('roleFallbacks',{}).get(role,[])
+        if any(spec.get('verifiedEquivalent') is not True for spec in fallbacks):raise DomainError('ROUTE_EQUIVALENCE_UNVERIFIED')
+        candidates=[primary,*fallbacks]
+        bases={'vercel_ai_gateway':'https://ai-gateway.vercel.sh/v1',
+               'gemini_openai':'https://generativelanguage.googleapis.com/v1beta/openai',
+               'google':'https://generativelanguage.googleapis.com/v1beta',
+               'deepinfra':'https://api.deepinfra.com/v1/openai','deepseek':'https://api.deepseek.com/v1'}
+        last=None
+        for spec in candidates:
+            outbound=body;out_headers=dict(headers)
+            if body and 'application/json' in headers.get('content-type',''):
+                doc=runtime_payload(json.loads(body),spec,context.get('roleInputModalities',{}).get(role))
+                outbound=json.dumps(doc).encode();out_headers['content-length']=str(len(outbound))
+            try:
+                return self.forward(bases[spec['provider']]+suffix,spec['secretAlias'],method,outbound,out_headers,
+                                    context['attemptId'],origin='runtime',role=role)
+            except DomainError as error:
+                if error.code!='CREDIT_EXHAUSTED':raise
+                last=error
+        raise last or DomainError('NO_ELIGIBLE_ROUTE')
+
+    def forward(self, target: str, alias: str, method: str, body: bytes, headers: dict, attempt=None, origin='adapter', role=None):
         from urllib.parse import urlsplit
         parsed = urlsplit(target)
         allowed = any(target.startswith(base + '/') or target == base for bases in ENDPOINTS.values() for base in bases if base.startswith('https://'))
@@ -95,34 +142,40 @@ class Relay:
             raise DomainError('DESTINATION_INVALID')
         config = json.loads((self.data / 'configs/active.json').read_text())
         permitted_aliases = {r['secretAlias'] for r in config['routes'].values()}
-        permitted_aliases.update(s['secretAlias'] for v in config['variants'].values() for s in v.get('roles', {}).values())
+        permitted_aliases.update(s['secretAlias'] for s in configured_role_specs(config))
         if alias not in permitted_aliases:
             raise DomainError('AUTH_INVALID')
         provider_for_host = {'ai-gateway.vercel.sh': 'gateway', 'generativelanguage.googleapis.com': 'gemini',
-                             'api.deepseek.com': 'deepseek', 'api.twelvelabs.io': 'twelvelabs',
+                             'api.deepseek.com': 'deepseek', 'api.deepinfra.com': 'deepinfra', 'api.twelvelabs.io': 'twelvelabs',
                              'dashscope.aliyuncs.com': 'qwen', 'dashscope-intl.aliyuncs.com': 'qwen',
                              'dashscope-us.aliyuncs.com': 'qwen'}
         intended = {r['provider'] for r in config['routes'].values() if r['secretAlias'] == alias}
-        intended.update({'google': 'gemini', 'vercel_ai_gateway': 'gateway'}.get(s['provider'], s['provider'])
-                        for v in config['variants'].values() for s in v.get('roles', {}).values() if s['secretAlias'] == alias)
+        intended.update({'google': 'gemini', 'gemini_openai': 'gemini', 'vercel_ai_gateway': 'gateway'}.get(s['provider'], s['provider'])
+                        for s in configured_role_specs(config) if s['secretAlias'] == alias)
         if provider_for_host.get(parsed.hostname) not in intended:
             raise DomainError('SECRET_SCOPE_MISMATCH', status=403)
+        requested_model=None
         if body and 'application/json' in headers.get('content-type', ''):
             payload = json.loads(body)
-            allowed_models = {r['model'] for r in config['routes'].values()} | {s['model'] for v in config['variants'].values() for s in v.get('roles', {}).values()}
+            allowed_models = {r['model'] for r in config['routes'].values()} | {s['model'] for s in configured_role_specs(config)}
             requested_model = payload.get('model') or payload.get('model_name') or headers.get('ai-language-model-id')
             if requested_model and requested_model not in allowed_models:
                 raise DomainError('MODEL_VARIANT_MISMATCH')
         if '/models/' in parsed.path:
             model = parsed.path.split('/models/', 1)[1].split(':', 1)[0]
-            if model not in {r['model'].split('/')[-1] for r in config['routes'].values()} | {s['model'].split('/')[-1] for v in config['variants'].values() for s in v.get('roles', {}).values()}:
+            if model not in {r['model'].split('/')[-1] for r in config['routes'].values()} | {s['model'].split('/')[-1] for s in configured_role_specs(config)}:
                 raise DomainError('MODEL_VARIANT_MISMATCH')
         key = self.secrets.get(alias)
         if method != 'GET' and alias in self.exhausted_aliases:
             raise DomainError('CREDIT_EXHAUSTED')
         outbound = {k: v for k, v in headers.items() if k in {'content-type', 'content-length'} or k.startswith('x-goog-upload-') or k.startswith('ai-')}
         if alias.startswith('GEMINI'):
-            outbound['x-goog-api-key'] = key
+            # Google's native API takes x-goog-api-key; its OpenAI-compatible endpoint
+            # (/v1beta/openai/...), used for Larkup vision, authenticates with a Bearer token.
+            if '/openai/' in parsed.path:
+                outbound['Authorization'] = 'Bearer ' + key
+            else:
+                outbound['x-goog-api-key'] = key
         elif alias.startswith('TWELEVE'):
             outbound['x-api-key'] = key
         else:
@@ -139,7 +192,7 @@ class Relay:
                 if self.total_calls[attempt] > 128:
                     raise DomainError('EXECUTION_BUDGET_EXCEEDED')
         paid = method == 'POST' and any(x in parsed.path for x in ('generateContent', 'completions', 'analyze/tasks', 'language-model', 'interactions'))
-        provider = 'gateway' if parsed.hostname == 'ai-gateway.vercel.sh' else 'gemini' if parsed.hostname == 'generativelanguage.googleapis.com' else 'deepseek' if parsed.hostname == 'api.deepseek.com' else 'twelvelabs'
+        provider = 'gateway' if parsed.hostname == 'ai-gateway.vercel.sh' else 'gemini' if parsed.hostname == 'generativelanguage.googleapis.com' else 'deepseek' if parsed.hostname == 'api.deepseek.com' else 'deepinfra' if parsed.hostname == 'api.deepinfra.com' else 'twelvelabs'
         try:
             response = self.http.sync(method, target, body=body or None, headers=outbound, timeout=600, submitted=paid)
         except DomainError as e:
@@ -147,7 +200,7 @@ class Relay:
                 self.exhausted_aliases.add(alias)
             if paid:
                 self.record(dict(attemptId=attempt, accountAlias=alias, operation=parsed.path,
-                                 provider=provider, origin=origin, actual=None, issue=e.issue()))
+                                 provider=provider, origin=origin, role=role, model=requested_model, actual=None, issue=e.issue()))
             raise
         if paid:
             try:
@@ -157,7 +210,7 @@ class Relay:
                 usage = {}
             self.record(dict(attemptId=attempt, accountAlias=alias, operation=parsed.path.split('?')[0],
                              usage=usage, actual=usage.get('cost'), status=response.status,
-                             provider=provider, origin=origin))
+                             provider=provider, origin=origin, role=role, model=requested_model))
         return response
 
     def handler(self):
@@ -202,18 +255,13 @@ class Relay:
                             if not context or context['expires'] < time.time():
                                 raise DomainError('RUNTIME_CONTEXT_REQUIRED')
                             role = 'vision' if path.startswith('/runtime/vision') else 'brain'
-                            spec = context['roles'][role]
-                            alias = spec['secretAlias']
-                            base = ('https://ai-gateway.vercel.sh/v1' if spec['provider'] == 'vercel_ai_gateway' else
-                                    'https://generativelanguage.googleapis.com/v1beta' if spec['provider'] == 'google' else 'https://api.deepseek.com/v1')
                             suffix = self.path[len('/runtime/' + role):]
-                            target, attempt = base + suffix, context['attemptId']
+                            response=relay.runtime_forward(context,role,suffix,self.command,body,headers)
                         elif path == '/forward':
                             target, alias, attempt = self.headers.get('X-Benchmark-Target', ''), self.headers.get('X-Benchmark-Account', ''), self.headers.get('X-Benchmark-Attempt')
+                            response=relay.forward(target,alias,self.command,body,headers,attempt)
                         else:
                             raise DomainError('NOT_FOUND', status=404)
-                        response = relay.forward(target, alias, self.command, body, headers, attempt,
-                                                 origin='runtime' if path.startswith('/runtime/') else 'adapter')
                         payload, status = response.body, response.status
                         extra = {k: v for k, v in response.headers.items() if k in {'x-goog-upload-url', 'content-type', 'retry-after'}}
                     self.send_response(status)
