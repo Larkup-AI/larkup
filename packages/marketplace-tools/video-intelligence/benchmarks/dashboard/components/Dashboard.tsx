@@ -75,7 +75,7 @@ export default function Dashboard() {
           }
         : previous,
     );
-    setTab('Home');
+    if (['start', 'new-run', 'resume-run'].includes(operation.action)) setTab('Home');
   }, []);
   useEffect(() => {
     if (meta?.mode !== 'proxy') return;
