@@ -19,3 +19,20 @@ class InfrastructurePauseTest(unittest.TestCase):
             self.assertEqual(store.ready(),[])
             self.assertEqual(store.rows('SELECT * FROM attempts'),[])
             store.close()
+
+    def test_resume_requeues_known_asr_failure_but_preserves_unknown_outcome(self):
+        for unknown in (False, True):
+            with self.subTest(unknown=unknown), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);atomic(root/'benchmark.env','KEY_ONE=fixture-one\nKEY_TWO=fixture-two\n',raw=True)
+                config=Config(profile(),root/'benchmark.env');store=Store(root/'state.sqlite3')
+                run=store.create(manifest(1),['arm-one'],config.active,'smoke');store.control(run['id'],'start',run['revision'])
+                task=store.ready()[0]
+                attempt=store.lease(task,config.active,'direct',config.active.config['routes']['direct'],'fixture')
+                store.fail(task,attempt,DomainError('CANONICAL_ASR_FAILED',unknown=unknown),1)
+                current=store.snapshot(run['id'])
+                if current['state']!='blocked':
+                    store.control(run['id'],'pause',current['revision'])
+                current=store.snapshot(run['id']);store.control(run['id'],'resume',current['revision'])
+                actual=store.one('SELECT state FROM tasks WHERE id=?',(task['id'],))['state']
+                self.assertEqual(actual,'blocked' if unknown else 'pending')
+                store.close()

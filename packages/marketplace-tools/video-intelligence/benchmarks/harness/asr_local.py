@@ -18,7 +18,8 @@ os.environ.update(DEEPGRAM_API_KEY=request['apiKey'], LARKUP_VIDEO_TRANSCRIPTION
                   LARKUP_VIDEO_DEEPGRAM_MODEL=request['model'], LARKUP_VIDEO_DEEPGRAM_AUTO_MODEL=request['model'],
                   LARKUP_VIDEO_TRANSCRIPTION_FALLBACK='', LARKUP_VIDEO_TRANSCRIPTION_CONCURRENCY='2',
                   LARKUP_VIDEO_TRANSCRIPTION_CHUNK_SECONDS='300')
-from app.services.transcription import TranscriptionService
+from app.services.transcription import TranscriptionService, EmptyTranscriptionError
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from harness.asr_result import transcribe
 service = TranscriptionService('cpu')
-segments, language = service.transcribe(Path(request['path']), None, [], request['durationSecs'])
-print(json.dumps({'transcript': segments, 'detectedLanguage': language, 'diagnostics': service.last_diagnostics}))
+print(json.dumps(transcribe(service, Path(request['path']), request['durationSecs'], EmptyTranscriptionError)))

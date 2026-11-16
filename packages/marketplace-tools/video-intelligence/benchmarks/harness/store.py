@@ -207,7 +207,7 @@ class Store:
                 # Only known rejection/dependency blockers are safe to admit again. Unknown paid outcomes
                 # require handle reconciliation and are never retried by a resume click.
                 cx.execute("""UPDATE tasks SET state='pending',issue=NULL,eligible_at=0 WHERE run_id=? AND state='blocked'
-                  AND json_extract(issue,'$.code') IN ('NO_ELIGIBLE_ROUTE','DEPENDENCY_BLOCKED','AUTH_INVALID','CREDIT_EXHAUSTED','MODEL_UNAVAILABLE','REMOTE_OUTCOME_UNKNOWN')
+                  AND json_extract(issue,'$.code') IN ('NO_ELIGIBLE_ROUTE','DEPENDENCY_BLOCKED','AUTH_INVALID','CREDIT_EXHAUSTED','MODEL_UNAVAILABLE','REMOTE_OUTCOME_UNKNOWN','CANONICAL_ASR_FAILED')
                   AND (current_attempt IS NULL OR NOT EXISTS(SELECT 1 FROM attempts a WHERE a.id=tasks.current_attempt AND a.state='unknown'))
                   AND NOT EXISTS(SELECT 1 FROM attempts a JOIN tasks sibling ON sibling.id=a.task_id
                     WHERE sibling.run_id=tasks.run_id AND sibling.source_id=tasks.source_id
