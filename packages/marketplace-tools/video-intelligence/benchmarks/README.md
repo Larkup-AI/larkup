@@ -94,12 +94,14 @@ calls, backs up, and stops the Pod. No top-ups or silent model substitutions occ
 
 Wake up first resumes the saved Pod in place, preserving its prepared environment.
 The UI requests alternative-host offers only when RunPod rejects saved-host
-capacity; accepting an alternative continues setup automatically. Downloaded Node
-and pnpm tools persist on the volume. Node dependencies install on the container
-SSD and are saved as one compressed archive for later wakes; slow shared-volume
-package-cache reads no longer block installation. Dependency manifests invalidate
-the cache when requirements change. Bootstrap failures surface promptly instead
-of leaving the UI waiting for the full service timeout.
+capacity; accepting an alternative continues setup automatically. Node, pnpm,
+Python environments and dependency stores run on the container SSD. A replacement
+GPU prepares these afresh unless the selected image already contains matching
+manifests. Existing source/evidence data stays on the volume; moving to another
+host still requires transferring the verified checkpoint. The UI reports transfer
+sizes and the current setup stage, rather than retaining the price-acceptance message.
+Bootstrap failures surface promptly instead of leaving the UI waiting for the full
+service timeout.
 CLI GPU startup retries after 60 seconds, then at most every 120 seconds. After two
 saved-host capacity failures, the PC operator also checks compatible NVIDIA GPUs
 in RunPod Community and Secure Cloud. It tries cheaper compatible offers first,

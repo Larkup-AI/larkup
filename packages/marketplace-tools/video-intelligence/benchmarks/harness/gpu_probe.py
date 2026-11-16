@@ -12,7 +12,7 @@ def verify(benchmark: Path):
     model = benchmark / 'data/models/yolox_s.onnx'
     options = ort.SessionOptions()
     options.add_session_config_entry('session.disable_cpu_ep_fallback', '1')
-    session = ort.InferenceSession(str(model), sess_options=options, providers=['CUDAExecutionProvider'])
+    session = ort.InferenceSession(str(model), sess_options=options, providers=[('CUDAExecutionProvider', {'cudnn_conv_algo_search': 'HEURISTIC'})])
     outputs = session.run(None, {session.get_inputs()[0].name: np.zeros((1, 3, 640, 640), dtype=np.float32)})
     if 'CUDAExecutionProvider' not in session.get_providers() or not outputs or not all(np.isfinite(x).all() for x in outputs):
         raise RuntimeError('GPU detector validation failed')

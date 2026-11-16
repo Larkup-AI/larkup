@@ -96,6 +96,15 @@ class GPUStartupTest(unittest.TestCase):
         self.assertEqual(error.exception.code,'REMOTE_BOOTSTRAP_FAILED')
         self.assertEqual(self.clock.value,10)
 
+    def test_service_wait_reports_the_actual_bootstrap_stage(self):
+        self.r.private=SimpleNamespace(clean=lambda value:value)
+        self.r.api=Mock(side_effect=lambda path,**kw: {'availability':'available','items':[{'name':'canonical video runtime','state':'running'}]} if self.clock.value>=12 else (_ for _ in ()).throw(DomainError('CONTROLLER_UNAVAILABLE')))
+        self.r.ssh.return_value=SimpleNamespace(returncode=0,stdout=b'Preparing Python dependencies')
+        progress=[]
+        self.r.wait_ready(sleep=self.clock.sleep,clock=self.clock.now,on_progress=progress.append)
+        self.assertEqual(progress,['Preparing Python dependencies'])
+        self.assertEqual(self.clock.value,12)
+
     def test_service_wait_cancellation_is_not_swallowed_as_health_failure(self):
         self.r.api=Mock(return_value={'availability':'available','items':[{'name':'canonical video runtime','state':'running'}]})
         checks=0

@@ -246,12 +246,14 @@ def restore_target(remote, target, saved, check, report):
     check(); target.ssh('mkdir -p ' + REMOTE_BENCH + '/data/state ' + REMOTE_BENCH + '/data/deployment')
     report('starting_gpu', stage='Restoring the verified benchmark checkpoint onto the alternative GPU. Saved answers are preserved.')
     check(); target.ssh('cat > ' + REMOTE_BENCH + '/data/state/benchmark.sqlite3', data=Path(saved['database']).read_bytes())
-    check(); target.ssh('tar --no-same-owner -xf - -C ' + REMOTE_BENCH, data=Path(saved['evidence']).read_bytes())
+    packed=Path(saved['evidence']).read_bytes()
+    report('starting_gpu',stage='Transferring '+str(round(len(packed)/1024/1024,1))+' MB of saved video evidence to the selected GPU.')
+    check(); target.ssh('tar --no-same-owner -xf - -C ' + REMOTE_BENCH, data=packed)
     proof = target.ssh("python3 -c " + shlex.quote("import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('" + REMOTE_BENCH + "/data/state/benchmark.sqlite3').read_bytes()).hexdigest())"))
     if proof.stdout.decode().strip() != saved['databaseSha256']:
         raise DomainError('RECOVERY_CHECKPOINT_INVALID')
     check(); report('starting_gpu', stage='Installing benchmark services on the restored GPU. No model inference is being submitted.')
-    target.install(); check()
+    target.install(on_progress=lambda stage:report('starting_gpu',stage=stage)); check()
 
 
 def allocation_input(remote, candidate, policy, name):

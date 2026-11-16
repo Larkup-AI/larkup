@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import gzip
 import io
 import ipaddress
 import json
@@ -181,9 +182,11 @@ class Remote:
         for value in self.private.values.values():
             if value and (value.encode() in base or value.encode() in content):
                 raise DomainError('SECRET_IN_SOURCE_BUNDLE')
-        return base, content
+        return gzip.compress(base,compresslevel=1,mtime=0), gzip.compress(content,compresslevel=1,mtime=0)
 
-    def install(self):
+    def install(self, *, on_progress=None):
+        progress=on_progress or (lambda stage:None)
+        progress('Checking cached benchmark sources on the selected GPU.')
         # Code/dependency updates are a drained release, not hot configuration reload.
         self.stop_owned_processes()
         inventory = """import pathlib,hashlib,json
@@ -200,8 +203,11 @@ print(json.dumps(result))
         import shlex
         hashes = self.ssh('python3 -c ' + shlex.quote(inventory))
         base, overlay = self.bundle(json.loads(hashes.stdout))
-        self.ssh('mkdir -p ' + REMOTE_REPO + ' && tar --no-same-owner -xf - -C ' + REMOTE_REPO, data=base)
-        self.ssh('tar --no-same-owner -xf - -C ' + REMOTE_REPO, data=overlay)
+        progress('Transferring '+str(round(len(base)/1024/1024,1))+' MB of compressed application code.')
+        self.ssh('mkdir -p ' + REMOTE_REPO + ' && tar --no-same-owner -xzf - -C ' + REMOTE_REPO, data=base)
+        progress('Transferring '+str(round(len(overlay)/1024/1024,1))+' MB of benchmark code and source media.')
+        self.ssh('tar --no-same-owner -xzf - -C ' + REMOTE_REPO, data=overlay)
+        progress('Restoring the benchmark controller configuration.')
         config = json.loads((self.data / 'configs/active.json').read_text())
         aliases = sorted({r['secretAlias'] for r in config['routes'].values()} |
                          {s['secretAlias'] for v in config['variants'].values() for s in v.get('roles', {}).values()})
@@ -480,7 +486,7 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
                 raise DomainError('CONTROLLER_PAGINATION_INVALID')
             cursor = next_cursor
 
-    def wait_ready(self, *, check_cancelled=None, sleep=None, clock=None):
+    def wait_ready(self, *, check_cancelled=None, sleep=None, clock=None, on_progress=None):
         pause=sleep or time.sleep;now=clock or time.monotonic
         check=check_cancelled or (lambda:None);deadline=now()+900;next_bootstrap_probe=now()+10
         while now()<deadline:
@@ -497,9 +503,11 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
             check()
             if ready:return
             if now()>=next_bootstrap_probe:
-                probe=self.ssh('test ! -f '+REMOTE_BENCH+'/data/deployment/bootstrap.failed',check=False)
+                probe=self.ssh('test ! -f '+REMOTE_BENCH+'/data/deployment/bootstrap.failed && cat '+REMOTE_BENCH+'/data/deployment/bootstrap-stage 2>/dev/null; test ! -f '+REMOTE_BENCH+'/data/deployment/bootstrap.failed',check=False)
                 check()
                 if probe.returncode==1:raise DomainError('REMOTE_BOOTSTRAP_FAILED')
+                if on_progress and probe.returncode==0 and probe.stdout:
+                    on_progress(self.private.clean(probe.stdout.decode(errors='replace').strip()[:300]))
                 next_bootstrap_probe=now()+10
             for _ in range(2):check();pause(1)
         raise DomainError('REMOTE_STARTUP_INCOMPLETE')

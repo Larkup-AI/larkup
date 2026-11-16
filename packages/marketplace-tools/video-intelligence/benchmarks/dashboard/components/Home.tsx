@@ -53,6 +53,9 @@ export function Home({
   const snapshot = queueView || loadedSnapshot?.id !== selected ? null : loadedSnapshot;
   const metrics = snapshot ? loadedMetrics : null;
   const latest = system?.operations[0];
+  useEffect(() => {
+    if (['completed', 'failed', 'cancelled'].includes(latest?.state ?? '')) setMessage('');
+  }, [latest?.id, latest?.state]);
   const disabled = !operatorEnabled || !system || system.readonly || busy || !!pending;
   const active = runs.some((r) => ['running', 'pausing', 'cancelling'].includes(r.state));
   async function action(name: string) {
@@ -100,11 +103,7 @@ export function Home({
             : (body.error?.message ?? 'GPU selection failed. Please try again.'),
         );
       setDismissedOffer(offer.id);
-      setMessage(
-        selection === 'wait'
-          ? 'Waiting for cheaper offers; no GPU reserved.'
-          : 'GPU price accepted. Checking reservation and preparing services.',
-      );
+      setMessage(selection === 'wait' ? 'Waiting for cheaper offers; no GPU reserved.' : '');
     } catch (e) {
       setOfferError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -198,7 +197,7 @@ export function Home({
           ready, the request is replaced by its experiment. Resume continues only the selected
           experiment and keeps its completed answers.
         </p>
-        {message && <p role="status">{message}</p>}
+        {message && !pending && <p role="status">{message}</p>}
         {queueView && (
           <div className="banner startup-request" role="status">
             <strong>
@@ -248,11 +247,12 @@ export function Home({
           <strong>{queueView ? queueLabel : (snapshot?.state ?? 'No run selected')}</strong>
           <span>
             GPU:{' '}
-            {pending?.startup?.phase === 'waiting_capacity'
-              ? 'Waiting for capacity'
-              : pending?.startup?.phase === 'starting_gpu'
-                ? 'Waking up'
-                : (system?.pod.state ?? 'unknown')}
+            {pending?.stage ??
+              (pending?.startup?.phase === 'waiting_capacity'
+                ? 'Waiting for capacity'
+                : pending?.startup?.phase === 'starting_gpu'
+                  ? 'Waking up'
+                  : (system?.pod.state ?? 'unknown'))}
           </span>
           <span>
             {system?.pod.state === 'RUNNING' && gpuServicesReady(system.services)
