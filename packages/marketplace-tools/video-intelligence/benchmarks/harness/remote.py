@@ -429,7 +429,16 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
 """
         # Incremental source files stay on both disks; a complete evidence checkpoint is taken at
         # stage boundaries, not every polling tick.
+        reuse_evidence=None
         if getattr(self, 'checkpoint_evidence', False):
+            from .gpu_capacity import checkpoint
+            try:reuse_evidence=checkpoint(self)
+            except DomainError:pass
+            if reuse_evidence:
+                # An idle wake admits no work; refresh the DB while retaining verified evidence.
+                import shutil
+                shutil.copyfile(reuse_evidence['evidence'],self.deployment/'remote-evidence.tar')
+        if getattr(self, 'checkpoint_evidence', False) and not reuse_evidence:
             captured = self.ssh('python3 -c ' + shlex.quote(code) + ' ' + REMOTE_BENCH)
             target = self.data / 'deployment/remote-evidence.tar'
             temporary = target.with_suffix('.partial')

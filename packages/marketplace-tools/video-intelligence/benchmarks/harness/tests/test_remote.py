@@ -158,6 +158,41 @@ class RemoteWorkflowTest(unittest.TestCase):
         self.remote.ensure_started()
         self.remote.install.assert_not_called()
 
+    def test_idle_wake_reuses_verified_evidence_while_refreshing_database_checkpoint(self):
+        import tarfile
+        from types import SimpleNamespace
+        from harness.gpu_capacity import capture_checkpoint,checkpoint
+        self.remote.state={'podId':'fixture'}
+        self.remote.data.mkdir(parents=True,exist_ok=True)
+        database=self.remote.data/'state/remote-backup.sqlite3'
+        store=Store(database);store.close()
+        evidence=self.remote.deployment/'remote-evidence.tar'
+        with tarfile.open(evidence,'w'):pass
+        original=capture_checkpoint(self.remote)
+        self.remote.checkpoint_evidence=True
+        self.remote.api_items=MagicMock(return_value=[])
+        self.remote.ssh=MagicMock(side_effect=[SimpleNamespace(stdout=b''),SimpleNamespace(stdout=database.read_bytes())])
+        self.remote._backup()
+        self.assertEqual(self.remote.ssh.call_count,2)
+        self.assertNotEqual(checkpoint(self.remote)['generation'],original['generation'])
+        self.assertEqual(checkpoint(self.remote)['evidenceSha256'],original['evidenceSha256'])
+
+    def test_new_work_invalidates_evidence_reuse(self):
+        import io,tarfile
+        from types import SimpleNamespace
+        from harness.gpu_capacity import capture_checkpoint,invalidate_checkpoint
+        self.remote.state={'podId':'fixture'}
+        database=self.remote.data/'state/remote-backup.sqlite3'
+        store=Store(database);store.close()
+        evidence=self.remote.deployment/'remote-evidence.tar'
+        with tarfile.open(evidence,'w'):pass
+        capture_checkpoint(self.remote);invalidate_checkpoint(self.remote)
+        self.remote.checkpoint_evidence=True
+        self.remote.api_items=MagicMock(return_value=[])
+        self.remote.ssh=MagicMock(side_effect=[SimpleNamespace(stdout=b''),SimpleNamespace(stdout=database.read_bytes()),SimpleNamespace(stdout=evidence.read_bytes())])
+        self.remote._backup()
+        self.assertEqual(self.remote.ssh.call_count,3)
+
     def test_startup_failure_stops_rental(self):
         remote = MagicMock()
         remote.children = []
