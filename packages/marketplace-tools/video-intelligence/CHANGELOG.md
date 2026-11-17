@@ -1,5 +1,11 @@
 # @larkup/tool-video-intelligence
 
+## 0.3.20
+
+### Patch Changes
+
+- da8b6d0: Keep all visual reads within the requested source range and preserve both comparison states as partial evidence. Do not treat generic scene summaries as verification of a requested comparison detail. Give healthy re-watch calls more of the existing bounded response budget and preserve the visible appearance of monochrome sources without inventing an original hue.
+
 ## 0.3.19
 
 ### Patch Changes
