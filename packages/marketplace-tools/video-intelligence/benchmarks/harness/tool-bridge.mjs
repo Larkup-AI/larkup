@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { VideoIntelligenceClient } from '../../src/client.ts';
-import { attachVideoIntelligenceAgentClient, AGENT_TOOLS } from '../../src/agent.ts';
+import { attachVideoIntelligenceAgentClient } from '../../src/agent.ts';
 import { runWithWorkspaceHost } from '../../../../core/src/workspace-host.ts';
 import { readVideoKnowledgeState } from '../../../../core/src/video-knowledge/store.ts';
 import { buildVideoKnowledgeFromEvidence } from '../../../../core/src/video-knowledge/knowledge-builder.ts';
@@ -15,6 +15,7 @@ import { scanVideoKnowledge, aggregateVideoKnowledge } from '../../../../core/sr
 import { planVideoQuestion } from '../../../../core/src/video-knowledge/query-planner.ts';
 import { planVideoInvestigation } from '../../../../core/src/video-knowledge/investigation.ts';
 import { loadConverter } from './build-converter.mjs';
+import { collectEvidencePages } from './evidence-pages.mjs';
 const { convertEvidence } = await loadConverter();
 
 /** Only a schema boundary: the imported core builder owns evidence/hierarchy behavior. */
@@ -112,20 +113,13 @@ export async function execute(input) {
       const hits = await searchVideoKnowledge(input.sourceId, input.question.question, 12);
       return { success: true, evidence: hits, actions: [{ action: 'simpleRetrieval', limit: 12 }] };
     }
-    const pages = [];
-    let cursor;
-    for (let step = 0; step < (input.protocol.maxToolSteps ?? 4); step++) {
+    const collected = await collectEvidencePages(async (cursor) => {
       actions.push({ action: 'queryVideoEvidence', cursor: cursor ?? 0 });
-      const result = await client.queryVideoEvidence({ mediaAssetId: input.sourceId,
+      return client.queryVideoEvidence({ mediaAssetId: input.sourceId,
         query: input.retrievalQuery ?? input.question.question, ...(input.investigation ? { investigation: input.investigation } : {}),
         limit: 48, ...(cursor !== undefined ? { cursor } : {}) }, context);
-      pages.push(result);
-      const policy = AGENT_TOOLS.map((t) => t.systemPromptFragment).filter(Boolean).join('\n');
-      if (!result.success) return { success: false, toolExecutionValid: true, pages, actions, policy };
-      if (!result.continuation?.hasMore) return { success: true, toolExecutionValid: true, pages, actions, policy };
-      cursor = result.continuation.nextCursor;
-    }
-    return { success: false, toolExecutionValid: true, error: 'Bounded tool steps exhausted before source coverage.', actions };
+    }, { maxPages: input.protocol.maxEvidencePages ?? 64 });
+    return { ...collected, actions };
   });
 }
 

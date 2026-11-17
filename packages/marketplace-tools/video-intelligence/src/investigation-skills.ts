@@ -46,6 +46,26 @@ export const VIDEO_INVESTIGATION_SKILLS = [
       'observedSubjects, when present, is the reconciled frame-grounded visibility ledger: use its ranges for visible-presence and timing claims, never speech, titles, or a source name. Its durations are observed intervals, not inferred continuous screen time.',
   },
   {
+    id: 'verify-local-detail',
+    instruction:
+      'For a visual attribute or brief change, establish the requested subject and time before answering. If the index is ambiguous, re-watch a bounded local range with adjacent frames; do not resolve colour, pattern, identity or a small object from a broad summary or world knowledge.',
+  },
+  {
+    id: 'verify-temporal-claim',
+    instruction:
+      'For order and counting, keep a timestamped ledger of the requested events and distinguish first occurrence, repetition, and later explanation. Use continuousSequence for a bounded transition when separated samples cannot establish what happened between them. Do not infer chronology merely from the order of retrieved records.',
+  },
+  {
+    id: 'verify-negative-claim',
+    instruction:
+      'Not retrieved does not mean absent. A negative or exclusion claim needs evidence covering the relevant source range and alternatives; disclose a sampling gap instead of treating it as proof that an event never occurred.',
+  },
+  {
+    id: 'match-answer-scope',
+    instruction:
+      'For a primary topic or overall purpose, synthesize the source navigation context and representative speech or visual evidence. Do not mistake a request for the overall topic for an exhaustive inventory. Preserve the distinction between spoken mentions, visible observations, and conclusions inferred across them.',
+  },
+  {
     id: 'respond',
     instruction:
       'Answer as a viewer who remembers the material: lead with the answer itself, and when natural say "I saw" or "I heard" rather than describing a system. Do not say "the video shows", "the analysis indicates", or "according to retrieved evidence". Never mention retrieval, search, indexing, frames, tools, or analysis unless the user asks how the answer was found.',
