@@ -1,0 +1,49 @@
+{
+  "method": "Cumulative development recovery, not fresh full-suite accuracy. Historical passes are untested on the new revision.",
+  "rows": [
+    {
+      "reader": "latest",
+      "baselineCorrect": 10,
+      "failedQuestions": 9,
+      "newAnswered": 7,
+      "newCorrect": 5,
+      "completedAttempts": 11,
+      "unknownVisionRequests": 2,
+      "cumulativeCorrect": 15,
+      "total": 19
+    },
+    {
+      "reader": "qwen",
+      "baselineCorrect": 11,
+      "failedQuestions": 8,
+      "newAnswered": 5,
+      "newCorrect": 3,
+      "completedAttempts": 5,
+      "unknownVisionRequests": 2,
+      "cumulativeCorrect": 14,
+      "total": 19
+    },
+    {
+      "reader": "muse",
+      "baselineCorrect": 9,
+      "failedQuestions": 10,
+      "newAnswered": 7,
+      "newCorrect": 6,
+      "completedAttempts": 7,
+      "unknownVisionRequests": 1,
+      "cumulativeCorrect": 15,
+      "total": 19
+    },
+    {
+      "reader": "minimax",
+      "baselineCorrect": 10,
+      "failedQuestions": 9,
+      "newAnswered": 7,
+      "newCorrect": 4,
+      "completedAttempts": 10,
+      "unknownVisionRequests": 0,
+      "cumulativeCorrect": 14,
+      "total": 19
+    }
+  ]
+}

@@ -1,126 +1,567 @@
-runId,sourceId,dataset,questionId,variantId,attemptId,configRevision,durationGroup,sourceDurationMs,capability,logicalModel,resolvedModel,routeId,provider,accountAlias,tier,state,answer,predictedOption,correct,evaluationRevision,evidence,cost,timing,usage,indexArtifactId,issue
-run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-audio,gemini-native-gateway-v1,attempt-b6d21a5caa2ef44b2586,config-adcd200706cc5dbd03ec,short,8000,audio,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
-{
- ""option"": ""C"",
- ""explanation"": ""The speaker in the clip explicitly states that the secret number spoken is seven."",
- ""evidence"": [
-  {
-   ""startMs"": 0,
-   ""endMs"": 4000,
-   ""kind"": ""transcript"",
-   ""claim"": ""The speaker states: 'The secret number spoken in this clip is seven.'""
-  }
- ]
-}
-```",C,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4000,""kind"":""transcript"",""supportedClaim"":""The speaker states: 'The secret number spoken in this clip is seven.'""}]","{""currency"":""USD"",""actual"":""0.00134925"",""estimated"":""0.00134925"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":54447.23033905029,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":5101.989571936429,""firstTokenMs"":null,""endToEndMs"":59549.21991098672,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":859,""outputTokens"":188,""reasoningTokens"":null,""cachedTokens"":null,""processingSeconds"":8.0,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-6e4426b03091d6e80a4115d6,
-run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-audio,qwen-frames,attempt-a262c148b5559816261d,config-adcd200706cc5dbd03ec,short,8000,audio,qwen3.6-plus,alibaba/qwen3.6-plus,qwen-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
-{
-    ""option"": ""C"",
-    ""explanation"": ""The official subtitle explicitly states, 'The secret number spoken in this clip is seven.'"",
-    ""evidence"": [
-        {
-            ""startMs"": 0,
-            ""endMs"": 4000,
-            ""kind"": ""subtitle"",
-            ""claim"": ""The secret number spoken in this clip is seven.""
-        }
-    ]
-}
-```",C,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4000,""kind"":""subtitle"",""supportedClaim"":""The secret number spoken in this clip is seven.""}]","{""currency"":""USD"",""actual"":""0.0046585"",""estimated"":""0.0046585"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":7393.146514892578,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":5692.081436980516,""firstTokenMs"":null,""endToEndMs"":13085.227951873094,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":7259,""outputTokens"":343,""reasoningTokens"":null,""cachedTokens"":0,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-265941ad1249e0ac5fa34f52,
-run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-audio,twelvelabs-native,attempt-39e6c7d2c449b50ffeed,config-adcd200706cc5dbd03ec,short,8000,audio,pegasus1.5,,twelvelabs-direct,twelvelabs,TWELEVE_LABS_KEY1,unverified,completed,"{
-  ""option"": ""C"",
-  ""explanation"": ""The audio explicitly states that the secret number spoken in the clip is seven."",
+reader,question_id,source_id,baseline_run_id,baseline_correct,baseline_option,official_option,retested,new_correct,new_option,cumulative_correct,answer_origin,new_brain,latency_s,completed_attempts,execution_mode,final_reasoning_effort,rewatch_timeout_ms,new_answer,reported_final_usage,actual_cash_cost_usd
+latest,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-79f3b55b0359ec26d60c,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
+latest,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,E,B,True,False,E,False,new failed-question retry,deepseek-v4-pro,19.88,1,api-rewatch,high,interactive-default,"{
+  ""option"": ""E"",
+  ""explanation"": ""At 34:01–34:37, the rewatch evidence shows the man appearing beside 'THE WALL STREET JOURNAL' putting on dark sunglasses, so the change is an additional pair of sunglasses on his face."",
   ""evidence"": [
     {
-      ""startMs"": 0,
-      ""endMs"": 4000,
-      ""kind"": ""subtitle"",
-      ""claim"": ""The secret number spoken in this clip is seven.""
+      ""startMs"": 2041873,
+      ""endMs"": 2077208,
+      ""kind"": ""visual"",
+      ""claim"": ""The man (Joe Biden) is shown putting on dark sunglasses while appearing beside 'THE WALL STREET JOURNAL'.""
     }
   ]
-}",C,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4000,""kind"":""subtitle"",""supportedClaim"":""The secret number spoken in this clip is seven.""}]","{""currency"":""USD"",""actual"":null,""estimated"":null,""unknownAttemptCount"":1,""reconciled"":false}","{""queueMs"":161.88335418701172,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":10828.176097013056,""firstTokenMs"":null,""endToEndMs"":10990.059451200068,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":2029,""outputTokens"":95,""reasoningTokens"":null,""cachedTokens"":null,""processingSeconds"":8.0,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-375481a5db492d7e12a7407e,
-run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-visual,gemini-native-gateway-v1,attempt-0a310d493590e52ff52a,config-adcd200706cc5dbd03ec,short,8000,visual,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
-{
- ""option"": ""A"",
- ""explanation"": ""The video starts with a solid red screen from 00:00 until around 00:03, before transitioning to blue."",
- ""evidence"": [
-  {
-   ""startMs"": 0,
-   ""endMs"": 3000,
-   ""kind"": ""video"",
-   ""claim"": ""The screen is filled with the color red.""
-  }
- ]
-}
-```",A,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":3000,""kind"":""video"",""supportedClaim"":""The screen is filled with the color red.""}]","{""currency"":""USD"",""actual"":""0.001887"",""estimated"":""0.001887"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":86.84039115905762,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":6524.2695229826495,""firstTokenMs"":null,""endToEndMs"":6611.109914141707,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":861,""outputTokens"":331,""reasoningTokens"":null,""cachedTokens"":null,""processingSeconds"":8.0,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-6e4426b03091d6e80a4115d6,
-run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-visual,qwen-frames,attempt-8090e98ea0a8aa081b59,config-adcd200706cc5dbd03ec,short,8000,visual,qwen3.6-plus,alibaba/qwen3.6-plus,qwen-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
-{
-    ""option"": ""A"",
-    ""explanation"": ""The video begins with a solid red screen that persists from 0 ms until at least 3386 ms, before switching to blue at 4514 ms. Therefore, the color filling the first part of the video is red."",
-    ""evidence"": [
-        {
-            ""startMs"": 0,
-            ""endMs"": 3386,
-            ""kind"": ""visual"",
-            ""claim"": ""The video displays a solid red screen.""
-        }
-    ]
-}
-```",A,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":3386,""kind"":""visual"",""supportedClaim"":""The video displays a solid red screen.""}]","{""currency"":""USD"",""actual"":""0.0048695"",""estimated"":""0.0048695"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":248.50058555603027,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":6754.883467103355,""firstTokenMs"":null,""endToEndMs"":7003.384052659385,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":7261,""outputTokens"":413,""reasoningTokens"":null,""cachedTokens"":0,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-265941ad1249e0ac5fa34f52,
-run-6e5156835f4573d13725,development-smoke,development-CC0,smoke-visual,twelvelabs-native,attempt-ec7f81305cb90540c4d0,config-adcd200706cc5dbd03ec,short,8000,visual,pegasus1.5,,twelvelabs-direct,twelvelabs,TWELEVE_LABS_KEY1,unverified,completed,"{""option"":""A"",""explanation"":""The video begins with a solid red screen that fills the frame from the start until the color changes at 00:04."",""evidence"":[{""startMs"":0,""endMs"":4000,""kind"":""visual"",""claim"":""The screen is filled with the color red.""}]}",A,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4000,""kind"":""visual"",""supportedClaim"":""The screen is filled with the color red.""}]","{""currency"":""USD"",""actual"":null,""estimated"":null,""unknownAttemptCount"":1,""reconciled"":false}","{""queueMs"":11434.571266174316,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":10506.400706944987,""firstTokenMs"":null,""endToEndMs"":21940.971973119304,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":2031,""outputTokens"":69,""reasoningTokens"":null,""cachedTokens"":null,""processingSeconds"":8.0,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-375481a5db492d7e12a7407e,
-run-6d52d407421c1d1b0be0,development-smoke,development-CC0,smoke-audio,larkup-gateway-brain-v2,attempt-553c14668d7f0a823144,config-f15ac1a74f0541c10c51,short,8000,audio,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
-{
-  ""option"": ""C"",
-  ""explanation"": ""In the audio track, the speaker clearly states, \""The secret number spoken in this clip is 7.\"""",
+}","{""completion_tokens"": 949, ""completion_tokens_details"": {""reasoning_tokens"": 819}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 7334, ""prompt_tokens"": 7590, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 8539}",
+latest,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,,E,False,,,False,unresolved baseline failure,,,0,,,,,,
+latest,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-79f3b55b0359ec26d60c,False,,D,True,True,D,True,new failed-question retry,deepseek-v4-pro,30.18,3,api-rewatch,high,interactive-default,"{
+  ""option"": ""D"",
+  ""explanation"": ""The rewatch observation at 41:42 shows that when the screen text changes to 'GLOBAL WATCH', the anchor's right hand is raised off the desk and holding a white paper, so the change is to holding a piece of paper with his right hand."",
   ""evidence"": [
     {
-      ""startMs"": 0,
-      ""endMs"": 3600,
-      ""kind"": ""speech"",
-      ""claim"": ""The speaker announces: \""The secret number spoken in this clip is 7.\""""
+      ""startMs"": 2499157,
+      ""endMs"": 2559157,
+      ""kind"": ""visual observation"",
+      ""claim"": ""At 41:42, when 'GLOBAL WATCH' appears on the monitor beside the anchor, the anchor's right hand is raised off the desk and holding a white paper.""
     }
   ]
-}
-```",C,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":3600,""kind"":""speech"",""supportedClaim"":""The speaker announces: \""The secret number spoken in this clip is 7.\""""}]","{""currency"":""USD"",""actual"":""0.00748290"",""estimated"":""0.00391875"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":55848.86050224304,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":47582.7071450185,""firstTokenMs"":null,""endToEndMs"":103431.56764726155,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":8401,""outputTokens"":681,""reasoningTokens"":0,""cachedTokens"":2032,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":3}",index-03aae92ee6c5dd343bb8925d,
-run-6d52d407421c1d1b0be0,development-smoke,development-CC0,smoke-audio,same-backbone-retrieval-gateway-brain-v2,attempt-53fcd4c6e0d79f039571,config-f15ac1a74f0541c10c51,short,8000,audio,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
-{
+}","{""completion_tokens"": 1359, ""completion_tokens_details"": {""reasoning_tokens"": 1208}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 7456, ""prompt_tokens"": 7968, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 9327}",
+latest,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-79f3b55b0359ec26d60c,False,A,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,9.95,2,api-rewatch,,interactive-default,"{
   ""option"": ""C"",
-  ""explanation"": ""According to the official transcript and audio descriptions, the number spoken in the audio clip is seven."",
+  ""explanation"": ""The source is a black-and-white photograph of Ostad Elahi playing a tanbur. The tie appears dark/black in grayscale, but the original hue cannot be recovered from monochrome. Among the options, 'black' is the closest match to the observed dark appearance."",
   ""evidence"": [
     {
       ""startMs"": 0,
-      ""endMs"": 4000,
+      ""endMs"": 6548,
+      ""kind"": ""visual"",
+      ""claim"": ""In the black-and-white photograph of Ostad Elahi playing a tanbur, the tie appears dark / black in grayscale, while the original hue cannot be definitively recovered from the monochrome image.""
+    }
+  ]
+}","{""completion_tokens"": 154, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 6563, ""prompt_tokens"": 6819, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 6973}",
+latest,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-79f3b55b0359ec26d60c,False,E,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,14.53,1,api-rewatch,,interactive-default,"{
+  ""option"": ""C"",
+  ""explanation"": ""The man with glasses holding a musical instrument is observed wearing white gloves in the source video at 1:40–1:50 (100.976–110.36 seconds)."",
+  ""evidence"": [
+    {
+      ""startMs"": 100976,
+      ""endMs"": 110360,
+      ""kind"": ""visual"",
+      ""claim"": ""The man with glasses holding the musical instrument is wearing white gloves.""
+    }
+  ]
+}","{""completion_tokens"": 106, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 7119, ""prompt_tokens"": 7119, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 7225}",
+latest,longvideobench-pJuq8D1NGJQ_0,longvideobench-pJuq8D1NGJQ,run-79f3b55b0359ec26d60c,True,E,E,False,,,True,retained baseline pass,,,0,,,,,,
+latest,video-mme-428-1,video-mme-20gUIdXGuAs,run-79f3b55b0359ec26d60c,False,,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,13.05,1,api-rewatch,,interactive-default,"{
+  ""option"": ""A"",
+  ""explanation"": ""The video reports that Google was fined by the French competition watchdog for failing to negotiate fair licensing deals with news media outlets and for not disclosing that it was using their articles to train its AI chatbot. This corresponds to being sued for unlawfully using copyrighted content to train AI models."",
+  ""evidence"": [
+    {
+      ""startMs"": 143400,
+      ""endMs"": 182180,
+      ""kind"": ""video"",
+      ""claim"": ""Google was fined by the French competition watchdog because it failed to negotiate fair licensing deals with news media outlets and did not disclose that it was using their articles and data to train its AI chatbot.""
+    }
+  ]
+}","{""completion_tokens"": 150, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 6109, ""prompt_tokens"": 6365, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 6515}",
+latest,video-mme-428-2,video-mme-20gUIdXGuAs,run-79f3b55b0359ec26d60c,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+latest,video-mme-428-3,video-mme-20gUIdXGuAs,run-79f3b55b0359ec26d60c,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
+latest,video-mme-156-1,video-mme-BkiTScinYOQ,run-79f3b55b0359ec26d60c,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
+latest,video-mme-156-2,video-mme-BkiTScinYOQ,run-79f3b55b0359ec26d60c,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+latest,video-mme-156-3,video-mme-BkiTScinYOQ,run-79f3b55b0359ec26d60c,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+latest,video-mme-010-1,video-mme-PSt_op3fQck,run-79f3b55b0359ec26d60c,False,B,C,True,False,B,False,new failed-question retry,deepseek-v4-pro,11.66,1,api-rewatch,high,interactive-default,"{
+  ""option"": ""B"",
+  ""explanation"": ""The video is an animated cardboard-cutout presentation about intercultural communication. It opens by noting world diversity, explains how cultural perspective influences perception, raises questions about speaking across cultures and workplace cultural differences, introduces a 'Diversity Dashboard' of cultural dimensions, and closes by promoting Dr. Deborah Swallow as a leading authority on intercultural communication. This aligns with learning the fundamentals of intercultural communication, not conflict history, language mastery, or political resolution."",
+  ""evidence"": [
+    {
+      ""startMs"": 0,
+      ""endMs"": 115000,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled overview: An animated cardboard-cutout video illustrates how cultural perspective shapes communication and business, introduces a 'Diversity Dashboard' of cultural dimensions, and ends by promoting Dr. Deborah Swallow as a speaker, author, consultant, and leading authority on intercultural communication.""
+    },
+    {
+      ""startMs"": 1790,
+      ""endMs"": 6600,
       ""kind"": ""transcript"",
-      ""claim"": ""The secret number spoken in this clip is seven.""
+      ""claim"": ""It’s a big world, full of difference and diversity.""
+    },
+    {
+      ""startMs"": 6600,
+      ""endMs"": 14150,
+      ""kind"": ""transcript"",
+      ""claim"": ""How you see others is influenced by your own cultural perspective, and how others see you""
+    },
+    {
+      ""startMs"": 17680,
+      ""endMs"": 25180,
+      ""kind"": ""computed"",
+      ""claim"": ""Source question (spoken, primary): What happens when you speak? Do people from other cultures understand you in the way you intended?""
+    },
+    {
+      ""startMs"": 24180,
+      ""endMs"": 26520,
+      ""kind"": ""computed"",
+      ""claim"": ""Source question (spoken, primary): And what happens with different cultures in the workplace?""
+    },
+    {
+      ""startMs"": 44240,
+      ""endMs"": 53080,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled context: The 'DIVERSITY DASHBOARD' is an airplane instrument panel labeled as such.""
+    },
+    {
+      ""startMs"": 53080,
+      ""endMs"": 61920,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled state: Cultural dimension switches and gauges: Deal/Relationship switch panel and Direct/Indirect gauge""
+    },
+    {
+      ""startMs"": 88480,
+      ""endMs"": 97320,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled event: Title card introduces Dr. Deborah Swallow; stick figures react with speech bubbles like 'THAT'S CLEAR', 'AHA!', 'YAY!'.""
     }
   ]
-}
-```",C,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4000,""kind"":""transcript"",""supportedClaim"":""The secret number spoken in this clip is seven.""}]","{""currency"":""USD"",""actual"":""0.00294525"",""estimated"":""0.00294525"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":49410.696268081665,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":10202.880470082164,""firstTokenMs"":null,""endToEndMs"":59613.57673816383,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":2027,""outputTokens"":380,""reasoningTokens"":null,""cachedTokens"":0,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-03aae92ee6c5dd343bb8925d,
-run-6d52d407421c1d1b0be0,development-smoke,development-CC0,smoke-visual,larkup-gateway-brain-v2,attempt-30e4f08292e530093889,config-f15ac1a74f0541c10c51,short,8000,visual,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
-{
+}","{""completion_tokens"": 1400, ""completion_tokens_details"": {""reasoning_tokens"": 792}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 31439, ""prompt_tokens"": 31695, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 33095}",
+latest,video-mme-010-2,video-mme-PSt_op3fQck,run-79f3b55b0359ec26d60c,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
+latest,video-mme-010-3,video-mme-PSt_op3fQck,run-79f3b55b0359ec26d60c,False,A,B,False,,,False,unresolved baseline failure,,,0,,,,,,
+latest,video-mme-623-1,video-mme-gfikT_O4v9A,run-79f3b55b0359ec26d60c,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
+latest,video-mme-623-2,video-mme-gfikT_O4v9A,run-79f3b55b0359ec26d60c,False,C,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,26.38,2,api-rewatch,high,interactive-default,"{
   ""option"": ""A"",
-  ""explanation"": ""I saw that a solid red color fills the screen during the first section of the recording before it transitions to blue."",
+  ""explanation"": ""The earliest supported timestamps are: Personal Fat Threshold heading at ~582.8s; the question 'What makes the fat cell grow?' at ~882.4s; and the contrast between low-calorie and low-insulin diets at ~2036.2s. Therefore the order is ①, ②, ③."",
+  ""evidence"": [
+    {
+      ""startMs"": 582816,
+      ""endMs"": 800133,
+      ""kind"": ""computed"",
+      ""claim"": ""Slide heading 'Personal Fat Threshold' appears at ~582.8s.""
+    },
+    {
+      ""startMs"": 882420,
+      ""endMs"": 888420,
+      ""kind"": ""computed"",
+      ""claim"": ""Spoken question 'What makes the fat cell grow?' is introduced at ~882.4s.""
+    },
+    {
+      ""startMs"": 2036155,
+      ""endMs"": 2042155,
+      ""kind"": ""computed"",
+      ""claim"": ""Bikman contrasts low-calorie and low-insulin diets at ~2036.2s.""
+    }
+  ]
+}","{""completion_tokens"": 2519, ""completion_tokens_details"": {""reasoning_tokens"": 2266}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 57857, ""prompt_tokens"": 57857, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 60376}",
+latest,video-mme-623-3,video-mme-gfikT_O4v9A,run-79f3b55b0359ec26d60c,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,E,B,False,,,False,unresolved baseline failure,,,0,,,,,,
+qwen,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,B,E,False,,,False,unresolved baseline failure,,,0,,,,,,
+qwen,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,longvideobench-pJuq8D1NGJQ_0,longvideobench-pJuq8D1NGJQ,run-9d45724237e86021e098,True,E,E,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,video-mme-428-1,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,video-mme-428-2,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,70.83,1,api-rewatch,high,120000,"{
+  ""option"": ""C"",
+  ""explanation"": ""The video shows gameplay footage of an AI-driven NPC (Bloom) in a Ubisoft prototype. The presenter describes it as an AI experiment, and the character is stated to be AI-powered, not scripted, responding in real-time. Therefore the game content is generated by AI."",
+  ""evidence"": [
+    {
+      ""startMs"": 492200,
+      ""endMs"": 552200,
+      ""kind"": ""speech"",
+      ""claim"": ""Presenter describes the gameplay as a creative experiment by Ubisoft involving AI breakthroughs; on-screen labels say 'GDC 2024 BUILD - PROTOTYPE' and 'NOT ACTUAL GAME FOOTAGE'.""
+    },
+    {
+      ""startMs"": 552200,
+      ""endMs"": 604760,
+      ""kind"": ""speech"",
+      ""claim"": ""Speaker states Bloom is 'an avatar powered by AI' that is 'not scripted' and 'just responding to you in real-time conversation'.""
+    }
+  ]
+}","{""completion_tokens"": 984, ""completion_tokens_details"": {""reasoning_tokens"": 760}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 6725, ""prompt_tokens"": 7109, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 8093}",
+qwen,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,video-mme-156-2,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,video-mme-156-3,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+qwen,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,new failed-question retry,deepseek-v4-pro,13.5,1,api-rewatch,high,120000,"{
+  ""option"": ""B"",
+  ""explanation"": ""The video uses animated scenarios to illustrate how cultural perspective shapes perception, depicts cross-cultural miscommunication and workplace cultural dimensions, and ends with Dr. Deborah Swallow, identified as a leading authority on intercultural communication. Its focus is fundamentals of intercultural communication, not history, language acquisition, or political conflict."",
+  ""evidence"": [
+    {
+      ""startMs"": 17680,
+      ""endMs"": 25180,
+      ""kind"": ""speech"",
+      ""claim"": ""Narrator asks 'What happens when you speak?' and 'Do people from other cultures understand you in the way you intended?', introducing the theme of cross-cultural communication.""
+    },
+    {
+      ""startMs"": 46240,
+      ""endMs"": 65000,
+      ""kind"": ""visual"",
+      ""claim"": ""A 'DIVERSITY DASHBOARD' panel presents cultural dimensions: deal orientated vs relationship orientated, direct vs indirect communication, egalitarian vs hierarchical management.""
+    },
+    {
+      ""startMs"": 97320,
+      ""endMs"": 115000,
+      ""kind"": ""title-card"",
+      ""claim"": ""Ending title card names Dr. Deborah Swallow as 'Speaker, Author, Consultant' and 'LEADING AUTHORITY ON INTERCULTURAL COMMUNICATION'.""
+    }
+  ]
+}","{""completion_tokens"": 945, ""completion_tokens_details"": {""reasoning_tokens"": 656}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 44212, ""prompt_tokens"": 44596, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 45541}",
+qwen,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,False,,,False,unresolved baseline failure,,,0,,,,,,
+qwen,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,,False,new failed-question retry,deepseek-v4-pro,41.8,1,api-rewatch,high,120000,"{
+  ""option"": null,
+  ""explanation"": ""The supplied evidence only mentions the pilot flying over the Taj Mahal and Petronas-style twin towers near the end (65-88s). It does not mention the White House, Big Ben, the Egyptian Pyramids, or the Eiffel Tower, so it cannot establish which of the listed places the copilot does not travel to."",
+  ""evidence"": [
+    {
+      ""startMs"": 65000,
+      ""endMs"": 88480,
+      ""kind"": ""computed"",
+      ""claim"": ""A cut-out propeller plane with a goggled pilot flies over a city skyline, countryside, and world landmarks including the Taj Mahal and Petronas-style twin towers, representing a journey of understanding.""
+    }
+  ]
+}","{""completion_tokens"": 2996, ""completion_tokens_details"": {""reasoning_tokens"": 2827}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 43475, ""prompt_tokens"": 43859, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 46855}",
+qwen,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,54.92,1,api-rewatch,high,120000,"{
+  ""option"": ""C"",
+  ""explanation"": ""The presentation consistently focuses on how body fat, especially fat-cell hypertrophy, causes insulin resistance, and how insulin resistance is linked to chronic diseases such as obesity and diabetes. Early slides show Insulin Resistance as a central hub connected to Diabetes, Heart Disease, Cancer, Obesity, and other chronic conditions, and the talk asks 'How does body fat cause insulin resistance?' The overarching theme is the relationship among body fat, insulin resistance, and chronic disease, making option C the best match. Option D is too narrow because it centers only on insulin's role rather than the broader fat-cell/insulin-resistance/chronic-disease relationship."",
   ""evidence"": [
     {
       ""startMs"": 0,
-      ""endMs"": 4500,
-      ""kind"": ""visual"",
-      ""claim"": ""The screen background is solid red during the initial part of the video.""
+      ""endMs"": 2667064,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled overview: A Metabolic Health Summit presentation by Dr. Benjamin Bikman explains how fat-cell hypertrophy drives insulin resistance, contrasting caloric and endocrine theories of obesity, and presents evidence that insulin control matters more than calorie quantity for fat-cell size and metabolic health.""
+    },
+    {
+      ""startMs"": 205293,
+      ""endMs"": 211293,
+      ""kind"": ""computed"",
+      ""claim"": ""Diabetes, Heart Disease, Cancer, Obesity, Fatty Liver, Migraines, PCOS, Dementia, Erectile Dysfunction are shown as satellite circles around the Insulin Resistance hub as chronic diseases linked to insulin resistance.""
+    },
+    {
+      ""startMs"": 231930,
+      ""endMs"": 234930,
+      ""kind"": ""computed"",
+      ""claim"": ""Slide poses 'How does body fat cause insulin resistance?' establishing the investigation of body fat's causal link to insulin resistance.""
     }
   ]
-}
-```",A,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4500,""kind"":""visual"",""supportedClaim"":""The screen background is solid red during the initial part of the video.""}]","{""currency"":""USD"",""actual"":""0.01163625"",""estimated"":""0.00649425"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":50.5375862121582,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":52665.165330981836,""firstTokenMs"":null,""endToEndMs"":52715.702917193994,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":10280,""outputTokens"":1047,""reasoningTokens"":0,""cachedTokens"":0,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":3}",index-03aae92ee6c5dd343bb8925d,
-run-6d52d407421c1d1b0be0,development-smoke,development-CC0,smoke-visual,same-backbone-retrieval-gateway-brain-v2,attempt-f40b8c5f99648e5c51b4,config-f15ac1a74f0541c10c51,short,8000,visual,gemini-3.8-flash,google/gemini-3.8-flash,gemini-gateway,gateway,VERCEL_GATEWAY_API_KEY,unverified,completed,"```json
-{
+}","{""completion_tokens"": 2364, ""completion_tokens_details"": {""reasoning_tokens"": 1988}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 89529, ""prompt_tokens"": 89785, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 92149}",
+qwen,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,114.94,1,api-rewatch,high,120000,"{
   ""option"": ""A"",
-  ""explanation"": ""According to the visual evidence from the beginning of the video (0 to 4.5 seconds), a solid red screen displays continuously before transitioning to solid blue."",
+  ""explanation"": ""The personal fat threshold is introduced first at ~581 s, followed by the question of what makes fat cells grow at ~886 s, and the insulin-diet relationship is introduced later at ~2033 s. This yields ①→②→③."",
+  ""evidence"": [
+    {
+      ""startMs"": 581160,
+      ""endMs"": 585040,
+      ""kind"": ""transcript"",
+      ""claim"": ""Speaker first introduces the personal fat threshold concept around 581 s.""
+    },
+    {
+      ""startMs"": 885940,
+      ""endMs"": 897380,
+      ""kind"": ""transcript"",
+      ""claim"": ""Speaker poses the question 'What makes the fat cell grow?' around 885.9 s, introducing how to grow fat cells.""
+    },
+    {
+      ""startMs"": 2033039,
+      ""endMs"": 2034960,
+      ""kind"": ""transcript"",
+      ""claim"": ""Speaker begins comparing low-calorie and low-insulin diets around 2033 s, introducing the insulin-diet relationship.""
+    }
+  ]
+}","{""completion_tokens"": 4152, ""completion_tokens_details"": {""reasoning_tokens"": 3908}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 310149, ""prompt_tokens"": 310533, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 314685}",
+qwen,video-mme-623-3,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
+muse,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-9d45724237e86021e098,False,,D,True,True,D,True,new failed-question retry,deepseek-v4-pro,21.26,1,api-rewatch,high,interactive-default,"{
+  ""option"": ""D"",
+  ""explanation"": ""The rewatch reading shows semisweet chocolate is poured into the empty transparent bowl first, and butter is added later on top before stirring, so chocolate appears first."",
+  ""evidence"": [
+    {
+      ""startMs"": 11700,
+      ""endMs"": 17667,
+      ""kind"": ""visual"",
+      ""claim"": ""Rewatch reading: chocolate chunks labeled 'Semisweet chocolate 100g' are poured into the empty transparent bowl first; butter labeled 'Butter without salt 100g' is added later on top, before stirring, so chocolate appears first.""
+    }
+  ]
+}","{""completion_tokens"": 674, ""completion_tokens_details"": {""reasoning_tokens"": 534}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 5756, ""prompt_tokens"": 6012, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 6686}",
+muse,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,E,B,False,,,False,unresolved baseline failure,,,0,,,,,,
+muse,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,B,E,False,,,False,unresolved baseline failure,,,0,,,,,,
+muse,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
+muse,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
+muse,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
+muse,longvideobench-pJuq8D1NGJQ_0,longvideobench-pJuq8D1NGJQ,run-9d45724237e86021e098,True,E,E,False,,,True,retained baseline pass,,,0,,,,,,
+muse,video-mme-428-1,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
+muse,video-mme-428-2,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+muse,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,32.17,1,api-rewatch,high,120000,"{
+  ""option"": ""C"",
+  ""explanation"": ""The video shows Ubisoft's prototype footage of an AI-powered NPC named Bloom. The on-screen label marks it as a GDC 2024 prototype (not actual game footage), and the dialogue with Bloom is presented as a real-time, AI-generated conversation rather than pre-set scripted content or a performance by real people."",
+  ""evidence"": [
+    {
+      ""startMs"": 494200,
+      ""endMs"": 604760,
+      ""kind"": ""speech"",
+      ""claim"": ""The host introduces Ubisoft's unreleased AI avatar experiment and describes the prototype footage as a real-time, unscripted conversation with NPC Bloom.""
+    },
+    {
+      ""startMs"": 512720,
+      ""endMs"": 572720,
+      ""kind"": ""visual"",
+      ""claim"": ""The game footage is labelled 'GDC 2024 BUILD - PROTOTYPE' and 'NOT ACTUAL GAME FOOTAGE', showing the AI NPC Bloom answering player questions in real time.""
+    },
+    {
+      ""startMs"": 80950,
+      ""endMs"": 83110,
+      ""kind"": ""visible-text"",
+      ""claim"": ""An on-screen article headline reads 'Ubisoft let me actually speak with its new AI-powered video game NPCs'.""
+    }
+  ]
+}","{""completion_tokens"": 1506, ""completion_tokens_details"": {""reasoning_tokens"": 1218}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 7737, ""prompt_tokens"": 7993, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 9499}",
+muse,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,36.11,1,api-rewatch,high,120000,"{
+  ""option"": ""C"",
+  ""explanation"": ""The first goal shown is Portugal's 2006 goal; the scorer in red #17 shouts with fists clenched, then goes to his knees as teammates pile on him, matching kneeling and screaming."",
+  ""evidence"": [
+    {
+      ""startMs"": 1920,
+      ""endMs"": 12800,
+      ""kind"": ""visual"",
+      ""claim"": ""The scorer in red with \""17\"" shouts with mouth open and fists clenched, then goes to his knees as teammates in matching red converge and pile on top of him in front of the crowd.""
+    }
+  ]
+}","{""completion_tokens"": 962, ""completion_tokens_details"": {""reasoning_tokens"": 827}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 6944, ""prompt_tokens"": 7200, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 8162}",
+muse,video-mme-156-2,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+muse,video-mme-156-3,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+muse,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,new failed-question retry,deepseek-v4-pro,13.83,1,api-rewatch,high,120000,"{
+  ""option"": ""B"",
+  ""explanation"": ""The video is consistently described as an animated explainer about intercultural communication, with narrated lessons on cultural perspective, workplace differences, and the need for cultural intelligence, ending with credit to Dr. Deborah Swallow as a leading authority on intercultural communication. This aligns with quick ways to grasp fundamentals of intercultural communication, not conflicts, language learning, or political resolution."",
   ""evidence"": [
     {
       ""startMs"": 0,
-      ""endMs"": 4500,
-      ""kind"": ""visual"",
-      ""claim"": ""A solid red screen displays continuously until frame 4, at which point the video transitions to solid blue.""
+      ""endMs"": 115000,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled overview: An animated explainer video about intercultural communication, featuring hand-drawn characters and narrated lessons on cultural perspective, workplace differences, and the need for cultural intelligence, ending with a credit for Dr. Deborah Swallow.""
+    },
+    {
+      ""startMs"": 95000,
+      ""endMs"": 115000,
+      ""kind"": ""computed"",
+      ""claim"": ""End card displays Dr. Deborah Swallow, leading authority on intercultural communication, with website; 'Speaker, Author, Consultant' fades out.""
+    },
+    {
+      ""startMs"": 18800,
+      ""endMs"": 27200,
+      ""kind"": ""computed"",
+      ""claim"": ""Narrated questions focus on cross-cultural understanding: 'What happens when you speak?' and 'Do people from other cultures understand you in the way you intended?'""
     }
   ]
-}
-```",A,True,official-mcq-v1,"[{""sourceId"":""development-smoke"",""startMs"":0,""endMs"":4500,""kind"":""visual"",""supportedClaim"":""A solid red screen displays continuously until frame 4, at which point the video transitions to solid blue.""}]","{""currency"":""USD"",""actual"":""0.00272025"",""estimated"":""0.00272025"",""unknownAttemptCount"":0,""reconciled"":true}","{""queueMs"":61116.84536933899,""prepareMs"":null,""uploadMs"":null,""indexMs"":null,""answerMs"":8303.42008289881,""firstTokenMs"":null,""endToEndMs"":69420.2654522378,""inputReuse"":true,""measurementProfileId"":""bounded-independent-v1"",""unavailableReasons"":{""firstTokenMs"":""non-streaming provider call"",""indexMs"":""referenced by indexArtifactId""}}","{""inputTokens"":2072,""outputTokens"":311,""reasoningTokens"":null,""cachedTokens"":0,""processingSeconds"":null,""freeAllowanceConsumed"":null,""apiCallCount"":1}",index-03aae92ee6c5dd343bb8925d,
+}","{""completion_tokens"": 963, ""completion_tokens_details"": {""reasoning_tokens"": 656}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 31480, ""prompt_tokens"": 31864, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 32827}",
+muse,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,B,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,30.4,1,api-rewatch,high,120000,"{
+  ""option"": ""A"",
+  ""explanation"": ""The rewatch of 33.02–35.4s identifies the informally behaving staff (second from left behind the left counter, leaning then waving) as wearing a shirt with a dark floral flower pattern on a light base; original hue unknown."",
+  ""evidence"": [
+    {
+      ""startMs"": 33020,
+      ""endMs"": 35400,
+      ""kind"": ""visual"",
+      ""claim"": ""The informally behaving staff (second from left behind the left counter, leaning then waving) has a shirt with a dark floral flower pattern on a light base.""
+    }
+  ]
+}","{""completion_tokens"": 509, ""completion_tokens_details"": {""reasoning_tokens"": 371}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 8679, ""prompt_tokens"": 8935, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 9444}",
+muse,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,False,,,False,unresolved baseline failure,,,0,,,,,,
+muse,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,80.89,1,api-rewatch,high,120000,"{
+  ""option"": ""C"",
+  ""explanation"": ""The presentation is introduced as 'Fat: Why It Matters and What to Do About It,' and the sourced overview describes it as explaining how fat cell hypertrophy causes insulin resistance and contrasting caloric/endocrine theories, all centered on body fat, insulin resistance, and related metabolic conditions such as obesity and diabetes. Option D is too narrow because insulin's role is only one component of the talk, not the primary overall focus."",
+  ""evidence"": [
+    {
+      ""startMs"": 0,
+      ""endMs"": 2667064,
+      ""kind"": ""computed"",
+      ""claim"": ""A Metabolic Health Summit presentation explains how fat cell hypertrophy causes insulin resistance, contrasts caloric and endocrine theories, and presents evidence that insulin controls fat storage and energy expenditure.""
+    },
+    {
+      ""startMs"": 68840,
+      ""endMs"": 77600,
+      ""kind"": ""transcript"",
+      ""claim"": ""The speaker states the title of his talk is 'Fat: Why It Matters and What to Do About It.'""
+    },
+    {
+      ""startMs"": 119853,
+      ""endMs"": 122570,
+      ""kind"": ""visual"",
+      ""claim"": ""Title slide identifies the talk as 'Shrinking Fat Cells Energy vs. Insulin' by Benjamin Bikman, PhD.""
+    }
+  ]
+}","{""completion_tokens"": 1783, ""completion_tokens_details"": {""reasoning_tokens"": 1492}, ""prompt_cache_hit_tokens"": 384, ""prompt_cache_miss_tokens"": 288939, ""prompt_tokens"": 289323, ""prompt_tokens_details"": {""cached_tokens"": 384}, ""total_tokens"": 291106}",
+muse,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,88.8,1,api-rewatch,high,120000,"{
+  ""option"": ""A"",
+  ""explanation"": ""The personal fat threshold is introduced first around 581–585 s, followed by how to grow fat cells around 888–891 s, and the relationship between insulin and diet appears later around 2050–2052 s. Thus the order is ① → ② → ③."",
+  ""evidence"": [
+    {
+      ""startMs"": 581160,
+      ""endMs"": 585040,
+      ""kind"": ""transcript"",
+      ""claim"": ""Introduces the concept of the personal fat threshold.""
+    },
+    {
+      ""startMs"": 888040,
+      ""endMs"": 891120,
+      ""kind"": ""transcript"",
+      ""claim"": ""Asks what makes the fat cell grow, beginning the section on how to grow fat cells.""
+    },
+    {
+      ""startMs"": 2050010,
+      ""endMs"": 2056010,
+      ""kind"": ""computed"",
+      ""claim"": ""Introduces the relationship between macronutrients and insulin (diet and insulin).""
+    }
+  ]
+}","{""completion_tokens"": 1328, ""completion_tokens_details"": {""reasoning_tokens"": 1093}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 290311, ""prompt_tokens"": 290823, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 292151}",
+muse,video-mme-623-3,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
+minimax,longvideobench-@thatrecipe.us-7266555380925287723_0,longvideobench-@thatrecipe.us-7266555380925287723,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,
+minimax,longvideobench-Fw1rirubXiU_0,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,A,B,False,,,False,unresolved baseline failure,,,0,,,,,,
+minimax,longvideobench-Fw1rirubXiU_1,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,C,E,False,,,False,unresolved baseline failure,,,0,,,,,,
+minimax,longvideobench-Fw1rirubXiU_2,longvideobench-Fw1rirubXiU,run-9d45724237e86021e098,False,,D,True,True,D,True,new failed-question retry,deepseek-v4-pro,25.97,1,api-rewatch,high,120000,"{
+  ""option"": ""D"",
+  ""explanation"": ""At 41:51–42:51, the re-watch observation records that when the screen text changes to 'GLOBAL WATCH', the man's right hand changes from resting flat on the table to holding and lifting a sheet of paper. This matches option D."",
+  ""evidence"": [
+    {
+      ""startMs"": 2511500,
+      ""endMs"": 2571500,
+      ""kind"": ""visual"",
+      ""claim"": ""At 41:51–42:51, the man's right hand changes from resting flat on the table to holding and lifting a sheet of paper when the screen changes to 'GLOBAL WATCH'.""
+    }
+  ]
+}","{""completion_tokens"": 1469, ""completion_tokens_details"": {""reasoning_tokens"": 1313}, ""prompt_cache_hit_tokens"": 512, ""prompt_cache_miss_tokens"": 12790, ""prompt_tokens"": 13302, ""prompt_tokens_details"": {""cached_tokens"": 512}, ""total_tokens"": 14771}",
+minimax,longvideobench-Jaw7eWzgWr0_0,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,False,B,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,39.92,3,api-rewatch,high,120000,"{
+  ""option"": ""C"",
+  ""explanation"": ""At 20.2–27.0s, the man in the suit playing the instrument wears a dark tie. Because the footage is monochrome, only the tie's dark grayscale rendering is observable; its original color cannot be recovered. Among the options, the visible shade matches black."",
+  ""evidence"": [
+    {
+      ""startMs"": 20229,
+      ""endMs"": 26985,
+      ""kind"": ""visual"",
+      ""claim"": ""The suited man holding and playing the instrument is wearing a dark tie; the footage is monochrome, so only the dark grayscale appearance is visible and the original color cannot be recovered.""
+    }
+  ]
+}","{""completion_tokens"": 3012, ""completion_tokens_details"": {""reasoning_tokens"": 2857}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 6942, ""prompt_tokens"": 6942, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 9954}",
+minimax,longvideobench-Jaw7eWzgWr0_1,longvideobench-Jaw7eWzgWr0,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
+minimax,longvideobench-pJuq8D1NGJQ_0,longvideobench-pJuq8D1NGJQ,run-9d45724237e86021e098,True,E,E,False,,,True,retained baseline pass,,,0,,,,,,
+minimax,video-mme-428-1,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
+minimax,video-mme-428-2,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+minimax,video-mme-428-3,video-mme-20gUIdXGuAs,run-9d45724237e86021e098,False,,C,True,True,C,True,new failed-question retry,deepseek-v4-pro,18.68,1,api-rewatch,high,120000,"{
+  ""option"": ""C"",
+  ""explanation"": ""At 8:07–9:07, the screen shows a Ubisoft prototype label 'GDC 2024 BUILD - PROTOTYPE, NOT ACTUAL GAME FOOTAGE' and the content appears as a real-time conversation with an AI avatar. At 10:07–10:10, the discussion describes the game content as produced by a real-time AI-powered avatar that responds to the player rather than following a scripted sequence. This indicates the game content is generated by AI."",
+  ""evidence"": [
+    {
+      ""startMs"": 487520,
+      ""endMs"": 547520,
+      ""kind"": ""visual"",
+      ""claim"": ""On-screen label reads 'GDC 2024 BUILD - PROTOTYPE, NOT ACTUAL GAME FOOTAGE'; game content is shown as a real-time conversation with an AI avatar.""
+    },
+    {
+      ""startMs"": 607520,
+      ""endMs"": 610760,
+      ""kind"": ""speech"",
+      ""claim"": ""The game content is described as produced by a real-time AI-powered avatar that responds to the player in conversation, not following a scripted sequence.""
+    }
+  ]
+}","{""completion_tokens"": 868, ""completion_tokens_details"": {""reasoning_tokens"": 606}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 8264, ""prompt_tokens"": 8520, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 9388}",
+minimax,video-mme-156-1,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,C,C,False,,,True,retained baseline pass,,,0,,,,,,
+minimax,video-mme-156-2,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+minimax,video-mme-156-3,video-mme-BkiTScinYOQ,run-9d45724237e86021e098,True,B,B,False,,,True,retained baseline pass,,,0,,,,,,
+minimax,video-mme-010-1,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,,C,True,False,B,False,new failed-question retry,deepseek-v4-pro,18.23,1,api-rewatch,high,120000,"{
+  ""option"": ""B"",
+  ""explanation"": ""The video is an educational animation about intercultural communication. It presents key ideas such as cultural perspectives, direct vs indirect communication, egalitarian vs hierarchical management, and cultural intelligence. The closing title card identifies the presenter as 'Leading Authority on Intercultural Communication', confirming the topic is the fundamentals of intercultural communication."",
+  ""evidence"": [
+    {
+      ""startMs"": 0,
+      ""endMs"": 7500,
+      ""kind"": ""speech"",
+      ""claim"": ""Narration: 'It's a big world full of difference and diversity.'""
+    },
+    {
+      ""startMs"": 6500,
+      ""endMs"": 8840,
+      ""kind"": ""speech"",
+      ""claim"": ""Narration: 'How you see others is influenced by your own cultural perspective.'""
+    },
+    {
+      ""startMs"": 50740,
+      ""endMs"": 53080,
+      ""kind"": ""speech"",
+      ""claim"": ""Narration: 'You need an understanding of how different cultures trade and do business.'""
+    },
+    {
+      ""startMs"": 59580,
+      ""endMs"": 61920,
+      ""kind"": ""speech"",
+      ""claim"": ""Narration: 'Insight into how different cultures communicate. And a clear idea of how different cultures manage people.'""
+    },
+    {
+      ""startMs"": 88480,
+      ""endMs"": 97320,
+      ""kind"": ""speech"",
+      ""claim"": ""Narration: 'Develop cultural intelligence so you can communicate confidently across cultures.'""
+    },
+    {
+      ""startMs"": 97320,
+      ""endMs"": 106160,
+      ""kind"": ""visual"",
+      ""claim"": ""Title card: 'DR. DEBORAH SWALLOW' with 'LEADING AUTHORITY ON INTERCULTURAL COMMUNICATION'.""
+    }
+  ]
+}","{""completion_tokens"": 1600, ""completion_tokens_details"": {""reasoning_tokens"": 1183}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 60270, ""prompt_tokens"": 60526, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 62126}",
+minimax,video-mme-010-2,video-mme-PSt_op3fQck,run-9d45724237e86021e098,True,A,A,False,,,True,retained baseline pass,,,0,,,,,,
+minimax,video-mme-010-3,video-mme-PSt_op3fQck,run-9d45724237e86021e098,False,A,B,True,False,C,False,new failed-question retry,deepseek-v4-pro,37.94,1,api-rewatch,high,120000,"{
+  ""option"": ""C"",
+  ""explanation"": ""A direct rewatch of 70–97s reports that the copilot travels over a landscape containing landmarks such as the Eiffel Tower and pyramids, but does not travel to the pyramid area."",
+  ""evidence"": [
+    {
+      ""startMs"": 70000,
+      ""endMs"": 97000,
+      ""kind"": ""visual"",
+      ""claim"": ""The copilot travels by plane and then by a long pointed vehicle over a landscape containing landmarks including the Taj Mahal, the Eiffel Tower, twin towers, the Statue of Liberty, and pyramids. The place the copilot does not travel to is the pyramid area.""
+    }
+  ]
+}","{""completion_tokens"": 3109, ""completion_tokens_details"": {""reasoning_tokens"": 2956}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 13424, ""prompt_tokens"": 13680, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 16789}",
+minimax,video-mme-623-1,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,,C,True,False,D,False,new failed-question retry,deepseek-v4-pro,52.52,2,api-rewatch,high,120000,"{
+  ""option"": ""D"",
+  ""explanation"": ""The title slide identifies the presentation as 'Shrinking Fat Cells: Energy vs. Insulin' by Benjamin Bikman, PhD, and the reconciled overview states he explains how insulin, not just energy balance, drives fat cell size and insulin resistance. Later clips directly state that elevated insulin and sufficient energy are needed for fat cell growth and that insulin promotes fat storage / low insulin forces fat cells to shrink, supporting the primary focus on insulin's role in regulating fat mass and related metabolic conditions."",
+  ""evidence"": [
+    {
+      ""startMs"": 83851,
+      ""endMs"": 89850,
+      ""kind"": ""visual"",
+      ""claim"": ""Title slide 'Shrinking Fat Cells: Energy vs. Insulin' with speaker Benjamin Bikman, PhD, Professor of Cell Biology, Brigham Young University.""
+    },
+    {
+      ""startMs"": 0,
+      ""endMs"": 2667064,
+      ""kind"": ""computed"",
+      ""claim"": ""Reconciled overview: presentation explains how insulin, not just energy balance, drives fat cell size and insulin resistance.""
+    },
+    {
+      ""startMs"": 1335950,
+      ""endMs"": 1341950,
+      ""kind"": ""visual"",
+      ""claim"": ""Slide states 'Insulin promotes fat storage'.""
+    }
+  ]
+}","{""completion_tokens"": 1416, ""completion_tokens_details"": {""reasoning_tokens"": 1123}, ""prompt_cache_hit_tokens"": 0, ""prompt_cache_miss_tokens"": 69211, ""prompt_tokens"": 69211, ""prompt_tokens_details"": {""cached_tokens"": 0}, ""total_tokens"": 70627}",
+minimax,video-mme-623-2,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,False,D,A,True,True,A,True,new failed-question retry,deepseek-v4-pro,40.41,1,api-rewatch,high,120000,"{
+  ""option"": ""A"",
+  ""explanation"": ""The personal fat threshold is introduced first around 599.695–605.695s with the slide title and human silhouette. Fat-cell growth via hyperplasia is introduced next around 684.695–689.83s with the question 'What if we could force fat to store more fat?'. The relationship between insulin and diet is introduced later around 1351.95–1411.95s when the speaker describes fat cells grown in a 'sea of fats and glucose' and insulin telling them what to do with that energy. Therefore the order is ①②③."",
+  ""evidence"": [
+    {
+      ""startMs"": 599695,
+      ""endMs"": 605695,
+      ""kind"": ""visual"",
+      ""claim"": ""Slide introduces 'Personal Fat Threshold' concept with human silhouette at 599.695–605.695s.""
+    },
+    {
+      ""startMs"": 684695,
+      ""endMs"": 689830,
+      ""kind"": ""visual"",
+      ""claim"": ""Slide asks 'What if we could force fat to store more fat?' and discusses hyperplasia, introducing fat-cell growth around 684.695–689.83s.""
+    },
+    {
+      ""startMs"": 1351950,
+      ""endMs"": 1411950,
+      ""kind"": ""visual/speech"",
+      ""claim"": ""At 1351.95–1411.95s, speaker describes fat cells grown in a 'sea of fats and glucose' and insulin telling them what to do with energy, explicitly connecting insulin and diet.""
+    }
+  ]
+}","{""completion_tokens"": 3927, ""completion_tokens_details"": {""reasoning_tokens"": 3585}, ""prompt_cache_hit_tokens"": 256, ""prompt_cache_miss_tokens"": 7825, ""prompt_tokens"": 8081, ""prompt_tokens_details"": {""cached_tokens"": 256}, ""total_tokens"": 12008}",
+minimax,video-mme-623-3,video-mme-gfikT_O4v9A,run-9d45724237e86021e098,True,D,D,False,,,True,retained baseline pass,,,0,,,,,,

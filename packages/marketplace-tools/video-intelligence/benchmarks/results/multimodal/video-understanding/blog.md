@@ -1,134 +1,55 @@
-# Video understanding engineering smoke
+# Video understanding: targeted failed-question recovery
 
-The isolated canonical video benchmark passed its engineering smoke on 14 November
-2026. **The comparative pilot was prepared but not started, at the user's request.**
-There is no continue/stop accuracy conclusion and no claim of superiority.
+17 November 2026. The latest Gemini-reader condition recovered **five of its nine original failures**, taking the requested cumulative ledger from **10/19 to 15/19**. The ten historical passes were retained and never asked again.
 
-The generated CC0 source is eight seconds long, changes from red to blue, and
-speaks a number. Two deterministic development questions test visual and speech
-handling. All five final arms answered both correctly. These questions verify
-wiring; 100% here does not estimate research accuracy. The native arms retained
-full video/audio. Qwen used timestamped frames and the supplied transcript.
+These are **cumulative development recoveries**, not fresh full-suite accuracies or a fair new ranking of the models. Previously passing questions were not tested on the final implementation or new answer backbone. Reference options and all original 19-question denominators remain unchanged.
 
-| Configuration | Correct / completed | Planned |
-|---|---:|---:|
-| Gemini 3.8 Flash native via Gateway | 2 / 2 | 2 |
-| Qwen 3.6 Plus frames via Gateway | 2 / 2 | 2 |
-| TwelveLabs Pegasus 1.5 native Analyze | 2 / 2 | 2 |
-| Canonical tool, Gateway brain/vision | 2 / 2 | 2 |
-| Same answer model, simple retrieval | 2 / 2 | 2 |
+| Reader | Original correct | Recovered / original failures | Cumulative correct | Distinct scorable retries |
+| --- | ---: | ---: | ---: | ---: |
+| Latest Gemini reader | 10/19 | 5/9 | 15/19 | 7 |
+| Qwen 3.8 Max reader | 11/19 | 3/8 | 14/19 | 5 |
+| Muse Spark 1.3 reader | 9/19 | 6/10 | 15/19 | 7 |
+| MiniMax M3 reader | 10/19 | 4/9 | 14/19 | 7 |
 
-The initial direct DeepSeek brain account returned credit exhaustion. That
-profile and its failed attempts remain in the private database. Before any
-pilot answers, a distinct named profile selected Gateway Gemini 3.6 Flash for
-brain and vision, Deepgram Nova 3 for transcription, and Gateway Gemini 3.8 Flash
-for the fixed answer wrapper. Only the changed tool/ablation smoke paths were
-rerun; the six passing native answers were reused. Earlier direct authentication,
-model-availability, timeout and TwelveLabs task-handle preflights are development
-history, not wrong answers. TwelveLabs saved tasks were reconciled without paid
-resubmission.
+The latest baseline is `run-79f3b55b0359ec26d60c`. The other readers use the completed pilot requested by the user, `run-9d45724237e86021e098`; its first and second reader phases are joined by question ID, giving exactly 19 unique questions per reader. Baseline passes remain immutable. `results.csv` records every retained or retried answer, output origin, official option, attempt count, measured standalone latency, reasoning setting, timeout and available token usage. Empty cash-cost fields mean **unknown**, not zero.
 
-`results.csv` contains the ten passing final smoke answers, their route/model,
-response/queue timing, cost observations, evidence and coverage. `data/indexes.csv`
-reports preparation/indexing once per source artifact. `data/usage.csv` preserves
-remote smoke usage receipts including failed development attempts. Some provider
-charges remain unknown; known cash is a partial total and cannot be treated as
-complete spend. Actual cash and estimates must not be added together. Rental
-observations are kept privately in `data/deployment/rental-observations.jsonl`.
-Native services have no persistent index stage; non-streaming TTFT is unobserved.
+## What failed
 
-The frozen pilot contains eight complete verified official sources and 19
-available official questions, including two videos longer than 40 minutes. A
-six-question fixed-backbone retrieval ablation is preregistered. Full official
-subtitles are aligned to the actual excerpt clock; where unavailable, Qwen's
-separately declared canonical ASR supplies its text input. This is an exploratory
-subset/input condition, not an official leaderboard score. The gate requires
-complete core coverage and, for a positive decision, independent grounding review.
-No larger run starts automatically after the pilot decision.
+The drop from 11/19 to 10/19 did not isolate one code regression: the historical runs changed model/reader and indexing settings, and recorded revisions did not capture every intermediate working-tree adjustment. The saved latest-run answers show concrete defects regardless of that comparison:
 
-At the user's stop instruction, the SQLite backup passed integrity checks,
-evidence/runtime artifacts were saved off-Pod, and the GPU was stopped. The
-launcher is the next explicit start point. Tests cover scheduler concurrency,
-quota exhaustion and cooldown, exact-model routing, immutable hot reload,
-reconciliation/recovery, pause/resume/cancel, scoring, credential boundaries and
-readonly backup access. The canonical package's 117 tests, type check and build
-also passed. No production runtime or Cloud deployment was changed.
+- A retrieved performer with a conflicting shirt was substituted for the requested performer. Explicit source ranges now bound every read, including fallbacks.
+- Generic scene relevance was treated as verification of a specific comparison detail. A declared comparison now requires question-specific evidence; separately observed states are retained as partial evidence rather than discarded.
+- A short final chunk missed the beginning of the relevant last scene. Both boundary reads now cover a complete bounded window.
+- A 12-second re-watch deadline abandoned healthy provider responses and fell through to much slower indexing. The canonical fast read now receives 30 seconds within its existing 40-second overall budget.
+- The final answer writer received repeated source context and display payloads. Exact duplicate records and presentation-only data are removed while distinct events and conflicting readings remain. The diagnosed ordering prompt shrank from 297,096 to 211,623 serialized characters. Its wrong option contradicted its own cited timestamps; deliberate DeepSeek reasoning and option/explanation consistency checks recovered it.
+- Quoted labels could be missed when OCR joined words. Source navigation now normalizes spacing and Unicode width and exposes observed OCR anchors and their source-clock positions.
 
+`data/managed-retries-20261117/failure-analysis.csv` contains all nine latest-run failures, their observable signatures and remaining limits. These are development diagnoses; no benchmark identifiers, values or answers were inserted into product behavior.
 
-## Later partial pilot checkpoint
+## Reference issues stay in the official score
 
-A subsequent development pilot started after the initial smoke handoff and was
-paused before a complete comparison. Two Qwen answers completed on one roughly
-52-minute LongVideoBench source: one correct, one incorrect. These are the only
-completed pilot answers at this checkpoint; they do not estimate comparative
-accuracy. Some input preparations completed for other sources, while native
-transport/capability failures and unknown remote outcomes blocked coverage.
+Source review found two strong content/reference conflicts and one ambiguous negative-choice question:
 
-`data/pilot-partial-results.csv` records those measured answers;
-`data/pilot-partial-summary.json` preserves denominators and partial cost. The
-checkpoint gate is **inconclusive**. Known cash is partial, unknown charges are
-retained, and provider estimates must not be added to observed cash. The paused
-run and its source/attempt history remain available in the operator dashboard.
-No publication expansion or paid restart was performed while adding the UI.
+| Question | Source review | Official reference retained |
+| --- | --- | --- |
+| `longvideobench-Fw1rirubXiU_0` | The article graphic adds sunglasses, rather than a hat. | B |
+| `video-mme-010-1` | The source teaches intercultural communication and cultural intelligence, rather than rapid foreign-language mastery. | C |
+| `video-mme-010-3` | The final landmark sequence shows the Taj Mahal, Eiffel Tower, Statue of Liberty, Petronas Towers and pyramids; both the White House and Big Ben are absent from the reviewed sequence. | B |
 
+This is assistant source review, not an independent human adjudication. No disputed case is excluded from the denominator and no output is forced to match an unsupported reference. MiniMax also retains one unresolved real failure on the presentation's primary focus; an introductory title alone was insufficient, and a source-wide retry still chose the wrong official option.
 
-## Actual API readiness checks, 2026-11-14
+## Execution and limitations
 
-These isolated development checks do not complete or replace the partial pilot.
-All four configured systems returned fresh nonempty answers, with Larkup reusing
-its fingerprint-matched cached evidence. The saved RunPod GPU was unavailable on
-two resume attempts, so fresh canonical GPU indexing was **not** reverified.
+Planning and final answers use `deepseek-v4-pro` directly through the DeepSeek API. Vision remains the selected reader, using hosted Gateway model APIs. The fast-path recovery imports the **same canonical re-watch and evidence code used by Cloud**, running as a standalone script against checksum-verified saved source files and indexes. It is **not an authenticated live Cloud-chat HTTP latency measurement**. No RunPod was started. Source indexing was reused rather than repeated.
 
-| Check | Completed answers | Correct answers | Source duration | Scope |
-| --- | ---: | ---: | --- | --- |
-| Gemini Gateway | 2/2 | 2/2 | 8 seconds | Full-video/audio smoke |
-| Qwen Gateway | 2/2 | 2/2 | 8 seconds | Timestamped frames + supplied subtitles |
-| TwelveLabs direct | 2/2 | 2/2 | 8 seconds | Native asset + Analyze |
-| Larkup Gateway answer | 2/2 | 2/2 | 8 seconds | Fresh canonical investigation/retrieval/answer; existing index |
-| Gemini Gateway | 1/1 | 0/1 | 12.6 minutes | Whole original pilot video; API success, incorrect answer |
-| TwelveLabs direct | 1/1 | 1/1 | 12.6 minutes | Whole original pilot video; native async result |
-| Gemini direct background diagnostic | 0/2 | Not scored | 8 seconds | Provider `DEADLINE_EXCEEDED`; excluded from active profile |
-| Gemini direct Files synchronous diagnostic | 0/2 planned | Not scored | 8 seconds | One submitted answer outcome unknown; sibling blocked without resubmission |
+The latest Sonnet-run indexes were absent from the local checkpoint; the recovery explicitly reuses source-matched indexes from the completed pilot's same vision reader. This changed-index and changed-backbone condition prevents attributing the entire gain to code alone. Completed planner and evidence outputs are reused when only final synthesis changes. The later reader comparisons use up to 120 seconds for a standalone vision request; this differs from the canonical interactive timeout and is recorded per result. Deliberate reasoning was enabled on unresolved answers and later scope-planning retries.
 
-Known API cash for this check batch was **USD 0.08886825**, with **8 attempts
-whose cash charges remain unknown**. It excludes earlier pilot/smoke spending
-and RunPod storage. Provider estimates are separate; do not add them to cash.
-Failed infrastructure cells are unscored. `data/service-checks.csv` includes
-preparation and answer rows, nullable costs, timings, route/variant IDs, errors
-and reuse flags; `data/service-checks.json` preserves full sanitized metrics.
+The existing managed service was also tested. Its stale default endpoint was corrected. A real Modal request exposed native Gemini schema-complexity rejection; a separate live provider check exposed an unsupported thinking level. Both now adapt only the explicitly rejected option, preserving local JSON and coverage validation. Focused tests and a live native-provider preflight passed. Modal's own system log reported T4 capacity shortage, so the existing one-worker function now permits ordered T4/L4 allocation. A managed inspection subsequently completed but reported blank frames where the local source is visibly nonblank. That managed result remains **unresolved and excluded from accuracy**. These fast-path results do not establish that the managed-indexing discrepancy is fixed.
 
-The native Gateway adapter now uses the configured deadline and rejects raw
-inline video above 100 MB before a paid submission. This reflects the documented
-[Gemini inline limit](https://ai.google.dev/gemini-api/docs/file-input-methods),
-not a successful long-input test. Longer sources remain coverage limitations;
-no truncation, hidden resampling, key rotation or model substitution was used.
-The comparative gate remains **inconclusive** and no publication expansion ran.
+Five vision requests have an unknown provider outcome: two for the latest reader's coat-change question, two for Qwen (the reference-conflict article and the pilot-character question), and one for Muse's reference-conflict article. They remain journaled in `unknown-requests.json` and were not silently replayed. The coat-change question was deferred for every other reader while explicit retry guidance was pending. Other incomplete API-only attempts are likewise unscored; their historical failed cells remain failed in the cumulative ledger. Provider cash charges were not returned consistently, and uncertain calls prevent a complete cost total.
 
+## Reproducibility and release
 
-## Requested model matrix and GPU queue, 2026-11-15
+Minimal public state is under `data/managed-retries-20261117/`: immutable baselines, completed evaluation records, the recovery summary, failure analysis, unknown-request metadata and `retry.py`. Private working attempts and provider receipts remain in the benchmark's working-state area, outside this published report. The script requires the existing ignored `benchmark.env` and checksum-matched source/index files. It filters to original failures, retains recovered passes, and refuses automatic replay of unresolved paid calls. Original historical runs are preserved.
 
-The next prospective pilot keeps the same eight development videos and 19
-questions and changes the model matrix at the user's request: Qwen 3.8 Max,
-Meta Muse Spark 1.3 and MiniMax M3 via Gateway frame/subtitle input, Gemini 3.8
-Flash via Gateway native video/audio, TwelveLabs Pegasus 1.5 native, and the
-unchanged canonical Larkup profile. Six retrieval-ablation cells keep its answer
-backbone fixed. There are 120 planned answer cells; **this new pilot has not run**.
-The continue/stop/inconclusive rule and held-out publication exclusion are unchanged.
-
-Tiny actual API checks produced eight nonempty responses on the same licensed
-8-second fixture: two Qwen Max, two Muse Spark, and four MiniMax responses across
-two explicitly separate prompt versions. Qwen and Muse answered 2/2 correctly.
-MiniMax's first two responses contained the correct choice text instead of the
-required letter and were marked invalid by the existing strict scorer. The new
-v2 frame variants make option-letter bindings explicit; a focused MiniMax rerun
-then passed 2/2. Earlier rows remain unmodified and were not rescored. This is a
-formatting regression fix before the new pilot, not evidence of comparative
-accuracy. `data/requested-model-smoke.csv` and `.json` retain both versions,
-timings, answers, routes and known/estimated charges. Known API cash for these
-checks was USD 0.06924567; estimates remain separate.
-
-A real saved-Pod startup probe observed capacity waiting and its 30-second retry
-schedule, then was explicitly cancelled before any benchmark dispatch. Mocked
-regressions cover eventual acceptance, SSH readiness, capped 5-minute retry
-intervals, cancellation and exactly-one pilot transition after missing-model
-smoke. Live capacity availability is not guaranteed. No extra Pod was rented.
+The canonical fixes were committed and pushed, with package release **0.3.20**. The existing Modal app was updated; Cloud synchronization, types, tests, lint and production build passed. Public API health and the web login route returned HTTP 200 after deployment. Production verification is recorded in `data/managed-retries-20261117/release-verification.json`. Video CI passed, but the general cross-platform gate remains unsatisfied: Linux/Windows jobs failed in unrelated workspace-server/Python tests and the macOS job was cancelled. This is a release limitation, not a green whole-repository CI result. The ECS worker was not changed. npm publication remains user-owned.

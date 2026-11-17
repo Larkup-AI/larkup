@@ -1,0 +1,43 @@
+{
+  "packageVersion": "0.3.20",
+  "canonicalReleaseCommit": "75dc70ece56ab22d52f72692e1d95e9943338791",
+  "modal": "Existing larkup-video-intelligence app deployed; ordered T4/L4 allocation, one worker.",
+  "cloud": {
+    "sync": "passed",
+    "releaseGate": "types, tests, lint and production builds passed",
+    "deployment": "healthy; build cache disabled",
+    "api": "https://console-api.larkup.de",
+    "apiHealthHttp": 200,
+    "web": "https://console.larkup.de",
+    "webHttp": 200,
+    "ecsWorkerChanged": false
+  },
+  "verification": {
+    "videoPackage": "134 tests, type-check and build passed",
+    "nativeVision": "47 tests passed",
+    "gpuProviders": "149 tests passed with localhost fixture permission; prior run encountered intermittent local HTTP/FFmpeg fixture truncation",
+    "controlPlane": "33 tests passed",
+    "benchmarkPython": "25 tests passed",
+    "benchmarkNode": "9 tests passed"
+  },
+  "github": {
+    "videoWorkflow": {
+      "runId": 44175654484,
+      "conclusion": "success"
+    },
+    "generalCI": {
+      "runId": 44175654454,
+      "conclusion": "cancelled with failed jobs",
+      "build": "success",
+      "secretScan": "success",
+      "linuxQuality": "failed: unrelated workspace-server structured analysis tests require unavailable pandas",
+      "windows": "failed: workspace-server policy snapshot and missing pandas; Python execution quoting test",
+      "macOS": "cancelled before steps",
+      "desktop": "failed; outside video scope"
+    },
+    "crossPlatformGate": "NOT satisfied; do not interpret successful video CI as a green whole-repository matrix"
+  },
+  "liveAcceptance": "Native provider preflight passed. Managed inspection completed but reported blank frames contrary to the local source; discrepancy unresolved, excluded from accuracy. Standalone API re-watch recovery is not live Cloud-chat acceptance.",
+  "npm": "Not published; user-owned publication command: cd ../larkup && ./scripts/auto-publish.sh --npm-only",
+  "paidRequests": "Five unknown vision outcomes retained; no automatic replay."
+}

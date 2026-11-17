@@ -1,0 +1,2685 @@
+[
+  {
+    "reader": "latest",
+    "condition": "managed-api-v1",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 6.548,
+            "lookingFor": "What changes during this window, what it changed from and to, and who or what brought it about. Name whoever is responsible if anything on screen or in the speech names them -- a caption, a label, a number worn or displayed, an announcement -- and say which of those established the name. If nothing names them, say so instead of guessing.",
+            "startSecs": 0
+          },
+          {
+            "endSecs": 223.7238,
+            "lookingFor": "What changes during this window, what it changed from and to, and who or what brought it about. Name whoever is responsible if anything on screen or in the speech names them -- a caption, a label, a number worn or displayed, an announcement -- and say which of those established the name. If nothing names them, say so instead of guessing.",
+            "startSecs": 163.7238
+          },
+          {
+            "endSecs": 248.582,
+            "lookingFor": "What changes during this window, what it changed from and to, and who or what brought it about. Name whoever is responsible if anything on screen or in the speech names them -- a caption, a label, a number worn or displayed, an announcement -- and say which of those established the name. If nothing names them, say so instead of guessing.",
+            "startSecs": 218.582
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "2ba5ec2bbf6890951aacd5cdbfaf351c7879552aeb5d654fcc965c27b36aa9df"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "8ea2d38d8bcbd34522cfa05a745a3db87cf16965196d08bda7aad7a2f96df2c9"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "d84855f6c21498a9231c928c6b833cdf34064358ce68416285a659642adccd44"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "8ea2d38d8bcbd34522cfa05a745a3db87cf16965196d08bda7aad7a2f96df2c9"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "2ba5ec2bbf6890951aacd5cdbfaf351c7879552aeb5d654fcc965c27b36aa9df"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "d84855f6c21498a9231c928c6b833cdf34064358ce68416285a659642adccd44"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 3,
+        "established": 2
+      }
+    ],
+    "answer": "{\n  \"option\": \"A\",\n  \"explanation\": \"The man playing the instrument is identified as Shahrokh Elahi, MD, and he is wearing a white (or silver/light-colored) tie with colored dots.\",\n  \"evidence\": [\n    {\n      \"startMs\": 163723.8,\n      \"endMs\": 223723.8,\n      \"kind\": \"visual\",\n      \"claim\": \"The man playing the instrument (identified on-screen as Shahrokh Elahi, MD) is wearing a suit jacket and a white (or silver/light-colored) tie with colored dots.\"\n    },\n    {\n      \"startMs\": 218582,\n      \"endMs\": 248582,\n      \"kind\": \"visual\",\n      \"claim\": \"The man playing the instrument wears a light/white tie patterned with small colorful dots.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:19:00.803495Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "indexSha256": "e2b79ea52005496775fda59be347a37039a75afd13099f2e061e1809d5015d39",
+    "latencySecs": 16.96,
+    "predicted": "A",
+    "questionId": "longvideobench-Jaw7eWzgWr0_0",
+    "sourceId": "longvideobench-Jaw7eWzgWr0",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 183,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 7428,
+      "prompt_tokens": 7428,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 7611
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-api-v1",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 110.36,
+            "lookingFor": "What changes during this window, what it changed from and to, and who or what brought it about. Name whoever is responsible if anything on screen or in the speech names them -- a caption, a label, a number worn or displayed, an announcement -- and say which of those established the name. If nothing names them, say so instead of guessing.",
+            "startSecs": 100.976
+          },
+          {
+            "endSecs": 223.7238,
+            "lookingFor": "What changes during this window, what it changed from and to, and who or what brought it about. Name whoever is responsible if anything on screen or in the speech names them -- a caption, a label, a number worn or displayed, an announcement -- and say which of those established the name. If nothing names them, say so instead of guessing.",
+            "startSecs": 163.7238
+          },
+          {
+            "endSecs": 248.582,
+            "lookingFor": "What changes during this window, what it changed from and to, and who or what brought it about. Name whoever is responsible if anything on screen or in the speech names them -- a caption, a label, a number worn or displayed, an announcement -- and say which of those established the name. If nothing names them, say so instead of guessing.",
+            "startSecs": 218.582
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "e015953ea01912a1758f0274d624974e8c0f97bbf1b873f00611df680fa7f818"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "94ca5be5d5289e8a4937711f389f1b5da8aa4bf8a0ddf8f7b0e3391079682c51"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "3b053ee8f43c6d61b4f50bf38901fcc2c9a173ef114cf80532042db54350d8aa"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "94ca5be5d5289e8a4937711f389f1b5da8aa4bf8a0ddf8f7b0e3391079682c51"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "3b053ee8f43c6d61b4f50bf38901fcc2c9a173ef114cf80532042db54350d8aa"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "e015953ea01912a1758f0274d624974e8c0f97bbf1b873f00611df680fa7f818"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 3,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"The man with glasses holding a musical instrument is observed wearing white gloves in the source video at 1:40–1:50 (100.976–110.36 seconds).\",\n  \"evidence\": [\n    {\n      \"startMs\": 100976,\n      \"endMs\": 110360,\n      \"kind\": \"visual\",\n      \"claim\": \"The man with glasses holding the musical instrument is wearing white gloves.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:19:17.760952Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "indexSha256": "e2b79ea52005496775fda59be347a37039a75afd13099f2e061e1809d5015d39",
+    "latencySecs": 14.53,
+    "predicted": "C",
+    "questionId": "longvideobench-Jaw7eWzgWr0_1",
+    "sourceId": "longvideobench-Jaw7eWzgWr0",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 106,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 7119,
+      "prompt_tokens": 7119,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 7225
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-api-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 6.548,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 0
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "74b78dc08a9aa8b31bf834f2417c3d2a490e353622fb89d56414f465d8658f8c"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "74b78dc08a9aa8b31bf834f2417c3d2a490e353622fb89d56414f465d8658f8c"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"The source is a black-and-white photograph of Ostad Elahi playing a tanbur. The tie appears dark/black in grayscale, but the original hue cannot be recovered from monochrome. Among the options, 'black' is the closest match to the observed dark appearance.\",\n  \"evidence\": [\n    {\n      \"startMs\": 0,\n      \"endMs\": 6548,\n      \"kind\": \"visual\",\n      \"claim\": \"In the black-and-white photograph of Ostad Elahi playing a tanbur, the tie appears dark / black in grayscale, while the original hue cannot be definitively recovered from the monochrome image.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:21:40.511421Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "indexSha256": "e2b79ea52005496775fda59be347a37039a75afd13099f2e061e1809d5015d39",
+    "latencySecs": 9.95,
+    "predicted": "C",
+    "questionId": "longvideobench-Jaw7eWzgWr0_0",
+    "sourceId": "longvideobench-Jaw7eWzgWr0",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 154,
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 6563,
+      "prompt_tokens": 6819,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 6973
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-api-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 182.18,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 143.4
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "b762eeb9e381e872b1b91030d92f3162f97adc0e8ff6ce77a2e9d6cb0889aefa"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "b762eeb9e381e872b1b91030d92f3162f97adc0e8ff6ce77a2e9d6cb0889aefa"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"A\",\n  \"explanation\": \"The video reports that Google was fined by the French competition watchdog for failing to negotiate fair licensing deals with news media outlets and for not disclosing that it was using their articles to train its AI chatbot. This corresponds to being sued for unlawfully using copyrighted content to train AI models.\",\n  \"evidence\": [\n    {\n      \"startMs\": 143400,\n      \"endMs\": 182180,\n      \"kind\": \"video\",\n      \"claim\": \"Google was fined by the French competition watchdog because it failed to negotiate fair licensing deals with news media outlets and did not disclose that it was using their articles and data to train its AI chatbot.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:22:19.747021Z",
+    "executionMode": "api-rewatch",
+    "expected": "A",
+    "indexSha256": "da0a5ad4f78410f0098a95ada1ae55094dc658865536be33759120ef0ddca306",
+    "latencySecs": 13.05,
+    "predicted": "A",
+    "questionId": "video-mme-428-1",
+    "sourceId": "video-mme-20gUIdXGuAs",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 150,
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 6109,
+      "prompt_tokens": 6365,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 6515
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-api-v2",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 288
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 336
+      }
+    ],
+    "answer": "{\n  \"option\": \"B\",\n  \"explanation\": \"The concept of the personal fat threshold is introduced at 582.816s (slide 'Personal Fat Threshold'). How to grow fat cells is introduced at 937.42s (Bikman states fat cell growth requires elevated insulin and energy). The relationship between insulin and diet is introduced at 2036.155s (Bikman contrasts low-calorie and low-insulin diets). Thus the order is ①③②.\",\n  \"evidence\": [\n    {\n      \"startMs\": 582816,\n      \"endMs\": 800133,\n      \"kind\": \"visible-text\",\n      \"claim\": \"Slide 'Personal Fat Threshold' appears, introducing the concept.\"\n    },\n    {\n      \"startMs\": 937420,\n      \"endMs\": 943420,\n      \"kind\": \"speech\",\n      \"claim\": \"Bikman states fat cell growth requires elevated insulin and energy, explaining how to grow fat cells.\"\n    },\n    {\n      \"startMs\": 2036155,\n      \"endMs\": 2042155,\n      \"kind\": \"speech\",\n      \"claim\": \"Bikman contrasts low-calorie and low-insulin diets, introducing the relationship between insulin and diet.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:24:17.131485Z",
+    "executionMode": "api-rewatch",
+    "expected": "A",
+    "indexSha256": "c0803c144e5bea7c07ae1a71835ab172fe13d4ac854a737f44fa321396e3de0e",
+    "indexVariantId": "larkup-quality-v9-vb-gemini-deepseek",
+    "latencySecs": 13.24,
+    "predicted": "B",
+    "questionId": "video-mme-623-2",
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 269,
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 89236,
+      "prompt_tokens": 89492,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 89761
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-api-v3",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 288
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 336
+      }
+    ],
+    "answer": "{\n  \"option\": \"A\",\n  \"explanation\": \"The earliest supported timestamps are: Personal Fat Threshold heading at ~582.8s; the question 'What makes the fat cell grow?' at ~882.4s; and the contrast between low-calorie and low-insulin diets at ~2036.2s. Therefore the order is ①, ②, ③.\",\n  \"evidence\": [\n    {\n      \"startMs\": 582816,\n      \"endMs\": 800133,\n      \"kind\": \"computed\",\n      \"claim\": \"Slide heading 'Personal Fat Threshold' appears at ~582.8s.\"\n    },\n    {\n      \"startMs\": 882420,\n      \"endMs\": 888420,\n      \"kind\": \"computed\",\n      \"claim\": \"Spoken question 'What makes the fat cell grow?' is introduced at ~882.4s.\"\n    },\n    {\n      \"startMs\": 2036155,\n      \"endMs\": 2042155,\n      \"kind\": \"computed\",\n      \"claim\": \"Bikman contrasts low-calorie and low-insulin diets at ~2036.2s.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:27:53.542027Z",
+    "executionMode": "api-rewatch",
+    "expected": "A",
+    "finalReasoningEffort": "high",
+    "indexSha256": "c0803c144e5bea7c07ae1a71835ab172fe13d4ac854a737f44fa321396e3de0e",
+    "indexVariantId": "larkup-quality-v9-vb-gemini-deepseek",
+    "latencySecs": 26.38,
+    "predicted": "A",
+    "questionId": "video-mme-623-2",
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2519,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2266
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 57857,
+      "prompt_tokens": 57857,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 60376
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-api-v4",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The collected evidence contains the on-screen text 'DYING FOR AID' but includes no mention of 'GLOBAL WATCH' and no observation of the man's right-hand position or any change to it. Therefore the requested transition cannot be established.\",\n  \"evidence\": [\n    {\n      \"startMs\": 737537,\n      \"endMs\": 747547,\n      \"kind\": \"visual\",\n      \"claim\": \"On screen: 'DYING FOR AID' — News segment topic header; 'MORE THAN 100 PALESTINIANS WAITING FOR AID KILLED' — Lower third headline describing casualties during aid distribution; 'NBC NEWS NOW.' — Network bug/logo.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:41:47.277092Z",
+    "executionMode": "api-rewatch",
+    "expected": "D",
+    "finalReasoningEffort": "high",
+    "indexSha256": "bb23e4a700ac9b6463e97e235b5937356e641e38df2ee5530bc72c62bb63152e",
+    "indexVariantId": "larkup-v8-vb-gemini-deepseek",
+    "latencySecs": 14.12,
+    "predicted": null,
+    "questionId": "longvideobench-Fw1rirubXiU_2",
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1099,
+      "completion_tokens_details": {
+        "reasoning_tokens": 935
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 6904,
+      "prompt_tokens": 6904,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 8003
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-api-v5",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 2077.208,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 2041.873
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "ed45a21aba86f5d90675025fd2c5010b7b468cb236b12df46c71e0b9b325f32f"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "ed45a21aba86f5d90675025fd2c5010b7b468cb236b12df46c71e0b9b325f32f"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"E\",\n  \"explanation\": \"At 34:01–34:37, the rewatch evidence shows the man appearing beside 'THE WALL STREET JOURNAL' putting on dark sunglasses, so the change is an additional pair of sunglasses on his face.\",\n  \"evidence\": [\n    {\n      \"startMs\": 2041873,\n      \"endMs\": 2077208,\n      \"kind\": \"visual\",\n      \"claim\": \"The man (Joe Biden) is shown putting on dark sunglasses while appearing beside 'THE WALL STREET JOURNAL'.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:45:24.754005Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "bb23e4a700ac9b6463e97e235b5937356e641e38df2ee5530bc72c62bb63152e",
+    "indexVariantId": "larkup-v8-vb-gemini-deepseek",
+    "latencySecs": 19.88,
+    "predicted": "E",
+    "questionId": "longvideobench-Fw1rirubXiU_0",
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 949,
+      "completion_tokens_details": {
+        "reasoning_tokens": 819
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 7334,
+      "prompt_tokens": 7590,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 8539
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-api-v5",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 111.518,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 51.518
+          },
+          {
+            "endSecs": 2559.157,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 2511.518
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "93f6a918bea80f3e1283cd49dc0389d5ffbb38d7c77539f7c47e75e741f4ab31"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "09503677d295cf8d5d462263090d676df25058da035715abff32b34dfec8c2dc"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "09503677d295cf8d5d462263090d676df25058da035715abff32b34dfec8c2dc"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "93f6a918bea80f3e1283cd49dc0389d5ffbb38d7c77539f7c47e75e741f4ab31"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 2,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The evidence does not establish any right-hand change for the described man. A rewatch of 0:51–1:51 shows only video segments and graphics (including 'DYING FOR AID') but not the studio broadcast room, the man, or 'GLOBAL WATCH'. A rewatch of 41:51–42:39 begins with 'GLOBAL WATCH' already displayed and does not capture the preceding 'DYING FOR AID' segment or the transition. No evidence ties any of the listed actions (mouse, forehead, chin, paper, phone) to the man at that moment.\",\n  \"evidence\": [\n    {\n      \"startMs\": 51518,\n      \"endMs\": 111518,\n      \"kind\": \"visual\",\n      \"claim\": \"The provided video frames only show the video segments and graphics for 'DYING FOR AID', 'DEADLY WILDFIRE GROWS', 'WHERE IS KATE?', and 'OLD SCHOOL RULES'. The studio broadcast room, the man in the suit at the desk, and any graphic reading 'GLOBAL WATCH' are not shown in these frames.\"\n    },\n    {\n      \"startMs\": 2511518,\n      \"endMs\": 2559157,\n      \"kind\": \"visual\",\n      \"claim\": \"The provided frames begin with 'GLOBAL WATCH' already displayed on the screen behind the anchor and do not show the preceding segment where 'DYING FOR AID' appeared or the transition between them.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:45:02.767738Z",
+    "executionMode": "api-rewatch",
+    "expected": "D",
+    "finalReasoningEffort": "high",
+    "indexSha256": "bb23e4a700ac9b6463e97e235b5937356e641e38df2ee5530bc72c62bb63152e",
+    "indexVariantId": "larkup-v8-vb-gemini-deepseek",
+    "latencySecs": 30.84,
+    "predicted": null,
+    "questionId": "longvideobench-Fw1rirubXiU_2",
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2569,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2237
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 7774,
+      "prompt_tokens": 8030,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 10599
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-api-v5",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      }
+    ],
+    "answer": "{\n  \"option\": \"B\",\n  \"explanation\": \"The video is an animated cardboard-cutout presentation about intercultural communication. It opens by noting world diversity, explains how cultural perspective influences perception, raises questions about speaking across cultures and workplace cultural differences, introduces a 'Diversity Dashboard' of cultural dimensions, and closes by promoting Dr. Deborah Swallow as a leading authority on intercultural communication. This aligns with learning the fundamentals of intercultural communication, not conflict history, language mastery, or political resolution.\",\n  \"evidence\": [\n    {\n      \"startMs\": 0,\n      \"endMs\": 115000,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled overview: An animated cardboard-cutout video illustrates how cultural perspective shapes communication and business, introduces a 'Diversity Dashboard' of cultural dimensions, and ends by promoting Dr. Deborah Swallow as a speaker, author, consultant, and leading authority on intercultural communication.\"\n    },\n    {\n      \"startMs\": 1790,\n      \"endMs\": 6600,\n      \"kind\": \"transcript\",\n      \"claim\": \"It’s a big world, full of difference and diversity.\"\n    },\n    {\n      \"startMs\": 6600,\n      \"endMs\": 14150,\n      \"kind\": \"transcript\",\n      \"claim\": \"How you see others is influenced by your own cultural perspective, and how others see you\"\n    },\n    {\n      \"startMs\": 17680,\n      \"endMs\": 25180,\n      \"kind\": \"computed\",\n      \"claim\": \"Source question (spoken, primary): What happens when you speak? Do people from other cultures understand you in the way you intended?\"\n    },\n    {\n      \"startMs\": 24180,\n      \"endMs\": 26520,\n      \"kind\": \"computed\",\n      \"claim\": \"Source question (spoken, primary): And what happens with different cultures in the workplace?\"\n    },\n    {\n      \"startMs\": 44240,\n      \"endMs\": 53080,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled context: The 'DIVERSITY DASHBOARD' is an airplane instrument panel labeled as such.\"\n    },\n    {\n      \"startMs\": 53080,\n      \"endMs\": 61920,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled state: Cultural dimension switches and gauges: Deal/Relationship switch panel and Direct/Indirect gauge\"\n    },\n    {\n      \"startMs\": 88480,\n      \"endMs\": 97320,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled event: Title card introduces Dr. Deborah Swallow; stick figures react with speech bubbles like 'THAT'S CLEAR', 'AHA!', 'YAY!'.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:45:44.639166Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "a10918f3b761c1426a1bf43b4afbe566f8275baf0314ee769effa7bcf39bca9e",
+    "indexVariantId": "larkup-v8-vb-gemini-deepseek",
+    "latencySecs": 11.66,
+    "predicted": "B",
+    "questionId": "video-mme-010-1",
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1400,
+      "completion_tokens_details": {
+        "reasoning_tokens": 792
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 31439,
+      "prompt_tokens": 31695,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 33095
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "latest",
+    "condition": "managed-api-v6",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 111.518,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. Record a visible state even when the other comparison state lies outside this window. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 51.518
+          },
+          {
+            "endSecs": 2559.157,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. Record a visible state even when the other comparison state lies outside this window. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 2499.157
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "fd3e36b910aec429b5ac33247916032eb18942dad66fe251e7093e3d85b18f03"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "google/gemini-3.8-flash",
+        "requestId": "7234e75c0f8c01940502a85050b7c333eec0821686fb0997fffc4bd4d674565b"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "7234e75c0f8c01940502a85050b7c333eec0821686fb0997fffc4bd4d674565b"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "fd3e36b910aec429b5ac33247916032eb18942dad66fe251e7093e3d85b18f03"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 2,
+        "established": 0
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"The rewatch observation at 41:42 shows that when the screen text changes to 'GLOBAL WATCH', the anchor's right hand is raised off the desk and holding a white paper, so the change is to holding a piece of paper with his right hand.\",\n  \"evidence\": [\n    {\n      \"startMs\": 2499157,\n      \"endMs\": 2559157,\n      \"kind\": \"visual observation\",\n      \"claim\": \"At 41:42, when 'GLOBAL WATCH' appears on the monitor beside the anchor, the anchor's right hand is raised off the desk and holding a white paper.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:49:20.313906Z",
+    "executionMode": "api-rewatch",
+    "expected": "D",
+    "finalReasoningEffort": "high",
+    "indexSha256": "bb23e4a700ac9b6463e97e235b5937356e641e38df2ee5530bc72c62bb63152e",
+    "indexVariantId": "larkup-v8-vb-gemini-deepseek",
+    "latencySecs": 30.18,
+    "predicted": "D",
+    "questionId": "longvideobench-Fw1rirubXiU_2",
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1359,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1208
+      },
+      "prompt_cache_hit_tokens": 512,
+      "prompt_cache_miss_tokens": 7456,
+      "prompt_tokens": 7968,
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      },
+      "total_tokens": 9327
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "qwen",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      }
+    ],
+    "answer": "{\n  \"option\": \"B\",\n  \"explanation\": \"The video uses animated scenarios to illustrate how cultural perspective shapes perception, depicts cross-cultural miscommunication and workplace cultural dimensions, and ends with Dr. Deborah Swallow, identified as a leading authority on intercultural communication. Its focus is fundamentals of intercultural communication, not history, language acquisition, or political conflict.\",\n  \"evidence\": [\n    {\n      \"startMs\": 17680,\n      \"endMs\": 25180,\n      \"kind\": \"speech\",\n      \"claim\": \"Narrator asks 'What happens when you speak?' and 'Do people from other cultures understand you in the way you intended?', introducing the theme of cross-cultural communication.\"\n    },\n    {\n      \"startMs\": 46240,\n      \"endMs\": 65000,\n      \"kind\": \"visual\",\n      \"claim\": \"A 'DIVERSITY DASHBOARD' panel presents cultural dimensions: deal orientated vs relationship orientated, direct vs indirect communication, egalitarian vs hierarchical management.\"\n    },\n    {\n      \"startMs\": 97320,\n      \"endMs\": 115000,\n      \"kind\": \"title-card\",\n      \"claim\": \"Ending title card names Dr. Deborah Swallow as 'Speaker, Author, Consultant' and 'LEADING AUTHORITY ON INTERCULTURAL COMMUNICATION'.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:59:45.496939Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "85b941da28fd678a53c240dffc06eaf8f840fac791482758c9e13deba0eb718d",
+    "indexVariantId": "larkup-v8-vb-qwen-deepseek",
+    "latencySecs": 13.5,
+    "predicted": "B",
+    "questionId": "video-mme-010-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 945,
+      "completion_tokens_details": {
+        "reasoning_tokens": 656
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 44212,
+      "prompt_tokens": 44596,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 45541
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "qwen",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 552.2,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 492.2
+          },
+          {
+            "endSecs": 604.76,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 552.2
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "alibaba/qwen3.8-max",
+        "requestId": "ad8401bed274caef5ebbd098c60b814a407bc6ec58fb4af59db1e300849dd31f"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "alibaba/qwen3.8-max",
+        "requestId": "47228e678009d676e0ae61e9c0ed1e0597877a5dc84ac19c9f91aef96e8f6514"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "47228e678009d676e0ae61e9c0ed1e0597877a5dc84ac19c9f91aef96e8f6514"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "ad8401bed274caef5ebbd098c60b814a407bc6ec58fb4af59db1e300849dd31f"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 2,
+        "established": 2
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"The video shows gameplay footage of an AI-driven NPC (Bloom) in a Ubisoft prototype. The presenter describes it as an AI experiment, and the character is stated to be AI-powered, not scripted, responding in real-time. Therefore the game content is generated by AI.\",\n  \"evidence\": [\n    {\n      \"startMs\": 492200,\n      \"endMs\": 552200,\n      \"kind\": \"speech\",\n      \"claim\": \"Presenter describes the gameplay as a creative experiment by Ubisoft involving AI breakthroughs; on-screen labels say 'GDC 2024 BUILD - PROTOTYPE' and 'NOT ACTUAL GAME FOOTAGE'.\"\n    },\n    {\n      \"startMs\": 552200,\n      \"endMs\": 604760,\n      \"kind\": \"speech\",\n      \"claim\": \"Speaker states Bloom is 'an avatar powered by AI' that is 'not scripted' and 'just responding to you in real-time conversation'.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:58:34.665664Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "ae5c5e9f653bd13f3d6672af6eced1df225154036dcc2755c65ec8b9da0dcdee",
+    "indexVariantId": "larkup-quality-v9-vb-qwen-deepseek",
+    "latencySecs": 70.83,
+    "predicted": "C",
+    "questionId": "video-mme-428-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-20gUIdXGuAs",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 984,
+      "completion_tokens_details": {
+        "reasoning_tokens": 760
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 6725,
+      "prompt_tokens": 7109,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 8093
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "qwen",
+    "condition": "managed-api-v8",
+    "abstained": true,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      }
+    ],
+    "answer": "{\n  \"option\": null,\n  \"explanation\": \"The supplied evidence only mentions the pilot flying over the Taj Mahal and Petronas-style twin towers near the end (65-88s). It does not mention the White House, Big Ben, the Egyptian Pyramids, or the Eiffel Tower, so it cannot establish which of the listed places the copilot does not travel to.\",\n  \"evidence\": [\n    {\n      \"startMs\": 65000,\n      \"endMs\": 88480,\n      \"kind\": \"computed\",\n      \"claim\": \"A cut-out propeller plane with a goggled pilot flies over a city skyline, countryside, and world landmarks including the Taj Mahal and Petronas-style twin towers, representing a journey of understanding.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T21:13:32.060306Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "85b941da28fd678a53c240dffc06eaf8f840fac791482758c9e13deba0eb718d",
+    "indexVariantId": "larkup-v8-vb-qwen-deepseek",
+    "latencySecs": 41.8,
+    "predicted": null,
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2996,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2827
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 43475,
+      "prompt_tokens": 43859,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 46855
+    },
+    "valid_format": false
+  },
+  {
+    "reader": "qwen",
+    "condition": "managed-api-v8",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 288
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 336
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 384
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 432
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 480
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 528
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"The presentation consistently focuses on how body fat, especially fat-cell hypertrophy, causes insulin resistance, and how insulin resistance is linked to chronic diseases such as obesity and diabetes. Early slides show Insulin Resistance as a central hub connected to Diabetes, Heart Disease, Cancer, Obesity, and other chronic conditions, and the talk asks 'How does body fat cause insulin resistance?' The overarching theme is the relationship among body fat, insulin resistance, and chronic disease, making option C the best match. Option D is too narrow because it centers only on insulin's role rather than the broader fat-cell/insulin-resistance/chronic-disease relationship.\",\n  \"evidence\": [\n    {\n      \"startMs\": 0,\n      \"endMs\": 2667064,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled overview: A Metabolic Health Summit presentation by Dr. Benjamin Bikman explains how fat-cell hypertrophy drives insulin resistance, contrasting caloric and endocrine theories of obesity, and presents evidence that insulin control matters more than calorie quantity for fat-cell size and metabolic health.\"\n    },\n    {\n      \"startMs\": 205293,\n      \"endMs\": 211293,\n      \"kind\": \"computed\",\n      \"claim\": \"Diabetes, Heart Disease, Cancer, Obesity, Fatty Liver, Migraines, PCOS, Dementia, Erectile Dysfunction are shown as satellite circles around the Insulin Resistance hub as chronic diseases linked to insulin resistance.\"\n    },\n    {\n      \"startMs\": 231930,\n      \"endMs\": 234930,\n      \"kind\": \"computed\",\n      \"claim\": \"Slide poses 'How does body fat cause insulin resistance?' establishing the investigation of body fat's causal link to insulin resistance.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T21:05:05.607138Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "10df9170ee6591942e7dfca4987a819d2ff15b9bcc1cbd4b129a85898851715a",
+    "indexVariantId": "larkup-quality-v9-vb-qwen-deepseek",
+    "latencySecs": 54.92,
+    "predicted": "C",
+    "questionId": "video-mme-623-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2364,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1988
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 89529,
+      "prompt_tokens": 89785,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 92149
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "qwen",
+    "condition": "managed-api-v8",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 288
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 336
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 384
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 432
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 480
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 528
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 576
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 624
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 672
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 720
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 768
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 816
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 864
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 912
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 960
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1008
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1056
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1104
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1152
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1200
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1248
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1296
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1344
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1392
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1440
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1488
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1536
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1584
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1632
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1680
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1728
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1776
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1824
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1872
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1920
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1968
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2016
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2064
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2112
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2160
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2208
+      }
+    ],
+    "answer": "{\n  \"option\": \"A\",\n  \"explanation\": \"The personal fat threshold is introduced first at ~581 s, followed by the question of what makes fat cells grow at ~886 s, and the insulin-diet relationship is introduced later at ~2033 s. This yields ①→②→③.\",\n  \"evidence\": [\n    {\n      \"startMs\": 581160,\n      \"endMs\": 585040,\n      \"kind\": \"transcript\",\n      \"claim\": \"Speaker first introduces the personal fat threshold concept around 581 s.\"\n    },\n    {\n      \"startMs\": 885940,\n      \"endMs\": 897380,\n      \"kind\": \"transcript\",\n      \"claim\": \"Speaker poses the question 'What makes the fat cell grow?' around 885.9 s, introducing how to grow fat cells.\"\n    },\n    {\n      \"startMs\": 2033039,\n      \"endMs\": 2034960,\n      \"kind\": \"transcript\",\n      \"claim\": \"Speaker begins comparing low-calorie and low-insulin diets around 2033 s, introducing the insulin-diet relationship.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T21:06:00.526146Z",
+    "executionMode": "api-rewatch",
+    "expected": "A",
+    "finalReasoningEffort": "high",
+    "indexSha256": "10df9170ee6591942e7dfca4987a819d2ff15b9bcc1cbd4b129a85898851715a",
+    "indexVariantId": "larkup-quality-v9-vb-qwen-deepseek",
+    "latencySecs": 114.94,
+    "predicted": "A",
+    "questionId": "video-mme-623-2",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 4152,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3908
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 310149,
+      "prompt_tokens": 310533,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 314685
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "managed-api-v6",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 17.667,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 11.7
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "c9a875718a7ced49a3e3ea89ff649f0f84440c3331b4e6ae91c27a0f03e52ab5"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "c9a875718a7ced49a3e3ea89ff649f0f84440c3331b4e6ae91c27a0f03e52ab5"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"The rewatch reading shows semisweet chocolate is poured into the empty transparent bowl first, and butter is added later on top before stirring, so chocolate appears first.\",\n  \"evidence\": [\n    {\n      \"startMs\": 11700,\n      \"endMs\": 17667,\n      \"kind\": \"visual\",\n      \"claim\": \"Rewatch reading: chocolate chunks labeled 'Semisweet chocolate 100g' are poured into the empty transparent bowl first; butter labeled 'Butter without salt 100g' is added later on top, before stirring, so chocolate appears first.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:51:26.833452Z",
+    "executionMode": "api-rewatch",
+    "expected": "D",
+    "finalReasoningEffort": "high",
+    "indexSha256": "bdc3aaa74c088709cfc6055dd8b72b4e62c4ebe090679df241a967941d02cc45",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 21.26,
+    "predicted": "D",
+    "questionId": "longvideobench-@thatrecipe.us-7266555380925287723_0",
+    "sourceId": "longvideobench-@thatrecipe.us-7266555380925287723",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 674,
+      "completion_tokens_details": {
+        "reasoning_tokens": 534
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 5756,
+      "prompt_tokens": 6012,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 6686
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      }
+    ],
+    "answer": "{\n  \"option\": \"B\",\n  \"explanation\": \"The video is consistently described as an animated explainer about intercultural communication, with narrated lessons on cultural perspective, workplace differences, and the need for cultural intelligence, ending with credit to Dr. Deborah Swallow as a leading authority on intercultural communication. This aligns with quick ways to grasp fundamentals of intercultural communication, not conflicts, language learning, or political resolution.\",\n  \"evidence\": [\n    {\n      \"startMs\": 0,\n      \"endMs\": 115000,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled overview: An animated explainer video about intercultural communication, featuring hand-drawn characters and narrated lessons on cultural perspective, workplace differences, and the need for cultural intelligence, ending with a credit for Dr. Deborah Swallow.\"\n    },\n    {\n      \"startMs\": 95000,\n      \"endMs\": 115000,\n      \"kind\": \"computed\",\n      \"claim\": \"End card displays Dr. Deborah Swallow, leading authority on intercultural communication, with website; 'Speaker, Author, Consultant' fades out.\"\n    },\n    {\n      \"startMs\": 18800,\n      \"endMs\": 27200,\n      \"kind\": \"computed\",\n      \"claim\": \"Narrated questions focus on cross-cultural understanding: 'What happens when you speak?' and 'Do people from other cultures understand you in the way you intended?'\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:59:45.385424Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "31ea44e4837ce0c75b6888f7ce85ec609f6a76af8211997389876edbc7435939",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 13.83,
+    "predicted": "B",
+    "questionId": "video-mme-010-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 963,
+      "completion_tokens_details": {
+        "reasoning_tokens": 656
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 31480,
+      "prompt_tokens": 31864,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 32827
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 35.4,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 33.02
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "17b2e1fc7f4b257f0a850d1a9d12b35942a2cffe07313b75ee8cc70671038b05"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "17b2e1fc7f4b257f0a850d1a9d12b35942a2cffe07313b75ee8cc70671038b05"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"A\",\n  \"explanation\": \"The rewatch of 33.02–35.4s identifies the informally behaving staff (second from left behind the left counter, leaning then waving) as wearing a shirt with a dark floral flower pattern on a light base; original hue unknown.\",\n  \"evidence\": [\n    {\n      \"startMs\": 33020,\n      \"endMs\": 35400,\n      \"kind\": \"visual\",\n      \"claim\": \"The informally behaving staff (second from left behind the left counter, leaning then waving) has a shirt with a dark floral flower pattern on a light base.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:59:59.219725Z",
+    "executionMode": "api-rewatch",
+    "expected": "A",
+    "finalReasoningEffort": "high",
+    "indexSha256": "31ea44e4837ce0c75b6888f7ce85ec609f6a76af8211997389876edbc7435939",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 30.4,
+    "predicted": "A",
+    "questionId": "video-mme-010-2",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 509,
+      "completion_tokens_details": {
+        "reasoning_tokens": 371
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 8679,
+      "prompt_tokens": 8935,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 9444
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 12.8,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 1.92
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "48fb5372175b21027279c06be89e4f1062562ac0b508f8749215826eec0f137e"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "48fb5372175b21027279c06be89e4f1062562ac0b508f8749215826eec0f137e"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"The first goal shown is Portugal's 2006 goal; the scorer in red #17 shouts with fists clenched, then goes to his knees as teammates pile on him, matching kneeling and screaming.\",\n  \"evidence\": [\n    {\n      \"startMs\": 1920,\n      \"endMs\": 12800,\n      \"kind\": \"visual\",\n      \"claim\": \"The scorer in red with \\\"17\\\" shouts with mouth open and fists clenched, then goes to his knees as teammates in matching red converge and pile on top of him in front of the crowd.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:59:09.278027Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "16240fd4138171a2edfc7a197575a75ba3082f795f68725ed8063c784faf4129",
+    "indexVariantId": "larkup-v8-vb-muse-deepseek",
+    "latencySecs": 36.11,
+    "predicted": "C",
+    "questionId": "video-mme-156-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-BkiTScinYOQ",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 962,
+      "completion_tokens_details": {
+        "reasoning_tokens": 827
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 6944,
+      "prompt_tokens": 7200,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 8162
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 572.72,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 512.72
+          },
+          {
+            "endSecs": 604.76,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 544.76
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "16ddb2849237d696b3252d0d436a29946106e40f6eb541bb41808caa73e4cb3b"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "meta/muse-spark-1.3",
+        "requestId": "9a33fc6b46940c024178d6438e9bb1f182ccbccd18668475632c0fd4fd95078e"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "9a33fc6b46940c024178d6438e9bb1f182ccbccd18668475632c0fd4fd95078e"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "16ddb2849237d696b3252d0d436a29946106e40f6eb541bb41808caa73e4cb3b"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 2,
+        "established": 2
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"The video shows Ubisoft's prototype footage of an AI-powered NPC named Bloom. The on-screen label marks it as a GDC 2024 prototype (not actual game footage), and the dialogue with Bloom is presented as a real-time, AI-generated conversation rather than pre-set scripted content or a performance by real people.\",\n  \"evidence\": [\n    {\n      \"startMs\": 494200,\n      \"endMs\": 604760,\n      \"kind\": \"speech\",\n      \"claim\": \"The host introduces Ubisoft's unreleased AI avatar experiment and describes the prototype footage as a real-time, unscripted conversation with NPC Bloom.\"\n    },\n    {\n      \"startMs\": 512720,\n      \"endMs\": 572720,\n      \"kind\": \"visual\",\n      \"claim\": \"The game footage is labelled 'GDC 2024 BUILD - PROTOTYPE' and 'NOT ACTUAL GAME FOOTAGE', showing the AI NPC Bloom answering player questions in real time.\"\n    },\n    {\n      \"startMs\": 80950,\n      \"endMs\": 83110,\n      \"kind\": \"visible-text\",\n      \"claim\": \"An on-screen article headline reads 'Ubisoft let me actually speak with its new AI-powered video game NPCs'.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:58:37.106539Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "2b60d0ae6c5944c8a31d35f7529243763a50e16f6682a5accf5db6a319117f93",
+    "indexVariantId": "larkup-quality-v9-vb-muse-deepseek",
+    "latencySecs": 32.17,
+    "predicted": "C",
+    "questionId": "video-mme-428-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-20gUIdXGuAs",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1506,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1218
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 7737,
+      "prompt_tokens": 7993,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 9499
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "managed-api-v8",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 288
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 336
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 384
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 432
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 480
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 528
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 576
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 624
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 672
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 720
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 768
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 816
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 864
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 912
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 960
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1008
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1056
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1104
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1152
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1200
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1248
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1296
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1344
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1392
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1440
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1488
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1536
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1584
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1632
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1680
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1728
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1776
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1824
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1872
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1920
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1968
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2016
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2064
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2112
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"The presentation is introduced as 'Fat: Why It Matters and What to Do About It,' and the sourced overview describes it as explaining how fat cell hypertrophy causes insulin resistance and contrasting caloric/endocrine theories, all centered on body fat, insulin resistance, and related metabolic conditions such as obesity and diabetes. Option D is too narrow because insulin's role is only one component of the talk, not the primary overall focus.\",\n  \"evidence\": [\n    {\n      \"startMs\": 0,\n      \"endMs\": 2667064,\n      \"kind\": \"computed\",\n      \"claim\": \"A Metabolic Health Summit presentation explains how fat cell hypertrophy causes insulin resistance, contrasts caloric and endocrine theories, and presents evidence that insulin controls fat storage and energy expenditure.\"\n    },\n    {\n      \"startMs\": 68840,\n      \"endMs\": 77600,\n      \"kind\": \"transcript\",\n      \"claim\": \"The speaker states the title of his talk is 'Fat: Why It Matters and What to Do About It.'\"\n    },\n    {\n      \"startMs\": 119853,\n      \"endMs\": 122570,\n      \"kind\": \"visual\",\n      \"claim\": \"Title slide identifies the talk as 'Shrinking Fat Cells Energy vs. Insulin' by Benjamin Bikman, PhD.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T21:05:10.764614Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "59c0c4840b54920998003f6be2edaafb230232f092692ac3add2e48cbd7a15f0",
+    "indexVariantId": "larkup-quality-v9-vb-muse-deepseek",
+    "latencySecs": 80.89,
+    "predicted": "C",
+    "questionId": "video-mme-623-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1783,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1492
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 288939,
+      "prompt_tokens": 289323,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "total_tokens": 291106
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "muse",
+    "condition": "managed-api-v8",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 288
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 336
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 384
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 432
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 480
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 528
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 576
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 624
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 672
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 720
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 768
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 816
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 864
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 912
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 960
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1008
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1056
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1104
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1152
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1200
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1248
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1296
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1344
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1392
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1440
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1488
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1536
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1584
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1632
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1680
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1728
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1776
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1824
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1872
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1920
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 1968
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2016
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2064
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 2112
+      }
+    ],
+    "answer": "{\n  \"option\": \"A\",\n  \"explanation\": \"The personal fat threshold is introduced first around 581–585 s, followed by how to grow fat cells around 888–891 s, and the relationship between insulin and diet appears later around 2050–2052 s. Thus the order is ① → ② → ③.\",\n  \"evidence\": [\n    {\n      \"startMs\": 581160,\n      \"endMs\": 585040,\n      \"kind\": \"transcript\",\n      \"claim\": \"Introduces the concept of the personal fat threshold.\"\n    },\n    {\n      \"startMs\": 888040,\n      \"endMs\": 891120,\n      \"kind\": \"transcript\",\n      \"claim\": \"Asks what makes the fat cell grow, beginning the section on how to grow fat cells.\"\n    },\n    {\n      \"startMs\": 2050010,\n      \"endMs\": 2056010,\n      \"kind\": \"computed\",\n      \"claim\": \"Introduces the relationship between macronutrients and insulin (diet and insulin).\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T21:06:31.650542Z",
+    "executionMode": "api-rewatch",
+    "expected": "A",
+    "finalReasoningEffort": "high",
+    "indexSha256": "59c0c4840b54920998003f6be2edaafb230232f092692ac3add2e48cbd7a15f0",
+    "indexVariantId": "larkup-quality-v9-vb-muse-deepseek",
+    "latencySecs": 88.8,
+    "predicted": "A",
+    "questionId": "video-mme-623-2",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1328,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1093
+      },
+      "prompt_cache_hit_tokens": 512,
+      "prompt_cache_miss_tokens": 290311,
+      "prompt_tokens": 290823,
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      },
+      "total_tokens": 292151
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 616.5,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. Record a visible state even when the other comparison state lies outside this window. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 556.5
+          },
+          {
+            "endSecs": 2571.5,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. Record a visible state even when the other comparison state lies outside this window. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 2511.5
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "e1cea31accab155cccdfe3d00203b60fa8347b520da603e1e4d03bae6c68be9c"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "029ae9fbcb94ff198f6dcfbfd397f3b1dd4f9e2d61312397afffd573dbbc0ec3"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "029ae9fbcb94ff198f6dcfbfd397f3b1dd4f9e2d61312397afffd573dbbc0ec3"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "e1cea31accab155cccdfe3d00203b60fa8347b520da603e1e4d03bae6c68be9c"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 2,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"At 41:51–42:51, the re-watch observation records that when the screen text changes to 'GLOBAL WATCH', the man's right hand changes from resting flat on the table to holding and lifting a sheet of paper. This matches option D.\",\n  \"evidence\": [\n    {\n      \"startMs\": 2511500,\n      \"endMs\": 2571500,\n      \"kind\": \"visual\",\n      \"claim\": \"At 41:51–42:51, the man's right hand changes from resting flat on the table to holding and lifting a sheet of paper when the screen changes to 'GLOBAL WATCH'.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:58:40.013967Z",
+    "executionMode": "api-rewatch",
+    "expected": "D",
+    "finalReasoningEffort": "high",
+    "indexSha256": "369a23c62498aafa8d724969aaf4b427f88219f66a4fd2a870a111142d8f1de0",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 25.97,
+    "predicted": "D",
+    "questionId": "longvideobench-Fw1rirubXiU_2",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Fw1rirubXiU",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1469,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1313
+      },
+      "prompt_cache_hit_tokens": 512,
+      "prompt_cache_miss_tokens": 12790,
+      "prompt_tokens": 13302,
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      },
+      "total_tokens": 14771
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 26.985,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 20.229
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "5141cc213a7040fafbcc876cafdb10dc07f983b8d76b3d532db4af63fb33f01c"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "5141cc213a7040fafbcc876cafdb10dc07f983b8d76b3d532db4af63fb33f01c"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\"option\":\"E\",\"explanation\":\"The source is monochrome. The man matching the question is shown wearing a dark tie, but because the footage is monochrome, only its dark grayscale appearance is visible and the original color cannot be recovered. Therefore none of white, green, black, or yellow can be established; N/A is correct.\",\"evidence\":[{\"startMs\":20229,\"endMs\":26985,\"kind\":\"visual\",\"claim\":\"The suited man holding and playing the instrument is wearing a dark tie; the footage is monochrome, so only its dark grayscale appearance is visible and the original color cannot be recovered.\"}]}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:59:05.989458Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "160494a6ca43ca29a7afe1c7787f7c1f975cc4e6989da28259478716e3420e95",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 15.87,
+    "predicted": "E",
+    "questionId": "longvideobench-Jaw7eWzgWr0_0",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Jaw7eWzgWr0",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1064,
+      "completion_tokens_details": {
+        "reasoning_tokens": 929
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 6707,
+      "prompt_tokens": 6963,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 8027
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 288
+      }
+    ],
+    "answer": "{\n  \"option\": \"B\",\n  \"explanation\": \"The video is an educational animation about intercultural communication. It presents key ideas such as cultural perspectives, direct vs indirect communication, egalitarian vs hierarchical management, and cultural intelligence. The closing title card identifies the presenter as 'Leading Authority on Intercultural Communication', confirming the topic is the fundamentals of intercultural communication.\",\n  \"evidence\": [\n    {\n      \"startMs\": 0,\n      \"endMs\": 7500,\n      \"kind\": \"speech\",\n      \"claim\": \"Narration: 'It's a big world full of difference and diversity.'\"\n    },\n    {\n      \"startMs\": 6500,\n      \"endMs\": 8840,\n      \"kind\": \"speech\",\n      \"claim\": \"Narration: 'How you see others is influenced by your own cultural perspective.'\"\n    },\n    {\n      \"startMs\": 50740,\n      \"endMs\": 53080,\n      \"kind\": \"speech\",\n      \"claim\": \"Narration: 'You need an understanding of how different cultures trade and do business.'\"\n    },\n    {\n      \"startMs\": 59580,\n      \"endMs\": 61920,\n      \"kind\": \"speech\",\n      \"claim\": \"Narration: 'Insight into how different cultures communicate. And a clear idea of how different cultures manage people.'\"\n    },\n    {\n      \"startMs\": 88480,\n      \"endMs\": 97320,\n      \"kind\": \"speech\",\n      \"claim\": \"Narration: 'Develop cultural intelligence so you can communicate confidently across cultures.'\"\n    },\n    {\n      \"startMs\": 97320,\n      \"endMs\": 106160,\n      \"kind\": \"visual\",\n      \"claim\": \"Title card: 'DR. DEBORAH SWALLOW' with 'LEADING AUTHORITY ON INTERCULTURAL COMMUNICATION'.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:59:40.548791Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "7f26226ac16251234e56df9481e258d92f35fff838195ebfced632e94c70c9a4",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 18.23,
+    "predicted": "B",
+    "questionId": "video-mme-010-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1600,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1183
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 60270,
+      "prompt_tokens": 60526,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 62126
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 97,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 70
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "6e97ab3c49d6e9ac0820b31b6032419d24a68433ae8ea1d5faae519b387f1188"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "6e97ab3c49d6e9ac0820b31b6032419d24a68433ae8ea1d5faae519b387f1188"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"A direct rewatch of 70–97s reports that the copilot travels over a landscape containing landmarks such as the Eiffel Tower and pyramids, but does not travel to the pyramid area.\",\n  \"evidence\": [\n    {\n      \"startMs\": 70000,\n      \"endMs\": 97000,\n      \"kind\": \"visual\",\n      \"claim\": \"The copilot travels by plane and then by a long pointed vehicle over a landscape containing landmarks including the Taj Mahal, the Eiffel Tower, twin towers, the Statue of Liberty, and pyramids. The place the copilot does not travel to is the pyramid area.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T20:59:58.779955Z",
+    "executionMode": "api-rewatch",
+    "expected": "B",
+    "finalReasoningEffort": "high",
+    "indexSha256": "7f26226ac16251234e56df9481e258d92f35fff838195ebfced632e94c70c9a4",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 37.94,
+    "predicted": "C",
+    "questionId": "video-mme-010-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-PSt_op3fQck",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 3109,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2956
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 13424,
+      "prompt_tokens": 13680,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 16789
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 547.52,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 487.52
+          },
+          {
+            "endSecs": 607.52,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 547.52
+          },
+          {
+            "endSecs": 610.76,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 607.52
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "c00f9b97dbe2649f8b3b04f4e6d844ceafefe79d406e81480a78aef0aaac4d3c"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "a4663c5c38d7581587e0a17a4bf8ff030a172c68da29a52db47a98aca917cb19"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "4946172010be9d66a9a597d2c1348c1fe2149fd77f12b32562c88a70744dbd00"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "c00f9b97dbe2649f8b3b04f4e6d844ceafefe79d406e81480a78aef0aaac4d3c"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "4946172010be9d66a9a597d2c1348c1fe2149fd77f12b32562c88a70744dbd00"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "a4663c5c38d7581587e0a17a4bf8ff030a172c68da29a52db47a98aca917cb19"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 3,
+        "established": 2
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"At 8:07–9:07, the screen shows a Ubisoft prototype label 'GDC 2024 BUILD - PROTOTYPE, NOT ACTUAL GAME FOOTAGE' and the content appears as a real-time conversation with an AI avatar. At 10:07–10:10, the discussion describes the game content as produced by a real-time AI-powered avatar that responds to the player rather than following a scripted sequence. This indicates the game content is generated by AI.\",\n  \"evidence\": [\n    {\n      \"startMs\": 487520,\n      \"endMs\": 547520,\n      \"kind\": \"visual\",\n      \"claim\": \"On-screen label reads 'GDC 2024 BUILD - PROTOTYPE, NOT ACTUAL GAME FOOTAGE'; game content is shown as a real-time conversation with an AI avatar.\"\n    },\n    {\n      \"startMs\": 607520,\n      \"endMs\": 610760,\n      \"kind\": \"speech\",\n      \"claim\": \"The game content is described as produced by a real-time AI-powered avatar that responds to the player in conversation, not following a scripted sequence.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T20:59:21.864702Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "ddef48a9575a968e5bca1bb7cfe01ab1a9b85e3e4f274835b6606b0e9ccab2f2",
+    "indexVariantId": "larkup-quality-v9-vb-minimax-deepseek",
+    "latencySecs": 18.68,
+    "predicted": "C",
+    "questionId": "video-mme-428-3",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-20gUIdXGuAs",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 868,
+      "completion_tokens_details": {
+        "reasoning_tokens": 606
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 8264,
+      "prompt_tokens": 8520,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 9388
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 138.57,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 83.85
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "b29d40474ac6f7b60dcca8590c1be9200c5d1d3963e5f5507c4541cfd4978ef8"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "b29d40474ac6f7b60dcca8590c1be9200c5d1d3963e5f5507c4541cfd4978ef8"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"The title slide 'Shrinking Fat Cells: Energy vs. Insulin' and the speaker's focus on how insulin, rather than energy balance alone, drives fat cell size and insulin resistance match the role of insulin in obesity/diabetes and fat mass maintenance.\",\n  \"evidence\": [\n    {\n      \"startMs\": 83951,\n      \"endMs\": 138570,\n      \"kind\": \"visual\",\n      \"claim\": \"Title slide 'Shrinking Fat Cells: Energy vs. Insulin' and speaker focus on fat cells, energy vs insulin, and insulin resistance.\"\n    },\n    {\n      \"startMs\": 0,\n      \"endMs\": 2667064,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled overview: presentation explains how insulin, not just energy balance, drives fat cell size and insulin resistance.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T21:00:36.719343Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "64ab625e9517ff4ee23b3e9c0d562341a208f15c7c736302808b51e64b58bf29",
+    "indexVariantId": "larkup-quality-v9-vb-minimax-deepseek",
+    "latencySecs": 56.41,
+    "predicted": "D",
+    "questionId": "video-mme-623-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 6201,
+      "completion_tokens_details": {
+        "reasoning_tokens": 6004
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 9148,
+      "prompt_tokens": 9404,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 15605
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-api-v7",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 659.695,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. Record a visible state even when the other comparison state lies outside this window. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 599.695
+          },
+          {
+            "endSecs": 1411.95,
+            "lookingFor": "For each requested state or label visible in this window, record the requested subject and property at that time. Record a visible state even when the other comparison state lies outside this window. Separate what is visible here from any unobserved transition, and never substitute a different subject.",
+            "startSecs": 1351.95
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "f69b4501dee7485fb3f1b102aa2366f1586e8c620caa91737d2c6eed7281a479"
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "e2f099db9711cef49794be7b1577c3c7c8cb13d51dd9f470de94c09d622fc0b9"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "f69b4501dee7485fb3f1b102aa2366f1586e8c620caa91737d2c6eed7281a479"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "e2f099db9711cef49794be7b1577c3c7c8cb13d51dd9f470de94c09d622fc0b9"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 2,
+        "established": 2
+      }
+    ],
+    "answer": "{\n  \"option\": \"A\",\n  \"explanation\": \"The personal fat threshold is introduced first around 599.695–605.695s with the slide title and human silhouette. Fat-cell growth via hyperplasia is introduced next around 684.695–689.83s with the question 'What if we could force fat to store more fat?'. The relationship between insulin and diet is introduced later around 1351.95–1411.95s when the speaker describes fat cells grown in a 'sea of fats and glucose' and insulin telling them what to do with that energy. Therefore the order is ①②③.\",\n  \"evidence\": [\n    {\n      \"startMs\": 599695,\n      \"endMs\": 605695,\n      \"kind\": \"visual\",\n      \"claim\": \"Slide introduces 'Personal Fat Threshold' concept with human silhouette at 599.695–605.695s.\"\n    },\n    {\n      \"startMs\": 684695,\n      \"endMs\": 689830,\n      \"kind\": \"visual\",\n      \"claim\": \"Slide asks 'What if we could force fat to store more fat?' and discusses hyperplasia, introducing fat-cell growth around 684.695–689.83s.\"\n    },\n    {\n      \"startMs\": 1351950,\n      \"endMs\": 1411950,\n      \"kind\": \"visual/speech\",\n      \"claim\": \"At 1351.95–1411.95s, speaker describes fat cells grown in a 'sea of fats and glucose' and insulin telling them what to do with energy, explicitly connecting insulin and diet.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T21:01:33.128766Z",
+    "executionMode": "api-rewatch",
+    "expected": "A",
+    "finalReasoningEffort": "high",
+    "indexSha256": "64ab625e9517ff4ee23b3e9c0d562341a208f15c7c736302808b51e64b58bf29",
+    "indexVariantId": "larkup-quality-v9-vb-minimax-deepseek",
+    "latencySecs": 40.41,
+    "predicted": "A",
+    "questionId": "video-mme-623-2",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 3927,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3585
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 7825,
+      "prompt_tokens": 8081,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "total_tokens": 12008
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-api-v8",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 26.985,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 20.229
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchSubmitted",
+        "model": "minimax/minimax-m3",
+        "requestId": "5141cc213a7040fafbcc876cafdb10dc07f983b8d76b3d532db4af63fb33f01c"
+      },
+      {
+        "action": "canonicalReWatchCompleted",
+        "requestId": "5141cc213a7040fafbcc876cafdb10dc07f983b8d76b3d532db4af63fb33f01c"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"E\",\n  \"explanation\": \"At 0:20–0:26, the suited man holding and playing the instrument is shown wearing a dark tie. The footage is monochrome, so only the dark grayscale appearance is visible; the original tie color cannot be recovered. Therefore no specific color among the choices can be established.\",\n  \"evidence\": [\n    {\n      \"startMs\": 20229,\n      \"endMs\": 26985,\n      \"kind\": \"visual\",\n      \"claim\": \"The suited man holding and playing the instrument is wearing a dark tie; the footage is monochrome, so only dark grayscale appearance is visible and original color cannot be recovered.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T21:05:54.598645Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "160494a6ca43ca29a7afe1c7787f7c1f975cc4e6989da28259478716e3420e95",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 22.22,
+    "predicted": "E",
+    "questionId": "longvideobench-Jaw7eWzgWr0_0",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Jaw7eWzgWr0",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 2701,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2547
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 7020,
+      "prompt_tokens": 7020,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 9721
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-api-v9",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "canonicalReWatchRequested",
+        "ranges": [
+          {
+            "endSecs": 26.985,
+            "lookingFor": "Resolve the exact requested detail for the subject matching every qualifier in the question. Do not substitute a similar person with conflicting clothing, action, or position. For monochrome material, report the visible grayscale appearance separately from any original hue that cannot be recovered; an unknown original hue does not erase an observable light or dark appearance.",
+            "startSecs": 20.229
+          }
+        ]
+      },
+      {
+        "action": "canonicalReWatchCache",
+        "requestId": "5141cc213a7040fafbcc876cafdb10dc07f983b8d76b3d532db4af63fb33f01c"
+      },
+      {
+        "action": "canonicalReWatchConsumed",
+        "completed": 1,
+        "established": 1
+      }
+    ],
+    "answer": "{\n  \"option\": \"C\",\n  \"explanation\": \"At 20.2–27.0s, the man in the suit playing the instrument wears a dark tie. Because the footage is monochrome, only the tie's dark grayscale rendering is observable; its original color cannot be recovered. Among the options, the visible shade matches black.\",\n  \"evidence\": [\n    {\n      \"startMs\": 20229,\n      \"endMs\": 26985,\n      \"kind\": \"visual\",\n      \"claim\": \"The suited man holding and playing the instrument is wearing a dark tie; the footage is monochrome, so only the dark grayscale appearance is visible and the original color cannot be recovered.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": true,
+    "createdAt": "2026-11-17T21:08:26.240820Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "160494a6ca43ca29a7afe1c7787f7c1f975cc4e6989da28259478716e3420e95",
+    "indexVariantId": "larkup-v8-vb-minimax-deepseek",
+    "latencySecs": 39.92,
+    "predicted": "C",
+    "questionId": "longvideobench-Jaw7eWzgWr0_0",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "longvideobench-Jaw7eWzgWr0",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 3012,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2857
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 6942,
+      "prompt_tokens": 6942,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 9954
+    },
+    "valid_format": true
+  },
+  {
+    "reader": "minimax",
+    "condition": "managed-api-v9",
+    "abstained": false,
+    "actions": [
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 0
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 48
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 96
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 144
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 192
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 240
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 288
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 336
+      },
+      {
+        "action": "queryVideoEvidence",
+        "cursor": 384
+      }
+    ],
+    "answer": "{\n  \"option\": \"D\",\n  \"explanation\": \"The title slide identifies the presentation as 'Shrinking Fat Cells: Energy vs. Insulin' by Benjamin Bikman, PhD, and the reconciled overview states he explains how insulin, not just energy balance, drives fat cell size and insulin resistance. Later clips directly state that elevated insulin and sufficient energy are needed for fat cell growth and that insulin promotes fat storage / low insulin forces fat cells to shrink, supporting the primary focus on insulin's role in regulating fat mass and related metabolic conditions.\",\n  \"evidence\": [\n    {\n      \"startMs\": 83851,\n      \"endMs\": 89850,\n      \"kind\": \"visual\",\n      \"claim\": \"Title slide 'Shrinking Fat Cells: Energy vs. Insulin' with speaker Benjamin Bikman, PhD, Professor of Cell Biology, Brigham Young University.\"\n    },\n    {\n      \"startMs\": 0,\n      \"endMs\": 2667064,\n      \"kind\": \"computed\",\n      \"claim\": \"Reconciled overview: presentation explains how insulin, not just energy balance, drives fat cell size and insulin resistance.\"\n    },\n    {\n      \"startMs\": 1335950,\n      \"endMs\": 1341950,\n      \"kind\": \"visual\",\n      \"claim\": \"Slide states 'Insulin promotes fat storage'.\"\n    }\n  ]\n}",
+    "baselineCorrect": false,
+    "correct": false,
+    "createdAt": "2026-11-17T21:09:06.160805Z",
+    "executionMode": "api-rewatch",
+    "expected": "C",
+    "finalReasoningEffort": "high",
+    "indexSha256": "64ab625e9517ff4ee23b3e9c0d562341a208f15c7c736302808b51e64b58bf29",
+    "indexVariantId": "larkup-quality-v9-vb-minimax-deepseek",
+    "latencySecs": 52.52,
+    "predicted": "D",
+    "questionId": "video-mme-623-1",
+    "rewatchTimeoutMs": 120000,
+    "sourceId": "video-mme-gfikT_O4v9A",
+    "state": "completed",
+    "usage": {
+      "completion_tokens": 1416,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1123
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 69211,
+      "prompt_tokens": 69211,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "total_tokens": 70627
+    },
+    "valid_format": true
+  }
+]

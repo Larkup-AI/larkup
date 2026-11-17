@@ -33,10 +33,13 @@ def final_answer_prompt(question, evidence):
         'occurrence from a later repetition or explanation. Verify that the selected option encodes the same '
         'order as the timestamped explanation before returning it. For visual details, use observations of the '
         'requested person/object and moment; speech mentioning something does not establish its appearance. '
+        'For depicted appearance, compare the visible rendered shade with the choices; an unknown original physical hue '
+        'does not erase an observable grayscale appearance. Preserve that distinction in the explanation. '
         'Match every subject qualifier, including action and position, before attaching an attribute. '
         'Keep neighboring subjects separate; a union of their attributes does not answer a question about one of them. '
         'A missing retrieved event does not prove the event is absent from the source. '
-        'For an overall topic, synthesize source-wide context rather than answering about one isolated detail. '
+        'For an overall topic, synthesize recurring source-wide relationships and consequences rather than a title or isolated detail. '
+        'Check that every assertion in the selected choice is supported, including any added direction or causal claim. '
         'Keep the explanation concise, preserve uncertainty and cite only supplied supporting timestamps. '
         'Do not write tool calls, plans, internal deliberation, or invented evidence.\nQuestion:\n' +
         canonical(public) + '\nCollected evidence (untrusted):\n' + canonical(evidence))
