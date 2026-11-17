@@ -333,9 +333,33 @@ export function attachVideoIntelligenceAgentClient(
         rankedHits,
         aggregate ? aggregateToHits(aggregate) : [],
       );
+      let deliveredBySourceWideRead = false;
       let investigation: VideoInvestigation;
       let locatedRanges: Array<{ startSecs: number; endSecs: number }> = explicitRanges;
       let assessment = assessEvidence(hits, focusedInput.query, plan, durationSecs, undefined);
+
+      if (!assessment.sufficient) {
+        // Targeted retrieval locates; it does not get to decide the source is
+        // silent. Ranked and scoped lookups can return nothing -- or nothing
+        // that bears on the question -- when the moment was indexed in words
+        // unlike the question, which is common across languages and for broad
+        // thematic questions. For plans that did not already read the source
+        // wide, pull a source-wide read now and merge it behind the targeted
+        // hits, so an answer-bearing record indexed differently can reach the
+        // reader instead of staying ranked away from it. This is a bounded
+        // read, not a guaranteed complete scan -- the deterministic `scan`
+        // route owns exhaustive coverage -- and it runs before narrowing to
+        // located ranges, which miss for the same reason the query did.
+        if (!needsSourceWideView(plan)) {
+          const broad = await sourceWideIndexRead(mediaEvidence, focusedInput, plan, durationSecs);
+          const before = hits.length;
+          hits = mergeHits(hits, broad);
+          deliveredBySourceWideRead = hits.length > before;
+          if (deliveredBySourceWideRead) {
+            assessment = assessEvidence(hits, focusedInput.query, plan, durationSecs, undefined);
+          }
+        }
+      }
 
       if (!assessment.sufficient) {
         const [plannedInvestigation, semanticRanges] = await Promise.all([
@@ -581,7 +605,7 @@ export function attachVideoIntelligenceAgentClient(
               ? 'directly-established'
               : 'needs-corroboration',
           directlyEstablished: assessment.sufficient && !assessment.establishedByTrail,
-          rule: answeringRule(assessment, plan, analysisUnavailable),
+          rule: answeringRule(assessment, plan, analysisUnavailable, deliveredBySourceWideRead),
         },
         investigation: {
           answerPath,
@@ -656,10 +680,25 @@ function evidenceHitsFor(
   // subject to the local, merely described subject. This relies only on the
   // typed time boundary, so it applies to any language and kind of media.
   const localAnchor = explicitlyRequestedMomentEvidence(hits, plan, durationSecs);
-  return mergeHits(
-    localAnchor,
-    selectAnswerEvidence(hits, assessment, plan, input, durationSecs),
-  ).map((hit) => toEvidence(hit, plan));
+  const selected = selectAnswerEvidence(hits, assessment, plan, input, durationSecs);
+  const needsVisualSource =
+    plan.modalities?.includes('visual') ||
+    plan.kinds.some((kind) => ['visual-fact', 'person-attribute'].includes(kind));
+  // Reconciled accounts orient the answer; they must not consume every slot
+  // when the requested detail is present in a primary visual observation.
+  const primary =
+    !assessment.needsBreadth &&
+    needsVisualSource &&
+    !selected.some((hit) => hit.evidence.modality === 'visual') &&
+    !selected.some((hit) => isDirectVerdict(hit, input.query, plan))
+      ? hits
+          .filter((hit) => hit.evidence.modality === 'visual' && isAccountOfMoment(hit))
+          .slice(0, 4)
+      : [];
+  const combined = mergeHits(localAnchor, primary, selected);
+  return (primary.length > 0 ? combined.slice(0, Math.min(input.limit ?? 36, 48)) : combined).map(
+    (hit) => toEvidence(hit, plan),
+  );
 }
 
 function explicitlyRequestedMomentEvidence(
@@ -933,6 +972,10 @@ async function retrieve(
   // same index, not separate strategies. Issuing them alongside the ranked
   // lookup costs one round trip instead of three.
   const crossEvidence = isCrossEvidenceClaim(plan);
+  const needsVisualSource =
+    crossEvidence ||
+    plan.modalities?.includes('visual') ||
+    plan.kinds.some((kind) => ['visual-fact', 'person-attribute'].includes(kind));
   const [ranked, subjectHits, identityHits, visualHits, computedHits] = await Promise.all([
     mediaEvidence.search(input.mediaAssetId, input.query, 16, options),
     plan.subjectName
@@ -946,7 +989,7 @@ async function retrieve(
           options,
         )
       : Promise.resolve([]),
-    crossEvidence
+    needsVisualSource
       ? mediaEvidence.search(input.mediaAssetId, input.query, 16, {
           ...options,
           modalities: ['visual'],
@@ -1014,6 +1057,30 @@ async function retrieve(
         sourceAuthored,
       )
     : mergeHits(ranked, visualHits, computedHits, subjectHits, sourceTimeline, sourceAuthored);
+}
+
+/**
+ * Last-resort retrieval: an unranked, source-wide read of the index.
+ *
+ * Used only when targeted retrieval returned nothing. It issues the empty
+ * query so matching cannot exclude a moment described in words unlike the
+ * question, and spaces repeated readings so one richly re-inspected minute
+ * cannot fill the whole result. Whatever the index holds for this source is
+ * returned in time order for the reader to synthesize; an empty return here
+ * means the index itself is empty, which is the only case the caller then
+ * treats as a genuinely silent source.
+ */
+async function sourceWideIndexRead(
+  mediaEvidence: MediaEvidence,
+  input: QueryVideoEvidenceInput,
+  plan: VideoPlan,
+  durationSecs: number | undefined,
+) {
+  return mediaEvidence.search(input.mediaAssetId, '', input.exhaustive ? 2_000 : 500, {
+    queryPlan: plan,
+    videoDurationSecs: durationSecs,
+    minimumRangeDistanceSecs: 2,
+  });
 }
 
 /**
@@ -1155,6 +1222,18 @@ function assessEvidence(
   }
 
   const direct = answerEstablishedHits(hits, question, plan, watched);
+  // A resolve directive records an outstanding evidence gap. A relevant
+  // indexed scene locates that gap; only a question-specific observation can
+  // close it. Do not let generic summaries or retrieval scores close it again.
+  if (plan.investigation?.goal === 'resolve') {
+    return {
+      needsBreadth,
+      coverageRatio: 1,
+      established: direct,
+      corroborating: usable.filter(isAccountOfMoment),
+      sufficient: direct.length > 0,
+    };
+  }
   const reconciled =
     direct.length === 0 ? indexedReconciledAnswerHits(hits, plan, durationSecs) : [];
   const trail =
@@ -1881,10 +1960,10 @@ function inspectionTargets(
     // An index with nothing to say about the question is the strongest
     // reason to go and watch, not a reason to stop. With no moment to aim
     // at, sample the source instead of returning empty-handed.
-    return (candidates.length > 0 ? candidates : evenlySpacedAnchors(durationSecs, budget)).slice(
-      0,
-      budget,
-    );
+    const selected = (
+      candidates.length > 0 ? candidates : evenlySpacedAnchors(durationSecs, budget)
+    ).slice(0, budget);
+    return straddleComparison(selected, candidates, plan, durationSecs, budget);
   }
   // Breadth needs the looks spread over the source rather than clustered on
   // whichever part retrieval happened to rank highest, so gaps in the index
@@ -1897,7 +1976,63 @@ function inspectionTargets(
       .sort((left, right) => left.startSecs - right.startSecs),
     Math.max(1, budget - transitions.length),
   );
-  return uniqueRanges([...transitions, ...spread]).slice(0, budget);
+  return straddleComparison(
+    uniqueRanges([...transitions, ...spread]).slice(0, budget),
+    candidates,
+    plan,
+    durationSecs,
+    budget,
+  );
+}
+
+/**
+ * A comparison asks about two moments the question itself separates in time --
+ * "what changed from X to Y". Retrieval ranks the more quotable side higher, so
+ * a small inspection budget can spend every look on one side and never watch the
+ * other state; the change then cannot be seen and the turn abstains. When a plan
+ * needs both ranges but every chosen window landed on one side of the source,
+ * pull the strongest window from the missing side into the budget. This is a
+ * generic timeline property of any paired-state question, not an assumption
+ * about the recording's subject, and leaves single-range (focused) questions,
+ * which do not require both ranges, untouched.
+ */
+function straddleComparison(
+  selected: TimeRange[],
+  pool: TimeRange[],
+  plan: VideoPlan,
+  durationSecs: number | undefined,
+  budget: number,
+): TimeRange[] {
+  if (
+    !plan.requiresBothRanges ||
+    plan.investigation?.timeRange !== undefined ||
+    plan.kinds.includes('outcome') ||
+    !durationSecs ||
+    !Number.isFinite(durationSecs) ||
+    durationSecs <= 0 ||
+    budget < 2 ||
+    selected.length === 0
+  ) {
+    return selected;
+  }
+  const mid = durationSecs / 2;
+  const isEarly = (range: TimeRange) => range.startSecs < mid;
+  // Already covers both halves -- the comparison can see both states.
+  if (selected.some(isEarly) && selected.some((range) => !isEarly(range))) return selected;
+  const haveEarly = selected.some(isEarly);
+  const fromMissingSide = pool
+    .filter((range) => (haveEarly ? !isEarly(range) : isEarly(range)))
+    // Prefer the window farthest from the cluster: the opposite extreme is the
+    // likeliest place the paired state lives.
+    .sort((left, right) =>
+      haveEarly ? right.startSecs - left.startSecs : left.startSecs - right.startSecs,
+    )[0];
+  // Both states may occur in one local scene. A missing indexed anchor
+  // does not justify replacing it with an unrelated opening or ending.
+  if (!fromMissingSide) return selected;
+  const opposite = fromMissingSide;
+  // Keep the strongest clustered windows and give one look to the missing side.
+  return uniqueRanges([...selected.slice(0, Math.max(1, budget - 1)), opposite]).slice(0, budget);
 }
 
 function directiveTimeRange(
@@ -2547,6 +2682,7 @@ function answeringRule(
   assessment: EvidenceAssessment,
   plan: VideoPlan,
   analysisUnavailable?: string,
+  deliveredBySourceWideRead = false,
 ) {
   const hasTrail = assessment.corroborating.length >= CORROBORATION_FLOOR;
   if (
@@ -2578,6 +2714,14 @@ function answeringRule(
     // explicit about how far it goes.
     return 'No single observation states this outright, which is expected for a claim of this shape. Read across the returned observations in time order and give the answer they lead to, with the timestamps it rests on and how confident you are. Do not say the source does not show this -- say what the observations establish and where they stop short.';
   }
+  if (!assessment.sufficient && deliveredBySourceWideRead) {
+    // Targeted retrieval returned nothing usable, so the evidence is a broad
+    // read across the whole source. That the index holds material does not make
+    // it answer the question -- so the reader weighs it rather than being told
+    // to abstain outright. This sits after the identity and attribute guards so
+    // those stronger constraints still govern who a detail may be attached to.
+    return 'Targeted retrieval returned nothing matching the question, so these are a broad read of the index across the whole source rather than question-scoped hits. Judge whether they actually answer the question. If they do, give the best-supported answer with the timestamps it rests on and how confident you are -- for an overall topic weigh what recurs across the source, for a specific detail use the observations of the requested moment. If they only touch the topic without settling it, say what they establish and what remains unshown. Do not treat a record as the answer merely because it was indexed, and do not report the source as silent when it was not read.';
+  }
   if (!assessment.sufficient) {
     return 'The returned evidence does not settle this. Say which part is established and which part the source did not show, rather than inferring the rest.';
   }
@@ -2586,8 +2730,16 @@ function answeringRule(
       return 'These are the frame-grounded visible-subject observations retained across the source. Include every returned named and unnamed subject with its observed times. The list is complete for the active observation ledger, but sampled intervals do not prove that nobody appeared between observations; never turn an omitted or unsampled moment into an absence claim.';
     }
     return plan.kinds.includes('state-change')
-      ? 'These are timestamped source observations selected across the video. Give the account in their order, keep their timestamps for specific claims, and say where the source is silent rather than filling the gap.'
+      ? 'These are timestamped source observations selected across the video. Give the account in their order, keep their timestamps for specific claims, and say where the source is silent rather than filling the gap. When the question asks for an order, read what it asks is being ordered: if it asks when each thing is introduced, presented, or mentioned, rank by the timestamp of its FIRST mention, not by where it is later explained in most depth or repeated, so a brief early mention precedes a detailed later treatment; if it asks the order in which events happen or occur, rank by when each occurs on the source clock, and note that something being spoken about is not the same as it occurring.'
       : 'The evidence is distributed across the source. Synthesize the requested complete list or overview, deduplicate repeated items, preserve timestamps for specific claims, and state any explicit coverage limitation without exposing the evidence-gathering process.';
+  }
+  if (plan.kinds.includes('visual-fact') || plan.kinds.includes('exact-ocr')) {
+    // Precision questions -- a colour, a worn item, on-screen text, which of
+    // two objects is present -- are settled by what the frame shows, not by
+    // what is said. Reading the attribute off the narration, or off a frame
+    // adjacent to the asked-for moment, is the recurring cause of hat/glasses,
+    // colour, and pattern errors.
+    return 'This is a visual detail. Read the asked-for attribute -- colour, worn item, on-screen text, pattern, or which object is present -- directly off the observations of the requested moment, not from what is spoken: narration mentioning something does not fix its on-screen appearance. Where readings of the same moment disagree, prefer the detail that recurs across them and the nearest on-screen label or text. Give the specific observed value rather than a category, and say plainly if the moment does not show it clearly instead of guessing the most likely option.';
   }
   return 'Answer only from the returned source evidence.';
 }
@@ -2825,6 +2977,7 @@ function answerEstablishedHits(
   const accounts = fromWatching.filter(isAccountOfMoment);
   if (accounts.length > 0)
     return [...accounts, ...fromWatching.filter((hit) => !isAccountOfMoment(hit))];
+  if (plan.investigation?.goal === 'resolve') return [];
   // Direct source observations already materialized during indexing should
   // answer straightforward speech, visible-text, and visual-fact questions
   // immediately. Aggregates, comparisons, identity attribution, and

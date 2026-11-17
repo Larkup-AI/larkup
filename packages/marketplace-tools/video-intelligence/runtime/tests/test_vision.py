@@ -366,6 +366,54 @@ class GatewayResponseParsingTests(unittest.TestCase):
         # The deadline is sized to the single frame this batch sends.
         self.assertEqual(post.call_args.kwargs["timeout_secs"], _timeout_for_images(1))
 
+    def test_native_schema_complexity_retries_json_once_and_preserves_clip_validation(self) -> None:
+        for interactions in (False, True):
+            with self.subTest(interactions=interactions), patch.dict("os.environ", {
+                "LARKUP_VIDEO_VISION_API_KEY": "fixture-key",
+                "LARKUP_VIDEO_SEMANTIC_VISION_MODEL": "gemini-3.6-flash",
+                "LARKUP_VIDEO_GOOGLE_USE_INTERACTIONS_API": str(interactions).lower(),
+            }, clear=True):
+                client = GeminiVisionClient()
+                rejected = Mock(ok=False, status_code=400, text="The specified schema produces a constraint that has too many states for serving")
+                recovered = Mock(ok=True, status_code=200)
+                text = '{"clips":[{"clipIndex":0,"summary":"A silver handle is visible."}]}'
+                recovered.json.return_value = ({"steps": [{"type": "model_output", "content": [{"type": "text", "text": text}]}]}
+                    if interactions else {"candidates": [{"content": {"parts": [{"text": text}]}}]})
+                clip = ClipCaptionRequest("fixture", 2000, 4000, [(3000, np.zeros((10, 10, 3), dtype=np.uint8))])
+                with patch("app.services.vision._post_with_retry", side_effect=[rejected, recovered]) as post:
+                    result = client._describe_batch([clip], "", [])
+                self.assertIn("fixture", result)
+                self.assertEqual(post.call_count, 2)
+                first, second = [call.args[3] for call in post.call_args_list]
+                self.assertEqual(first.get("input", first.get("contents")), second.get("input", second.get("contents")))
+                if interactions:
+                    self.assertIn("schema", first["response_format"])
+                    self.assertNotIn("schema", second["response_format"])
+                else:
+                    self.assertIn("responseSchema", first["generationConfig"])
+                    self.assertNotIn("responseSchema", second["generationConfig"])
+                    self.assertEqual(second["generationConfig"]["responseMimeType"], "application/json")
+
+    def test_native_rejected_thinking_level_and_schema_are_each_adapted_once(self) -> None:
+        with patch.dict("os.environ", {"LARKUP_VIDEO_VISION_API_KEY": "fixture-key",
+            "LARKUP_VIDEO_SEMANTIC_VISION_MODEL": "gemini-3.6-flash",
+            "LARKUP_VIDEO_GOOGLE_USE_INTERACTIONS_API": "false"}, clear=True):
+            client = GeminiVisionClient()
+            thinking = Mock(ok=False, status_code=400, text="Thinking level MINIMAL is not supported for this model")
+            schema = Mock(ok=False, status_code=400, text="The specified schema produces a constraint that has too many states for serving")
+            recovered = Mock(ok=True, status_code=200)
+            recovered.json.return_value = {"candidates": [{"content": {"parts": [{"text": '{"clips":[{"clipIndex":0,"summary":"A dial is visible."}]}'}]}}]}
+            clip = ClipCaptionRequest("fixture", 2000, 4000, [(3000, np.zeros((10, 10, 3), dtype=np.uint8))])
+            with patch("app.services.vision._post_with_retry", side_effect=[thinking, schema, recovered]) as post:
+                result = client._describe_batch([clip], "", [])
+            self.assertIn("fixture", result)
+            self.assertEqual(post.call_count, 3)
+            configs = [call.args[3]["generationConfig"] for call in post.call_args_list]
+            self.assertIn("thinkingConfig", configs[0])
+            self.assertNotIn("thinkingConfig", configs[1])
+            self.assertIn("responseSchema", configs[1])
+            self.assertNotIn("responseSchema", configs[2])
+
     def test_native_gemini_25_bulk_reader_disables_hidden_thinking(self) -> None:
         with patch.dict(
             "os.environ",

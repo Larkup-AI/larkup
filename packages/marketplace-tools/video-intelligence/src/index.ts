@@ -29,7 +29,7 @@ export const TOOL_META = {
 /** Managed infrastructure stays an implementation detail of Larkup Cloud. */
 const MANAGED_CLOUD_ENDPOINT =
   process.env.LARKUP_VIDEO_INTELLIGENCE_CLOUD_ENDPOINT ??
-  'https://7w1bab08jf.execute-api.eu-central-1.amazonaws.com';
+  'https://1vcjmwx9ha.execute-api.eu-central-1.amazonaws.com';
 
 export const TOOL_EXTENSION = {
   id: TOOL_META.id,

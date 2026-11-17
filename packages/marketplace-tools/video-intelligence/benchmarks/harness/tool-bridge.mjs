@@ -39,7 +39,7 @@ export async function execute(input) {
     trackUsage: async (event) => ({ ...event, id: randomUUID() }),
   };
   const actions = [];
-  const runtime = new VideoIntelligenceClient({ mode: 'custom-remote', endpoint: input.runtimeEndpoint, apiKey: input.runtimeToken });
+  const runtime = new VideoIntelligenceClient({ mode: input.runtimeMode ?? 'custom-remote', endpoint: input.runtimeEndpoint, apiKey: input.runtimeToken });
   return runWithWorkspaceHost(host, async () => {
     const revision = await createVideoKnowledgeRevision({ mediaAssetId: input.sourceId,
       sourceFingerprint: input.evidencePath, pipelineVersion: 'canonical-benchmark-v1',
@@ -52,7 +52,8 @@ export async function execute(input) {
       activeProjectionIds: [], activationReason: 'initial' });
     await updateVideoKnowledgeRevision(revision.id, { status: 'completed' });
     let inspections = 0;
-    const fetcher = async (url, options) => {
+    let readbackCompleted = false;
+    const inspect = async (url, options) => {
       const parsed = new URL(url);
       if (parsed.origin !== 'http://127.0.0.1:8892' || parsed.pathname !== '/api/media/inspect') throw Error('UNSUPPORTED_PRIVATE_OPERATION');
       const request = JSON.parse(options.body);
@@ -67,15 +68,22 @@ export async function execute(input) {
       try { saved = JSON.parse(await readFile(checkpoint, 'utf8')); } catch {}
       const key = `${request.startSecs}:${request.endSecs}`;
       let jobId = saved[key]?.jobId;
+      if (!jobId && input.reconcileOnly) {
+        actions.push({ action: 'inspectionReadbackUnavailable' });
+        return Response.json({ error: 'Read-back cannot submit a new inspection.' }, { status: 503 });
+      }
       if (!jobId) {
         // An explicit unknown fence survives a crash between submit and handle persistence.
         if (saved[key]?.submitted) throw Error('REMOTE_OUTCOME_UNKNOWN');
         saved[key] = { submitted: true };
         await save(checkpoint, saved);
-        const job = await runtime.submitJob({ source: { uploadId },
+        const job = await runtime.submitJob({ source: { uploadId,
+          ...(input.runtimeMode === 'managed-cloud' ? { durationSecs: request.endSecs - request.startSecs,
+            timelineDurationSecs: raw.durationMs / 1000 } : {}) },
           ...(!input.proxyMode ? { modelConfiguration: Object.fromEntries(Object.entries(input.roles).map(([role, spec]) => [role,
             { provider: spec.provider, model: spec.model, apiKey: spec.apiKey }])) } : {}),
           brief: { indexingMode: 'thorough', processingAuthorityConfirmed: true, retainSourceHours: 24,
+            goal: request.question, expectedQuestions: [request.question],
             importantRanges: [{ startSecs: request.startSecs, endSecs: request.endSecs, reason: request.question }],
             interactive: true, requireSemanticVision: true, skipVideoEmbeddings: true,
             skipTranscription: input.proxyMode || !request.includeSpeech,
@@ -92,12 +100,26 @@ export async function execute(input) {
         if (job.status === 'completed' && job.result) {
           const evidence = evidenceInputs(job.result);
           await appendVideoKnowledgeRefinement({ mediaAssetId: input.sourceId, evidence });
+          readbackCompleted = true;
           return Response.json({ evidence: evidence.map((x) => ({ ...x, id: randomUUID() })), jobId });
         }
         if (['failed', 'cancelled'].includes(job.status)) return Response.json({ error: 'Inspection failed.' }, { status: 503 });
         await new Promise((r) => setTimeout(r, 1000));
       }
+      actions.push({ action: 'inspectionPending', jobId });
       return Response.json({ error: 'Inspection still processing; outcome requires reconciliation.', jobId }, { status: 503 });
+    };
+    const fetcher = async (url, options) => {
+      try {
+        const response = await inspect(url, options);
+        if (!response.ok && !actions.some((a) => a.action === 'inspectionPending' || a.action === 'inspectionReadbackUnavailable')) {
+          actions.push({ action: 'inspectionFailed', status: response.status });
+        }
+        return response;
+      } catch {
+        actions.push({ action: 'inspectionFailed' });
+        return Response.json({ error: 'Runtime inspection failed; not a correctness result.' }, { status: 503 });
+      }
     };
     const client = attachVideoIntelligenceAgentClient(runtime, fetcher);
     const context = { origin: 'http://127.0.0.1:8892', projectId: 'isolated-video-benchmark', mediaEvidence: {
@@ -119,11 +141,14 @@ export async function execute(input) {
     const collected = await collectEvidencePages(async (cursor) => {
       actions.push({ action: 'queryVideoEvidence', cursor: cursor ?? 0 });
       return client.queryVideoEvidence({ mediaAssetId: input.sourceId,
-        query: input.retrievalQuery ?? input.question.question, ...(input.investigation ? { investigation: input.investigation } : {}),
+        query: input.question.question, ...(input.investigation ? { investigation: input.investigation } : {}),
         limit: 48, ...(cursor !== undefined ? { cursor } : {}) }, context);
     }, { maxPages: input.protocol.maxEvidencePages ?? 64 });
     if (actions.some((action) => action.action === 'canonicalReWatchFailed')) return { ...collected, success: false, toolExecutionValid: false, error: 'Canonical re-watch incomplete; reconcile saved requests before retry.', actions };
-    return { ...collected, actions };
+    if (actions.some((action) => action.action === 'inspectionFailed' || action.action === 'inspectionPending' || (action.action === 'inspectionReadbackUnavailable' && !readbackCompleted))) {
+      return { ...collected, success: false, toolExecutionValid: false, actions };
+    }
+    return { ...collected, actions, readbackCompleted };
   });
 }
 

@@ -537,6 +537,43 @@ describe('Video Intelligence chat extension', () => {
     expect(ranges.some((range) => Math.abs(range.startSecs - 2_992.1) < 0.01)).toBe(true);
   });
 
+  it('inspects both sides of a paired-state comparison instead of clustering on the higher-ranked side', async () => {
+    // A "what changed from state X to state Y" question separates two moments in
+    // time. Retrieval here ranks the later state far higher, so without forcing a
+    // straddle the whole budget is spent late and the earlier state is never
+    // watched -- the change cannot be seen and the turn abstains. The chosen
+    // windows must cover both halves of the source. Labels are deliberately
+    // generic; the rule is a timeline property, not a fact about any recording.
+    const reWatch = vi.fn(async () => []);
+    await agentClient(vi.fn() as any).queryVideoEvidence(
+      {
+        mediaAssetId: 'media-1',
+        query: 'What changes about the prop when the banner switches?',
+        investigation: { scope: 'temporal', goal: 'compare' },
+      },
+      evidenceContext({
+        durationSecs: 3_000,
+        plan: {
+          kinds: ['comparison'],
+          requiresBothRanges: true,
+          requiresInspectionWhenInsufficient: true,
+        },
+        // Three strongly-ranked later moments, then one lower-ranked earlier one.
+        search: () => [
+          hit('later-a', 2_400, 'A later segment that resembles the question wording.'),
+          hit('later-b', 2_480, 'Another later segment with similar wording.'),
+          hit('later-c', 2_560, 'A third later segment with similar wording.'),
+          hit('earlier', 760, 'The earlier state, ranked lower by resemblance.'),
+        ],
+        reWatch,
+      }),
+    );
+
+    const ranges = reWatch.mock.calls[0][2] as Array<{ startSecs: number; endSecs: number }>;
+    expect(ranges.some((range) => range.startSecs < 1_500)).toBe(true);
+    expect(ranges.some((range) => range.startSecs >= 1_500)).toBe(true);
+  });
+
   it('falls back to the dispatched inspection when the source cannot be re-watched', async () => {
     const fetcher = vi.fn(async () =>
       Response.json({ evidence: [{ id: 'fresh' }], status: 'completed' }),
@@ -898,6 +935,188 @@ describe('Video Intelligence chat extension', () => {
     expect(result.claimVerification.directlyEstablished).toBe(false);
     expect(result.claimVerification.rule).toMatch(/did not show/i);
     expect(result.ui).toBeUndefined();
+  });
+
+  // The defect this covers: targeted retrieval returned nothing because the
+  // question shares no wording with how the source was indexed, so the tool
+  // declared the source silent and hard-failed -- the reader never saw the
+  // transcript that was sitting in the index. A broad thematic question must
+  // fall back to a source-wide read and deliver what was indexed.
+  it('falls back to a source-wide index read when targeted retrieval is empty', async () => {
+    // The closer-look service is unavailable for this turn.
+    const fetcher = vi.fn(async () => Response.json({ error: 'busy' }, { status: 503 })) as any;
+
+    const result = (await agentClient(fetcher).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'What is the speaker mainly arguing for?' },
+      evidenceContext({
+        durationSecs: 2_400,
+        plan: { kinds: ['direct-speech'], requiresInspectionWhenInsufficient: true },
+        // The ranked/scoped query finds nothing; the index itself is full.
+        search: (query) =>
+          query.trim().length > 0
+            ? []
+            : [
+                hit('open', 60, 'The speaker introduces the measurement problem.', {
+                  modality: 'transcript',
+                }),
+                hit('body', 900, 'The speaker argues the method must be reproducible.', {
+                  modality: 'transcript',
+                }),
+                hit('close', 2_100, 'The speaker concludes reproducibility is the main point.', {
+                  modality: 'transcript',
+                }),
+              ],
+      }),
+    )) as any;
+
+    // The tool must succeed and hand the indexed material to the reader rather
+    // than reporting that it could not establish any evidence, and must not
+    // tell the reader to abstain or report the source silent.
+    expect(result.success).toBe(true);
+    expect(result.evidence.length).toBeGreaterThan(0);
+    expect(result.evidence.map((item: any) => item.id)).toContain('body');
+    expect(result.claimVerification.rule).not.toMatch(/did not show|does not settle/i);
+  });
+
+  // Companion to the fallback: when the broad read still does not formally
+  // certify the claim (its wording is unlike the question, as across
+  // languages), the verdict must invite synthesis of the best-supported
+  // answer, not the blanket "the evidence does not settle this" that made the
+  // reader abstain on an indexed source.
+  it('directs synthesis, not abstention, when only the source-wide read has evidence', async () => {
+    const result = (await agentClient(vi.fn() as any).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'What is the overarching lesson of this talk?' },
+      evidenceContext({
+        durationSecs: 1_800,
+        // No inspection, so the verdict comes straight from the delivered read.
+        plan: { kinds: ['direct-speech'], requiresInspectionWhenInsufficient: false },
+        // Thematically on point but lexically unlike the question, so no single
+        // record is certified as the direct answer.
+        search: (query) =>
+          query.trim().length > 0
+            ? []
+            : [
+                hit('a', 120, 'A gardener tends seedlings before dawn.', {
+                  modality: 'transcript',
+                }),
+                hit('b', 600, 'The harvest is shared with neighbours.', { modality: 'transcript' }),
+                hit('c', 1_500, 'Nothing grown alone lasts the winter.', {
+                  modality: 'transcript',
+                }),
+              ],
+      }),
+    )) as any;
+
+    expect(result.success).toBe(true);
+    expect(result.claimVerification.directlyEstablished).toBe(false);
+    // It invites a judged, best-supported answer -- not a blanket abstention,
+    // and not a claim that an indexed record is automatically the answer.
+    expect(result.claimVerification.rule).toMatch(/best-supported answer/i);
+    expect(result.claimVerification.rule).toMatch(/merely because it was indexed/i);
+    expect(result.claimVerification.rule).not.toMatch(/did not show|does not settle/i);
+  });
+
+  // The defect this covers: an ordering question was answered by ranking items
+  // on where each was explained in most depth, not where it first appeared, so
+  // a brief early mention was placed after a later detailed treatment. The
+  // verdict must tell the reader to order by first occurrence.
+  it('tells the reader to order by first occurrence for a sequence question', async () => {
+    const indexed = (id: string, atSecs: number, text: string) =>
+      hit(id, atSecs, `Indexed event: ${text}`, {
+        modality: 'computed',
+        source: { kind: 'provider', provider: 'video-intelligence-index' },
+      });
+
+    const result = (await agentClient(vi.fn() as any).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'In what order are the three ideas introduced?' },
+      evidenceContext({
+        durationSecs: 3_000,
+        plan: {
+          kinds: ['state-change'],
+          requiresBroadCoverage: true,
+          requiresInspectionWhenInsufficient: false,
+        },
+        search: () => [
+          indexed('first', 300, 'The first idea is named in passing.'),
+          indexed('second', 1_500, 'The second idea is set out.'),
+          indexed('third', 2_700, 'The third idea is examined at length.'),
+        ],
+      }),
+    )) as any;
+
+    expect(result.claimVerification.rule).toMatch(/first mention/i);
+    expect(result.claimVerification.rule).toMatch(/order/i);
+    // And it keeps the distinction the reviewer flagged: ordering by mention is
+    // only for "introduced/presented/mentioned"; event order follows occurrence.
+    expect(result.claimVerification.rule).toMatch(/occurs on the source clock/i);
+  });
+
+  // The defect this covers: a precision detail (tie colour, hat vs glasses,
+  // garment pattern) was answered from narration or a neighbouring frame. The
+  // verdict must send the reader to the frame of the asked-for moment.
+  it('tells the reader to read a visual detail off the frame, not the narration', async () => {
+    const result = (await agentClient(vi.fn() as any).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'What colour is the scarf the presenter is wearing?' },
+      evidenceContext({
+        plan: { kinds: ['visual-fact'], requiresInspectionWhenInsufficient: false },
+        search: () => [
+          directVerdict(
+            'scarf',
+            42,
+            'What colour is the scarf the presenter is wearing?',
+            'The scarf is teal.',
+          ),
+        ],
+      }),
+    )) as any;
+
+    expect(result.claimVerification.rule).toMatch(/visual detail/i);
+    expect(result.claimVerification.rule).toMatch(/spoken|narration/i);
+  });
+
+  // Reviewer note: the fallback must not fire only when retrieval is empty. If
+  // targeted retrieval returns unhelpful records, the answer-bearing one can
+  // stay ranked away from the reader. An insufficient (not just empty) targeted
+  // result must pull the source-wide read so that record can surface.
+  it('surfaces the answer-bearing record when targeted retrieval returns only unhelpful hits', async () => {
+    const result = (await agentClient(vi.fn() as any).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'What does the badge on the uniform say?' },
+      evidenceContext({
+        durationSecs: 600,
+        plan: { kinds: ['visual-fact'], requiresInspectionWhenInsufficient: false },
+        search: (query) =>
+          query.trim().length > 0
+            ? [hit('offtopic', 10, 'An unrelated wide shot of the room.', { modality: 'visual' })]
+            : [
+                hit('offtopic', 10, 'An unrelated wide shot of the room.', { modality: 'visual' }),
+                directVerdict(
+                  'badge',
+                  300,
+                  'What does the badge on the uniform say?',
+                  'It reads R-7.',
+                ),
+              ],
+      }),
+    )) as any;
+
+    expect(result.success).toBe(true);
+    expect(result.evidence.map((item: any) => item.id)).toContain('badge');
+  });
+
+  it('still fails cleanly when the index itself holds nothing for the source', async () => {
+    const fetcher = vi.fn(async () => Response.json({ error: 'busy' }, { status: 503 })) as any;
+
+    const result = (await agentClient(fetcher).queryVideoEvidence(
+      { mediaAssetId: 'media-1', query: 'What is the speaker mainly arguing for?' },
+      evidenceContext({
+        plan: { kinds: ['direct-speech'], requiresInspectionWhenInsufficient: true },
+        // Nothing was indexed for this source, so there is genuinely nothing to
+        // deliver: the source-wide fallback is empty too.
+        search: () => [],
+      }),
+    )) as any;
+
+    expect(result.success).toBe(false);
   });
 
   // The defect this covers: a conclusion is settled by reading a trail of

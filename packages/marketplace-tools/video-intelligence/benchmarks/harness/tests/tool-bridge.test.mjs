@@ -33,3 +33,70 @@ test('isolated host executes canonical querying and keeps the fixed-backbone ret
     assert.ok(baseline.evidence.length > 0);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('bounded runtime inspection receives the question as a question, not only a range reason', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'video-inspection-contract-'));
+  const originalFetch = globalThis.fetch;
+  const question = 'What symbol is engraved on the handle?';
+  let submitted;
+  let partial = false;
+  globalThis.fetch = async (url, options = {}) => {
+    if (options.method === 'POST') {
+      submitted = JSON.parse(options.body);
+      return Response.json({ id: 'fixture-job', status: 'queued' });
+    }
+    return Response.json({ id: 'fixture-job', status: 'completed', result: {
+      durationMs: 10000, transcript: [], visualObservations: [], tracks: [],
+      semanticObservations: [{ startMs: 2000, endMs: 4000, confidence: .95,
+        text: `Claim question: ${question}\nClaim verdict: ${partial ? "partial" : "direct"}\nClaim answer: A spiral is engraved on the handle.` }],
+    } });
+  };
+  try {
+    const file = path.join(dir, 'evidence.json');
+    await writeFile(file, JSON.stringify({ durationMs: 10000, transcript: [], visualObservations: [], tracks: [], semanticObservations: [] }));
+    const input = { evidencePath: file, sourceId: 'workshop', retrievalQuery: 'A navigation hint about a neighboring object.', question: { question, options: ['spiral', 'square'] },
+      investigation: { scope: 'focused', goal: 'resolve', evidence: ['visual'], timeRange: { startSecs: 2, endSecs: 4 } },
+      protocol: {}, runtimeMode: 'managed-cloud', runtimeEndpoint: 'http://fixture.test', runtimeToken: 'fixture-only', runtimeUploadId: 'fixture-upload',
+      inspectionStatePath: path.join(dir, 'inspection.json'), roles: {} };
+    const result = await execute(input);
+    assert.equal(submitted.source.durationSecs, 2);
+    assert.equal(submitted.source.timelineDurationSecs, 10);
+    assert.deepEqual(submitted.brief.expectedQuestions, [question]);
+    assert.equal(submitted.brief.goal, question);
+    assert.equal(result.pages[0].claimVerification.directlyEstablished, true);
+    submitted = undefined;
+    const readback = await execute({ ...input, reconcileOnly: true });
+    assert.equal(submitted, undefined, 'saved runtime work must not be resubmitted');
+    assert.equal(readback.pages[0].claimVerification.directlyEstablished, true);
+    const missing = await execute({ ...input, reconcileOnly: true, inspectionStatePath: path.join(dir, 'missing.json') });
+    assert.equal(submitted, undefined, 'read-back may never create a new paid job');
+    assert.equal(missing.success, false);
+    assert.equal(missing.toolExecutionValid, false);
+    partial = true;
+    const inconclusive = await execute({ ...input, reconcileOnly: true });
+    assert.equal(submitted, undefined);
+    assert.equal(inconclusive.readbackCompleted, true);
+    assert.notEqual(inconclusive.toolExecutionValid, false);
+
+
+  } finally { globalThis.fetch = originalFetch; await rm(dir, { recursive: true, force: true }); }
+});
+
+
+test('a rejected managed inspection cannot be scored as a completed evidence answer', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'video-managed-failure-'));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ error: 'Unsupported vision provider for Video Intelligence' }, { status: 400 });
+  try {
+    const file = path.join(dir, 'evidence.json');
+    await writeFile(file, JSON.stringify({ durationMs: 10000, transcript: [], visualObservations: [], tracks: [], semanticObservations: [] }));
+    const result = await execute({ evidencePath: file, sourceId: 'workshop',
+      question: { question: 'What is on the handle?', options: ['spiral', 'square'] },
+      investigation: { scope: 'focused', goal: 'resolve', evidence: ['visual'], timeRange: { startSecs: 2, endSecs: 4 } },
+      protocol: {}, runtimeMode: 'managed-cloud', runtimeEndpoint: 'http://fixture.test', runtimeToken: 'fixture-only',
+      runtimeUploadId: 'fixture-upload', inspectionStatePath: path.join(dir, 'inspection.json'), roles: {} });
+    assert.equal(result.success, false);
+    assert.equal(result.toolExecutionValid, false);
+    assert.ok(result.actions.some((a) => a.action === 'inspectionFailed'));
+  } finally { globalThis.fetch = originalFetch; await rm(dir, { recursive: true, force: true }); }
+});

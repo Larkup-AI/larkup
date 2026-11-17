@@ -406,6 +406,14 @@ def _build_prompt(
         )
     if questions:
         prompt += " Questions to resolve: " + " | ".join(questions[:4])[:1600] + "."
+        prompt += (
+            " Resolve the exact subject specified by every qualifier in the question: its action, "
+            "position, appearance and source moment. When neighboring subjects share a role or "
+            "category, describe each separately and bind the requested property to the one performing "
+            "the specified action; do not merge their attributes into a group answer. For a singular "
+            "target, claimVerdict is direct only when that subject-to-property binding is visible. "
+            "If the target remains ambiguous, state which candidates have which properties and use partial."
+        )
     if known_entities:
         prompt += (
             " Continuity candidates from earlier clips: "
@@ -1397,6 +1405,39 @@ class GeminiVisionClient(GatewayVisionClient):
                         max_output_tokens,
                         reasoning_effort,
                     )
+                return {}
+        for _ in range(2):
+            if response.status_code != 400:
+                break
+            error_text = str(response.text).casefold()
+            config_key = "generation_config" if use_interactions else "generationConfig"
+            config = dict(payload[config_key])
+            schema_rejected = "schema" in error_text and any(reason in error_text for reason in (
+                "too many states", "schema is too complex", "schema complexity",
+            ))
+            thinking_rejected = "thinking level" in error_text and "not supported" in error_text
+            if schema_rejected and use_interactions and "schema" in payload["response_format"]:
+                payload = {**payload, "response_format": {
+                    key: value for key, value in payload["response_format"].items() if key != "schema"
+                }}
+            elif schema_rejected and "responseSchema" in config:
+                config.pop("responseSchema")
+                payload = {**payload, config_key: config}
+            elif thinking_rejected and ("thinking_level" if use_interactions else "thinkingConfig") in config:
+                config.pop("thinking_level" if use_interactions else "thinkingConfig")
+                payload = {**payload, config_key: config}
+            else:
+                break
+            # Adapt only an explicitly rejected provider option, once per option.
+            # The same images, JSON output, and local evidence validation remain.
+            self.limiter.acquire()
+            try:
+                response = _post_with_retry(
+                    self._session(), request_url, headers, payload,
+                    attempts=1, timeout_secs=request_timeout,
+                )
+            except RuntimeError as error:
+                self.last_error = str(error)[:500]
                 return {}
         if not response.ok:
             self._record_http_error("Gemini", response)
