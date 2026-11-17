@@ -426,7 +426,7 @@ print(json.dumps(dict(revision=revision,running=running,active=active,privateRea
         code = """import pathlib,tarfile,sys
 b=pathlib.Path(sys.argv[1])
 with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
- for name in ['data/artifacts','data/runtime','results']:
+ for name in ['data/artifacts','data/runtime','data/runs','results']:
   p=b/name
   if p.exists():a.add(p,arcname=name,recursive=True)
  for name in ['controller.log','runtime.log','bootstrap.log']:
@@ -471,7 +471,10 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as a:
             try:capture_checkpoint(self)
             except DomainError as error:
                 if error.code!='RECOVERY_CHECKPOINT_UNSAFE':raise
-        return {'backup': 'verified', 'at': utc()}
+        from .recovery_contract import evidence_closure
+        evidence = evidence_closure(self.data / 'state/remote-backup.sqlite3', self.data)
+        return {'backup': 'verified' if evidence['status'] == 'verified' else 'partial',
+                'database': 'verified', 'evidence': evidence, 'at': utc()}
 
     def api_items(self, path):
         from urllib.parse import urlencode

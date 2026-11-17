@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .common import Secrets, atomic
 from .main import BENCHMARK, initialize
+from .recovery_contract import runtime_command
 
 
 def main():
@@ -55,7 +56,7 @@ def main():
         stopping = threading.Event()
         for sig in (signal.SIGTERM, signal.SIGINT):
             signal.signal(sig, lambda *_: stopping.set())
-        runtime = subprocess.Popen([sys.executable, '-m', 'app'], cwd=BENCHMARK.parent / 'runtime',
+        runtime = subprocess.Popen(runtime_command(sys.executable, env), cwd=BENCHMARK.parent / 'runtime',
                                    env=env, stdout=runtime_log, stderr=subprocess.STDOUT)
         controller = subprocess.Popen([sys.executable, '-m', 'harness.main', 'serve'], cwd=BENCHMARK,
                                       env={**os.environ}, stdout=controller_log, stderr=subprocess.STDOUT)
